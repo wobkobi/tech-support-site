@@ -1,0 +1,48 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum BookingStatus {
+  held
+  confirmed
+  cancelled
+}
+
+model Resource {
+  id       String    @id @default(cuid())
+  name     String
+  bookings Booking[]
+
+  @@unique([name])
+}
+
+model Booking {
+  id         String   @id @default(cuid())
+  resourceId String
+  resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  email String
+  name  String
+
+  startUtc DateTime @db.Timestamptz(6)
+  endUtc   DateTime @db.Timestamptz(6)
+
+  bufferBeforeMin Int @default(0)
+  bufferAfterMin  Int @default(0)
+
+  status         BookingStatus @default(held)
+  holdExpiresUtc DateTime?     @db.Timestamptz(6)
+  cancelToken    String        @unique
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  @@index([resourceId, startUtc, endUtc])
+  @@index([status, holdExpiresUtc])
+}
