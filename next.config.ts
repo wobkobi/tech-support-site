@@ -51,7 +51,7 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ["react-icons"],
   },
-  serverExternalPackages: ["nodemailer", "tailwind-merge"],
+  serverExternalPackages: ["nodemailer"],
 } satisfies NextConfig;
 
 const withBundleAnalyzer = bundleAnalyzer({

@@ -6,6 +6,7 @@
  */
 
 "use client";
+import { cn } from "@/lib/cn";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { JSX } from "react";
@@ -28,17 +29,18 @@ export default function NavBar(): JSX.Element {
   const isActive = (href: string): boolean => pathname === href;
 
   return (
-    <nav className="bg-russian-violet py-5 md:py-6">
-      <ul className="mx-auto flex max-w-4xl justify-around">
+    <nav className={cn("bg-russian-violet py-5 md:py-6")}>
+      <ul className={cn("mx-auto flex max-w-4xl justify-around")}>
         {navItems.map((item) => (
-          <li key={item.href} className="flex-1 text-center">
+          <li key={item.href} className={cn("flex-1 text-center")}>
             <Link
               href={item.href}
-              className={`block px-5 py-3 text-2xl tracking-tight md:text-3xl ${
+              className={cn(
+                "block px-5 py-3 text-2xl tracking-tight md:text-3xl",
                 isActive(item.href)
                   ? "text-coquelicot-500 font-bold"
                   : "text-seasalt-900 hover:text-coquelicot-400 dark:text-seasalt-600 dark:hover:text-coquelicot-400"
-              }`}>
+              )}>
               {item.name}
             </Link>
           </li>
