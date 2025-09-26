@@ -4,6 +4,7 @@
  * @description
  * Root layout for the App Router. Injects global styles and persistent UI like the taskbar.
  */
+import { Analytics } from "@vercel/analytics/next";
 import { Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
@@ -62,6 +63,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         {/* <NavBar /> */}
         {children}
+        <Analytics />
       </body>
     </html>
   );
