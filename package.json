@@ -6,7 +6,7 @@
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
-    "lint": "eslint \"src/app/**/*.{js,ts,jsx,tsx}\" \"src/components/**/*.{js,ts,jsx,tsx}\"",
+    "lint": "eslint \"src/*.{js,ts,jsx,tsx}\" ",
     "prepare": "husky"
   },
   "dependencies": {
