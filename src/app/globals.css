@@ -2,7 +2,7 @@
 /**
 * @file globals.css
 * @description
-* Tailwind v4 global styles with tokenised colours/fonts via @theme. No dark mode.
+* Tailwind v4 global styles with tokenised colours/fonts via @theme.
 */
 @import "tailwindcss";
 
