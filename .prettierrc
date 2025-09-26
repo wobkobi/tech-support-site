@@ -1,0 +1,13 @@
+{
+  "tailwindConfig": "./tailwind.config.js",
+  "plugins": [
+    "prettier-plugin-organize-imports",
+    "prettier-plugin-tailwindcss"
+  ],
+  "tailwindFunctions": ["clsx"],
+  "bracketSameLine": true,
+  "trailingComma": "es5",
+  "semi": true,
+  "singleQuote": false,
+  "endOfLine": "lf"
+}
