@@ -4,7 +4,7 @@
  * @description
  * Root layout for the App Router. Injects global styles and persistent UI like the taskbar.
  */
-import NavBar from "@/components/NavBar";
+import { Analytics } from "@vercel/analytics/next";
 import { Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
@@ -20,12 +20,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "site nanme goes here",
+  title: "To the Point Tech",
   description: "site description goes here",
-  authors: [{ name: "author name goes here" }],
-  keywords: ["keyword1", "keyword2", "keyword3"],
+  authors: [{ name: "Harrison Raynes" }],
+  keywords: ["Tech Support", "keyword2", "keyword3"],
   openGraph: {
-    title: "site name goes here",
+    title: "To the Point Tech",
     description: "site description goes here",
     url: "https://www.yoursiteurl.com",
     locale: "en_NZ",
@@ -59,9 +59,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
+        suppressHydrationWarning
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <NavBar />
+        {/* <NavBar /> */}
         {children}
+        <Analytics />
       </body>
     </html>
   );

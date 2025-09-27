@@ -1,49 +1,140 @@
 /* src/app/globals.css */
 /**
- * @file globals.css
- * @description
- * Tailwind v4 global styles with tokenized colors/fonts via @theme.
- */
+* @file globals.css
+* @description
+* Tailwind v4 global styles with tokenised colours/fonts via @theme.
+*/
 @import "tailwindcss";
 
-/* Prefer the OS color scheme; expose tokens */
-:root {
-  color-scheme: light dark;
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-/* Tailwind v4 tokens */
+/* Design tokens */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
   --font-sans:
     var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, Segoe UI,
-    Roboto, Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+    Roboto, "Noto Sans", Arial, "Apple Color Emoji", "Segoe UI Emoji";
   --font-mono:
     var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco,
     Consolas, "Liberation Mono", "Courier New";
+
+  /* rich-black */
+  --color-rich-black: #001514;
+  --color-rich-black-100: #000404;
+  --color-rich-black-200: #000808;
+  --color-rich-black-300: #000c0c;
+  --color-rich-black-400: #001010;
+  --color-rich-black-500: #001514;
+  --color-rich-black-600: #007670;
+  --color-rich-black-700: #00d8cd;
+  --color-rich-black-800: #3bfff5;
+  --color-rich-black-900: #9dfffa;
+
+  /* seasalt */
+  --color-seasalt: #f6f7f8;
+  --color-seasalt-100: #2c3137;
+  --color-seasalt-200: #57636f;
+  --color-seasalt-300: #8894a1;
+  --color-seasalt-400: #bfc6cd;
+  --color-seasalt-500: #f6f7f8;
+  --color-seasalt-600: #f8f9fa;
+  --color-seasalt-700: #fafafb;
+  --color-seasalt-800: #fcfcfc;
+  --color-seasalt-900: #fdfdfe;
+
+  /* coquelicot */
+  --color-coquelicot: #f34213;
+  --color-coquelicot-100: #310d03;
+  --color-coquelicot-200: #631905;
+  --color-coquelicot-300: #942608;
+  --color-coquelicot-400: #c6330a;
+  --color-coquelicot-500: #f34213;
+  --color-coquelicot-600: #f56841;
+  --color-coquelicot-700: #f88e71;
+  --color-coquelicot-800: #fab4a0;
+  --color-coquelicot-900: #fdd9d0;
+
+  /* russian-violet */
+  --color-russian-violet: #0c0a3e;
+  --color-russian-violet-100: #02020c;
+  --color-russian-violet-200: #050419;
+  --color-russian-violet-300: #070625;
+  --color-russian-violet-400: #090831;
+  --color-russian-violet-500: #0c0a3e;
+  --color-russian-violet-600: #1a1689;
+  --color-russian-violet-700: #2823d4;
+  --color-russian-violet-800: #6c68e6;
+  --color-russian-violet-900: #b6b4f3;
+
+  /* mustard */
+  --color-mustard: #fed766;
+  --color-mustard-100: #473500;
+  --color-mustard-200: #8e6b01;
+  --color-mustard-300: #d5a001;
+  --color-mustard-400: #fec620;
+  --color-mustard-500: #fed766;
+  --color-mustard-600: #fee085;
+  --color-mustard-700: #ffe8a4;
+  --color-mustard-800: #fff0c2;
+  --color-mustard-900: #fff7e1;
+
+  /* moonstone */
+  --color-moonstone: #43bccd;
+  --color-moonstone-100: #0b272b;
+  --color-moonstone-200: #174e55;
+  --color-moonstone-300: #227580;
+  --color-moonstone-400: #2d9cab;
+  --color-moonstone-500: #43bccd;
+  --color-moonstone-600: #68cad7;
+  --color-moonstone-700: #8dd7e1;
+  --color-moonstone-800: #b3e4eb;
+  --color-moonstone-900: #d9f2f5;
 }
 
-/* Dark scheme overrides */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Fixed light theme: seasalt on rich-black text */
+:root {
+  --color-background: var(--color-seasalt);
+  --color-foreground: #171717;
 }
 
-/* Base element defaults; use tokens */
+/* Base */
 html,
 body {
   height: 100%;
 }
 
 body {
+  margin: 0;
   background-color: var(--color-background);
   color: var(--color-foreground);
   font-family: var(--font-sans);
-  margin: 0;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Focus ring */
+:where(:focus-visible) {
+  outline: 2px solid color-mix(in oklab, var(--color-moonstone-500) 70%, white);
+  outline-offset: 2px;
+}
+
+/* Selection */
+::selection {
+  background: color-mix(in oklab, var(--color-coquelicot-500) 30%, transparent);
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Minimal prose helpers */
+.prose :where(h1, h2, h3) {
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+.prose :where(p, li) {
+  line-height: 1.7;
 }
