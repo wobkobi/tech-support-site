@@ -129,12 +129,6 @@ body {
   }
 }
 
-img[aria-hidden],
-svg[aria-hidden] {
-  user-select: none;
-  -webkit-user-drag: none;
-}
-
 /* Minimal prose helpers */
 .prose :where(h1, h2, h3) {
   line-height: 1.2;

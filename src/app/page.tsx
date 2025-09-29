@@ -156,11 +156,17 @@ export default function Home(): React.ReactElement {
                   )}>
                   <span
                     className={cn(
-                      "bg-moonstone-600/20 text-moonstone-600 pointer-events-none grid size-10 place-items-center rounded-md select-none sm:size-12"
+                      "bg-moonstone-600/20 text-moonstone-600 grid size-10 place-items-center rounded-md select-none sm:size-12"
                     )}>
-                    <Icon className={cn("h-6 w-6 select-none")} aria-hidden />
+                    <Icon
+                      className={cn("h-6 w-6 select-none sm:h-7 sm:w-7")}
+                      aria-hidden
+                    />
                   </span>
-                  <span className={cn("text-rich-black text-base sm:text-lg")}>
+                  <span
+                    className={cn(
+                      "text-rich-black min-w-0 text-base break-words sm:text-lg"
+                    )}>
                     {label}
                   </span>
                 </li>
