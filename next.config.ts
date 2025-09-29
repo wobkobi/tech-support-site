@@ -6,11 +6,12 @@ const isDev = process.env.NODE_ENV !== "production";
 
 const cspProd =
   "default-src 'self'; " +
-  "script-src 'self'; " +
+  "script-src 'self' 'unsafe-inline' blob:; " + // allow inline + blob for Next runtime
   "style-src 'self' 'unsafe-inline'; " +
-  "img-src 'self' data:; " +
+  "img-src 'self' data: blob:; " +
   "font-src 'self' data:; " +
-  "connect-src 'self'; " +
+  "connect-src 'self' https:; " + // SSR/data fetch, SSG revalidate, analytics if any
+  "worker-src 'self' blob:; " + // turbopack/route workers
   "frame-ancestors 'none'; " +
   "base-uri 'self'; " +
   "form-action 'self';";
