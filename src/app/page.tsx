@@ -48,14 +48,19 @@ export default function Home(): React.ReactElement {
   return (
     <main className={cn("relative min-h-dvh overflow-hidden")}>
       {/* Backdrop*/}
-      <div className={cn("absolute inset-0 -z-10 overflow-hidden")}>
+      <div
+        className={cn(
+          "pointer-events-none absolute inset-0 -z-10 overflow-hidden select-none"
+        )}>
         <Image
           src="/backdrop.jpg"
           alt=""
           fill
           priority
           sizes="100vw"
-          className={cn("scale-110 transform-gpu object-cover blur")}
+          className={cn(
+            "scale-110 transform-gpu object-cover blur-xl select-none"
+          )}
         />
       </div>
 
@@ -76,8 +81,9 @@ export default function Home(): React.ReactElement {
               width={640}
               height={146}
               priority
+              draggable={false}
               className={cn(
-                "h-auto w-[240px] max-w-full sm:w-[360px] md:w-[520px] lg:w-[640px]"
+                "h-auto w-[240px] select-none sm:w-[360px] md:w-[520px] lg:w-[640px]"
               )}
             />
           </div>
@@ -150,9 +156,12 @@ export default function Home(): React.ReactElement {
                   )}>
                   <span
                     className={cn(
-                      "bg-moonstone-600/20 text-moonstone-600 grid size-10 place-items-center rounded-md sm:size-12"
+                      "bg-moonstone-600/20 text-moonstone-600 grid size-10 place-items-center rounded-md select-none sm:size-12"
                     )}>
-                    <Icon className={cn("h-6 w-6 sm:h-7 sm:w-7")} aria-hidden />
+                    <Icon
+                      className={cn("h-6 w-6 select-none sm:h-7 sm:w-7")}
+                      aria-hidden
+                    />
                   </span>
                   <span
                     className={cn(
@@ -178,7 +187,12 @@ export default function Home(): React.ReactElement {
               className={cn(
                 "text-russian-violet hover:text-coquelicot-500 flex items-center gap-2 rounded-md px-3 py-2 text-base font-semibold"
               )}>
-              <FaPhone className={cn("h-5 w-5 shrink-0")} aria-hidden />
+              <FaPhone
+                className={cn(
+                  "pointer-events-none h-5 w-5 shrink-0 select-none"
+                )}
+                aria-hidden
+              />
               <span>+64 21 297 1237</span>
             </a>
             <div className={cn("bg-seasalt-400/50 hidden h-5 w-px sm:block")} />
@@ -187,7 +201,12 @@ export default function Home(): React.ReactElement {
               className={cn(
                 "text-russian-violet hover:text-coquelicot-500 flex items-center gap-2 rounded-md px-3 py-2 text-base font-semibold"
               )}>
-              <FaEnvelope className={cn("h-5 w-5 shrink-0")} aria-hidden />
+              <FaEnvelope
+                className={cn(
+                  "pointer-events-none h-5 w-5 shrink-0 select-none"
+                )}
+                aria-hidden
+              />
               <span>harrisonraynes8@gmail.com</span>
             </a>
           </div>

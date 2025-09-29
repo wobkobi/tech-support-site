@@ -1,23 +1,26 @@
 // next.config.ts
 import bundleAnalyzer from "@next/bundle-analyzer";
 import type { NextConfig } from "next";
+import path from "node:path";
 
 const isDev = process.env.NODE_ENV !== "production";
 
 const cspProd =
   "default-src 'self'; " +
-  "script-src 'self'; " +
+  "script-src 'self' 'unsafe-inline' blob:; " +
   "style-src 'self' 'unsafe-inline'; " +
-  "img-src 'self' data:; " +
+  "img-src 'self' data: blob:; " +
   "font-src 'self' data:; " +
   "connect-src 'self'; " +
+  "worker-src 'self' blob:; " +
+  "manifest-src 'self'; " +
   "frame-ancestors 'none'; " +
   "base-uri 'self'; " +
   "form-action 'self';";
 
 const cspDev =
   "default-src 'self' blob: data:; " +
-  "script-src 'self' 'unsafe-eval' 'unsafe-inline' blob:; " + // inline + eval for HMR
+  "script-src 'self' 'unsafe-eval' 'unsafe-inline' blob:; " +
   "style-src 'self' 'unsafe-inline'; " +
   "img-src 'self' data: blob:; " +
   "font-src 'self' data:; " +
@@ -32,6 +35,11 @@ const nextConfig: NextConfig = {
   output: "standalone",
   eslint: { ignoreDuringBuilds: true },
   typescript: { ignoreBuildErrors: false },
+
+  // Silence “inferred workspace root” warning
+  turbopack: {
+    root: path.resolve(__dirname),
+  },
 
   async headers() {
     return [
@@ -51,6 +59,7 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ["react-icons"],
   },
+
   serverExternalPackages: ["nodemailer"],
 } satisfies NextConfig;
 
