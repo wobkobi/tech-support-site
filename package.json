@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
-    "start": "next build --turbopack && next start",
+    "start": "next start",
+    "build-and-start": "next build --turbopack && next start",
     "lint": "eslint \"src/**/*.{js,ts,jsx,tsx}\" && prettier --write \"**/*.{js,ts,jsx,tsx,css,md,json}\"",
     "prepare": "husky"
   },

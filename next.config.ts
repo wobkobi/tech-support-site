@@ -6,12 +6,13 @@ const isDev = process.env.NODE_ENV !== "production";
 
 const cspProd =
   "default-src 'self'; " +
-  "script-src 'self' blob:; " +
+  "script-src 'self' 'unsafe-inline' blob:; " +
   "style-src 'self' 'unsafe-inline'; " +
   "img-src 'self' data: blob:; " +
   "font-src 'self' data:; " +
-  "connect-src 'self' https://api.example.com; " +
+  "connect-src 'self' https: wss:; " +
   "worker-src 'self' blob:; " +
+  "manifest-src 'self'; " +
   "frame-ancestors 'none'; " +
   "base-uri 'self'; " +
   "form-action 'self';";
