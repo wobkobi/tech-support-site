@@ -6,35 +6,73 @@
  */
 import { Analytics } from "@vercel/analytics/next";
 import { Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Exo } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const exo = Exo({
   subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+  weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
+  style: ["normal", "italic"],
+  display: "swap",
+  variable: "--font-geist-sans", // populates your var
 });
 
 export const metadata = {
-  title: "To the Point Tech",
-  description: "site description goes here",
+  metadataBase: new URL("https://tothepointnz.vercel.app"),
+  title: {
+    default: "To the Point Tech",
+    template: "%s | To the Point Tech",
+  },
+  description:
+    "Local tech support in Point Chevalier. Clear fixes, setup, Wi-Fi, email, backups, and more. Always straight to the point.",
+  applicationName: "To the Point Tech",
   authors: [{ name: "Harrison Raynes" }],
-  keywords: ["Tech Support", "keyword2", "keyword3"],
+  keywords: [
+    "Tech Support",
+    "IT Help",
+    "Computer Help",
+    "Wi-Fi",
+    "Printer Setup",
+    "Email",
+    "Data Transfer",
+    "Backups",
+    "Point Chevalier",
+    "Auckland",
+  ],
   openGraph: {
-    title: "To the Point Tech",
-    description: "site description goes here",
-    url: "https://www.yoursiteurl.com",
-    locale: "en_NZ",
     type: "website",
+    locale: "en_NZ",
+    siteName: "To the Point Tech",
+    url: "/",
+    title: "To the Point Tech",
+    description:
+      "For all your tech support needs. Always straight to the point.",
+    images: [
+      { url: "/og.jpg", width: 1200, height: 630, alt: "To the Point Tech" },
+    ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "site name goes here",
-    description: "site description goes here",
+    title: "To the Point Tech",
+    description:
+      "For all your tech support needs. Always straight to the point.",
+    images: ["/og.jpg"],
+  },
+  alternates: { canonical: "/" },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/apple-touch-icon.png",
   },
 };
 
@@ -57,10 +95,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>): React.ReactElement {
   return (
-    <html lang="en">
-      <body
-        suppressHydrationWarning
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+    <html lang="en" className={`${exo.variable} font-sans`}>
+      <body suppressHydrationWarning>
         {/* <NavBar /> */}
         {children}
         <Analytics />
