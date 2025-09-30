@@ -11,10 +11,6 @@
   --font-sans:
     var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, Segoe UI,
     Roboto, "Noto Sans", Arial, "Apple Color Emoji", "Segoe UI Emoji";
-  --font-mono:
-    var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco,
-    Consolas, "Liberation Mono", "Courier New";
-
   /* rich-black */
   --color-rich-black: #001514;
   --color-rich-black-100: #000404;

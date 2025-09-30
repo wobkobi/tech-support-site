@@ -83,7 +83,7 @@ export default function Home(): React.ReactElement {
               priority
               draggable={false}
               className={cn(
-                "h-auto w-[240px] select-none sm:w-[360px] md:w-[520px] lg:w-[640px]"
+                "h-auto w-[320px] select-none sm:w-[360px] md:w-[520px] lg:w-[640px]"
               )}
             />
           </div>
@@ -97,18 +97,29 @@ export default function Home(): React.ReactElement {
               className={cn(
                 "border-seasalt-400/60 bg-seasalt-800 rounded-xl border p-4 shadow-sm sm:p-4"
               )}>
-              <h2
-                className={cn(
-                  "text-russian-violet mb-1 text-2xl font-semibold"
-                )}>
+              <h2 className={cn("text-russian-violet mb-1 text-3xl font-bold")}>
                 About Me
               </h2>
-              <p className={cn("text-rich-black text-base sm:text-lg")}>
-                Hi there, I'm Harrison. I am a computer science graduate looking
-                to get started by helping in the community. I live and grew up
-                in Point Chevalier, and I'm looking to contribute to the
-                community with the skills I have.
+              <p
+                className={cn(
+                  "text-rich-black text-lg font-medium sm:text-xl"
+                )}>
+                Hi there, I’m Harrison. I’m a computer science graduate from
+                Point Chevalier, eager to apply my practical tech skills to
+                benefit the community. I grew up here and want to make
+                technology more straightforward and less stressful for people
+                who don’t have a go-to tech person.
               </p>
+              <ul
+                className={cn(
+                  "text-rich-black mt-3 list-disc pl-5 text-base sm:text-lg"
+                )}>
+                <li>Plain-English explanations and zero jargon</li>
+                <li>Clear written notes and simple next steps</li>
+                <li>Privacy-first and careful with your data</li>
+                <li>Local to Point Chevalier; evenings/weekends available</li>
+                <li>House calls and secure remote support</li>
+              </ul>
             </div>
 
             <div
@@ -117,17 +128,44 @@ export default function Home(): React.ReactElement {
               )}>
               <h2
                 className={cn(
-                  "text-russian-violet mb-1 text-2xl font-semibold sm:mb-2"
+                  "text-russian-violet mb-1 text-3xl font-bold sm:mb-2"
                 )}>
                 Services
               </h2>
               <p
                 className={cn(
-                  "text-rich-black mb-2 text-base sm:mb-3 sm:text-lg"
+                  "text-rich-black mb-2 text-lg font-medium sm:mb-3 sm:text-xl"
                 )}>
-                If you have any tech issues, I've got you covered. No problem is
-                too small. I am happy to help with any issue. Please feel free
-                to contact me, and we can arrange a time to meet.
+                If you’ve got a tech issue, I’ve got you covered. I fix slow
+                computers, set up new phones and laptops, sort Wi-Fi and network
+                connections, connect printers and TVs, and ensure cloud backups
+                and email run reliably. I can secure your devices, remove scams
+                and malware, and move photos and files safely between devices. I
+                will explain everything in plain language, leave clear notes,
+                and not upsell. I’m local, flexible with evenings/weekends, and
+                can help in person or remotely.
+              </p>
+              <ul
+                className={cn(
+                  "text-rich-black list-disc pl-5 text-base sm:text-lg"
+                )}>
+                <li>
+                  Quick diagnosis, options with pros/cons before work starts
+                </li>
+                <li>Up-front pricing and no surprise add-ons</li>
+                <li>
+                  Data-safe approach: important files backed up before changes
+                </li>
+                <li>Clean handover: what changed and how to manage it</li>
+                <li>On-site nearby or remote if it’s faster</li>
+              </ul>
+              <p
+                className={cn(
+                  "text-rich-black mb-2 text-lg font-medium sm:mb-3 sm:text-xl"
+                )}>
+                <br />
+                Please message or email me to let me know what’s going on, and
+                we’ll book a time that suits you.
               </p>
             </div>
           </section>
@@ -139,9 +177,9 @@ export default function Home(): React.ReactElement {
             <h2
               id="support"
               className={cn(
-                "text-rich-black mb-2 text-xl font-semibold sm:text-2xl"
+                "text-rich-black mb-2 text-center text-2xl font-semibold sm:text-3xl"
               )}>
-              What I support
+              Areas I Can Help With
             </h2>
 
             <ul
@@ -152,20 +190,25 @@ export default function Home(): React.ReactElement {
                 <li
                   key={label}
                   className={cn(
-                    "border-seasalt-400/60 bg-seasalt-800 flex w-full min-w-0 items-center gap-3 rounded-lg border p-3 sm:p-4"
+                    "bg-seasalt-800 border-seasalt-400/60",
+                    "flex h-16 w-full min-w-0 items-center gap-2",
+                    "rounded-md border px-2"
                   )}>
                   <span
                     className={cn(
-                      "bg-moonstone-600/20 text-moonstone-600 grid size-10 place-items-center rounded-md select-none sm:size-12"
+                      "grid size-9 shrink-0 place-items-center rounded-md",
+                      "border-moonstone-500/30 bg-moonstone-600/15 border sm:size-10"
                     )}>
                     <Icon
-                      className={cn("h-6 w-6 select-none sm:h-7 sm:w-7")}
+                      className="text-moonstone-600 h-6 w-6 sm:h-7 sm:w-7"
                       aria-hidden
                     />
                   </span>
+
                   <span
                     className={cn(
-                      "text-rich-black min-w-0 text-base break-words sm:text-lg"
+                      "text-rich-black min-w-0 text-left leading-tight font-semibold",
+                      "line-clamp-2 text-base [overflow-wrap:anywhere] sm:text-[17px] md:text-lg"
                     )}>
                     {label}
                   </span>
@@ -185,11 +228,11 @@ export default function Home(): React.ReactElement {
             <a
               href="tel:+64212971237"
               className={cn(
-                "text-russian-violet hover:text-coquelicot-500 flex items-center gap-2 rounded-md px-3 py-2 text-base font-semibold"
+                "text-russian-violet hover:text-coquelicot-500 flex items-center gap-2 rounded-md px-3 py-2 text-lg font-semibold"
               )}>
               <FaPhone
                 className={cn(
-                  "pointer-events-none h-5 w-5 shrink-0 select-none"
+                  "pointer-events-none h-7 w-7 shrink-0 select-none"
                 )}
                 aria-hidden
               />
@@ -199,11 +242,11 @@ export default function Home(): React.ReactElement {
             <a
               href="mailto:harrisonraynes8@gmail.com"
               className={cn(
-                "text-russian-violet hover:text-coquelicot-500 flex items-center gap-2 rounded-md px-3 py-2 text-base font-semibold"
+                "text-russian-violet hover:text-coquelicot-500 flex items-center gap-2 rounded-md px-3 py-2 text-lg font-semibold"
               )}>
               <FaEnvelope
                 className={cn(
-                  "pointer-events-none h-5 w-5 shrink-0 select-none"
+                  "pointer-events-none h-7 w-7 shrink-0 select-none"
                 )}
                 aria-hidden
               />
