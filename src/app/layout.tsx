@@ -71,9 +71,26 @@ export const metadata = {
     },
   },
   icons: {
-    icon: "/favicon.ico",
-    apple: "/apple-touch-icon.png",
+    icon: [
+      { url: "/favicon-16x16.png?v=4", type: "image/png", sizes: "16x16" },
+      { url: "/favicon-32x32.png?v=4", type: "image/png", sizes: "32x32" },
+      {
+        url: "/android-chrome-192x192.png?v=4",
+        type: "image/png",
+        sizes: "192x192",
+      },
+      {
+        url: "/android-chrome-512x512.png?v=4",
+        type: "image/png",
+        sizes: "512x512",
+      },
+      { url: "/favicon.ico?v=4" }, // optional
+    ],
+    apple: [{ url: "/apple-touch-icon.png?v=4", sizes: "180x180" }],
+    shortcut: ["/favicon.ico?v=4"],
   },
+  manifest: "/site.webmanifest",
+  themeColor: "#f34213",
 };
 
 // Viewport settings for responsive design, mobile-friendliness, and accessibility
