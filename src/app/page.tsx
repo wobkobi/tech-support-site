@@ -64,7 +64,7 @@ export default function Home(): React.ReactElement {
         />
       </div>
 
-      {/* Frosted container  */}
+      {/* Frosted container */}
       <div
         className={cn(
           "mx-auto my-4 w-full max-w-[min(100vw-2rem,68rem)] sm:my-8"
@@ -95,7 +95,7 @@ export default function Home(): React.ReactElement {
             )}>
             <div
               className={cn(
-                "border-seasalt-400/60 bg-seasalt-800 rounded-xl border p-4 shadow-sm sm:p-4"
+                "border-seasalt-400/60 bg-seasalt-800 rounded-lg border p-4 shadow-sm sm:p-4"
               )}>
               <h2 className={cn("text-russian-violet mb-1 text-3xl font-bold")}>
                 About Me
@@ -124,7 +124,7 @@ export default function Home(): React.ReactElement {
 
             <div
               className={cn(
-                "border-seasalt-400/60 bg-seasalt-800 rounded-xl border p-4 shadow-sm sm:p-4"
+                "border-seasalt-400/60 bg-seasalt-800 rounded-lg border p-4 shadow-sm sm:p-4"
               )}>
               <h2
                 className={cn(
@@ -190,17 +190,15 @@ export default function Home(): React.ReactElement {
                 <li
                   key={label}
                   className={cn(
-                    "bg-seasalt-800 border-seasalt-400/60",
-                    "flex h-16 w-full min-w-0 items-center gap-2",
-                    "rounded-md border px-2"
+                    "border-seasalt-400/60 bg-seasalt-800 rounded-lg border",
+                    "flex h-16 w-full min-w-0 items-center gap-3 px-3"
                   )}>
                   <span
                     className={cn(
-                      "grid size-9 shrink-0 place-items-center rounded-md",
-                      "border-moonstone-500/30 bg-moonstone-600/15 border sm:size-10"
+                      "border-moonstone-500/30 bg-moonstone-600/15 grid size-10 shrink-0 place-items-center rounded-md border sm:size-11"
                     )}>
                     <Icon
-                      className="text-moonstone-600 h-6 w-6 sm:h-7 sm:w-7"
+                      className={cn("text-moonstone-600 h-6 w-6 sm:h-7 sm:w-7")}
                       aria-hidden
                     />
                   </span>
@@ -223,7 +221,8 @@ export default function Home(): React.ReactElement {
           className={cn("mx-auto mt-4 w-fit max-w-[calc(100vw-2rem)] sm:mt-6")}>
           <div
             className={cn(
-              "border-seasalt-400/40 bg-seasalt-800/70 flex flex-col items-stretch gap-3 rounded-lg border p-3 backdrop-blur-md sm:flex-row sm:items-center sm:gap-6 sm:px-4 sm:py-3"
+              "border-seasalt-400/40 bg-seasalt-800/70 rounded-lg border backdrop-blur-md",
+              "flex flex-col items-stretch gap-3 p-3 sm:flex-row sm:items-center sm:gap-6 sm:px-4 sm:py-3"
             )}>
             <a
               href="tel:+64212971237"
@@ -231,9 +230,7 @@ export default function Home(): React.ReactElement {
                 "text-russian-violet hover:text-coquelicot-500 flex items-center gap-2 rounded-md px-3 py-2 text-lg font-semibold"
               )}>
               <FaPhone
-                className={cn(
-                  "pointer-events-none h-7 w-7 shrink-0 select-none"
-                )}
+                className={cn("h-7 w-7 shrink-0 select-none")}
                 aria-hidden
               />
               <span>+64 21 297 1237</span>
@@ -245,9 +242,7 @@ export default function Home(): React.ReactElement {
                 "text-russian-violet hover:text-coquelicot-500 flex items-center gap-2 rounded-md px-3 py-2 text-lg font-semibold"
               )}>
               <FaEnvelope
-                className={cn(
-                  "pointer-events-none h-7 w-7 shrink-0 select-none"
-                )}
+                className={cn("h-7 w-7 shrink-0 select-none")}
                 aria-hidden
               />
               <span>harrisonraynes8@gmail.com</span>
