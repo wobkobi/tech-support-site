@@ -36,11 +36,17 @@ const nextConfig: NextConfig = {
   eslint: { ignoreDuringBuilds: true },
   typescript: { ignoreBuildErrors: false },
 
-  // Silence “inferred workspace root” warning
+  // Silence "inferred workspace root" warning
   turbopack: {
     root: path.resolve(__dirname),
   },
 
+  /**
+   * Security headers for every route.
+   * Sets clickjacking, MIME-sniffing, referrer, permissions, and CSP
+   * (CSP switches between dev and prod variants).
+   * @returns Header rules applied to all paths.
+   */
   async headers() {
     return [
       {

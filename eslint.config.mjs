@@ -67,15 +67,28 @@ export default [
         { allowExpressions: true },
       ],
 
-      // JSDoc enforcement (tighten or relax as needed)
-      "jsdoc/require-jsdoc": "error",
+      // JSDoc enforcement for every function
+      "jsdoc/require-jsdoc": [
+        "error",
+        {
+          require: {
+            FunctionDeclaration: true,
+            FunctionExpression: true,
+            ArrowFunctionExpression: true,
+            MethodDefinition: true,
+          },
+        },
+      ],
       "jsdoc/require-param": "error",
       "jsdoc/require-returns": "error",
       "jsdoc/check-param-names": "error",
       "jsdoc/check-tag-names": "error",
       "jsdoc/no-undefined-types": "error",
-
-      // Formatting handled by Prettier (run separately), no plugin here
+      "jsdoc/require-param-type": "off",
+      "jsdoc/require-returns-type": "off",
+      "jsdoc/require-param-description": "error",
+      "jsdoc/require-returns-description": "error",
+      "jsdoc/require-description": "error",
     },
   },
 ];

@@ -1,51 +1,72 @@
 // src/components/NavBar.tsx
 /**
  * @file NavBar.tsx
- * @description
- * Persistent bottom navigation with four primary links and active route highlighting.
+ * @description Themed bottom navigation. Frosted pill container, active highlight, responsive sizing.
  */
 
 "use client";
+
 import { cn } from "@/lib/cn";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { JSX } from "react";
 
-// No props are expected for NavBar
+interface NavItem {
+  name: string;
+  href: string;
+}
 
-const navItems = [
+const navItems: NavItem[] = [
   { name: "Home", href: "/" },
   { name: "Booking", href: "/booking" },
   { name: "About", href: "/about" },
   { name: "Contact", href: "/contact" },
 ];
 
-// NavBar component to display navigation links
 /**
- * @returns The NavBar component with navigation links.
+ * Navigation bar with active route styles.
+ * @returns Themed NavBar element.
  */
-export default function NavBar(): JSX.Element {
+export default function NavBar(): React.ReactElement {
   const pathname = usePathname();
-  const isActive = (href: string): boolean => pathname === href;
+
+  /**
+   * Match active route (exact for "/", prefix for others).
+   * @param href Item href.
+   * @returns Whether item is active.
+   */
+  const isActive = (href: string): boolean =>
+    href === "/" ? pathname === "/" : pathname.startsWith(href);
 
   return (
-    <nav className={cn("bg-russian-violet py-5 md:py-6")}>
-      <ul className={cn("mx-auto flex max-w-4xl justify-around")}>
-        {navItems.map((item) => (
-          <li key={item.href} className={cn("flex-1 text-center")}>
-            <Link
-              href={item.href}
-              className={cn(
-                "block px-5 py-3 text-2xl tracking-tight md:text-3xl",
-                isActive(item.href)
-                  ? "text-coquelicot-500 font-bold"
-                  : "text-seasalt-900 hover:text-coquelicot-400 dark:text-seasalt-600 dark:hover:text-coquelicot-400"
-              )}>
-              {item.name}
-            </Link>
-          </li>
-        ))}
-      </ul>
+    <nav className={cn("mx-auto w-fit max-w-[calc(100vw-2rem)]")}>
+      <div
+        className={cn(
+          "border-seasalt-400/40 bg-seasalt-800/70",
+          "rounded-lg border p-2 shadow-sm backdrop-blur-md"
+        )}>
+        <ul className={cn("flex items-center gap-1 sm:gap-2")}>
+          {navItems.map((item) => {
+            const active = isActive(item.href);
+            return (
+              <li key={item.href}>
+                <Link
+                  href={item.href}
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "rounded-md px-3 py-2 text-sm font-semibold sm:text-base",
+                    active
+                      ? // active pill
+                        "border-moonstone-500/30 bg-moonstone-600/15 text-moonstone-600 border"
+                      : // inactive
+                        "text-russian-violet hover:text-coquelicot-500"
+                  )}>
+                  {item.name}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
     </nav>
   );
 }

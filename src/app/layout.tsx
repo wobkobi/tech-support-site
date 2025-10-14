@@ -90,7 +90,6 @@ export const metadata = {
     shortcut: ["/favicon.ico?v=4"],
   },
   manifest: "/site.webmanifest",
-  themeColor: "#f34213",
 };
 
 // Viewport settings for responsive design, mobile-friendliness, and accessibility
