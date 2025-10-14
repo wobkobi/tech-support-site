@@ -46,3 +46,14 @@ model Booking {
   @@index([resourceId, startUtc, endUtc])
   @@index([status, holdExpiresUtc])
 }
+
+model Review {
+  id          String   @id @default(cuid())
+  text        String
+  firstName   String?      // null when anonymous
+  lastName    String?      // null when anonymous
+  isAnonymous Boolean  @default(false)
+  approved    Boolean  @default(false) // vetting flag
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

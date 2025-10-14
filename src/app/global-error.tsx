@@ -7,6 +7,7 @@
 
 "use client";
 /**
+ * Global error boundary UI.
  * @returns A simple message indicating the app has crashed.
  */
 export default function GlobalError(): React.ReactElement {
