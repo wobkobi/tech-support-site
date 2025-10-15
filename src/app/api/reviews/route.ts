@@ -2,7 +2,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-export async function POST(req: Request) {
+/**
+ * Create a pending review (approved=false) for moderation.
+ * Trims inputs. Requires `text`. If not anonymous, `firstName` is required.
+ * @param req HTTP request whose JSON body matches.
+ * @returns 201 on success or 400 on validation error.
+ */
+export async function POST(req: Request): Promise<NextResponse> {
   const { text, firstName, lastName, isAnonymous } = await req.json();
 
   const t = typeof text === "string" ? text.trim() : "";
