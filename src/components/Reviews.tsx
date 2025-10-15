@@ -43,47 +43,38 @@ function formatName(r: ReviewItem): string {
  * @param [root0.items] Reviews to render.
  * @returns Section or null.
  */
-export default function Reviews({
-  items = [],
-}: ReviewsProps): React.ReactElement | null {
+export default function Reviews({ items = [] }: ReviewsProps): React.ReactElement | null {
   if (!items.length) return null;
 
   // Marquee when more than six reviews
   if (items.length > 6) {
     const track = [...items, ...items];
     return (
-      <section
-        aria-labelledby="reviews"
-        className={cn("mx-auto w-full max-w-5xl")}>
+      <section aria-labelledby="reviews" className={cn("mx-auto w-full max-w-5xl")}>
         <h2
           id="reviews"
-          className={cn(
-            "text-rich-black mb-2 text-center text-xl font-semibold sm:text-2xl"
-          )}>
+          className={cn("text-rich-black mb-2 text-center text-xl font-semibold sm:text-2xl")}
+        >
           What People Say
         </h2>
 
-        <div
-          className={cn(
-            "relative w-full overflow-hidden rounded-lg bg-transparent p-0"
-          )}>
+        <div className={cn("relative w-full overflow-hidden rounded-lg bg-transparent p-0")}>
           <ul className={cn("marquee-track animate-marquee flex w-max gap-3")}>
             {track.map((r, i) => (
               <li
                 key={`${formatName(r)}-${i}`}
                 className={cn(
-                  "border-seasalt-400/60 bg-seasalt-800/80 flex h-40 w-[360px] shrink-0 flex-col rounded-lg border p-4 sm:h-44 sm:w-[380px] sm:p-5"
-                )}>
-                <p
-                  className={cn(
-                    "text-rich-black text-sm leading-relaxed sm:text-base"
-                  )}>
+                  "border-seasalt-400/60 bg-seasalt-800/80 flex h-40 w-[360px] shrink-0 flex-col rounded-lg border p-4 sm:h-44 sm:w-[380px] sm:p-5",
+                )}
+              >
+                <p className={cn("text-rich-black text-sm leading-relaxed sm:text-base")}>
                   {r.text}
                 </p>
                 <p
                   className={cn(
-                    "text-russian-violet mt-auto pt-3 text-right text-xs font-semibold sm:text-sm"
-                  )}>
+                    "text-russian-violet mt-auto pt-3 text-right text-xs font-semibold sm:text-sm",
+                  )}
+                >
                   - {formatName(r)}
                 </p>
               </li>
@@ -96,14 +87,11 @@ export default function Reviews({
 
   // less than 6 items: center last row at all breakpoints using flex-wrap + justify-center
   return (
-    <section
-      aria-labelledby="reviews"
-      className={cn("mx-auto w-full max-w-5xl")}>
+    <section aria-labelledby="reviews" className={cn("mx-auto w-full max-w-5xl")}>
       <h2
         id="reviews"
-        className={cn(
-          "text-rich-black mb-2 text-center text-xl font-semibold sm:text-2xl"
-        )}>
+        className={cn("text-rich-black mb-2 text-center text-xl font-semibold sm:text-2xl")}
+      >
         What People Say
       </h2>
 
@@ -112,8 +100,9 @@ export default function Reviews({
           // rows
           "flex flex-wrap justify-center gap-3",
           // prevent odd spacing due to rounding
-          "content-start"
-        )}>
+          "content-start",
+        )}
+      >
         {items.map((r, i) => (
           <li
             key={`${formatName(r)}-${i}`}
@@ -122,15 +111,15 @@ export default function Reviews({
               // full width on mobile, two-up on sm, three-up on md+. Centering comes from justify-center.
               "w-full sm:w-[calc(50%-0.375rem)] md:w-[calc(33.333%-0.5rem)]",
               // card styles
-              "border-seasalt-400/60 bg-seasalt-800 flex h-40 flex-col rounded-lg border p-4 shadow-sm sm:h-44 sm:p-5"
-            )}>
-            <p className={cn("text-rich-black text-sm sm:text-base")}>
-              {r.text}
-            </p>
+              "border-seasalt-400/60 bg-seasalt-800 flex h-40 flex-col rounded-lg border p-4 shadow-sm sm:h-44 sm:p-5",
+            )}
+          >
+            <p className={cn("text-rich-black text-sm sm:text-base")}>{r.text}</p>
             <p
               className={cn(
-                "text-russian-violet mt-auto pt-3 text-right text-xs font-semibold sm:text-sm"
-              )}>
+                "text-russian-violet mt-auto pt-3 text-right text-xs font-semibold sm:text-sm",
+              )}
+            >
               - {formatName(r)}
             </p>
           </li>

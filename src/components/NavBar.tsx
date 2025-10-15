@@ -42,8 +42,9 @@ export default function NavBar(): React.ReactElement {
       <div
         className={cn(
           "border-seasalt-400/40 bg-seasalt-800/70",
-          "rounded-lg border p-2 shadow-sm backdrop-blur-md"
-        )}>
+          "rounded-lg border p-2 shadow-sm backdrop-blur-md",
+        )}
+      >
         <ul className={cn("flex items-center gap-1 sm:gap-2")}>
           {navItems.map((item) => {
             const active = isActive(item.href);
@@ -58,8 +59,9 @@ export default function NavBar(): React.ReactElement {
                       ? // active pill
                         "border-moonstone-500/30 bg-moonstone-600/15 text-moonstone-600 border"
                       : // inactive
-                        "text-russian-violet hover:text-coquelicot-500"
-                  )}>
+                        "text-russian-violet hover:text-coquelicot-500",
+                  )}
+                >
                   {item.name}
                 </Link>
               </li>

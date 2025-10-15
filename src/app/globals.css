@@ -1,16 +1,13 @@
 /* src/app/globals.css */
-/**
-* @file globals.css
-* @description
-* Tailwind v4 global styles with tokenised colours/fonts via @theme.
-*/
+/* Tailwindv 4 + tokenised colours/fonts */
 @import "tailwindcss";
 
 /* Design tokens */
 @theme inline {
   --font-sans:
-    var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, Segoe UI,
-    Roboto, "Noto Sans", Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, SegoeUI, Roboto, "NotoSans",
+    Arial, "AppleColorEmoji", "SegoeUIEmoji";
+
   /* rich-black */
   --color-rich-black: #001514;
   --color-rich-black-100: #000404;
@@ -84,7 +81,7 @@
   --color-moonstone-900: #d9f2f5;
 }
 
-/* Fixed light theme: seasalt on rich-black text */
+/* Fixed light theme base colours */
 :root {
   --color-background: var(--color-seasalt);
   --color-foreground: #171717;
@@ -94,26 +91,32 @@
 html,
 body {
   height: 100%;
+  overflow-x: clip;
+  /* avoid sideways scroll without hiding overflow */
+}
+
+/* Force transparency to defeat dark-mode extensions painting body */
+html,
+body {
+  background: transparent !important;
 }
 
 body {
   margin: 0;
-  background-color: var(--color-background);
   color: var(--color-foreground);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
-/* Focus ring */
+/* A11y: focus + selection */
 :where(:focus-visible) {
-  outline: 2px solid color-mix(in oklab, var(--color-moonstone-500) 70%, white);
+  outline: 2pxsolidcolor-mix(inoklab, var(--color-moonstone-500) 70%, white);
   outline-offset: 2px;
 }
 
-/* Selection */
 ::selection {
-  background: color-mix(in oklab, var(--color-coquelicot-500) 30%, transparent);
+  background: color-mix(inoklab, var(--color-coquelicot-500) 30%, transparent);
 }
 
 /* Reduced motion */
@@ -125,7 +128,7 @@ body {
   }
 }
 
-/* Minimal prose helpers */
+/* Prose helpers */
 .prose :where(h1, h2, h3) {
   line-height: 1.2;
   font-weight: 700;
@@ -135,24 +138,22 @@ body {
   line-height: 1.7;
 }
 
+/* Marquee */
 @keyframes marquee {
   from {
     transform: translateX(0);
   }
+
   to {
     transform: translateX(-50%);
   }
 }
 
-/* slower */
 .animate-marquee {
-  animation: marquee 40s linear infinite;
+  animation: marquee40slinearinfinite;
 }
-/* optional: prevent layout jump from scrollbars */
+
+/* Scrollbar behaviour */
 html {
   scrollbar-gutter: auto;
-} /* or just remove this rule */
-html,
-body {
-  overflow-x: clip;
-} /* safer than hidden */
+}
