@@ -3,20 +3,22 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "prestart": "npx prisma generate && npx prisma db push && npm run build:icons",
+    "postinstall": "prisma generate",
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
-    "start": "next build && next start",
-    "setup-and-start": "npm run prestart && npm run start",
+    "start": "next start",
+    "db:push": "prisma db push",
+    "seed": "tsx prisma/seed.ts",
     "lint": "eslint \"src/**/*.{js,ts,jsx,tsx}\"",
     "format": "prettier --write \"**/*.{js,ts,jsx,tsx,css,md,json}\"",
     "build:icons": "node scripts/build-icons.mjs",
-    "seed": "tsx prisma/seed.ts"
+    "build:all": "npm run build:icons && npm run build"
   },
   "dependencies": {
     "@vercel/analytics": "^1.5.0",
     "autoprefixer": "^10.4.21",
     "clsx": "^2.1.1",
+    "mongodb": "^6.20.0",
     "next": "^15.5.5",
     "nodemailer": "^7.0.9",
     "react": "^19.2.0",
@@ -38,22 +40,24 @@
     "eslint": "^9.37.0",
     "eslint-config-next": "^15.5.5",
     "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-jsdoc": "^61.1.2",
+    "eslint-plugin-jsdoc": "^61.1.3",
     "globals": "^16.4.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.4",
     "postcss": "^8.5.6",
     "prettier": "^3.6.2",
     "prettier-plugin-organize-imports": "^4",
-    "prettier-plugin-tailwindcss": "^0.6.14",
+    "prettier-plugin-tailwindcss": "^0.7.0",
     "prisma": "^6.17.1",
     "sharp": "^0.34.4",
     "tailwindcss": "^4.1.14",
+    "to-valid-identifier": "^1.0.0",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3"
   },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
+  "engines": {
+    "node": ">=22.0.0",
+    "npm": ">=10.0.0"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": "eslint --cache --fix",

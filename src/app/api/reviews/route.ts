@@ -1,72 +1,35 @@
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
-
-const SEED: {
-  text: string;
-  firstName: string | null;
-  lastName: string | null;
-  isAnonymous: boolean;
-  approved: boolean;
-}[] = [
-  {
-    text: "Clear, patient, and fast. Fixed my Wi-Fi and set up backups.",
-    firstName: "Alice",
-    lastName: "Ngata",
-    isAnonymous: false,
-    approved: true,
-  },
-  {
-    text: "Explained everything in plain terms. Laptop is snappy again.",
-    firstName: "Ben",
-    lastName: "Kaur",
-    isAnonymous: false,
-    approved: true,
-  },
-  {
-    text: "Recovered my photos and organised them neatly.",
-    firstName: "Chloe",
-    lastName: "Rangi",
-    isAnonymous: false,
-    approved: true,
-  },
-  {
-    text: "Sorted email issues across phone and PC.",
-    firstName: "Daniel",
-    lastName: "Li",
-    isAnonymous: false,
-    approved: false,
-  },
-  {
-    text: "Honest advice. No upsell. Left clear notes.",
-    firstName: "Ella",
-    lastName: "Patel",
-    isAnonymous: false,
-    approved: false,
-  },
-  {
-    text: "Printer nightmare finally solved.",
-    firstName: null,
-    lastName: null,
-    isAnonymous: true,
-    approved: true,
-  },
-];
+// src/app/api/reviews/route.ts
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 
 /**
- * Seed the database with initial reviews.
+ * Create a pending review (approved=false) for moderation.
+ * Trims inputs. Requires `text`. If not anonymous, `firstName` is required.
+ * @param req HTTP request whose JSON body matches.
+ * @returns 201 on success or 400 on validation error.
  */
-async function main(): Promise<void> {
-  // optional: reset
-  // await prisma.review.deleteMany({});
-  await prisma.review.createMany({ data: SEED });
-}
+export async function POST(req: Request): Promise<NextResponse> {
+  const { text, firstName, lastName, isAnonymous } = await req.json();
 
-main()
-  .catch((e) => {
-    console.error(e);
-    process.exitCode = 1;
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
+  const t = typeof text === "string" ? text.trim() : "";
+  const f = typeof firstName === "string" ? firstName.trim() : null;
+  const l = typeof lastName === "string" ? lastName.trim() : null;
+  const anon = Boolean(isAnonymous);
+
+  if (!t) return NextResponse.json({ error: "Text required" }, { status: 400 });
+  if (!anon && !f) {
+    return NextResponse.json({ error: "First name required" }, { status: 400 });
+  }
+
+  await prisma.review.create({
+    data: {
+      text: t,
+      firstName: anon ? null : f,
+      lastName: anon ? null : l,
+      isAnonymous: anon,
+      approved: false, // moderation gate
+    },
   });
+
+  return NextResponse.json({ ok: true }, { status: 201 });
+}

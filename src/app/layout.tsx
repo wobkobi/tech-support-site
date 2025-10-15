@@ -45,17 +45,13 @@ export const metadata = {
     siteName: "To the Point Tech",
     url: "/",
     title: "To the Point Tech",
-    description:
-      "For all your tech support needs. Always straight to the point.",
-    images: [
-      { url: "/og.jpg", width: 1200, height: 630, alt: "To the Point Tech" },
-    ],
+    description: "For all your tech support needs. Always straight to the point.",
+    images: [{ url: "/og.jpg", width: 1200, height: 630, alt: "To the Point Tech" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "To the Point Tech",
-    description:
-      "For all your tech support needs. Always straight to the point.",
+    description: "For all your tech support needs. Always straight to the point.",
     images: ["/og.jpg"],
   },
   alternates: { canonical: "/" },

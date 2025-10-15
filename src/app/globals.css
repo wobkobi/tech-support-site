@@ -1,16 +1,13 @@
 /* src/app/globals.css */
-/**
-* @file globals.css
-* @description
-* Tailwind v4 global styles with tokenised colours/fonts via @theme.
-*/
+/* Tailwindv 4 + tokenised colours/fonts */
 @import "tailwindcss";
 
 /* Design tokens */
 @theme inline {
   --font-sans:
-  var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, Segoe UI,
-  Roboto, "Noto Sans", Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, SegoeUI, Roboto, "NotoSans",
+    Arial, "AppleColorEmoji", "SegoeUIEmoji";
+
   /* rich-black */
   --color-rich-black: #001514;
   --color-rich-black-100: #000404;
@@ -22,7 +19,7 @@
   --color-rich-black-700: #00d8cd;
   --color-rich-black-800: #3bfff5;
   --color-rich-black-900: #9dfffa;
-  
+
   /* seasalt */
   --color-seasalt: #f6f7f8;
   --color-seasalt-100: #2c3137;
@@ -34,7 +31,7 @@
   --color-seasalt-700: #fafafb;
   --color-seasalt-800: #fcfcfc;
   --color-seasalt-900: #fdfdfe;
-  
+
   /* coquelicot */
   --color-coquelicot: #f34213;
   --color-coquelicot-100: #310d03;
@@ -46,7 +43,7 @@
   --color-coquelicot-700: #f88e71;
   --color-coquelicot-800: #fab4a0;
   --color-coquelicot-900: #fdd9d0;
-  
+
   /* russian-violet */
   --color-russian-violet: #0c0a3e;
   --color-russian-violet-100: #02020c;
@@ -58,7 +55,7 @@
   --color-russian-violet-700: #2823d4;
   --color-russian-violet-800: #6c68e6;
   --color-russian-violet-900: #b6b4f3;
-  
+
   /* mustard */
   --color-mustard: #fed766;
   --color-mustard-100: #473500;
@@ -70,7 +67,7 @@
   --color-mustard-700: #ffe8a4;
   --color-mustard-800: #fff0c2;
   --color-mustard-900: #fff7e1;
-  
+
   /* moonstone */
   --color-moonstone: #43bccd;
   --color-moonstone-100: #0b272b;
@@ -84,7 +81,7 @@
   --color-moonstone-900: #d9f2f5;
 }
 
-/* Fixed light theme: seasalt on rich-black text */
+/* Fixed light theme base colours */
 :root {
   --color-background: var(--color-seasalt);
   --color-foreground: #171717;
@@ -94,30 +91,36 @@
 html,
 body {
   height: 100%;
+  overflow-x: clip;
+  /* avoid sideways scroll without hiding overflow */
+}
+
+/* Force transparency to defeat dark-mode extensions painting body */
+html,
+body {
+  background: transparent !important;
 }
 
 body {
   margin: 0;
-  background-color: var(--color-background);
   color: var(--color-foreground);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
-/* Focus ring */
+/* A11y: focus + selection */
 :where(:focus-visible) {
-  outline: 2px solid color-mix(in oklab, var(--color-moonstone-500) 70%, white);
+  outline: 2pxsolidcolor-mix(inoklab, var(--color-moonstone-500) 70%, white);
   outline-offset: 2px;
 }
 
-/* Selection */
 ::selection {
-  background: color-mix(in oklab, var(--color-coquelicot-500) 30%, transparent);
+  background: color-mix(inoklab, var(--color-coquelicot-500) 30%, transparent);
 }
 
 /* Reduced motion */
-@media (prefers-reduced-motion:reduce) {
+@media (prefers-reduced-motion: reduce) {
   * {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
@@ -125,7 +128,7 @@ body {
   }
 }
 
-/* Minimal prose helpers */
+/* Prose helpers */
 .prose :where(h1, h2, h3) {
   line-height: 1.2;
   font-weight: 700;
@@ -135,13 +138,22 @@ body {
   line-height: 1.7;
 }
 
+/* Marquee */
 @keyframes marquee {
-  from { transform: translateX(0); }
-  to   { transform: translateX(-50%); }
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-50%);
+  }
 }
 
-/* slower */
-.animate-marquee { animation: marquee 40s linear infinite; } 
-/* optional: prevent layout jump from scrollbars */
-html { scrollbar-gutter: auto; } /* or just remove this rule */
-html, body { overflow-x: clip; } /* safer than hidden */
+.animate-marquee {
+  animation: marquee40slinearinfinite;
+}
+
+/* Scrollbar behaviour */
+html {
+  scrollbar-gutter: auto;
+}

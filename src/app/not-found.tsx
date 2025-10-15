@@ -20,27 +20,27 @@ export default function NotFound(): React.ReactElement {
         <section className={cn("mx-auto w-full max-w-5xl")}>
           <h1
             className={cn(
-              "text-rich-black mb-3 text-center text-2xl font-bold sm:mb-4 sm:text-3xl md:text-4xl"
-            )}>
+              "text-rich-black mb-3 text-center text-2xl font-bold sm:mb-4 sm:text-3xl md:text-4xl",
+            )}
+          >
             Page not found
           </h1>
 
           <div
             className={cn(
-              "border-seasalt-400/60 bg-seasalt-800 rounded-lg border p-4 shadow-sm sm:p-6"
-            )}>
-            <p
-              className={cn(
-                "text-rich-black mb-4 text-base font-medium sm:text-lg"
-              )}>
+              "border-seasalt-400/60 bg-seasalt-800 rounded-lg border p-4 shadow-sm sm:p-6",
+            )}
+          >
+            <p className={cn("text-rich-black mb-4 text-base font-medium sm:text-lg")}>
               The page you’re after isn’t here.
             </p>
 
             <Link
               href="/"
               className={cn(
-                "text-russian-violet hover:text-coquelicot-500 inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold"
-              )}>
+                "text-russian-violet hover:text-coquelicot-500 inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold",
+              )}
+            >
               <FaHouse className={cn("h-4 w-4")} aria-hidden />
               Go home
             </Link>

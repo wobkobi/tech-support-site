@@ -58,6 +58,35 @@ const SEED = [
  * Seed the database with initial reviews.
  */
 async function main(): Promise<void> {
-  await prisma.review.createMany({ data: SEED });
+  // dev safety: uncomment to block seeding in production
+  // if (process.env.NODE_ENV === "production") throw new Error("Refusing to seed in production");
+
+  // Start clean (Mongo-friendly)
+  await prisma.review.deleteMany({});
+
+  // Normalise payload
+  const data = SEED.map((r) => {
+    const isAnon = !!r.isAnonymous;
+    const f = r.firstName ? r.firstName.trim() : null;
+    const l = r.lastName ? r.lastName.trim() : null;
+    return {
+      text: r.text.trim(),
+      isAnonymous: isAnon,
+      firstName: isAnon ? null : f || null,
+      lastName: isAnon ? null : l || null,
+      approved: !!r.approved,
+    };
+  });
+
+  await prisma.review.createMany({ data });
+  console.log(`Seeded ${data.length} reviews`);
 }
-main().finally(() => prisma.$disconnect());
+
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
