@@ -4,7 +4,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mongodb"
   url      = env("DATABASE_URL")
 }
 
@@ -15,7 +15,7 @@ enum BookingStatus {
 }
 
 model Resource {
-  id       String    @id @default(cuid())
+  id       String    @id @default(auto()) @map("_id") @db.ObjectId
   name     String
   bookings Booking[]
 
@@ -23,37 +23,41 @@ model Resource {
 }
 
 model Booking {
-  id         String   @id @default(cuid())
-  resourceId String
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  // FK must be ObjectId to match Resource.id on Mongo
+  resourceId String   @db.ObjectId
   resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
 
   email String
   name  String
 
-  startUtc DateTime @db.Timestamptz(6)
-  endUtc   DateTime @db.Timestamptz(6)
+  // Mongo stores DateTime as BSON Date (UTC). No native @db.* here.
+  startUtc DateTime
+  endUtc   DateTime
 
   bufferBeforeMin Int @default(0)
   bufferAfterMin  Int @default(0)
 
   status         BookingStatus @default(held)
-  holdExpiresUtc DateTime?     @db.Timestamptz(6)
-  cancelToken    String        @unique
+  holdExpiresUtc DateTime?
 
-  createdAt DateTime @default(now()) @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+  cancelToken String @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([resourceId, startUtc, endUtc])
   @@index([status, holdExpiresUtc])
 }
 
 model Review {
-  id          String   @id @default(cuid())
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
   text        String
-  firstName   String?      // null when anonymous
-  lastName    String?      // null when anonymous
+  firstName   String?
+  lastName    String?
   isAnonymous Boolean  @default(false)
-  approved    Boolean  @default(false) // vetting flag
+  approved    Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }

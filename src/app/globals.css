@@ -9,8 +9,8 @@
 /* Design tokens */
 @theme inline {
   --font-sans:
-  var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, Segoe UI,
-  Roboto, "Noto Sans", Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, Segoe UI,
+    Roboto, "Noto Sans", Arial, "Apple Color Emoji", "Segoe UI Emoji";
   /* rich-black */
   --color-rich-black: #001514;
   --color-rich-black-100: #000404;
@@ -22,7 +22,7 @@
   --color-rich-black-700: #00d8cd;
   --color-rich-black-800: #3bfff5;
   --color-rich-black-900: #9dfffa;
-  
+
   /* seasalt */
   --color-seasalt: #f6f7f8;
   --color-seasalt-100: #2c3137;
@@ -34,7 +34,7 @@
   --color-seasalt-700: #fafafb;
   --color-seasalt-800: #fcfcfc;
   --color-seasalt-900: #fdfdfe;
-  
+
   /* coquelicot */
   --color-coquelicot: #f34213;
   --color-coquelicot-100: #310d03;
@@ -46,7 +46,7 @@
   --color-coquelicot-700: #f88e71;
   --color-coquelicot-800: #fab4a0;
   --color-coquelicot-900: #fdd9d0;
-  
+
   /* russian-violet */
   --color-russian-violet: #0c0a3e;
   --color-russian-violet-100: #02020c;
@@ -58,7 +58,7 @@
   --color-russian-violet-700: #2823d4;
   --color-russian-violet-800: #6c68e6;
   --color-russian-violet-900: #b6b4f3;
-  
+
   /* mustard */
   --color-mustard: #fed766;
   --color-mustard-100: #473500;
@@ -70,7 +70,7 @@
   --color-mustard-700: #ffe8a4;
   --color-mustard-800: #fff0c2;
   --color-mustard-900: #fff7e1;
-  
+
   /* moonstone */
   --color-moonstone: #43bccd;
   --color-moonstone-100: #0b272b;
@@ -117,7 +117,7 @@ body {
 }
 
 /* Reduced motion */
-@media (prefers-reduced-motion:reduce) {
+@media (prefers-reduced-motion: reduce) {
   * {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
@@ -136,12 +136,23 @@ body {
 }
 
 @keyframes marquee {
-  from { transform: translateX(0); }
-  to   { transform: translateX(-50%); }
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
 }
 
 /* slower */
-.animate-marquee { animation: marquee 40s linear infinite; } 
+.animate-marquee {
+  animation: marquee 40s linear infinite;
+}
 /* optional: prevent layout jump from scrollbars */
-html { scrollbar-gutter: auto; } /* or just remove this rule */
-html, body { overflow-x: clip; } /* safer than hidden */
+html {
+  scrollbar-gutter: auto;
+} /* or just remove this rule */
+html,
+body {
+  overflow-x: clip;
+} /* safer than hidden */

@@ -3,20 +3,22 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "prestart": "npx prisma generate && npx prisma db push && npm run build:icons",
+    "postinstall": "prisma generate",
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
-    "start": "next build && next start",
-    "setup-and-start": "npm run prestart && npm run start",
+    "start": "next start",
+    "db:push": "prisma db push",
+    "seed": "tsx prisma/seed.ts",
     "lint": "eslint \"src/**/*.{js,ts,jsx,tsx}\"",
     "format": "prettier --write \"**/*.{js,ts,jsx,tsx,css,md,json}\"",
     "build:icons": "node scripts/build-icons.mjs",
-    "seed": "tsx prisma/seed.ts"
+    "build:all": "npm run build:icons && npm run build"
   },
   "dependencies": {
     "@vercel/analytics": "^1.5.0",
     "autoprefixer": "^10.4.21",
     "clsx": "^2.1.1",
+    "mongodb": "^6.20.0",
     "next": "^15.5.5",
     "nodemailer": "^7.0.9",
     "react": "^19.2.0",
@@ -54,6 +56,9 @@
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
+  },
+  "engines": {
+    "node": "20.x"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": "eslint --cache --fix",
