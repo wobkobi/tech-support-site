@@ -106,7 +106,7 @@ export default async function Home(): Promise<React.ReactElement> {
             </p>
             <p className={cn("text-rich-black text-base font-medium sm:text-lg")}>
               Please message or email me to let me know what's going on, and we'll book a time that
-              suits you. you.
+              suits you.
             </p>
           </div>
         </section>
