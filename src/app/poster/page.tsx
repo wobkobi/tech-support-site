@@ -107,7 +107,7 @@ export default function Home(): React.ReactElement {
                 If you've got a tech issue, I've got you covered. I fix slow computers, set up new
                 phones and laptops, sort Wi-Fi and network connections, connect printers and TVs,
                 and ensure cloud backups and email run reliably. I can secure your devices, remove
-                scams and malware, and move photos and files safely between devices. I will explain
+                malware and scams, and safely move photos and files between devices. I will explain
                 everything in plain language, leave clear notes, and not upsell. I'm local, flexible
                 with evenings/weekends, and can help in person or remotely.
               </p>

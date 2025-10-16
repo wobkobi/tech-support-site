@@ -97,15 +97,16 @@ export default async function Home(): Promise<React.ReactElement> {
           >
             <h2 className={cn("text-russian-violet mb-1 text-2xl font-bold sm:mb-2")}>Services</h2>
             <p className={cn("text-rich-black mb-2 text-base font-medium sm:mb-3 sm:text-lg")}>
-              If you've got a tech issue, I can help. I fix slow computers, set up new phones and
-              laptops, sort Wi-Fi and network connections, connect printers and TVs, and make sure
-              cloud backups and email run reliably. I secure devices, remove scams and malware, and
-              move photos and files safely. I explain in plain language, leave clear notes, and
-              don't upsell.
+              If you've got a tech issue, I've got you covered. I fix slow computers, set up new
+              phones and laptops, sort Wi-Fi and network connections, connect printers and TVs, and
+              ensure cloud backups and email run reliably. I can secure your devices, remove malware
+              and scams, and safely move photos and files between devices. I will explain everything
+              in plain language, leave clear notes, and not upsell. I'm local, flexible with
+              evenings/weekends, and can help in person or remotely.
             </p>
             <p className={cn("text-rich-black text-base font-medium sm:text-lg")}>
-              Please message or email me to say what's going on, and we'll book a time that suits
-              you.
+              Please message or email me to let me know what's going on, and we'll book a time that
+              suits you. you.
             </p>
           </div>
         </section>
