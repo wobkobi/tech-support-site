@@ -5,7 +5,7 @@
  * - Standard card sizes and spacing
  */
 
-import ReviewForm from "@/components/ReviewForm";
+// import ReviewForm from "@/components/ReviewForm";
 import { FrostedSection, PageShell } from "@/components/SiteFrame";
 import { cn } from "@/lib/cn";
 
@@ -31,7 +31,11 @@ export default function ReviewsPage(): React.ReactElement {
               "border-seasalt-400/60 bg-seasalt-800 rounded-lg border p-4 shadow-sm sm:p-6",
             )}
           >
-            <ReviewForm />
+            {/* <ReviewForm /> */}
+            {/* currently disabled */}
+            <p className="text-seasalt-200 text-center">
+              Reviews are currently disabled. Please check back later.
+            </p>
           </div>
         </section>
       </FrostedSection>
