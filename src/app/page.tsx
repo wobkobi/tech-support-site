@@ -121,7 +121,7 @@ export default async function Home(): Promise<React.ReactElement> {
           </h2>
           <ul
             className={cn(
-              "mx-auto grid w-full max-w-[68rem] grid-cols-2 gap-2 sm:grid-cols-2 sm:gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4",
+              "mx-auto grid w-full max-w-272 grid-cols-2 gap-2 sm:grid-cols-2 sm:gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4",
             )}
           >
             {supportItems.map(({ label, icon: Icon }) => (
@@ -140,7 +140,7 @@ export default async function Home(): Promise<React.ReactElement> {
                 </span>
                 <span
                   className={cn(
-                    "text-rich-black line-clamp-2 min-w-0 text-left text-sm font-semibold leading-tight [overflow-wrap:anywhere] sm:text-base md:text-[17px]",
+                    "text-rich-black line-clamp-2 min-w-0 text-left text-sm font-semibold leading-tight wrap-anywhere sm:text-base md:text-[17px]",
                   )}
                 >
                   {label}
@@ -181,13 +181,13 @@ export default async function Home(): Promise<React.ReactElement> {
           </a>
           <div className={cn("bg-seasalt-400/50 hidden h-5 w-px sm:block")} />
           <a
-            href="mailto:harrisonraynes8@gmail.com"
+            href="mailto:harrison@tothepoint.com"
             className={cn(
               "text-russian-violet hover:text-coquelicot-500 flex items-center gap-2 rounded-md px-3 py-2 text-base font-semibold sm:text-lg",
             )}
           >
             <FaEnvelope className={cn("h-6 w-6 shrink-0 select-none sm:h-7 sm:w-7")} aria-hidden />
-            <span>harrisonraynes8@gmail.com</span>
+            <span>harrison@tothepoint.com</span>
           </a>
         </div>
       </footer>
