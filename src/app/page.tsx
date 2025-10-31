@@ -121,7 +121,7 @@ export default async function Home(): Promise<React.ReactElement> {
           </h2>
           <ul
             className={cn(
-              "mx-auto grid w-full max-w-[68rem] grid-cols-2 gap-2 sm:grid-cols-2 sm:gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4",
+              "mx-auto grid w-full max-w-272 grid-cols-2 gap-2 sm:grid-cols-2 sm:gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4",
             )}
           >
             {supportItems.map(({ label, icon: Icon }) => (
@@ -140,7 +140,7 @@ export default async function Home(): Promise<React.ReactElement> {
                 </span>
                 <span
                   className={cn(
-                    "text-rich-black line-clamp-2 min-w-0 text-left text-sm font-semibold leading-tight [overflow-wrap:anywhere] sm:text-base md:text-[17px]",
+                    "text-rich-black line-clamp-2 min-w-0 text-left text-sm font-semibold leading-tight wrap-anywhere sm:text-base md:text-[17px]",
                   )}
                 >
                   {label}
