@@ -179,7 +179,7 @@ export default function Home(): React.ReactElement {
               href="tel:+64212971237"
               className={cn(
                 "text-russian-violet hover:text-coquelicot-500",
-                "flex items-center gap-3 rounded-md px-4 py-3 text-xl font-semibold",
+                "flex items-center gap-3 rounded-md px-4 py-3 text-3xl font-semibold",
               )}
             >
               <FaPhone
@@ -190,17 +190,17 @@ export default function Home(): React.ReactElement {
             </a>
             <div className={cn("bg-seasalt-400/50 hidden h-6 w-px sm:block")} />
             <a
-              href="mailto:harrisonraynes8@gmail.com"
+              href="mailto:harrison@tothepoint.com"
               className={cn(
                 "text-russian-violet hover:text-coquelicot-500",
-                "flex items-center gap-3 rounded-md px-4 py-3 text-xl font-semibold",
+                "flex items-center gap-3 rounded-md px-4 py-3 text-3xl font-semibold",
               )}
             >
               <FaEnvelope
                 className={cn("pointer-events-none h-8 w-8 shrink-0 select-none")}
                 aria-hidden
               />
-              <span>harrisonraynes8@gmail.com</span>
+              <span>harrison@tothepoint.com</span>
             </a>
           </div>
         </footer>
