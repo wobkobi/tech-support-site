@@ -133,7 +133,7 @@ export default function Home(): React.ReactElement {
 
             <ul
               className={cn(
-                "mx-auto grid w-full max-w-[68rem] grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4",
+                "mx-auto grid w-full max-w-272 grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4",
               )}
             >
               {supportItems.map(({ label, icon: Icon }) => (
@@ -156,7 +156,7 @@ export default function Home(): React.ReactElement {
                   <span
                     className={cn(
                       "text-rich-black min-w-0 text-left font-semibold leading-tight",
-                      "line-clamp-2 text-[18px] [overflow-wrap:anywhere] sm:text-[19px] md:text-[20px]",
+                      "line-clamp-2 text-[18px] wrap-anywhere sm:text-[19px] md:text-[20px]",
                     )}
                   >
                     {label}
