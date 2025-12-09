@@ -193,7 +193,7 @@ export default function Home(): React.ReactElement {
             </a>
             <div className={cn("bg-seasalt-400/50 hidden h-6 w-px sm:block")} />
             <a
-              href="mailto:harrison@tothepoint.com"
+              href="mailto:harrison@tothepoint.co.nz"
               className={cn(
                 "text-russian-violet hover:text-coquelicot-500",
                 "flex items-center gap-3 rounded-md px-4 py-3 text-3xl font-semibold",

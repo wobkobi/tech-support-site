@@ -182,7 +182,7 @@ export default async function Home(): Promise<React.ReactElement> {
           </a>
           <div className={cn("bg-seasalt-400/50 hidden h-5 w-px sm:block")} />
           <a
-            href="mailto:harrison@tothepoint.com"
+            href="mailto:harrison@tothepoint.co.nz"
             className={cn(
               "text-russian-violet hover:text-coquelicot-500 flex items-center gap-2 rounded-md px-3 py-2 text-base font-semibold sm:text-lg",
             )}
