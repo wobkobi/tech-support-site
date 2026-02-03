@@ -14,41 +14,38 @@ enum BookingStatus {
   cancelled
 }
 
-model Resource {
-  id       String    @id @default(auto()) @map("_id") @db.ObjectId
-  name     String
-  bookings Booking[]
-
-  @@unique([name])
-}
-
 model Booking {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 
-  // FK must be ObjectId to match Resource.id on Mongo
-  resourceId String   @db.ObjectId
-  resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
-
-  email String
+  // Person booking the appointment.
   name  String
+  email String
+  notes String?
 
-  // Mongo stores DateTime as BSON Date (UTC). No native @db.* here.
+  // When the appointment actually runs (in server time / UTC).
   startUtc DateTime
   endUtc   DateTime
 
+  // Per-booking buffer, in minutes, before and after the appointment.
   bufferBeforeMin Int @default(0)
   bufferAfterMin  Int @default(0)
 
-  status         BookingStatus @default(held)
+  // Status and hold expiry for possible future multi-step flows.
+  status         BookingStatus @default(confirmed)
   holdExpiresUtc DateTime?
 
+  // Secret token for management links (cancel / confirm, if you add them later).
   cancelToken String @unique
+
+  // Optional reference to the Google Calendar event, for future cancellation.
+  calendarEventId String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([resourceId, startUtc, endUtc])
+  @@index([startUtc, endUtc])
   @@index([status, holdExpiresUtc])
+  @@index([calendarEventId])
 }
 
 model Review {

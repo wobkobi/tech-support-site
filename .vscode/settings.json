@@ -1,3 +1,26 @@
 {
-  "svg.preview.background": "dark-transparent"
+  "svg.preview.background": "dark-transparent",
+  "prisma.pinToPrisma6": true,
+  // Tell VS Code ESLint extension we're using flat config
+  "eslint.useFlatConfig": true,
+  // Let ESLint find the right working directory (monorepo-safe)
+  "eslint.workingDirectories": [
+    {
+      "mode": "auto"
+    }
+  ],
+  // Run ESLint fixes when explicitly requested (or on save if you like)
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  // Use Prettier as the default formatter, ESLint only for lint
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  // Optional: don't let ESLint act as a formatter
+  "eslint.format.enable": false
 }

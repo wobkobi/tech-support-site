@@ -1,74 +1,146 @@
 // src/components/NavBar.tsx
+"use client";
 /**
- * @file NavBar.tsx
- * @description Themed bottom navigation. Frosted pill container, active highlight, responsive sizing.
+ * Top navigation bar with logo, primary links, and booking/contact CTAs.
+ * @returns React element for the site navigation bar.
  */
 
-"use client";
-
-import { cn } from "@/lib/cn";
+import type React from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-
-interface NavItem {
-  name: string;
-  href: string;
-}
-
-const navItems: NavItem[] = [
-  { name: "Home", href: "/" },
-  { name: "Booking", href: "/booking" },
-  { name: "About", href: "/about" },
-  { name: "Contact", href: "/contact" },
-];
+import { cn } from "@/lib/cn";
 
 /**
- * Navigation bar with active route styles.
- * @returns Themed NavBar element.
+ * One navigation entry shown in the primary nav.
  */
-export default function NavBar(): React.ReactElement {
-  const pathname = usePathname();
-
+interface NavItem {
   /**
-   * Match active route (exact for "/", prefix for others).
-   * @param href Item href.
-   * @returns Whether item is active.
+   * Label displayed to the user.
    */
-  const isActive = (href: string): boolean =>
-    href === "/" ? pathname === "/" : pathname.startsWith(href);
+  label: string;
+  /**
+   * Destination path.
+   */
+  href: string;
+  /**
+   * Route prefix used to determine active state.
+   */
+  activePrefix: string;
+}
+
+/**
+ * Determine whether a path is active for a given prefix route.
+ * @param pathname Current pathname.
+ * @param prefix Route prefix such as "/services".
+ * @returns True if pathname matches the prefix.
+ */
+function isActivePrefix(pathname: string, prefix: string): boolean {
+  if (prefix === "/") {
+    return pathname === "/";
+  }
+  return pathname === prefix || pathname.startsWith(`${prefix}/`);
+}
+
+/**
+ * Navigation bar rendered at the top of most pages.
+ * Hides itself on specific routes (eg, printable poster).
+ * @returns Navigation bar React element, or null if hidden on this route.
+ */
+export function NavBar(): React.ReactElement | null {
+  const pathname: string = usePathname();
+
+  const HIDDEN_PATHS: ReadonlyArray<string> = ["/poster"];
+
+  if (HIDDEN_PATHS.includes(pathname)) {
+    return null;
+  }
+
+  const items: ReadonlyArray<NavItem> = [
+    { label: "Services", href: "/services", activePrefix: "/services" },
+    { label: "Pricing", href: "/pricing", activePrefix: "/pricing" },
+    { label: "FAQ", href: "/faq", activePrefix: "/faq" },
+    { label: "Reviews", href: "/review", activePrefix: "/review" },
+  ];
+
+  const bookingActive = isActivePrefix(pathname, "/booking");
+  const contactActive = isActivePrefix(pathname, "/contact");
 
   return (
-    <nav className={cn("mx-auto w-fit max-w-[calc(100vw-2rem)]")}>
+    <header
+      className={cn(
+        "border-seasalt-400/40 sticky top-0 z-20 border-b",
+        "bg-seasalt/80 backdrop-blur-md",
+      )}
+    >
       <div
         className={cn(
-          "border-seasalt-400/40 bg-seasalt-800/70",
-          "rounded-lg border p-2 shadow-sm backdrop-blur-md",
+          "mx-auto flex h-14 w-full items-center justify-between",
+          "max-w-[min(100vw-1rem,80rem)]",
         )}
       >
-        <ul className={cn("flex items-center gap-1 sm:gap-2")}>
-          {navItems.map((item) => {
-            const active = isActive(item.href);
+        <Link href="/" className={cn("flex items-center gap-3 px-2")}>
+          <Image
+            src="/logo.svg"
+            alt="To The Point Tech"
+            width={28}
+            height={28}
+            priority
+            className={cn("select-none")}
+          />
+          <span className={cn("text-russian-violet text-base font-bold")}>To The Point Tech</span>
+        </Link>
+
+        <nav className={cn("hidden items-center gap-1.5 sm:flex")} aria-label="Primary navigation">
+          {items.map((item) => {
+            const active = isActivePrefix(pathname, item.activePrefix);
+
             return (
-              <li key={item.href}>
-                <Link
-                  href={item.href}
-                  aria-current={active ? "page" : undefined}
-                  className={cn(
-                    "rounded-md px-3 py-2 text-sm font-semibold sm:text-base",
-                    active
-                      ? // active pill
-                        "border-moonstone-500/30 bg-moonstone-600/15 text-moonstone-600 border"
-                      : // inactive
-                        "text-russian-violet hover:text-coquelicot-500",
-                  )}
-                >
-                  {item.name}
-                </Link>
-              </li>
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  "rounded-md px-3 py-2 text-sm font-semibold",
+                  active
+                    ? "text-russian-violet bg-moonstone-600/15"
+                    : "text-rich-black hover:bg-moonstone-600/10 hover:text-russian-violet",
+                )}
+                aria-current={active ? "page" : undefined}
+              >
+                {item.label}
+              </Link>
             );
           })}
-        </ul>
+        </nav>
+
+        <div className={cn("flex items-center gap-2 pr-2")}>
+          <Link
+            href="/booking"
+            className={cn(
+              "rounded-md px-3 py-2 text-sm font-bold",
+              bookingActive
+                ? "bg-coquelicot-600 text-rich-black"
+                : "bg-coquelicot-500 hover:bg-coquelicot-600 text-rich-black",
+            )}
+            aria-current={bookingActive ? "page" : undefined}
+          >
+            Book now
+          </Link>
+
+          <Link
+            href="/contact"
+            className={cn(
+              "rounded-md px-3 py-2 text-sm font-bold",
+              contactActive
+                ? "bg-moonstone-600/30 text-russian-violet"
+                : "bg-moonstone-600/20 text-russian-violet hover:bg-moonstone-600/30",
+            )}
+            aria-current={contactActive ? "page" : undefined}
+          >
+            Contact
+          </Link>
+        </div>
       </div>
-    </nav>
+    </header>
   );
 }

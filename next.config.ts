@@ -33,7 +33,6 @@ const cspDev =
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   output: "standalone",
-  eslint: { ignoreDuringBuilds: true },
   typescript: { ignoreBuildErrors: false },
 
   // Silence "inferred workspace root" warning

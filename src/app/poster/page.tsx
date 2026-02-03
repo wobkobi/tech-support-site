@@ -1,4 +1,4 @@
-// src/app/older/page.tsx
+// src/app/poster/page.tsx
 /**
  * Older-users variant:
  * - Larger type and controls (~+1-2 steps)
@@ -62,14 +62,14 @@ export default function Home(): React.ReactElement {
   return (
     <main className={cn("relative min-h-dvh overflow-hidden")}>
       {/* Backdrop*/}
-      <div className={cn("pointer-events-none absolute inset-0 -z-10 select-none overflow-hidden")}>
+      <div className={cn("pointer-events-none absolute inset-0 -z-10 overflow-hidden")}>
         <Image
           src="/backdrop.jpg"
           alt=""
           fill
           priority
           sizes="100vw"
-          className={cn("scale-110 transform-gpu select-none object-cover blur-xl")}
+          className={cn("scale-110 transform-gpu object-cover blur-xl")}
         />
       </div>
 
@@ -89,7 +89,7 @@ export default function Home(): React.ReactElement {
               height={182}
               priority
               draggable={false}
-              className={cn("h-auto w-[380px] select-none sm:w-[420px] md:w-[560px] lg:w-[700px]")}
+              className={cn("h-auto w-[380px] sm:w-[420px] md:w-[560px] lg:w-[700px]")}
             />
           </div>
 
@@ -185,10 +185,7 @@ export default function Home(): React.ReactElement {
                 "flex items-center gap-3 rounded-md px-4 py-3 text-3xl font-semibold",
               )}
             >
-              <FaPhone
-                className={cn("pointer-events-none h-8 w-8 shrink-0 select-none")}
-                aria-hidden
-              />
+              <FaPhone className={cn("pointer-events-none h-8 w-8 shrink-0")} aria-hidden />
               <span>+64 21 297 1237</span>
             </a>
             <div className={cn("bg-seasalt-400/50 hidden h-6 w-px sm:block")} />
@@ -199,10 +196,7 @@ export default function Home(): React.ReactElement {
                 "flex items-center gap-3 rounded-md px-4 py-3 text-3xl font-semibold",
               )}
             >
-              <FaEnvelope
-                className={cn("pointer-events-none h-8 w-8 shrink-0 select-none")}
-                aria-hidden
-              />
+              <FaEnvelope className={cn("pointer-events-none h-8 w-8 shrink-0")} aria-hidden />
               <span>harrison@tothepoint.co.nz</span>
             </a>
           </div>

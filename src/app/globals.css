@@ -111,7 +111,7 @@ body {
 
 /* A11y: focus + selection */
 :where(:focus-visible) {
-  outline: 2pxsolidcolor-mix(inoklab, var(--color-moonstone-500) 70%, white);
+  outline: 2px solid color-mix(inoklab, var(--color-moonstone-500) 70%, white);
   outline-offset: 2px;
 }
 
@@ -150,8 +150,9 @@ body {
 }
 
 .animate-marquee {
-  animation: marquee40slinearinfinite;
+  animation: marquee 40s linear infinite;
 }
+
 
 /* Scrollbar behaviour */
 html {

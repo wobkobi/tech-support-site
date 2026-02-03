@@ -4,6 +4,7 @@
  * @description Themed 404 page. Matches site styling and offers a way home.
  */
 
+import type React from "react";
 import { FrostedSection, PageShell } from "@/components/SiteFrame";
 import { cn } from "@/lib/cn";
 import Link from "next/link";
@@ -32,7 +33,7 @@ export default function NotFound(): React.ReactElement {
             )}
           >
             <p className={cn("text-rich-black mb-4 text-base font-medium sm:text-lg")}>
-              The page you’re after isn’t here.
+              The page you're after isn't here.
             </p>
 
             <Link

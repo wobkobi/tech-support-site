@@ -3,8 +3,10 @@
  * @file error.tsx
  * @description Themed error page. Matches site styling and offers retry/home actions.
  */
+
 "use client";
 
+import type React from "react";
 import { FrostedSection, PageShell } from "@/components/SiteFrame";
 import { cn } from "@/lib/cn";
 import Link from "next/link";
@@ -12,10 +14,10 @@ import { FaArrowRotateRight, FaHouse } from "react-icons/fa6";
 
 /**
  * Error boundary UI for the App Router.
- * @param root0 Props
- * @param root0.error Thrown error instance
- * @param root0.reset Callback to re-render the segment
- * @returns Error page element
+ * @param root0 Component props.
+ * @param root0.error Thrown error instance.
+ * @param root0.reset Callback to re-render the segment.
+ * @returns Error page element.
  */
 export default function Error({
   error,
@@ -75,9 +77,8 @@ export default function Error({
               </Link>
             </div>
 
-            {/* Optional details for debugging; collapse by default */}
             <details className={cn("text-rich-black/80 mt-4 text-sm")}>
-              <summary className={cn("cursor-pointer select-none")}>Technical details</summary>
+              <summary className={cn("cursor-pointer")}>Technical details</summary>
               <pre
                 className={cn(
                   "border-seasalt-400/60 bg-seasalt-800 mt-2 overflow-auto rounded-md border p-3",

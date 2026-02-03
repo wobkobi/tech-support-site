@@ -104,7 +104,7 @@ export default function ReviewForm({
               : "border-moonstone-500/50 bg-moonstone-600/10 text-moonstone-600",
           )}
         >
-          {errorMsg ?? "Thanks-your review was sent for moderation."}
+          {errorMsg ?? "Thanks for your review!"}
         </div>
       )}
 

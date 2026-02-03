@@ -22,7 +22,7 @@ export function PageBackdrop(): React.ReactElement {
         sizes="100vw"
         className={cn(
           "absolute inset-0 h-full w-full object-cover blur-xl",
-          "will-change-transform [transform-origin:center] [transform:scale(1.14)]",
+          "will-change-transform origin-center transform-[scale(1.14)]",
         )}
       />
     </div>
@@ -37,10 +37,10 @@ export function PageBackdrop(): React.ReactElement {
  */
 export function FrostedSection({ children }: { children: React.ReactNode }): React.ReactElement {
   return (
-    <div className={cn("mx-auto w-full max-w-[min(100vw-2rem,68rem)]")}>
+    <div className={cn("mx-auto w-full max-w-[min(100vw-1rem,80rem)]")}>
       <div
         className={cn(
-          "border-seasalt-400/40 bg-seasalt-800/60 rounded-2xl border p-4 shadow-lg backdrop-blur-xl sm:p-8",
+          "border-seasalt-400/40 bg-seasalt-800/60 rounded-2xl border p-3 shadow-lg backdrop-blur-xl sm:p-4",
         )}
       >
         {children}
@@ -60,6 +60,8 @@ export function PageShell({ children }: { children: React.ReactNode }): React.Re
     <main
       className={cn(
         "relative flex min-h-dvh w-full flex-col overflow-hidden pb-6 pt-6 sm:pb-10 sm:pt-10",
+        // Make all page text selectable
+        "select-text",
       )}
     >
       <PageBackdrop />
@@ -67,3 +69,13 @@ export function PageShell({ children }: { children: React.ReactNode }): React.Re
     </main>
   );
 }
+// Shared layout + surface tokens (matches the dark/frosted style used across the site)
+export const PAGE_MAIN =
+  "mx-auto flex w-full max-w-6xl flex-col gap-6 pb-6 pt-4 sm:gap-8 sm:pb-8 sm:pt-6";
+
+export const CARD = "border-seasalt-400/60 bg-seasalt-800 rounded-xl border p-4 shadow-sm sm:p-6";
+
+export const SOFT_CARD =
+  "border-seasalt-400/60 bg-seasalt-900/60 rounded-xl border p-3 shadow-sm sm:p-4";
+
+export const TILE = "border-seasalt-400/60 bg-seasalt-900/60 rounded-xl border p-3";

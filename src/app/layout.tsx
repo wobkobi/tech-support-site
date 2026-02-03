@@ -9,6 +9,7 @@ import type { Metadata, Viewport } from "next";
 import { Exo } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
+import { NavBar } from "@/components/NavBar";
 
 const exo = Exo({
   subsets: ["latin"],
@@ -231,6 +232,7 @@ export default function RootLayout({
     <html lang="en" className={`${exo.variable} font-sans`}>
       <body suppressHydrationWarning>
         {/* Primary app content */}
+        <NavBar />
         {children}
 
         {/* Analytics */}
