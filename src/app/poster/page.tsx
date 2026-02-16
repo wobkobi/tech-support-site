@@ -40,6 +40,20 @@ const supportItems = [
   { label: "Photos & Storage", icon: FaImages },
 ];
 
+const aboutMeText = ` Hi there, I'm Harrison. I'm a computer science graduate from Point Chevalier, eager
+                to apply my practical tech skills to benefit the community. I grew up here and want
+                to make technology more straightforward and less stressful for people who don't have
+                a go-to tech person.`;
+
+const servicesText = `If you've got a tech issue, I've got you covered. I fix slow computers, set up new
+                phones and laptops, sort Wi-Fi and network connections, connect printers and TVs,
+                and ensure cloud backups and email run reliably. I can secure your devices, remove
+                malware and scams, and safely move photos and files between devices. I will explain
+                everything in plain language, leave clear notes, and not upsell. I'm local, flexible
+                with evenings/weekends, and can help in person or remotely.`;
+
+const conactText = `Please message or email me to let me know what's going on, and we'll book a time
+                that suits you.`;
 /**
  * Home page component
  * @returns The Home page React element.
@@ -87,12 +101,7 @@ export default function Home(): React.ReactElement {
               )}
             >
               <h2 className={cn("text-russian-violet mb-2 text-4xl font-bold")}>About Me</h2>
-              <p className={cn("text-rich-black text-xl font-medium sm:text-2xl")}>
-                Hi there, I'm Harrison. I'm a computer science graduate from Point Chevalier, eager
-                to apply my practical tech skills to benefit the community. I grew up here and want
-                to make technology more straightforward and less stressful for people who don't have
-                a go-to tech person.
-              </p>
+              <p className={cn("text-rich-black text-xl font-medium sm:text-2xl")}>{aboutMeText}</p>
             </div>
 
             <div
@@ -104,17 +113,11 @@ export default function Home(): React.ReactElement {
                 Services
               </h2>
               <p className={cn("text-rich-black mb-3 text-xl font-medium sm:mb-4 sm:text-2xl")}>
-                If you've got a tech issue, I've got you covered. I fix slow computers, set up new
-                phones and laptops, sort Wi-Fi and network connections, connect printers and TVs,
-                and ensure cloud backups and email run reliably. I can secure your devices, remove
-                malware and scams, and safely move photos and files between devices. I will explain
-                everything in plain language, leave clear notes, and not upsell. I'm local, flexible
-                with evenings/weekends, and can help in person or remotely.
+                {servicesText}
               </p>
               <p className={cn("text-rich-black mb-3 text-xl font-medium sm:mb-4 sm:text-2xl")}>
                 <br />
-                Please message or email me to let me know what's going on, and we'll book a time
-                that suits you.
+                {conactText}
               </p>
             </div>
           </section>
@@ -133,7 +136,7 @@ export default function Home(): React.ReactElement {
 
             <ul
               className={cn(
-                "mx-auto grid w-full max-w-272 grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4",
+                "max-w-272 mx-auto grid w-full grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4",
               )}
             >
               {supportItems.map(({ label, icon: Icon }) => (
@@ -156,7 +159,7 @@ export default function Home(): React.ReactElement {
                   <span
                     className={cn(
                       "text-rich-black min-w-0 text-left font-semibold leading-tight",
-                      "line-clamp-2 text-[18px] wrap-anywhere sm:text-[19px] md:text-[20px]",
+                      "wrap-anywhere line-clamp-2 text-[18px] sm:text-[19px] md:text-[20px]",
                     )}
                   >
                     {label}
@@ -190,7 +193,7 @@ export default function Home(): React.ReactElement {
             </a>
             <div className={cn("bg-seasalt-400/50 hidden h-6 w-px sm:block")} />
             <a
-              href="mailto:harrison@tothepoint.com"
+              href="mailto:harrison@tothepoint.co.nz"
               className={cn(
                 "text-russian-violet hover:text-coquelicot-500",
                 "flex items-center gap-3 rounded-md px-4 py-3 text-3xl font-semibold",
@@ -200,7 +203,7 @@ export default function Home(): React.ReactElement {
                 className={cn("pointer-events-none h-8 w-8 shrink-0 select-none")}
                 aria-hidden
               />
-              <span>harrison@tothepoint.com</span>
+              <span>harrison@tothepoint.co.nz</span>
             </a>
           </div>
         </footer>
