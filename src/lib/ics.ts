@@ -38,7 +38,11 @@ export interface IcsEventParams {
  * @returns Escaped text.
  */
 function escapeIcs(text: string): string {
-  return text.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
+  return text
+    .replace(/\\/g, "\\\\")
+    .replace(/;/g, "\\;")
+    .replace(/,/g, "\\,")
+    .replace(/\n/g, "\\n");
 }
 
 /**
@@ -136,8 +140,16 @@ export function generateIcsContent(params: IcsEventParams): string {
  * @returns ICS cancellation content.
  */
 export function generateCancellationIcs(params: IcsEventParams): string {
-  const { uid, summary, startUtc, endUtc, organizerEmail, organizerName, attendeeEmail, attendeeName } =
-    params;
+  const {
+    uid,
+    summary,
+    startUtc,
+    endUtc,
+    organizerEmail,
+    organizerName,
+    attendeeEmail,
+    attendeeName,
+  } = params;
 
   const lines: string[] = [
     "BEGIN:VCALENDAR",

@@ -1,20 +1,24 @@
 // src/app/poster/page.tsx
 /**
- * Older-users variant:
- * - Larger type and controls (~+1-2 steps)
- * - Taller cards and bigger icon boxes
- * - More generous spacing for tap targets
- * - Keeps commented-out blocks
+ * POSTER PAGE - A4 at 300 DPI (1680x2308px)
+ * Even outer gap on all 4 sides:
+ * - Controlled by p-[60px] on the main content wrapper.
+ * Footer sits on the bottom edge of the padded area via mt-auto.
  */
 
 import { cn } from "@/lib/cn";
 import Image from "next/image";
+import type React from "react";
 import {
+  FaCircleCheck,
+  FaClock,
   FaCloud,
   FaEnvelope,
+  FaGlobe,
   FaHouse,
   FaImages,
   FaLaptop,
+  FaLocationDot,
   FaMobileScreen,
   FaPhone,
   FaPrint,
@@ -25,7 +29,7 @@ import {
   FaWifi,
 } from "react-icons/fa6";
 
-const supportItems = [
+const supportItems: Array<{ label: string; icon: React.ComponentType<{ className?: string }> }> = [
   { label: "Computers", icon: FaLaptop },
   { label: "Phones & Tablets", icon: FaMobileScreen },
   { label: "Wi-Fi & Internet", icon: FaWifi },
@@ -40,168 +44,232 @@ const supportItems = [
   { label: "Photos & Storage", icon: FaImages },
 ];
 
-const aboutMeText = ` Hi there, I'm Harrison. I'm a computer science graduate from Point Chevalier, eager
-                to apply my practical tech skills to benefit the community. I grew up here and want
-                to make technology more straightforward and less stressful for people who don't have
-                a go-to tech person.`;
+const aboutMeText =
+  "Hi there, I'm Harrison. I'm a computer science graduate from Point Chevalier, eager to apply my practical tech skills to benefit the community. I grew up here and want to make technology more straightforward and less stressful for people who don't have a go-to tech person.";
 
-const servicesText = `If you've got a tech issue, I've got you covered. I fix slow computers, set up new
-                phones and laptops, sort Wi-Fi and network connections, connect printers and TVs,
-                and ensure cloud backups and email run reliably. I can secure your devices, remove
-                malware and scams, and safely move photos and files between devices. I will explain
-                everything in plain language, leave clear notes, and not upsell. I'm local, flexible
-                with evenings/weekends, and can help in person or remotely.`;
+const servicesText =
+  "If you've got a tech issue, I've got you covered. I fix slow computers, set up new phones and laptops, sort Wi-Fi and network connections, connect printers and TVs, and ensure cloud backups and email run reliably. I can secure your devices, remove malware and scams, and safely move photos and files between devices. I will explain everything in plain language, leave clear notes, and not upsell. I'm local, flexible with evenings/weekends, and can help in person or remotely.";
 
-const conactText = `Please message or email me to let me know what's going on, and we'll book a time
-                that suits you.`;
 /**
- * Home page component
- * @returns The Home page React element.
+ * Poster page component for A4 print export
+ * @returns React element containing the poster layout
  */
-export default function Home(): React.ReactElement {
+export default function PosterPage(): React.ReactElement {
   return (
-    <main className={cn("relative min-h-dvh overflow-hidden")}>
-      {/* Backdrop*/}
-      <div className={cn("pointer-events-none absolute inset-0 -z-10 overflow-hidden")}>
+    <div className={cn("relative h-577 w-420 overflow-hidden")}>
+      {/* Backdrop */}
+      <div className={cn("absolute inset-0 -z-10")}>
         <Image
           src="/backdrop.jpg"
           alt=""
           fill
           priority
-          sizes="100vw"
-          className={cn("scale-110 transform-gpu object-cover blur-xl")}
+          sizes="1680px"
+          className={cn("scale-110 object-cover blur-xl")}
         />
       </div>
 
-      {/* Frosted container  */}
-      <div className={cn("mx-auto my-5 w-full max-w-[min(100vw-2rem,68rem)] sm:my-10")}>
-        <div
-          className={cn(
-            "border-seasalt-400/40 bg-seasalt-800/60 rounded-2xl border p-5 shadow-lg backdrop-blur-xl sm:p-10",
-          )}
-        >
-          {/* Logo */}
-          <div className={cn("grid place-items-center pb-5 sm:pb-7")}>
-            <Image
-              src="/logo-full.svg"
-              alt="To The Point Tech"
-              width={800}
-              height={182}
-              priority
-              draggable={false}
-              className={cn("h-auto w-[380px] sm:w-[420px] md:w-[560px] lg:w-[700px]")}
-            />
-          </div>
-
-          {/* Text boxes */}
-          <section className={cn("mx-auto flex w-full max-w-5xl flex-col gap-4 sm:gap-5")}>
-            <div
-              className={cn(
-                "border-seasalt-400/60 bg-seasalt-800 rounded-xl border p-5 shadow-sm sm:p-6",
-              )}
-            >
-              <h2 className={cn("text-russian-violet mb-2 text-4xl font-bold")}>About Me</h2>
-              <p className={cn("text-rich-black text-xl font-medium sm:text-2xl")}>{aboutMeText}</p>
-            </div>
-
-            <div
-              className={cn(
-                "border-seasalt-400/60 bg-seasalt-800 rounded-xl border p-5 shadow-sm sm:p-6",
-              )}
-            >
-              <h2 className={cn("text-russian-violet mb-2 text-4xl font-bold sm:mb-3")}>
-                Services
-              </h2>
-              <p className={cn("text-rich-black mb-3 text-xl font-medium sm:mb-4 sm:text-2xl")}>
-                {servicesText}
-              </p>
-              <p className={cn("text-rich-black mb-3 text-xl font-medium sm:mb-4 sm:text-2xl")}>
-                <br />
-                {conactText}
-              </p>
-            </div>
-          </section>
-
-          {/* Support grid */}
-          <section
-            aria-labelledby="support"
-            className={cn("mx-auto mt-5 w-full max-w-5xl sm:mt-7")}
-          >
-            <h2
-              id="support"
-              className={cn("text-rich-black mb-3 text-center text-3xl font-semibold sm:text-4xl")}
-            >
-              Areas I Can Help With
-            </h2>
-
-            <ul
-              className={cn(
-                "max-w-272 mx-auto grid w-full grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4",
-              )}
-            >
-              {supportItems.map(({ label, icon: Icon }) => (
-                <li
-                  key={label}
-                  className={cn(
-                    "border-seasalt-400/60 bg-seasalt-800 rounded-lg border",
-                    "flex h-20 w-full min-w-0 items-center gap-3 px-3 sm:gap-4 sm:px-4",
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "grid size-12 shrink-0 place-items-center rounded-md",
-                      "border-moonstone-500/30 bg-moonstone-600/15 border md:size-14",
-                    )}
-                  >
-                    <Icon className={cn("text-moonstone-600 h-7 w-7 sm:h-8 sm:w-8")} aria-hidden />
-                  </span>
-
-                  <span
-                    className={cn(
-                      "text-rich-black min-w-0 text-left font-semibold leading-tight",
-                      "wrap-anywhere line-clamp-2 text-[18px] sm:text-[19px] md:text-[20px]",
-                    )}
-                  >
-                    {label}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </section>
-        </div>
-
-        {/* Footer */}
-        <footer className={cn("mx-auto mt-5 w-fit max-w-[calc(100vw-2rem)] sm:mt-8")}>
+      {/* Even outer gap on all sides */}
+      <div className={cn("flex h-full w-full flex-col p-10")}>
+        {/* Inner column fills available height so footer can pin to bottom */}
+        <div className={cn("flex min-h-0 flex-1 flex-col")}>
+          {/* Main frosted card */}
           <div
             className={cn(
-              "border-seasalt-400/40 bg-seasalt-800/70 rounded-lg border p-4 backdrop-blur-md sm:px-5 sm:py-4",
-              "flex flex-col items-stretch gap-4 sm:flex-row sm:items-center sm:gap-7",
+              "rounded-4xl border-seasalt-400/40 bg-seasalt-800/60 border-[3px] p-7.5 shadow-xl backdrop-blur-xl",
             )}
           >
-            <a
-              href="tel:+64212971237"
-              className={cn(
-                "text-russian-violet hover:text-coquelicot-500",
-                "flex items-center gap-3 rounded-md px-4 py-3 text-3xl font-semibold",
-              )}
-            >
-              <FaPhone className={cn("pointer-events-none h-8 w-8 shrink-0")} aria-hidden />
-              <span>+64 21 297 1237</span>
-            </a>
-            <div className={cn("bg-seasalt-400/50 hidden h-6 w-px sm:block")} />
-            <a
-              href="mailto:harrison@tothepoint.co.nz"
-              className={cn(
-                "text-russian-violet hover:text-coquelicot-500",
-                "flex items-center gap-3 rounded-md px-4 py-3 text-3xl font-semibold",
-              )}
-            >
-              <FaEnvelope className={cn("pointer-events-none h-8 w-8 shrink-0")} aria-hidden />
-              <span>harrison@tothepoint.co.nz</span>
-            </a>
+            {/* Logo */}
+            <div className={cn("grid place-items-center pb-5")}>
+              <Image
+                src="/logo-full.svg"
+                alt="To The Point Tech"
+                width={1376}
+                height={313}
+                priority
+                className={cn("h-auto w-344")}
+              />
+            </div>
+
+            {/* Trust badges */}
+            <div className={cn("mx-auto mb-5 flex flex-wrap justify-center gap-3")}>
+              <div
+                className={cn(
+                  "relative flex items-center gap-3 rounded-xl border-2 border-moonstone-500/30 px-4.5 py-1.5 shadow-sm",
+                )}
+                style={{ backgroundColor: '#f6f7f8' }}
+              >
+                <div 
+                  className={cn("absolute inset-0 rounded-xl")} 
+                  style={{ backgroundColor: 'rgba(67, 188, 205, 0.15)' }}
+                />
+                <FaCircleCheck className={cn("relative z-10 text-moonstone-600 h-9 w-9")} />
+                <span className={cn("relative z-10 text-rich-black text-[34px] font-semibold")}>CS Graduate</span>
+              </div>
+
+              <div
+                className={cn(
+                  "relative flex items-center gap-3 rounded-xl border-2 border-moonstone-500/30 px-4.5 py-1.5 shadow-sm",
+                )}
+                style={{ backgroundColor: '#f6f7f8' }}
+              >
+                <div 
+                  className={cn("absolute inset-0 rounded-xl")} 
+                  style={{ backgroundColor: 'rgba(67, 188, 205, 0.15)' }}
+                />
+                <FaLocationDot className={cn("relative z-10 text-moonstone-600 h-9 w-9")} />
+                <span className={cn("relative z-10 text-rich-black text-[34px] font-semibold")}>
+                  Pt Chev Local
+                </span>
+              </div>
+
+              <div
+                className={cn(
+                  "relative flex items-center gap-3 rounded-xl border-2 border-moonstone-500/30 px-4.5 py-1.5 shadow-sm",
+                )}
+                style={{ backgroundColor: '#f6f7f8' }}
+              >
+                <div 
+                  className={cn("absolute inset-0 rounded-xl")} 
+                  style={{ backgroundColor: 'rgba(67, 188, 205, 0.15)' }}
+                />
+                <FaClock className={cn("relative z-10 text-moonstone-600 h-9 w-9")} />
+                <span className={cn("relative z-10 text-rich-black text-[34px] font-semibold")}>
+                  Same-Day Available
+                </span>
+              </div>
+            </div>
+
+            {/* Text boxes */}
+            <section className={cn("flex flex-col gap-5")}>
+              <div
+                className={cn(
+                  "border-seasalt-400/60 bg-seasalt-800 rounded-[18px] border-2 p-4.5 shadow-sm",
+                )}
+              >
+                <h2 className={cn("text-russian-violet mb-1.5 text-[53px] font-bold")}>
+                  About Me
+                </h2>
+                <p className={cn("text-rich-black text-[38px] font-medium leading-tight")}>
+                  {aboutMeText}
+                </p>
+              </div>
+
+              <div
+                className={cn(
+                  "border-seasalt-400/60 bg-seasalt-800 rounded-[18px] border-2 p-4.5 shadow-sm",
+                )}
+              >
+                <h2 className={cn("text-russian-violet mb-1.5 text-[53px] font-bold")}>
+                  Services
+                </h2>
+                <p className={cn("text-rich-black text-[38px] font-medium leading-tight")}>
+                  {servicesText}
+                </p>
+              </div>
+            </section>
+
+            {/* Support grid */}
+            <section className={cn("mt-3")}>
+              <h2 className={cn("text-rich-black mb-3 text-center text-[53px] font-semibold")}>
+                Areas I Can Help With
+              </h2>
+
+              <ul className={cn("grid grid-cols-3 gap-3")}>
+                {supportItems.map(({ label, icon: Icon }) => (
+                  <li
+                    key={label}
+                    className={cn(
+                      "border-seasalt-400/60 bg-seasalt-800 flex h-27 items-center gap-3 rounded-xl border-2 px-4.5",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "border-moonstone-500/30 bg-moonstone-600/15 grid size-15 shrink-0 place-items-center rounded-xl border-2",
+                      )}
+                    >
+                      <Icon className={cn("text-moonstone-600 h-9 w-9")} aria-hidden />
+                    </span>
+
+                    <span
+                      className={cn(
+                        "text-rich-black text-left text-[34px] font-semibold leading-tight",
+                      )}
+                    >
+                      {label}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
           </div>
-        </footer>
+
+          {/* Fixed gap between main card and footer */}
+          <div className={cn("h-10")} />
+
+          {/* Footer pinned to the bottom of the padded area */}
+          <footer className={cn("mx-auto mt-auto w-fit")}>
+            <div
+              className={cn(
+                "bg-seasalt-800/70 rounded-[14px] border-seasalt-400/40 border-2 p-4.5 shadow-xl backdrop-blur-md",
+              )}
+            >
+              <div className={cn("flex items-center gap-7")}>
+                {/* QR Code */}
+                <div className={cn("flex shrink-0 flex-col items-center gap-1")}>
+                  <div
+                    className={cn(
+                      "border-seasalt-400/60 grid size-37.5 place-items-center rounded-[10px] border-2 bg-white p-2.5 shadow-sm",
+                    )}
+                  >
+                    <Image
+                      src="/qr-booking.svg"
+                      alt="Scan to book"
+                      width={150}
+                      height={150}
+                      className={cn("h-full w-full")}
+                    />
+                  </div>
+                  <span className={cn("text-rich-black text-center text-[24px] font-semibold")}>
+                    Scan to Book
+                  </span>
+                </div>
+
+                {/* Contact Info */}
+                <div className={cn("flex flex-col gap-2.5")}>
+                  <a
+                    href="tel:+64212971237"
+                    className={cn(
+                      "text-russian-violet flex items-center gap-3.5 text-[34px] font-semibold",
+                    )}
+                  >
+                    <FaPhone className={cn("h-7.5 w-7.5 shrink-0")} aria-hidden />
+                    <span>021 297 1237</span>
+                  </a>
+
+                  <a
+                    href="mailto:harrison@tothepoint.co.nz"
+                    className={cn(
+                      "text-russian-violet flex items-center gap-3.5 text-[34px] font-semibold",
+                    )}
+                  >
+                    <FaEnvelope className={cn("h-7.5 w-7.5 shrink-0")} aria-hidden />
+                    <span>harrison@tothepoint.co.nz</span>
+                  </a>
+
+                  <div className={cn("flex items-center gap-3.5 text-[34px] font-semibold")}>
+                    <FaGlobe
+                      className={cn("text-russian-violet h-7.5 w-7.5 shrink-0")}
+                      aria-hidden
+                    />
+                    <p className={cn("text-russian-violet")}>tothepoint.co.nz</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </footer>
+        </div>
       </div>
-    </main>
+    </div>
   );
 }

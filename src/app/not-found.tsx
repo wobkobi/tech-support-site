@@ -1,11 +1,11 @@
 // src/app/not-found.tsx
 /**
  * @file not-found.tsx
- * @description Themed 404 page. Matches site styling and offers a way home.
+ * @description Themed 404 page. Matches site styling.
  */
 
 import type React from "react";
-import { FrostedSection, PageShell } from "@/components/SiteFrame";
+import { FrostedSection, PageShell, CARD } from "@/components/SiteFrame";
 import { cn } from "@/lib/cn";
 import Link from "next/link";
 import { FaHouse } from "react-icons/fa6";
@@ -17,36 +17,33 @@ import { FaHouse } from "react-icons/fa6";
 export default function NotFound(): React.ReactElement {
   return (
     <PageShell>
-      <FrostedSection>
-        <section className={cn("mx-auto w-full max-w-5xl")}>
-          <h1
-            className={cn(
-              "text-rich-black mb-3 text-center text-2xl font-bold sm:mb-4 sm:text-3xl md:text-4xl",
-            )}
-          >
-            Page not found
-          </h1>
+      <FrostedSection maxWidth="48rem">
+        <div className={cn("flex flex-col gap-4 sm:gap-5")}>
+          <section className={cn(CARD)}>
+            <h1
+              className={cn(
+                "text-russian-violet mb-3 text-2xl font-extrabold sm:text-3xl md:text-4xl",
+              )}
+            >
+              Page not found
+            </h1>
 
-          <div
-            className={cn(
-              "border-seasalt-400/60 bg-seasalt-800 rounded-lg border p-4 shadow-sm sm:p-6",
-            )}
-          >
-            <p className={cn("text-rich-black mb-4 text-base font-medium sm:text-lg")}>
-              The page you're after isn't here.
+            <p className={cn("text-rich-black mb-4 text-sm sm:text-base")}>
+              The page you're looking for doesn't exist or has been moved.
             </p>
 
             <Link
               href="/"
               className={cn(
-                "text-russian-violet hover:text-coquelicot-500 inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold",
+                "bg-russian-violet text-seasalt inline-flex items-center gap-2 rounded-md px-4 py-2.5 text-sm font-semibold",
+                "hover:brightness-110",
               )}
             >
               <FaHouse className={cn("h-4 w-4")} aria-hidden />
               Go home
             </Link>
-          </div>
-        </section>
+          </section>
+        </div>
       </FrostedSection>
     </PageShell>
   );

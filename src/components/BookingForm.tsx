@@ -2,7 +2,8 @@
 "use client";
 /**
  * @file BookingForm.tsx
- * @description Simplified booking form with day and time-of-day selection.
+ * @description Booking request form - clients pick day + time window.
+ * Unavailable times are disabled based on calendar conflicts.
  */
 
 import type React from "react";
@@ -11,20 +12,10 @@ import { useRouter } from "next/navigation";
 import { cn } from "@/lib/cn";
 import { TIME_OF_DAY_OPTIONS, type BookableDay, type TimeOfDay } from "@/lib/booking";
 
-/**
- * Props for the BookingForm component.
- */
 export interface BookingFormProps {
-  /** Available days with their time windows. */
   availableDays: BookableDay[];
 }
 
-/**
- * Booking form with day picker and time-of-day selection.
- * @param root0 - Component props.
- * @param root0.availableDays - Available days for booking.
- * @returns Booking form element.
- */
 export default function BookingForm({ availableDays }: BookingFormProps): React.ReactElement {
   const router = useRouter();
   const [selectedDay, setSelectedDay] = useState<BookableDay | null>(null);
@@ -40,10 +31,6 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
   const weekdays = availableDays.filter((d) => !d.isWeekend);
   const weekends = availableDays.filter((d) => d.isWeekend);
 
-  /**
-   * Handle day selection.
-   * @param day - The selected day.
-   */
   function handleDaySelect(day: BookableDay): void {
     setSelectedDay(day);
     // Reset time if not available on new day
@@ -52,10 +39,6 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
     }
   }
 
-  /**
-   * Submit the booking request.
-   * @param e - Form submit event.
-   */
   async function handleSubmit(e: React.FormEvent): Promise<void> {
     e.preventDefault();
     setError(null);
@@ -99,7 +82,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
 
       if (!res.ok) {
         const data = (await res.json()) as { error?: string };
-        setError(data.error || "Could not submit booking request.");
+        setError(data.error || "Could not submit request.");
         setSubmitting(false);
         return;
       }
@@ -128,7 +111,11 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
             {/* Weekdays */}
             {weekdays.length > 0 && (
               <div>
-                <p className={cn("text-rich-black/60 mb-1.5 text-xs font-medium uppercase tracking-wide")}>
+                <p
+                  className={cn(
+                    "text-rich-black/60 mb-1.5 text-xs font-medium uppercase tracking-wide",
+                  )}
+                >
                   Weekdays
                 </p>
                 <div className={cn("flex flex-wrap gap-2")}>
@@ -158,7 +145,11 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
             {/* Weekends */}
             {weekends.length > 0 && (
               <div>
-                <p className={cn("text-rich-black/60 mb-1.5 text-xs font-medium uppercase tracking-wide")}>
+                <p
+                  className={cn(
+                    "text-rich-black/60 mb-1.5 text-xs font-medium uppercase tracking-wide",
+                  )}
+                >
                   Weekends
                 </p>
                 <div className={cn("flex flex-wrap gap-2")}>
@@ -210,6 +201,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
                   )}
                 >
                   {option.label}
+                  {!isAvailable && " (busy)"}
                 </button>
               );
             })}
@@ -231,7 +223,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
             onChange={(e) => setName(e.target.value)}
             className={cn(
               "border-seasalt-400/80 bg-seasalt text-rich-black rounded-md border px-3 py-2 text-sm",
-              "focus:border-russian-violet focus:outline-none focus:ring-1 focus:ring-russian-violet/30",
+              "focus:border-russian-violet focus:ring-russian-violet/30 focus:outline-none focus:ring-1",
             )}
           />
         </div>
@@ -248,7 +240,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
             onChange={(e) => setEmail(e.target.value)}
             className={cn(
               "border-seasalt-400/80 bg-seasalt text-rich-black rounded-md border px-3 py-2 text-sm",
-              "focus:border-russian-violet focus:outline-none focus:ring-1 focus:ring-russian-violet/30",
+              "focus:border-russian-violet focus:ring-russian-violet/30 focus:outline-none focus:ring-1",
             )}
           />
         </div>
@@ -266,7 +258,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
           onChange={(e) => setPhone(e.target.value)}
           className={cn(
             "border-seasalt-400/80 bg-seasalt text-rich-black rounded-md border px-3 py-2 text-sm",
-            "focus:border-russian-violet focus:outline-none focus:ring-1 focus:ring-russian-violet/30",
+            "focus:border-russian-violet focus:ring-russian-violet/30 focus:outline-none focus:ring-1",
             "sm:max-w-xs",
           )}
         />
@@ -283,7 +275,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
           onChange={(e) => setNotes(e.target.value)}
           className={cn(
             "border-seasalt-400/80 bg-seasalt text-rich-black rounded-md border px-3 py-2 text-sm",
-            "focus:border-russian-violet focus:outline-none focus:ring-1 focus:ring-russian-violet/30",
+            "focus:border-russian-violet focus:ring-russian-violet/30 focus:outline-none focus:ring-1",
           )}
           placeholder="e.g., Wi-Fi not working, need help with email setup, laptop running slow..."
         />
@@ -304,7 +296,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
             "hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60",
           )}
         >
-          {submitting ? "Sending..." : "Request booking"}
+          {submitting ? "Sending..." : "Submit request"}
         </button>
         <p className={cn("text-rich-black/60 text-xs sm:text-sm")}>
           I'll confirm your exact appointment time by email.

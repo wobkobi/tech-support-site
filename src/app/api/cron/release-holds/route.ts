@@ -7,7 +7,7 @@
  * {
  *   "crons": [{
  *     "path": "/api/cron/release-holds",
- *     "schedule": "*/5 * * * *"
+ *     "schedule": "*/ 5; /* /* /* /*"
  *   }]
  * }
  *

@@ -6,7 +6,12 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { BOOKING_CONFIG, buildAvailableSlots, type ExistingBooking, type BookingSlot } from "@/lib/booking";
+import {
+  BOOKING_CONFIG,
+  buildAvailableSlots,
+  type ExistingBooking,
+  type BookingSlot,
+} from "@/lib/booking";
 import { releaseExpiredHolds } from "@/lib/releaseExpiredHolds";
 
 /**
@@ -62,9 +67,6 @@ export async function GET(): Promise<NextResponse<AvailableSlotsResponse>> {
     });
   } catch (error) {
     console.error("[booking/slots] Error:", error);
-    return NextResponse.json(
-      { slots: [], timeZone: BOOKING_CONFIG.timeZone },
-      { status: 500 },
-    );
+    return NextResponse.json({ slots: [], timeZone: BOOKING_CONFIG.timeZone }, { status: 500 });
   }
 }

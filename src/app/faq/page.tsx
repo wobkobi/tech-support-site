@@ -1,11 +1,11 @@
 // src/app/faq/page.tsx
 /**
- * FAQ page.
+ * FAQ page: common questions about services, pricing, and how I work.
  */
 
 import type React from "react";
 import Link from "next/link";
-import { FrostedSection, PageShell } from "@/components/SiteFrame";
+import { FrostedSection, PageShell, CARD, SOFT_CARD } from "@/components/SiteFrame";
 import { cn } from "@/lib/cn";
 
 export const dynamic = "force-dynamic";
@@ -16,15 +16,6 @@ interface FaqItem {
   answer: React.ReactNode;
 }
 
-const pageMain = cn(
-  "mx-auto flex w-full max-w-6xl flex-col gap-6 sm:gap-8",
-  "pt-4 sm:pt-6 pb-6 sm:pb-8",
-);
-
-const card = cn("border-seasalt-400/60 bg-seasalt-800 rounded-xl border p-4 shadow-sm sm:p-6");
-const softCard = cn(
-  "border-seasalt-400/60 bg-seasalt-900/60 rounded-xl border p-3 shadow-sm sm:p-4",
-);
 const linkStyle = cn(
   "text-coquelicot-500 hover:text-coquelicot-600 underline-offset-4 hover:underline",
 );
@@ -33,108 +24,161 @@ const faqItems: ReadonlyArray<FaqItem> = [
   {
     question: "Where are you based and what areas do you cover?",
     answer: (
-      <div className={cn("space-y-2")}>
-        <p>I am based in Point Chevalier. Most on-site visits are around the local area.</p>
-        <p className={cn("text-rich-black/80")}>
-          If you are nearby but not sure, send a message and I will let you know what works.
+      <>
+        <p>
+          I'm based in Point Chevalier and mainly work across Point Chev, Western Springs, Mount
+          Albert, Grey Lynn, Westmere, Kingsland, and nearby suburbs.
         </p>
-      </div>
+        <p className={cn("text-rich-black/80 mt-2")}>
+          Not sure if you're in range? Send a message and I'll let you know.
+        </p>
+      </>
     ),
   },
   {
     question: "Do you offer remote support?",
     answer: (
-      <div className={cn("space-y-2")}>
+      <>
         <p>
-          Yes, for many software, account, and setup jobs where you have a stable internet
-          connection.
+          Yes. Many software, account, and setup issues can be handled remotely if you have a stable
+          internet connection.
         </p>
-        <p className={cn("text-rich-black/80")}>
-          If it turns out an on-site visit is needed (for cabling, Wi-Fi hardware, printers, etc.),
+        <p className={cn("text-rich-black/80 mt-2")}>
+          If it turns out an on-site visit is needed (for Wi-Fi hardware, printers, cabling, etc.),
           we can switch.
         </p>
-      </div>
+      </>
     ),
   },
   {
-    question: "What kinds of devices do you work with?",
+    question: "What devices and systems do you work with?",
     answer: (
-      <div className={cn("space-y-2")}>
+      <>
         <p>
-          Windows PCs and laptops, phones and tablets, Wi-Fi and networking gear, printers, smart
-          TVs, and common home tech.
+          Windows PCs and laptops, Android and iOS phones and tablets, Wi-Fi and networking gear,
+          printers, smart TVs, and common home tech.
         </p>
-        <p className={cn("text-rich-black/80")}>
-          If you have something unusual, include the model in your message and I will confirm.
+        <p className={cn("text-rich-black/80 mt-2")}>
+          I don't specialise in Mac repairs, but can help with general setup and connectivity. If
+          you have something unusual, mention the model and I'll confirm.
         </p>
-      </div>
+      </>
     ),
   },
   {
-    question: "Do you sell hardware or upsell products?",
+    question: "How much does it cost?",
     answer: (
-      <div className={cn("space-y-2")}>
+      <>
         <p>
-          No upselling. The focus is fixing the problem and leaving you with a setup you understand.
+          Most work is billed hourly with a minimum call-out for on-site visits. I'll give you a
+          clear estimate before starting so there are no surprises.
         </p>
-        <p className={cn("text-rich-black/80")}>
-          If a replacement part or upgrade genuinely makes sense, I will explain options and you
+        <p className={cn("text-rich-black/80 mt-2")}>
+          See the{" "}
+          <Link href="/pricing" className={linkStyle}>
+            pricing page
+          </Link>{" "}
+          for more details, or{" "}
+          <Link href="/contact" className={linkStyle}>
+            get in touch
+          </Link>{" "}
+          for a quote.
+        </p>
+      </>
+    ),
+  },
+  {
+    question: "Do you sell hardware or push unnecessary upgrades?",
+    answer: (
+      <>
+        <p>
+          No. I don't sell products or earn commission on anything. My only goal is to fix the
+          problem and leave you with a setup you understand.
+        </p>
+        <p className={cn("text-rich-black/80 mt-2")}>
+          If a replacement part or upgrade genuinely makes sense, I'll explain the options and you
           decide.
         </p>
-      </div>
+      </>
     ),
   },
   {
-    question: "How do bookings work?",
+    question: "How do I book an appointment?",
     answer: (
-      <div className={cn("space-y-2")}>
-        <p>You can message or email first, or use online booking for available times.</p>
-        <p className={cn("text-rich-black/80")}>
+      <>
+        <p>
+          You can{" "}
+          <Link href="/booking" className={linkStyle}>
+            book online
+          </Link>{" "}
+          for available times, or{" "}
+          <Link href="/contact" className={linkStyle}>
+            contact me
+          </Link>{" "}
+          directly by phone or email.
+        </p>
+        <p className={cn("text-rich-black/80 mt-2")}>
           For urgent issues, calling is best so I can try to fit you in sooner.
         </p>
-      </div>
+      </>
+    ),
+  },
+  {
+    question: "What if you can't fix the problem?",
+    answer: (
+      <>
+        <p>
+          If I can't resolve your issue, I'll explain what I found and suggest next steps. You won't
+          be charged for work that doesn't help.
+        </p>
+        <p className={cn("text-rich-black/80 mt-2")}>
+          For complex problems outside my expertise, I can point you to appropriate specialists.
+        </p>
+      </>
     ),
   },
 ];
 
 /**
- *
+ * FAQ page component.
+ * @returns FAQ page element.
  */
 export default function FaqPage(): React.ReactElement {
   return (
     <PageShell>
-      <FrostedSection>
-        <main className={pageMain}>
-          <section aria-labelledby="faq-heading" className={card}>
+      <FrostedSection maxWidth="56rem">
+        <div className={cn("flex flex-col gap-4 sm:gap-5")}>
+          <section aria-labelledby="faq-heading" className={cn(CARD)}>
             <h1
               id="faq-heading"
               className={cn(
                 "text-russian-violet mb-2 text-2xl font-extrabold sm:text-3xl md:text-4xl",
               )}
             >
-              FAQ
+              Frequently asked questions
             </h1>
-            <p className={cn("text-rich-black/80 max-w-3xl text-sm sm:text-base")}>
-              Quick answers to common questions. If you do not see your question here,{" "}
+            <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
+              Quick answers to common questions. Don't see yours?{" "}
               <Link href="/contact" className={linkStyle}>
-                contact me
+                Get in touch
               </Link>
               .
             </p>
           </section>
 
-          <section aria-label="Frequently asked questions" className={card}>
-            <div className={cn("space-y-3")}>
+          <section aria-label="FAQ list" className={cn(CARD)}>
+            <div className={cn("space-y-4")}>
               {faqItems.map((item) => (
-                <details key={item.question} className={softCard}>
+                <details key={item.question} className={cn(SOFT_CARD, "group")}>
                   <summary
                     className={cn(
                       "text-rich-black cursor-pointer select-text text-sm font-semibold sm:text-base",
+                      "list-none [&::-webkit-details-marker]:hidden",
                     )}
                   >
                     {item.question}
                   </summary>
-                  <div className={cn("text-rich-black/90 mt-2 text-sm sm:text-base")}>
+                  <div className={cn("text-rich-black/90 mt-3 text-sm sm:text-base")}>
                     {item.answer}
                   </div>
                 </details>
@@ -142,20 +186,20 @@ export default function FaqPage(): React.ReactElement {
             </div>
           </section>
 
-          <section aria-label="Next steps" className={card}>
+          <section aria-label="Next steps" className={cn(CARD)}>
             <p className={cn("text-rich-black text-sm sm:text-base")}>
-              Next:{" "}
-              <Link href="/services" className={linkStyle}>
-                view services
+              Ready to get started?{" "}
+              <Link href="/booking" className={linkStyle}>
+                Book online
               </Link>{" "}
               or{" "}
-              <Link href="/booking" className={linkStyle}>
-                book a time
-              </Link>
-              .
+              <Link href="/contact" className={linkStyle}>
+                contact me
+              </Link>{" "}
+              to discuss your needs.
             </p>
           </section>
-        </main>
+        </div>
       </FrostedSection>
     </PageShell>
   );

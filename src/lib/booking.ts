@@ -2,8 +2,10 @@
 /**
  * @file booking.ts
  * @description Booking domain logic with simplified time-of-day preferences.
- * Designed for a small one-person business with flexible scheduling.
+ * Clients pick a day and time window, you confirm the exact time.
  */
+
+import type { CalendarEvent } from "@/server/google/calendar";
 
 /**
  * Configuration for the booking system.
@@ -26,7 +28,13 @@ export interface BookingConfig {
 /**
  * Time of day preference for booking.
  */
-export type TimeOfDay = "morning" | "afternoon" | "evening";
+export type TimeOfDay =
+  | "morning"
+  | "late-morning"
+  | "early-afternoon"
+  | "late-afternoon"
+  | "early-evening"
+  | "late-evening";
 
 /**
  * Time of day option with label and hour range.
@@ -61,18 +69,6 @@ export interface BookableDay {
 }
 
 /**
- * An existing booking or calendar event used for conflict detection.
- */
-export interface ExistingEvent {
-  /** Event start time in UTC. */
-  startUtc: Date;
-  /** Event end time in UTC. */
-  endUtc: Date;
-  /** Source calendar identifier. */
-  calendarId?: string;
-}
-
-/**
  * Booking configuration:
  * - 10am to 7pm working hours
  * - 30 minute buffer after bookings
@@ -90,22 +86,32 @@ export const BOOKING_CONFIG: BookingConfig = {
 };
 
 /**
- * Time of day options.
+ * Time of day options - narrower 1.5-2 hour windows.
  */
-export const TIME_OF_DAY_OPTIONS: TimeOfDayOption[] = [
-  { value: "morning", label: "Morning (10am–12pm)", startHour: 10, endHour: 12 },
-  { value: "afternoon", label: "Afternoon (12pm–4pm)", startHour: 12, endHour: 16 },
-  { value: "evening", label: "Evening (4pm–7pm)", startHour: 16, endHour: 19 },
-];
+export const TIME_OF_DAY_OPTIONS: readonly TimeOfDayOption[] = [
+  { value: "morning", label: "10:00am–11:30am", startHour: 10, endHour: 11.5 },
+  { value: "late-morning", label: "11:30am–1:00pm", startHour: 11.5, endHour: 13 },
+  {
+    value: "early-afternoon",
+    label: "1:00pm–2:30pm",
+    startHour: 13,
+    endHour: 14.5,
+  },
+  {
+    value: "late-afternoon",
+    label: "2:30pm–4:00pm",
+    startHour: 14.5,
+    endHour: 16,
+  },
+  { value: "early-evening", label: "4:00pm–5:30pm", startHour: 16, endHour: 17.5 },
+  { value: "late-evening", label: "5:30pm–7:00pm", startHour: 17.5, endHour: 19 },
+] as const;
 
 const MS_PER_MIN = 60 * 1000;
 const MS_PER_DAY = 24 * 60 * MS_PER_MIN;
 
 /**
  * Get time-zone wall-clock parts for a given UTC date.
- * @param dateUtc - Date in UTC.
- * @param timeZone - IANA time zone id.
- * @returns Numeric parts in the given time zone.
  */
 function getZonedParts(
   dateUtc: Date,
@@ -153,13 +159,6 @@ function getZonedParts(
 
 /**
  * Convert a wall-clock time in a time zone into a UTC Date.
- * @param timeZone - IANA time zone id.
- * @param year - Local year.
- * @param month - Local month (1-12).
- * @param day - Local day (1-31).
- * @param hour - Local hour (0-23).
- * @param minute - Local minute (0-59).
- * @returns Date in UTC that corresponds to the provided local time.
  */
 export function zonedTimeToUtc(
   timeZone: string,
@@ -171,17 +170,20 @@ export function zonedTimeToUtc(
 ): Date {
   const approxUtc = new Date(Date.UTC(year, month - 1, day, hour, minute, 0));
   const zoned = getZonedParts(approxUtc, timeZone);
-  const zonedAsUtcMs = Date.UTC(zoned.year, zoned.month - 1, zoned.day, zoned.hour, zoned.minute, 0);
+  const zonedAsUtcMs = Date.UTC(
+    zoned.year,
+    zoned.month - 1,
+    zoned.day,
+    zoned.hour,
+    zoned.minute,
+    0,
+  );
   const offsetMs = zonedAsUtcMs - approxUtc.getTime();
   return new Date(approxUtc.getTime() - offsetMs);
 }
 
 /**
  * Format a date label in the configured time zone.
- * @param dateUtc - Date in UTC.
- * @param timeZone - IANA time zone id.
- * @param options - Intl formatting options.
- * @returns Formatted label.
  */
 function formatInTimeZone(
   dateUtc: Date,
@@ -193,16 +195,11 @@ function formatInTimeZone(
 
 /**
  * Check if a time range overlaps with any existing events (including buffer).
- * @param startUtc - Start time to check.
- * @param endUtc - End time to check.
- * @param events - Existing events.
- * @param bufferMin - Buffer minutes after each event.
- * @returns True if there's a conflict.
  */
 function hasConflict(
   startUtc: Date,
   endUtc: Date,
-  events: ExistingEvent[],
+  events: CalendarEvent[],
   bufferMin: number,
 ): boolean {
   const startMs = startUtc.getTime();
@@ -217,21 +214,16 @@ function hasConflict(
 
 /**
  * Check if a time-of-day window is available on a given date.
- * @param dateKey - Date in YYYY-MM-DD format.
- * @param timeOption - Time of day option.
- * @param events - Existing events.
- * @param config - Booking configuration.
- * @returns True if the time window has availability.
  */
 function isTimeWindowAvailable(
   dateKey: string,
   timeOption: TimeOfDayOption,
-  events: ExistingEvent[],
+  events: CalendarEvent[],
   config: BookingConfig,
 ): boolean {
   const [year, month, day] = dateKey.split("-").map(Number);
 
-  // Check if any hour in this window is free (jobs can be 30min-2hrs)
+  // Check if any hour in this window is free
   for (let hour = timeOption.startHour; hour < timeOption.endHour; hour++) {
     const slotStart = zonedTimeToUtc(config.timeZone, year, month, day, hour, 0);
     const slotEnd = zonedTimeToUtc(config.timeZone, year, month, day, hour + 1, 0);
@@ -246,13 +238,9 @@ function isTimeWindowAvailable(
 
 /**
  * Build the list of available days for booking.
- * @param existingEvents - Events from all calendars (work + personal).
- * @param now - Current time.
- * @param config - Booking configuration.
- * @returns List of bookable days with available time windows.
  */
 export function buildAvailableDays(
-  existingEvents: ExistingEvent[],
+  existingEvents: CalendarEvent[],
   now: Date,
   config: BookingConfig,
 ): BookableDay[] {
@@ -260,7 +248,14 @@ export function buildAvailableDays(
   const nowZoned = getZonedParts(now, config.timeZone);
 
   for (let dayOffset = 0; dayOffset <= config.maxAdvanceDays; dayOffset++) {
-    const baseUtc = zonedTimeToUtc(config.timeZone, nowZoned.year, nowZoned.month, nowZoned.day, 12, 0);
+    const baseUtc = zonedTimeToUtc(
+      config.timeZone,
+      nowZoned.year,
+      nowZoned.month,
+      nowZoned.day,
+      12,
+      0,
+    );
     const targetUtc = new Date(baseUtc.getTime() + dayOffset * MS_PER_DAY);
     const targetZoned = getZonedParts(targetUtc, config.timeZone);
 
@@ -317,17 +312,11 @@ export function buildAvailableDays(
 
 /**
  * Validate a booking request.
- * @param dateKey - Requested date in YYYY-MM-DD format.
- * @param timeOfDay - Requested time of day.
- * @param existingEvents - Events from all calendars.
- * @param now - Current time.
- * @param config - Booking configuration.
- * @returns Object with valid boolean and optional error message.
  */
 export function validateBookingRequest(
   dateKey: string,
   timeOfDay: TimeOfDay,
-  existingEvents: ExistingEvent[],
+  existingEvents: CalendarEvent[],
   now: Date,
   config: BookingConfig,
 ): { valid: boolean; error?: string } {
@@ -339,7 +328,14 @@ export function validateBookingRequest(
   const [year, month, day] = dateParts;
   const requestedDate = zonedTimeToUtc(config.timeZone, year, month, day, 12, 0);
   const nowZoned = getZonedParts(now, config.timeZone);
-  const todayStart = zonedTimeToUtc(config.timeZone, nowZoned.year, nowZoned.month, nowZoned.day, 0, 0);
+  const todayStart = zonedTimeToUtc(
+    config.timeZone,
+    nowZoned.year,
+    nowZoned.month,
+    nowZoned.day,
+    0,
+    0,
+  );
 
   if (requestedDate.getTime() < todayStart.getTime()) {
     return { valid: false, error: "Cannot book dates in the past." };

@@ -51,10 +51,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const text = body.text?.trim();
     if (!text || text.length < 10) {
-      return NextResponse.json({ error: "Review must be at least 10 characters." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Review must be at least 10 characters." },
+        { status: 400 },
+      );
     }
     if (text.length > 600) {
-      return NextResponse.json({ error: "Review must be 600 characters or less." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Review must be 600 characters or less." },
+        { status: 400 },
+      );
     }
 
     const firstName = body.firstName?.trim() || null;

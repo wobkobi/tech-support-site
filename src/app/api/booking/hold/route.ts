@@ -133,7 +133,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreateBoo
     try {
       const calendarResult = await createBookingEvent({
         summary: `Booking: ${name.trim()}`,
-        description: `Client: ${name.trim()}\nEmail: ${email.trim()}\n${notes?.trim() ? `Notes: ${notes.trim()}` : ""}`.trim(),
+        description:
+          `Client: ${name.trim()}\nEmail: ${email.trim()}\n${notes?.trim() ? `Notes: ${notes.trim()}` : ""}`.trim(),
         startUtc,
         endUtc,
         timeZone: BOOKING_CONFIG.timeZone,

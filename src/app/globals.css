@@ -1,5 +1,5 @@
 /* src/app/globals.css */
-/* Tailwindv 4 + tokenised colours/fonts */
+/* Tailwind v4 + tokenised colours/fonts */
 @import "tailwindcss";
 
 /* Design tokens */
@@ -92,7 +92,6 @@ html,
 body {
   height: 100%;
   overflow-x: clip;
-  /* avoid sideways scroll without hiding overflow */
 }
 
 /* Force transparency to defeat dark-mode extensions painting body */
@@ -109,26 +108,64 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* A11y: focus + selection */
+/* ============================================
+   Text Selection Fix (Tailwind v4 override)
+   ============================================ */
+
+/* Reset Tailwind v4's default user-select: none on interactive elements */
+* {
+  -webkit-user-select: auto;
+  user-select: auto;
+}
+
+/* Keep buttons and form controls non-selectable (expected UX) */
+button,
+[role="button"],
+input[type="button"],
+input[type="submit"],
+input[type="reset"] {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Inputs/textareas should allow selection of their content */
+input,
+textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* ============================================
+   A11y: focus + selection highlights
+   ============================================ */
+
 :where(:focus-visible) {
-  outline: 2px solid color-mix(inoklab, var(--color-moonstone-500) 70%, white);
+  outline: 2px solid color-mix(in oklab, var(--color-moonstone-500) 70%, white);
   outline-offset: 2px;
 }
 
 ::selection {
-  background: color-mix(inoklab, var(--color-coquelicot-500) 30%, transparent);
+  background: color-mix(in oklab, var(--color-coquelicot-500) 30%, transparent);
 }
 
-/* Reduced motion */
+/* ============================================
+   Reduced motion
+   ============================================ */
+
 @media (prefers-reduced-motion: reduce) {
-  * {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
 }
 
-/* Prose helpers */
+/* ============================================
+   Prose helpers
+   ============================================ */
+
 .prose :where(h1, h2, h3) {
   line-height: 1.2;
   font-weight: 700;
@@ -138,12 +175,14 @@ body {
   line-height: 1.7;
 }
 
-/* Marquee */
+/* ============================================
+   Animations
+   ============================================ */
+
 @keyframes marquee {
   from {
     transform: translateX(0);
   }
-
   to {
     transform: translateX(-50%);
   }
@@ -153,8 +192,73 @@ body {
   animation: marquee 40s linear infinite;
 }
 
+/* ============================================
+   Cursor consistency
+   ============================================ */
 
-/* Scrollbar behaviour */
+/* Interactive elements and ALL their children get pointer cursor */
+a,
+a *,
+button,
+button *,
+[role="button"],
+[role="button"] *,
+[role="link"],
+[role="link"] *,
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+summary {
+  cursor: pointer;
+}
+
+/* Text content should show text cursor */
+p,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+li,
+td,
+th,
+blockquote,
+figcaption,
+article,
+.prose {
+  cursor: text;
+}
+
+/* Containers inherit from parent */
+div,
+section,
+main,
+header,
+footer,
+nav,
+span,
+label {
+  cursor: inherit;
+}
+
+/* Form inputs get default cursor (browser handles it) */
+input,
+textarea,
+select {
+  cursor: auto;
+}
+
+/* Disabled elements */
+:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+/* ============================================
+   Scrollbar
+   ============================================ */
+
 html {
   scrollbar-gutter: auto;
 }

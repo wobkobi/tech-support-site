@@ -6,36 +6,29 @@
 import type React from "react";
 import Link from "next/link";
 import ReviewForm from "@/components/ReviewForm";
-import { FrostedSection, PageShell } from "@/components/SiteFrame";
+import { FrostedSection, PageShell, CARD } from "@/components/SiteFrame";
 import { cn } from "@/lib/cn";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-const pageMain = cn(
-  "mx-auto flex w-full max-w-5xl flex-col gap-6 sm:gap-8",
-  "pt-4 sm:pt-6 pb-6 sm:pb-8",
-);
-
-const card = cn("border-seasalt-400/60 bg-seasalt-800 rounded-xl border p-4 shadow-sm sm:p-6");
-
 const primaryBtn = cn(
-  "bg-coquelicot-500 hover:bg-coquelicot-600 text-rich-black rounded-md px-4 py-2 text-sm font-semibold sm:text-base",
+  "bg-coquelicot-500 hover:bg-coquelicot-600 text-rich-black rounded-md px-4 py-2.5 text-sm font-semibold sm:text-base",
 );
 const secondaryBtn = cn(
-  "border-seasalt-400/60 hover:bg-seasalt-900/40 text-rich-black rounded-md border px-4 py-2 text-sm font-semibold sm:text-base",
+  "border-seasalt-400/60 hover:bg-seasalt-900/40 text-rich-black rounded-md border px-4 py-2.5 text-sm font-semibold sm:text-base",
 );
 
 /**
- * Reviews submission page.
- * @returns Reviews page element.
+ * Review page component.
+ * @returns Review page element.
  */
-export default function ReviewsPage(): React.ReactElement {
+export default function ReviewPage(): React.ReactElement {
   return (
     <PageShell>
-      <FrostedSection>
-        <main className={pageMain}>
-          <section aria-labelledby="review-heading" className={card}>
+      <FrostedSection maxWidth="48rem">
+        <div className={cn("flex flex-col gap-4 sm:gap-5")}>
+          <section aria-labelledby="review-heading" className={cn(CARD)}>
             <h1
               id="review-heading"
               className={cn(
@@ -44,31 +37,32 @@ export default function ReviewsPage(): React.ReactElement {
             >
               Leave a review
             </h1>
-            <p className={cn("text-rich-black/80 max-w-3xl text-sm sm:text-base")}>
-              If I helped you out, a short review makes a big difference.
+            <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
+              If I helped you out, a short review means a lot. It helps other people in the
+              community find reliable tech support.
             </p>
           </section>
 
-          <section aria-label="Review form" className={card}>
+          <section aria-label="Review form" className={cn(CARD)}>
             <ReviewForm />
           </section>
 
-          <section aria-label="Alternative contact" className={card}>
+          <section aria-label="Alternative" className={cn(CARD)}>
             <p className={cn("text-rich-black mb-3 text-sm sm:text-base")}>
-              Prefer to send feedback directly? Use the contact page and I will add it (with your
+              Prefer to send feedback privately? Use the contact page and I can add it (with your
               permission).
             </p>
 
             <div className={cn("flex flex-wrap gap-3")}>
               <Link href="/contact" className={primaryBtn}>
-                Contact
+                Contact me
               </Link>
               <Link href="/" className={secondaryBtn}>
                 Back to home
               </Link>
             </div>
           </section>
-        </main>
+        </div>
       </FrostedSection>
     </PageShell>
   );

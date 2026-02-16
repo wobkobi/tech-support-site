@@ -12,34 +12,22 @@ import {
   validateBookingRequest,
   TIME_OF_DAY_OPTIONS,
   type TimeOfDay,
-  type ExistingEvent,
 } from "@/lib/booking";
-import { fetchAllCalendarEvents } from "@/server/google/calendar";
+import { fetchAllCalendarEvents, type CalendarEvent } from "@/server/google/calendar";
 import { randomUUID } from "crypto";
 
-/**
- * Request payload for booking.
- */
 interface BookingRequestPayload {
-  /** Date in YYYY-MM-DD format. */
   dateKey: string;
-  /** Time of day preference. */
   timeOfDay: TimeOfDay;
-  /** Client's name. */
   name: string;
-  /** Client's email. */
   email: string;
-  /** Client's phone (optional). */
   phone?: string;
-  /** What they need help with. */
   notes: string;
 }
 
 /**
  * POST /api/booking/request
  * Submits a booking request for manual confirmation.
- * @param request - The incoming request.
- * @returns JSON response.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
@@ -70,11 +58,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const maxDate = new Date(now.getTime() + BOOKING_CONFIG.maxAdvanceDays * 24 * 60 * 60 * 1000);
 
     // Fetch calendar events for validation
-    let existingEvents: ExistingEvent[] = [];
+    let existingEvents: CalendarEvent[] = [];
     try {
       existingEvents = await fetchAllCalendarEvents(now, maxDate);
-    } catch {
-      existingEvents = [];
+    } catch (err) {
+      console.error("[booking/request] Calendar fetch failed:", err);
     }
 
     // Validate the request
@@ -94,15 +82,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const timeLabel = timeOption?.label ?? timeOfDay;
 
     // Create a placeholder start/end time (middle of the time window)
-    // This will be updated when you confirm the exact time
     const [year, month, day] = dateKey.split("-").map(Number);
     const middleHour = timeOption
       ? Math.floor((timeOption.startHour + timeOption.endHour) / 2)
       : 12;
 
-    // Create UTC times for the placeholder slot
-    const placeholderStart = new Date(Date.UTC(year, month - 1, day, middleHour - 12, 0, 0)); // Rough UTC conversion
-    const placeholderEnd = new Date(placeholderStart.getTime() + 60 * 60 * 1000); // 1 hour placeholder
+    // Rough UTC conversion (NZ is UTC+12/13)
+    const placeholderStart = new Date(Date.UTC(year, month - 1, day, middleHour - 12, 0, 0));
+    const placeholderEnd = new Date(placeholderStart.getTime() + 60 * 60 * 1000);
 
     const cancelToken = randomUUID();
 
@@ -111,10 +98,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       data: {
         name: name.trim(),
         email: email.trim().toLowerCase(),
-        notes: `[${timeLabel}] ${notes.trim()}${phone ? `\nPhone: ${phone.trim()}` : ""}`,
+        notes: `[${timeLabel} on ${dateKey}]\n${notes.trim()}${phone ? `\nPhone: ${phone.trim()}` : ""}`,
         startUtc: placeholderStart,
         endUtc: placeholderEnd,
-        status: "held", // Pending your confirmation
+        status: "held",
         cancelToken,
         bufferBeforeMin: 0,
         bufferAfterMin: BOOKING_CONFIG.bufferMin,
@@ -122,7 +109,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     });
 
     // TODO: Send notification email to yourself about the new booking request
-    // Include: name, email, phone, date, time preference, notes
 
     return NextResponse.json({ ok: true, bookingId: booking.id });
   } catch (error) {

@@ -6,7 +6,18 @@
  */
 
 import { google } from "googleapis";
-import type { ExistingEvent } from "@/lib/booking";
+
+/**
+ * An existing calendar event used for conflict detection.
+ */
+export interface CalendarEvent {
+  /** Event start time in UTC. */
+  startUtc: Date;
+  /** Event end time in UTC. */
+  endUtc: Date;
+  /** Source calendar identifier. */
+  calendarId?: string;
+}
 
 /**
  * Parameters needed to create a booking event in Google Calendar.
@@ -45,17 +56,17 @@ export interface DeleteBookingEventParams {
 }
 
 /**
- * Create an OAuth2 client for the primary (work) account.
+ * Create an OAuth2 client from env vars.
  * @returns OAuth2 client authorised for Calendar API calls.
  */
-function getWorkOAuthClient(): InstanceType<typeof google.auth.OAuth2> {
+function getOAuthClient(): InstanceType<typeof google.auth.OAuth2> {
   const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
   const redirectUri = process.env.GOOGLE_OAUTH_REDIRECT_URI;
   const refreshToken = process.env.GOOGLE_OAUTH_REFRESH_TOKEN;
 
   if (!clientId || !clientSecret || !redirectUri || !refreshToken) {
-    throw new Error("Missing GOOGLE_OAUTH_* env vars for work account.");
+    throw new Error("Missing GOOGLE_OAUTH_* env vars.");
   }
 
   const oauth2 = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
@@ -64,30 +75,7 @@ function getWorkOAuthClient(): InstanceType<typeof google.auth.OAuth2> {
 }
 
 /**
- * Create an OAuth2 client for the personal account (optional).
- * @returns OAuth2 client or null if not configured.
- */
-function getPersonalOAuthClient(): InstanceType<typeof google.auth.OAuth2> | null {
-  const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
-  const redirectUri = process.env.GOOGLE_OAUTH_REDIRECT_URI;
-  const refreshToken = process.env.GOOGLE_PERSONAL_OAUTH_REFRESH_TOKEN;
-
-  if (!refreshToken) {
-    return null; // Personal calendar not configured
-  }
-
-  if (!clientId || !clientSecret || !redirectUri) {
-    return null;
-  }
-
-  const oauth2 = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
-  oauth2.setCredentials({ refresh_token: refreshToken });
-  return oauth2;
-}
-
-/**
- * Get the booking calendar id from env.
+ * Get the work calendar id from env.
  * @returns Calendar id string.
  */
 function getWorkCalendarId(): string {
@@ -108,14 +96,14 @@ function getPersonalCalendarId(): string | null {
  * @param calendarId - Calendar to fetch from.
  * @param timeMin - Start of range (UTC).
  * @param timeMax - End of range (UTC).
- * @returns Array of existing events.
+ * @returns Array of calendar events.
  */
 async function fetchCalendarEvents(
   auth: InstanceType<typeof google.auth.OAuth2>,
   calendarId: string,
   timeMin: Date,
   timeMax: Date,
-): Promise<ExistingEvent[]> {
+): Promise<CalendarEvent[]> {
   const calendar = google.calendar({ version: "v3", auth });
 
   try {
@@ -127,7 +115,7 @@ async function fetchCalendarEvents(
       orderBy: "startTime",
     });
 
-    const events: ExistingEvent[] = [];
+    const events: CalendarEvent[] = [];
 
     for (const item of response.data.items ?? []) {
       // Skip all-day events (no dateTime)
@@ -163,29 +151,29 @@ async function fetchCalendarEvents(
 export async function fetchAllCalendarEvents(
   timeMin: Date,
   timeMax: Date,
-): Promise<ExistingEvent[]> {
-  const allEvents: ExistingEvent[] = [];
+): Promise<CalendarEvent[]> {
+  const auth = getOAuthClient();
+  const allEvents: CalendarEvent[] = [];
 
   // Fetch from work calendar
-  const workAuth = getWorkOAuthClient();
   const workCalendarId = getWorkCalendarId();
-  const workEvents = await fetchCalendarEvents(workAuth, workCalendarId, timeMin, timeMax);
+  console.log(`[calendar] Fetching work calendar: ${workCalendarId}`);
+  const workEvents = await fetchCalendarEvents(auth, workCalendarId, timeMin, timeMax);
+  console.log(`[calendar] Found ${workEvents.length} work events`);
   allEvents.push(...workEvents);
 
   // Fetch from personal calendar if configured
-  const personalAuth = getPersonalOAuthClient();
   const personalCalendarId = getPersonalCalendarId();
-
-  if (personalAuth && personalCalendarId) {
-    const personalEvents = await fetchCalendarEvents(
-      personalAuth,
-      personalCalendarId,
-      timeMin,
-      timeMax,
-    );
+  if (personalCalendarId) {
+    console.log(`[calendar] Fetching personal calendar: ${personalCalendarId}`);
+    const personalEvents = await fetchCalendarEvents(auth, personalCalendarId, timeMin, timeMax);
+    console.log(`[calendar] Found ${personalEvents.length} personal events`);
     allEvents.push(...personalEvents);
+  } else {
+    console.log(`[calendar] No personal calendar configured (PERSONAL_CALENDAR_ID not set)`);
   }
 
+  console.log(`[calendar] Total events: ${allEvents.length}`);
   return allEvents;
 }
 
@@ -197,7 +185,7 @@ export async function fetchAllCalendarEvents(
 export async function createBookingEvent(
   params: CreateBookingEventParams,
 ): Promise<CreateBookingEventResult> {
-  const auth = getWorkOAuthClient();
+  const auth = getOAuthClient();
   const calendar = google.calendar({ version: "v3", auth });
   const calendarId = getWorkCalendarId();
 
@@ -233,7 +221,7 @@ export async function createBookingEvent(
  * @returns Promise that resolves when deletion completes.
  */
 export async function deleteBookingEvent(params: DeleteBookingEventParams): Promise<void> {
-  const auth = getWorkOAuthClient();
+  const auth = getOAuthClient();
   const calendar = google.calendar({ version: "v3", auth });
   const calendarId = getWorkCalendarId();
 

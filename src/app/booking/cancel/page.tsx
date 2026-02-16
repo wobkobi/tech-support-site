@@ -1,7 +1,7 @@
 // src/app/booking/cancel/page.tsx
 /**
  * @file page.tsx
- * @description Booking cancel page.
+ * @description Booking cancel page - reads token from URL.
  */
 
 import type React from "react";
@@ -9,9 +9,6 @@ import BookingCancelClient from "./ui";
 
 /**
  * Cancel page that reads token from search params.
- * @param root0 - Page props.
- * @param root0.searchParams - Query params promise.
- * @returns Cancel page element.
  */
 export default async function BookingCancelPage({
   searchParams,

@@ -4,7 +4,6 @@ import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 import prettier from "eslint-config-prettier/flat";
 import jsdoc from "eslint-plugin-jsdoc";
-import tsPlugin from "@typescript-eslint/eslint-plugin";
 import globals from "globals";
 
 export default defineConfig([
@@ -25,19 +24,17 @@ export default defineConfig([
         ...globals.node,
       },
     },
-    plugins: {
-      "@typescript-eslint": tsPlugin,
-      jsdoc,
-    },
     settings: {
       jsdoc: { mode: "typescript" },
     },
     rules: {
       // TS hygiene
       "@typescript-eslint/no-unused-vars": "error",
-      "react/no-unescaped-entities": "off",
       "@typescript-eslint/consistent-type-definitions": "error",
       "@typescript-eslint/explicit-function-return-type": ["warn", { allowExpressions: true }],
+
+      // Next/React noise
+      "react/no-unescaped-entities": "off",
 
       // JSDoc enforcement
       "jsdoc/require-jsdoc": [

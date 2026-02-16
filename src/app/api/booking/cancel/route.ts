@@ -1,51 +1,54 @@
 // src/app/api/booking/cancel/route.ts
 /**
  * @file route.ts
- * @description API route to cancel a booking.
+ * @description API route to cancel a booking using a cancel token.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { deleteBookingEvent } from "@/server/google/calendar";
 
+interface CancelPayload {
+  cancelToken: string;
+}
+
 /**
  * POST /api/booking/cancel
- * Cancels a booking using the cancel token.
- * @param request - Incoming request.
- * @returns JSON response.
+ * Cancels a booking by its cancel token.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
-    const body = (await request.json()) as { cancelToken?: string };
+    const body = (await request.json()) as CancelPayload;
     const { cancelToken } = body;
 
-    if (!cancelToken?.trim()) {
-      return NextResponse.json({ ok: false, error: "Cancel token required." }, { status: 400 });
+    if (!cancelToken) {
+      return NextResponse.json({ ok: false, error: "Missing cancel token." }, { status: 400 });
     }
 
+    // Find the booking
     const booking = await prisma.booking.findFirst({
-      where: {
-        cancelToken: cancelToken.trim(),
-        status: { in: ["held", "confirmed"] },
-      },
+      where: { cancelToken },
     });
 
     if (!booking) {
-      return NextResponse.json(
-        { ok: false, error: "Booking not found or already cancelled." },
-        { status: 404 },
-      );
+      return NextResponse.json({ ok: false, error: "Booking not found." }, { status: 404 });
     }
 
-    // Delete calendar event if exists
+    if (booking.status === "cancelled") {
+      return NextResponse.json({ ok: false, error: "Booking already cancelled." }, { status: 400 });
+    }
+
+    // Delete from Google Calendar if there's an event ID
     if (booking.calendarEventId) {
       try {
         await deleteBookingEvent({ eventId: booking.calendarEventId });
       } catch (err) {
-        console.error("[booking/cancel] Calendar delete failed:", err);
+        console.error("[booking/cancel] Failed to delete calendar event:", err);
+        // Continue anyway - we still want to mark as cancelled in our DB
       }
     }
 
+    // Update booking status
     await prisma.booking.update({
       where: { id: booking.id },
       data: { status: "cancelled" },
@@ -54,6 +57,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("[booking/cancel] Error:", error);
-    return NextResponse.json({ ok: false, error: "Failed to cancel." }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Failed to cancel booking." }, { status: 500 });
   }
 }

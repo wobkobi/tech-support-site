@@ -1,5 +1,5 @@
 {
-  "svg.preview.background": "dark-transparent",
+  "svg.preview.background": "transparent",
   "prisma.pinToPrisma6": true,
   // Tell VS Code ESLint extension we're using flat config
   "eslint.useFlatConfig": true,
