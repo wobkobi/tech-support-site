@@ -89,7 +89,7 @@ export function NavBar(): React.ReactElement | null {
       >
         <div
           className={cn(
-            "border-seasalt-400/40 bg-seasalt-800/90 flex h-16 w-full items-center justify-between rounded-2xl border px-4 shadow-lg backdrop-blur-lg",
+            "border-seasalt-400/40 bg-seasalt-800/90 flex h-20 w-full items-center justify-between rounded-2xl border px-5 shadow-lg backdrop-blur-lg",
           )}
         >
           {/* Logo */}
@@ -100,18 +100,18 @@ export function NavBar(): React.ReactElement | null {
             <Image
               src="/source/logo.svg"
               alt="To The Point Tech"
-              width={32}
-              height={32}
+              width={40}
+              height={40}
               priority
               className={cn("select-none")}
             />
-            <span className={cn("text-russian-violet hidden text-lg font-bold sm:inline")}>
+            <span className={cn("text-russian-violet hidden text-xl font-bold sm:inline")}>
               To The Point Tech
             </span>
           </Link>
 
           {/* Desktop Navigation */}
-          <nav className={cn("hidden items-center gap-1 md:flex")} aria-label="Primary navigation">
+          <nav className={cn("hidden items-center gap-1 lg:flex")} aria-label="Primary navigation">
             {items.map((item) => {
               const active = isActivePrefix(pathname, item.activePrefix);
 
@@ -120,7 +120,7 @@ export function NavBar(): React.ReactElement | null {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "rounded-lg px-4 py-2 text-base font-semibold transition-all",
+                    "shrink-0 whitespace-nowrap rounded-lg px-4 py-2.5 text-lg font-semibold transition-all xl:text-xl",
                     active
                       ? "text-russian-violet bg-moonstone-600/20"
                       : "text-rich-black hover:bg-seasalt-900/30 hover:text-russian-violet",
@@ -134,11 +134,11 @@ export function NavBar(): React.ReactElement | null {
           </nav>
 
           {/* CTA Buttons */}
-          <div className={cn("flex items-center gap-2")}>
+          <div className={cn("flex shrink-0 items-center gap-2")}>
             <Link
               href="/booking"
               className={cn(
-                "hidden rounded-lg px-4 py-2 text-base font-bold transition-all sm:block",
+                "hidden shrink-0 whitespace-nowrap rounded-lg px-6 py-3 text-lg font-bold transition-all lg:block xl:text-xl",
                 bookingActive
                   ? "bg-coquelicot-600 text-seasalt shadow-md"
                   : "bg-coquelicot-500 hover:bg-coquelicot-600 text-seasalt hover:shadow-md",
@@ -151,7 +151,7 @@ export function NavBar(): React.ReactElement | null {
             <Link
               href="/contact"
               className={cn(
-                "hidden rounded-lg px-4 py-2 text-base font-bold transition-all sm:block",
+                "hidden shrink-0 whitespace-nowrap rounded-lg px-6 py-3 text-lg font-bold transition-all lg:block xl:text-xl",
                 contactActive
                   ? "bg-moonstone-600/30 text-russian-violet shadow-sm"
                   : "bg-moonstone-600/20 text-russian-violet hover:bg-moonstone-600/30",
@@ -165,7 +165,7 @@ export function NavBar(): React.ReactElement | null {
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className={cn(
-                "bg-seasalt-900/20 hover:bg-seasalt-900/30 flex h-10 w-10 items-center justify-center rounded-lg transition-all md:hidden",
+                "bg-seasalt-900/20 hover:bg-seasalt-900/30 flex h-11 w-11 items-center justify-center rounded-lg transition-all lg:hidden",
               )}
               aria-label="Toggle mobile menu"
               aria-expanded={mobileMenuOpen}
@@ -199,7 +199,7 @@ export function NavBar(): React.ReactElement | null {
       {mobileMenuOpen && (
         <div
           className={cn(
-            "bg-rich-black/50 fixed inset-0 z-40 backdrop-blur-sm md:hidden",
+            "bg-rich-black/50 fixed inset-0 z-40 backdrop-blur-sm lg:hidden",
             "animate-in fade-in duration-200",
           )}
           onClick={() => setMobileMenuOpen(false)}
@@ -210,7 +210,7 @@ export function NavBar(): React.ReactElement | null {
       {/* Mobile Menu Slide-out */}
       <nav
         className={cn(
-          "border-seasalt-400/40 bg-seasalt-800/95 fixed right-4 top-20 z-40 h-[calc(100vh-6rem)] w-72 rounded-2xl border shadow-2xl backdrop-blur-xl transition-transform duration-300 md:hidden",
+          "border-seasalt-400/40 bg-seasalt-800/95 fixed right-4 top-24 z-40 h-[calc(100vh-7rem)] w-72 rounded-2xl border shadow-2xl backdrop-blur-xl transition-transform duration-300 lg:hidden",
           mobileMenuOpen ? "translate-x-0" : "translate-x-full",
         )}
         aria-label="Mobile navigation"
