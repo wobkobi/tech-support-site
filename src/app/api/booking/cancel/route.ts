@@ -1,7 +1,7 @@
 // src/app/api/booking/cancel/route.ts
 /**
  * @file route.ts
- * @description API route to cancel a booking using a cancel token
+ * @description API route to cancel a booking using a cancel token.
  */
 
 import { NextRequest, NextResponse } from "next/server";

@@ -1,15 +1,7 @@
 // src/app/api/cron/send-review-emails/route.ts
 /**
  * @file route.ts
- * @description Cron job that sends review request emails 1 hour after appointments
- *
- * Configure in vercel.json:
- * {
- *   "crons": [{
- *     "path": "/api/cron/send-review-emails",
- *     "schedule": "0 * * * *"  // Every hour
- *   }]
- * }
+ * @description Cron job that sends review request emails 1 hour after appointments.
  */
 
 import { NextRequest, NextResponse } from "next/server";

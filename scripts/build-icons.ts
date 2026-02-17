@@ -374,8 +374,7 @@ async function buildSocialImages(): Promise<void> {
   console.log("📱 Building social images...");
   await ensureDir("public");
 
-  // Read all logos
-  const logoMarkBuffer = await fs.readFile(LOGO_MARK);
+  // Read logos used by social specs
   const logoFullBuffer = await fs.readFile(LOGO_FULL);
   const logoProfileBuffer = await fs.readFile(LOGO_PROFILE);
 
@@ -428,7 +427,6 @@ async function buildAdditionalAssets(): Promise<void> {
 
   const logoMarkBuffer = await fs.readFile(LOGO_MARK);
   const logoFullBuffer = await fs.readFile(LOGO_FULL);
-  const logoProfileBuffer = await fs.readFile(LOGO_PROFILE);
 
   for (const { name, width, height, type, format } of ADDITIONAL_ASSETS) {
     let output: sharp.Sharp;

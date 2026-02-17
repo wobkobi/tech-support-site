@@ -1,18 +1,13 @@
 // src/app/api/booking/hold/route.ts
 /**
  * @file route.ts
- * @description API route to create a booking hold with Google Calendar integration
+ * @description API route to create a booking hold with Google Calendar integration.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import {
-  BOOKING_CONFIG,
-  validateSlotSelection,
-  type ExistingBooking,
-  type ExistingEvent,
-} from "@/lib/booking";
-import { fetchAllCalendarEvents, createBookingEvent } from "@/lib/google-calendar";
+import { BOOKING_CONFIG } from "@/lib/booking";
+import { createBookingEvent } from "@/lib/google-calendar";
 import { randomUUID } from "crypto";
 
 // Hold expiration time in minutes
@@ -90,68 +85,27 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreateBoo
     }
 
     const now = new Date();
-    const maxDate = new Date(now.getTime() + BOOKING_CONFIG.maxAdvanceDays * 24 * 60 * 60 * 1000);
-
-    // Get existing bookings from database
-    const existingBookings = await prisma.booking.findMany({
-      where: {
-        status: { in: ["held", "confirmed"] },
-        endUtc: { gte: now },
-      },
-      select: {
-        id: true,
-        startUtc: true,
-        endUtc: true,
-        bufferBeforeMin: true,
-        bufferAfterMin: true,
-      },
-    });
-
-    const existingForValidation: ExistingBooking[] = existingBookings.map((b) => ({
-      id: b.id,
-      startUtc: b.startUtc,
-      endUtc: b.endUtc,
-      bufferBeforeMin: b.bufferBeforeMin,
-      bufferAfterMin: b.bufferAfterMin,
-    }));
-
-    // Fetch Google Calendar events
-    let calendarEvents: ExistingEvent[] = [];
-    try {
-      const rawEvents = await fetchAllCalendarEvents(now, maxDate);
-      calendarEvents = rawEvents.map((e) => ({
-        id: e.id,
-        start: e.start,
-        end: e.end,
-      }));
-    } catch (error) {
-      console.error("[booking/hold] Failed to fetch calendar events:", error);
-      // Continue without calendar events - validation will only check database
-    }
-
-    // Validate the slot selection against both database and calendar
-    const validation = validateSlotSelection(
-      dateKey,
-      slotStart,
-      slotEnd,
-      existingForValidation,
-      calendarEvents,
-      now,
-      BOOKING_CONFIG,
-    );
-
-    if (!validation.valid) {
-      return NextResponse.json({ ok: false, error: validation.error }, { status: 400 });
-    }
 
     // Parse date and time
     const [year, month, day] = dateKey.split("-").map(Number);
     const [startHour, startMinute] = slotStart.split(":").map(Number);
     const [endHour, endMinute] = slotEnd.split(":").map(Number);
 
+    if (!year || !month || !day) {
+      return NextResponse.json({ ok: false, error: "Invalid date format." }, { status: 400 });
+    }
+
     // Create local NZ dates
     const startLocal = new Date(year, month - 1, day, startHour, startMinute, 0);
     const endLocal = new Date(year, month - 1, day, endHour, endMinute, 0);
+
+    if (startLocal >= endLocal) {
+      return NextResponse.json({ ok: false, error: "Invalid time range." }, { status: 400 });
+    }
+
+    if (startLocal < now) {
+      return NextResponse.json({ ok: false, error: "Cannot book times in the past." }, { status: 400 });
+    }
 
     // Convert to UTC for database storage
     const startUtc = new Date(startLocal.toISOString());

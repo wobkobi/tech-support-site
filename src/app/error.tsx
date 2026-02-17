@@ -54,7 +54,7 @@ export default function Error({
             </p>
 
             <p
-              className={cn("text-rich-black/70 mb-6 text-sm sm:text-base italic")}
+              className={cn("text-rich-black/70 mb-6 wrap-break-word text-sm sm:text-base italic")}
               role="status"
               aria-live="polite"
             >
@@ -90,7 +90,7 @@ export default function Error({
               </summary>
               <pre
                 className={cn(
-                  "border-seasalt-400/60 bg-seasalt-900/60 mt-3 overflow-auto rounded-lg border p-4 text-xs text-left",
+                  "border-seasalt-400/60 bg-seasalt-900/60 mt-3 max-w-full overflow-auto rounded-lg border p-4 text-xs text-left",
                 )}
               >
                 {String(error?.stack || error)}

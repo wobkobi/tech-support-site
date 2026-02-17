@@ -1,7 +1,7 @@
 // src/app/api/booking/request/route.ts
 /**
  * @file route.ts
- * @description API route with duration support (1hr vs 2hr jobs)
+ * @description API route with duration support (1hr vs 2hr jobs).
  */
 
 import { NextRequest, NextResponse } from "next/server";

@@ -87,6 +87,12 @@ export interface ExistingBooking {
   bufferAfterMin: number;
 }
 
+export interface ExistingEvent {
+  id: string;
+  start: string;
+  end: string;
+}
+
 /**
  * Check if a time slot conflicts with existing bookings/events
  * @param slotStart - Slot start time

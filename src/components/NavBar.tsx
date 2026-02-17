@@ -1,9 +1,10 @@
 // src/components/NavBar.tsx
-"use client";
 /**
  * @file NavBar.tsx
  * @description Modern navigation bar with mobile menu, frosted glass effect, and smooth animations.
  */
+
+"use client";
 
 import type React from "react";
 import Image from "next/image";

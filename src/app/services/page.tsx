@@ -1,7 +1,7 @@
 // src/app/services/page.tsx
 /**
  * @file page.tsx
- * @description Services page with wider layout and better organization
+ * @description Services page with wider layout and better organization.
  */
 
 import type React from "react";

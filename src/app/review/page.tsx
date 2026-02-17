@@ -1,7 +1,7 @@
 // src/app/review/page.tsx
 /**
  * @file page.tsx
- * @description Protected review page - requires token OR allows public reviews
+ * @description Protected review page - requires token OR allows public reviews.
  */
 
 import type React from "react";

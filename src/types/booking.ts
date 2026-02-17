@@ -1,6 +1,7 @@
 // src/types/booking.ts
 /**
- * Shared TypeScript types for booking flows and API payloads.
+ * @file booking.ts
+ * @description Shared TypeScript types for booking flows and API payloads.
  */
 
 export type BookingStatus = "held" | "confirmed" | "cancelled";

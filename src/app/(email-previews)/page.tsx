@@ -1,8 +1,7 @@
 // src/app/(email-previews)/page.tsx
 /**
  * @file page.tsx
- * @description Dev-only email previews. This route exists so the project compiles even when
- * email templates are not wired up.
+ * @description Dev-only email preview placeholder so the project compiles.
  */
 
 import type React from "react";

@@ -1,7 +1,7 @@
 // src/app/api/reviews/route.ts
 /**
  * @file route.ts
- * @description API routes for reviews with verification support
+ * @description API routes for reviews with verification support.
  */
 
 import { NextRequest, NextResponse } from "next/server";

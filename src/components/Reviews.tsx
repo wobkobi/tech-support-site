@@ -1,8 +1,7 @@
 // src/components/Reviews.tsx
 /**
  * @file Reviews.tsx
- * @description Reviews module. Renders inside an existing frosted container.
- * 1-3 items: responsive rows centered using flex-wrap. 4+ items: marquee scroll.
+ * @description Reviews module with responsive rows (1-3 items) or marquee scroll (4+ items).
  */
 
 import { cn } from "@/lib/cn";

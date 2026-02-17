@@ -1,7 +1,7 @@
 // src/app/api/booking/days/route.ts
 /**
  * @file route.ts
- * @description API route to get available booking days (blocks calendar events + DB bookings)
+ * @description API route to get available booking days (blocks calendar events and DB bookings).
  */
 
 import { NextResponse } from "next/server";

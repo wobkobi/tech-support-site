@@ -1,7 +1,7 @@
 // src/app/api/booking/slots/route.ts
 /**
  * @file route.ts
- * @description API route to get available booking slots based on database AND Google Calendar
+ * @description API route to get available booking slots based on database and Google Calendar.
  */
 
 import { NextResponse } from "next/server";

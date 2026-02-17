@@ -1,9 +1,10 @@
 // src/app/booking/cancel/CancelClient.tsx
-"use client";
 /**
  * @file CancelClient.tsx
  * @description Client UI for cancelling a booking.
  */
+
+"use client";
 
 import type React from "react";
 import { useEffect, useState } from "react";

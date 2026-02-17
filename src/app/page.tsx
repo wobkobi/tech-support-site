@@ -1,7 +1,7 @@
 // src/app/page.tsx
 /**
  * @file page.tsx
- * @description Main landing page for tech support company
+ * @description Main landing page for tech support company.
  */
 
 import type React from "react";

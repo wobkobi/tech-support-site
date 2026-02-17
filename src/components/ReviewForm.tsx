@@ -1,9 +1,10 @@
 // src/components/ReviewForm.tsx
-"use client";
 /**
  * @file ReviewForm.tsx
  * @description Review form that supports verified reviews via booking tokens.
  */
+
+"use client";
 
 import type React from "react";
 import { cn } from "@/lib/cn";

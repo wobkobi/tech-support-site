@@ -1,7 +1,7 @@
 // src/app/booking/layout.tsx
 /**
  * @file layout.tsx
- * @description Booking page layout with Google Maps Places API
+ * @description Booking page layout with Google Maps Places API.
  */
 
 import type React from "react";

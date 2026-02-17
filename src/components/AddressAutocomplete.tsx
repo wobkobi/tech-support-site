@@ -1,9 +1,10 @@
 // src/components/AddressAutocomplete.tsx
-"use client";
 /**
  * @file AddressAutocomplete.tsx
- * @description Address input with Google Places Autocomplete (with graceful fallback)
+ * @description Address input with Google Places Autocomplete (with graceful fallback).
  */
+
+"use client";
 
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
