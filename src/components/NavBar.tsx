@@ -105,7 +105,7 @@ export function NavBar(): React.ReactElement | null {
               priority
               className={cn("select-none")}
             />
-            <span className={cn("text-russian-violet hidden text-base font-bold sm:inline")}>
+            <span className={cn("text-russian-violet hidden text-lg font-bold sm:inline")}>
               To The Point Tech
             </span>
           </Link>
@@ -120,7 +120,7 @@ export function NavBar(): React.ReactElement | null {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "rounded-lg px-3.5 py-2 text-sm font-semibold transition-all",
+                    "rounded-lg px-4 py-2 text-base font-semibold transition-all",
                     active
                       ? "text-russian-violet bg-moonstone-600/20"
                       : "text-rich-black hover:bg-seasalt-900/30 hover:text-russian-violet",
@@ -138,7 +138,7 @@ export function NavBar(): React.ReactElement | null {
             <Link
               href="/booking"
               className={cn(
-                "hidden rounded-lg px-4 py-2 text-sm font-bold transition-all sm:block",
+                "hidden rounded-lg px-4 py-2 text-base font-bold transition-all sm:block",
                 bookingActive
                   ? "bg-coquelicot-600 text-seasalt shadow-md"
                   : "bg-coquelicot-500 hover:bg-coquelicot-600 text-seasalt hover:shadow-md",
@@ -151,7 +151,7 @@ export function NavBar(): React.ReactElement | null {
             <Link
               href="/contact"
               className={cn(
-                "hidden rounded-lg px-4 py-2 text-sm font-bold transition-all sm:block",
+                "hidden rounded-lg px-4 py-2 text-base font-bold transition-all sm:block",
                 contactActive
                   ? "bg-moonstone-600/30 text-russian-violet shadow-sm"
                   : "bg-moonstone-600/20 text-russian-violet hover:bg-moonstone-600/30",
