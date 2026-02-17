@@ -1,32 +1,48 @@
 // src/components/ReviewForm.tsx
-"use client";
 /**
- * Review form.
- * Cleaner layout, live name preview, character counter, and accessible states.
- * Posts to /api/reviews. Supports anonymous posting that disables name fields.
+ * @file ReviewForm.tsx
+ * @description Review form that supports verified reviews via booking tokens.
  */
 
+"use client";
+
+import type React from "react";
 import { cn } from "@/lib/cn";
 import { useId, useState } from "react";
+import { useRouter } from "next/navigation";
+
+interface ReviewFormProtectedProps {
+  bookingId?: string;
+  token?: string;
+  prefillName?: string;
+}
 
 /**
- * Review form that posts to /api/reviews.
- * @param root0 Component props.
- * @param root0.onSubmitDone Callback after successful submit.
- * @returns Review form element.
+ * Protected review form with optional booking verification
+ * @param props - Component props
+ * @param props.bookingId - Optional booking ID for verified reviews
+ * @param props.token - Optional review token for verification
+ * @param props.prefillName - Pre-fill customer name
+ * @returns Review form element
  */
-export default function ReviewForm({
-  onSubmitDone,
-}: {
-  onSubmitDone?: () => void;
-}): React.ReactElement {
+export default function ReviewFormProtected({
+  bookingId,
+  token,
+  prefillName,
+}: ReviewFormProtectedProps): React.ReactElement {
+  const router = useRouter();
   const firstId = useId();
   const lastId = useId();
   const anonId = useId();
   const textId = useId();
 
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
+  const isVerified = !!(bookingId && token);
+  const nameParts = prefillName?.split(" ") || [];
+  const defaultFirst = nameParts[0] || "";
+  const defaultLast = nameParts.slice(1).join(" ") || "";
+
+  const [firstName, setFirstName] = useState(defaultFirst);
+  const [lastName, setLastName] = useState(defaultLast);
   const [text, setText] = useState("");
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -34,11 +50,12 @@ export default function ReviewForm({
   const [sent, setSent] = useState(false);
 
   const textMax = 600;
+  const textMin = 10;
   const textCount = text.length;
 
   /**
-   * Submit handler. Sends JSON to /api/reviews.
-   * @param e Form submit event to prevent default and post payload.
+   * Submit handler
+   * @param e - Form event
    */
   async function handleSubmit(e: React.FormEvent): Promise<void> {
     e.preventDefault();
@@ -48,8 +65,18 @@ export default function ReviewForm({
     const t = text.trim();
     const f = firstName.trim();
     const l = lastName.trim();
+
+    // Validation
     if (!t) {
       setErrorMsg("Please write a short review.");
+      return;
+    }
+    if (t.length < textMin) {
+      setErrorMsg(`Review must be at least ${textMin} characters.`);
+      return;
+    }
+    if (t.length > textMax) {
+      setErrorMsg(`Review must be ${textMax} characters or less.`);
       return;
     }
     if (!isAnonymous && !f) {
@@ -67,19 +94,24 @@ export default function ReviewForm({
           firstName: isAnonymous ? null : f,
           lastName: isAnonymous ? null : l,
           isAnonymous,
+          // Include booking info if verified review
+          bookingId: isVerified ? bookingId : undefined,
+          reviewToken: isVerified ? token : undefined,
         }),
       });
+
       if (!res.ok) {
-        const detail = await res.text().catch(() => "");
-        throw new Error(detail || `Request failed with ${res.status}`);
+        const data = await res.json().catch(() => null);
+        const errorMessage = data?.error || `Request failed with ${res.status}`;
+        throw new Error(errorMessage);
       }
 
-      setFirstName("");
-      setLastName("");
-      setText("");
-      setIsAnonymous(false);
       setSent(true);
-      onSubmitDone?.();
+
+      // Redirect to thank you page after 2 seconds
+      setTimeout(() => {
+        router.push("/");
+      }, 2000);
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
@@ -88,11 +120,28 @@ export default function ReviewForm({
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      aria-busy={loading}
-      className={cn("mx-auto w-full max-w-[min(100vw-2rem,42rem)] space-y-4")}
-    >
+    <form onSubmit={handleSubmit} aria-busy={loading} className={cn("space-y-4")}>
+      {/* Verified badge */}
+      {isVerified && (
+        <div
+          className={cn(
+            "border-moonstone-500/50 bg-moonstone-600/10 text-moonstone-600 flex items-center gap-2 rounded-lg border p-3 text-sm",
+          )}
+        >
+          <svg className={cn("h-5 w-5")} fill="currentColor" viewBox="0 0 20 20">
+            <path
+              fillRule="evenodd"
+              d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+              clipRule="evenodd"
+            />
+          </svg>
+          <span className={cn("font-semibold")}>Verified Review</span>
+          <span className={cn("text-moonstone-600/80")}>
+            • Your review will be marked as verified
+          </span>
+        </div>
+      )}
+
       {/* Status */}
       {(errorMsg || sent) && (
         <div
@@ -104,15 +153,14 @@ export default function ReviewForm({
               : "border-moonstone-500/50 bg-moonstone-600/10 text-moonstone-600",
           )}
         >
-          {errorMsg ?? "Thanks-your review was sent for moderation."}
+          {errorMsg ??
+            "Thanks for your review! It will appear on the site after approval. Redirecting..."}
         </div>
       )}
 
-      {/* Identity card */}
+      {/* Identity */}
       <div
-        className={cn(
-          "border-seasalt-400/60 bg-seasalt-800 space-y-4 rounded-xl border p-4 shadow-sm",
-        )}
+        className={cn("border-seasalt-400/60 bg-seasalt-900/60 space-y-4 rounded-xl border p-4")}
       >
         <div className={cn("flex items-center gap-3")}>
           <input
@@ -134,15 +182,12 @@ export default function ReviewForm({
               htmlFor={firstId}
               className={cn("text-rich-black mb-1 block text-sm font-semibold")}
             >
-              First name
+              First name {!isAnonymous && <span className={cn("text-coquelicot-500")}>*</span>}
             </label>
             <input
               id={firstId}
-              name="firstName"
-              autoComplete="given-name"
-              aria-invalid={!isAnonymous && !firstName.trim() ? "true" : "false"}
               className={cn(
-                "border-seasalt-400/60 bg-seasalt-800 text-rich-black focus:ring-moonstone-500/50",
+                "border-seasalt-400/60 bg-seasalt text-rich-black focus:ring-moonstone-500/50",
                 "w-full rounded-md border px-3 py-2 outline-none focus:ring-2",
               )}
               value={firstName}
@@ -161,10 +206,8 @@ export default function ReviewForm({
             </label>
             <input
               id={lastId}
-              name="lastName"
-              autoComplete="family-name"
               className={cn(
-                "border-seasalt-400/60 bg-seasalt-800 text-rich-black focus:ring-moonstone-500/50",
+                "border-seasalt-400/60 bg-seasalt text-rich-black focus:ring-moonstone-500/50",
                 "w-full rounded-md border px-3 py-2 outline-none focus:ring-2",
               )}
               value={lastName}
@@ -176,29 +219,33 @@ export default function ReviewForm({
         </div>
       </div>
 
-      {/* Review card */}
-      <div className={cn("border-seasalt-400/60 bg-seasalt-800 rounded-xl border p-4 shadow-sm")}>
+      {/* Review */}
+      <div className={cn("border-seasalt-400/60 bg-seasalt-900/60 rounded-xl border p-4")}>
         <div className={cn("flex items-baseline justify-between gap-3")}>
           <label htmlFor={textId} className={cn("text-rich-black block text-sm font-semibold")}>
-            Review
+            Review <span className={cn("text-coquelicot-500")}>*</span>
           </label>
           <span
             className={cn(
               "text-rich-black/60 text-[11px] tabular-nums",
-              textCount > textMax ? "text-coquelicot-500" : "",
+              textCount > textMax
+                ? "text-coquelicot-500"
+                : textCount < textMin && textCount > 0
+                  ? "text-coquelicot-500/70"
+                  : "",
             )}
             aria-live="polite"
           >
-            {textCount}/{textMax}
+            {textCount}/{textMax} {textCount > 0 && textCount < textMin && `(min ${textMin})`}
           </span>
         </div>
 
         <textarea
           id={textId}
-          name="text"
+          placeholder={`Share your experience (at least ${textMin} characters)...`}
           className={cn(
-            "border-seasalt-400/60 bg-seasalt-800 text-rich-black focus:ring-moonstone-500/50",
-            "mt-1 min-h-[140px] w-full rounded-md border px-3 py-2 outline-none focus:ring-2",
+            "border-seasalt-400/60 bg-seasalt text-rich-black focus:ring-moonstone-500/50",
+            "mt-1 min-h-35 w-full rounded-md border px-3 py-2 outline-none focus:ring-2",
           )}
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -213,10 +260,10 @@ export default function ReviewForm({
           </p>
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || textCount < textMin}
             className={cn(
-              "bg-russian-violet text-seasalt-800 rounded-md px-4 py-2 text-sm font-semibold",
-              "hover:brightness-110 disabled:opacity-60",
+              "bg-russian-violet text-seasalt rounded-md px-4 py-2 text-sm font-semibold",
+              "hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60",
             )}
           >
             {loading ? "Sending..." : "Send review"}

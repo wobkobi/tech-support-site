@@ -5,59 +5,86 @@ generator client {
 
 datasource db {
   provider = "mongodb"
-  url      = env("DATABASE_URL")
+  url      = env("MONGODB_URI")
 }
 
 enum BookingStatus {
   held
   confirmed
   cancelled
-}
-
-model Resource {
-  id       String    @id @default(auto()) @map("_id") @db.ObjectId
-  name     String
-  bookings Booking[]
-
-  @@unique([name])
+  completed // NEW: Added for tracking completed appointments
 }
 
 model Booking {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 
-  // FK must be ObjectId to match Resource.id on Mongo
-  resourceId String   @db.ObjectId
-  resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
-
-  email String
+  // Person booking the appointment.
   name  String
+  email String
+  notes String?
 
-  // Mongo stores DateTime as BSON Date (UTC). No native @db.* here.
+  // When the appointment actually runs (in server time / UTC).
   startUtc DateTime
   endUtc   DateTime
 
+  // Per-booking buffer, in minutes, before and after the appointment.
   bufferBeforeMin Int @default(0)
   bufferAfterMin  Int @default(0)
 
-  status         BookingStatus @default(held)
+  // Status and hold expiry for possible future multi-step flows.
+  status         BookingStatus @default(confirmed)
   holdExpiresUtc DateTime?
 
+  // Secret tokens for management links
   cancelToken String @unique
+  reviewToken String @unique @default(uuid()) // NEW: Token for review link
+
+  // Optional reference to the Google Calendar event, for future cancellation.
+  calendarEventId String?
+
+  // Review tracking - NEW
+  reviewSentAt      DateTime? // When review email was sent
+  reviewSubmittedAt DateTime? // When they submitted a review
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([resourceId, startUtc, endUtc])
+  @@index([startUtc, endUtc])
   @@index([status, holdExpiresUtc])
+  @@index([calendarEventId])
 }
 
 model Review {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
   text        String
   firstName   String?
   lastName    String?
-  isAnonymous Boolean  @default(false)
-  approved    Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isAnonymous Boolean @default(false)
+  approved    Boolean @default(false)
+
+  // NEW: Link to booking (optional, for verified reviews)
+  bookingId String? @db.ObjectId
+  verified  Boolean @default(false) // True if from a booking link
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Cached calendar events for fast booking page loads
+model CalendarEventCache {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  // Event details from Google Calendar
+  eventId       String   // Google Calendar event ID
+  calendarEmail String   // Which calendar this event is from
+  startUtc      DateTime // Event start time
+  endUtc        DateTime // Event end time
+
+  // Cache metadata
+  fetchedAt DateTime @default(now()) // When this was cached
+  expiresAt DateTime // When to refresh this cache entry
+
+  @@index([expiresAt])
+  @@index([startUtc, endUtc])
+  @@unique([eventId, calendarEmail])
 }

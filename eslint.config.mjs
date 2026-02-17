@@ -1,59 +1,28 @@
 // eslint.config.mjs
-import { FlatCompat } from "@eslint/eslintrc";
-import js from "@eslint/js";
-import tsPlugin from "@typescript-eslint/eslint-plugin";
-import tsParser from "@typescript-eslint/parser";
-import prettierConfig from "eslint-config-prettier";
+import { defineConfig, globalIgnores } from "eslint/config";
+import nextVitals from "eslint-config-next/core-web-vitals";
+import nextTs from "eslint-config-next/typescript";
+import prettier from "eslint-config-prettier/flat";
 import jsdoc from "eslint-plugin-jsdoc";
 import globals from "globals";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+export default defineConfig([
+  // Next.js core + Core Web Vitals + TS rules
+  ...nextVitals,
+  ...nextTs,
 
-// Minimal compat to use classic shareable configs
-const compat = new FlatCompat({ baseDirectory: __dirname });
-
-export default [
-  // Ignore globs
-  {
-    ignores: [
-      "**/node_modules/**",
-      "**/.next/**",
-      "dist/**",
-      "coverage/**",
-      "build/**",
-      ".turbo/**",
-      ".eslintcache",
-      "next.config.mjs",
-      "postcss.config.js",
-      "eslint.config.mjs",
-    ],
-  },
-
-  // JSDoc rules tuned for TypeScript (error-level)
+  // JSDoc baseline (flat config variant, tuned for TS)
   jsdoc.configs["flat/recommended-typescript-error"],
 
-  // Baselines: JS, TS, Next.js; and disable stylistic conflicts via Prettier config
-  js.configs.recommended,
-  ...compat.extends(
-    "plugin:@typescript-eslint/recommended",
-    "plugin:@next/next/recommended",
-    "plugin:@next/next/core-web-vitals"
-  ),
-  prettierConfig,
-
-  // Project rules
+  // Your project-specific TS + JSDoc rules
   {
+    files: ["**/*.{js,jsx,ts,tsx}"],
     languageOptions: {
-      parser: tsParser,
-      // Keep globals explicit; parserOptions.project omitted for speed
-      globals: { ...globals.browser, ...globals.node },
-    },
-    plugins: {
-      "@typescript-eslint": tsPlugin,
-      jsdoc,
+      // Next config already sets parser; here we only tweak globals
+      globals: {
+        ...globals.browser,
+        ...globals.node,
+      },
     },
     settings: {
       jsdoc: { mode: "typescript" },
@@ -62,12 +31,12 @@ export default [
       // TS hygiene
       "@typescript-eslint/no-unused-vars": "error",
       "@typescript-eslint/consistent-type-definitions": "error",
-      "@typescript-eslint/explicit-function-return-type": [
-        "warn",
-        { allowExpressions: true },
-      ],
+      "@typescript-eslint/explicit-function-return-type": ["warn", { allowExpressions: true }],
 
-      // JSDoc enforcement for every function
+      // Next/React noise
+      "react/no-unescaped-entities": "off",
+
+      // JSDoc enforcement
       "jsdoc/require-jsdoc": [
         "error",
         {
@@ -91,4 +60,23 @@ export default [
       "jsdoc/require-description": "error",
     },
   },
-];
+
+  // Turn off stylistic rules that clash with Prettier
+  prettier,
+
+  // Ignores (this replaces your manual ignores + Next defaults)
+  globalIgnores([
+    ".next/**",
+    "out/**",
+    "build/**",
+    "next-env.d.ts",
+    "node_modules/**",
+    "dist/**",
+    "coverage/**",
+    ".turbo/**",
+    ".eslintcache",
+    "next.config.mjs",
+    "postcss.config.js",
+    "eslint.config.mjs",
+  ]),
+]);

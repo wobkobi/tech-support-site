@@ -1,21 +1,23 @@
 // src/app/error.tsx
 /**
  * @file error.tsx
- * @description Themed error page. Matches site styling and offers retry/home actions.
+ * @description Themed error boundary. Matches site styling.
  */
+
 "use client";
 
-import { FrostedSection, PageShell } from "@/components/SiteFrame";
+import type React from "react";
+import { FrostedSection, PageShell, CARD } from "@/components/PageLayout";
 import { cn } from "@/lib/cn";
 import Link from "next/link";
 import { FaArrowRotateRight, FaHouse } from "react-icons/fa6";
 
 /**
  * Error boundary UI for the App Router.
- * @param root0 Props
- * @param root0.error Thrown error instance
- * @param root0.reset Callback to re-render the segment
- * @returns Error page element
+ * @param props - Component props.
+ * @param props.error - Thrown error instance.
+ * @param props.reset - Callback to re-render the segment.
+ * @returns The error page element.
  */
 export default function Error({
   error,
@@ -28,66 +30,74 @@ export default function Error({
 
   return (
     <PageShell>
-      <FrostedSection>
-        <section className={cn("mx-auto w-full max-w-5xl")}>
-          <h1
-            className={cn(
-              "text-rich-black mb-3 text-center text-2xl font-bold sm:mb-4 sm:text-3xl md:text-4xl",
-            )}
-          >
-            Something went wrong
-          </h1>
+      <FrostedSection maxWidth="48rem">
+        <div className={cn("flex flex-col gap-6 sm:gap-8")}>
+          <section className={cn(CARD, "text-center")}>
+            <div className={cn("text-coquelicot-500 mb-4 text-7xl font-extrabold sm:text-8xl")}>
+              Oops!
+            </div>
 
-          <div
-            className={cn(
-              "border-seasalt-400/60 bg-seasalt-800 rounded-lg border p-4 shadow-sm sm:p-6",
-            )}
-          >
+            <h1
+              className={cn(
+                "text-russian-violet mb-4 text-3xl font-extrabold sm:text-4xl md:text-5xl",
+              )}
+            >
+              The website has encountered an error
+            </h1>
+
+            <p className={cn("text-rich-black mb-2 text-base sm:text-lg md:text-xl")}>
+              Looks like something went wrong. Have you tried turning it off and on again?
+            </p>
+
+            <p className={cn("text-rich-black/80 mb-4 text-base sm:text-lg")}>
+              Just kidding. That's my job, not yours.
+            </p>
+
             <p
-              className={cn("text-rich-black mb-3 text-base font-medium sm:mb-4 sm:text-lg")}
+              className={cn("text-rich-black/70 mb-6 wrap-break-word text-sm sm:text-base italic")}
               role="status"
               aria-live="polite"
             >
               {msg}
             </p>
 
-            <div className={cn("flex flex-wrap items-center gap-3")}>
+            <div className={cn("flex flex-wrap items-center justify-center gap-3")}>
               <button
                 type="button"
                 onClick={reset}
                 className={cn(
-                  "bg-russian-violet text-seasalt-800 inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold",
-                  "hover:brightness-110 disabled:opacity-60",
+                  "bg-coquelicot-500 hover:bg-coquelicot-600 text-seasalt inline-flex items-center gap-2 rounded-lg px-6 py-3 font-semibold transition-colors shadow-lg hover:shadow-xl",
                 )}
               >
-                <FaArrowRotateRight className={cn("h-4 w-4")} aria-hidden />
+                <FaArrowRotateRight className={cn("h-5 w-5")} aria-hidden />
                 Try again
               </button>
 
               <Link
                 href="/"
                 className={cn(
-                  "text-russian-violet hover:text-coquelicot-500 inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold",
+                  "border-seasalt-400/60 hover:bg-seasalt-900/40 text-rich-black inline-flex items-center gap-2 rounded-lg border px-6 py-3 font-semibold transition-colors",
                 )}
               >
-                <FaHouse className={cn("h-4 w-4")} aria-hidden />
+                <FaHouse className={cn("h-5 w-5")} aria-hidden />
                 Go home
               </Link>
             </div>
 
-            {/* Optional details for debugging; collapse by default */}
-            <details className={cn("text-rich-black/80 mt-4 text-sm")}>
-              <summary className={cn("cursor-pointer select-none")}>Technical details</summary>
+            <details className={cn("text-rich-black/80 mt-6 text-sm")}>
+              <summary className={cn("cursor-pointer font-semibold hover:text-russian-violet")}>
+                Technical details (for the curious)
+              </summary>
               <pre
                 className={cn(
-                  "border-seasalt-400/60 bg-seasalt-800 mt-2 overflow-auto rounded-md border p-3",
+                  "border-seasalt-400/60 bg-seasalt-900/60 mt-3 max-w-full overflow-auto rounded-lg border p-4 text-xs text-left",
                 )}
               >
                 {String(error?.stack || error)}
               </pre>
             </details>
-          </div>
-        </section>
+          </section>
+        </div>
       </FrostedSection>
     </PageShell>
   );

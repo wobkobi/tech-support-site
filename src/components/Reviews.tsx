@@ -1,8 +1,7 @@
 // src/components/Reviews.tsx
 /**
- * Reviews module. Renders inside an existing frosted container.
- * less than 6 items: responsive rows centered using flex-wrap.
- * >6 items: marquee scroll.
+ * @file Reviews.tsx
+ * @description Reviews module with responsive rows (1-3 items) or marquee scroll (4+ items).
  */
 
 import { cn } from "@/lib/cn";
@@ -22,7 +21,7 @@ export interface ReviewsProps {
 /**
  * Build display name like "A. Bcdef." or "Anonymous".
  * Uses first/last unless r.isAnonymous is true.
- * @param r Review item to format.
+ * @param r - Review item to format.
  * @returns Formatted display name.
  */
 function formatName(r: ReviewItem): string {
@@ -38,16 +37,16 @@ function formatName(r: ReviewItem): string {
 
 /**
  * Reviews section content. No outer frosted wrapper.
- * less than 6 items render as centered wrapped cards. >6 items use marquee.
- * @param root0 Component props.
- * @param [root0.items] Reviews to render.
- * @returns Section or null.
+ * 1-3 items render as centered wrapped cards. 4+ items use marquee.
+ * @param props - Component props.
+ * @param [props.items] - Reviews to render.
+ * @returns The reviews section, or null if empty.
  */
 export default function Reviews({ items = [] }: ReviewsProps): React.ReactElement | null {
   if (!items.length) return null;
 
-  // Marquee when more than six reviews
-  if (items.length > 6) {
+  // Marquee when more than three reviews
+  if (items.length > 3) {
     const track = [...items, ...items];
     return (
       <section aria-labelledby="reviews" className={cn("mx-auto w-full max-w-5xl")}>
@@ -64,7 +63,7 @@ export default function Reviews({ items = [] }: ReviewsProps): React.ReactElemen
               <li
                 key={`${formatName(r)}-${i}`}
                 className={cn(
-                  "border-seasalt-400/60 bg-seasalt-800/80 flex h-40 w-[360px] shrink-0 flex-col rounded-lg border p-4 sm:h-44 sm:w-[380px] sm:p-5",
+                  "border-seasalt-400/60 bg-seasalt-800/80 w-90 sm:w-95 flex h-40 shrink-0 flex-col rounded-lg border p-4 sm:h-44 sm:p-5",
                 )}
               >
                 <p className={cn("text-rich-black text-sm leading-relaxed sm:text-base")}>
@@ -85,7 +84,7 @@ export default function Reviews({ items = [] }: ReviewsProps): React.ReactElemen
     );
   }
 
-  // less than 6 items: center last row at all breakpoints using flex-wrap + justify-center
+  // 1-3 items: center last row at all breakpoints using flex-wrap + justify-center
   return (
     <section aria-labelledby="reviews" className={cn("mx-auto w-full max-w-5xl")}>
       <h2

@@ -1,7 +1,7 @@
 // src/lib/prisma.ts
 /**
- * Prisma client singleton for server components and routes.
- * @returns Prisma client instance.
+ * @file prisma.ts
+ * @description Prisma client singleton for server components and routes.
  */
 import { PrismaClient } from "@prisma/client";
 
