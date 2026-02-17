@@ -1,6 +1,7 @@
 // src/app/contact/page.tsx
 /**
- * Contact page: how to get in touch.
+ * @file page.tsx
+ * @description Contact page: how to get in touch.
  */
 
 import type React from "react";

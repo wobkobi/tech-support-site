@@ -3,15 +3,8 @@
  * @file route.ts
  * @description Cron endpoint to release expired booking holds.
  *
- * Configure in vercel.json:
- * {
- *   "crons": [{
- *     "path": "/api/cron/release-holds",
- *     "schedule": "*/ 5; /* /* /* /*"
- *   }]
- * }
- *
- * This runs every 5 minutes to clean up stale holds.
+ * Configured in vercel.json with path "/api/cron/release-holds"
+ * and a schedule of every 5 minutes.
  */
 
 import { NextRequest, NextResponse } from "next/server";

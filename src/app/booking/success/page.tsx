@@ -14,6 +14,7 @@ const CARD = "border-seasalt-400/60 bg-seasalt-800 rounded-xl border p-5 shadow-
 
 /**
  * Booking success page component.
+ * @returns The success page element.
  */
 export default function BookingSuccessPage(): React.ReactElement {
   return (

@@ -11,9 +11,9 @@ const CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID || "primary";
 // ADD YOUR CALENDAR IDs HERE
 // Get these by going to Google Calendar settings for each calendar
 const CALENDAR_IDS = [
-  "harrison@tothepoint.co.nz", //deafult calender 
-  "c_5f9906cba6c528e022579b741aa70120f3c2b3c57846839cc8005f99b323157b@group.calendar.google.com", //booking calendar
-  "harrisonraynes8@gmail.com", //personal calender
+  "harrison@tothepoint.co.nz", // default calendar
+  "c_5f9906cba6c528e022579b741aa70120f3c2b3c57846839cc8005f99b323157b@group.calendar.google.com", // booking calendar
+  "harrisonraynes8@gmail.com", // personal calendar
   // "personal-calendar-id@gmail.com",
   // "work-calendar-id@group.calendar.google.com",
   // "shared-calendar-id@group.calendar.google.com",

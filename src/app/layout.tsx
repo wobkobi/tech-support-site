@@ -5,6 +5,7 @@
  */
 
 import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata, Viewport } from "next";
 import { Exo } from "next/font/google";
 import Script from "next/script";
@@ -123,14 +124,16 @@ export const metadata: Metadata = {
     siteName: "To The Point Tech",
     url: "/",
     title: "To The Point Tech",
-    description: "Local tech support in Point Chevalier. Clear explanations, no jargon, and solutions that actually work.",
-    images: [{ url: "/og.jpg", width: 1200, height: 630, alt: "To The Point Tech" }],
+    description:
+      "Local tech support in Point Chevalier. Clear explanations, no jargon, and solutions that actually work.",
+    images: [{ url: "/og-1200x630.jpg", width: 1200, height: 630, alt: "To The Point Tech" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "To The Point Tech",
-    description: "Local tech support in Point Chevalier. Clear explanations, no jargon, and solutions that actually work.",
-    images: ["/og.jpg"],
+    description:
+      "Local tech support in Point Chevalier. Clear explanations, no jargon, and solutions that actually work.",
+    images: ["/og-1200x630.jpg"],
   },
   robots: {
     index: true,
@@ -220,7 +223,7 @@ export default function RootLayout({
     "@type": "ProfessionalService",
     name: "To The Point Tech",
     url: siteUrl,
-    image: `${siteUrl}/og.jpg`,
+    image: `${siteUrl}/og-1200x630.jpg`,
     description:
       "Local tech support in Point Chevalier, Auckland. Wi-Fi, email, backups, setup, and repairs.",
     areaServed: ["Point Chevalier", "Auckland", "New Zealand"],
@@ -237,6 +240,9 @@ export default function RootLayout({
         {/* Analytics */}
         <Analytics />
 
+        {/* Performance */}
+        {/* Vercel performance and analytics integrations */}
+        <SpeedInsights />
         {/* JSON-LD for richer SERP features */}
         <Script
           id="ld-org"

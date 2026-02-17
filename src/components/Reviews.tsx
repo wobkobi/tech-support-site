@@ -1,8 +1,8 @@
 // src/components/Reviews.tsx
 /**
- * Reviews module. Renders inside an existing frosted container.
- * 1-3 items: responsive rows centered using flex-wrap.
- * 4+ items: marquee scroll.
+ * @file Reviews.tsx
+ * @description Reviews module. Renders inside an existing frosted container.
+ * 1-3 items: responsive rows centered using flex-wrap. 4+ items: marquee scroll.
  */
 
 import { cn } from "@/lib/cn";
@@ -22,7 +22,7 @@ export interface ReviewsProps {
 /**
  * Build display name like "A. Bcdef." or "Anonymous".
  * Uses first/last unless r.isAnonymous is true.
- * @param r Review item to format.
+ * @param r - Review item to format.
  * @returns Formatted display name.
  */
 function formatName(r: ReviewItem): string {
@@ -39,9 +39,9 @@ function formatName(r: ReviewItem): string {
 /**
  * Reviews section content. No outer frosted wrapper.
  * 1-3 items render as centered wrapped cards. 4+ items use marquee.
- * @param root0 Component props.
- * @param [root0.items] Reviews to render.
- * @returns Section or null.
+ * @param props - Component props.
+ * @param [props.items] - Reviews to render.
+ * @returns The reviews section, or null if empty.
  */
 export default function Reviews({ items = [] }: ReviewsProps): React.ReactElement | null {
   if (!items.length) return null;

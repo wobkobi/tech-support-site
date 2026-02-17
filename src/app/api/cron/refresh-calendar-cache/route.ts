@@ -3,15 +3,8 @@
  * @file route.ts
  * @description Cron endpoint to refresh cached calendar events.
  *
- * Configure in vercel.json:
- * {
- *   "crons": [{
- *     "path": "/api/cron/refresh-calendar-cache",
- *     "schedule": "*/10 * * * *"
- *   }]
- * }
- *
- * This runs every 10 minutes to keep calendar cache fresh.
+ * Configured in vercel.json with path "/api/cron/refresh-calendar-cache"
+ * and a schedule of every 10 minutes.
  */
 
 import { NextRequest, NextResponse } from "next/server";

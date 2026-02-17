@@ -9,6 +9,9 @@ import BookingCancelClient from "./ui";
 
 /**
  * Cancel page that reads token from search params.
+ * @param props - Page props.
+ * @param props.searchParams - URL search params containing the cancel token.
+ * @returns The cancel page element.
  */
 export default async function BookingCancelPage({
   searchParams,

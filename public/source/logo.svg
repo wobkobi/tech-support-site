@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="441" height="441" viewBox="1.5 2 441 441">
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="441" height="441" viewBox="10 10.5 424 424">
     <path
         d="M0 0 C105.93 0 211.86 0 321 0 C321 106.26 321 212.52 321 322 C215.07 322 109.14 322 0 322 C0 215.74 0 109.48 0 0 Z M14 15 C14 111.36 14 207.72 14 307 C110.69 307 207.38 307 307 307 C307 210.64 307 114.28 307 15 C210.31 15 113.62 15 14 15 Z "
         fill="#0B093B" transform="translate(62,61)" />

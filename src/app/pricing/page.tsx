@@ -1,6 +1,7 @@
 // src/app/pricing/page.tsx
 /**
- * Pricing page: transparent pricing structure for tech support services.
+ * @file page.tsx
+ * @description Pricing page: transparent pricing structure for tech support services.
  */
 
 import type React from "react";

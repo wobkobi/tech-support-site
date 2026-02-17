@@ -13,10 +13,10 @@ import { FaArrowRotateRight, FaHouse } from "react-icons/fa6";
 
 /**
  * Global error boundary UI for the App Router.
- * @param root0 Component props.
- * @param root0.error Thrown error instance.
- * @param root0.reset Callback to retry rendering the route tree.
- * @returns Global error page element.
+ * @param props - Component props.
+ * @param props.error - Thrown error instance.
+ * @param props.reset - Callback to retry rendering the route tree.
+ * @returns The global error page element.
  */
 export default function GlobalError({
   error,

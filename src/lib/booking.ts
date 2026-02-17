@@ -1,7 +1,7 @@
-// src/lib/booking.ts - DURATION SUPPORT
+// src/lib/booking.ts
 /**
  * @file booking.ts
- * @description Booking system with duration selection (1hr quick jobs vs 2hr standard jobs)
+ * @description Booking system with duration selection (1hr quick jobs vs 2hr standard jobs).
  */
 
 export const BOOKING_CONFIG = {

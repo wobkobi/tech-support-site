@@ -1,7 +1,8 @@
 // src/app/(email-previews)/page.tsx
 /**
- * Dev-only email previews.
- * This route exists so the project compiles even when email templates are not wired up.
+ * @file page.tsx
+ * @description Dev-only email previews. This route exists so the project compiles even when
+ * email templates are not wired up.
  */
 
 import type React from "react";
@@ -12,7 +13,8 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 /**
- *
+ * Placeholder page for email template previews.
+ * @returns Email previews page element.
  */
 export default function EmailPreviewsPage(): React.ReactElement {
   return (

@@ -1,9 +1,8 @@
 // src/app/poster/page.tsx
 /**
- * POSTER PAGE - A4 at 300 DPI (1680x2308px)
- * Even outer gap on all 4 sides:
- * - Controlled by p-[60px] on the main content wrapper.
- * Footer sits on the bottom edge of the padded area via mt-auto.
+ * @file page.tsx
+ * @description Poster page — A4 at 300 DPI (1680x2308px). Even outer gap on all four sides
+ * controlled by p-[60px] on the main content wrapper. Footer sits on the bottom edge via mt-auto.
  */
 
 import { cn } from "@/lib/cn";

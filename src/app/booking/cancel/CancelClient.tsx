@@ -19,6 +19,9 @@ export interface BookingCancelClientProps {
 
 /**
  * Booking cancel page UI.
+ * @param props - Component props.
+ * @param props.token - The cancellation token from the URL.
+ * @returns The cancel page element.
  */
 export default function BookingCancelClient({
   token,
@@ -29,6 +32,7 @@ export default function BookingCancelClient({
   useEffect(() => {
     let cancelled = false;
 
+    /** Executes the cancellation API call. */
     async function runCancel(): Promise<void> {
       if (!token) {
         setState("error");

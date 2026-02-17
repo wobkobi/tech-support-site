@@ -1,6 +1,7 @@
 // src/app/faq/page.tsx
 /**
- * FAQ page: common questions about services, pricing, and how I work.
+ * @file page.tsx
+ * @description FAQ page: common questions about services, pricing, and how I work.
  */
 
 import type React from "react";

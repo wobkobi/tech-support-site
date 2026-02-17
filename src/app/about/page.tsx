@@ -1,6 +1,7 @@
 // src/app/about/page.tsx
 /**
- * About page: background, approach, and who I help.
+ * @file page.tsx
+ * @description About page: background, approach, and who I help.
  */
 
 import type React from "react";

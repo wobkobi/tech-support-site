@@ -1,7 +1,8 @@
 // src/components/NavBar.tsx
 "use client";
 /**
- * Modern navigation bar with mobile menu, frosted glass effect, and smooth animations.
+ * @file NavBar.tsx
+ * @description Modern navigation bar with mobile menu, frosted glass effect, and smooth animations.
  */
 
 import type React from "react";
@@ -19,6 +20,9 @@ interface NavItem {
 
 /**
  * Determine whether a path is active for a given prefix route.
+ * @param pathname - The current path.
+ * @param prefix - The prefix to match against.
+ * @returns Whether the path matches the prefix.
  */
 function isActivePrefix(pathname: string, prefix: string): boolean {
   if (prefix === "/") {
@@ -29,16 +33,23 @@ function isActivePrefix(pathname: string, prefix: string): boolean {
 
 /**
  * Modern navigation bar with mobile menu support.
+ * @returns The NavBar element, or null on hidden paths.
  */
 export function NavBar(): React.ReactElement | null {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [prevPathname, setPrevPathname] = useState(pathname);
+
+  // Close mobile menu when route changes (state-based comparison avoids effect)
+  if (prevPathname !== pathname) {
+    setPrevPathname(pathname);
+    if (mobileMenuOpen) {
+      setMobileMenuOpen(false);
+    }
+  }
 
   const HIDDEN_PATHS: ReadonlyArray<string> = ["/poster"];
-
-  if (HIDDEN_PATHS.includes(pathname)) {
-    return null;
-  }
+  const hidden = HIDDEN_PATHS.includes(pathname);
 
   const items: ReadonlyArray<NavItem> = [
     { label: "Services", href: "/services", activePrefix: "/services" },
@@ -49,11 +60,6 @@ export function NavBar(): React.ReactElement | null {
 
   const bookingActive = isActivePrefix(pathname, "/booking");
   const contactActive = isActivePrefix(pathname, "/contact");
-
-  // Close mobile menu when route changes
-  useEffect(() => {
-    setMobileMenuOpen(false);
-  }, [pathname]);
 
   // Prevent body scroll when mobile menu is open
   useEffect(() => {
@@ -66,6 +72,10 @@ export function NavBar(): React.ReactElement | null {
       document.body.style.overflow = "unset";
     };
   }, [mobileMenuOpen]);
+
+  if (hidden) {
+    return null;
+  }
 
   return (
     <>
@@ -84,9 +94,7 @@ export function NavBar(): React.ReactElement | null {
           {/* Logo */}
           <Link
             href="/"
-            className={cn(
-              "flex items-center gap-2.5 transition-transform hover:scale-105",
-            )}
+            className={cn("flex items-center gap-2.5 transition-transform hover:scale-105")}
           >
             <Image
               src="/source/logo.svg"
@@ -102,10 +110,7 @@ export function NavBar(): React.ReactElement | null {
           </Link>
 
           {/* Desktop Navigation */}
-          <nav
-            className={cn("hidden items-center gap-1 md:flex")}
-            aria-label="Primary navigation"
-          >
+          <nav className={cn("hidden items-center gap-1 md:flex")} aria-label="Primary navigation">
             {items.map((item) => {
               const active = isActivePrefix(pathname, item.activePrefix);
 
@@ -193,7 +198,7 @@ export function NavBar(): React.ReactElement | null {
       {mobileMenuOpen && (
         <div
           className={cn(
-            "fixed inset-0 z-40 bg-rich-black/50 backdrop-blur-sm md:hidden",
+            "bg-rich-black/50 fixed inset-0 z-40 backdrop-blur-sm md:hidden",
             "animate-in fade-in duration-200",
           )}
           onClick={() => setMobileMenuOpen(false)}
@@ -232,7 +237,7 @@ export function NavBar(): React.ReactElement | null {
           })}
 
           {/* Mobile CTA Buttons */}
-          <div className={cn("mt-4 flex flex-col gap-2 border-t border-seasalt-400/40 pt-4")}>
+          <div className={cn("border-seasalt-400/40 mt-4 flex flex-col gap-2 border-t pt-4")}>
             <Link
               href="/booking"
               className={cn(

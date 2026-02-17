@@ -15,6 +15,8 @@ interface CancelPayload {
 /**
  * POST /api/booking/cancel
  * Cancels a booking by its cancel token and removes from Google Calendar.
+ * @param request - The incoming cancel request.
+ * @returns JSON response indicating success or failure.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
