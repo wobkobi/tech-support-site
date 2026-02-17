@@ -1,7 +1,7 @@
-// src/components/SiteFrame.tsx
+// src/components/PageLayout.tsx
 /**
- * @file SiteFrame.tsx
- * @description Reusable layout components with frosted glass effect
+ * @file PageLayout.tsx
+ * @description Reusable layout components with frosted glass effect.
  */
 
 import type React from "react";

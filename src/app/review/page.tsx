@@ -7,7 +7,7 @@
 import type React from "react";
 import Link from "next/link";
 import ReviewFormProtected from "@/components/ReviewForm";
-import { FrostedSection, PageShell, CARD } from "@/components/SiteFrame";
+import { FrostedSection, PageShell, CARD } from "@/components/PageLayout";
 import { cn } from "@/lib/cn";
 import { prisma } from "@/lib/prisma";
 

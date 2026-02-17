@@ -6,7 +6,7 @@
 
 import type React from "react";
 import Link from "next/link";
-import { FrostedSection, PageShell, CARD, SOFT_CARD } from "@/components/SiteFrame";
+import { FrostedSection, PageShell, CARD, SOFT_CARD } from "@/components/PageLayout";
 import { cn } from "@/lib/cn";
 
 export const dynamic = "force-dynamic";

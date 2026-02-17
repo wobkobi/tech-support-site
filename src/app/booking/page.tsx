@@ -14,7 +14,7 @@ import {
 } from "@/lib/booking";
 import { prisma } from "@/lib/prisma";
 import BookingForm from "@/components/BookingForm";
-import { FrostedSection, PageShell, CARD } from "@/components/SiteFrame";
+import { FrostedSection, PageShell, CARD } from "@/components/PageLayout";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 60; // Cache for 60 seconds to reduce API load

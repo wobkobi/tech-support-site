@@ -5,7 +5,7 @@
  */
 
 import type React from "react";
-import BookingCancelClient from "./ui";
+import BookingCancelClient from "./CancelClient";
 
 /**
  * Cancel page that reads token from search params.

@@ -7,7 +7,7 @@
 "use client";
 
 import type React from "react";
-import { FrostedSection, PageShell, CARD } from "@/components/SiteFrame";
+import { FrostedSection, PageShell, CARD } from "@/components/PageLayout";
 import { cn } from "@/lib/cn";
 import Link from "next/link";
 import { FaArrowRotateRight, FaHouse } from "react-icons/fa6";

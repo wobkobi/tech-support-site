@@ -8,7 +8,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { refreshCalendarCache } from "@/lib/refreshCalendarCache";
+import { refreshCalendarCache } from "@/lib/calendar-cache";
 
 /**
  * Verify the request is from Vercel Cron or has the correct secret.

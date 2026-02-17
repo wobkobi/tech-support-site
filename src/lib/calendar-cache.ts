@@ -1,7 +1,7 @@
-// src/lib/refreshCalendarCache.ts
+// src/lib/calendar-cache.ts
 /**
- * @file refreshCalendarCache.ts
- * @description Background task to fetch and cache Google Calendar events
+ * @file calendar-cache.ts
+ * @description Background task to fetch and cache Google Calendar events.
  */
 
 import { prisma } from "@/lib/prisma";

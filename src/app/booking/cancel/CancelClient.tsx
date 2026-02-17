@@ -1,7 +1,7 @@
-// src/app/booking/cancel/ui.tsx
+// src/app/booking/cancel/CancelClient.tsx
 "use client";
 /**
- * @file ui.tsx
+ * @file CancelClient.tsx
  * @description Client UI for cancelling a booking.
  */
 

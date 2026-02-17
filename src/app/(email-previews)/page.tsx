@@ -6,7 +6,7 @@
  */
 
 import type React from "react";
-import { FrostedSection, PageShell } from "@/components/SiteFrame";
+import { FrostedSection, PageShell } from "@/components/PageLayout";
 import { cn } from "@/lib/cn";
 
 export const dynamic = "force-dynamic";

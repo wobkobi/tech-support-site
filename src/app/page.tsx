@@ -6,7 +6,7 @@
 
 import type React from "react";
 import Reviews, { type ReviewItem } from "@/components/Reviews";
-import { FrostedSection, PageShell } from "@/components/SiteFrame";
+import { FrostedSection, PageShell } from "@/components/PageLayout";
 import { cn } from "@/lib/cn";
 import { prisma } from "@/lib/prisma";
 import Image from "next/image";
