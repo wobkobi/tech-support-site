@@ -9,7 +9,7 @@ import { FrostedSection, PageShell, CARD, SOFT_CARD } from "@/components/SiteFra
 import { cn } from "@/lib/cn";
 
 export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 3600; // Cache for 1 hour - static content
 
 interface FaqItem {
   question: string;
@@ -70,8 +70,8 @@ const faqItems: ReadonlyArray<FaqItem> = [
     answer: (
       <>
         <p>
-          Most work is billed hourly with a minimum call-out for on-site visits. I'll give you a
-          clear estimate before starting so there are no surprises.
+          I charge $50 per hour, billed in 15-minute increments. I'll give you a clear estimate
+          before starting so there are no surprises.
         </p>
         <p className={cn("text-rich-black/80 mt-2")}>
           See the{" "}
@@ -147,17 +147,17 @@ export default function FaqPage(): React.ReactElement {
   return (
     <PageShell>
       <FrostedSection maxWidth="56rem">
-        <div className={cn("flex flex-col gap-4 sm:gap-5")}>
-          <section aria-labelledby="faq-heading" className={cn(CARD)}>
+        <div className={cn("flex flex-col gap-6 sm:gap-8")}>
+          <section aria-labelledby="faq-heading" className={cn(CARD, "animate-fade-in")}>
             <h1
               id="faq-heading"
               className={cn(
-                "text-russian-violet mb-2 text-2xl font-extrabold sm:text-3xl md:text-4xl",
+                "text-russian-violet mb-4 text-3xl font-extrabold sm:text-4xl md:text-5xl",
               )}
             >
               Frequently asked questions
             </h1>
-            <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
+            <p className={cn("text-rich-black/80 text-base sm:text-lg")}>
               Quick answers to common questions. Don't see yours?{" "}
               <Link href="/contact" className={linkStyle}>
                 Get in touch
@@ -166,7 +166,7 @@ export default function FaqPage(): React.ReactElement {
             </p>
           </section>
 
-          <section aria-label="FAQ list" className={cn(CARD)}>
+          <section aria-label="FAQ list" className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}>
             <div className={cn("space-y-4")}>
               {faqItems.map((item) => (
                 <details key={item.question} className={cn(SOFT_CARD, "group")}>
@@ -186,8 +186,8 @@ export default function FaqPage(): React.ReactElement {
             </div>
           </section>
 
-          <section aria-label="Next steps" className={cn(CARD)}>
-            <p className={cn("text-rich-black text-sm sm:text-base")}>
+          <section aria-label="Next steps" className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-200")}>
+            <p className={cn("text-rich-black text-base sm:text-lg")}>
               Ready to get started?{" "}
               <Link href="/booking" className={linkStyle}>
                 Book online

@@ -2,53 +2,115 @@
 "use client";
 /**
  * @file BookingForm.tsx
- * @description Booking request form - clients pick day + time window.
- * Unavailable times are disabled based on calendar conflicts.
+ * @description Booking form with duration selection (1hr vs 2hr jobs)
  */
 
 import type React from "react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/cn";
-import { TIME_OF_DAY_OPTIONS, type BookableDay, type TimeOfDay } from "@/lib/booking";
+import {
+  DURATION_OPTIONS,
+  type BookableDay,
+  type TimeOfDay,
+  type JobDuration,
+} from "@/lib/booking";
+import AddressAutocomplete from "@/components/AddressAutocomplete";
 
 export interface BookingFormProps {
   availableDays: BookableDay[];
 }
 
+/**
+ * Booking form component with duration selection
+ * @param props - Component props
+ * @param props.availableDays - Array of available booking days
+ * @returns Booking form element
+ */
 export default function BookingForm({ availableDays }: BookingFormProps): React.ReactElement {
   const router = useRouter();
+
+  // Form state
+  const [duration, setDuration] = useState<JobDuration>("long"); // Default to 2hr
   const [selectedDay, setSelectedDay] = useState<BookableDay | null>(null);
   const [selectedTime, setSelectedTime] = useState<TimeOfDay | null>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [meetingType, setMeetingType] = useState<"in-person" | "remote" | "">("");
+  const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Auto-select first available day - runs only once on mount
+  useEffect(() => {
+    if (availableDays.length > 0) {
+      // Find first day with available slots
+      const firstAvailable = availableDays.find((d) => d.hasAnySlots);
+      if (firstAvailable) {
+        setSelectedDay(firstAvailable);
+      } else {
+        setSelectedDay(availableDays[0]); // Fallback to first day
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run on mount
 
   // Split days into weekdays and weekends
   const weekdays = availableDays.filter((d) => !d.isWeekend);
   const weekends = availableDays.filter((d) => d.isWeekend);
 
+  /**
+   * Handle day selection and reset time if needed
+   * @param day - Selected bookable day
+   */
   function handleDaySelect(day: BookableDay): void {
     setSelectedDay(day);
-    // Reset time if not available on new day
-    if (selectedTime && !day.availableTimes.includes(selectedTime)) {
-      setSelectedTime(null);
+    // Reset time if current selection not available on new day
+    if (selectedTime) {
+      const slot = day.timeWindows.find((w) => w.value === selectedTime);
+      const available = duration === "short" ? slot?.availableShort : slot?.availableLong;
+      if (!available) {
+        setSelectedTime(null);
+      }
     }
   }
 
+  /**
+   * Handle duration change and reset time if needed
+   * @param newDuration - Selected job duration
+   */
+  function handleDurationChange(newDuration: JobDuration): void {
+    setDuration(newDuration);
+    // Reset time if current selection not available for new duration
+    if (selectedTime && selectedDay) {
+      const slot = selectedDay.timeWindows.find((w) => w.value === selectedTime);
+      const available = newDuration === "short" ? slot?.availableShort : slot?.availableLong;
+      if (!available) {
+        setSelectedTime(null);
+      }
+    }
+  }
+
+  /**
+   * Handle form submission
+   * @param e - Form event
+   */
   async function handleSubmit(e: React.FormEvent): Promise<void> {
     e.preventDefault();
     setError(null);
 
+    if (!duration) {
+      setError("Please select job duration.");
+      return;
+    }
     if (!selectedDay) {
       setError("Please select a day.");
       return;
     }
     if (!selectedTime) {
-      setError("Please select a time preference.");
+      setError("Please select a time.");
       return;
     }
     if (!name.trim()) {
@@ -57,6 +119,14 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
     }
     if (!email.trim() || !email.includes("@")) {
       setError("Please enter a valid email address.");
+      return;
+    }
+    if (!meetingType) {
+      setError("Please select in-person or remote.");
+      return;
+    }
+    if (meetingType === "in-person" && !address.trim()) {
+      setError("Please enter your address for in-person appointments.");
       return;
     }
     if (!notes.trim()) {
@@ -73,9 +143,12 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
         body: JSON.stringify({
           dateKey: selectedDay.dateKey,
           timeOfDay: selectedTime,
+          duration,
           name: name.trim(),
           email: email.trim(),
           phone: phone.trim() || undefined,
+          meetingType,
+          address: meetingType === "in-person" ? address.trim() : undefined,
           notes: notes.trim(),
         }),
       });
@@ -96,6 +169,42 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
 
   return (
     <form onSubmit={handleSubmit} className={cn("flex flex-col gap-6")}>
+      {/* Duration Selection - FIRST */}
+      <div>
+        <label className={cn("text-rich-black mb-2 block text-sm font-semibold")}>
+          How long do you need? <span className={cn("text-coquelicot-500")}>*</span>
+        </label>
+        <div className={cn("grid gap-3 sm:grid-cols-2")}>
+          {DURATION_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => handleDurationChange(opt.value)}
+              className={cn(
+                "rounded-lg border p-4 text-left transition-colors",
+                duration === opt.value
+                  ? "border-russian-violet bg-russian-violet/10"
+                  : "border-seasalt-400/60 bg-seasalt hover:border-russian-violet/40",
+              )}
+            >
+              <div className={cn("flex items-start justify-between")}>
+                <div>
+                  <p className={cn("text-rich-black text-sm font-semibold")}>{opt.label}</p>
+                  <p className={cn("text-rich-black/70 mt-1 text-xs")}>{opt.description}</p>
+                </div>
+                {duration === opt.value && (
+                  <span className={cn("text-russian-violet text-lg")}>✓</span>
+                )}
+              </div>
+            </button>
+          ))}
+        </div>
+        <p className={cn("text-rich-black/60 mt-2 text-xs")}>
+          Duration is just an estimate for scheduling. Most appointments are 1 hour. Choose 2 hours
+          if you have multiple issues or complex setup needs.
+        </p>
+      </div>
+
       {/* Day Selection */}
       <div>
         <label className={cn("text-rich-black mb-2 block text-sm font-semibold")}>
@@ -108,7 +217,6 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
           </p>
         ) : (
           <div className={cn("space-y-3")}>
-            {/* Weekdays */}
             {weekdays.length > 0 && (
               <div>
                 <p
@@ -123,26 +231,36 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
                     <button
                       key={day.dateKey}
                       type="button"
+                      disabled={!day.hasAnySlots}
                       onClick={() => handleDaySelect(day)}
                       className={cn(
-                        "rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
+                        "w-32 rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
+                        !day.hasAnySlots && "cursor-not-allowed opacity-50",
                         selectedDay?.dateKey === day.dateKey
                           ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
-                          : "border-seasalt-400/60 bg-seasalt text-rich-black hover:border-russian-violet/40",
-                        day.isToday && "ring-coquelicot-500/50 ring-2 ring-offset-1",
+                          : day.hasAnySlots
+                            ? "border-seasalt-400/60 bg-seasalt text-rich-black hover:border-russian-violet/40"
+                            : "border-seasalt-400/40 bg-seasalt-900/20 text-rich-black/60",
+                        day.isToday &&
+                          day.hasAnySlots &&
+                          "ring-coquelicot-500/50 ring-2 ring-offset-1",
                       )}
                     >
-                      {day.label}
-                      {day.isToday && (
-                        <span className={cn("text-coquelicot-600 ml-1 text-xs")}>(Today)</span>
-                      )}
+                      <div className={cn("flex flex-col items-center")}>
+                        <span>{day.dayLabel}</span>
+                        {day.isToday && day.hasAnySlots && (
+                          <span className={cn("text-coquelicot-600 text-xs")}>(Today)</span>
+                        )}
+                        {!day.hasAnySlots && (
+                          <span className={cn("text-rich-black/50 text-xs")}>(Fully Booked)</span>
+                        )}
+                      </div>
                     </button>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Weekends */}
             {weekends.length > 0 && (
               <div>
                 <p
@@ -157,15 +275,24 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
                     <button
                       key={day.dateKey}
                       type="button"
+                      disabled={!day.hasAnySlots}
                       onClick={() => handleDaySelect(day)}
                       className={cn(
-                        "rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
+                        "w-32 rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
+                        !day.hasAnySlots && "cursor-not-allowed opacity-50",
                         selectedDay?.dateKey === day.dateKey
                           ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
-                          : "border-seasalt-400/60 bg-seasalt text-rich-black hover:border-russian-violet/40",
+                          : day.hasAnySlots
+                            ? "border-seasalt-400/60 bg-seasalt text-rich-black hover:border-russian-violet/40"
+                            : "border-seasalt-400/40 bg-seasalt-900/20 text-rich-black/60",
                       )}
                     >
-                      {day.label}
+                      <div className={cn("flex flex-col items-center")}>
+                        <span>{day.dayLabel}</span>
+                        {!day.hasAnySlots && (
+                          <span className={cn("text-rich-black/50 text-xs")}>(Fully Booked)</span>
+                        )}
+                      </div>
                     </button>
                   ))}
                 </div>
@@ -175,37 +302,52 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
         )}
       </div>
 
-      {/* Time Selection - only show when day is selected */}
+      {/* Time Selection */}
       {selectedDay && (
         <div>
           <label className={cn("text-rich-black mb-2 block text-sm font-semibold")}>
-            Preferred time for {selectedDay.fullLabel}
+            Start time for {selectedDay.fullLabel}
           </label>
-          <div className={cn("flex flex-wrap gap-2")}>
-            {TIME_OF_DAY_OPTIONS.map((option) => {
-              const isAvailable = selectedDay.availableTimes.includes(option.value);
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  disabled={!isAvailable}
-                  onClick={() => setSelectedTime(option.value)}
-                  className={cn(
-                    "rounded-lg border px-4 py-2 text-sm font-medium transition-colors",
-                    !isAvailable && "cursor-not-allowed opacity-40",
-                    selectedTime === option.value
-                      ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
-                      : isAvailable
-                        ? "border-seasalt-400/60 bg-seasalt text-rich-black hover:border-russian-violet/40"
-                        : "border-seasalt-400/40 bg-seasalt-900/30 text-rich-black/50",
-                  )}
-                >
-                  {option.label}
-                  {!isAvailable && " (busy)"}
-                </button>
-              );
-            })}
-          </div>
+
+          {/* Check if day has any available slots for selected duration */}
+          {selectedDay.timeWindows.every((w) =>
+            duration === "short" ? !w.availableShort : !w.availableLong,
+          ) ? (
+            <div className={cn("border-seasalt-400/60 bg-seasalt-900/30 rounded-lg border p-4")}>
+              <p className={cn("text-rich-black/70 text-sm")}>
+                Sorry, no {duration === "short" ? "1-hour" : "2-hour"} slots available on this day.
+                {duration === "long" && " Try selecting 1 hour instead, or choose another day."}
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className={cn("flex flex-wrap gap-2")}>
+                {selectedDay.timeWindows.map((window) => {
+                  const available =
+                    duration === "short" ? window.availableShort : window.availableLong;
+                  return (
+                    <button
+                      key={window.value}
+                      type="button"
+                      disabled={!available}
+                      onClick={() => setSelectedTime(window.value)}
+                      className={cn(
+                        "w-20 rounded-lg border px-4 py-2 text-sm font-medium transition-colors",
+                        !available && "cursor-not-allowed opacity-40",
+                        selectedTime === window.value
+                          ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
+                          : available
+                            ? "border-seasalt-400/60 bg-seasalt text-rich-black hover:border-russian-violet/40"
+                            : "border-seasalt-400/40 bg-seasalt-900/30 text-rich-black/50",
+                      )}
+                    >
+                      {window.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -263,6 +405,58 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
           )}
         />
       </div>
+
+      {/* Meeting Type */}
+      <div className={cn("flex flex-col gap-2")}>
+        <label className={cn("text-rich-black text-sm font-semibold")}>
+          Meeting type <span className={cn("text-coquelicot-500")}>*</span>
+        </label>
+        <div className={cn("flex flex-wrap gap-2")}>
+          <button
+            type="button"
+            onClick={() => setMeetingType("in-person")}
+            className={cn(
+              "rounded-lg border px-4 py-2 text-sm font-medium transition-colors",
+              meetingType === "in-person"
+                ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
+                : "border-seasalt-400/60 bg-seasalt text-rich-black hover:border-russian-violet/40",
+            )}
+          >
+            In-person
+          </button>
+          <button
+            type="button"
+            onClick={() => setMeetingType("remote")}
+            className={cn(
+              "rounded-lg border px-4 py-2 text-sm font-medium transition-colors",
+              meetingType === "remote"
+                ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
+                : "border-seasalt-400/60 bg-seasalt text-rich-black hover:border-russian-violet/40",
+            )}
+          >
+            Remote
+          </button>
+        </div>
+      </div>
+
+      {/* Address (only for in-person) */}
+      {meetingType === "in-person" && (
+        <div>
+          <label
+            htmlFor="booking-address"
+            className={cn("text-rich-black mb-2 block text-sm font-semibold")}
+          >
+            Address <span className={cn("text-coquelicot-500")}>*</span>
+          </label>
+          <AddressAutocomplete
+            id="booking-address"
+            value={address}
+            onChange={setAddress}
+            placeholder="Start typing your address..."
+            required
+          />
+        </div>
+      )}
 
       <div className={cn("flex flex-col gap-1")}>
         <label htmlFor="booking-notes" className={cn("text-rich-black text-sm font-semibold")}>

@@ -1,8 +1,8 @@
 // src/components/Reviews.tsx
 /**
  * Reviews module. Renders inside an existing frosted container.
- * less than 6 items: responsive rows centered using flex-wrap.
- * >6 items: marquee scroll.
+ * 1-3 items: responsive rows centered using flex-wrap.
+ * 4+ items: marquee scroll.
  */
 
 import { cn } from "@/lib/cn";
@@ -38,7 +38,7 @@ function formatName(r: ReviewItem): string {
 
 /**
  * Reviews section content. No outer frosted wrapper.
- * less than 6 items render as centered wrapped cards. >6 items use marquee.
+ * 1-3 items render as centered wrapped cards. 4+ items use marquee.
  * @param root0 Component props.
  * @param [root0.items] Reviews to render.
  * @returns Section or null.
@@ -46,8 +46,8 @@ function formatName(r: ReviewItem): string {
 export default function Reviews({ items = [] }: ReviewsProps): React.ReactElement | null {
   if (!items.length) return null;
 
-  // Marquee when more than six reviews
-  if (items.length > 6) {
+  // Marquee when more than three reviews
+  if (items.length > 3) {
     const track = [...items, ...items];
     return (
       <section aria-labelledby="reviews" className={cn("mx-auto w-full max-w-5xl")}>
@@ -85,7 +85,7 @@ export default function Reviews({ items = [] }: ReviewsProps): React.ReactElemen
     );
   }
 
-  // less than 6 items: center last row at all breakpoints using flex-wrap + justify-center
+  // 1-3 items: center last row at all breakpoints using flex-wrap + justify-center
   return (
     <section aria-labelledby="reviews" className={cn("mx-auto w-full max-w-5xl")}>
       <h2

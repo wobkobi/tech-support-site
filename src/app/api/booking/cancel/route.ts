@@ -1,12 +1,12 @@
 // src/app/api/booking/cancel/route.ts
 /**
  * @file route.ts
- * @description API route to cancel a booking using a cancel token.
+ * @description API route to cancel a booking using a cancel token
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { deleteBookingEvent } from "@/server/google/calendar";
+import { deleteBookingEvent } from "@/lib/google-calendar";
 
 interface CancelPayload {
   cancelToken: string;
@@ -14,7 +14,7 @@ interface CancelPayload {
 
 /**
  * POST /api/booking/cancel
- * Cancels a booking by its cancel token.
+ * Cancels a booking by its cancel token and removes from Google Calendar.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {

@@ -1,8 +1,7 @@
 // src/components/NavBar.tsx
 "use client";
 /**
- * Top navigation bar with logo, primary links, and booking/contact CTAs.
- * @returns React element for the site navigation bar.
+ * Modern navigation bar with mobile menu, frosted glass effect, and smooth animations.
  */
 
 import type React from "react";
@@ -10,30 +9,16 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/cn";
+import { useState, useEffect } from "react";
 
-/**
- * One navigation entry shown in the primary nav.
- */
 interface NavItem {
-  /**
-   * Label displayed to the user.
-   */
   label: string;
-  /**
-   * Destination path.
-   */
   href: string;
-  /**
-   * Route prefix used to determine active state.
-   */
   activePrefix: string;
 }
 
 /**
  * Determine whether a path is active for a given prefix route.
- * @param pathname Current pathname.
- * @param prefix Route prefix such as "/services".
- * @returns True if pathname matches the prefix.
  */
 function isActivePrefix(pathname: string, prefix: string): boolean {
   if (prefix === "/") {
@@ -43,12 +28,11 @@ function isActivePrefix(pathname: string, prefix: string): boolean {
 }
 
 /**
- * Navigation bar rendered at the top of most pages.
- * Hides itself on specific routes (eg, printable poster).
- * @returns Navigation bar React element, or null if hidden on this route.
+ * Modern navigation bar with mobile menu support.
  */
 export function NavBar(): React.ReactElement | null {
-  const pathname: string = usePathname();
+  const pathname = usePathname();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const HIDDEN_PATHS: ReadonlyArray<string> = ["/poster"];
 
@@ -59,39 +43,174 @@ export function NavBar(): React.ReactElement | null {
   const items: ReadonlyArray<NavItem> = [
     { label: "Services", href: "/services", activePrefix: "/services" },
     { label: "Pricing", href: "/pricing", activePrefix: "/pricing" },
+    { label: "About", href: "/about", activePrefix: "/about" },
     { label: "FAQ", href: "/faq", activePrefix: "/faq" },
-    { label: "Reviews", href: "/review", activePrefix: "/review" },
   ];
 
   const bookingActive = isActivePrefix(pathname, "/booking");
   const contactActive = isActivePrefix(pathname, "/contact");
 
+  // Close mobile menu when route changes
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [pathname]);
+
+  // Prevent body scroll when mobile menu is open
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [mobileMenuOpen]);
+
   return (
-    <header
-      className={cn(
-        "border-seasalt-400/40 sticky top-0 z-20 border-b",
-        "bg-seasalt/80 backdrop-blur-md",
-      )}
-    >
-      <div
+    <>
+      <header
         className={cn(
-          "mx-auto flex h-14 w-full items-center justify-between",
-          "max-w-[min(100vw-1rem,80rem)]",
+          "sticky top-4 z-50 mx-auto w-full px-4",
+          "max-w-[min(100vw-2rem,90rem)]",
+          "animate-slide-down",
         )}
       >
-        <Link href="/" className={cn("flex items-center gap-3 px-2")}>
-          <Image
-            src="/logo.svg"
-            alt="To The Point Tech"
-            width={28}
-            height={28}
-            priority
-            className={cn("select-none")}
-          />
-          <span className={cn("text-russian-violet text-base font-bold")}>To The Point Tech</span>
-        </Link>
+        <div
+          className={cn(
+            "border-seasalt-400/40 bg-seasalt-800/90 flex h-16 w-full items-center justify-between rounded-2xl border px-4 shadow-lg backdrop-blur-lg",
+          )}
+        >
+          {/* Logo */}
+          <Link
+            href="/"
+            className={cn(
+              "flex items-center gap-2.5 transition-transform hover:scale-105",
+            )}
+          >
+            <Image
+              src="/source/logo.svg"
+              alt="To The Point Tech"
+              width={32}
+              height={32}
+              priority
+              className={cn("select-none")}
+            />
+            <span className={cn("text-russian-violet hidden text-base font-bold sm:inline")}>
+              To The Point Tech
+            </span>
+          </Link>
 
-        <nav className={cn("hidden items-center gap-1.5 sm:flex")} aria-label="Primary navigation">
+          {/* Desktop Navigation */}
+          <nav
+            className={cn("hidden items-center gap-1 md:flex")}
+            aria-label="Primary navigation"
+          >
+            {items.map((item) => {
+              const active = isActivePrefix(pathname, item.activePrefix);
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "rounded-lg px-3.5 py-2 text-sm font-semibold transition-all",
+                    active
+                      ? "text-russian-violet bg-moonstone-600/20"
+                      : "text-rich-black hover:bg-seasalt-900/30 hover:text-russian-violet",
+                  )}
+                  aria-current={active ? "page" : undefined}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
+
+          {/* CTA Buttons */}
+          <div className={cn("flex items-center gap-2")}>
+            <Link
+              href="/booking"
+              className={cn(
+                "hidden rounded-lg px-4 py-2 text-sm font-bold transition-all sm:block",
+                bookingActive
+                  ? "bg-coquelicot-600 text-seasalt shadow-md"
+                  : "bg-coquelicot-500 hover:bg-coquelicot-600 text-seasalt hover:shadow-md",
+              )}
+              aria-current={bookingActive ? "page" : undefined}
+            >
+              Book now
+            </Link>
+
+            <Link
+              href="/contact"
+              className={cn(
+                "hidden rounded-lg px-4 py-2 text-sm font-bold transition-all sm:block",
+                contactActive
+                  ? "bg-moonstone-600/30 text-russian-violet shadow-sm"
+                  : "bg-moonstone-600/20 text-russian-violet hover:bg-moonstone-600/30",
+              )}
+              aria-current={contactActive ? "page" : undefined}
+            >
+              Contact
+            </Link>
+
+            {/* Mobile Menu Button */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className={cn(
+                "bg-seasalt-900/20 hover:bg-seasalt-900/30 flex h-10 w-10 items-center justify-center rounded-lg transition-all md:hidden",
+              )}
+              aria-label="Toggle mobile menu"
+              aria-expanded={mobileMenuOpen}
+            >
+              <div className={cn("flex h-5 w-5 flex-col justify-center gap-1")}>
+                <span
+                  className={cn(
+                    "bg-russian-violet h-0.5 w-full rounded-full transition-all",
+                    mobileMenuOpen && "translate-y-1.5 rotate-45",
+                  )}
+                />
+                <span
+                  className={cn(
+                    "bg-russian-violet h-0.5 w-full rounded-full transition-all",
+                    mobileMenuOpen && "opacity-0",
+                  )}
+                />
+                <span
+                  className={cn(
+                    "bg-russian-violet h-0.5 w-full rounded-full transition-all",
+                    mobileMenuOpen && "-translate-y-1.5 -rotate-45",
+                  )}
+                />
+              </div>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Mobile Menu Overlay */}
+      {mobileMenuOpen && (
+        <div
+          className={cn(
+            "fixed inset-0 z-40 bg-rich-black/50 backdrop-blur-sm md:hidden",
+            "animate-in fade-in duration-200",
+          )}
+          onClick={() => setMobileMenuOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Mobile Menu Slide-out */}
+      <nav
+        className={cn(
+          "border-seasalt-400/40 bg-seasalt-800/95 fixed right-4 top-20 z-40 h-[calc(100vh-6rem)] w-72 rounded-2xl border shadow-2xl backdrop-blur-xl transition-transform duration-300 md:hidden",
+          mobileMenuOpen ? "translate-x-0" : "translate-x-full",
+        )}
+        aria-label="Mobile navigation"
+      >
+        <div className={cn("flex h-full flex-col gap-2 p-4")}>
+          {/* Mobile Nav Links */}
           {items.map((item) => {
             const active = isActivePrefix(pathname, item.activePrefix);
 
@@ -100,10 +219,10 @@ export function NavBar(): React.ReactElement | null {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "rounded-md px-3 py-2 text-sm font-semibold",
+                  "rounded-lg px-4 py-3 text-base font-semibold transition-all",
                   active
-                    ? "text-russian-violet bg-moonstone-600/15"
-                    : "text-rich-black hover:bg-moonstone-600/10 hover:text-russian-violet",
+                    ? "text-russian-violet bg-moonstone-600/20 shadow-sm"
+                    : "text-rich-black hover:bg-seasalt-900/30 hover:text-russian-violet",
                 )}
                 aria-current={active ? "page" : undefined}
               >
@@ -111,36 +230,37 @@ export function NavBar(): React.ReactElement | null {
               </Link>
             );
           })}
-        </nav>
 
-        <div className={cn("flex items-center gap-2 pr-2")}>
-          <Link
-            href="/booking"
-            className={cn(
-              "rounded-md px-3 py-2 text-sm font-bold",
-              bookingActive
-                ? "bg-coquelicot-600 text-rich-black"
-                : "bg-coquelicot-500 hover:bg-coquelicot-600 text-rich-black",
-            )}
-            aria-current={bookingActive ? "page" : undefined}
-          >
-            Book now
-          </Link>
+          {/* Mobile CTA Buttons */}
+          <div className={cn("mt-4 flex flex-col gap-2 border-t border-seasalt-400/40 pt-4")}>
+            <Link
+              href="/booking"
+              className={cn(
+                "rounded-lg px-4 py-3 text-center text-base font-bold transition-all",
+                bookingActive
+                  ? "bg-coquelicot-600 text-seasalt shadow-md"
+                  : "bg-coquelicot-500 hover:bg-coquelicot-600 text-seasalt",
+              )}
+              aria-current={bookingActive ? "page" : undefined}
+            >
+              Book now
+            </Link>
 
-          <Link
-            href="/contact"
-            className={cn(
-              "rounded-md px-3 py-2 text-sm font-bold",
-              contactActive
-                ? "bg-moonstone-600/30 text-russian-violet"
-                : "bg-moonstone-600/20 text-russian-violet hover:bg-moonstone-600/30",
-            )}
-            aria-current={contactActive ? "page" : undefined}
-          >
-            Contact
-          </Link>
+            <Link
+              href="/contact"
+              className={cn(
+                "rounded-lg px-4 py-3 text-center text-base font-bold transition-all",
+                contactActive
+                  ? "bg-moonstone-600/30 text-russian-violet shadow-sm"
+                  : "bg-moonstone-600/20 text-russian-violet hover:bg-moonstone-600/30",
+              )}
+              aria-current={contactActive ? "page" : undefined}
+            >
+              Contact
+            </Link>
+          </div>
         </div>
-      </div>
-    </header>
+      </nav>
+    </>
   );
 }

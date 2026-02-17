@@ -24,12 +24,12 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz";
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "To the Point Tech",
-    template: "%s | To the Point Tech",
+    default: "To The Point Tech",
+    template: "%s | To The Point Tech",
   },
   description:
     "Local tech support in Point Chevalier. Clear fixes, setup, Wi-Fi, email, backups, and more. Always straight to the point.",
-  applicationName: "To the Point Tech",
+  applicationName: "To The Point Tech",
   authors: [{ name: "Harrison Raynes" }],
   keywords: [
     "Tech Support",
@@ -120,16 +120,16 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_NZ",
-    siteName: "To the Point Tech",
+    siteName: "To The Point Tech",
     url: "/",
-    title: "To the Point Tech",
-    description: "For all your tech support needs. Always straight to the point.",
-    images: [{ url: "/og.jpg", width: 1200, height: 630, alt: "To the Point Tech" }],
+    title: "To The Point Tech",
+    description: "Local tech support in Point Chevalier. Clear explanations, no jargon, and solutions that actually work.",
+    images: [{ url: "/og.jpg", width: 1200, height: 630, alt: "To The Point Tech" }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "To the Point Tech",
-    description: "For all your tech support needs. Always straight to the point.",
+    title: "To The Point Tech",
+    description: "Local tech support in Point Chevalier. Clear explanations, no jargon, and solutions that actually work.",
     images: ["/og.jpg"],
   },
   robots: {
@@ -144,9 +144,8 @@ export const metadata: Metadata = {
     },
   },
   icons: {
-    // Adaptive SVG + raster fallbacks with light/dark media
+    // Raster favicons with light/dark media
     icon: [
-      { url: "/favicon.svg", type: "image/svg+xml" },
       {
         url: "/favicon-32x32.png",
         sizes: "32x32",
@@ -219,7 +218,7 @@ export default function RootLayout({
   const orgJsonLd = {
     "@context": "https://schema.org",
     "@type": "ProfessionalService",
-    name: "To the Point Tech",
+    name: "To The Point Tech",
     url: siteUrl,
     image: `${siteUrl}/og.jpg`,
     description:

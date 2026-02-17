@@ -18,30 +18,48 @@ export default function NotFound(): React.ReactElement {
   return (
     <PageShell>
       <FrostedSection maxWidth="48rem">
-        <div className={cn("flex flex-col gap-4 sm:gap-5")}>
-          <section className={cn(CARD)}>
+        <div className={cn("flex flex-col gap-6 sm:gap-8")}>
+          <section className={cn(CARD, "text-center")}>
+            <div className={cn("text-coquelicot-500 mb-4 text-8xl font-extrabold sm:text-9xl")}>
+              404
+            </div>
+
             <h1
               className={cn(
-                "text-russian-violet mb-3 text-2xl font-extrabold sm:text-3xl md:text-4xl",
+                "text-russian-violet mb-4 text-3xl font-extrabold sm:text-4xl md:text-5xl",
               )}
             >
-              Page not found
+              Well, this is awkward...
             </h1>
 
-            <p className={cn("text-rich-black mb-4 text-sm sm:text-base")}>
-              The page you're looking for doesn't exist or has been moved.
+            <p className={cn("text-rich-black mb-2 text-base sm:text-lg md:text-xl")}>
+              This page seems to have wandered off like a Wi-Fi signal at the worst possible moment.
             </p>
 
-            <Link
-              href="/"
-              className={cn(
-                "bg-russian-violet text-seasalt inline-flex items-center gap-2 rounded-md px-4 py-2.5 text-sm font-semibold",
-                "hover:brightness-110",
-              )}
-            >
-              <FaHouse className={cn("h-4 w-4")} aria-hidden />
-              Go home
-            </Link>
+            <p className={cn("text-rich-black/80 mb-6 text-base sm:text-lg")}>
+              Don't worry. I'm better at finding solutions than this page is at hiding.
+            </p>
+
+            <div className={cn("flex flex-wrap items-center justify-center gap-3")}>
+              <Link
+                href="/"
+                className={cn(
+                  "bg-coquelicot-500 hover:bg-coquelicot-600 text-seasalt inline-flex items-center gap-2 rounded-lg px-6 py-3 font-semibold transition-colors shadow-lg hover:shadow-xl",
+                )}
+              >
+                <FaHouse className={cn("h-5 w-5")} aria-hidden />
+                Take me home
+              </Link>
+
+              <Link
+                href="/contact"
+                className={cn(
+                  "border-seasalt-400/60 hover:bg-seasalt-900/40 text-rich-black inline-flex items-center gap-2 rounded-lg border px-6 py-3 font-semibold transition-colors",
+                )}
+              >
+                Report this issue
+              </Link>
+            </div>
           </section>
         </div>
       </FrostedSection>

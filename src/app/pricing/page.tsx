@@ -9,7 +9,7 @@ import { FrostedSection, PageShell, CARD, SOFT_CARD } from "@/components/SiteFra
 import { cn } from "@/lib/cn";
 
 export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 3600; // Cache for 1 hour - static content
 
 const linkStyle = cn(
   "text-coquelicot-500 hover:text-coquelicot-600 underline-offset-4 hover:underline",
@@ -22,120 +22,194 @@ const linkStyle = cn(
 export default function PricingPage(): React.ReactElement {
   return (
     <PageShell>
-      <FrostedSection maxWidth="56rem">
-        <div className={cn("flex flex-col gap-4 sm:gap-5")}>
-          <section aria-labelledby="pricing-heading" className={cn(CARD)}>
+      <FrostedSection>
+        <div className={cn("flex flex-col gap-6 sm:gap-8")}>
+          <section aria-labelledby="pricing-heading" className={cn(CARD, "animate-fade-in")}>
             <h1
               id="pricing-heading"
               className={cn(
-                "text-russian-violet mb-2 text-2xl font-extrabold sm:text-3xl md:text-4xl",
+                "text-russian-violet mb-4 text-3xl font-extrabold sm:text-4xl md:text-5xl",
               )}
             >
               Pricing
             </h1>
-            <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
+            <p className={cn("text-rich-black mb-4 text-base sm:text-lg md:text-xl")}>
               Simple, transparent pricing. You'll always know the cost before work begins, and
               there's no pressure to buy anything you don't need.
             </p>
           </section>
 
-          <section aria-label="How pricing works" className={cn(CARD)}>
-            <h2 className={cn("text-rich-black mb-3 text-lg font-semibold sm:text-xl")}>
-              How it works
+          <section aria-label="Standard rates" className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}>
+            <h2 className={cn("text-russian-violet mb-3 text-xl font-bold sm:text-2xl")}>
+              Standard rate
             </h2>
 
-            <div className={cn("grid gap-4 sm:grid-cols-2")}>
+            <div className={cn("bg-seasalt-900/40 border-seasalt-400/60 rounded-lg border p-5")}>
+              <p className={cn("text-russian-violet mb-2 text-4xl font-bold sm:text-5xl")}>
+                $50 per hour
+              </p>
+              <p className={cn("text-rich-black/80 text-base sm:text-lg")}>
+                Billed in 15-minute increments. Both on-site visits and remote support.
+              </p>
+            </div>
+
+            <div className={cn("mt-5 space-y-3")}>
+              <p className={cn("text-rich-black/90 flex gap-3 text-base sm:text-lg")}>
+                <span className={cn("text-moonstone-600 mt-1 text-lg")}>✓</span>
+                <span>
+                  <strong>Quick calls and emails are free.</strong> If you have a simple question,
+                  just reach out.
+                </span>
+              </p>
+              <p className={cn("text-rich-black/90 flex gap-3 text-base sm:text-lg")}>
+                <span className={cn("text-moonstone-600 mt-1 text-lg")}>✓</span>
+                <span>
+                  <strong>Most jobs take 1 to 2 hours.</strong> I'll give you a time estimate before we
+                  start.
+                </span>
+              </p>
+              <p className={cn("text-rich-black/90 flex gap-3 text-base sm:text-lg")}>
+                <span className={cn("text-moonstone-600 mt-1 text-lg")}>✓</span>
+                <span>
+                  <strong>Bundle multiple issues into one visit</strong> to make the most of your
+                  time.
+                </span>
+              </p>
+            </div>
+          </section>
+
+          <section aria-label="How pricing works" className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-200")}>
+            <h2 className={cn("text-russian-violet mb-3 text-xl font-bold sm:text-2xl")}>
+              On-site vs Remote
+            </h2>
+
+            <div className={cn("grid gap-5 sm:grid-cols-2")}>
               <div className={cn(SOFT_CARD)}>
-                <h3 className={cn("text-russian-violet mb-2 text-base font-semibold sm:text-lg")}>
+                <h3 className={cn("text-russian-violet mb-3 text-lg font-semibold sm:text-xl")}>
                   On-site visits
                 </h3>
-                <ul
-                  className={cn("text-rich-black/90 list-disc space-y-2 pl-5 text-sm sm:text-base")}
-                >
-                  <li>Hourly rate with a minimum call-out</li>
-                  <li>Most common jobs take 1–2 hours</li>
-                  <li>Multiple issues can be bundled into one visit</li>
-                  <li>
-                    Best for: Wi-Fi setup, printers, smart TVs, physical hardware, anything needing
-                    hands-on work
+                <ul className={cn("text-rich-black space-y-2.5 text-base sm:text-lg")}>
+                  <li className={cn("flex gap-3")}>
+                    <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
+                    <span>Same hourly rate applies</span>
+                  </li>
+                  <li className={cn("flex gap-3")}>
+                    <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
+                    <span>Travel within Point Chev and nearby suburbs included</span>
+                  </li>
+                  <li className={cn("flex gap-3")}>
+                    <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
+                    <span>
+                      Best for: Wi-Fi setup, printers, smart TVs, physical hardware, anything needing
+                      hands-on work
+                    </span>
                   </li>
                 </ul>
               </div>
 
               <div className={cn(SOFT_CARD)}>
-                <h3 className={cn("text-russian-violet mb-2 text-base font-semibold sm:text-lg")}>
+                <h3 className={cn("text-russian-violet mb-3 text-lg font-semibold sm:text-xl")}>
                   Remote support
                 </h3>
-                <ul
-                  className={cn("text-rich-black/90 list-disc space-y-2 pl-5 text-sm sm:text-base")}
-                >
-                  <li>Hourly rate, often shorter sessions</li>
-                  <li>No travel time means quicker turnaround</li>
-                  <li>Requires stable internet and device access</li>
-                  <li>
-                    Best for: account issues, software setup, email problems, quick fixes, follow-up
-                    support
+                <ul className={cn("text-rich-black space-y-2.5 text-base sm:text-lg")}>
+                  <li className={cn("flex gap-3")}>
+                    <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
+                    <span>Same hourly rate, often shorter sessions</span>
+                  </li>
+                  <li className={cn("flex gap-3")}>
+                    <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
+                    <span>No travel time means quicker turnaround</span>
+                  </li>
+                  <li className={cn("flex gap-3")}>
+                    <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
+                    <span>
+                      Best for: account issues, software setup, email problems, quick fixes, follow-up
+                      support
+                    </span>
                   </li>
                 </ul>
               </div>
             </div>
           </section>
 
-          <section aria-labelledby="estimate-heading" className={cn(CARD)}>
+          <section aria-labelledby="estimate-heading" className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-300")}>
             <h2
               id="estimate-heading"
-              className={cn("text-rich-black mb-2 text-lg font-semibold sm:text-xl")}
+              className={cn("text-russian-violet mb-3 text-xl font-bold sm:text-2xl")}
             >
-              Getting an estimate
+              What you'll pay
             </h2>
 
-            <p className={cn("text-rich-black mb-3 text-sm sm:text-base")}>
-              When you get in touch, I'll ask a few questions about what's happening and give you:
+            <p className={cn("text-rich-black mb-4 text-base sm:text-lg")}>
+              When you get in touch, I'll give you a rough time estimate so you know what to expect:
             </p>
 
-            <ul
-              className={cn(
-                "text-rich-black/90 mb-3 list-disc space-y-1 pl-5 text-sm sm:text-base",
-              )}
-            >
-              <li>A rough time estimate for the work</li>
-              <li>Whether it needs an on-site visit or can be done remotely</li>
-              <li>The likely cost range before we book anything</li>
+            <ul className={cn("text-rich-black space-y-2.5 text-base sm:text-lg mb-4")}>
+              <li className={cn("flex gap-3")}>
+                <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
+                <span>Simple fixes: Often 15 to 30 minutes ($12.50 to $25)</span>
+              </li>
+              <li className={cn("flex gap-3")}>
+                <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
+                <span>Standard appointments: Usually 1 to 2 hours ($50 to $100)</span>
+              </li>
+              <li className={cn("flex gap-3")}>
+                <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
+                <span>Larger projects: Broken into stages with estimates for each part</span>
+              </li>
             </ul>
 
-            <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
-              For larger jobs (device migrations, small business setups, whole-home Wi-Fi
-              improvements), I can break the work into stages so you can decide how far to go.
+            <p className={cn("text-rich-black/80 mb-4 text-base sm:text-lg")}>
+              Time is rounded to the nearest 15 minutes. If a job takes 20 minutes, you pay for 30
+              minutes. If it takes 40 minutes, you pay for 45 minutes.
+            </p>
+
+            <p className={cn("text-rich-black/80 text-base sm:text-lg")}>
+              <strong>One-off questions are free.</strong> Need quick advice over the phone or a
+              simple email answer? No charge. For ongoing email support or troubleshooting
+              conversations, I'll let you know if it's getting into billable territory.
             </p>
           </section>
 
-          <section aria-labelledby="no-surprises-heading" className={cn(CARD)}>
+          <section aria-labelledby="no-surprises-heading" className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-400")}>
             <h2
               id="no-surprises-heading"
-              className={cn("text-rich-black mb-2 text-lg font-semibold sm:text-xl")}
+              className={cn("text-russian-violet mb-3 text-xl font-bold sm:text-2xl")}
             >
               No surprises
             </h2>
 
-            <ul className={cn("text-rich-black/90 list-disc space-y-2 pl-5 text-sm sm:text-base")}>
-              <li>
-                <strong>No hidden fees.</strong> The price I quote is the price you pay.
+            <ul className={cn("text-rich-black space-y-2.5 text-base sm:text-lg")}>
+              <li className={cn("flex gap-3")}>
+                <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
+                <span>
+                  <strong>No hidden fees.</strong> The price I quote is the price you pay.
+                </span>
               </li>
-              <li>
-                <strong>No upselling.</strong> I don't sell hardware or earn commission on products.
+              <li className={cn("flex gap-3")}>
+                <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
+                <span>
+                  <strong>No upselling.</strong> I don't sell hardware or earn commission on products.
+                </span>
               </li>
-              <li>
-                <strong>No charge for unsuccessful work.</strong> If I can't fix it, you don't pay
-                for that time.
+              <li className={cn("flex gap-3")}>
+                <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
+                <span>
+                  <strong>No charge for unsuccessful work.</strong> If I can't fix it, you don't pay
+                  for that time.
+                </span>
               </li>
-              <li>
-                <strong>Clear communication.</strong> If a job is taking longer than expected, I'll
-                let you know before continuing.
+              <li className={cn("flex gap-3")}>
+                <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
+                <span>
+                  <strong>Clear communication.</strong> If a job is taking longer than expected, I'll
+                  let you know before continuing.
+                </span>
               </li>
             </ul>
           </section>
 
-          <section aria-label="Next steps" className={cn(CARD)}>
+          <section aria-label="Next steps" className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-500")}>
             <p className={cn("text-rich-black text-sm sm:text-base")}>
               <Link href="/contact" className={linkStyle}>
                 Get in touch

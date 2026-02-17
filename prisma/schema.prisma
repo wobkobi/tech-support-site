@@ -12,6 +12,7 @@ enum BookingStatus {
   held
   confirmed
   cancelled
+  completed // NEW: Added for tracking completed appointments
 }
 
 model Booking {
@@ -34,11 +35,16 @@ model Booking {
   status         BookingStatus @default(confirmed)
   holdExpiresUtc DateTime?
 
-  // Secret token for management links (cancel / confirm, if you add them later).
+  // Secret tokens for management links
   cancelToken String @unique
+  reviewToken String @unique @default(uuid()) // NEW: Token for review link
 
   // Optional reference to the Google Calendar event, for future cancellation.
   calendarEventId String?
+
+  // Review tracking - NEW
+  reviewSentAt      DateTime? // When review email was sent
+  reviewSubmittedAt DateTime? // When they submitted a review
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -49,12 +55,36 @@ model Booking {
 }
 
 model Review {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
   text        String
   firstName   String?
   lastName    String?
-  isAnonymous Boolean  @default(false)
-  approved    Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isAnonymous Boolean @default(false)
+  approved    Boolean @default(false)
+
+  // NEW: Link to booking (optional, for verified reviews)
+  bookingId String? @db.ObjectId
+  verified  Boolean @default(false) // True if from a booking link
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Cached calendar events for fast booking page loads
+model CalendarEventCache {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  // Event details from Google Calendar
+  eventId       String   // Google Calendar event ID
+  calendarEmail String   // Which calendar this event is from
+  startUtc      DateTime // Event start time
+  endUtc        DateTime // Event end time
+
+  // Cache metadata
+  fetchedAt DateTime @default(now()) // When this was cached
+  expiresAt DateTime // When to refresh this cache entry
+
+  @@index([expiresAt])
+  @@index([startUtc, endUtc])
+  @@unique([eventId, calendarEmail])
 }

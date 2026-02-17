@@ -9,7 +9,7 @@ import { cn } from "@/lib/cn";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 3600; // Cache for 1 hour - static content
 
 const linkStyle = cn(
   "text-coquelicot-500 hover:text-coquelicot-600 underline-offset-4 hover:underline",
@@ -22,94 +22,107 @@ const linkStyle = cn(
 export default function AboutPage(): React.ReactElement {
   return (
     <PageShell>
-      <FrostedSection maxWidth="56rem">
-        <div className={cn("flex flex-col gap-4 sm:gap-5")}>
-          <section aria-labelledby="about-hero-heading" className={cn(CARD)}>
+      <FrostedSection>
+        <div className={cn("flex flex-col gap-6 sm:gap-8")}>
+          <section aria-labelledby="about-hero-heading" className={cn(CARD, "animate-fade-in")}>
             <h1
               id="about-hero-heading"
               className={cn(
-                "text-russian-violet mb-3 text-2xl font-extrabold sm:text-3xl md:text-4xl",
+                "text-russian-violet mb-4 text-3xl font-extrabold sm:text-4xl md:text-5xl",
               )}
             >
               About To The Point Tech
             </h1>
 
-            <p className={cn("text-rich-black mb-3 text-sm sm:text-base")}>
+            <p className={cn("text-rich-black mb-4 text-base sm:text-lg md:text-xl")}>
               I'm Harrison, a computer science graduate based in Point Chevalier. I started To The
               Point Tech because I saw how many people struggle with everyday technology problems
               but don't have anyone reliable to call.
             </p>
 
-            <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
+            <p className={cn("text-rich-black/80 text-base sm:text-lg")}>
               My focus is on practical fixes and clear explanations. I want to leave your tech in a
               better state than I found it, and make sure you understand what changed and why.
             </p>
           </section>
 
-          <section aria-labelledby="about-approach-heading" className={cn(CARD)}>
+          <section aria-labelledby="about-approach-heading" className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}>
             <h2
               id="about-approach-heading"
-              className={cn("text-rich-black mb-2 text-lg font-semibold sm:text-xl")}
+              className={cn("text-russian-violet mb-3 text-xl font-bold sm:text-2xl")}
             >
               My approach
             </h2>
 
-            <ul
-              className={cn(
-                "text-rich-black/90 mb-3 list-disc space-y-2 pl-5 text-sm sm:text-base",
-              )}
-            >
-              <li>
-                <strong>Listen first.</strong> I start with a quick chat to understand what's
-                happening and what you want to achieve.
+            <ul className={cn("text-rich-black space-y-2.5 text-base sm:text-lg mb-4")}>
+              <li className={cn("flex gap-3")}>
+                <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
+                <span>
+                  <strong>Listen first.</strong> I start with a quick chat to understand what's
+                  happening and what you want to achieve.
+                </span>
               </li>
-              <li>
-                <strong>Explain before acting.</strong> You'll know what I'm planning to do and
-                roughly how long it should take before I touch anything.
+              <li className={cn("flex gap-3")}>
+                <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
+                <span>
+                  <strong>Explain before acting.</strong> You'll know what I'm planning to do and
+                  roughly how long it should take before I touch anything.
+                </span>
               </li>
-              <li>
-                <strong>Work transparently.</strong> I make changes in small steps so you can see
-                what's happening and ask questions.
+              <li className={cn("flex gap-3")}>
+                <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
+                <span>
+                  <strong>Work transparently.</strong> I make changes in small steps so you can see
+                  what's happening and ask questions.
+                </span>
               </li>
-              <li>
-                <strong>Leave clear notes.</strong> After every visit, you get a simple summary of
-                what changed and any tips for next time.
+              <li className={cn("flex gap-3")}>
+                <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
+                <span>
+                  <strong>Leave clear notes.</strong> After every visit, you get a simple summary of
+                  what changed and any tips for next time.
+                </span>
               </li>
             </ul>
 
-            <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
+            <p className={cn("text-rich-black/80 text-base sm:text-lg")}>
               I'm happy to work with you directly, alongside family members, or with a small
               business owner. If you prefer, we can start with email and move to a visit once you're
               comfortable.
             </p>
           </section>
 
-          <section aria-labelledby="about-who-heading" className={cn(CARD)}>
+          <section aria-labelledby="about-who-heading" className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-200")}>
             <h2
               id="about-who-heading"
-              className={cn("text-rich-black mb-2 text-lg font-semibold sm:text-xl")}
+              className={cn("text-russian-violet mb-3 text-xl font-bold sm:text-2xl")}
             >
               Who I help
             </h2>
 
-            <p className={cn("text-rich-black mb-2 text-sm sm:text-base")}>
+            <p className={cn("text-rich-black mb-4 text-base sm:text-lg")}>
               I mainly work with households and small businesses around Point Chevalier who want
               their tech to just work, without wading through jargon or sales pitches.
             </p>
 
-            <ul
-              className={cn(
-                "text-rich-black/90 mb-3 list-disc space-y-1 pl-5 text-sm sm:text-base",
-              )}
-            >
-              <li>Home users wanting reliable Wi-Fi, secure accounts, and proper backups.</li>
-              <li>Families helping parents or grandparents get comfortable with devices.</li>
-              <li>
-                Sole traders and small teams who need occasional IT support without a contract.
+            <ul className={cn("text-rich-black space-y-2.5 text-base sm:text-lg mb-4")}>
+              <li className={cn("flex gap-3")}>
+                <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
+                <span>Home users wanting reliable Wi-Fi, secure accounts, and proper backups.</span>
+              </li>
+              <li className={cn("flex gap-3")}>
+                <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
+                <span>Families helping parents or grandparents get comfortable with devices.</span>
+              </li>
+              <li className={cn("flex gap-3")}>
+                <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
+                <span>
+                  Sole traders and small teams who need occasional IT support without a contract.
+                </span>
               </li>
             </ul>
 
-            <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
+            <p className={cn("text-rich-black/80 text-base sm:text-lg")}>
               See the{" "}
               <Link href="/services" className={linkStyle}>
                 services page

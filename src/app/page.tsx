@@ -1,6 +1,7 @@
 // src/app/page.tsx
 /**
- * Main landing with frosted hero, about and services, support grid, optional reviews, and footer.
+ * @file page.tsx
+ * @description Main landing page for tech support company
  */
 
 import type React from "react";
@@ -11,11 +12,15 @@ import { prisma } from "@/lib/prisma";
 import Image from "next/image";
 import Link from "next/link";
 import {
+  FaCalendarCheck,
+  FaCircleCheck,
   FaCloud,
   FaEnvelope,
+  FaHandshake,
   FaHouse,
   FaImages,
   FaLaptop,
+  FaMapLocationDot,
   FaMobileScreen,
   FaPhone,
   FaPrint,
@@ -28,7 +33,7 @@ import {
 import type { IconType } from "react-icons";
 
 export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 300; // Cache for 5 minutes - reviews don't change frequently
 
 interface SupportItem {
   label: string;
@@ -36,41 +41,31 @@ interface SupportItem {
 }
 
 const supportItems: ReadonlyArray<SupportItem> = [
-  { label: "Computers", icon: FaLaptop },
+  { label: "Computers & Laptops", icon: FaLaptop },
   { label: "Phones & Tablets", icon: FaMobileScreen },
-  { label: "Wi-Fi & Internet", icon: FaWifi },
-  { label: "TV & Streaming", icon: FaTv },
+  { label: "Wi-Fi & Networks", icon: FaWifi },
+  { label: "Smart TVs", icon: FaTv },
   { label: "Smart Home", icon: FaHouse },
-  { label: "Printers & Scanners", icon: FaPrint },
+  { label: "Printers", icon: FaPrint },
   { label: "Cloud & Backups", icon: FaCloud },
-  { label: "Email & Accounts", icon: FaEnvelope },
-  { label: "Safety & Security", icon: FaShieldHalved },
-  { label: "Setup & Transfer", icon: FaRightLeft },
-  { label: "Tune-ups & Repairs", icon: FaToolbox },
-  { label: "Photos & Storage", icon: FaImages },
+  { label: "Email Setup", icon: FaEnvelope },
+  { label: "Security", icon: FaShieldHalved },
+  { label: "Data Transfer", icon: FaRightLeft },
+  { label: "Repairs", icon: FaToolbox },
+  { label: "Photo Storage", icon: FaImages },
 ];
 
-const pageMain = cn(
-  "mx-auto flex w-full max-w-7xl flex-col gap-4",
-  "px-1.5 py-2 sm:gap-5 sm:px-2 sm:py-3",
-);
-
-const card = cn("border-seasalt-400/60 bg-seasalt-800 rounded-xl border p-4 shadow-sm sm:p-5");
-const softCard = cn(
-  "border-seasalt-400/60 bg-seasalt-900/60 rounded-xl border p-3 text-sm sm:p-4 sm:text-base",
+const CARD = cn(
+  "border-seasalt-400/60 bg-seasalt-800 rounded-xl border p-5 shadow-sm sm:p-6 md:p-7",
 );
 
 const primaryBtn = cn(
-  "bg-coquelicot-500 hover:bg-coquelicot-600 text-rich-black rounded-md px-4 py-2 text-sm font-bold sm:text-base",
-);
-
-const secondaryBtn = cn(
-  "border-seasalt-400/60 hover:bg-seasalt-900/40 text-rich-black rounded-md border px-4 py-2 text-sm font-bold sm:text-base",
+  "bg-coquelicot-500 hover:bg-coquelicot-600 text-seasalt inline-flex items-center gap-2 rounded-lg px-5 py-3 text-sm font-bold sm:text-base transition-colors",
 );
 
 /**
- * Home page component.
- * @returns The Home page React element.
+ * Home page component
+ * @returns The Home page React element
  */
 export default async function Home(): Promise<React.ReactElement> {
   const rows = await prisma.review.findMany({
@@ -92,160 +87,135 @@ export default async function Home(): Promise<React.ReactElement> {
   return (
     <PageShell>
       <FrostedSection>
-        <div className={pageMain}>
-          <section aria-labelledby="hero-heading" className={card}>
-            <div
+        <div className={cn("flex flex-col gap-6 sm:gap-8")}>
+          {/* Hero Section */}
+          <section aria-labelledby="hero-heading" className={cn("text-center animate-fade-in")}>
+            <div className={cn("mb-6 grid place-items-center")}>
+              <Image
+                src="/source/logo-full.svg"
+                alt="To The Point Tech"
+                width={640}
+                height={146}
+                priority
+                draggable={false}
+                className={cn("w-70 sm:w-95 md:w-120 lg:w-140 h-auto")}
+              />
+            </div>
+
+            <p
               className={cn(
-                "grid items-start gap-4",
-                "sm:grid-cols-[minmax(0,1.4fr),minmax(0,1fr)] sm:gap-6",
+                "text-rich-black mx-auto mb-8 max-w-3xl text-lg font-medium sm:text-xl md:text-2xl",
               )}
             >
-              <div>
-                <div className={cn("grid place-items-center pb-2 sm:place-items-start")}>
-                  <Image
-                    src="/logo-full.svg"
-                    alt="To The Point Tech"
-                    width={640}
-                    height={146}
-                    priority
-                    draggable={false}
-                    className={cn("h-auto w-[260px] sm:w-[320px] md:w-[460px] lg:w-[520px]")}
-                  />
-                </div>
+              Professional tech help in Point Chevalier and nearby suburbs. Clear explanations, no
+              jargon, and solutions that actually work.
+            </p>
 
-                <h1
-                  id="hero-heading"
-                  className={cn("text-russian-violet mb-2 text-2xl font-bold sm:text-3xl")}
-                >
-                  Friendly tech help in Point Chevalier
-                </h1>
+            <div className={cn("flex flex-wrap items-center justify-center gap-4")}>
+              <Link href="/booking" className={primaryBtn}>
+                <FaCalendarCheck className={cn("h-5 w-5")} aria-hidden />
+                Book appointment
+              </Link>
+              <a
+                href="tel:+64212971237"
+                className={cn(
+                  "bg-russian-violet text-seasalt inline-flex items-center gap-2 rounded-lg px-5 py-3 text-base font-bold sm:text-lg transition-colors hover:brightness-110",
+                )}
+              >
+                <FaPhone className={cn("h-5 w-5")} aria-hidden />
+                <span>021 297 1237</span>
+              </a>
+            </div>
 
-                <p className={cn("text-rich-black text-sm font-medium sm:text-base md:text-lg")}>
-                  Practical support for home and small business: setup, connectivity, storage,
-                  safety, and more. Clear explanations, notes you can refer back to, and flexible
-                  times.
-                </p>
+            <p className={cn("text-rich-black/70 mt-6 text-base sm:text-lg")}>
+              Same day appointments available • Evening & weekend hours • Remote support options
+            </p>
+          </section>
 
-                <div className={cn("mt-3 flex flex-wrap gap-3")}>
-                  <Link href="/contact" className={primaryBtn}>
-                    Enquire now
-                  </Link>
-                  <Link href="/services" className={secondaryBtn}>
-                    View services
-                  </Link>
-                </div>
-
-                <p className={cn("text-rich-black/70 mt-2 text-xs sm:text-sm")}>
-                  Serving Point Chevalier and nearby suburbs, with remote help available for many
-                  tasks.
-                </p>
+          {/* Trust Indicators */}
+          <section aria-label="Why choose us" className={cn("grid gap-4 sm:grid-cols-3 sm:gap-5")}>
+            <div className={cn(CARD, "text-center animate-slide-up animate-fill-both animate-delay-100")}>
+              <div
+                className={cn(
+                  "bg-moonstone-500/10 border-moonstone-500/30 mx-auto mb-3 grid size-16 place-items-center rounded-full border-2",
+                )}
+              >
+                <FaCircleCheck className={cn("text-moonstone-600 h-8 w-8")} aria-hidden />
               </div>
+              <h3 className={cn("text-russian-violet mb-2 text-xl font-bold sm:text-2xl")}>
+                CS Graduate
+              </h3>
+              <p className={cn("text-rich-black/80 text-base sm:text-lg")}>
+                University-trained with real-world experience
+              </p>
+            </div>
 
-              <div className={softCard}>
-                <h2 className={cn("text-russian-violet mb-2 text-sm font-semibold sm:text-base")}>
-                  Common things I help with
-                </h2>
-                <ul
-                  className={cn("text-rich-black/90 list-disc space-y-1 pl-5 text-xs sm:text-sm")}
-                >
-                  <li>New computer, phone, or tablet setup</li>
-                  <li>Wi-Fi dropouts or slow internet</li>
-                  <li>Backups and photo storage</li>
-                  <li>Email and account issues</li>
-                  <li>Smart TVs and streaming boxes</li>
-                  <li>Smart home devices and apps</li>
-                </ul>
+            <div className={cn(CARD, "text-center animate-slide-up animate-fill-both animate-delay-200")}>
+              <div
+                className={cn(
+                  "bg-moonstone-500/10 border-moonstone-500/30 mx-auto mb-3 grid size-16 place-items-center rounded-full border-2",
+                )}
+              >
+                <FaMapLocationDot className={cn("text-moonstone-600 h-8 w-8")} aria-hidden />
               </div>
+              <h3 className={cn("text-russian-violet mb-2 text-xl font-bold sm:text-2xl")}>
+                Point Chev Local
+              </h3>
+              <p className={cn("text-rich-black/80 text-base sm:text-lg")}>
+                Born and raised here, serving the community
+              </p>
+            </div>
+
+            <div className={cn(CARD, "text-center animate-slide-up animate-fill-both animate-delay-300")}>
+              <div
+                className={cn(
+                  "bg-moonstone-500/10 border-moonstone-500/30 mx-auto mb-3 grid size-16 place-items-center rounded-full border-2",
+                )}
+              >
+                <FaHandshake className={cn("text-moonstone-600 h-8 w-8")} aria-hidden />
+              </div>
+              <h3 className={cn("text-russian-violet mb-2 text-xl font-bold sm:text-2xl")}>
+                No Upselling
+              </h3>
+              <p className={cn("text-rich-black/80 text-base sm:text-lg")}>
+                Honest advice, fair pricing, clear communication
+              </p>
             </div>
           </section>
 
-          <section
-            aria-label="About and services overview"
-            className={cn("grid gap-3 sm:grid-cols-2 sm:gap-4")}
-          >
-            <article
-              className={cn(
-                "border-seasalt-400/60 bg-seasalt-800 rounded-xl border p-4 shadow-sm sm:p-4",
-              )}
-            >
-              <h2 className={cn("text-russian-violet mb-1 text-xl font-bold sm:text-2xl")}>
-                About me
-              </h2>
-              <p className={cn("text-rich-black text-sm sm:text-base")}>
-                Hi, I am Harrison, a computer science graduate from Point Chevalier. I grew up here,
-                and I started To The Point Tech so locals have a reliable, friendly person to call
-                when technology misbehaves.
-              </p>
-              <p className={cn("text-rich-black mt-2 text-sm sm:text-base")}>
-                I focus on practical fixes, clear explanations, and leaving your setup in a better
-                and easier-to-understand state than when I arrived.
-              </p>
-            </article>
-
-            <article
-              className={cn(
-                "border-seasalt-400/60 bg-seasalt-800 rounded-xl border p-4 shadow-sm sm:p-4",
-              )}
-            >
-              <h2 className={cn("text-russian-violet mb-1 text-xl font-bold sm:text-2xl")}>
-                Services
-              </h2>
-              <p className={cn("text-rich-black mb-2 text-sm sm:text-base")}>
-                I fix slow computers, set up new phones and laptops, sort Wi-Fi and network issues,
-                connect printers and TVs, and make sure cloud backups and email run reliably. I can
-                secure your devices, clean up unwanted software, and safely move photos and files
-                between devices.
-              </p>
-              <p className={cn("text-rich-black text-sm sm:text-base")}>
-                Everything is explained in plain language, with clear notes and no upselling.{" "}
-                <Link
-                  href="/services"
-                  className={cn(
-                    "text-coquelicot-500 hover:text-coquelicot-600 underline-offset-4 hover:underline",
-                  )}
-                >
-                  See detailed services
-                </Link>
-                .
-              </p>
-            </article>
-          </section>
-
-          <section
-            aria-labelledby="support"
-            className={cn(
-              "border-seasalt-400/60 bg-seasalt-800 w-full rounded-xl border p-4 shadow-sm sm:p-5",
-            )}
-          >
+          {/* Services Grid */}
+          <section aria-labelledby="services-heading" className={cn("text-center animate-slide-up animate-fill-both animate-delay-200")}>
             <h2
-              id="support"
-              className={cn("text-rich-black mb-2 text-center text-xl font-semibold sm:text-2xl")}
+              id="services-heading"
+              className={cn(
+                "text-rich-black mb-8 text-3xl font-bold sm:text-4xl md:text-5xl",
+              )}
             >
-              Areas I can help with
+              What I can help with
             </h2>
 
             <ul
               className={cn(
-                "max-w-272 mx-auto grid w-full grid-cols-2 gap-2 sm:grid-cols-2 sm:gap-3 md:grid-cols-3 lg:grid-cols-4",
+                "mx-auto grid max-w-6xl grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:gap-5",
               )}
             >
               {supportItems.map(({ label, icon: Icon }) => (
                 <li
                   key={label}
                   className={cn(
-                    "border-seasalt-400/60 bg-seasalt-900/60 flex h-16 w-full min-w-0 items-center gap-3 rounded-xl border px-3",
+                    "border-seasalt-400/60 bg-seasalt-800 flex h-24 items-center gap-3 rounded-xl border px-4 shadow-sm transition-all hover:shadow-md sm:h-28",
                   )}
                 >
                   <span
                     className={cn(
-                      "border-moonstone-500/30 bg-moonstone-600/15 grid size-9 shrink-0 place-items-center rounded-md border sm:size-10",
+                      "border-moonstone-500/40 bg-moonstone-600/20 grid size-12 shrink-0 place-items-center rounded-lg border sm:size-14",
                     )}
                   >
-                    <Icon className={cn("text-moonstone-600 h-5 w-5 sm:h-6 sm:w-6")} aria-hidden />
+                    <Icon className={cn("text-moonstone-600 h-6 w-6 sm:h-7 sm:w-7")} aria-hidden />
                   </span>
                   <span
                     className={cn(
-                      "text-rich-black line-clamp-2 min-w-0 text-left text-sm font-semibold leading-tight sm:text-base",
+                      "text-rich-black line-clamp-2 text-left text-base font-semibold leading-tight sm:text-lg",
                     )}
                   >
                     {label}
@@ -253,44 +223,110 @@ export default async function Home(): Promise<React.ReactElement> {
                 </li>
               ))}
             </ul>
+
+            <div className={cn("mt-8 text-center")}>
+              <Link
+                href="/services"
+                className={cn(
+                  "bg-moonstone-600 hover:bg-moonstone-700 text-seasalt inline-flex items-center gap-2 rounded-lg px-6 py-3 text-base font-bold sm:text-lg transition-all shadow-md hover:shadow-lg",
+                )}
+              >
+                View all services
+              </Link>
+            </div>
+          </section>
+
+          {/* About & Approach */}
+          <section
+            aria-label="About and approach"
+            className={cn("grid gap-5 md:grid-cols-2 md:gap-6")}
+          >
+            <article className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-300")}>
+              <h2 className={cn("text-russian-violet mb-4 text-2xl font-bold sm:text-3xl")}>
+                About Me
+              </h2>
+              <p className={cn("text-rich-black mb-4 text-base sm:text-lg")}>
+                Hi, I'm Harrison, a computer science graduate from Point Chevalier. I started To The
+                Point Tech to give locals a reliable, friendly person to call when technology acts
+                up.
+              </p>
+              <p className={cn("text-rich-black/90 text-base sm:text-lg")}>
+                I focus on practical fixes and clear explanations, leaving your tech in a better
+                state than when I arrived.
+              </p>
+            </article>
+
+            <article className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-400")}>
+              <h2 className={cn("text-russian-violet mb-4 text-2xl font-bold sm:text-3xl")}>
+                My approach
+              </h2>
+              <ul className={cn("text-rich-black space-y-3 text-base sm:text-lg")}>
+                <li className={cn("flex gap-3")}>
+                  <FaCircleCheck
+                    className={cn("text-moonstone-600 mt-1 h-5 w-5 shrink-0")}
+                    aria-hidden
+                  />
+                  <span>Listen first, understand your needs</span>
+                </li>
+                <li className={cn("flex gap-3")}>
+                  <FaCircleCheck
+                    className={cn("text-moonstone-600 mt-1 h-5 w-5 shrink-0")}
+                    aria-hidden
+                  />
+                  <span>Explain everything in plain English</span>
+                </li>
+                <li className={cn("flex gap-3")}>
+                  <FaCircleCheck
+                    className={cn("text-moonstone-600 mt-1 h-5 w-5 shrink-0")}
+                    aria-hidden
+                  />
+                  <span>Leave clear notes you can refer back to</span>
+                </li>
+                <li className={cn("flex gap-3")}>
+                  <FaCircleCheck
+                    className={cn("text-moonstone-600 mt-1 h-5 w-5 shrink-0")}
+                    aria-hidden
+                  />
+                  <span>Transparent pricing, no hidden fees</span>
+                </li>
+              </ul>
+            </article>
           </section>
         </div>
       </FrostedSection>
 
+      {/* Reviews Section */}
       {hasReviews && (
-        <div className={cn("mt-4 sm:mt-6")}>
+        <div className={cn("pb-6 sm:pb-8 animate-fade-in animate-delay-500 animate-fill-both")}>
           <FrostedSection>
-            <div className={cn("mx-auto w-full max-w-7xl px-1.5 py-2 sm:px-2 sm:py-3")}>
-              <Reviews items={items} />
-            </div>
+            <Reviews items={items} />
           </FrostedSection>
         </div>
       )}
 
-      <div aria-hidden className="grow" />
-
-      <footer className={cn("mx-auto mt-4 w-fit max-w-[calc(100vw-1rem)] sm:mt-6")}>
+      {/* Contact Footer */}
+      <footer className={cn("mx-auto mb-6 w-fit max-w-[calc(100vw-2rem)] sm:mb-8")}>
         <div
           className={cn(
-            "border-seasalt-400/40 bg-seasalt-800/70 flex flex-col items-center gap-3 rounded-xl border p-3 backdrop-blur-md sm:flex-row sm:items-center sm:gap-6 sm:px-4 sm:py-3",
+            "border-seasalt-400/40 bg-seasalt-800/70 flex flex-col items-center gap-4 rounded-xl border p-4 shadow-lg backdrop-blur-md sm:flex-row sm:gap-8 sm:px-6 sm:py-4",
           )}
         >
           <a
             href="tel:+64212971237"
             className={cn(
-              "text-russian-violet hover:text-coquelicot-500 flex items-center gap-2 rounded-md px-3 py-2 text-base font-semibold sm:text-lg",
+              "text-russian-violet hover:text-coquelicot-500 flex items-center gap-3 rounded-md px-4 py-2 text-base font-semibold transition-colors sm:text-lg",
             )}
           >
             <FaPhone className={cn("h-6 w-6 shrink-0 sm:h-7 sm:w-7")} aria-hidden />
-            <span>+64 21 297 1237</span>
+            <span>021 297 1237</span>
           </a>
 
-          <div className={cn("bg-seasalt-400/50 hidden h-5 w-px sm:block")} />
+          <div className={cn("bg-seasalt-400/50 hidden h-6 w-px sm:block")} />
 
           <a
             href="mailto:harrison@tothepoint.co.nz"
             className={cn(
-              "text-russian-violet hover:text-coquelicot-500 flex items-center gap-2 rounded-md px-3 py-2 text-base font-semibold sm:text-lg",
+              "text-russian-violet hover:text-coquelicot-500 flex items-center gap-3 rounded-md px-4 py-2 text-base font-semibold transition-colors sm:text-lg",
             )}
           >
             <FaEnvelope className={cn("h-6 w-6 shrink-0 sm:h-7 sm:w-7")} aria-hidden />

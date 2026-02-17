@@ -1,7 +1,7 @@
 // src/app/api/reviews/route.ts
 /**
  * @file route.ts
- * @description API routes for reviews.
+ * @description API routes for reviews with verification support
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -23,6 +23,7 @@ export async function GET(): Promise<NextResponse> {
         firstName: true,
         lastName: true,
         isAnonymous: true,
+        verified: true,
         createdAt: true,
       },
     });
@@ -36,7 +37,7 @@ export async function GET(): Promise<NextResponse> {
 
 /**
  * POST /api/reviews
- * Submits a new review for approval.
+ * Submits a new review (verified or public).
  * @param request - Incoming request.
  * @returns JSON response.
  */
@@ -47,6 +48,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       firstName?: string;
       lastName?: string;
       isAnonymous?: boolean;
+      bookingId?: string;
+      reviewToken?: string;
     };
 
     const text = body.text?.trim();
@@ -74,17 +77,44 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
+    let verified = false;
+    let bookingId = null;
+
+    // Check if this is a verified review from a booking
+    if (body.bookingId && body.reviewToken) {
+      const booking = await prisma.booking.findFirst({
+        where: {
+          id: body.bookingId,
+          reviewToken: body.reviewToken,
+        },
+      });
+
+      if (booking) {
+        // Valid token - mark as verified
+        verified = true;
+        bookingId = booking.id;
+
+        // Mark booking as reviewed
+        await prisma.booking.update({
+          where: { id: booking.id },
+          data: { reviewSubmittedAt: new Date() },
+        });
+      }
+    }
+
     const review = await prisma.review.create({
       data: {
         text,
         firstName: isAnonymous ? null : firstName,
         lastName: isAnonymous ? null : lastName,
         isAnonymous,
-        approved: false,
+        verified,
+        bookingId,
+        approved: verified, // Auto-approve verified reviews
       },
     });
 
-    return NextResponse.json({ ok: true, id: review.id }, { status: 201 });
+    return NextResponse.json({ ok: true, id: review.id, verified }, { status: 201 });
   } catch (error) {
     console.error("[reviews] POST error:", error);
     return NextResponse.json({ error: "Failed to submit review." }, { status: 500 });

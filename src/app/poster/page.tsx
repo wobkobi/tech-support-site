@@ -45,10 +45,10 @@ const supportItems: Array<{ label: string; icon: React.ComponentType<{ className
 ];
 
 const aboutMeText =
-  "Hi there, I'm Harrison. I'm a computer science graduate from Point Chevalier, eager to apply my practical tech skills to benefit the community. I grew up here and want to make technology more straightforward and less stressful for people who don't have a go-to tech person.";
+  "Hi there, I'm Harrison. I'm a computer science graduate from Point Chevalier and I want to put my skills to good use helping the community. I grew up here and want to make technology more straightforward and less stressful for people who don't have a go-to tech person.";
 
 const servicesText =
-  "If you've got a tech issue, I've got you covered. I fix slow computers, set up new phones and laptops, sort Wi-Fi and network connections, connect printers and TVs, and ensure cloud backups and email run reliably. I can secure your devices, remove malware and scams, and safely move photos and files between devices. I will explain everything in plain language, leave clear notes, and not upsell. I'm local, flexible with evenings/weekends, and can help in person or remotely.";
+  "If you've got a tech issue, I've got you covered. I fix slow computers, set up new phones and laptops, sort Wi-Fi and network connections, connect printers and TVs, and ensure cloud backups and email run reliably. I can secure your devices, remove malware and scams, and safely move photos and files between devices. I'll explain everything in plain language, leave clear notes, and I won't try to upsell you. I'm local, flexible with evenings/weekends, and can help in person or remotely.";
 
 /**
  * Poster page component for A4 print export
@@ -56,11 +56,11 @@ const servicesText =
  */
 export default function PosterPage(): React.ReactElement {
   return (
-    <div className={cn("relative h-577 w-420 overflow-hidden")}>
+    <div className={cn("h-577 w-420 relative overflow-hidden")}>
       {/* Backdrop */}
       <div className={cn("absolute inset-0 -z-10")}>
         <Image
-          src="/backdrop.jpg"
+          src="/source/backdrop.jpg"
           alt=""
           fill
           priority
@@ -76,18 +76,18 @@ export default function PosterPage(): React.ReactElement {
           {/* Main frosted card */}
           <div
             className={cn(
-              "rounded-4xl border-seasalt-400/40 bg-seasalt-800/60 border-[3px] p-7.5 shadow-xl backdrop-blur-xl",
+              "rounded-4xl border-seasalt-400/40 bg-seasalt-800/60 p-7.5 border-[3px] shadow-xl backdrop-blur-xl",
             )}
           >
             {/* Logo */}
             <div className={cn("grid place-items-center pb-5")}>
               <Image
-                src="/logo-full.svg"
+                src="/source/logo-full.svg"
                 alt="To The Point Tech"
                 width={1376}
                 height={313}
                 priority
-                className={cn("h-auto w-344")}
+                className={cn("w-344 h-auto")}
               />
             </div>
 
@@ -95,47 +95,49 @@ export default function PosterPage(): React.ReactElement {
             <div className={cn("mx-auto mb-5 flex flex-wrap justify-center gap-3")}>
               <div
                 className={cn(
-                  "relative flex items-center gap-3 rounded-xl border-2 border-moonstone-500/30 px-4.5 py-1.5 shadow-sm",
+                  "border-moonstone-500/30 px-4.5 relative flex items-center gap-3 rounded-xl border-2 py-1.5 shadow-sm",
                 )}
-                style={{ backgroundColor: '#f6f7f8' }}
+                style={{ backgroundColor: "#f6f7f8" }}
               >
-                <div 
-                  className={cn("absolute inset-0 rounded-xl")} 
-                  style={{ backgroundColor: 'rgba(67, 188, 205, 0.15)' }}
+                <div
+                  className={cn("absolute inset-0 rounded-xl")}
+                  style={{ backgroundColor: "rgba(67, 188, 205, 0.15)" }}
                 />
-                <FaCircleCheck className={cn("relative z-10 text-moonstone-600 h-9 w-9")} />
-                <span className={cn("relative z-10 text-rich-black text-[34px] font-semibold")}>CS Graduate</span>
+                <FaCircleCheck className={cn("text-moonstone-600 relative z-10 h-9 w-9")} />
+                <span className={cn("text-rich-black relative z-10 text-[34px] font-semibold")}>
+                  CS Graduate
+                </span>
               </div>
 
               <div
                 className={cn(
-                  "relative flex items-center gap-3 rounded-xl border-2 border-moonstone-500/30 px-4.5 py-1.5 shadow-sm",
+                  "border-moonstone-500/30 px-4.5 relative flex items-center gap-3 rounded-xl border-2 py-1.5 shadow-sm",
                 )}
-                style={{ backgroundColor: '#f6f7f8' }}
+                style={{ backgroundColor: "#f6f7f8" }}
               >
-                <div 
-                  className={cn("absolute inset-0 rounded-xl")} 
-                  style={{ backgroundColor: 'rgba(67, 188, 205, 0.15)' }}
+                <div
+                  className={cn("absolute inset-0 rounded-xl")}
+                  style={{ backgroundColor: "rgba(67, 188, 205, 0.15)" }}
                 />
-                <FaLocationDot className={cn("relative z-10 text-moonstone-600 h-9 w-9")} />
-                <span className={cn("relative z-10 text-rich-black text-[34px] font-semibold")}>
+                <FaLocationDot className={cn("text-moonstone-600 relative z-10 h-9 w-9")} />
+                <span className={cn("text-rich-black relative z-10 text-[34px] font-semibold")}>
                   Pt Chev Local
                 </span>
               </div>
 
               <div
                 className={cn(
-                  "relative flex items-center gap-3 rounded-xl border-2 border-moonstone-500/30 px-4.5 py-1.5 shadow-sm",
+                  "border-moonstone-500/30 px-4.5 relative flex items-center gap-3 rounded-xl border-2 py-1.5 shadow-sm",
                 )}
-                style={{ backgroundColor: '#f6f7f8' }}
+                style={{ backgroundColor: "#f6f7f8" }}
               >
-                <div 
-                  className={cn("absolute inset-0 rounded-xl")} 
-                  style={{ backgroundColor: 'rgba(67, 188, 205, 0.15)' }}
+                <div
+                  className={cn("absolute inset-0 rounded-xl")}
+                  style={{ backgroundColor: "rgba(67, 188, 205, 0.15)" }}
                 />
-                <FaClock className={cn("relative z-10 text-moonstone-600 h-9 w-9")} />
-                <span className={cn("relative z-10 text-rich-black text-[34px] font-semibold")}>
-                  Same-Day Available
+                <FaClock className={cn("text-moonstone-600 relative z-10 h-9 w-9")} />
+                <span className={cn("text-rich-black relative z-10 text-[34px] font-semibold")}>
+                  Same Day Available
                 </span>
               </div>
             </div>
@@ -144,12 +146,10 @@ export default function PosterPage(): React.ReactElement {
             <section className={cn("flex flex-col gap-5")}>
               <div
                 className={cn(
-                  "border-seasalt-400/60 bg-seasalt-800 rounded-[18px] border-2 p-4.5 shadow-sm",
+                  "border-seasalt-400/60 bg-seasalt-800 p-4.5 rounded-[18px] border-2 shadow-sm",
                 )}
               >
-                <h2 className={cn("text-russian-violet mb-1.5 text-[53px] font-bold")}>
-                  About Me
-                </h2>
+                <h2 className={cn("text-russian-violet mb-1.5 text-[53px] font-bold")}>About Me</h2>
                 <p className={cn("text-rich-black text-[38px] font-medium leading-tight")}>
                   {aboutMeText}
                 </p>
@@ -157,12 +157,10 @@ export default function PosterPage(): React.ReactElement {
 
               <div
                 className={cn(
-                  "border-seasalt-400/60 bg-seasalt-800 rounded-[18px] border-2 p-4.5 shadow-sm",
+                  "border-seasalt-400/60 bg-seasalt-800 p-4.5 rounded-[18px] border-2 shadow-sm",
                 )}
               >
-                <h2 className={cn("text-russian-violet mb-1.5 text-[53px] font-bold")}>
-                  Services
-                </h2>
+                <h2 className={cn("text-russian-violet mb-1.5 text-[53px] font-bold")}>Services</h2>
                 <p className={cn("text-rich-black text-[38px] font-medium leading-tight")}>
                   {servicesText}
                 </p>
@@ -180,12 +178,12 @@ export default function PosterPage(): React.ReactElement {
                   <li
                     key={label}
                     className={cn(
-                      "border-seasalt-400/60 bg-seasalt-800 flex h-27 items-center gap-3 rounded-xl border-2 px-4.5",
+                      "border-seasalt-400/60 bg-seasalt-800 h-27 px-4.5 flex items-center gap-3 rounded-xl border-2",
                     )}
                   >
                     <span
                       className={cn(
-                        "border-moonstone-500/30 bg-moonstone-600/15 grid size-15 shrink-0 place-items-center rounded-xl border-2",
+                        "border-moonstone-500/30 bg-moonstone-600/15 size-15 grid shrink-0 place-items-center rounded-xl border-2",
                       )}
                     >
                       <Icon className={cn("text-moonstone-600 h-9 w-9")} aria-hidden />
@@ -211,7 +209,7 @@ export default function PosterPage(): React.ReactElement {
           <footer className={cn("mx-auto mt-auto w-fit")}>
             <div
               className={cn(
-                "bg-seasalt-800/70 rounded-[14px] border-seasalt-400/40 border-2 p-4.5 shadow-xl backdrop-blur-md",
+                "bg-seasalt-800/70 border-seasalt-400/40 p-4.5 rounded-[14px] border-2 shadow-xl backdrop-blur-md",
               )}
             >
               <div className={cn("flex items-center gap-7")}>
@@ -219,7 +217,7 @@ export default function PosterPage(): React.ReactElement {
                 <div className={cn("flex shrink-0 flex-col items-center gap-1")}>
                   <div
                     className={cn(
-                      "border-seasalt-400/60 grid size-37.5 place-items-center rounded-[10px] border-2 bg-white p-2.5 shadow-sm",
+                      "border-seasalt-400/60 size-37.5 grid place-items-center rounded-[10px] border-2 bg-white p-2.5 shadow-sm",
                     )}
                   >
                     <Image

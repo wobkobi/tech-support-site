@@ -1,17 +1,22 @@
 // src/app/api/booking/hold/route.ts
 /**
  * @file route.ts
- * @description API route to create a booking hold.
- * Validates the slot, creates a hold in the database, then confirms by creating
- * a Google Calendar event and sending confirmation email.
+ * @description API route to create a booking hold with Google Calendar integration
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { BOOKING_CONFIG, validateSlot, type ExistingBooking } from "@/lib/booking";
-import { releaseExpiredHolds, HOLD_EXPIRATION_MINUTES } from "@/lib/releaseExpiredHolds";
-import { createBookingEvent } from "@/server/google/calendar";
+import {
+  BOOKING_CONFIG,
+  validateSlotSelection,
+  type ExistingBooking,
+  type ExistingEvent,
+} from "@/lib/booking";
+import { fetchAllCalendarEvents, createBookingEvent } from "@/lib/google-calendar";
 import { randomUUID } from "crypto";
+
+// Hold expiration time in minutes
+const HOLD_EXPIRATION_MINUTES = 15;
 
 /**
  * Request payload for creating a booking.
@@ -21,12 +26,20 @@ interface CreateBookingRequest {
   name: string;
   /** Client's email address. */
   email: string;
+  /** Client's phone number. */
+  phone?: string;
   /** Optional notes from the client. */
   notes?: string;
-  /** ISO string of the selected slot start time. */
-  slotStartIso: string;
-  /** ISO string of the selected slot end time. */
-  slotEndIso: string;
+  /** Date key YYYY-MM-DD. */
+  dateKey: string;
+  /** Slot start time HH:MM. */
+  slotStart: string;
+  /** Slot end time HH:MM. */
+  slotEnd: string;
+  /** Meeting type: in-person or remote. */
+  meetingType: "in-person" | "remote";
+  /** Address for in-person appointments. */
+  address?: string;
 }
 
 /**
@@ -43,7 +56,7 @@ interface CreateBookingResponse {
 
 /**
  * POST /api/booking/hold
- * Creates a booking, adds it to Google Calendar, and returns success.
+ * Creates a booking hold in the database and Google Calendar.
  * @param request - The incoming request with booking details.
  * @returns JSON response indicating success or failure.
  */
@@ -51,7 +64,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreateBoo
   try {
     // Parse and validate request body
     const body = (await request.json()) as CreateBookingRequest;
-    const { name, email, notes, slotStartIso, slotEndIso } = body;
+    const { name, email, phone, notes, dateKey, slotStart, slotEnd, meetingType, address } = body;
 
     // Basic validation
     if (!name?.trim()) {
@@ -60,19 +73,30 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreateBoo
     if (!email?.trim() || !email.includes("@")) {
       return NextResponse.json({ ok: false, error: "Valid email is required." }, { status: 400 });
     }
-    if (!slotStartIso || !slotEndIso) {
-      return NextResponse.json({ ok: false, error: "Slot times are required." }, { status: 400 });
+    if (!dateKey || !slotStart || !slotEnd) {
+      return NextResponse.json({ ok: false, error: "Please select a time slot." }, { status: 400 });
+    }
+    if (!meetingType) {
+      return NextResponse.json(
+        { ok: false, error: "Please select in-person or remote." },
+        { status: 400 },
+      );
+    }
+    if (meetingType === "in-person" && !address?.trim()) {
+      return NextResponse.json(
+        { ok: false, error: "Address is required for in-person appointments." },
+        { status: 400 },
+      );
     }
 
-    // Release any expired holds first to free up slots
-    await releaseExpiredHolds();
-
-    // Get existing bookings for conflict check
     const now = new Date();
+    const maxDate = new Date(now.getTime() + BOOKING_CONFIG.maxAdvanceDays * 24 * 60 * 60 * 1000);
+
+    // Get existing bookings from database
     const existingBookings = await prisma.booking.findMany({
       where: {
         status: { in: ["held", "confirmed"] },
-        startUtc: { gte: now },
+        endUtc: { gte: now },
       },
       select: {
         id: true,
@@ -91,33 +115,69 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreateBoo
       bufferAfterMin: b.bufferAfterMin,
     }));
 
-    // Validate the requested slot
-    const validation = validateSlot(
-      slotStartIso,
-      slotEndIso,
+    // Fetch Google Calendar events
+    let calendarEvents: ExistingEvent[] = [];
+    try {
+      const rawEvents = await fetchAllCalendarEvents(now, maxDate);
+      calendarEvents = rawEvents.map((e) => ({
+        id: e.id,
+        start: e.start,
+        end: e.end,
+      }));
+    } catch (error) {
+      console.error("[booking/hold] Failed to fetch calendar events:", error);
+      // Continue without calendar events - validation will only check database
+    }
+
+    // Validate the slot selection against both database and calendar
+    const validation = validateSlotSelection(
+      dateKey,
+      slotStart,
+      slotEnd,
       existingForValidation,
+      calendarEvents,
       now,
       BOOKING_CONFIG,
     );
 
     if (!validation.valid) {
-      return NextResponse.json(
-        { ok: false, error: validation.error || "Invalid slot." },
-        { status: 400 },
-      );
+      return NextResponse.json({ ok: false, error: validation.error }, { status: 400 });
     }
 
-    const startUtc = new Date(slotStartIso);
-    const endUtc = new Date(slotEndIso);
+    // Parse date and time
+    const [year, month, day] = dateKey.split("-").map(Number);
+    const [startHour, startMinute] = slotStart.split(":").map(Number);
+    const [endHour, endMinute] = slotEnd.split(":").map(Number);
+
+    // Create local NZ dates
+    const startLocal = new Date(year, month - 1, day, startHour, startMinute, 0);
+    const endLocal = new Date(year, month - 1, day, endHour, endMinute, 0);
+
+    // Convert to UTC for database storage
+    const startUtc = new Date(startLocal.toISOString());
+    const endUtc = new Date(endLocal.toISOString());
+
     const cancelToken = randomUUID();
     const holdExpiresUtc = new Date(now.getTime() + HOLD_EXPIRATION_MINUTES * 60 * 1000);
 
-    // Create the booking in the database (initially as held)
+    // Build notes with meeting details
+    let bookingNotes = `Meeting type: ${meetingType === "in-person" ? "In-person" : "Remote"}\n`;
+    if (meetingType === "in-person" && address) {
+      bookingNotes += `Address: ${address.trim()}\n`;
+    }
+    if (phone) {
+      bookingNotes += `Phone: ${phone.trim()}\n`;
+    }
+    if (notes?.trim()) {
+      bookingNotes += `\nNotes: ${notes.trim()}`;
+    }
+
+    // Create the booking in the database first
     const booking = await prisma.booking.create({
       data: {
         name: name.trim(),
         email: email.trim().toLowerCase(),
-        notes: notes?.trim() || null,
+        notes: bookingNotes,
         startUtc,
         endUtc,
         status: "held",
@@ -128,38 +188,36 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreateBoo
       },
     });
 
-    // Create Google Calendar event
+    // Try to create Google Calendar event
     let calendarEventId: string | null = null;
     try {
       const calendarResult = await createBookingEvent({
         summary: `Booking: ${name.trim()}`,
-        description:
-          `Client: ${name.trim()}\nEmail: ${email.trim()}\n${notes?.trim() ? `Notes: ${notes.trim()}` : ""}`.trim(),
+        description: bookingNotes,
         startUtc,
         endUtc,
         timeZone: BOOKING_CONFIG.timeZone,
         attendeeEmail: email.trim().toLowerCase(),
         attendeeName: name.trim(),
+        location: meetingType === "in-person" && address ? address.trim() : undefined,
       });
 
       calendarEventId = calendarResult.eventId;
+
+      // Update booking with calendar event ID and confirm it
+      await prisma.booking.update({
+        where: { id: booking.id },
+        data: {
+          status: "confirmed",
+          calendarEventId,
+          holdExpiresUtc: null, // Clear hold expiry since it's confirmed
+        },
+      });
     } catch (calendarError) {
       // Log but continue - calendar integration is optional
       console.error("[booking/hold] Calendar event creation failed:", calendarError);
+      // Booking is still created in database, just without calendar event
     }
-
-    // Update booking to confirmed with calendar event ID
-    await prisma.booking.update({
-      where: { id: booking.id },
-      data: {
-        status: "confirmed",
-        calendarEventId,
-        holdExpiresUtc: null, // Clear hold expiry since it's confirmed
-      },
-    });
-
-    // TODO: Send confirmation email with ICS attachment
-    // This would integrate with your email provider (e.g., Resend, SendGrid)
 
     return NextResponse.json({ ok: true, bookingId: booking.id });
   } catch (error) {

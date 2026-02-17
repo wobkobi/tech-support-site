@@ -1,10 +1,11 @@
 // src/app/services/page.tsx
 /**
- * Services page: what To The Point Tech can help with.
+ * @file page.tsx
+ * @description Services page with wider layout and better organization
  */
 
 import type React from "react";
-import { FrostedSection, PageShell, CARD, SOFT_CARD } from "@/components/SiteFrame";
+import { FrostedSection, PageShell, CARD } from "@/components/SiteFrame";
 import { cn } from "@/lib/cn";
 import Link from "next/link";
 import {
@@ -19,10 +20,11 @@ import {
   FaToolbox,
   FaTv,
   FaWifi,
+  FaEnvelope,
 } from "react-icons/fa6";
 
 export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 3600; // Cache for 1 hour - static content
 
 interface ServiceArea {
   icon: React.ReactElement;
@@ -33,52 +35,52 @@ interface ServiceArea {
 const serviceAreas: ReadonlyArray<ServiceArea> = [
   {
     icon: <FaLaptop />,
-    label: "Computers",
+    label: "Computers & Laptops",
     examples: ["Slow PC fixes", "Software installs", "Virus cleanup", "General tune-ups"],
   },
   {
     icon: <FaMobileScreen />,
-    label: "Phones & tablets",
+    label: "Phones & Tablets",
     examples: ["New device setup", "Data transfer", "App help", "Account sync"],
   },
   {
     icon: <FaWifi />,
-    label: "Wi-Fi & internet",
+    label: "Wi-Fi & Internet",
     examples: ["Fixing dropouts", "Extending coverage", "Router setup", "Speed issues"],
   },
   {
     icon: <FaTv />,
-    label: "TV & streaming",
+    label: "TV & Streaming",
     examples: ["Smart TV setup", "Streaming apps", "Chromecast/AirPlay", "Sound systems"],
   },
   {
     icon: <FaHouse />,
-    label: "Smart home",
+    label: "Smart Home",
     examples: ["Smart lights", "Security cameras", "Voice assistants", "App setup"],
   },
   {
     icon: <FaPrint />,
-    label: "Printers & scanners",
+    label: "Printers & Scanners",
     examples: ["Getting online", "Driver issues", "Network printing", "Scan setup"],
   },
   {
     icon: <FaCloud />,
-    label: "Cloud & backups",
+    label: "Cloud & Backups",
     examples: ["OneDrive/iCloud/Google", "External drives", "Auto-backup setup", "Recovery"],
   },
   {
     icon: <FaImages />,
-    label: "Photos & storage",
+    label: "Photos & Storage",
     examples: ["Organising photos", "Freeing space", "Photo backup", "File management"],
   },
   {
     icon: <FaRightLeft />,
-    label: "Setup & transfer",
+    label: "Setup & Transfer",
     examples: ["New device migration", "Old to new PC", "Email setup", "Account moves"],
   },
   {
     icon: <FaToolbox />,
-    label: "Tune-ups & repairs",
+    label: "Tune-ups & Repairs",
     examples: ["Speed improvements", "Update installs", "Cleanup", "Basic repairs"],
   },
   {
@@ -86,145 +88,196 @@ const serviceAreas: ReadonlyArray<ServiceArea> = [
     label: "Security",
     examples: ["Password help", "Scam removal", "Safety checks", "Secure setup"],
   },
+  {
+    icon: <FaEnvelope />,
+    label: "Email & Accounts",
+    examples: ["Email setup", "Password recovery", "Account sync", "Spam filtering"],
+  },
 ];
 
-const linkStyle = cn(
-  "text-coquelicot-500 hover:text-coquelicot-600 underline-offset-4 hover:underline",
-);
-
 /**
- * Services page component.
- * @returns React element for the services page.
+ * Services page component
+ * @returns Services page element
  */
 export default function ServicesPage(): React.ReactElement {
   return (
     <PageShell>
-      <FrostedSection maxWidth="64rem">
-        <div className={cn("flex flex-col gap-4 sm:gap-5")}>
-          <section aria-labelledby="services-heading" className={cn(CARD)}>
+      <FrostedSection maxWidth="90rem">
+        <div className={cn("flex flex-col gap-6 sm:gap-8")}>
+          <section aria-labelledby="services-heading" className={cn(CARD, "animate-fade-in")}>
             <h1
               id="services-heading"
               className={cn(
-                "text-russian-violet mb-3 text-2xl font-extrabold sm:text-3xl md:text-4xl",
+                "text-russian-violet mb-4 text-3xl font-extrabold sm:text-4xl md:text-5xl",
               )}
             >
               Services
             </h1>
 
-            <p className={cn("text-rich-black mb-3 text-sm sm:text-base")}>
+            <p className={cn("text-rich-black mb-4 text-base sm:text-lg md:text-xl")}>
               I help with the everyday tech problems that sit between "turn it off and on again" and
               calling a big IT company. The goal is to get things working reliably and leave you
               with a setup you understand.
             </p>
 
-            <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
+            <p className={cn("text-rich-black/90 text-base sm:text-lg")}>
               Every job includes clear explanations in plain English, and I can leave notes so you
               know what changed and how to handle things next time.
             </p>
           </section>
 
-          <section aria-labelledby="areas-heading" className={cn(CARD)}>
+          <section aria-labelledby="areas-heading" className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}>
             <h2
               id="areas-heading"
-              className={cn("text-rich-black mb-3 text-lg font-semibold sm:text-xl")}
+              className={cn("text-russian-violet mb-3 text-xl font-bold sm:text-2xl")}
             >
               What I help with
             </h2>
 
             <div
-              className={cn(
-                "grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4",
-              )}
+              className={cn("grid grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4")}
             >
               {serviceAreas.map((area) => (
-                <div key={area.label} className={cn(SOFT_CARD)}>
-                  <div className={cn("flex items-start gap-3")}>
+                <div
+                  key={area.label}
+                  className={cn(
+                    "border-seasalt-400/60 bg-seasalt-800 rounded-lg border p-5 shadow-sm transition-all hover:shadow-md",
+                  )}
+                >
+                  <div className={cn("mb-3 flex items-center gap-3")}>
                     <span
                       className={cn(
-                        "border-moonstone-500/30 bg-moonstone-600/15 grid size-10 shrink-0 place-items-center rounded-md border",
+                        "border-moonstone-500/40 bg-moonstone-600/20 grid size-12 shrink-0 place-items-center rounded-lg border",
                       )}
                     >
-                      <span className={cn("text-moonstone-600 text-lg")} aria-hidden>
+                      <span className={cn("text-moonstone-600 text-2xl")} aria-hidden>
                         {area.icon}
                       </span>
                     </span>
-                    <div className={cn("min-w-0")}>
-                      <p className={cn("text-rich-black text-sm font-semibold")}>{area.label}</p>
-                      <p className={cn("text-rich-black/70 text-xs")}>
-                        {area.examples.join(" · ")}
-                      </p>
-                    </div>
+                    <h3 className={cn("text-rich-black text-lg font-semibold sm:text-xl")}>
+                      {area.label}
+                    </h3>
                   </div>
+                  <ul className={cn("text-rich-black/80 space-y-1.5 text-sm sm:text-base")}>
+                    {area.examples.map((example) => (
+                      <li key={example} className={cn("flex gap-2")}>
+                        <span className={cn("text-moonstone-600 mt-0.5")}>•</span>
+                        <span>{example}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               ))}
             </div>
 
-            <p className={cn("text-rich-black/80 mt-4 text-sm sm:text-base")}>
-              Not sure which category your problem fits? That's fine—just describe what's happening
+            <p className={cn("text-rich-black/90 mt-6 text-base sm:text-lg")}>
+              Not sure which category your problem fits? That's fine. Just describe what's happening
               and I'll figure out the best approach.
             </p>
           </section>
 
-          <section aria-labelledby="home-heading" className={cn(CARD)}>
-            <h2
-              id="home-heading"
-              className={cn("text-rich-black mb-2 text-lg font-semibold sm:text-xl")}
-            >
-              For home users
-            </h2>
+          <div className={cn("grid gap-5 md:grid-cols-2")}>
+            <section aria-labelledby="home-heading" className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-200")}>
+              <h2
+                id="home-heading"
+                className={cn("text-russian-violet mb-3 text-xl font-bold sm:text-2xl")}
+              >
+                For home users
+              </h2>
 
-            <p className={cn("text-rich-black mb-3 text-sm sm:text-base")}>
-              Common home visits include:
-            </p>
+              <p className={cn("text-rich-black mb-3 text-base sm:text-lg")}>
+                Common home visits include:
+              </p>
 
-            <ul className={cn("text-rich-black/90 list-disc space-y-1 pl-5 text-sm sm:text-base")}>
-              <li>Setting up a new laptop, phone, or tablet with all your accounts and apps</li>
-              <li>Fixing Wi-Fi dead spots or unreliable connections</li>
-              <li>Organising and backing up photos to the cloud or an external drive</li>
-              <li>Helping parents or grandparents get comfortable with their devices</li>
-              <li>Sorting out email and account login issues</li>
-              <li>Removing unwanted software, scams, or malware</li>
-            </ul>
-          </section>
+              <ul className={cn("text-rich-black/90 space-y-2 text-base sm:text-lg")}>
+                <li className={cn("flex gap-2")}>
+                  <span className={cn("text-moonstone-600 mt-1")}>•</span>
+                  <span>Setting up a new laptop, phone, or tablet with all your accounts</span>
+                </li>
+                <li className={cn("flex gap-2")}>
+                  <span className={cn("text-moonstone-600 mt-1")}>•</span>
+                  <span>Fixing Wi-Fi dead spots or unreliable connections</span>
+                </li>
+                <li className={cn("flex gap-2")}>
+                  <span className={cn("text-moonstone-600 mt-1")}>•</span>
+                  <span>Organising and backing up photos to the cloud</span>
+                </li>
+                <li className={cn("flex gap-2")}>
+                  <span className={cn("text-moonstone-600 mt-1")}>•</span>
+                  <span>Helping parents or grandparents get comfortable with devices</span>
+                </li>
+                <li className={cn("flex gap-2")}>
+                  <span className={cn("text-moonstone-600 mt-1")}>•</span>
+                  <span>Sorting out email and account login issues</span>
+                </li>
+                <li className={cn("flex gap-2")}>
+                  <span className={cn("text-moonstone-600 mt-1")}>•</span>
+                  <span>Removing unwanted software, scams, or malware</span>
+                </li>
+              </ul>
+            </section>
 
-          <section aria-labelledby="business-heading" className={cn(CARD)}>
-            <h2
-              id="business-heading"
-              className={cn("text-rich-black mb-2 text-lg font-semibold sm:text-xl")}
-            >
-              For small businesses
-            </h2>
+            <section aria-labelledby="business-heading" className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-300")}>
+              <h2
+                id="business-heading"
+                className={cn("text-russian-violet mb-3 text-xl font-bold sm:text-2xl")}
+              >
+                For small businesses
+              </h2>
 
-            <p className={cn("text-rich-black mb-3 text-sm sm:text-base")}>
-              Light IT support for sole traders and small teams who don't need (or want) a full IT
-              contract:
-            </p>
+              <p className={cn("text-rich-black mb-3 text-base sm:text-lg")}>
+                Light IT support for sole traders and small teams:
+              </p>
 
-            <ul className={cn("text-rich-black/90 list-disc space-y-1 pl-5 text-sm sm:text-base")}>
-              <li>Setting up workstations, email, and shared files</li>
-              <li>Basic network and Wi-Fi improvements</li>
-              <li>Backup and security checks</li>
-              <li>New staff device setup</li>
-              <li>One-off projects like office moves or system refreshes</li>
-            </ul>
+              <ul className={cn("text-rich-black/90 space-y-2 text-base sm:text-lg")}>
+                <li className={cn("flex gap-2")}>
+                  <span className={cn("text-moonstone-600 mt-1")}>•</span>
+                  <span>Setting up workstations, email, and shared files</span>
+                </li>
+                <li className={cn("flex gap-2")}>
+                  <span className={cn("text-moonstone-600 mt-1")}>•</span>
+                  <span>Basic network and Wi-Fi improvements</span>
+                </li>
+                <li className={cn("flex gap-2")}>
+                  <span className={cn("text-moonstone-600 mt-1")}>•</span>
+                  <span>Backup and security checks</span>
+                </li>
+                <li className={cn("flex gap-2")}>
+                  <span className={cn("text-moonstone-600 mt-1")}>•</span>
+                  <span>New staff device setup</span>
+                </li>
+                <li className={cn("flex gap-2")}>
+                  <span className={cn("text-moonstone-600 mt-1")}>•</span>
+                  <span>One-off projects like office moves</span>
+                </li>
+              </ul>
 
-            <p className={cn("text-rich-black/80 mt-3 text-sm sm:text-base")}>
-              No ongoing contracts required. You call when you need help.
-            </p>
-          </section>
+              <p className={cn("text-rich-black/90 mt-3 text-base sm:text-lg")}>
+                No ongoing contracts required. You call when you need help.
+              </p>
+            </section>
+          </div>
 
-          <section aria-label="Next steps" className={cn(CARD)}>
-            <p className={cn("text-rich-black text-sm sm:text-base")}>
-              See the{" "}
-              <Link href="/pricing" className={linkStyle}>
-                pricing page
-              </Link>{" "}
-              for how billing works, or{" "}
-              <Link href="/contact" className={linkStyle}>
-                get in touch
-              </Link>{" "}
-              to describe what you need.
-            </p>
+          <section aria-label="Next steps" className={cn(CARD, "text-center animate-slide-up animate-fill-both animate-delay-400")}>
+            <p className={cn("text-rich-black mb-4 text-base sm:text-lg")}>Ready to get started?</p>
+            <div className={cn("flex flex-wrap items-center justify-center gap-3")}>
+              <Link
+                href="/pricing"
+                className={cn(
+                  "border-seasalt-400/60 hover:bg-seasalt-900/40 text-rich-black rounded-lg border px-5 py-3 text-sm font-bold transition-colors sm:text-base",
+                )}
+              >
+                View pricing
+              </Link>
+              <Link
+                href="/contact"
+                className={cn(
+                  "bg-coquelicot-500 hover:bg-coquelicot-600 text-seasalt rounded-lg px-5 py-3 text-sm font-bold transition-colors sm:text-base",
+                )}
+              >
+                Get in touch
+              </Link>
+            </div>
           </section>
         </div>
       </FrostedSection>

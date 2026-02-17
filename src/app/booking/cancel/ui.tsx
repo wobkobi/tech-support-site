@@ -73,7 +73,7 @@ export default function BookingCancelClient({
       {/* Backdrop */}
       <div className={cn("pointer-events-none absolute inset-0 -z-10 overflow-hidden")}>
         <Image
-          src="/backdrop.jpg"
+          src="/source/backdrop.jpg"
           alt=""
           fill
           priority

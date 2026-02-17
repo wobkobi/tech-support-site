@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/release-holds",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/refresh-calendar-cache",
+      "schedule": "*/10 * * * *"
+    }
+  ]
+}

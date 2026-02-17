@@ -1,22 +1,16 @@
 // src/app/contact/page.tsx
 /**
- * Contact page: how to get in touch and what to include.
+ * Contact page: how to get in touch.
  */
 
 import type React from "react";
-import { FrostedSection, PageShell, CARD, SOFT_CARD } from "@/components/SiteFrame";
+import { FrostedSection, PageShell, CARD } from "@/components/SiteFrame";
 import { cn } from "@/lib/cn";
-import { FaEnvelope, FaPhone } from "react-icons/fa6";
+import { FaEnvelope, FaPhone, FaMapLocationDot } from "react-icons/fa6";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
-const primaryBtn = cn(
-  "bg-coquelicot-500 hover:bg-coquelicot-600 text-rich-black flex items-center gap-2 rounded-md px-4 py-2.5 font-semibold text-sm sm:text-base",
-);
-const secondaryBtn = cn(
-  "border-seasalt-400/60 hover:bg-seasalt-900/40 text-rich-black flex items-center gap-2 rounded-md border px-4 py-2.5 font-semibold text-sm sm:text-base",
-);
+export const revalidate = 3600; // Cache for 1 hour - static content
 
 /**
  * Contact page component.
@@ -25,138 +19,116 @@ const secondaryBtn = cn(
 export default function ContactPage(): React.ReactElement {
   return (
     <PageShell>
-      <FrostedSection maxWidth="56rem">
-        <div className={cn("flex flex-col gap-4 sm:gap-5")}>
-          <section aria-labelledby="contact-hero-heading" className={cn(CARD)}>
+      <FrostedSection>
+        <div className={cn("flex flex-col gap-6 sm:gap-8")}>
+          {/* Hero Section */}
+          <section aria-labelledby="contact-heading" className={cn(CARD, "animate-fade-in text-center")}>
             <h1
-              id="contact-hero-heading"
+              id="contact-heading"
               className={cn(
-                "text-russian-violet mb-3 text-2xl font-extrabold sm:text-3xl md:text-4xl",
+                "text-russian-violet mb-4 text-3xl font-extrabold sm:text-4xl md:text-5xl",
               )}
             >
               Get in touch
             </h1>
 
-            <p className={cn("text-rich-black mb-3 text-sm sm:text-base")}>
-              Send a message or give me a call with a quick description of what you need help with.
-              I'll get back to you with how I can help and what the next steps would be.
+            <p className={cn("text-rich-black mx-auto mb-8 max-w-2xl text-base sm:text-lg md:text-xl")}>
+              Have a tech problem or question? Call or email and I'll help you figure it out.
             </p>
 
-            <div className={cn("flex flex-wrap items-center gap-3")}>
-              <a href="tel:+64212971237" className={primaryBtn}>
-                <FaPhone className={cn("h-5 w-5")} aria-hidden />
-                Call +64 21 297 1237
+            <div className={cn("flex flex-col items-center gap-4 sm:flex-row sm:justify-center")}>
+              <a href="tel:+64212971237" className={cn(
+                "bg-russian-violet text-seasalt inline-flex w-full items-center justify-center gap-3 rounded-lg px-8 py-4 text-base font-bold sm:w-auto sm:text-lg transition-all hover:brightness-110 shadow-lg hover:shadow-xl"
+              )}>
+                <FaPhone className={cn("h-6 w-6")} aria-hidden />
+                <span>021 297 1237</span>
               </a>
-              <a href="mailto:harrison@tothepoint.co.nz" className={secondaryBtn}>
-                <FaEnvelope className={cn("h-5 w-5")} aria-hidden />
-                Email me
+              <a href="mailto:harrison@tothepoint.co.nz" className={cn(
+                "bg-moonstone-600 hover:bg-moonstone-700 text-seasalt inline-flex w-full items-center justify-center gap-3 rounded-lg px-8 py-4 text-base font-bold sm:w-auto sm:text-lg transition-all shadow-lg hover:shadow-xl"
+              )}>
+                <FaEnvelope className={cn("h-6 w-6")} aria-hidden />
+                <span>Email me</span>
               </a>
             </div>
 
-            <p className={cn("text-rich-black/70 mt-3 text-xs sm:text-sm")}>
-              If I'm with another client, I'll get back to you as soon as I can—usually the same day
-              or next business day.
+            <p className={cn("text-rich-black/70 mx-auto mt-6 max-w-xl text-sm sm:text-base")}>
+              I usually respond within a few hours during business days.
             </p>
           </section>
 
-          <section aria-labelledby="contact-channels-heading" className={cn(CARD)}>
-            <h2
-              id="contact-channels-heading"
-              className={cn("text-rich-black mb-3 text-lg font-semibold sm:text-xl")}
-            >
-              Best ways to reach me
-            </h2>
-
-            <div className={cn("grid gap-4 sm:grid-cols-2")}>
-              <a
-                href="tel:+64212971237"
-                className={cn(SOFT_CARD, "hover:border-coquelicot-500/70 transition-colors")}
-              >
-                <div className={cn("flex items-start gap-3")}>
-                  <span
-                    className={cn(
-                      "border-moonstone-500/30 bg-moonstone-600/15 grid size-10 shrink-0 place-items-center rounded-md border",
-                    )}
-                  >
-                    <FaPhone className={cn("text-moonstone-600 h-5 w-5")} aria-hidden />
-                  </span>
-                  <div>
-                    <p className={cn("text-russian-violet text-sm font-semibold")}>Phone</p>
-                    <p className={cn("text-rich-black font-semibold")}>+64 21 297 1237</p>
-                    <p className={cn("text-rich-black/80 mt-1 text-xs sm:text-sm")}>
-                      Best for urgent issues or if you prefer to talk things through.
-                    </p>
-                  </div>
-                </div>
-              </a>
-
-              <a
-                href="mailto:harrison@tothepoint.co.nz"
-                className={cn(SOFT_CARD, "hover:border-coquelicot-500/70 transition-colors")}
-              >
-                <div className={cn("flex items-start gap-3")}>
-                  <span
-                    className={cn(
-                      "border-moonstone-500/30 bg-moonstone-600/15 grid size-10 shrink-0 place-items-center rounded-md border",
-                    )}
-                  >
-                    <FaEnvelope className={cn("text-moonstone-600 h-5 w-5")} aria-hidden />
-                  </span>
-                  <div>
-                    <p className={cn("text-russian-violet text-sm font-semibold")}>Email</p>
-                    <p className={cn("text-rich-black font-semibold")}>harrison@tothepoint.co.nz</p>
-                    <p className={cn("text-rich-black/80 mt-1 text-xs sm:text-sm")}>
-                      Great for detailed descriptions, screenshots, or a list of questions.
-                    </p>
-                  </div>
-                </div>
-              </a>
+          {/* Service Area */}
+          <section aria-labelledby="area-heading" className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}>
+            <div className={cn("flex items-start gap-4")}>
+              <div className={cn("border-moonstone-500/30 bg-moonstone-600/10 grid size-12 shrink-0 place-items-center rounded-lg border sm:size-14")}>
+                <FaMapLocationDot className={cn("text-moonstone-600 h-6 w-6 sm:h-7 sm:w-7")} aria-hidden />
+              </div>
+              <div>
+                <h2
+                  id="area-heading"
+                  className={cn("text-russian-violet mb-2 text-xl font-bold sm:text-2xl")}
+                >
+                  Service area
+                </h2>
+                <p className={cn("text-rich-black mb-3 text-base sm:text-lg")}>
+                  Based in Point Chevalier, serving nearby suburbs including Western Springs, Mount Albert, Grey Lynn, Westmere, Kingsland, and surrounding areas.
+                </p>
+                <p className={cn("text-rich-black/80 text-base sm:text-lg")}>
+                  Remote support available for software and account issues. No travel needed.
+                </p>
+              </div>
             </div>
           </section>
 
-          <section aria-labelledby="contact-details-heading" className={cn(CARD)}>
+          {/* What to Include */}
+          <section aria-labelledby="details-heading" className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-200")}>
             <h2
-              id="contact-details-heading"
-              className={cn("text-rich-black mb-2 text-lg font-semibold sm:text-xl")}
+              id="details-heading"
+              className={cn("text-russian-violet mb-3 text-xl font-bold sm:text-2xl")}
             >
-              What to include
+              What to include when you contact me
             </h2>
 
-            <p className={cn("text-rich-black mb-3 text-sm sm:text-base")}>
-              A few details help me understand the situation and give you an accurate idea of time
-              and cost:
+            <p className={cn("text-rich-black mb-4 text-base sm:text-lg")}>
+              A few details help me give you a quick, accurate quote:
             </p>
 
-            <ul className={cn("text-rich-black/90 list-disc space-y-2 pl-5 text-sm sm:text-base")}>
-              <li>What's happening or what you'd like to achieve</li>
-              <li>Which devices are involved (e.g., Windows laptop, iPhone, smart TV)</li>
-              <li>Whether it's for home or a small business</li>
-              <li>Your general availability (weekday mornings, evenings, etc.)</li>
-              <li>Any deadlines (e.g., "need this sorted before a trip next week")</li>
+            <ul className={cn("text-rich-black space-y-2.5 text-base sm:text-lg")}>
+              <li className={cn("flex gap-3")}>
+                <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
+                <span>What's happening or what you want to achieve</span>
+              </li>
+              <li className={cn("flex gap-3")}>
+                <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
+                <span>Which devices are involved (e.g., laptop, phone, printer)</span>
+              </li>
+              <li className={cn("flex gap-3")}>
+                <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
+                <span>Whether it's for home or business</span>
+              </li>
+              <li className={cn("flex gap-3")}>
+                <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
+                <span>Your availability (mornings, evenings, weekends)</span>
+              </li>
             </ul>
 
-            <p className={cn("text-rich-black/80 mt-3 text-sm sm:text-base")}>
-              Screenshots or photos are welcome if they help explain an error or setup.
+            <p className={cn("text-rich-black/80 mt-4 text-base sm:text-lg")}>
+              Feel free to include screenshots or photos if they help explain the issue.
             </p>
           </section>
 
-          <section aria-labelledby="contact-areas-heading" className={cn(CARD)}>
-            <h2
-              id="contact-areas-heading"
-              className={cn("text-rich-black mb-2 text-lg font-semibold sm:text-xl")}
+          {/* CTA */}
+          <section aria-label="Ready to get started" className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-300 text-center")}>
+            <p className={cn("text-rich-black mb-4 text-base sm:text-lg")}>
+              Prefer to book directly?
+            </p>
+            <Link
+              href="/booking"
+              className={cn(
+                "bg-coquelicot-500 hover:bg-coquelicot-600 text-seasalt inline-flex items-center gap-2 rounded-lg px-6 py-3 text-base font-bold sm:text-lg transition-all shadow-md hover:shadow-lg"
+              )}
             >
-              Service area
-            </h2>
-
-            <p className={cn("text-rich-black mb-2 text-sm sm:text-base")}>
-              I'm based in Point Chevalier and travel to nearby suburbs including Western Springs,
-              Mount Albert, Grey Lynn, Westmere, Kingsland, and surrounding areas.
-            </p>
-
-            <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
-              Remote support is available for many software and account tasks if you have a stable
-              internet connection. Not sure if your job needs an on-site visit? Just ask.
-            </p>
+              Book an appointment
+            </Link>
           </section>
         </div>
       </FrostedSection>

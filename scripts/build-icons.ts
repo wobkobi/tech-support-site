@@ -16,6 +16,7 @@ import canvas from "canvas";
 
 const PALETTE = {
   seasalt500: "#f6f7f8",
+  seasalt800: "#fcfcfc",
   richBlack500: "#001514",
   russianViolet500: "#0c0a3e",
   coquelicot500: "#f34213",
@@ -24,9 +25,10 @@ const PALETTE = {
 
 /* ---------- Source Files ---------- */
 
-const LOGO_MARK = "public/logo.svg"; // Square logo mark (441x441)
-const LOGO_FULL = "public/logo-full.svg"; // Full wordmark (2000x673)
-const BACKDROP = "public/backdrop.jpg"; // Background image
+const LOGO_MARK = "public/source/logo.svg"; // Square logo mark (441x441)
+const LOGO_FULL = "public/source/logo-full.svg"; // Full wordmark (2000x673)
+const LOGO_PROFILE = "public/source/profile.svg"; // Profile picture logo (542x542)
+const BACKDROP = "public/source/backdrop.jpg"; // Background image
 
 /* ---------- Favicon Specs ---------- */
 
@@ -74,13 +76,13 @@ const SOCIAL_SPECS: SocialSpec[] = [
   { name: "linkedin-banner", width: 1584, height: 396, blur: 28, logoScale: 0.6, quality: 90 },
   // YouTube banner
   { name: "youtube-banner", width: 2560, height: 1440, blur: 35, logoScale: 0.5, quality: 85 },
-  // Profile pics - use square logo mark
+  // Profile pics - use profile logo
   {
     name: "instagram-profile",
     width: 320,
     height: 320,
     blur: 15,
-    logoScale: 0.7,
+    logoScale: 0.85,
     quality: 90,
     useMarkLogo: true,
   },
@@ -89,7 +91,7 @@ const SOCIAL_SPECS: SocialSpec[] = [
     width: 512,
     height: 512,
     blur: 20,
-    logoScale: 0.7,
+    logoScale: 0.85,
     quality: 90,
     useMarkLogo: true,
   },
@@ -98,7 +100,16 @@ const SOCIAL_SPECS: SocialSpec[] = [
     width: 200,
     height: 200,
     blur: 12,
-    logoScale: 0.7,
+    logoScale: 0.85,
+    quality: 90,
+    useMarkLogo: true,
+  },
+  {
+    name: "profile-square",
+    width: 1000,
+    height: 1000,
+    blur: 25,
+    logoScale: 0.85,
     quality: 90,
     useMarkLogo: true,
   },
@@ -108,7 +119,7 @@ const SOCIAL_SPECS: SocialSpec[] = [
     width: 720,
     height: 720,
     blur: 22,
-    logoScale: 0.65,
+    logoScale: 0.8,
     quality: 90,
     useMarkLogo: true,
   },
@@ -167,22 +178,24 @@ async function ensureDir(dir: string): Promise<void> {
 }
 
 /**
- * Create a gradient overlay SVG for social images.
- * @param w - Width in pixels
- * @param h - Height in pixels
+ * Create a frosted white card/box SVG centered on the canvas (like the website's cards).
+ * Matches the website's bg-seasalt-800/60 style (60% opacity #fcfcfc).
+ * @param w - Canvas width in pixels
+ * @param h - Canvas height in pixels
+ * @param logoScale - Scale factor of the logo (to size the card appropriately)
  * @returns SVG buffer
  */
-function makeOverlaySvg(w: number, h: number): Buffer {
+function makeFrostedCard(w: number, h: number, logoScale: number): Buffer {
+  // Card should be slightly larger than the logo with minimal padding
+  const cardWidth = Math.round(w * logoScale * 1.05);
+  const cardHeight = Math.round(h * logoScale * 1.05);
+  const cardX = Math.round((w - cardWidth) / 2);
+  const cardY = Math.round((h - cardHeight) / 2);
+  const borderRadius = Math.max(16, Math.round(cardWidth * 0.03));
+
   return Buffer.from(`
 <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
-  <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="${PALETTE.seasalt500}" stop-opacity="0.45"/>
-      <stop offset="1" stop-color="${PALETTE.coquelicot500}" stop-opacity="0.30"/>
-    </linearGradient>
-  </defs>
-  <rect width="100%" height="100%" fill="url(#g)"/>
-  <rect width="100%" height="100%" fill="${PALETTE.seasalt500}" opacity="0.06"/>
+  <rect x="${cardX}" y="${cardY}" width="${cardWidth}" height="${cardHeight}" rx="${borderRadius}" fill="${PALETTE.seasalt800}" opacity="0.6"/>
 </svg>`);
 }
 
@@ -292,9 +305,10 @@ async function buildSocialImages(): Promise<void> {
   console.log("📱 Building social images...");
   await ensureDir("public");
 
-  // Read both logos
+  // Read all logos
   const logoMarkBuffer = await fs.readFile(LOGO_MARK);
   const logoFullBuffer = await fs.readFile(LOGO_FULL);
+  const logoProfileBuffer = await fs.readFile(LOGO_PROFILE);
 
   for (const spec of SOCIAL_SPECS) {
     const { name, width, height, blur, logoScale, quality, useMarkLogo } = spec;
@@ -305,14 +319,14 @@ async function buildSocialImages(): Promise<void> {
       .blur(blur)
       .toBuffer();
 
-    // Create overlay
-    const overlay = await sharp(makeOverlaySvg(width, height))
+    // Create frosted card box
+    const frostedCard = await sharp(makeFrostedCard(width, height, logoScale))
       .resize(width, height)
       .png()
       .toBuffer();
 
-    // Select logo
-    const logoSource = useMarkLogo ? logoMarkBuffer : logoFullBuffer;
+    // Select logo - use profile logo for profile pictures, otherwise use mark or full
+    const logoSource = useMarkLogo ? logoProfileBuffer : logoFullBuffer;
 
     // Resize logo to fit
     const logo = await sharp(logoSource)
@@ -324,9 +338,9 @@ async function buildSocialImages(): Promise<void> {
       .png()
       .toBuffer();
 
-    // Composite all layers
+    // Composite all layers: blur, then frosted card, then logo
     await sharp(bg)
-      .composite([{ input: overlay }, { input: logo, gravity: "centre" }])
+      .composite([{ input: frostedCard }, { input: logo, gravity: "centre" }])
       .jpeg({ quality })
       .toFile(`public/${name}.jpg`);
 
@@ -345,6 +359,7 @@ async function buildAdditionalAssets(): Promise<void> {
 
   const logoMarkBuffer = await fs.readFile(LOGO_MARK);
   const logoFullBuffer = await fs.readFile(LOGO_FULL);
+  const logoProfileBuffer = await fs.readFile(LOGO_PROFILE);
 
   for (const { name, width, height, type, format } of ADDITIONAL_ASSETS) {
     let output: sharp.Sharp;
@@ -388,13 +403,13 @@ async function buildAdditionalAssets(): Promise<void> {
         },
       }).composite([{ input: logo, gravity: "centre" }]);
     } else if (type === "mark-on-bg") {
-      // Square logo mark on blurred background
+      // Square logo mark on blurred background with frosted card
       const bg = await sharp(BACKDROP)
         .resize(width, height, { fit: "cover", position: "centre" })
         .blur(20)
         .toBuffer();
 
-      const overlay = await sharp(makeOverlaySvg(width, height))
+      const frostedCard = await sharp(makeFrostedCard(width, height, 0.65))
         .resize(width, height)
         .png()
         .toBuffer();
@@ -408,18 +423,18 @@ async function buildAdditionalAssets(): Promise<void> {
         .png()
         .toBuffer();
 
-      output = sharp(bg).composite([{ input: overlay }, { input: logo, gravity: "centre" }]);
+      output = sharp(bg).composite([{ input: frostedCard }, { input: logo, gravity: "centre" }]);
     } else if (type === "bg-only") {
       // Just the blurred backdrop
       output = sharp(BACKDROP).resize(width, height, { fit: "cover", position: "centre" }).blur(30);
     } else {
-      // logo-on-bg: Full wordmark on blurred background
+      // logo-on-bg: Full wordmark on blurred background with frosted card
       const bg = await sharp(BACKDROP)
         .resize(width, height, { fit: "cover", position: "centre" })
         .blur(25)
         .toBuffer();
 
-      const overlay = await sharp(makeOverlaySvg(width, height))
+      const frostedCard = await sharp(makeFrostedCard(width, height, 0.8))
         .resize(width, height)
         .png()
         .toBuffer();
@@ -433,7 +448,7 @@ async function buildAdditionalAssets(): Promise<void> {
         .png()
         .toBuffer();
 
-      output = sharp(bg).composite([{ input: overlay }, { input: logo, gravity: "centre" }]);
+      output = sharp(bg).composite([{ input: frostedCard }, { input: logo, gravity: "centre" }]);
     }
 
     if (format === "png") {
@@ -589,7 +604,7 @@ async function buildManifest(): Promise<void> {
  */
 async function preflight(): Promise<void> {
   console.log("🔍 Checking source files...");
-  const required = [LOGO_MARK, LOGO_FULL, BACKDROP];
+  const required = [LOGO_MARK, LOGO_FULL, LOGO_PROFILE, BACKDROP];
 
   for (const file of required) {
     try {

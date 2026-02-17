@@ -1,367 +1,333 @@
-// src/lib/booking.ts
+// src/lib/booking.ts - DURATION SUPPORT
 /**
  * @file booking.ts
- * @description Booking domain logic with simplified time-of-day preferences.
- * Clients pick a day and time window, you confirm the exact time.
+ * @description Booking system with duration selection (1hr quick jobs vs 2hr standard jobs)
  */
 
-import type { CalendarEvent } from "@/server/google/calendar";
+export const BOOKING_CONFIG = {
+  timeZone: "Pacific/Auckland",
+  maxAdvanceDays: 14,
+  bufferMin: 15,
+  minHoursNotice: 2,
+  sameDayCutoffHour: 18,
+  nextDayMorningCutoffHour: 20,
+  workStartHour: 10,
+  workEndHour: 20,
+} as const;
 
-/**
- * Configuration for the booking system.
- */
-export interface BookingConfig {
-  /** Buffer time in minutes after each booking (for travel). */
-  bufferMin: number;
-  /** Maximum days in advance that can be booked. */
-  maxAdvanceDays: number;
-  /** IANA time zone identifier for the booking calendar. */
-  timeZone: string;
-  /** Earliest bookable hour (24h format). */
-  dayStartHour: number;
-  /** Latest bookable hour (24h format). */
-  dayEndHour: number;
-  /** Hour of day after which same-day bookings are not allowed (24h format). */
-  sameDayCutoffHour: number;
+// Duration options
+export type JobDuration = "short" | "long";
+
+export interface DurationOption {
+  value: JobDuration;
+  label: string;
+  description: string;
+  durationMinutes: number;
 }
 
-/**
- * Time of day preference for booking.
- */
-export type TimeOfDay =
-  | "morning"
-  | "late-morning"
-  | "early-afternoon"
-  | "late-afternoon"
-  | "early-evening"
-  | "late-evening";
+export const DURATION_OPTIONS: ReadonlyArray<DurationOption> = [
+  {
+    value: "short",
+    label: "Standard (1 hour)",
+    description: "Most common appointment length",
+    durationMinutes: 60,
+  },
+  {
+    value: "long",
+    label: "Extended (2 hours)",
+    description: "For complex issues or multiple tasks",
+    durationMinutes: 120,
+  },
+] as const;
 
-/**
- * Time of day option with label and hour range.
- */
 export interface TimeOfDayOption {
-  /** Unique identifier. */
-  value: TimeOfDay;
-  /** Display label. */
+  value: string;
   label: string;
-  /** Start hour (24h format). */
   startHour: number;
-  /** End hour (24h format). */
   endHour: number;
 }
 
-/**
- * A single available day for booking.
- */
-export interface BookableDay {
-  /** Date string in YYYY-MM-DD format. */
-  dateKey: string;
-  /** Human-readable label (e.g., "Mon 3 Feb"). */
-  label: string;
-  /** Full date label (e.g., "Monday, 3 February"). */
-  fullLabel: string;
-  /** Whether this is today. */
-  isToday: boolean;
-  /** Whether this is a weekend. */
-  isWeekend: boolean;
-  /** Available time slots for this day. */
-  availableTimes: TimeOfDay[];
-}
-
-/**
- * Booking configuration:
- * - 10am to 7pm working hours
- * - 30 minute buffer after bookings
- * - Same-day bookings allowed before 6pm
- * - Up to 14 days ahead
- * - Pacific/Auckland time zone
- */
-export const BOOKING_CONFIG: BookingConfig = {
-  bufferMin: 30,
-  maxAdvanceDays: 14,
-  timeZone: "Pacific/Auckland",
-  dayStartHour: 10,
-  dayEndHour: 19, // 7pm
-  sameDayCutoffHour: 18, // 6pm - no same-day bookings after this
-};
-
-/**
- * Time of day options - narrower 1.5-2 hour windows.
- */
-export const TIME_OF_DAY_OPTIONS: readonly TimeOfDayOption[] = [
-  { value: "morning", label: "10:00am–11:30am", startHour: 10, endHour: 11.5 },
-  { value: "late-morning", label: "11:30am–1:00pm", startHour: 11.5, endHour: 13 },
-  {
-    value: "early-afternoon",
-    label: "1:00pm–2:30pm",
-    startHour: 13,
-    endHour: 14.5,
-  },
-  {
-    value: "late-afternoon",
-    label: "2:30pm–4:00pm",
-    startHour: 14.5,
-    endHour: 16,
-  },
-  { value: "early-evening", label: "4:00pm–5:30pm", startHour: 16, endHour: 17.5 },
-  { value: "late-evening", label: "5:30pm–7:00pm", startHour: 17.5, endHour: 19 },
+// Hourly time slots (10am-6pm, last slot needs 2hrs for long jobs)
+export const TIME_OF_DAY_OPTIONS: ReadonlyArray<TimeOfDayOption> = [
+  { value: "10am", label: "10am", startHour: 10, endHour: 11 },
+  { value: "11am", label: "11am", startHour: 11, endHour: 12 },
+  { value: "12pm", label: "12pm", startHour: 12, endHour: 13 },
+  { value: "1pm", label: "1pm", startHour: 13, endHour: 14 },
+  { value: "2pm", label: "2pm", startHour: 14, endHour: 15 },
+  { value: "3pm", label: "3pm", startHour: 15, endHour: 16 },
+  { value: "4pm", label: "4pm", startHour: 16, endHour: 17 },
+  { value: "5pm", label: "5pm", startHour: 17, endHour: 18 },
+  { value: "6pm", label: "6pm", startHour: 18, endHour: 19 },
 ] as const;
 
-const MS_PER_MIN = 60 * 1000;
-const MS_PER_DAY = 24 * 60 * MS_PER_MIN;
+export type TimeOfDay = (typeof TIME_OF_DAY_OPTIONS)[number]["value"];
 
-/**
- * Get time-zone wall-clock parts for a given UTC date.
- */
-function getZonedParts(
-  dateUtc: Date,
-  timeZone: string,
-): { year: number; month: number; day: number; hour: number; minute: number; weekday: number } {
-  const dtf = new Intl.DateTimeFormat("en-NZ", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    weekday: "short",
-  });
+export interface TimeWindow {
+  value: TimeOfDay;
+  label: string;
+  availableShort: boolean; // Can fit 1hr job
+  availableLong: boolean; // Can fit 2hr job
+}
 
-  const parts = dtf.formatToParts(dateUtc);
-  const values: Record<string, string> = {};
+export interface BookableDay {
+  dateKey: string;
+  dayLabel: string;
+  fullLabel: string;
+  isToday: boolean;
+  isWeekend: boolean;
+  timeWindows: TimeWindow[];
+  hasAnySlots: boolean; // True if any time slots are available
+}
 
-  for (const p of parts) {
-    if (p.type !== "literal") {
-      values[p.type] = p.value;
-    }
-  }
-
-  const weekdayMap: Record<string, number> = {
-    Sun: 0,
-    Mon: 1,
-    Tue: 2,
-    Wed: 3,
-    Thu: 4,
-    Fri: 5,
-    Sat: 6,
-  };
-
-  return {
-    year: Number(values.year),
-    month: Number(values.month),
-    day: Number(values.day),
-    hour: Number(values.hour),
-    minute: Number(values.minute),
-    weekday: weekdayMap[values.weekday] ?? 0,
-  };
+export interface ExistingBooking {
+  id: string;
+  startUtc: Date;
+  endUtc: Date;
+  bufferBeforeMin: number;
+  bufferAfterMin: number;
 }
 
 /**
- * Convert a wall-clock time in a time zone into a UTC Date.
+ * Check if a time slot conflicts with existing bookings/events
+ * @param slotStart - Slot start time
+ * @param slotEnd - Slot end time
+ * @param existingBookings - Database bookings
+ * @param calendarEvents - Calendar events
+ * @param bufferMin - Buffer time in minutes
+ * @returns True if slot is free
  */
-export function zonedTimeToUtc(
-  timeZone: string,
-  year: number,
-  month: number,
-  day: number,
-  hour: number,
-  minute: number,
-): Date {
-  const approxUtc = new Date(Date.UTC(year, month - 1, day, hour, minute, 0));
-  const zoned = getZonedParts(approxUtc, timeZone);
-  const zonedAsUtcMs = Date.UTC(
-    zoned.year,
-    zoned.month - 1,
-    zoned.day,
-    zoned.hour,
-    zoned.minute,
-    0,
-  );
-  const offsetMs = zonedAsUtcMs - approxUtc.getTime();
-  return new Date(approxUtc.getTime() - offsetMs);
-}
-
-/**
- * Format a date label in the configured time zone.
- */
-function formatInTimeZone(
-  dateUtc: Date,
-  timeZone: string,
-  options: Intl.DateTimeFormatOptions,
-): string {
-  return new Intl.DateTimeFormat("en-NZ", { timeZone, ...options }).format(dateUtc);
-}
-
-/**
- * Check if a time range overlaps with any existing events (including buffer).
- */
-function hasConflict(
-  startUtc: Date,
-  endUtc: Date,
-  events: CalendarEvent[],
+function isSlotFree(
+  slotStart: Date,
+  slotEnd: Date,
+  existingBookings: ExistingBooking[],
+  calendarEvents: Array<{ start: string; end: string }>,
   bufferMin: number,
 ): boolean {
-  const startMs = startUtc.getTime();
-  const endMs = endUtc.getTime() + bufferMin * MS_PER_MIN;
+  // Check database bookings
+  for (const booking of existingBookings) {
+    const bookingStart = new Date(booking.startUtc.getTime() - booking.bufferBeforeMin * 60 * 1000);
+    const bookingEnd = new Date(booking.endUtc.getTime() + booking.bufferAfterMin * 60 * 1000);
 
-  return events.some((event) => {
-    const eventStartMs = event.startUtc.getTime();
-    const eventEndMs = event.endUtc.getTime() + bufferMin * MS_PER_MIN;
-    return startMs < eventEndMs && endMs > eventStartMs;
-  });
-}
-
-/**
- * Check if a time-of-day window is available on a given date.
- */
-function isTimeWindowAvailable(
-  dateKey: string,
-  timeOption: TimeOfDayOption,
-  events: CalendarEvent[],
-  config: BookingConfig,
-): boolean {
-  const [year, month, day] = dateKey.split("-").map(Number);
-
-  // Check if any hour in this window is free
-  for (let hour = timeOption.startHour; hour < timeOption.endHour; hour++) {
-    const slotStart = zonedTimeToUtc(config.timeZone, year, month, day, hour, 0);
-    const slotEnd = zonedTimeToUtc(config.timeZone, year, month, day, hour + 1, 0);
-
-    if (!hasConflict(slotStart, slotEnd, events, config.bufferMin)) {
-      return true;
+    if (slotStart < bookingEnd && slotEnd > bookingStart) {
+      return false;
     }
   }
 
-  return false;
+  // Check calendar events
+  for (const event of calendarEvents) {
+    const eventStart = new Date(new Date(event.start).getTime() - bufferMin * 60 * 1000);
+    const eventEnd = new Date(new Date(event.end).getTime() + bufferMin * 60 * 1000);
+
+    if (slotStart < eventEnd && slotEnd > eventStart) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 /**
- * Build the list of available days for booking.
+ * Build available days with duration-aware slot checking
+ * @param existingBookings - Array of existing bookings from database
+ * @param calendarEvents - Array of calendar events to block
+ * @param now - Current date/time
+ * @param config - Booking configuration settings
+ * @returns Array of bookable days with time windows
  */
 export function buildAvailableDays(
-  existingEvents: CalendarEvent[],
+  existingBookings: ExistingBooking[],
+  calendarEvents: Array<{ id: string; start: string; end: string }>,
   now: Date,
-  config: BookingConfig,
+  config: typeof BOOKING_CONFIG,
 ): BookableDay[] {
   const days: BookableDay[] = [];
-  const nowZoned = getZonedParts(now, config.timeZone);
+  const nzTime = new Date(now.toLocaleString("en-US", { timeZone: config.timeZone }));
+  const currentHourNZ = nzTime.getHours();
+  const currentMinuteNZ = nzTime.getMinutes();
 
-  for (let dayOffset = 0; dayOffset <= config.maxAdvanceDays; dayOffset++) {
-    const baseUtc = zonedTimeToUtc(
-      config.timeZone,
-      nowZoned.year,
-      nowZoned.month,
-      nowZoned.day,
-      12,
-      0,
-    );
-    const targetUtc = new Date(baseUtc.getTime() + dayOffset * MS_PER_DAY);
-    const targetZoned = getZonedParts(targetUtc, config.timeZone);
+  const startDate = new Date(nzTime);
+  startDate.setHours(0, 0, 0, 0);
 
-    const isToday = dayOffset === 0;
-    const isWeekend = targetZoned.weekday === 0 || targetZoned.weekday === 6;
+  for (let i = 0; i < config.maxAdvanceDays; i++) {
+    const date = new Date(startDate);
+    date.setDate(date.getDate() + i);
 
-    // Check same-day cutoff
-    if (isToday && nowZoned.hour >= config.sameDayCutoffHour) {
-      continue;
-    }
+    const dayOfWeek = date.getDay();
+    if (dayOfWeek === 0) continue; // Skip Sundays
 
-    const dateKey = `${targetZoned.year}-${String(targetZoned.month).padStart(2, "0")}-${String(targetZoned.day).padStart(2, "0")}`;
+    const dateKey = date.toISOString().split("T")[0];
+    const isToday = i === 0;
+    const isTomorrow = i === 1;
+    const isWeekend = dayOfWeek === 6;
 
-    // Check which time windows are available
-    const availableTimes: TimeOfDay[] = [];
+    // Format labels
+    const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const shortDayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const monthNames = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
 
-    for (const timeOption of TIME_OF_DAY_OPTIONS) {
-      // For today, skip time windows that have already passed
-      if (isToday && timeOption.endHour <= nowZoned.hour + 1) {
-        continue;
+    const dayLabel = `${shortDayNames[dayOfWeek]} ${date.getDate()} ${monthNames[date.getMonth()]}`;
+    const fullLabel = `${dayNames[dayOfWeek]}, ${monthNames[date.getMonth()]} ${date.getDate()}`;
+
+    const timeWindows: TimeWindow[] = [];
+
+    for (const slot of TIME_OF_DAY_OPTIONS) {
+      const slotHour = slot.startHour;
+
+      // Check 1-hour availability
+      const shortStart = new Date(
+        Date.UTC(
+          date.getFullYear(),
+          date.getMonth(),
+          date.getDate(),
+          slotHour - 13, // NZ UTC+13
+          0,
+          0,
+        ),
+      );
+      const shortEnd = new Date(shortStart.getTime() + 60 * 60 * 1000); // 1 hour
+
+      let availableShort = isSlotFree(
+        shortStart,
+        shortEnd,
+        existingBookings,
+        calendarEvents,
+        config.bufferMin,
+      );
+
+      // Check 2-hour availability
+      const longEnd = new Date(shortStart.getTime() + 120 * 60 * 1000); // 2 hours
+      let availableLong = isSlotFree(
+        shortStart,
+        longEnd,
+        existingBookings,
+        calendarEvents,
+        config.bufferMin,
+      );
+
+      // Apply time-based rules
+      if (isToday) {
+        const minutesUntilSlot = (slotHour - currentHourNZ) * 60 - currentMinuteNZ;
+        const hoursUntilSlot = minutesUntilSlot / 60;
+
+        // 2-hour minimum notice
+        if (hoursUntilSlot < config.minHoursNotice) {
+          availableShort = false;
+          availableLong = false;
+        }
+
+        // 6pm same day cutoff
+        if (currentHourNZ >= config.sameDayCutoffHour) {
+          availableShort = false;
+          availableLong = false;
+        }
       }
 
-      if (isTimeWindowAvailable(dateKey, timeOption, existingEvents, config)) {
-        availableTimes.push(timeOption.value);
+      // Next-day morning cutoff (8pm blocks next morning)
+      if (isTomorrow && currentHourNZ >= config.nextDayMorningCutoffHour && slotHour < 12) {
+        availableShort = false;
+        availableLong = false;
       }
-    }
 
-    if (availableTimes.length > 0) {
-      const label = formatInTimeZone(targetUtc, config.timeZone, {
-        weekday: "short",
-        day: "numeric",
-        month: "short",
-      });
-
-      const fullLabel = formatInTimeZone(targetUtc, config.timeZone, {
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-      });
-
-      days.push({
-        dateKey,
-        label,
-        fullLabel,
-        isToday,
-        isWeekend,
-        availableTimes,
+      timeWindows.push({
+        value: slot.value,
+        label: slot.label,
+        availableShort,
+        availableLong,
       });
     }
+
+    // Check if day has any available slots
+    const hasAnySlots = timeWindows.some((w) => w.availableShort || w.availableLong);
+
+    // Always add the day to the list (even if fully booked)
+    // Exception: Skip today if all time slots are in the past
+    if (isToday && !hasAnySlots) {
+      continue; // Don't show today if it's fully booked (all times past)
+    }
+
+    days.push({
+      dateKey,
+      dayLabel,
+      fullLabel,
+      isToday,
+      isWeekend,
+      timeWindows,
+      hasAnySlots,
+    });
   }
 
   return days;
 }
 
 /**
- * Validate a booking request.
+ * Validate booking request
+ * @param dateKey - Selected date in YYYY-MM-DD format
+ * @param timeOfDay - Selected time slot value
+ * @param duration - Job duration (short or long)
+ * @param existingBookings - Array of existing bookings from database
+ * @param calendarEvents - Array of calendar events to check against
+ * @param now - Current date/time
+ * @param config - Booking configuration settings
+ * @returns Validation result with success flag and optional error message
  */
 export function validateBookingRequest(
   dateKey: string,
   timeOfDay: TimeOfDay,
-  existingEvents: CalendarEvent[],
+  duration: JobDuration,
+  existingBookings: ExistingBooking[],
+  calendarEvents: Array<{ id: string; start: string; end: string }>,
   now: Date,
-  config: BookingConfig,
+  config: typeof BOOKING_CONFIG,
 ): { valid: boolean; error?: string } {
-  const dateParts = dateKey.split("-").map(Number);
-  if (dateParts.length !== 3 || dateParts.some(isNaN)) {
-    return { valid: false, error: "Invalid date format." };
+  const [year, month, day] = dateKey.split("-").map(Number);
+  if (!year || !month || !day) {
+    return { valid: false, error: "Invalid date format" };
   }
 
-  const [year, month, day] = dateParts;
-  const requestedDate = zonedTimeToUtc(config.timeZone, year, month, day, 12, 0);
-  const nowZoned = getZonedParts(now, config.timeZone);
-  const todayStart = zonedTimeToUtc(
-    config.timeZone,
-    nowZoned.year,
-    nowZoned.month,
-    nowZoned.day,
-    0,
-    0,
-  );
+  const selectedDate = new Date(year, month - 1, day);
+  selectedDate.setHours(0, 0, 0, 0);
 
-  if (requestedDate.getTime() < todayStart.getTime()) {
-    return { valid: false, error: "Cannot book dates in the past." };
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+
+  if (selectedDate < today) {
+    return { valid: false, error: "Cannot book dates in the past" };
   }
 
-  const maxDate = new Date(todayStart.getTime() + config.maxAdvanceDays * MS_PER_DAY);
-  if (requestedDate.getTime() > maxDate.getTime()) {
-    return { valid: false, error: "Date is too far in the future." };
+  const maxDate = new Date(today);
+  maxDate.setDate(maxDate.getDate() + config.maxAdvanceDays);
+  if (selectedDate > maxDate) {
+    return {
+      valid: false,
+      error: `Cannot book more than ${config.maxAdvanceDays} days in advance`,
+    };
   }
 
-  const isToday = year === nowZoned.year && month === nowZoned.month && day === nowZoned.day;
-  if (isToday && nowZoned.hour >= config.sameDayCutoffHour) {
-    return { valid: false, error: "Same-day bookings must be made before 6pm." };
+  const slot = TIME_OF_DAY_OPTIONS.find((t) => t.value === timeOfDay);
+  if (!slot) {
+    return { valid: false, error: "Invalid time slot" };
   }
 
-  const timeOption = TIME_OF_DAY_OPTIONS.find((t) => t.value === timeOfDay);
-  if (!timeOption) {
-    return { valid: false, error: "Invalid time preference." };
-  }
+  // Check if slot is actually available for this duration
+  const durationMinutes = duration === "short" ? 60 : 120;
+  const slotStart = new Date(Date.UTC(year, month - 1, day, slot.startHour - 13, 0, 0));
+  const slotEnd = new Date(slotStart.getTime() + durationMinutes * 60 * 1000);
 
-  if (isToday && timeOption.endHour <= nowZoned.hour + 1) {
-    return { valid: false, error: "This time window has already passed." };
-  }
-
-  if (!isTimeWindowAvailable(dateKey, timeOption, existingEvents, config)) {
-    return { valid: false, error: "This time is no longer available." };
+  if (!isSlotFree(slotStart, slotEnd, existingBookings, calendarEvents, config.bufferMin)) {
+    return { valid: false, error: "This time slot is no longer available" };
   }
 
   return { valid: true };
