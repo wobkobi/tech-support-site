@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { releaseExpiredHolds } from "@/lib/releaseExpiredHolds";
+import { prisma } from "@/lib/prisma";
 
 /**
  * Verify the request is from Vercel Cron or has the correct secret.
@@ -38,12 +38,28 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    const result = await releaseExpiredHolds();
+    const now = new Date();
+    const expired = await prisma.booking.findMany({
+      where: {
+        status: "held",
+        holdExpiresUtc: { lte: now },
+      },
+      select: { id: true },
+    });
+
+    const ids = expired.map((b) => b.id);
+
+    if (ids.length > 0) {
+      await prisma.booking.updateMany({
+        where: { id: { in: ids } },
+        data: { status: "cancelled" },
+      });
+    }
 
     return NextResponse.json({
       ok: true,
-      releasedCount: result.releasedCount,
-      releasedIds: result.releasedIds,
+      releasedCount: ids.length,
+      releasedIds: ids,
     });
   } catch (error) {
     console.error("[cron/release-holds] Error:", error);
