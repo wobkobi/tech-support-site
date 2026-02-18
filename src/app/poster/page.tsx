@@ -68,15 +68,16 @@ export default function PosterPage(): React.ReactElement {
       </div>
 
       {/* Even outer gap on all sides */}
-      <div className={cn("flex h-full w-full flex-col p-10")}>
+      <div className={cn("flex h-full w-full flex-col p-6")}>
         {/* Inner column fills available height so footer can pin to bottom */}
         <div className={cn("flex min-h-0 flex-1 flex-col")}>
-          {/* Main frosted card */}
+          {/* Main frosted card — flex-1 so it fills the space above the footer */}
           <div
             className={cn(
-              "rounded-4xl border-seasalt-400/40 bg-seasalt-800/60 p-7.5 border-[3px] shadow-xl backdrop-blur-xl",
+              "flex-1 rounded-4xl border-seasalt-400/40 bg-seasalt-800/60 p-6 border-[3px] shadow-xl backdrop-blur-xl",
             )}
           >
+            <div className={cn("flex h-full flex-col")}>
             {/* Logo */}
             <div className={cn("grid place-items-center pb-5")}>
               <Image
@@ -101,7 +102,7 @@ export default function PosterPage(): React.ReactElement {
                   className={cn("absolute inset-0 rounded-xl")}
                   style={{ backgroundColor: "rgba(67, 188, 205, 0.15)" }}
                 />
-                <FaCircleCheck className={cn("text-moonstone-600 relative z-10 h-9 w-9")} />
+                <FaCircleCheck className={cn("text-moonstone-600 relative z-10 h-11 w-11")} />
                 <span className={cn("text-rich-black relative z-10 text-[34px] font-semibold")}>
                   CS Graduate
                 </span>
@@ -117,7 +118,7 @@ export default function PosterPage(): React.ReactElement {
                   className={cn("absolute inset-0 rounded-xl")}
                   style={{ backgroundColor: "rgba(67, 188, 205, 0.15)" }}
                 />
-                <FaLocationDot className={cn("text-moonstone-600 relative z-10 h-9 w-9")} />
+                <FaLocationDot className={cn("text-moonstone-600 relative z-10 h-11 w-11")} />
                 <span className={cn("text-rich-black relative z-10 text-[34px] font-semibold")}>
                   Pt Chev Local
                 </span>
@@ -133,18 +134,18 @@ export default function PosterPage(): React.ReactElement {
                   className={cn("absolute inset-0 rounded-xl")}
                   style={{ backgroundColor: "rgba(67, 188, 205, 0.15)" }}
                 />
-                <FaClock className={cn("text-moonstone-600 relative z-10 h-9 w-9")} />
+                <FaClock className={cn("text-moonstone-600 relative z-10 h-11 w-11")} />
                 <span className={cn("text-rich-black relative z-10 text-[34px] font-semibold")}>
                   Same Day Available
                 </span>
               </div>
             </div>
 
-            {/* Text boxes */}
-            <section className={cn("flex flex-col gap-5")}>
+            {/* Text boxes — flex-1 absorbs extra height so bottom padding stays even */}
+            <section className={cn("flex flex-1 flex-col gap-5")}>
               <div
                 className={cn(
-                  "border-seasalt-400/60 bg-seasalt-800 p-4.5 rounded-[18px] border-2 shadow-sm",
+                  "flex-1 border-seasalt-400/60 bg-seasalt-800 p-4.5 rounded-[18px] border-2 shadow-sm",
                 )}
               >
                 <h2 className={cn("text-russian-violet mb-1.5 text-[53px] font-bold")}>About Me</h2>
@@ -155,7 +156,7 @@ export default function PosterPage(): React.ReactElement {
 
               <div
                 className={cn(
-                  "border-seasalt-400/60 bg-seasalt-800 p-4.5 rounded-[18px] border-2 shadow-sm",
+                  "flex-1 border-seasalt-400/60 bg-seasalt-800 p-4.5 rounded-[18px] border-2 shadow-sm",
                 )}
               >
                 <h2 className={cn("text-russian-violet mb-1.5 text-[53px] font-bold")}>Services</h2>
@@ -181,15 +182,15 @@ export default function PosterPage(): React.ReactElement {
                   >
                     <span
                       className={cn(
-                        "border-moonstone-500/30 bg-moonstone-600/15 size-15 grid shrink-0 place-items-center rounded-xl border-2",
+                        "border-moonstone-500/30 bg-moonstone-600/15 size-18 grid shrink-0 place-items-center rounded-xl border-2",
                       )}
                     >
-                      <Icon className={cn("text-moonstone-600 h-9 w-9")} aria-hidden />
+                      <Icon className={cn("text-moonstone-600 h-11 w-11")} aria-hidden />
                     </span>
 
                     <span
                       className={cn(
-                        "text-rich-black text-left text-[34px] font-semibold leading-tight",
+                        "text-rich-black text-left text-[40px] font-semibold leading-tight",
                       )}
                     >
                       {label}
@@ -198,16 +199,14 @@ export default function PosterPage(): React.ReactElement {
                 ))}
               </ul>
             </section>
+            </div>
           </div>
 
-          {/* Fixed gap between main card and footer */}
-          <div className={cn("h-10")} />
-
-          {/* Footer pinned to the bottom of the padded area */}
-          <footer className={cn("mx-auto mt-auto w-fit")}>
+          {/* Footer — fixed gap from the card above */}
+          <footer className={cn("mx-auto mt-6 w-fit")}>
             <div
               className={cn(
-                "bg-seasalt-800/70 border-seasalt-400/40 p-4.5 rounded-[14px] border-2 shadow-xl backdrop-blur-md",
+                "bg-seasalt-800/70 border-seasalt-400/40 p-6 rounded-[14px] border-2 shadow-xl backdrop-blur-md",
               )}
             >
               <div className={cn("flex items-center gap-7")}>
@@ -215,7 +214,7 @@ export default function PosterPage(): React.ReactElement {
                 <div className={cn("flex shrink-0 flex-col items-center gap-1")}>
                   <div
                     className={cn(
-                      "border-seasalt-400/60 size-37.5 grid place-items-center rounded-[10px] border-2 bg-white p-2.5 shadow-sm",
+                      "border-seasalt-400/60 size-42 grid place-items-center rounded-[10px] border-2 bg-white p-2.5 shadow-sm",
                     )}
                   >
                     <Image

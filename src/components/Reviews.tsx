@@ -63,7 +63,7 @@ export default function Reviews({ items = [] }: ReviewsProps): React.ReactElemen
               <li
                 key={`${formatName(r)}-${i}`}
                 className={cn(
-                  "border-seasalt-400/60 bg-seasalt-800/80 w-90 sm:w-95 flex h-40 shrink-0 flex-col rounded-lg border p-4 sm:h-44 sm:p-5",
+                  "border-seasalt-400/60 bg-seasalt-800/80 w-90 sm:w-95 flex shrink-0 flex-col rounded-lg border p-4 sm:p-5",
                 )}
               >
                 <p className={cn("text-rich-black text-sm leading-relaxed sm:text-base")}>
@@ -110,7 +110,7 @@ export default function Reviews({ items = [] }: ReviewsProps): React.ReactElemen
               // full width on mobile, two-up on sm, three-up on md+. Centering comes from justify-center.
               "w-full sm:w-[calc(50%-0.375rem)] md:w-[calc(33.333%-0.5rem)]",
               // card styles
-              "border-seasalt-400/60 bg-seasalt-800 flex h-40 flex-col rounded-lg border p-4 shadow-sm sm:h-44 sm:p-5",
+              "border-seasalt-400/60 bg-seasalt-800 flex flex-col rounded-lg border p-4 shadow-sm sm:p-5",
             )}
           >
             <p className={cn("text-rich-black text-sm sm:text-base")}>{r.text}</p>

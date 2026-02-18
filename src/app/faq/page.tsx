@@ -9,8 +9,6 @@ import Link from "next/link";
 import { FrostedSection, PageShell, CARD, SOFT_CARD } from "@/components/PageLayout";
 import { cn } from "@/lib/cn";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 3600; // Cache for 1 hour - static content
 
 interface FaqItem {
   question: string;
@@ -153,7 +151,7 @@ export default function FaqPage(): React.ReactElement {
             <h1
               id="faq-heading"
               className={cn(
-                "text-russian-violet mb-4 text-3xl font-extrabold sm:text-4xl md:text-5xl",
+                "text-russian-violet mb-4 text-2xl font-extrabold sm:text-3xl md:text-4xl",
               )}
             >
               Frequently asked questions

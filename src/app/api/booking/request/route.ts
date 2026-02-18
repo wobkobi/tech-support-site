@@ -16,6 +16,7 @@ import {
   type ExistingBooking,
 } from "@/lib/booking";
 import { createBookingEvent, fetchAllCalendarEvents } from "@/lib/google-calendar";
+import { sendOwnerBookingNotification, sendCustomerBookingConfirmation } from "@/lib/email";
 import { randomUUID } from "crypto";
 
 interface BookingRequestPayload {
@@ -154,7 +155,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const reviewToken = randomUUID();
 
     // Build notes
-    let bookingNotes = `[${slot.label} - ${durationOption.label}]\n`;
+    let bookingNotes = `${notes.trim()}\n\n`;
+    bookingNotes += `[${slot.label} - ${durationOption.label}]\n`;
     bookingNotes += `Meeting type: ${meetingType === "in-person" ? "In-person" : "Remote"}\n`;
     if (meetingType === "in-person" && address) {
       bookingNotes += `Address: ${address.trim()}\n`;
@@ -162,7 +164,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (phone) {
       bookingNotes += `Phone: ${phone.trim()}\n`;
     }
-    bookingNotes += `\n${notes.trim()}`;
 
     // Create calendar event
     let calendarEventId: string | null = null;
@@ -209,6 +210,26 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     });
 
     console.log(`[booking/request] Created ${duration} booking: ${booking.id}`);
+
+    // Send confirmation emails — fire-and-forget, never block the response
+    void sendOwnerBookingNotification({
+      id: booking.id,
+      name: booking.name,
+      email: booking.email,
+      notes: booking.notes ?? "",
+      startUtc: booking.startUtc,
+      endUtc: booking.endUtc,
+      cancelToken: booking.cancelToken,
+    });
+    void sendCustomerBookingConfirmation({
+      id: booking.id,
+      name: booking.name,
+      email: booking.email,
+      notes: booking.notes ?? "",
+      startUtc: booking.startUtc,
+      endUtc: booking.endUtc,
+      cancelToken: booking.cancelToken,
+    });
 
     return NextResponse.json({ ok: true, bookingId: booking.id });
   } catch (error) {

@@ -57,6 +57,7 @@ export function NavBar(): React.ReactElement | null {
     { label: "Pricing", href: "/pricing", activePrefix: "/pricing" },
     { label: "About", href: "/about", activePrefix: "/about" },
     { label: "FAQ", href: "/faq", activePrefix: "/faq" },
+    { label: "Reviews", href: "/reviews", activePrefix: "/reviews" },
   ];
 
   const bookingActive = isActivePrefix(pathname, "/booking");

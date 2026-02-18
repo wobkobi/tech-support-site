@@ -49,12 +49,13 @@ export default function BookingSuccessPage(): React.ReactElement {
                   "text-russian-violet mb-3 text-2xl font-extrabold sm:text-3xl md:text-4xl",
                 )}
               >
-                Request received!
+                Booking confirmed!
               </h1>
 
               <p className={cn("text-rich-black/80 mb-6 text-sm sm:text-base")}>
-                Thanks for your booking request. I'll check my schedule and get back to you shortly
-                with a confirmed time. You'll receive a calendar invite once it's locked in.
+                Your appointment is confirmed. Check your email for the details and a Google
+                Calendar invite — if you don&apos;t see it within a few minutes, check your spam
+                folder.
               </p>
 
               <Link
@@ -78,10 +79,10 @@ export default function BookingSuccessPage(): React.ReactElement {
                   "text-rich-black/80 list-inside list-decimal space-y-1 text-sm sm:text-base",
                 )}
               >
-                <li>I'll review your request and find a time that works</li>
-                <li>You'll get an email with the confirmed appointment details</li>
-                <li>A Google Calendar invite will be sent so you don't forget</li>
-                <li>Need to change something? Just reply to the email</li>
+                <li>A confirmation email has been sent to you with the appointment details</li>
+                <li>A Google Calendar invite has been sent — accept it to add it to your calendar</li>
+                <li>To cancel or reschedule, use the link in the confirmation email or reply to it</li>
+                <li>I&apos;ll send you a review link after your appointment</li>
               </ol>
             </section>
           </div>

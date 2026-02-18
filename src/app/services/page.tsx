@@ -23,8 +23,6 @@ import {
   FaEnvelope,
 } from "react-icons/fa6";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 3600; // Cache for 1 hour - static content
 
 interface ServiceArea {
   icon: React.ReactElement;
@@ -108,19 +106,19 @@ export default function ServicesPage(): React.ReactElement {
             <h1
               id="services-heading"
               className={cn(
-                "text-russian-violet mb-4 text-3xl font-extrabold sm:text-4xl md:text-5xl",
+                "text-russian-violet mb-4 text-2xl font-extrabold sm:text-3xl md:text-4xl",
               )}
             >
               Services
             </h1>
 
-            <p className={cn("text-rich-black mb-4 text-base sm:text-lg md:text-xl")}>
+            <p className={cn("text-rich-black mb-4 text-sm sm:text-base")}>
               I help with the everyday tech problems that sit between "turn it off and on again" and
               calling a big IT company. The goal is to get things working reliably and leave you
               with a setup you understand.
             </p>
 
-            <p className={cn("text-rich-black/90 text-base sm:text-lg")}>
+            <p className={cn("text-rich-black/90 text-sm sm:text-base")}>
               Every job includes clear explanations in plain English, and I can leave notes so you
               know what changed and how to handle things next time.
             </p>
@@ -135,19 +133,19 @@ export default function ServicesPage(): React.ReactElement {
             </h2>
 
             <div
-              className={cn("grid grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4")}
+              className={cn("grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4")}
             >
               {serviceAreas.map((area) => (
                 <div
                   key={area.label}
                   className={cn(
-                    "border-seasalt-400/60 bg-seasalt-800 rounded-lg border p-5 shadow-sm transition-all hover:shadow-md",
+                    "border-seasalt-400/60 bg-seasalt-800 rounded-lg border p-3 shadow-sm transition-all hover:shadow-md",
                   )}
                 >
-                  <div className={cn("mb-3 flex items-center gap-3")}>
+                  <div className={cn("mb-2 flex items-center gap-2")}>
                     <span
                       className={cn(
-                        "border-moonstone-500/40 bg-moonstone-600/20 grid size-12 shrink-0 place-items-center rounded-lg border",
+                        "border-moonstone-500/40 bg-moonstone-600/20 grid size-10 shrink-0 place-items-center rounded-lg border",
                       )}
                     >
                       <span className={cn("text-moonstone-600 text-2xl")} aria-hidden>
@@ -158,7 +156,7 @@ export default function ServicesPage(): React.ReactElement {
                       {area.label}
                     </h3>
                   </div>
-                  <ul className={cn("text-rich-black/80 space-y-1.5 text-sm sm:text-base")}>
+                  <ul className={cn("text-rich-black/80 space-y-1 text-sm sm:text-base")}>
                     {area.examples.map((example) => (
                       <li key={example} className={cn("flex gap-2")}>
                         <span className={cn("text-moonstone-600 mt-0.5")}>•</span>
@@ -170,7 +168,7 @@ export default function ServicesPage(): React.ReactElement {
               ))}
             </div>
 
-            <p className={cn("text-rich-black/90 mt-6 text-base sm:text-lg")}>
+            <p className={cn("text-rich-black/90 mt-6 text-sm sm:text-base")}>
               Not sure which category your problem fits? That's fine. Just describe what's happening
               and I'll figure out the best approach.
             </p>
@@ -185,11 +183,11 @@ export default function ServicesPage(): React.ReactElement {
                 For home users
               </h2>
 
-              <p className={cn("text-rich-black mb-3 text-base sm:text-lg")}>
+              <p className={cn("text-rich-black mb-3 text-sm sm:text-base")}>
                 Common home visits include:
               </p>
 
-              <ul className={cn("text-rich-black/90 space-y-2 text-base sm:text-lg")}>
+              <ul className={cn("text-rich-black/90 space-y-2 text-sm sm:text-base")}>
                 <li className={cn("flex gap-2")}>
                   <span className={cn("text-moonstone-600 mt-1")}>•</span>
                   <span>Setting up a new laptop, phone, or tablet with all your accounts</span>
@@ -225,11 +223,11 @@ export default function ServicesPage(): React.ReactElement {
                 For small businesses
               </h2>
 
-              <p className={cn("text-rich-black mb-3 text-base sm:text-lg")}>
+              <p className={cn("text-rich-black mb-3 text-sm sm:text-base")}>
                 Light IT support for sole traders and small teams:
               </p>
 
-              <ul className={cn("text-rich-black/90 space-y-2 text-base sm:text-lg")}>
+              <ul className={cn("text-rich-black/90 space-y-2 text-sm sm:text-base")}>
                 <li className={cn("flex gap-2")}>
                   <span className={cn("text-moonstone-600 mt-1")}>•</span>
                   <span>Setting up workstations, email, and shared files</span>
@@ -252,14 +250,14 @@ export default function ServicesPage(): React.ReactElement {
                 </li>
               </ul>
 
-              <p className={cn("text-rich-black/90 mt-3 text-base sm:text-lg")}>
+              <p className={cn("text-rich-black/90 mt-3 text-sm sm:text-base")}>
                 No ongoing contracts required. You call when you need help.
               </p>
             </section>
           </div>
 
           <section aria-label="Next steps" className={cn(CARD, "text-center animate-slide-up animate-fill-both animate-delay-400")}>
-            <p className={cn("text-rich-black mb-4 text-base sm:text-lg")}>Ready to get started?</p>
+            <p className={cn("text-rich-black mb-4 text-sm sm:text-base")}>Ready to get started?</p>
             <div className={cn("flex flex-wrap items-center justify-center gap-3")}>
               <Link
                 href="/pricing"

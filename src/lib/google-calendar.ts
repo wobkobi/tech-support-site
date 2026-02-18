@@ -6,18 +6,28 @@
 
 import { google } from "googleapis";
 
-const CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID || "primary";
+/**
+ * The calendar where new booking events are created.
+ * Set BOOKING_CALENDAR_ID in env (e.g. a dedicated "Tech Support" calendar).
+ * Falls back to "primary" if not set.
+ */
+function getBookingCalendarId(): string {
+  return process.env.BOOKING_CALENDAR_ID ?? "primary";
+}
 
-// ADD YOUR CALENDAR IDs HERE
-// Get these by going to Google Calendar settings for each calendar
-const CALENDAR_IDS = [
-  "harrison@tothepoint.co.nz", // default calendar
-  "c_5f9906cba6c528e022579b741aa70120f3c2b3c57846839cc8005f99b323157b@group.calendar.google.com", // booking calendar
-  "harrisonraynes8@gmail.com", // personal calendar
-  // "personal-calendar-id@gmail.com",
-  // "work-calendar-id@group.calendar.google.com",
-  // "shared-calendar-id@group.calendar.google.com",
-];
+/**
+ * All calendars checked when computing availability.
+ * Reads BOOKING_CALENDAR_ID, WORK_CALENDAR_ID, and PERSONAL_CALENDAR_ID from env.
+ * Duplicate/empty values are filtered out automatically.
+ */
+function getCalendarIds(): string[] {
+  const ids = [
+    process.env.BOOKING_CALENDAR_ID,
+    process.env.WORK_CALENDAR_ID,
+    process.env.PERSONAL_CALENDAR_ID,
+  ].filter((id): id is string => Boolean(id));
+  return ids.length > 0 ? ids : ["primary"];
+}
 
 /**
  * Gets OAuth2 client with credentials from environment variables
@@ -110,7 +120,7 @@ export async function createBookingEvent(params: {
   };
 
   const response = await calendar.events.insert({
-    calendarId: CALENDAR_ID,
+    calendarId: getBookingCalendarId(),
     requestBody: event,
     sendUpdates: "all", // Send email notifications to attendees
   });
@@ -132,7 +142,7 @@ export async function deleteBookingEvent(params: { eventId: string }): Promise<v
   const calendar = getCalendarClient();
 
   await calendar.events.delete({
-    calendarId: CALENDAR_ID,
+    calendarId: getBookingCalendarId(),
     eventId: params.eventId,
     sendUpdates: "all", // Notify attendees of cancellation
   });
@@ -150,12 +160,13 @@ export async function fetchAllCalendarEvents(
 ): Promise<CalendarEvent[]> {
   const calendar = getCalendarClient();
 
-  console.log(`[calendar] Checking ${CALENDAR_IDS.length} calendars...`);
+  const calendarIds = getCalendarIds();
+  console.log(`[calendar] Checking ${calendarIds.length} calendars...`);
 
   const allEvents: CalendarEvent[] = [];
 
   // Fetch events from each calendar ID
-  for (const calendarId of CALENDAR_IDS) {
+  for (const calendarId of calendarIds) {
     try {
       const response = await calendar.events.list({
         calendarId,
@@ -186,7 +197,7 @@ export async function fetchAllCalendarEvents(
   }
 
   console.log(
-    `[calendar] Total: ${allEvents.length} events across ${CALENDAR_IDS.length} calendars`,
+    `[calendar] Total: ${allEvents.length} events across ${calendarIds.length} calendars`,
   );
   return allEvents;
 }
