@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { sendOwnerReviewNotification } from "@/lib/email";
 
 /**
  * GET /api/reviews
@@ -113,6 +114,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         approved: verified, // Auto-approve verified reviews
       },
     });
+
+    // Notify the owner — fire-and-forget, never blocks the response
+    void sendOwnerReviewNotification(review);
 
     return NextResponse.json({ ok: true, id: review.id, verified }, { status: 201 });
   } catch (error) {

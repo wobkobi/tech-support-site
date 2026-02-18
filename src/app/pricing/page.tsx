@@ -9,8 +9,6 @@ import Link from "next/link";
 import { FrostedSection, PageShell, CARD, SOFT_CARD } from "@/components/PageLayout";
 import { cn } from "@/lib/cn";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 3600; // Cache for 1 hour - static content
 
 const linkStyle = cn(
   "text-coquelicot-500 hover:text-coquelicot-600 underline-offset-4 hover:underline",
@@ -29,12 +27,12 @@ export default function PricingPage(): React.ReactElement {
             <h1
               id="pricing-heading"
               className={cn(
-                "text-russian-violet mb-4 text-3xl font-extrabold sm:text-4xl md:text-5xl",
+                "text-russian-violet mb-4 text-2xl font-extrabold sm:text-3xl md:text-4xl",
               )}
             >
               Pricing
             </h1>
-            <p className={cn("text-rich-black mb-4 text-base sm:text-lg md:text-xl")}>
+            <p className={cn("text-rich-black mb-4 text-sm sm:text-base")}>
               Simple, transparent pricing. You'll always know the cost before work begins, and
               there's no pressure to buy anything you don't need.
             </p>
@@ -46,30 +44,30 @@ export default function PricingPage(): React.ReactElement {
             </h2>
 
             <div className={cn("bg-seasalt-900/40 border-seasalt-400/60 rounded-lg border p-5")}>
-              <p className={cn("text-russian-violet mb-2 text-4xl font-bold sm:text-5xl")}>
+              <p className={cn("text-russian-violet mb-2 text-3xl font-bold sm:text-4xl")}>
                 $50 per hour
               </p>
-              <p className={cn("text-rich-black/80 text-base sm:text-lg")}>
-                Billed in 15-minute increments. Both on-site visits and remote support.
+              <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
+                Billed in 15-minute increments. On-site visits and most remote support — remote rates may vary.
               </p>
             </div>
 
             <div className={cn("mt-5 space-y-3")}>
-              <p className={cn("text-rich-black/90 flex gap-3 text-base sm:text-lg")}>
+              <p className={cn("text-rich-black/90 flex gap-3 text-sm sm:text-base")}>
                 <span className={cn("text-moonstone-600 mt-1 text-lg")}>✓</span>
                 <span>
                   <strong>Quick calls and emails are free.</strong> If you have a simple question,
                   just reach out.
                 </span>
               </p>
-              <p className={cn("text-rich-black/90 flex gap-3 text-base sm:text-lg")}>
+              <p className={cn("text-rich-black/90 flex gap-3 text-sm sm:text-base")}>
                 <span className={cn("text-moonstone-600 mt-1 text-lg")}>✓</span>
                 <span>
                   <strong>Most jobs take 1 to 2 hours.</strong> I'll give you a time estimate before we
                   start.
                 </span>
               </p>
-              <p className={cn("text-rich-black/90 flex gap-3 text-base sm:text-lg")}>
+              <p className={cn("text-rich-black/90 flex gap-3 text-sm sm:text-base")}>
                 <span className={cn("text-moonstone-600 mt-1 text-lg")}>✓</span>
                 <span>
                   <strong>Bundle multiple issues into one visit</strong> to make the most of your
@@ -89,7 +87,7 @@ export default function PricingPage(): React.ReactElement {
                 <h3 className={cn("text-russian-violet mb-3 text-lg font-semibold sm:text-xl")}>
                   On-site visits
                 </h3>
-                <ul className={cn("text-rich-black space-y-2.5 text-base sm:text-lg")}>
+                <ul className={cn("text-rich-black space-y-2.5 text-sm sm:text-base")}>
                   <li className={cn("flex gap-3")}>
                     <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
                     <span>Same hourly rate applies</span>
@@ -112,10 +110,10 @@ export default function PricingPage(): React.ReactElement {
                 <h3 className={cn("text-russian-violet mb-3 text-lg font-semibold sm:text-xl")}>
                   Remote support
                 </h3>
-                <ul className={cn("text-rich-black space-y-2.5 text-base sm:text-lg")}>
+                <ul className={cn("text-rich-black space-y-2.5 text-sm sm:text-base")}>
                   <li className={cn("flex gap-3")}>
                     <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
-                    <span>Same hourly rate, often shorter sessions</span>
+                    <span>Same hourly rate in most cases — may vary depending on the job</span>
                   </li>
                   <li className={cn("flex gap-3")}>
                     <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
@@ -133,46 +131,7 @@ export default function PricingPage(): React.ReactElement {
             </div>
           </section>
 
-          <section aria-labelledby="estimate-heading" className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-300")}>
-            <h2
-              id="estimate-heading"
-              className={cn("text-russian-violet mb-3 text-xl font-bold sm:text-2xl")}
-            >
-              What you'll pay
-            </h2>
-
-            <p className={cn("text-rich-black mb-4 text-base sm:text-lg")}>
-              When you get in touch, I'll give you a rough time estimate so you know what to expect:
-            </p>
-
-            <ul className={cn("text-rich-black space-y-2.5 text-base sm:text-lg mb-4")}>
-              <li className={cn("flex gap-3")}>
-                <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
-                <span>Simple fixes: Often 15 to 30 minutes ($12.50 to $25)</span>
-              </li>
-              <li className={cn("flex gap-3")}>
-                <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
-                <span>Standard appointments: Usually 1 to 2 hours ($50 to $100)</span>
-              </li>
-              <li className={cn("flex gap-3")}>
-                <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
-                <span>Larger projects: Broken into stages with estimates for each part</span>
-              </li>
-            </ul>
-
-            <p className={cn("text-rich-black/80 mb-4 text-base sm:text-lg")}>
-              Time is rounded to the nearest 15 minutes. If a job takes 20 minutes, you pay for 30
-              minutes. If it takes 40 minutes, you pay for 45 minutes.
-            </p>
-
-            <p className={cn("text-rich-black/80 text-base sm:text-lg")}>
-              <strong>One-off questions are free.</strong> Need quick advice over the phone or a
-              simple email answer? No charge. For ongoing email support or troubleshooting
-              conversations, I'll let you know if it's getting into billable territory.
-            </p>
-          </section>
-
-          <section aria-labelledby="no-surprises-heading" className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-400")}>
+          <section aria-labelledby="no-surprises-heading" className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-300")}>
             <h2
               id="no-surprises-heading"
               className={cn("text-russian-violet mb-3 text-xl font-bold sm:text-2xl")}
@@ -180,7 +139,7 @@ export default function PricingPage(): React.ReactElement {
               No surprises
             </h2>
 
-            <ul className={cn("text-rich-black space-y-2.5 text-base sm:text-lg")}>
+            <ul className={cn("text-rich-black space-y-2.5 text-sm sm:text-base")}>
               <li className={cn("flex gap-3")}>
                 <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
                 <span>
@@ -210,7 +169,7 @@ export default function PricingPage(): React.ReactElement {
             </ul>
           </section>
 
-          <section aria-label="Next steps" className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-500")}>
+          <section aria-label="Next steps" className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-400")}>
             <p className={cn("text-rich-black text-sm sm:text-base")}>
               <Link href="/contact" className={linkStyle}>
                 Get in touch

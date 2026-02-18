@@ -41,6 +41,7 @@ export function PageShell({ children }: PageShellProps): React.ReactElement {
           fill
           priority
           sizes="100vw"
+          quality={1}
           className={cn("scale-110 transform-gpu object-cover blur-xl")}
         />
       </div>

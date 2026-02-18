@@ -10,8 +10,6 @@ import { cn } from "@/lib/cn";
 import { FaEnvelope, FaPhone, FaMapLocationDot } from "react-icons/fa6";
 import Link from "next/link";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 3600; // Cache for 1 hour - static content
 
 /**
  * Contact page component.
@@ -27,13 +25,13 @@ export default function ContactPage(): React.ReactElement {
             <h1
               id="contact-heading"
               className={cn(
-                "text-russian-violet mb-4 text-3xl font-extrabold sm:text-4xl md:text-5xl",
+                "text-russian-violet mb-4 text-2xl font-extrabold sm:text-3xl md:text-4xl",
               )}
             >
               Get in touch
             </h1>
 
-            <p className={cn("text-rich-black mx-auto mb-8 max-w-2xl text-base sm:text-lg md:text-xl")}>
+            <p className={cn("text-rich-black mx-auto mb-8 max-w-2xl text-sm sm:text-base")}>
               Have a tech problem or question? Call or email and I'll help you figure it out.
             </p>
 
@@ -70,10 +68,10 @@ export default function ContactPage(): React.ReactElement {
                 >
                   Service area
                 </h2>
-                <p className={cn("text-rich-black mb-3 text-base sm:text-lg")}>
+                <p className={cn("text-rich-black mb-3 text-sm sm:text-base")}>
                   Based in Point Chevalier, serving nearby suburbs including Western Springs, Mount Albert, Grey Lynn, Westmere, Kingsland, and surrounding areas.
                 </p>
-                <p className={cn("text-rich-black/80 text-base sm:text-lg")}>
+                <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
                   Remote support available for software and account issues. No travel needed.
                 </p>
               </div>
@@ -89,11 +87,11 @@ export default function ContactPage(): React.ReactElement {
               What to include when you contact me
             </h2>
 
-            <p className={cn("text-rich-black mb-4 text-base sm:text-lg")}>
+            <p className={cn("text-rich-black mb-4 text-sm sm:text-base")}>
               A few details help me give you a quick, accurate quote:
             </p>
 
-            <ul className={cn("text-rich-black space-y-2.5 text-base sm:text-lg")}>
+            <ul className={cn("text-rich-black space-y-2.5 text-sm sm:text-base")}>
               <li className={cn("flex gap-3")}>
                 <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
                 <span>What's happening or what you want to achieve</span>
@@ -112,14 +110,14 @@ export default function ContactPage(): React.ReactElement {
               </li>
             </ul>
 
-            <p className={cn("text-rich-black/80 mt-4 text-base sm:text-lg")}>
+            <p className={cn("text-rich-black/80 mt-4 text-sm sm:text-base")}>
               Feel free to include screenshots or photos if they help explain the issue.
             </p>
           </section>
 
           {/* CTA */}
           <section aria-label="Ready to get started" className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-300 text-center")}>
-            <p className={cn("text-rich-black mb-4 text-base sm:text-lg")}>
+            <p className={cn("text-rich-black mb-4 text-sm sm:text-base")}>
               Prefer to book directly?
             </p>
             <Link

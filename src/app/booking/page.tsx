@@ -62,6 +62,31 @@ async function getCalendarEvents(
   try {
     const liveEvents = await fetchAllCalendarEvents(now, maxDate);
     console.log(`[booking/page] Fetched ${liveEvents.length} live calendar events (cache was empty)`);
+
+    // Populate cache in background so the next request is fast
+    const cacheExpiry = new Date(now.getTime() + 15 * 60 * 1000);
+    void Promise.all(
+      liveEvents.map((e) =>
+        prisma.calendarEventCache.upsert({
+          where: { eventId_calendarEmail: { eventId: e.id, calendarEmail: e.calendarEmail } },
+          create: {
+            eventId: e.id,
+            calendarEmail: e.calendarEmail,
+            startUtc: new Date(e.start),
+            endUtc: new Date(e.end),
+            fetchedAt: now,
+            expiresAt: cacheExpiry,
+          },
+          update: {
+            startUtc: new Date(e.start),
+            endUtc: new Date(e.end),
+            fetchedAt: now,
+            expiresAt: cacheExpiry,
+          },
+        }),
+      ),
+    ).catch((err) => console.error("[booking/page] Failed to populate calendar cache:", err));
+
     return liveEvents.map((e) => ({
       id: e.id,
       start: e.start,
@@ -128,12 +153,12 @@ export default async function BookingPage(): Promise<React.ReactElement> {
           <section className={cn(CARD, "animate-fade-in")}>
             <h1
               className={cn(
-                "text-russian-violet mb-3 text-3xl font-extrabold sm:text-4xl md:text-5xl",
+                "text-russian-violet mb-3 text-2xl font-extrabold sm:text-3xl md:text-4xl",
               )}
             >
               Request an appointment
             </h1>
-            <p className={cn("text-rich-black text-base sm:text-lg md:text-xl")}>
+            <p className={cn("text-rich-black text-sm sm:text-base")}>
               Pick a time that works for you and tell me what you need help with. I'll confirm
               the details and send you a calendar invite.
             </p>

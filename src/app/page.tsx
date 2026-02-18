@@ -32,8 +32,7 @@ import {
 } from "react-icons/fa6";
 import type { IconType } from "react-icons";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 300; // Cache for 5 minutes - reviews don't change frequently
+export const revalidate = 300; // ISR — regenerate every 5 minutes
 
 interface SupportItem {
   label: string;
@@ -196,14 +195,14 @@ export default async function Home(): Promise<React.ReactElement> {
 
             <ul
               className={cn(
-                "mx-auto grid max-w-6xl grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:gap-5",
+                "mx-auto grid max-w-6xl grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4",
               )}
             >
               {supportItems.map(({ label, icon: Icon }) => (
                 <li
                   key={label}
                   className={cn(
-                    "border-seasalt-400/60 bg-seasalt-800 flex h-24 items-center gap-3 rounded-xl border px-4 shadow-sm transition-all hover:shadow-md sm:h-28",
+                    "border-seasalt-400/60 bg-seasalt-800 flex items-center gap-3 rounded-xl border p-3 shadow-sm transition-all hover:shadow-md",
                   )}
                 >
                   <span
@@ -211,11 +210,11 @@ export default async function Home(): Promise<React.ReactElement> {
                       "border-moonstone-500/40 bg-moonstone-600/20 grid size-12 shrink-0 place-items-center rounded-lg border sm:size-14",
                     )}
                   >
-                    <Icon className={cn("text-moonstone-600 h-6 w-6 sm:h-7 sm:w-7")} aria-hidden />
+                    <Icon className={cn("text-moonstone-600 h-7 w-7 sm:h-8 sm:w-8")} aria-hidden />
                   </span>
                   <span
                     className={cn(
-                      "text-rich-black line-clamp-2 text-left text-base font-semibold leading-tight sm:text-lg",
+                      "text-rich-black line-clamp-2 text-left text-sm font-semibold leading-tight sm:text-base",
                     )}
                   >
                     {label}

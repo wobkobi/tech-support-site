@@ -5,8 +5,8 @@
       "schedule": "0 0 * * *"
     },
     {
-      "path": "/api/cron/refresh-calendar-cache",
-      "schedule": "0 0 * * *"
+      "path": "/api/cron/send-review-emails",
+      "schedule": "0 8 * * *"
     }
   ]
 }
