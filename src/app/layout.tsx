@@ -14,8 +14,7 @@ import { NavBar } from "@/components/NavBar";
 
 const exo = Exo({
   subsets: ["latin"],
-  weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
-  style: ["normal", "italic"],
+  weight: ["400", "500", "600", "700", "800"],
   display: "swap",
   variable: "--font-geist-sans",
 });
