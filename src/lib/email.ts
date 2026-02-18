@@ -312,6 +312,6 @@ export async function sendCustomerReviewRequest(booking: ReviewRequestData): Pro
       html,
     });
   } catch (error) {
-    console.error(`[email] Failed to send review request to ${booking.email}:`, error);
+    console.error("[email] Failed to send review request to %s:", booking.email, error);
   }
 }
