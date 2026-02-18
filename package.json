@@ -61,7 +61,7 @@
     "prisma": "6.19.2",
     "qr-code-styling": "^1.9.2",
     "sharp": "^0.34.5",
-    "tailwindcss": "^4.1.18",
+    "tailwindcss": "^4.2.0",
     "to-valid-identifier": "^1.0.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
