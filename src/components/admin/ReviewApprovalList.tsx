@@ -126,10 +126,9 @@ function ReviewCard({
     setLoading("delete");
     setError(null);
     try {
-      const res = await fetch(
-        `/api/admin/reviews/${row.id}?token=${encodeURIComponent(token)}`,
-        { method: "DELETE" },
-      );
+      const res = await fetch(`/api/admin/reviews/${row.id}?token=${encodeURIComponent(token)}`, {
+        method: "DELETE",
+      });
       if (!res.ok) throw new Error("Request failed");
       onDelete();
     } catch {
@@ -149,7 +148,9 @@ function ReviewCard({
             Verified
           </span>
         )}
-        <span className="text-seasalt-300 ml-auto shrink-0 text-xs">{formatDate(row.createdAt)}</span>
+        <span className="text-seasalt-300 ml-auto shrink-0 text-xs">
+          {formatDate(row.createdAt)}
+        </span>
       </div>
 
       {/* Review text */}
@@ -252,9 +253,7 @@ function AddReviewForm({
     <div className={cn(SOFT_CARD)}>
       <button
         onClick={() => setOpen((v) => !v)}
-        className={cn(
-          "text-russian-violet w-full text-left text-sm font-semibold hover:underline",
-        )}
+        className={cn("text-russian-violet w-full text-left text-sm font-semibold hover:underline")}
       >
         {open ? "▲ Cancel" : "+ Add past client review"}
       </button>
@@ -336,6 +335,10 @@ function SendReviewLinkForm({ token }: { token: string }): React.ReactElement {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
+  /**
+   * Handles form submission to send a review link.
+   * @param e - Form submit event.
+   */
   async function handleSubmit(e: React.FormEvent): Promise<void> {
     e.preventDefault();
     setLoading(true);
@@ -362,7 +365,11 @@ function SendReviewLinkForm({ token }: { token: string }): React.ReactElement {
   return (
     <div className={cn(SOFT_CARD)}>
       <button
-        onClick={() => { setOpen((v) => !v); setSuccess(false); setError(null); }}
+        onClick={() => {
+          setOpen((v) => !v);
+          setSuccess(false);
+          setError(null);
+        }}
         className={cn("text-russian-violet w-full text-left text-sm font-semibold hover:underline")}
       >
         {open ? "▲ Cancel" : "+ Send review link to past client"}
@@ -394,7 +401,9 @@ function SendReviewLinkForm({ token }: { token: string }): React.ReactElement {
           </div>
 
           {error && <p className={cn("text-coquelicot-400 text-xs")}>{error}</p>}
-          {success && <p className={cn("text-moonstone-600 text-xs")}>Review link sent successfully.</p>}
+          {success && (
+            <p className={cn("text-moonstone-600 text-xs")}>Review link sent successfully.</p>
+          )}
 
           <button
             type="submit"
@@ -431,7 +440,6 @@ export function ReviewApprovalList({
   /**
    * Moves a review from pending to approved.
    * @param id - Review ID to approve.
-   * @returns Void.
    */
   function handleApprove(id: string): void {
     const row = pending.find((r) => r.id === id);
@@ -443,7 +451,6 @@ export function ReviewApprovalList({
   /**
    * Moves a review from approved back to pending.
    * @param id - Review ID to revoke.
-   * @returns Void.
    */
   function handleRevoke(id: string): void {
     const row = approved.find((r) => r.id === id);
@@ -455,7 +462,6 @@ export function ReviewApprovalList({
   /**
    * Removes a review from whichever list contains it.
    * @param id - Review ID to delete.
-   * @returns Void.
    */
   function handleDelete(id: string): void {
     setPending((prev) => prev.filter((r) => r.id !== id));
@@ -468,10 +474,7 @@ export function ReviewApprovalList({
       <SendReviewLinkForm token={token} />
 
       {/* Add past review */}
-      <AddReviewForm
-        token={token}
-        onAdded={(row) => setApproved((prev) => [row, ...prev])}
-      />
+      <AddReviewForm token={token} onAdded={(row) => setApproved((prev) => [row, ...prev])} />
 
       {/* Pending */}
       <section>

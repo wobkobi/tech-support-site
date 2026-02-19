@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "prepare": "husky",
     "postinstall": "prisma generate",
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
@@ -64,7 +65,10 @@
     "typescript": "^5.9.3"
   },
   "lint-staged": {
-    "*.{js,jsx,ts,tsx}": "eslint --cache --fix",
-    "*.{js,jsx,ts,tsx,css,html,json,md}": "prettier --write"
+    "*.{js,jsx,ts,tsx}": [
+      "prettier --write",
+      "eslint"
+    ],
+    "*.{css,html,json,md}": "prettier --write"
   }
 }

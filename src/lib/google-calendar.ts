@@ -10,6 +10,7 @@ import { google } from "googleapis";
  * The calendar where new booking events are created.
  * Set BOOKING_CALENDAR_ID in env (e.g. a dedicated "Tech Support" calendar).
  * Falls back to "primary" if not set.
+ * @returns Booking calendar ID string.
  */
 function getBookingCalendarId(): string {
   return process.env.BOOKING_CALENDAR_ID ?? "primary";
@@ -19,6 +20,7 @@ function getBookingCalendarId(): string {
  * All calendars checked when computing availability.
  * Reads BOOKING_CALENDAR_ID, WORK_CALENDAR_ID, and PERSONAL_CALENDAR_ID from env.
  * Duplicate/empty values are filtered out automatically.
+ * @returns Array of calendar ID strings to check for availability.
  */
 function getCalendarIds(): string[] {
   const ids = [

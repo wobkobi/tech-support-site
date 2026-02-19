@@ -17,6 +17,9 @@ export const revalidate = 300;
 /**
  * Formats a reviewer's display name.
  * @param r - Review fields.
+ * @param r.firstName - First name or null.
+ * @param r.lastName - Last name or null.
+ * @param r.isAnonymous - Whether the review is posted anonymously.
  * @returns Formatted name string.
  */
 function formatName(r: {
@@ -75,9 +78,7 @@ export default async function ReviewsPage(): Promise<React.ReactElement> {
           </section>
 
           {rows.length === 0 ? (
-            <section
-              className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}
-            >
+            <section className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}>
               <p className={cn("text-rich-black/70 text-base sm:text-lg")}>
                 No reviews yet — be the first!{" "}
                 <Link href="/booking" className={linkStyle}>
