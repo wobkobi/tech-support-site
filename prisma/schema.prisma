@@ -70,6 +70,15 @@ model Review {
   updatedAt DateTime @updatedAt
 }
 
+// Standalone review requests for past clients (email or SMS)
+model ReviewRequest {
+  id                String    @id @default(auto()) @map("_id") @db.ObjectId
+  name              String
+  reviewToken       String    @unique @default(uuid())
+  reviewSubmittedAt DateTime?
+  createdAt         DateTime  @default(now())
+}
+
 // Cached calendar events for fast booking page loads
 model CalendarEventCache {
   id String @id @default(auto()) @map("_id") @db.ObjectId

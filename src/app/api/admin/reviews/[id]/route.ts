@@ -28,7 +28,8 @@ function isValidToken(token: string | null | undefined): boolean {
  * PATCH /api/admin/reviews/[id]
  * Approves or revokes a review.
  * @param request - Incoming request with { action, token } body.
- * @param params - Route params containing the review id.
+ * @param params - Route segment params wrapper.
+ * @param params.params - Promise resolving to the route segment containing the review ID.
  * @returns JSON response.
  */
 export async function PATCH(
@@ -64,7 +65,8 @@ export async function PATCH(
  * DELETE /api/admin/reviews/[id]
  * Permanently deletes a review.
  * @param request - Incoming request with ?token= query param.
- * @param params - Route params containing the review id.
+ * @param params - Route segment params wrapper.
+ * @param params.params - Promise resolving to the route segment containing the review ID.
  * @returns JSON response.
  */
 export async function DELETE(

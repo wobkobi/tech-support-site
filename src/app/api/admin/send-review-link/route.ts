@@ -8,7 +8,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendCustomerReviewRequest } from "@/lib/email";
 import { timingSafeEqual } from "crypto";
-import { randomUUID } from "crypto";
 
 /**
  * Verifies the admin token using timing-safe comparison.
@@ -33,8 +32,13 @@ function verifyToken(provided: string): boolean {
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
-    const body = (await request.json()) as { token?: string; name?: string; email?: string };
-    const { token, name, email } = body;
+    const body = (await request.json()) as {
+      token?: string;
+      name?: string;
+      email?: string;
+      mode?: "email" | "sms";
+    };
+    const { token, name, email, mode = "email" } = body;
 
     if (!token || !verifyToken(token)) {
       return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
@@ -43,37 +47,27 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (!name?.trim()) {
       return NextResponse.json({ ok: false, error: "Name is required." }, { status: 400 });
     }
-    if (!email?.trim() || !email.includes("@")) {
+    if (mode === "email" && (!email?.trim() || !email.includes("@"))) {
       return NextResponse.json({ ok: false, error: "Valid email is required." }, { status: 400 });
     }
 
-    const reviewToken = randomUUID();
-    const now = new Date();
-    const endUtc = new Date(now.getTime() - 60 * 60 * 1000); // 1 hour ago
-    const startUtc = new Date(endUtc.getTime() - 60 * 60 * 1000); // 2 hours ago
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz";
 
-    // Create a minimal booking record to back the review token
-    const booking = await prisma.booking.create({
-      data: {
-        name: name.trim(),
-        email: email.trim().toLowerCase(),
-        notes: "Manual review request — past client",
-        startUtc,
-        endUtc,
-        status: "confirmed",
-        cancelToken: randomUUID(),
-        reviewToken,
-        reviewSentAt: now, // mark as sent so cron doesn't re-send
-        bufferBeforeMin: 0,
-        bufferAfterMin: 0,
-      },
+    const reviewRequest = await prisma.reviewRequest.create({
+      data: { name: name.trim() },
     });
 
+    const reviewUrl = `${siteUrl}/review?token=${reviewRequest.reviewToken}`;
+
+    if (mode === "sms") {
+      return NextResponse.json({ ok: true, reviewUrl });
+    }
+
     await sendCustomerReviewRequest({
-      id: booking.id,
+      id: reviewRequest.id,
       name: name.trim(),
-      email: email.trim().toLowerCase(),
-      reviewToken,
+      email: email!.trim().toLowerCase(),
+      reviewToken: reviewRequest.reviewToken,
     });
 
     return NextResponse.json({ ok: true });

@@ -199,9 +199,6 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
                     <p className={cn("text-rich-black text-base font-semibold")}>{opt.label}</p>
                     <p className={cn("text-rich-black/70 mt-1 text-sm")}>{opt.description}</p>
                   </div>
-                  {duration === opt.value && (
-                    <span className={cn("text-russian-violet text-xl")}>✓</span>
-                  )}
                 </div>
               </button>
             ))}
@@ -256,12 +253,10 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
                         <div className={cn("flex flex-col items-center")}>
                           <span>{day.dayLabel}</span>
                           {day.isToday && day.hasAnySlots && (
-                            <span className={cn("text-coquelicot-600 text-sm")}>(Today)</span>
+                            <span className={cn("text-coquelicot-600 text-xs")}>today</span>
                           )}
                           {!day.hasAnySlots && (
-                            <span className={cn("text-rich-black/50 text-sm")}>
-                              (Fully Booked)
-                            </span>
+                            <span className={cn("text-rich-black/50 text-sm")}>(Fully Booked)</span>
                           )}
                         </div>
                       </button>
@@ -299,9 +294,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
                         <div className={cn("flex flex-col items-center")}>
                           <span>{day.dayLabel}</span>
                           {!day.hasAnySlots && (
-                            <span className={cn("text-rich-black/50 text-sm")}>
-                              (Fully Booked)
-                            </span>
+                            <span className={cn("text-rich-black/50 text-sm")}>(Fully Booked)</span>
                           )}
                         </div>
                       </button>
@@ -323,9 +316,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
             {selectedDay.timeWindows.every((w) =>
               duration === "short" ? !w.availableShort : !w.availableLong,
             ) ? (
-              <div
-                className={cn("border-seasalt-400/60 bg-seasalt-900/30 rounded-lg border p-4")}
-              >
+              <div className={cn("border-seasalt-400/60 bg-seasalt-900/30 rounded-lg border p-4")}>
                 <p className={cn("text-rich-black/70 text-base")}>
                   Sorry, no {duration === "short" ? "1-hour" : "2-hour"} slots available on this
                   day.
@@ -374,10 +365,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
 
         <div className={cn("grid gap-4 sm:grid-cols-2")}>
           <div className={cn("flex flex-col gap-1.5")}>
-            <label
-              htmlFor="booking-name"
-              className={cn("text-rich-black text-base font-semibold")}
-            >
+            <label htmlFor="booking-name" className={cn("text-rich-black text-base font-semibold")}>
               Name <span className={cn("text-coquelicot-500")}>*</span>
             </label>
             <input
@@ -415,12 +403,8 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
         </div>
 
         <div className={cn("flex flex-col gap-1.5")}>
-          <label
-            htmlFor="booking-phone"
-            className={cn("text-rich-black text-base font-semibold")}
-          >
-            Phone{" "}
-            <span className={cn("text-rich-black/50 text-sm font-normal")}>(optional)</span>
+          <label htmlFor="booking-phone" className={cn("text-rich-black text-base font-semibold")}>
+            Phone <span className={cn("text-rich-black/50 text-sm font-normal")}>(optional)</span>
           </label>
           <input
             id="booking-phone"
@@ -479,7 +463,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
           )}
         >
           <div className={cn("overflow-hidden")}>
-            <div className={cn("pt-0.5 pb-0.5")}>
+            <div className={cn("pb-0.5 pt-0.5")}>
               <label
                 htmlFor="booking-address"
                 className={cn("text-rich-black mb-2 block text-base font-semibold")}
@@ -508,10 +492,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
         </legend>
 
         <div className={cn("flex flex-col gap-1.5")}>
-          <label
-            htmlFor="booking-notes"
-            className={cn("text-rich-black text-base font-semibold")}
-          >
+          <label htmlFor="booking-notes" className={cn("text-rich-black text-base font-semibold")}>
             What do you need help with? <span className={cn("text-coquelicot-500")}>*</span>
           </label>
           <textarea
@@ -541,7 +522,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
           disabled={submitting || availableDays.length === 0}
           className={cn(
             "bg-russian-violet text-seasalt rounded-lg px-7 py-3.5 text-base font-semibold shadow-lg",
-            "hover:brightness-110 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60 transition-all",
+            "transition-all hover:shadow-xl hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60",
           )}
         >
           {submitting ? "Sending..." : "Submit request"}

@@ -50,6 +50,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       lastName?: string;
       isAnonymous?: boolean;
       bookingId?: string;
+      reviewRequestId?: string;
       reviewToken?: string;
     };
 
@@ -81,23 +82,32 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     let verified = false;
     let bookingId = null;
 
-    // Check if this is a verified review from a booking
+    // Verify against a real booking
     if (body.bookingId && body.reviewToken) {
       const booking = await prisma.booking.findFirst({
-        where: {
-          id: body.bookingId,
-          reviewToken: body.reviewToken,
-        },
+        where: { id: body.bookingId, reviewToken: body.reviewToken },
       });
 
       if (booking) {
-        // Valid token - mark as verified
         verified = true;
         bookingId = booking.id;
-
-        // Mark booking as reviewed
         await prisma.booking.update({
           where: { id: booking.id },
+          data: { reviewSubmittedAt: new Date() },
+        });
+      }
+    }
+
+    // Verify against a manual review request
+    if (!verified && body.reviewRequestId && body.reviewToken) {
+      const reviewRequest = await prisma.reviewRequest.findFirst({
+        where: { id: body.reviewRequestId, reviewToken: body.reviewToken },
+      });
+
+      if (reviewRequest) {
+        verified = true;
+        await prisma.reviewRequest.update({
+          where: { id: reviewRequest.id },
           data: { reviewSubmittedAt: new Date() },
         });
       }
