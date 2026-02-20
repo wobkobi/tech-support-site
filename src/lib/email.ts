@@ -46,9 +46,7 @@ export interface ReviewNotificationData {
  * @param review - The newly submitted review.
  * @returns Promise that resolves when the email is sent (or silently fails).
  */
-export async function sendOwnerReviewNotification(
-  review: ReviewNotificationData,
-): Promise<void> {
+export async function sendOwnerReviewNotification(review: ReviewNotificationData): Promise<void> {
   const adminSecret = process.env.ADMIN_SECRET;
   const adminEmail = process.env.ADMIN_EMAIL;
   const from = process.env.SMTP_FROM;
@@ -95,6 +93,7 @@ export async function sendOwnerReviewNotification(
     const transporter = createTransporter();
     await transporter.sendMail({
       from,
+      replyTo: adminEmail,
       to: adminEmail,
       subject: `New review — ${displayName} (${review.verified ? "verified" : "pending"})`,
       html,
@@ -185,6 +184,7 @@ export async function sendOwnerBookingNotification(
     const transporter = createTransporter();
     await transporter.sendMail({
       from,
+      replyTo: adminEmail,
       to: adminEmail,
       subject: `New booking — ${booking.name} (${start})`,
       html,
@@ -247,6 +247,7 @@ export async function sendCustomerBookingConfirmation(
     const transporter = createTransporter();
     await transporter.sendMail({
       from,
+      replyTo: process.env.ADMIN_EMAIL,
       to: booking.email,
       subject: `Booking confirmed — ${start}`,
       html,
@@ -294,11 +295,12 @@ export async function sendCustomerReviewRequest(booking: ReviewRequestData): Pro
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="font-family:system-ui,sans-serif;background:#f6f7f8;margin:0;padding:24px">
   <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
-    <h2 style="margin:0 0 16px;color:#0c0a3e;font-size:20px">How did we do, ${firstName}?</h2>
-    <p style="margin:0 0 12px;color:#444;line-height:1.6">Thanks for choosing To The Point Tech! I hope I was able to sort out your tech issue.</p>
-    <p style="margin:0 0 24px;color:#444;line-height:1.6">If you have a moment, I'd really appreciate your feedback — it helps other locals find reliable tech support.</p>
-    <a href="${reviewUrl}" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:600;font-size:14px">Leave a review →</a>
-    <p style="margin:24px 0 0;color:#888;font-size:13px">Thanks,<br>Harrison — To The Point Tech</p>
+    <h2 style="margin:0 0 12px;color:#0c0a3e;font-size:20px">Hi ${firstName}, how did everything go?</h2>
+    <p style="margin:0 0 12px;color:#444;line-height:1.6">It was great meeting you — I hope I managed to get everything sorted and left you feeling a bit less frustrated with technology!</p>
+    <p style="margin:0 0 12px;color:#444;line-height:1.6">If you have a spare moment, I'd love to hear how your experience was. A quick review makes a real difference for a small local business like mine, and helps other people in the area find reliable tech support when they need it.</p>
+    <p style="margin:0 0 24px;color:#444;line-height:1.6">It only takes a minute — and honest feedback is always welcome.</p>
+    <a href="${reviewUrl}" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:15px">Share your experience →</a>
+    <p style="margin:28px 0 0;color:#888;font-size:13px;line-height:1.6">Thanks again for choosing To The Point Tech. If you ever need a hand with anything else, don't hesitate to get in touch.<br><br>Cheers,<br><strong style="color:#555">Harrison</strong><br>To The Point Tech &mdash; <a href="${siteUrl}" style="color:#43bccd;text-decoration:none">tothepoint.co.nz</a></p>
   </div>
 </body>
 </html>`;
@@ -307,8 +309,9 @@ export async function sendCustomerReviewRequest(booking: ReviewRequestData): Pro
     const transporter = createTransporter();
     await transporter.sendMail({
       from,
+      replyTo: process.env.ADMIN_EMAIL,
       to: booking.email,
-      subject: "How was your tech support appointment?",
+      subject: `Thanks for having me, ${firstName} — how did everything go?`,
       html,
     });
   } catch (error) {

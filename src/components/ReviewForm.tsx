@@ -13,20 +13,23 @@ import { useRouter } from "next/navigation";
 
 interface ReviewFormProtectedProps {
   bookingId?: string;
+  reviewRequestId?: string;
   token?: string;
   prefillName?: string;
 }
 
 /**
- * Protected review form with optional booking verification
+ * Protected review form with optional booking or review-request verification
  * @param props - Component props
- * @param props.bookingId - Optional booking ID for verified reviews
- * @param props.token - Optional review token for verification
+ * @param props.bookingId - Booking ID for verified reviews from real bookings
+ * @param props.reviewRequestId - ReviewRequest ID for verified reviews from manual requests
+ * @param props.token - Review token for verification
  * @param props.prefillName - Pre-fill customer name
  * @returns Review form element
  */
 export default function ReviewFormProtected({
   bookingId,
+  reviewRequestId,
   token,
   prefillName,
 }: ReviewFormProtectedProps): React.ReactElement {
@@ -36,7 +39,7 @@ export default function ReviewFormProtected({
   const anonId = useId();
   const textId = useId();
 
-  const isVerified = !!(bookingId && token);
+  const isVerified = !!((bookingId || reviewRequestId) && token);
   const nameParts = prefillName?.split(" ") || [];
   const defaultFirst = nameParts[0] || "";
   const defaultLast = nameParts.slice(1).join(" ") || "";
@@ -94,8 +97,8 @@ export default function ReviewFormProtected({
           firstName: isAnonymous ? null : f,
           lastName: isAnonymous ? null : l,
           isAnonymous,
-          // Include booking info if verified review
           bookingId: isVerified ? bookingId : undefined,
+          reviewRequestId: isVerified ? reviewRequestId : undefined,
           reviewToken: isVerified ? token : undefined,
         }),
       });
@@ -245,7 +248,7 @@ export default function ReviewFormProtected({
           placeholder={`Share your experience (at least ${textMin} characters)...`}
           className={cn(
             "border-seasalt-400/60 bg-seasalt text-rich-black focus:ring-moonstone-500/50",
-            "mt-1 min-h-35 w-full rounded-md border px-3 py-2 outline-none focus:ring-2",
+            "min-h-35 mt-1 w-full rounded-md border px-3 py-2 outline-none focus:ring-2",
           )}
           value={text}
           onChange={(e) => setText(e.target.value)}

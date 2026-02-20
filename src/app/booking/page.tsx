@@ -16,12 +16,7 @@ import { prisma } from "@/lib/prisma";
 import { fetchAllCalendarEvents } from "@/lib/google-calendar";
 import BookingForm from "@/components/BookingForm";
 import { FrostedSection, PageShell, CARD, SOFT_CARD } from "@/components/PageLayout";
-import {
-  FaCalendarCheck,
-  FaClock,
-  FaEnvelopeOpenText,
-  FaListCheck,
-} from "react-icons/fa6";
+import { FaCalendarCheck, FaClock, FaEnvelopeOpenText, FaListCheck } from "react-icons/fa6";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 60; // Cache for 60 seconds to reduce API load
@@ -61,7 +56,9 @@ async function getCalendarEvents(
   // Cache empty — fetch directly from Google Calendar
   try {
     const liveEvents = await fetchAllCalendarEvents(now, maxDate);
-    console.log(`[booking/page] Fetched ${liveEvents.length} live calendar events (cache was empty)`);
+    console.log(
+      `[booking/page] Fetched ${liveEvents.length} live calendar events (cache was empty)`,
+    );
 
     // Populate cache in background so the next request is fast
     const cacheExpiry = new Date(now.getTime() + 15 * 60 * 1000);
@@ -106,20 +103,23 @@ async function getAvailableDays(): Promise<BookableDay[]> {
   const now = new Date();
   const maxDate = new Date(now.getTime() + BOOKING_CONFIG.maxAdvanceDays * 24 * 60 * 60 * 1000);
 
-  // Get existing bookings from database
-  const existingBookings = await prisma.booking.findMany({
-    where: {
-      status: { in: ["held", "confirmed"] },
-      endUtc: { gte: now },
-    },
-    select: {
-      id: true,
-      startUtc: true,
-      endUtc: true,
-      bufferBeforeMin: true,
-      bufferAfterMin: true,
-    },
-  });
+  // Run both DB queries in parallel
+  const [existingBookings, calendarEvents] = await Promise.all([
+    prisma.booking.findMany({
+      where: {
+        status: { in: ["held", "confirmed"] },
+        endUtc: { gte: now },
+      },
+      select: {
+        id: true,
+        startUtc: true,
+        endUtc: true,
+        bufferBeforeMin: true,
+        bufferAfterMin: true,
+      },
+    }),
+    getCalendarEvents(now, maxDate),
+  ]);
 
   const existingForSlots: ExistingBooking[] = existingBookings.map((b) => ({
     id: b.id,
@@ -128,8 +128,6 @@ async function getAvailableDays(): Promise<BookableDay[]> {
     bufferBeforeMin: b.bufferBeforeMin,
     bufferAfterMin: b.bufferAfterMin,
   }));
-
-  const calendarEvents = await getCalendarEvents(now, maxDate);
 
   return buildAvailableDays(existingForSlots, calendarEvents, now, BOOKING_CONFIG);
 }
@@ -159,29 +157,22 @@ export default async function BookingPage(): Promise<React.ReactElement> {
               Request an appointment
             </h1>
             <p className={cn("text-rich-black text-sm sm:text-base")}>
-              Pick a time that works for you and tell me what you need help with. I'll confirm
-              the details and send you a calendar invite.
+              Pick a time that works for you and tell me what you need help with. I'll confirm the
+              details and send you a calendar invite.
             </p>
           </section>
 
           {/* Two-column: Form + Sidebar */}
           <div className={cn("grid gap-6 sm:gap-8 lg:grid-cols-[1fr_20rem]")}>
             {/* Form Card */}
-            <section
-              className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}
-            >
+            <section className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}>
               <BookingForm availableDays={availableDays} />
             </section>
 
             {/* Sidebar */}
             <aside className={cn("flex flex-col gap-6 sm:gap-8 lg:sticky lg:top-24 lg:self-start")}>
               {/* How it works */}
-              <div
-                className={cn(
-                  CARD,
-                  "animate-slide-up animate-fill-both animate-delay-200",
-                )}
-              >
+              <div className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-200")}>
                 <h2 className={cn("text-russian-violet mb-4 text-xl font-bold sm:text-2xl")}>
                   How it works
                 </h2>
@@ -209,13 +200,18 @@ export default async function BookingPage(): Promise<React.ReactElement> {
                       <FaListCheck className={cn("text-moonstone-600 text-base")} aria-hidden />
                     </span>
                     <div>
-                      <p className={cn("text-rich-black text-base font-semibold")}>Describe the issue</p>
+                      <p className={cn("text-rich-black text-base font-semibold")}>
+                        Describe the issue
+                      </p>
                       <p className={cn("text-rich-black/70 text-sm")}>What you need help with</p>
                     </div>
                   </li>
                   <li className={cn("flex gap-3")}>
                     <span className={STEP_ICON}>
-                      <FaEnvelopeOpenText className={cn("text-moonstone-600 text-base")} aria-hidden />
+                      <FaEnvelopeOpenText
+                        className={cn("text-moonstone-600 text-base")}
+                        aria-hidden
+                      />
                     </span>
                     <div>
                       <p className={cn("text-rich-black text-base font-semibold")}>Get confirmed</p>
@@ -227,15 +223,12 @@ export default async function BookingPage(): Promise<React.ReactElement> {
 
               {/* Info card */}
               <div
-                className={cn(
-                  SOFT_CARD,
-                  "animate-slide-up animate-fill-both animate-delay-300",
-                )}
+                className={cn(SOFT_CARD, "animate-slide-up animate-fill-both animate-delay-300")}
               >
                 <p className={cn("text-rich-black/80 text-base leading-relaxed")}>
                   <strong>Timing is flexible.</strong> Most appointments are 1 hour. Choose 2 hours
-                  if you have multiple issues or need more time. Actual time may be shorter or longer
-                  as needed.
+                  if you have multiple issues or need more time. Actual time may be shorter or
+                  longer as needed.
                 </p>
               </div>
             </aside>

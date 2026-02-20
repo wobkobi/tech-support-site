@@ -29,26 +29,38 @@ export default async function ReviewPage({
   const tokenValue = params.token;
   const token = Array.isArray(tokenValue) ? tokenValue[0] : tokenValue;
 
-  let booking = null;
+  let sourceId: string | null = null;
+  let sourceType: "booking" | "reviewRequest" | null = null;
+  let prefillName: string | null = null;
   let tokenValid = false;
   let alreadyReviewed = false;
 
-  // If token provided, validate it
+  // If token provided, validate against both Booking and ReviewRequest tables
   if (token) {
-    booking = await prisma.booking.findFirst({
+    const booking = await prisma.booking.findFirst({
       where: { reviewToken: token },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        reviewSubmittedAt: true,
-        status: true,
-      },
+      select: { id: true, name: true, reviewSubmittedAt: true },
     });
 
     if (booking) {
+      sourceId = booking.id;
+      sourceType = "booking";
+      prefillName = booking.name;
       tokenValid = true;
       alreadyReviewed = !!booking.reviewSubmittedAt;
+    } else {
+      const reviewRequest = await prisma.reviewRequest.findFirst({
+        where: { reviewToken: token },
+        select: { id: true, name: true, reviewSubmittedAt: true },
+      });
+
+      if (reviewRequest) {
+        sourceId = reviewRequest.id;
+        sourceType = "reviewRequest";
+        prefillName = reviewRequest.name;
+        tokenValid = true;
+        alreadyReviewed = !!reviewRequest.reviewSubmittedAt;
+      }
     }
   }
 
@@ -117,16 +129,17 @@ export default async function ReviewPage({
                   How was your appointment?
                 </h1>
                 <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
-                  Hi {booking!.name}! Thanks for choosing To The Point Tech. I'd love to hear about
+                  Hi {prefillName}! Thanks for choosing To The Point Tech. I'd love to hear about
                   your experience.
                 </p>
               </section>
 
               <section className={cn(CARD)}>
                 <ReviewFormProtected
-                  bookingId={booking!.id}
+                  bookingId={sourceType === "booking" ? sourceId! : undefined}
+                  reviewRequestId={sourceType === "reviewRequest" ? sourceId! : undefined}
                   token={token!}
-                  prefillName={booking!.name}
+                  prefillName={prefillName!}
                 />
               </section>
             </>

@@ -159,12 +159,11 @@ export function buildAvailableDays(
     date.setDate(date.getDate() + i);
 
     const dayOfWeek = date.getDay();
-    if (dayOfWeek === 0) continue; // Skip Sundays
 
     const dateKey = date.toISOString().split("T")[0];
     const isToday = i === 0;
     const isTomorrow = i === 1;
-    const isWeekend = dayOfWeek === 6;
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
     // Format labels
     const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
