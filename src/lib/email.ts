@@ -1,25 +1,17 @@
 // src/lib/email.ts
 /**
  * @file email.ts
- * @description Shared nodemailer utility for sending transactional emails.
+ * @description Shared Resend utility for sending transactional emails.
  */
 
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 
 /**
- * Creates a nodemailer transporter from SMTP_* environment variables.
- * @returns Nodemailer transporter instance.
+ * Creates a Resend client from the RESEND_API_KEY environment variable.
+ * @returns Resend client instance.
  */
-function createTransporter(): nodemailer.Transporter {
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT ?? 587),
-    secure: Number(process.env.SMTP_PORT ?? 587) === 465,
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-  });
+function createResend(): Resend {
+  return new Resend(process.env.RESEND_API_KEY);
 }
 
 /**
@@ -49,11 +41,11 @@ export interface ReviewNotificationData {
 export async function sendOwnerReviewNotification(review: ReviewNotificationData): Promise<void> {
   const adminSecret = process.env.ADMIN_SECRET;
   const adminEmail = process.env.ADMIN_EMAIL;
-  const from = process.env.SMTP_FROM;
+  const from = process.env.EMAIL_FROM;
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz";
 
-  if (!adminEmail || !from || !process.env.SMTP_HOST) {
-    console.warn("[email] SMTP not configured — skipping owner notification.");
+  if (!adminEmail || !from || !process.env.RESEND_API_KEY) {
+    console.warn("[email] Resend not configured — skipping owner notification.");
     return;
   }
 
@@ -90,8 +82,8 @@ export async function sendOwnerReviewNotification(review: ReviewNotificationData
 </html>`;
 
   try {
-    const transporter = createTransporter();
-    await transporter.sendMail({
+    const resend = createResend();
+    await resend.emails.send({
       from,
       replyTo: adminEmail,
       to: adminEmail,
@@ -151,10 +143,10 @@ export async function sendOwnerBookingNotification(
   booking: BookingNotificationData,
 ): Promise<void> {
   const adminEmail = process.env.ADMIN_EMAIL;
-  const from = process.env.SMTP_FROM;
+  const from = process.env.EMAIL_FROM;
 
-  if (!adminEmail || !from || !process.env.SMTP_HOST) {
-    console.warn("[email] SMTP not configured — skipping owner booking notification.");
+  if (!adminEmail || !from || !process.env.RESEND_API_KEY) {
+    console.warn("[email] Resend not configured — skipping owner booking notification.");
     return;
   }
 
@@ -181,8 +173,8 @@ export async function sendOwnerBookingNotification(
 </html>`;
 
   try {
-    const transporter = createTransporter();
-    await transporter.sendMail({
+    const resend = createResend();
+    await resend.emails.send({
       from,
       replyTo: adminEmail,
       to: adminEmail,
@@ -203,11 +195,11 @@ export async function sendOwnerBookingNotification(
 export async function sendCustomerBookingConfirmation(
   booking: BookingNotificationData,
 ): Promise<void> {
-  const from = process.env.SMTP_FROM;
+  const from = process.env.EMAIL_FROM;
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz";
 
-  if (!from || !process.env.SMTP_HOST) {
-    console.warn("[email] SMTP not configured — skipping customer booking confirmation.");
+  if (!from || !process.env.RESEND_API_KEY) {
+    console.warn("[email] Resend not configured — skipping customer booking confirmation.");
     return;
   }
 
@@ -238,14 +230,24 @@ export async function sendCustomerBookingConfirmation(
 
     <a href="${cancelUrl}" style="display:inline-block;background:#e8e8e8;color:#333;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600">Cancel appointment</a>
 
-    <p style="margin:24px 0 0;color:#888;font-size:13px">See you soon,<br>Harrison — To The Point Tech<br><a href="https://tothepoint.co.nz" style="color:#43bccd">tothepoint.co.nz</a></p>
+    <div style="margin:32px 0 0;padding-top:24px;border-top:1px solid #e8e8e8">
+      <a href="${siteUrl}" style="display:inline-block;margin-bottom:12px">
+        <img src="${siteUrl}/assets/email-signature-400x135.png" alt="To The Point Tech" width="200" style="display:block;border:0;height:auto" />
+      </a>
+      <p style="margin:0 0 2px;font-size:14px;font-weight:600;color:#0c0a3e">Harrison Raynes</p>
+      <p style="margin:0 0 10px;font-size:13px;color:#666">Owner &amp; Technician</p>
+      <p style="margin:0 0 4px;font-size:13px;color:#555">📞 <a href="tel:+6421297237" style="color:#555;text-decoration:none">021 297 1237</a></p>
+      <p style="margin:0 0 4px;font-size:13px;color:#555">✉️ <a href="mailto:harrison@tothepoint.co.nz" style="color:#43bccd;text-decoration:none">harrison@tothepoint.co.nz</a></p>
+      <p style="margin:0 0 4px;font-size:13px;color:#555">🌐 <a href="${siteUrl}" style="color:#43bccd;text-decoration:none">tothepoint.co.nz</a></p>
+      <p style="margin:0;font-size:12px;color:#999">Auckland, New Zealand</p>
+    </div>
   </div>
 </body>
 </html>`;
 
   try {
-    const transporter = createTransporter();
-    await transporter.sendMail({
+    const resend = createResend();
+    await resend.emails.send({
       from,
       replyTo: process.env.ADMIN_EMAIL,
       to: booking.email,
@@ -261,7 +263,7 @@ export async function sendCustomerBookingConfirmation(
  * Booking data used for customer review request emails.
  */
 export interface ReviewRequestData {
-  /** Booking ID */
+  /** Booking ID or ReviewRequest ID */
   id: string;
   /** Customer name */
   name: string;
@@ -278,11 +280,11 @@ export interface ReviewRequestData {
  * @returns Promise that resolves when the email is sent (or silently fails).
  */
 export async function sendCustomerReviewRequest(booking: ReviewRequestData): Promise<void> {
-  const from = process.env.SMTP_FROM;
+  const from = process.env.EMAIL_FROM;
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz";
 
-  if (!from || !process.env.SMTP_HOST) {
-    console.warn("[email] SMTP not configured — skipping customer review request.");
+  if (!from || !process.env.RESEND_API_KEY) {
+    console.warn("[email] Resend not configured — skipping customer review request.");
     return;
   }
 
@@ -300,14 +302,27 @@ export async function sendCustomerReviewRequest(booking: ReviewRequestData): Pro
     <p style="margin:0 0 12px;color:#444;line-height:1.6">If you have a spare moment, I'd love to hear how your experience was. A quick review makes a real difference for a small local business like mine, and helps other people in the area find reliable tech support when they need it.</p>
     <p style="margin:0 0 24px;color:#444;line-height:1.6">It only takes a minute — and honest feedback is always welcome.</p>
     <a href="${reviewUrl}" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:15px">Share your experience →</a>
-    <p style="margin:28px 0 0;color:#888;font-size:13px;line-height:1.6">Thanks again for choosing To The Point Tech. If you ever need a hand with anything else, don't hesitate to get in touch.<br><br>Cheers,<br><strong style="color:#555">Harrison</strong><br>To The Point Tech &mdash; <a href="${siteUrl}" style="color:#43bccd;text-decoration:none">tothepoint.co.nz</a></p>
+
+    <p style="margin:28px 0 20px;color:#444;font-size:14px;line-height:1.6">Thanks again for choosing To The Point Tech. If you ever need a hand with anything else, don't hesitate to get in touch.</p>
+
+    <div style="padding-top:20px;border-top:1px solid #e8e8e8">
+      <a href="${siteUrl}" style="display:inline-block;margin-bottom:12px">
+        <img src="${siteUrl}/assets/email-signature-400x135.png" alt="To The Point Tech" width="200" style="display:block;border:0;height:auto" />
+      </a>
+      <p style="margin:0 0 2px;font-size:14px;font-weight:600;color:#0c0a3e">Harrison Raynes</p>
+      <p style="margin:0 0 10px;font-size:13px;color:#666">Owner &amp; Technician</p>
+      <p style="margin:0 0 4px;font-size:13px;color:#555">📞 <a href="tel:+6421297237" style="color:#555;text-decoration:none">021 297 1237</a></p>
+      <p style="margin:0 0 4px;font-size:13px;color:#555">✉️ <a href="mailto:harrison@tothepoint.co.nz" style="color:#43bccd;text-decoration:none">harrison@tothepoint.co.nz</a></p>
+      <p style="margin:0 0 4px;font-size:13px;color:#555">🌐 <a href="https://tothepoint.co.nz" style="color:#43bccd;text-decoration:none">tothepoint.co.nz</a></p>
+      <p style="margin:0;font-size:12px;color:#999">Auckland, New Zealand</p>
+    </div>
   </div>
 </body>
 </html>`;
 
   try {
-    const transporter = createTransporter();
-    await transporter.sendMail({
+    const resend = createResend();
+    await resend.emails.send({
       from,
       replyTo: process.env.ADMIN_EMAIL,
       to: booking.email,
