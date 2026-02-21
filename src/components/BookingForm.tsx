@@ -32,7 +32,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
   const router = useRouter();
 
   // Form state
-  const [duration, setDuration] = useState<JobDuration>("long"); // Default to 2hr
+  const [duration, setDuration] = useState<JobDuration>("short"); // Default to 1hr
   const [selectedDay, setSelectedDay] = useState<BookableDay | null>(null);
   const [selectedTime, setSelectedTime] = useState<TimeOfDay | null>(null);
   const [name, setName] = useState("");
