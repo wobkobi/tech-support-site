@@ -1,3 +1,11 @@
+// src/lib/useOnVisible.ts
+/**
+ * @file useOnVisible.ts
+ * @description React hook that tracks whether a DOM element is visible in the
+ * viewport (via IntersectionObserver) or has received focus, triggering a
+ * one-time visibility flag used to defer expensive resource loading.
+ */
+
 import { useEffect, useState } from "react";
 
 /**
