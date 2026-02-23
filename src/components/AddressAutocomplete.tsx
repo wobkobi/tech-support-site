@@ -8,6 +8,7 @@
 
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
+import useOnVisible from "@/lib/useOnVisible";
 import { cn } from "@/lib/cn";
 
 /**
@@ -48,22 +49,25 @@ export default function AddressAutocomplete({
   required = false,
   id = "address-autocomplete",
 }: AddressAutocompleteProps): React.ReactElement {
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [scriptError, setScriptError] = useState(false);
   const [apiKeyMissing, setApiKeyMissing] = useState(false);
 
-  // Load Google Maps script
+  // Only load the Maps script when this component becomes visible or receives focus
+  const isVisible = useOnVisible(wrapperRef);
+
+  // Load Google Maps script when visible
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (!isVisible) return;
 
     /**
-     * Checks if Google Maps is loaded
-     * @returns True if loaded
+     * Returns true if the Google Maps Places API is already loaded.
+     * @returns Whether the Places API is available on window.google.
      */
-    const checkLoaded = (): boolean => {
-      return Boolean(window.google?.maps?.places);
-    };
+    const checkLoaded = (): boolean => Boolean(window.google?.maps?.places);
 
     if (checkLoaded()) {
       const timer = setTimeout(() => setIsLoaded(true), 0);
@@ -84,23 +88,21 @@ export default function AddressAutocomplete({
 
     if (existingScript) {
       /**
-       * Handler for existing script load event
+       * Marks the component as loaded when the existing script fires its load event.
+       * @returns void
        */
-      const handleExistingLoad = (): void => {
-        setIsLoaded(true);
-      };
+      const handleExistingLoad = (): void => setIsLoaded(true);
       existingScript.addEventListener("load", handleExistingLoad);
       return () => existingScript.removeEventListener("load", handleExistingLoad);
     }
 
-    // Create script element
     const script = document.createElement("script");
     script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
     script.async = true;
     script.defer = true;
 
     /**
-     * Handler for successful script load
+     * Marks the component as loaded once the Maps script has finished loading.
      */
     const handleLoad = (): void => {
       console.log("✅ Google Maps loaded successfully");
@@ -108,7 +110,7 @@ export default function AddressAutocomplete({
     };
 
     /**
-     * Handler for script load error
+     * Logs a detailed error and marks the component in a failed-load state.
      */
     const handleError = (): void => {
       console.error(
@@ -131,9 +133,8 @@ export default function AddressAutocomplete({
     return () => {
       script.removeEventListener("load", handleLoad);
       script.removeEventListener("error", handleError);
-      // Don't remove script on cleanup - it can be reused
     };
-  }, []);
+  }, [isVisible]);
 
   // Initialize autocomplete when Maps API is loaded
   useEffect(() => {
@@ -180,7 +181,7 @@ export default function AddressAutocomplete({
   const showWarning = apiKeyMissing || scriptError;
 
   return (
-    <div className={cn("flex flex-col gap-1")}>
+    <div ref={wrapperRef} className={cn("flex flex-col gap-1")}>
       <input
         ref={inputRef}
         type="text"
