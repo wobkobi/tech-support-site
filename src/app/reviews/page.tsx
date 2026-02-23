@@ -11,7 +11,7 @@ import { cn } from "@/lib/cn";
 import { prisma } from "@/lib/prisma";
 import { FaCircleCheck } from "react-icons/fa6";
 
-export const dynamic = "force-dynamic";
+// Enable ISR: revalidate every 5 minutes for approved reviews
 export const revalidate = 300;
 
 /**

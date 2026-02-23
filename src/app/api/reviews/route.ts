@@ -5,6 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { sendOwnerReviewNotification } from "@/lib/email";
 
@@ -124,6 +125,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         approved: verified, // Auto-approve verified reviews
       },
     });
+
+    // ✅ Trigger on-demand revalidation of review pages
+    // Next users who visit /reviews or /review will see fresh data
+    revalidatePath("/reviews");
+    revalidatePath("/review");
 
     // Notify the owner — fire-and-forget, never blocks the response
     void sendOwnerReviewNotification(review);

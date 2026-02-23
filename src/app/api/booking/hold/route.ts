@@ -5,6 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { BOOKING_CONFIG } from "@/lib/booking";
 import { createBookingEvent } from "@/lib/google-calendar";
@@ -104,7 +105,10 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreateBoo
     }
 
     if (startLocal < now) {
-      return NextResponse.json({ ok: false, error: "Cannot book times in the past." }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, error: "Cannot book times in the past." },
+        { status: 400 },
+      );
     }
 
     // Convert to UTC for database storage
@@ -167,6 +171,10 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreateBoo
           holdExpiresUtc: null, // Clear hold expiry since it's confirmed
         },
       });
+
+      // ✅ Trigger on-demand revalidation of /booking page
+      // Next user who visits /booking will see fresh slots reflecting this new booking
+      revalidatePath("/booking");
     } catch (calendarError) {
       // Log but continue - calendar integration is optional
       console.error("[booking/hold] Calendar event creation failed:", calendarError);
