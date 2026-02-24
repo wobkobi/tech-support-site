@@ -13,7 +13,8 @@
     "seed": "tsx prisma/seed.ts",
     "lint": "eslint \"{src,tests,scripts}/**/*.{js,ts,jsx,tsx}\"",
     "format": "prettier --write \"**/*.{js,ts,jsx,tsx,css,md,json}\"",
-    "build:icons": "tsx scripts/build-icons.ts",
+    "build:icons": "tsx scripts/build-icons/index.ts",
+    "build:poster": "npx tsx scripts/export-poster-screenshot.ts",
     "build:all": "npm run build:icons && npm run build",
     "test": "vitest"
   },

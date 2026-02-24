@@ -1,12 +1,1 @@
-{
-  "crons": [
-    {
-      "path": "/api/cron/release-holds",
-      "schedule": "0 0 * * *"
-    },
-    {
-      "path": "/api/cron/send-review-emails",
-      "schedule": "0 8 * * *"
-    }
-  ]
-}
+{}

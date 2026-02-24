@@ -1,4 +1,10 @@
 // scripts/cleanup-reviews.ts
+/**
+ * @file cleanup-reviews.ts
+ * @description Removes known dummy seed reviews from the database.
+ * Run with: npx tsx scripts/cleanup-reviews.ts
+ */
+
 import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
