@@ -6,7 +6,9 @@
 
 import "@testing-library/react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import type { Mock } from "vitest";
 import { prisma } from "@/lib/prisma";
+import type { Review, ReviewStatus } from "@prisma/client";
 
 // Mock Prisma
 vi.mock("@/lib/prisma", () => ({
@@ -49,22 +51,20 @@ vi.mock("@/components/PageLayout", () => ({
  */
 function createMockReview(
   id: number,
-  overrides?: Partial<{
-    text: string;
-    firstName: string;
-    lastName: string;
-    isAnonymous: boolean;
-    isApproved: boolean;
-  }>,
-) {
+  overrides?: Partial<Review>,
+): Review {
   return {
     id: `review-${id}`,
     text: `Review ${id}: Excellent service and very helpful.`,
     firstName: `John${id}`,
     lastName: `Doe${id}`,
     isAnonymous: false,
-    isApproved: true,
+    status: "approved" as ReviewStatus,
+    customerRef: null,
+    bookingId: null,
+    verified: false,
     createdAt: new Date(2024, 0, id),
+    updatedAt: new Date(2024, 0, id),
     ...overrides,
   };
 }
@@ -77,12 +77,13 @@ describe("Reviews Page - Integration Tests", () => {
   describe("Empty state (0 approved reviews)", () => {
     it("displays empty message when no approved reviews", async () => {
       const mockPrisma = vi.mocked(prisma);
-      mockPrisma.review.findMany.mockResolvedValue([]);
+      const findManyMock = mockPrisma.review.findMany as unknown as Mock;
+      findManyMock.mockResolvedValue([]);
 
       // Note: actual implementation would be tested with rendering
       // This is a mock-based test
       const result = await mockPrisma.review.findMany({
-        where: { isApproved: true },
+        where: { status: "approved" },
         orderBy: { createdAt: "desc" },
       });
 
@@ -91,13 +92,14 @@ describe("Reviews Page - Integration Tests", () => {
 
     it("orders approved reviews by most recent first", async () => {
       const mockPrisma = vi.mocked(prisma);
+      const findManyMock = mockPrisma.review.findMany as unknown as Mock;
       const reviews = [
         createMockReview(3, { createdAt: new Date(2024, 0, 3) }),
         createMockReview(1, { createdAt: new Date(2024, 0, 1) }),
         createMockReview(2, { createdAt: new Date(2024, 0, 2) }),
       ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
-      mockPrisma.review.findMany.mockResolvedValue(reviews);
+      findManyMock.mockResolvedValue(reviews);
 
       const result = await mockPrisma.review.findMany({
         orderBy: { createdAt: "desc" },
@@ -112,11 +114,12 @@ describe("Reviews Page - Integration Tests", () => {
   describe("Small scale (1-10 approved reviews)", () => {
     it("renders 1 approved review", async () => {
       const mockPrisma = vi.mocked(prisma);
+      const findManyMock = mockPrisma.review.findMany as unknown as Mock;
       const reviews = [createMockReview(1)];
-      mockPrisma.review.findMany.mockResolvedValue(reviews);
+      findManyMock.mockResolvedValue(reviews);
 
       const result = await mockPrisma.review.findMany({
-        where: { isApproved: true },
+        where: { status: "approved" },
       });
 
       expect(result).toHaveLength(1);
@@ -125,11 +128,12 @@ describe("Reviews Page - Integration Tests", () => {
 
     it("renders 5 approved reviews in order", async () => {
       const mockPrisma = vi.mocked(prisma);
+      const findManyMock = mockPrisma.review.findMany as unknown as Mock;
       const reviews = Array.from({ length: 5 }, (_, i) => createMockReview(i + 1)).sort(
         (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
       );
 
-      mockPrisma.review.findMany.mockResolvedValue(reviews);
+      findManyMock.mockResolvedValue(reviews);
 
       const result = await mockPrisma.review.findMany({
         orderBy: { createdAt: "desc" },
@@ -143,11 +147,12 @@ describe("Reviews Page - Integration Tests", () => {
   describe("Medium scale (10-50 approved reviews)", () => {
     it("handles 20 approved reviews", async () => {
       const mockPrisma = vi.mocked(prisma);
+      const findManyMock = mockPrisma.review.findMany as unknown as Mock;
       const reviews = Array.from({ length: 20 }, (_, i) =>
         createMockReview(i + 1),
       ).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
-      mockPrisma.review.findMany.mockResolvedValue(reviews);
+      findManyMock.mockResolvedValue(reviews);
 
       const result = await mockPrisma.review.findMany({
         orderBy: { createdAt: "desc" },
@@ -158,11 +163,12 @@ describe("Reviews Page - Integration Tests", () => {
 
     it("handles 50 approved reviews without timeout", async () => {
       const mockPrisma = vi.mocked(prisma);
+      const findManyMock = mockPrisma.review.findMany as unknown as Mock;
       const reviews = Array.from({ length: 50 }, (_, i) =>
         createMockReview(i + 1),
       ).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
-      mockPrisma.review.findMany.mockResolvedValue(reviews);
+      findManyMock.mockResolvedValue(reviews);
 
       const start = performance.now();
       const result = await mockPrisma.review.findMany({
@@ -179,11 +185,12 @@ describe("Reviews Page - Integration Tests", () => {
   describe("Large scale (100+ approved reviews)", () => {
     it("handles 100 approved reviews", async () => {
       const mockPrisma = vi.mocked(prisma);
+      const findManyMock = mockPrisma.review.findMany as unknown as Mock;
       const reviews = Array.from({ length: 100 }, (_, i) =>
         createMockReview(i + 1),
       ).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
-      mockPrisma.review.findMany.mockResolvedValue(reviews);
+      findManyMock.mockResolvedValue(reviews);
 
       const start = performance.now();
       const result = await mockPrisma.review.findMany({
@@ -198,11 +205,12 @@ describe("Reviews Page - Integration Tests", () => {
 
     it("handles 500 approved reviews (stress test)", async () => {
       const mockPrisma = vi.mocked(prisma);
+      const findManyMock = mockPrisma.review.findMany as unknown as Mock;
       const reviews = Array.from({ length: 500 }, (_, i) =>
         createMockReview(i + 1),
       ).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
-      mockPrisma.review.findMany.mockResolvedValue(reviews);
+      findManyMock.mockResolvedValue(reviews);
 
       const start = performance.now();
       const result = await mockPrisma.review.findMany({
@@ -219,31 +227,33 @@ describe("Reviews Page - Integration Tests", () => {
   describe("Review data validation", () => {
     it("filters out unapproved reviews", async () => {
       const mockPrisma = vi.mocked(prisma);
+      const findManyMock = mockPrisma.review.findMany as unknown as Mock;
       const reviews = [
-        createMockReview(1, { isApproved: true }),
-        createMockReview(2, { isApproved: false }), // Should not be included
-        createMockReview(3, { isApproved: true }),
-      ].filter((r) => r.isApproved);
+        createMockReview(1, { status: "approved" }),
+        createMockReview(2, { status: "pending" }), // Should not be included
+        createMockReview(3, { status: "approved" }),
+      ].filter((r) => r.status === "approved");
 
-      mockPrisma.review.findMany.mockResolvedValue(reviews);
+      findManyMock.mockResolvedValue(reviews);
 
       const result = await mockPrisma.review.findMany({
-        where: { isApproved: true },
+        where: { status: "approved" },
       });
 
       expect(result).toHaveLength(2);
-      expect(result.every((r) => r.isApproved)).toBe(true);
+      expect(result.every((r) => r.status === "approved")).toBe(true);
     });
 
     it("handles reviews with null first/last names", async () => {
       const mockPrisma = vi.mocked(prisma);
+      const findManyMock = mockPrisma.review.findMany as unknown as Mock;
       const reviews = [
         createMockReview(1, { firstName: null, lastName: null }),
         createMockReview(2, { firstName: "John", lastName: null }),
         createMockReview(3, { isAnonymous: true }),
       ];
 
-      mockPrisma.review.findMany.mockResolvedValue(reviews);
+      findManyMock.mockResolvedValue(reviews);
 
       const result = await mockPrisma.review.findMany();
 
@@ -254,10 +264,11 @@ describe("Reviews Page - Integration Tests", () => {
 
     it("handles long review text", async () => {
       const mockPrisma = vi.mocked(prisma);
+      const findManyMock = mockPrisma.review.findMany as unknown as Mock;
       const longText = "Lorem ipsum dolor sit amet. ".repeat(100);
       const reviews = [createMockReview(1, { text: longText })];
 
-      mockPrisma.review.findMany.mockResolvedValue(reviews);
+      findManyMock.mockResolvedValue(reviews);
 
       const result = await mockPrisma.review.findMany();
 
@@ -269,12 +280,13 @@ describe("Reviews Page - Integration Tests", () => {
   describe("Pagination/Limiting scenarios", () => {
     it("can limit returned reviews for pagination", async () => {
       const mockPrisma = vi.mocked(prisma);
+      const findManyMock = mockPrisma.review.findMany as unknown as Mock;
       const allReviews = Array.from({ length: 100 }, (_, i) =>
         createMockReview(i + 1),
       );
 
       // First page: 10 reviews
-      mockPrisma.review.findMany.mockResolvedValueOnce(allReviews.slice(0, 10));
+      findManyMock.mockResolvedValueOnce(allReviews.slice(0, 10));
 
       const firstPage = await mockPrisma.review.findMany({
         take: 10,
@@ -284,7 +296,7 @@ describe("Reviews Page - Integration Tests", () => {
       expect(firstPage).toHaveLength(10);
 
       // Second page: next 10 reviews
-      mockPrisma.review.findMany.mockResolvedValueOnce(allReviews.slice(10, 20));
+      findManyMock.mockResolvedValueOnce(allReviews.slice(10, 20));
 
       const secondPage = await mockPrisma.review.findMany({
         take: 10,
@@ -296,24 +308,24 @@ describe("Reviews Page - Integration Tests", () => {
 
     it("counts total approved reviews for pagination metadata", async () => {
       const mockPrisma = vi.mocked(prisma);
-      mockPrisma.review.count.mockResolvedValue({
-        _count: 150,
-      } as any);
+      const countMock = mockPrisma.review.count as unknown as Mock;
+      countMock.mockResolvedValue(150);
 
       const count = await mockPrisma.review.count();
 
-      expect(count._count).toBe(150);
+      expect(count).toBe(150);
     });
   });
 
   describe("Performance scenarios", () => {
     it("renders large dataset without rerenders", async () => {
       const mockPrisma = vi.mocked(prisma);
+      const findManyMock = mockPrisma.review.findMany as unknown as Mock;
       const reviews = Array.from({ length: 100 }, (_, i) =>
         createMockReview(i + 1),
       );
 
-      mockPrisma.review.findMany.mockResolvedValue(reviews);
+      findManyMock.mockResolvedValue(reviews);
 
       const start = performance.now();
       const result = await mockPrisma.review.findMany({
@@ -327,6 +339,7 @@ describe("Reviews Page - Integration Tests", () => {
 
     it("handles reviews with varying content lengths", async () => {
       const mockPrisma = vi.mocked(prisma);
+      const findManyMock = mockPrisma.review.findMany as unknown as Mock;
       const reviews = Array.from({ length: 50 }, (_, i) => {
         const length = i % 3 === 0 ? 10 : i % 3 === 1 ? 500 : 2000;
         return createMockReview(i + 1, {
@@ -334,7 +347,7 @@ describe("Reviews Page - Integration Tests", () => {
         });
       });
 
-      mockPrisma.review.findMany.mockResolvedValue(reviews);
+      findManyMock.mockResolvedValue(reviews);
 
       const result = await mockPrisma.review.findMany(
       );
@@ -358,13 +371,14 @@ describe("Reviews Page - Integration Tests", () => {
 
     it("can refetch approved reviews on revalidation", async () => {
       const mockPrisma = vi.mocked(prisma);
+      const findManyMock = mockPrisma.review.findMany as unknown as Mock;
 
       // First fetch (cached)
       const firstFetch = [createMockReview(1), createMockReview(2)];
-      mockPrisma.review.findMany.mockResolvedValueOnce(firstFetch);
+      findManyMock.mockResolvedValueOnce(firstFetch);
 
       let result = await mockPrisma.review.findMany({
-        where: { isApproved: true },
+        where: { status: "approved" },
         orderBy: { createdAt: "desc" },
       });
 
@@ -376,10 +390,10 @@ describe("Reviews Page - Integration Tests", () => {
         createMockReview(2),
         createMockReview(1),
       ];
-      mockPrisma.review.findMany.mockResolvedValueOnce(secondFetch);
+      findManyMock.mockResolvedValueOnce(secondFetch);
 
       result = await mockPrisma.review.findMany({
-        where: { isApproved: true },
+        where: { status: "approved" },
         orderBy: { createdAt: "desc" },
       });
 
@@ -390,6 +404,7 @@ describe("Reviews Page - Integration Tests", () => {
   describe("Internationalization (names)", () => {
     it("handles non-ASCII names", async () => {
       const mockPrisma = vi.mocked(prisma);
+      const findManyMock = mockPrisma.review.findMany as unknown as Mock;
       const reviews = [
         createMockReview(1, {
           firstName: "François",
@@ -401,7 +416,7 @@ describe("Reviews Page - Integration Tests", () => {
         }),
       ];
 
-      mockPrisma.review.findMany.mockResolvedValue(reviews);
+      findManyMock.mockResolvedValue(reviews);
 
       const result = await mockPrisma.review.findMany();
 
