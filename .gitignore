@@ -12,10 +12,13 @@
 
 # testing
 /coverage
+*.lcov
+.vitest-cache/
 
 # next.js
 /.next/
 /out/
+.turbo/
 
 # production
 /build
@@ -23,6 +26,18 @@
 # misc
 .DS_Store
 *.pem
+Thumbs.db
+
+# IDE
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
 
 # debug
 npm-debug.log*
@@ -30,8 +45,12 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# env files (never commit secrets!)
+.env
+.env*.local
+.env.development.local
+.env.test.local
+.env.production.local
 
 # vercel
 .vercel
@@ -40,9 +59,20 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# prisma
 /src/generated/prisma
 
+# eslint
 .eslintcache
 
-# claude
+# claude AI workspace
 .claude/
+
+# generated docs & analysis artifacts
+/docs/
+QA_CRON_TESTING_REPORT.md
+TEST_STRATEGY_GAPS.md
+ROOT_CAUSE_ANALYSIS.md
+REVIEW_TEST_COMPLETION.md
+
+BUG_FIX_REPORT.md

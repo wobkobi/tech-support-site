@@ -1,7 +1,7 @@
 // src/app/poster/page.tsx
 /**
  * @file page.tsx
- * @description Poster page — A4 at 300 DPI (1680x2308px) with even outer padding.
+ * @description Poster page — A5 at 300 DPI (1748x2480px) with even outer padding.
  */
 
 import { cn } from "@/lib/cn";
@@ -49,12 +49,12 @@ const servicesText =
   "If you've got a tech issue, I've got you covered. I fix slow computers, set up new phones and laptops, sort Wi-Fi and network connections, connect printers and TVs, and ensure cloud backups and email run reliably. I can secure your devices, remove malware and scams, and safely move photos and files between devices. I'll explain everything in plain language, leave clear notes, and I won't try to upsell you. I'm local, flexible with evenings/weekends, and can help in person or remotely.";
 
 /**
- * Poster page component for A4 print export
- * @returns React element containing the poster layout
+ * Poster page component for A5 print export
+ * @returns Poster page element
  */
 export default function PosterPage(): React.ReactElement {
   return (
-    <div className={cn("h-577 w-420 relative overflow-hidden")}>
+    <div className={cn("h-screen w-screen relative overflow-hidden")}>
       {/* Backdrop */}
       <div className={cn("absolute inset-0 -z-10")}>
         <Image
@@ -62,7 +62,7 @@ export default function PosterPage(): React.ReactElement {
           alt=""
           fill
           priority
-          sizes="1680px"
+          sizes="1748px"
           className={cn("scale-110 object-cover blur-xl")}
         />
       </div>
@@ -78,127 +78,127 @@ export default function PosterPage(): React.ReactElement {
             )}
           >
             <div className={cn("flex h-full flex-col")}>
-            {/* Logo */}
-            <div className={cn("grid place-items-center pb-5")}>
-              <Image
-                src="/source/logo-full.svg"
-                alt="To The Point Tech"
-                width={1376}
-                height={313}
-                priority
-                className={cn("w-344 h-auto")}
-              />
-            </div>
-
-            {/* Trust badges */}
-            <div className={cn("mx-auto mb-5 flex flex-wrap justify-center gap-3")}>
-              <div
-                className={cn(
-                  "border-moonstone-500/30 px-4.5 relative flex items-center gap-3 rounded-xl border-2 py-1.5 shadow-sm",
-                )}
-                style={{ backgroundColor: "#f6f7f8" }}
-              >
-                <div
-                  className={cn("absolute inset-0 rounded-xl")}
-                  style={{ backgroundColor: "rgba(67, 188, 205, 0.15)" }}
+              {/* Logo */}
+              <div className={cn("grid place-items-center pb-5")}>
+                <Image
+                  src="/source/logo-full.svg"
+                  alt="To The Point Tech"
+                  width={1376}
+                  height={313}
+                  priority
+                  className={cn("w-344 h-auto")}
                 />
-                <FaCircleCheck className={cn("text-moonstone-600 relative z-10 h-11 w-11")} />
-                <span className={cn("text-rich-black relative z-10 text-[34px] font-semibold")}>
-                  CS Graduate
-                </span>
               </div>
 
-              <div
-                className={cn(
-                  "border-moonstone-500/30 px-4.5 relative flex items-center gap-3 rounded-xl border-2 py-1.5 shadow-sm",
-                )}
-                style={{ backgroundColor: "#f6f7f8" }}
-              >
+              {/* Trust badges */}
+              <div className={cn("mx-auto mb-5 flex flex-wrap justify-center gap-3")}>
                 <div
-                  className={cn("absolute inset-0 rounded-xl")}
-                  style={{ backgroundColor: "rgba(67, 188, 205, 0.15)" }}
-                />
-                <FaLocationDot className={cn("text-moonstone-600 relative z-10 h-11 w-11")} />
-                <span className={cn("text-rich-black relative z-10 text-[34px] font-semibold")}>
-                  Pt Chev Local
-                </span>
-              </div>
+                  className={cn(
+                    "border-moonstone-500/30 px-4.5 relative flex items-center gap-3 rounded-xl border-2 py-1.5 shadow-sm",
+                  )}
+                  style={{ backgroundColor: "#f6f7f8" }}
+                >
+                  <div
+                    className={cn("absolute inset-0 rounded-xl")}
+                    style={{ backgroundColor: "rgba(67, 188, 205, 0.15)" }}
+                  />
+                  <FaCircleCheck className={cn("text-moonstone-600 relative z-10 h-11 w-11")} />
+                  <span className={cn("text-rich-black relative z-10 text-[34px] font-semibold")}>
+                    CS Graduate
+                  </span>
+                </div>
 
-              <div
-                className={cn(
-                  "border-moonstone-500/30 px-4.5 relative flex items-center gap-3 rounded-xl border-2 py-1.5 shadow-sm",
-                )}
-                style={{ backgroundColor: "#f6f7f8" }}
-              >
                 <div
-                  className={cn("absolute inset-0 rounded-xl")}
-                  style={{ backgroundColor: "rgba(67, 188, 205, 0.15)" }}
-                />
-                <FaClock className={cn("text-moonstone-600 relative z-10 h-11 w-11")} />
-                <span className={cn("text-rich-black relative z-10 text-[34px] font-semibold")}>
-                  Same Day Available
-                </span>
+                  className={cn(
+                    "border-moonstone-500/30 px-4.5 relative flex items-center gap-3 rounded-xl border-2 py-1.5 shadow-sm",
+                  )}
+                  style={{ backgroundColor: "#f6f7f8" }}
+                >
+                  <div
+                    className={cn("absolute inset-0 rounded-xl")}
+                    style={{ backgroundColor: "rgba(67, 188, 205, 0.15)" }}
+                  />
+                  <FaLocationDot className={cn("text-moonstone-600 relative z-10 h-11 w-11")} />
+                  <span className={cn("text-rich-black relative z-10 text-[34px] font-semibold")}>
+                    Pt Chev Local
+                  </span>
+                </div>
+
+                <div
+                  className={cn(
+                    "border-moonstone-500/30 px-4.5 relative flex items-center gap-3 rounded-xl border-2 py-1.5 shadow-sm",
+                  )}
+                  style={{ backgroundColor: "#f6f7f8" }}
+                >
+                  <div
+                    className={cn("absolute inset-0 rounded-xl")}
+                    style={{ backgroundColor: "rgba(67, 188, 205, 0.15)" }}
+                  />
+                  <FaClock className={cn("text-moonstone-600 relative z-10 h-11 w-11")} />
+                  <span className={cn("text-rich-black relative z-10 text-[34px] font-semibold")}>
+                    Same Day Available
+                  </span>
+                </div>
               </div>
-            </div>
 
-            {/* Text boxes — flex-1 absorbs extra height so bottom padding stays even */}
-            <section className={cn("flex flex-1 flex-col gap-5")}>
-              <div
-                className={cn(
-                  "flex-1 border-seasalt-400/60 bg-seasalt-800 p-4.5 rounded-[18px] border-2 shadow-sm",
-                )}
-              >
-                <h2 className={cn("text-russian-violet mb-1.5 text-[53px] font-bold")}>About Me</h2>
-                <p className={cn("text-rich-black text-[38px] font-medium leading-tight")}>
-                  {aboutMeText}
-                </p>
-              </div>
+              {/* Text boxes — flex-1 absorbs extra height so bottom padding stays even */}
+              <section className={cn("flex flex-1 flex-col gap-5")}>
+                <div
+                  className={cn(
+                    "flex-1 border-seasalt-400/60 bg-seasalt-800 p-4.5 rounded-[18px] border-2 shadow-sm",
+                  )}
+                >
+                  <h2 className={cn("text-russian-violet mb-1.5 text-[53px] font-bold")}>About Me</h2>
+                  <p className={cn("text-rich-black text-[38px] font-medium leading-tight")}>
+                    {aboutMeText}
+                  </p>
+                </div>
 
-              <div
-                className={cn(
-                  "flex-1 border-seasalt-400/60 bg-seasalt-800 p-4.5 rounded-[18px] border-2 shadow-sm",
-                )}
-              >
-                <h2 className={cn("text-russian-violet mb-1.5 text-[53px] font-bold")}>Services</h2>
-                <p className={cn("text-rich-black text-[38px] font-medium leading-tight")}>
-                  {servicesText}
-                </p>
-              </div>
-            </section>
+                <div
+                  className={cn(
+                    "flex-1 border-seasalt-400/60 bg-seasalt-800 p-4.5 rounded-[18px] border-2 shadow-sm",
+                  )}
+                >
+                  <h2 className={cn("text-russian-violet mb-1.5 text-[53px] font-bold")}>Services</h2>
+                  <p className={cn("text-rich-black text-[38px] font-medium leading-tight")}>
+                    {servicesText}
+                  </p>
+                </div>
+              </section>
 
-            {/* Support grid */}
-            <section className={cn("mt-3")}>
-              <h2 className={cn("text-rich-black mb-3 text-center text-[53px] font-semibold")}>
-                Areas I Can Help With
-              </h2>
+              {/* Support grid */}
+              <section className={cn("mt-3")}>
+                <h2 className={cn("text-rich-black mb-3 text-center text-[53px] font-semibold")}>
+                  Areas I Can Help With
+                </h2>
 
-              <ul className={cn("grid grid-cols-3 gap-3")}>
-                {supportItems.map(({ label, icon: Icon }) => (
-                  <li
-                    key={label}
-                    className={cn(
-                      "border-seasalt-400/60 bg-seasalt-800 h-27 px-4.5 flex items-center gap-3 rounded-xl border-2",
-                    )}
-                  >
-                    <span
+                <ul className={cn("grid grid-cols-3 gap-3")}>
+                  {supportItems.map(({ label, icon: Icon }) => (
+                    <li
+                      key={label}
                       className={cn(
-                        "border-moonstone-500/30 bg-moonstone-600/15 size-18 grid shrink-0 place-items-center rounded-xl border-2",
+                        "border-seasalt-400/60 bg-seasalt-800 h-27 px-4.5 flex items-center gap-3 rounded-xl border-2",
                       )}
                     >
-                      <Icon className={cn("text-moonstone-600 h-11 w-11")} aria-hidden />
-                    </span>
+                      <span
+                        className={cn(
+                          "border-moonstone-500/30 bg-moonstone-600/15 size-18 grid shrink-0 place-items-center rounded-xl border-2",
+                        )}
+                      >
+                        <Icon className={cn("text-moonstone-600 h-11 w-11")} aria-hidden />
+                      </span>
 
-                    <span
-                      className={cn(
-                        "text-rich-black text-left text-[40px] font-semibold leading-tight",
-                      )}
-                    >
-                      {label}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </section>
+                      <span
+                        className={cn(
+                          "text-rich-black text-left text-[40px] font-semibold leading-tight",
+                        )}
+                      >
+                        {label}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
             </div>
           </div>
 

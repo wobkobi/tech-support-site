@@ -11,10 +11,12 @@
     "start": "next start",
     "db:push": "prisma db push",
     "seed": "tsx prisma/seed.ts",
-    "lint": "eslint \"src/**/*.{js,ts,jsx,tsx}\"",
+    "lint": "eslint \"{src,tests,scripts}/**/*.{js,ts,jsx,tsx}\"",
     "format": "prettier --write \"**/*.{js,ts,jsx,tsx,css,md,json}\"",
-    "build:icons": "node scripts/build-icons.ts",
-    "build:all": "npm run build:icons && npm run build"
+    "build:icons": "tsx scripts/build-icons/index.ts",
+    "build:poster": "npx tsx scripts/export-poster-screenshot.ts",
+    "build:all": "npm run build:icons && npm run build",
+    "test": "vitest"
   },
   "dependencies": {
     "@vercel/analytics": "^1.6.1",
@@ -35,6 +37,9 @@
     "@next/bundle-analyzer": "^16.1.6",
     "@prisma/client": "6.19.2",
     "@tailwindcss/postcss": "^4.2.0",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^15.0.0",
+    "@testing-library/user-event": "^14.6.1",
     "@types/google.maps": "^3.58.1",
     "@types/jsdom": "^27.0.0",
     "@types/node": "^25.3.0",
@@ -53,18 +58,21 @@
     "husky": "^9.1.7",
     "jsdom": "^28.1.0",
     "lint-staged": "^16.2.7",
+    "pdf-lib": "^1.17.1",
     "postcss": "^8.5.6",
     "prettier": "^3.8.1",
     "prettier-plugin-tailwindcss": "^0.7.2",
     "prisma": "6.19.2",
+    "puppeteer": "^24.37.5",
     "qr-code-styling": "^1.9.2",
     "sharp": "^0.34.5",
     "tailwindcss": "^4.2.0",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
   },
   "engines": {
-    "node": ">=18.18.0",
+    "node": "22.x",
     "npm": ">=10.0.0"
   },
   "overrides": {
@@ -78,7 +86,8 @@
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
       "prettier --write",
-      "eslint"
+      "eslint",
+      "vitest related --run"
     ],
     "*.{css,html,json,md}": "prettier --write"
   }

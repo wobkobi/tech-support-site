@@ -5,18 +5,19 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { sendOwnerReviewNotification } from "@/lib/email";
 
 /**
  * GET /api/reviews
- * Returns approved reviews.
- * @returns JSON with reviews array.
+ * Returns all approved reviews ordered by most recent first.
+ * @returns JSON response with a reviews array, or an empty array on error.
  */
 export async function GET(): Promise<NextResponse> {
   try {
     const reviews = await prisma.review.findMany({
-      where: { approved: true },
+      where: { status: "approved" },
       orderBy: { createdAt: "desc" },
       select: {
         id: true,
@@ -38,9 +39,10 @@ export async function GET(): Promise<NextResponse> {
 
 /**
  * POST /api/reviews
- * Submits a new review (verified or public).
- * @param request - Incoming request.
- * @returns JSON response.
+ * Submits a new review. Optionally verifies the reviewer against a booking
+ * or manual review request using bookingId/reviewRequestId and reviewToken.
+ * @param request - Incoming Next.js request containing review text, optional name fields, and optional booking verification fields.
+ * @returns JSON response with ok flag and review id on success (201), or an error message on failure.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
@@ -81,6 +83,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     let verified = false;
     let bookingId = null;
+    let customerRef = null;
 
     // Verify against a real booking
     if (body.bookingId && body.reviewToken) {
@@ -91,6 +94,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       if (booking) {
         verified = true;
         bookingId = booking.id;
+        customerRef = booking.reviewToken;
         await prisma.booking.update({
           where: { id: booking.id },
           data: { reviewSubmittedAt: new Date() },
@@ -106,6 +110,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
       if (reviewRequest) {
         verified = true;
+        customerRef = reviewRequest.reviewToken;
         await prisma.reviewRequest.update({
           where: { id: reviewRequest.id },
           data: { reviewSubmittedAt: new Date() },
@@ -121,9 +126,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         isAnonymous,
         verified,
         bookingId,
-        approved: verified, // Auto-approve verified reviews
+        customerRef,
+        status: "pending", // All reviews start as pending
       },
     });
+
+    // ✅ Trigger on-demand revalidation of review pages
+    // Next users who visit /reviews or /review will see fresh data
+    revalidatePath("/reviews");
+    revalidatePath("/review");
 
     // Notify the owner — fire-and-forget, never blocks the response
     void sendOwnerReviewNotification(review);

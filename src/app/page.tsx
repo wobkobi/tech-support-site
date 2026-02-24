@@ -28,6 +28,7 @@ import {
   FaShieldHalved,
   FaToolbox,
   FaTv,
+  FaDownload,
   FaWifi,
 } from "react-icons/fa6";
 import type { IconType } from "react-icons";
@@ -64,13 +65,13 @@ const primaryBtn = cn(
 
 /**
  * Home page component
- * @returns The Home page React element
+ * @returns Home page element
  */
 export default async function Home(): Promise<React.ReactElement> {
   const rows = await prisma.review.findMany({
     orderBy: { createdAt: "desc" },
     select: { text: true, firstName: true, lastName: true, isAnonymous: true },
-    where: { approved: true },
+    where: { status: "approved" },
     take: 20,
   });
 
@@ -290,6 +291,49 @@ export default async function Home(): Promise<React.ReactElement> {
                 </li>
               </ul>
             </article>
+          </section>
+
+          {/* Download Flyer */}
+          <section
+            aria-labelledby="flyer-heading"
+            className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-500")}
+          >
+            <div
+              className={cn(
+                "flex flex-col items-center gap-4 text-center sm:flex-row sm:items-center sm:text-left",
+              )}
+            >
+              <div
+                className={cn(
+                  "bg-moonstone-500/10 border-moonstone-500/30 grid shrink-0 size-16 place-items-center rounded-full border-2",
+                )}
+              >
+                <FaDownload className={cn("text-moonstone-600 h-8 w-8")} aria-hidden />
+              </div>
+
+              <div className={cn("flex-1")}>
+                <h2
+                  id="flyer-heading"
+                  className={cn("text-russian-violet mb-1 text-xl font-bold sm:text-2xl")}
+                >
+                  Know someone who needs tech help?
+                </h2>
+                <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
+                  Download and print this A5 flyer to share with neighbours or pin to a noticeboard.
+                </p>
+              </div>
+
+              <a
+                href="/downloads/poster.pdf"
+                download="to-the-point-tech-flyer.pdf"
+                className={cn(
+                  "bg-moonstone-600 hover:bg-moonstone-700 text-seasalt inline-flex shrink-0 items-center gap-2 rounded-lg px-5 py-3 text-sm font-bold shadow-md transition-all hover:shadow-lg sm:text-base",
+                )}
+              >
+                <FaDownload className={cn("h-5 w-5")} aria-hidden />
+                Download flyer
+              </a>
+            </div>
           </section>
         </div>
       </FrostedSection>

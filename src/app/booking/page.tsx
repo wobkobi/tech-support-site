@@ -18,8 +18,10 @@ import BookingForm from "@/components/BookingForm";
 import { FrostedSection, PageShell, CARD, SOFT_CARD } from "@/components/PageLayout";
 import { FaCalendarCheck, FaClock, FaEnvelopeOpenText, FaListCheck } from "react-icons/fa6";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 60; // Cache for 60 seconds to reduce API load
+// ISR (Incremental Static Regeneration) with 5-minute revalidation window
+// Ensures calendar availability is never more than 5 minutes stale
+// (cron-job.org refreshes every 15 minutes, so 5-min ISR is a safe buffer)
+export const revalidate = 300; // 5 minutes (300 seconds)
 
 /**
  * Get calendar events, preferring cache but falling back to live API

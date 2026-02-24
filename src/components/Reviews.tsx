@@ -1,3 +1,5 @@
+"use client";
+
 // src/components/Reviews.tsx
 /**
  * @file Reviews.tsx
@@ -5,6 +7,37 @@
  */
 
 import { cn } from "@/lib/cn";
+import React, { useState } from "react";
+
+/**
+ * ReviewText component: truncates long text and allows expand/collapse.
+ * @param text - Component props.
+ * @param text.text - The review text to display.
+ * @returns A span element with the review text and optional expand/collapse button.
+ */
+function ReviewText({ text }: { text: string }): React.ReactElement {
+  const [expanded, setExpanded] = useState(false);
+  const LIMIT = 280;
+  if (text.length <= LIMIT) {
+    return <span>{text}</span>;
+  }
+  return (
+    <span>
+      {expanded ? text : text.slice(0, LIMIT) + "…"}
+      <button
+        type="button"
+        aria-expanded={expanded}
+        aria-label={expanded ? "Collapse review" : "Expand review"}
+        className={cn(
+          "ml-2 inline rounded text-xs font-semibold text-blue-700 underline hover:text-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-400",
+        )}
+        onClick={() => setExpanded((v) => !v)}
+      >
+        {expanded ? "Show less" : "Read more"}
+      </button>
+    </span>
+  );
+}
 
 export interface ReviewItem {
   text: string;
@@ -66,9 +99,7 @@ export default function Reviews({ items = [] }: ReviewsProps): React.ReactElemen
                   "border-seasalt-400/60 bg-seasalt-800/80 w-90 sm:w-95 flex shrink-0 flex-col rounded-lg border p-4 sm:p-5",
                 )}
               >
-                <p className={cn("text-rich-black text-sm leading-relaxed sm:text-base")}>
-                  {r.text}
-                </p>
+                <ReviewText text={r.text} />
                 <p
                   className={cn(
                     "text-russian-violet mt-auto pt-3 text-right text-xs font-semibold sm:text-sm",
@@ -113,7 +144,7 @@ export default function Reviews({ items = [] }: ReviewsProps): React.ReactElemen
               "border-seasalt-400/60 bg-seasalt-800 flex flex-col rounded-lg border p-4 shadow-sm sm:p-5",
             )}
           >
-            <p className={cn("text-rich-black text-sm sm:text-base")}>{r.text}</p>
+            <ReviewText text={r.text} />
             <p
               className={cn(
                 "text-russian-violet mt-auto pt-3 text-right text-xs font-semibold sm:text-sm",

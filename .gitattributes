@@ -1,0 +1,16 @@
+# Binary files - prevent Git from attempting to merge
+*.png binary merge=ours
+*.jpg binary merge=ours
+*.jpeg binary merge=ours
+*.pdf binary merge=ours
+*.ico binary merge=ours
+*.gif binary merge=ours
+*.webp binary merge=ours
+
+# SVG files are text-based but treat as binary for merge conflicts
+*.svg binary merge=ours
+
+# Ensure consistent line endings
+* text=auto
+*.sh text eol=lf
+*.bash text eol=lf

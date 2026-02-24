@@ -11,8 +11,9 @@ import { FrostedSection, PageShell, CARD } from "@/components/PageLayout";
 import { cn } from "@/lib/cn";
 import { prisma } from "@/lib/prisma";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+// Enable ISR: revalidate every 10 minutes
+// Reviews are submitted infrequently; 10-min staleness is acceptable
+export const revalidate = 600;
 
 /**
  * Review page with optional token-based protection
