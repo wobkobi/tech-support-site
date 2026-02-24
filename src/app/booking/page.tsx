@@ -161,6 +161,8 @@ export default async function BookingPage(): Promise<React.ReactElement> {
             <p className={cn("text-rich-black text-sm sm:text-base")}>
               Pick a time that works for you and tell me what you need help with. I'll confirm the
               details and send you a calendar invite.
+              <br />
+              Prefer to call or text? Feel free to reach out directly.
             </p>
           </section>
 

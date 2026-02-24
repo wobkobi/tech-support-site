@@ -165,8 +165,9 @@ export default function PricingPage(): React.ReactElement {
               <li className={cn("flex gap-3")}>
                 <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
                 <span>
-                  <strong>Half off for unsuccessful work.</strong> If I can't fix it, you don't pay
-                  for the full amount.
+                  <strong>Fair pricing for unsuccessful work.</strong> If I can't fix the problem,
+                  on-site visits are half price. Remote support is usually free, though I may charge
+                  for extended troubleshooting sessions.
                 </span>
               </li>
               <li className={cn("flex gap-3")}>

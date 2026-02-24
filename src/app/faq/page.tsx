@@ -38,8 +38,8 @@ const faqItems: ReadonlyArray<FaqItem> = [
     answer: (
       <>
         <p>
-          Yes. Many software, account, and setup issues can be handled remotely if you have a stable
-          internet connection.
+          Yes. Many software, account, and setup issues can be handled remotely if you are
+          comfortable with it.
         </p>
         <p className={cn("text-rich-black/80 mt-2")}>
           If it turns out an on-site visit is needed (for Wi-Fi hardware, printers, cabling, etc.),
@@ -53,12 +53,13 @@ const faqItems: ReadonlyArray<FaqItem> = [
     answer: (
       <>
         <p>
-          Windows PCs and laptops, Android and iOS phones and tablets, Wi-Fi and networking gear,
-          printers, smart TVs, and common home tech.
+          I'm a jack of all trades when it comes to devices. Windows, Mac, Android, iOS, printers,
+          smart TVs, networking gear - I've worked with most common tech and can quickly pick up
+          anything new.
         </p>
         <p className={cn("text-rich-black/80 mt-2")}>
-          I don't specialise in Mac repairs, but can help with general setup and connectivity. If
-          you have something unusual, mention the model and I'll confirm.
+          If you have something unusual or specialized, just mention the model and I'll let you know
+          if I can help or point you in the right direction.
         </p>
       </>
     ),
@@ -68,8 +69,8 @@ const faqItems: ReadonlyArray<FaqItem> = [
     answer: (
       <>
         <p>
-          I charge $50 per hour, billed in 15-minute increments. I'll give you a clear estimate
-          before starting so there are no surprises.
+          I charge $50 per hour, but it depends on the complexity of the task. I'll give you a clear
+          estimate before starting so there are no surprises.
         </p>
         <p className={cn("text-rich-black/80 mt-2")}>
           See the{" "}
@@ -90,8 +91,8 @@ const faqItems: ReadonlyArray<FaqItem> = [
     answer: (
       <>
         <p>
-          No. I don't sell products or earn commission on anything. My only goal is to fix the
-          problem and leave you with a setup you understand.
+          No. I don't sell products or earn commission on anything. My goal is to fix the problem
+          and leave you with a setup you understand.
         </p>
         <p className={cn("text-rich-black/80 mt-2")}>
           If a replacement part or upgrade genuinely makes sense, I'll explain the options and you
@@ -126,11 +127,8 @@ const faqItems: ReadonlyArray<FaqItem> = [
     answer: (
       <>
         <p>
-          If I can't resolve your issue, I'll explain what I found and suggest next steps. You won't
-          be charged for work that doesn't help.
-        </p>
-        <p className={cn("text-rich-black/80 mt-2")}>
-          For complex problems outside my expertise, I can point you to appropriate specialists.
+          If I can't resolve your issue, on-site visits are half price. Remote support is usually
+          free, though I may charge for extended troubleshooting.
         </p>
       </>
     ),

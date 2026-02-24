@@ -10,31 +10,49 @@ import { cn } from "@/lib/cn";
 import React, { useState } from "react";
 
 /**
- * ReviewText component: truncates long text and allows expand/collapse.
+ * ReviewText component: truncates long text and allows expand/collapse on click.
  * @param text - Component props.
  * @param text.text - The review text to display.
- * @returns A span element with the review text and optional expand/collapse button.
+ * @returns A span element with the review text, expandable on click.
  */
+/** Character limit for truncating long reviews. */
+const REVIEW_CHAR_LIMIT = 150;
+
+/**
+ * Returns true when a review exceeds the truncation limit.
+ * @param text - Review text to check.
+ * @returns Whether the text is long enough to truncate.
+ */
+function isLongReview(text: string): boolean {
+  return text.length > REVIEW_CHAR_LIMIT;
+}
+
 function ReviewText({ text }: { text: string }): React.ReactElement {
   const [expanded, setExpanded] = useState(false);
-  const LIMIT = 280;
-  if (text.length <= LIMIT) {
+  if (!isLongReview(text)) {
     return <span>{text}</span>;
   }
+
+  // Truncate at the last space before the limit to avoid orphaned "…"
+  const truncated = text.slice(0, REVIEW_CHAR_LIMIT).replace(/\s+\S*$/, "") + "…";
+
   return (
-    <span>
-      {expanded ? text : text.slice(0, LIMIT) + "…"}
-      <button
-        type="button"
-        aria-expanded={expanded}
-        aria-label={expanded ? "Collapse review" : "Expand review"}
-        className={cn(
-          "ml-2 inline rounded text-xs font-semibold text-blue-700 underline hover:text-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-400",
-        )}
-        onClick={() => setExpanded((v) => !v)}
-      >
-        {expanded ? "Show less" : "Read more"}
-      </button>
+    <span
+      role="button"
+      tabIndex={0}
+      aria-expanded={expanded}
+      aria-label={expanded ? "Collapse review" : "Expand review"}
+      className={cn("cursor-pointer")}
+      title={expanded ? "Click to collapse" : "Click to read more"}
+      onClick={() => setExpanded((v) => !v)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          setExpanded((v) => !v);
+        }
+      }}
+    >
+      {expanded ? text : truncated}
     </span>
   );
 }
@@ -96,7 +114,10 @@ export default function Reviews({ items = [] }: ReviewsProps): React.ReactElemen
               <li
                 key={`${formatName(r)}-${i}`}
                 className={cn(
-                  "border-seasalt-400/60 bg-seasalt-800/80 w-90 sm:w-95 flex shrink-0 flex-col rounded-lg border p-4 sm:p-5",
+                  "bg-seasalt-800/80 w-90 sm:w-95 flex shrink-0 flex-col rounded-lg border-2 p-4 transition-colors duration-300 sm:p-5",
+                  isLongReview(r.text)
+                    ? "border-seasalt-400/60 hover:border-coquelicot-500/60"
+                    : "border-seasalt-400/60",
                 )}
               >
                 <ReviewText text={r.text} />
@@ -141,7 +162,10 @@ export default function Reviews({ items = [] }: ReviewsProps): React.ReactElemen
               // full width on mobile, two-up on sm, three-up on md+. Centering comes from justify-center.
               "w-full sm:w-[calc(50%-0.375rem)] md:w-[calc(33.333%-0.5rem)]",
               // card styles
-              "border-seasalt-400/60 bg-seasalt-800 flex flex-col rounded-lg border p-4 shadow-sm sm:p-5",
+              "bg-seasalt-800 flex flex-col rounded-lg border-2 p-4 shadow-sm transition-colors duration-300 sm:p-5",
+              isLongReview(r.text)
+                ? "border-seasalt-400/60 hover:border-coquelicot-500/60"
+                : "border-seasalt-400/60",
             )}
           >
             <ReviewText text={r.text} />
