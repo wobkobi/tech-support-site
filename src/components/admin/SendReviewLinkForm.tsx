@@ -40,7 +40,7 @@ export function SendReviewLinkForm({ token }: SendReviewLinkFormProps): React.Re
    * @param e - Form submit event.
    * @returns Promise resolving when the submit completes.
    */
-  async function handleSubmit(e: React.FormEvent): Promise<void> {
+  async function handleSubmit(e: React.SubmitEvent): Promise<void> {
     e.preventDefault();
     setLoading(true);
     setError(null);

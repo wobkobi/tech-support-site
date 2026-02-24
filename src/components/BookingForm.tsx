@@ -98,7 +98,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
    * Handle form submission
    * @param e - Form event
    */
-  async function handleSubmit(e: React.FormEvent): Promise<void> {
+  async function handleSubmit(e: React.SubmitEvent): Promise<void> {
     e.preventDefault();
     setError(null);
 

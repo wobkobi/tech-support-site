@@ -60,7 +60,7 @@ export default function ReviewFormProtected({
    * Submit handler
    * @param e - Form event
    */
-  async function handleSubmit(e: React.FormEvent): Promise<void> {
+  async function handleSubmit(e: React.SubmitEvent): Promise<void> {
     e.preventDefault();
     setErrorMsg(null);
     setSent(false);
@@ -258,9 +258,6 @@ export default function ReviewFormProtected({
         />
 
         <div className={cn("mt-3 flex items-center justify-between")}>
-          <p className={cn("text-rich-black/70 text-[12px]")}>
-            Be specific and constructive. No private info.
-          </p>
           <button
             type="submit"
             disabled={loading || textCount < textMin}
