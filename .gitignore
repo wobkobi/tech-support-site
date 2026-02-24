@@ -77,6 +77,5 @@ REVIEW_TEST_COMPLETION.md
 
 BUG_FIX_REPORT.md
 
-# generated assets (run npm run build:icons / export-poster-screenshot to regenerate)
+# generated assets at root (icons auto-generate in pre-commit hook)
 /poster.pdf
-/public/downloads/poster.pdf
