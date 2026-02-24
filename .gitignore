@@ -76,6 +76,3 @@ ROOT_CAUSE_ANALYSIS.md
 REVIEW_TEST_COMPLETION.md
 
 BUG_FIX_REPORT.md
-
-# generated assets at root (icons auto-generate in pre-commit hook)
-/poster.pdf
