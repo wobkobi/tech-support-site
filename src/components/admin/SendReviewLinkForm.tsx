@@ -58,7 +58,7 @@ export function SendReviewLinkForm({ token }: SendReviewLinkFormProps): React.Re
       if (mode === "sms" && data.reviewUrl) {
         const firstName = name.trim().split(" ")[0];
         setSmsText(
-          `Hi ${firstName}, it's Harrison from To The Point Tech. Hope everything is still working well! If you have a spare moment, I'd really appreciate a quick review — it makes a big difference for a small local business: ${data.reviewUrl}`,
+          `Hi ${firstName}, it's Harrison from To The Point Tech. Hope everything is still working well! If you have a spare moment, I'd really appreciate a quick review - it makes a big difference for a small local business: ${data.reviewUrl}`,
         );
         setName("");
       } else {

@@ -9,7 +9,6 @@ import Link from "next/link";
 import { FrostedSection, PageShell, CARD, SOFT_CARD } from "@/components/PageLayout";
 import { cn } from "@/lib/cn";
 
-
 interface FaqItem {
   question: string;
   answer: React.ReactNode;
@@ -165,7 +164,10 @@ export default function FaqPage(): React.ReactElement {
             </p>
           </section>
 
-          <section aria-label="FAQ list" className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}>
+          <section
+            aria-label="FAQ list"
+            className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}
+          >
             <div className={cn("space-y-4")}>
               {faqItems.map((item) => (
                 <details key={item.question} className={cn(SOFT_CARD, "group")}>
@@ -185,7 +187,10 @@ export default function FaqPage(): React.ReactElement {
             </div>
           </section>
 
-          <section aria-label="Next steps" className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-200")}>
+          <section
+            aria-label="Next steps"
+            className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-200")}
+          >
             <p className={cn("text-rich-black text-base sm:text-lg")}>
               Ready to get started?{" "}
               <Link href="/booking" className={linkStyle}>

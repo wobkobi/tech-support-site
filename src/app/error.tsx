@@ -54,7 +54,7 @@ export default function Error({
             </p>
 
             <p
-              className={cn("text-rich-black/70 mb-6 wrap-break-word text-sm sm:text-base italic")}
+              className={cn("text-rich-black/70 wrap-break-word mb-6 text-sm italic sm:text-base")}
               role="status"
               aria-live="polite"
             >
@@ -66,7 +66,7 @@ export default function Error({
                 type="button"
                 onClick={reset}
                 className={cn(
-                  "bg-coquelicot-500 hover:bg-coquelicot-600 text-seasalt inline-flex items-center gap-2 rounded-lg px-6 py-3 font-semibold transition-colors shadow-lg hover:shadow-xl",
+                  "bg-coquelicot-500 hover:bg-coquelicot-600 text-seasalt inline-flex items-center gap-2 rounded-lg px-6 py-3 font-semibold shadow-lg transition-colors hover:shadow-xl",
                 )}
               >
                 <FaArrowRotateRight className={cn("h-5 w-5")} aria-hidden />
@@ -85,12 +85,12 @@ export default function Error({
             </div>
 
             <details className={cn("text-rich-black/80 mt-6 text-sm")}>
-              <summary className={cn("cursor-pointer font-semibold hover:text-russian-violet")}>
+              <summary className={cn("hover:text-russian-violet cursor-pointer font-semibold")}>
                 Technical details (for the curious)
               </summary>
               <pre
                 className={cn(
-                  "border-seasalt-400/60 bg-seasalt-900/60 mt-3 max-w-full overflow-auto rounded-lg border p-4 text-xs text-left",
+                  "border-seasalt-400/60 bg-seasalt-900/60 mt-3 max-w-full overflow-auto rounded-lg border p-4 text-left text-xs",
                 )}
               >
                 {String(error?.stack || error)}

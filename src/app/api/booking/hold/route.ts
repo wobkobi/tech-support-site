@@ -10,9 +10,27 @@ import { prisma } from "@/lib/prisma";
 import { BOOKING_CONFIG } from "@/lib/booking";
 import { createBookingEvent } from "@/lib/google-calendar";
 import { randomUUID } from "crypto";
+import { Prisma } from "@prisma/client";
 
 // Hold expiration time in minutes
 const HOLD_EXPIRATION_MINUTES = 15;
+
+/**
+ * Get the UTC offset for Pacific/Auckland timezone on a specific date.
+ * Automatically handles NZDT (UTC+13) and NZST (UTC+12).
+ */
+function getPacificAucklandOffset(year: number, month: number, day: number): number {
+  const utcMidnight = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
+  const nzHour = parseInt(
+    utcMidnight.toLocaleString("en-US", {
+      timeZone: "Pacific/Auckland",
+      hour: "numeric",
+      hour12: false,
+    }),
+    10,
+  );
+  return nzHour;
+}
 
 /**
  * Request payload for creating a booking.
@@ -96,24 +114,25 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreateBoo
       return NextResponse.json({ ok: false, error: "Invalid date format." }, { status: 400 });
     }
 
-    // Create local NZ dates
-    const startLocal = new Date(year, month - 1, day, startHour, startMinute, 0);
-    const endLocal = new Date(year, month - 1, day, endHour, endMinute, 0);
+    // Get dynamic UTC offset for this date (handles NZDT/NZST)
+    const utcOffset = getPacificAucklandOffset(year, month, day);
 
-    if (startLocal >= endLocal) {
+    // Create UTC dates from NZ local time
+    const startUtc = new Date(
+      Date.UTC(year, month - 1, day, startHour - utcOffset, startMinute, 0),
+    );
+    const endUtc = new Date(Date.UTC(year, month - 1, day, endHour - utcOffset, endMinute, 0));
+
+    if (startUtc >= endUtc) {
       return NextResponse.json({ ok: false, error: "Invalid time range." }, { status: 400 });
     }
 
-    if (startLocal < now) {
+    if (startUtc < now) {
       return NextResponse.json(
         { ok: false, error: "Cannot book times in the past." },
         { status: 400 },
       );
     }
-
-    // Convert to UTC for database storage
-    const startUtc = new Date(startLocal.toISOString());
-    const endUtc = new Date(endLocal.toISOString());
 
     const cancelToken = randomUUID();
     const holdExpiresUtc = new Date(now.getTime() + HOLD_EXPIRATION_MINUTES * 60 * 1000);
@@ -131,57 +150,75 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreateBoo
     }
 
     // Create the booking in the database first
-    const booking = await prisma.booking.create({
-      data: {
-        name: name.trim(),
-        email: email.trim().toLowerCase(),
-        notes: bookingNotes,
-        startUtc,
-        endUtc,
-        status: "held",
-        cancelToken,
-        holdExpiresUtc,
-        bufferBeforeMin: BOOKING_CONFIG.bufferMin,
-        bufferAfterMin: BOOKING_CONFIG.bufferMin,
-      },
-    });
-
-    // Try to create Google Calendar event
-    let calendarEventId: string | null = null;
     try {
-      const calendarResult = await createBookingEvent({
-        summary: `Booking: ${name.trim()}`,
-        description: bookingNotes,
-        startUtc,
-        endUtc,
-        timeZone: BOOKING_CONFIG.timeZone,
-        attendeeEmail: email.trim().toLowerCase(),
-        attendeeName: name.trim(),
-        location: meetingType === "in-person" && address ? address.trim() : undefined,
-      });
-
-      calendarEventId = calendarResult.eventId;
-
-      // Update booking with calendar event ID and confirm it
-      await prisma.booking.update({
-        where: { id: booking.id },
+      const booking = await prisma.booking.create({
         data: {
-          status: "confirmed",
-          calendarEventId,
-          holdExpiresUtc: null, // Clear hold expiry since it's confirmed
+          name: name.trim(),
+          email: email.trim().toLowerCase(),
+          notes: bookingNotes,
+          startUtc,
+          endUtc,
+          status: "held",
+          cancelToken,
+          holdExpiresUtc,
+          activeSlotKey: startUtc.toISOString(), // Unique constraint for double-booking prevention
+          bufferBeforeMin: BOOKING_CONFIG.bufferMin,
+          bufferAfterMin: BOOKING_CONFIG.bufferMin,
         },
       });
 
-      // ✅ Trigger on-demand revalidation of /booking page
-      // Next user who visits /booking will see fresh slots reflecting this new booking
-      revalidatePath("/booking");
-    } catch (calendarError) {
-      // Log but continue - calendar integration is optional
-      console.error("[booking/hold] Calendar event creation failed:", calendarError);
-      // Booking is still created in database, just without calendar event
-    }
+      // Try to create Google Calendar event
+      let calendarEventId: string | null = null;
+      try {
+        const calendarResult = await createBookingEvent({
+          summary: `Booking: ${name.trim()}`,
+          description: bookingNotes,
+          startUtc,
+          endUtc,
+          timeZone: BOOKING_CONFIG.timeZone,
+          attendeeEmail: email.trim().toLowerCase(),
+          attendeeName: name.trim(),
+          location: meetingType === "in-person" && address ? address.trim() : undefined,
+        });
 
-    return NextResponse.json({ ok: true, bookingId: booking.id });
+        calendarEventId = calendarResult.eventId;
+
+        // Update booking with calendar event ID and confirm it
+        await prisma.booking.update({
+          where: { id: booking.id },
+          data: {
+            status: "confirmed",
+            calendarEventId,
+            holdExpiresUtc: null, // Clear hold expiry since it's confirmed
+          },
+        });
+
+        // ✅ Trigger on-demand revalidation of /booking page
+        // Next user who visits /booking will see fresh slots reflecting this new booking
+        revalidatePath("/booking");
+      } catch (calendarError) {
+        // Log but continue - calendar integration is optional
+        console.error("[booking/hold] Calendar event creation failed:", calendarError);
+        // Booking is still created in database, just without calendar event
+      }
+
+      return NextResponse.json({ ok: true, bookingId: booking.id });
+    } catch (error) {
+      // Handle unique constraint violation (concurrent booking for same slot)
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        console.warn("[booking/hold] Concurrent booking conflict", {
+          activeSlotKey: startUtc.toISOString(),
+          email: email.trim().toLowerCase(),
+          timestamp: new Date().toISOString(),
+        });
+        return NextResponse.json(
+          { ok: false, error: "This time slot is no longer available." },
+          { status: 409 },
+        );
+      }
+      // Re-throw other errors to be caught by outer handler
+      throw error;
+    }
   } catch (error) {
     console.error("[booking/hold] Error:", error);
     return NextResponse.json(

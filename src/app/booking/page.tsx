@@ -55,7 +55,7 @@ async function getCalendarEvents(
     }));
   }
 
-  // Cache empty — fetch directly from Google Calendar
+  // Cache empty - fetch directly from Google Calendar
   try {
     const liveEvents = await fetchAllCalendarEvents(now, maxDate);
     console.log(

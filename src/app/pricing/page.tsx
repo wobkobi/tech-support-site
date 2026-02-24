@@ -9,7 +9,6 @@ import Link from "next/link";
 import { FrostedSection, PageShell, CARD, SOFT_CARD } from "@/components/PageLayout";
 import { cn } from "@/lib/cn";
 
-
 const linkStyle = cn(
   "text-coquelicot-500 hover:text-coquelicot-600 underline-offset-4 hover:underline",
 );
@@ -38,7 +37,10 @@ export default function PricingPage(): React.ReactElement {
             </p>
           </section>
 
-          <section aria-label="Standard rates" className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}>
+          <section
+            aria-label="Standard rates"
+            className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}
+          >
             <h2 className={cn("text-russian-violet mb-3 text-xl font-bold sm:text-2xl")}>
               Standard rate
             </h2>
@@ -48,7 +50,8 @@ export default function PricingPage(): React.ReactElement {
                 $50 per hour
               </p>
               <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
-                Billed in 15-minute increments. On-site visits and most remote support — remote rates may vary.
+                Billed fairly for the time I work. On-site visits and most remote support - remote
+                rates may vary.
               </p>
             </div>
 
@@ -63,8 +66,8 @@ export default function PricingPage(): React.ReactElement {
               <p className={cn("text-rich-black/90 flex gap-3 text-sm sm:text-base")}>
                 <span className={cn("text-moonstone-600 mt-1 text-lg")}>✓</span>
                 <span>
-                  <strong>Most jobs take 1 to 2 hours.</strong> I'll give you a time estimate before we
-                  start.
+                  <strong>Most jobs take 1 to 2 hours.</strong> I'll give you a time estimate before
+                  we start.
                 </span>
               </p>
               <p className={cn("text-rich-black/90 flex gap-3 text-sm sm:text-base")}>
@@ -77,7 +80,10 @@ export default function PricingPage(): React.ReactElement {
             </div>
           </section>
 
-          <section aria-label="How pricing works" className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-200")}>
+          <section
+            aria-label="How pricing works"
+            className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-200")}
+          >
             <h2 className={cn("text-russian-violet mb-3 text-xl font-bold sm:text-2xl")}>
               On-site vs Remote
             </h2>
@@ -94,13 +100,13 @@ export default function PricingPage(): React.ReactElement {
                   </li>
                   <li className={cn("flex gap-3")}>
                     <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
-                    <span>Travel within Point Chev and nearby suburbs included</span>
+                    <span>Travel to your location included</span>
                   </li>
                   <li className={cn("flex gap-3")}>
                     <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
                     <span>
-                      Best for: Wi-Fi setup, printers, smart TVs, physical hardware, anything needing
-                      hands-on work
+                      Best for: Wi-Fi setup, printers, smart TVs, physical hardware, anything
+                      needing hands-on work
                     </span>
                   </li>
                 </ul>
@@ -113,7 +119,7 @@ export default function PricingPage(): React.ReactElement {
                 <ul className={cn("text-rich-black space-y-2.5 text-sm sm:text-base")}>
                   <li className={cn("flex gap-3")}>
                     <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
-                    <span>Same hourly rate in most cases — may vary depending on the job</span>
+                    <span>Cost varies normally less than on-site visits</span>
                   </li>
                   <li className={cn("flex gap-3")}>
                     <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
@@ -122,8 +128,8 @@ export default function PricingPage(): React.ReactElement {
                   <li className={cn("flex gap-3")}>
                     <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
                     <span>
-                      Best for: account issues, software setup, email problems, quick fixes, follow-up
-                      support
+                      Best for: account issues, software setup, email problems, quick fixes,
+                      follow-up support
                     </span>
                   </li>
                 </ul>
@@ -131,7 +137,10 @@ export default function PricingPage(): React.ReactElement {
             </div>
           </section>
 
-          <section aria-labelledby="no-surprises-heading" className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-300")}>
+          <section
+            aria-labelledby="no-surprises-heading"
+            className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-300")}
+          >
             <h2
               id="no-surprises-heading"
               className={cn("text-russian-violet mb-3 text-xl font-bold sm:text-2xl")}
@@ -149,27 +158,31 @@ export default function PricingPage(): React.ReactElement {
               <li className={cn("flex gap-3")}>
                 <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
                 <span>
-                  <strong>No upselling.</strong> I don't sell hardware or earn commission on products.
+                  <strong>No upselling.</strong> I don't sell hardware or earn commission on
+                  products.
                 </span>
               </li>
               <li className={cn("flex gap-3")}>
                 <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
                 <span>
-                  <strong>No charge for unsuccessful work.</strong> If I can't fix it, you don't pay
-                  for that time.
+                  <strong>Half off for unsuccessful work.</strong> If I can't fix it, you don't pay
+                  for the full amount.
                 </span>
               </li>
               <li className={cn("flex gap-3")}>
                 <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
                 <span>
-                  <strong>Clear communication.</strong> If a job is taking longer than expected, I'll
-                  let you know before continuing.
+                  <strong>Clear communication.</strong> If a job is taking longer than expected,
+                  I'll let you know before continuing.
                 </span>
               </li>
             </ul>
           </section>
 
-          <section aria-label="Next steps" className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-400")}>
+          <section
+            aria-label="Next steps"
+            className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-400")}
+          >
             <p className={cn("text-rich-black text-sm sm:text-base")}>
               <Link href="/contact" className={linkStyle}>
                 Get in touch

@@ -45,6 +45,11 @@ model Booking {
   cancelToken String @unique
   reviewToken String @unique @default(uuid()) // NEW: Token for review link
 
+  // Double-booking prevention: Unique constraint on active time slots
+  // Set to startUtc.toISOString() when booking is active (held or confirmed)
+  // Set to null when cancelled or expired (MongoDB sparse index allows unlimited nulls)
+  activeSlotKey String? @unique
+
   // Optional reference to the Google Calendar event, for future cancellation.
   calendarEventId String?
 

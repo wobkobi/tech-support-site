@@ -48,7 +48,7 @@ describe("AddressAutocomplete lazy-load", () => {
 
     const onChange = vi.fn();
 
-    // Render component — no visibility event yet
+    // Render component - no visibility event yet
     render(<AddressAutocomplete value="" onChange={onChange} />);
 
     // Initially no script should have been created

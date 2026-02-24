@@ -4,7 +4,7 @@ import type { Config } from "prettier";
 const config: Config = {
   $schema: "https://json.schemastore.org/prettierrc",
   plugins: ["prettier-plugin-tailwindcss"],
-  tailwindConfig: "./tailwind.config.cjs",
+  tailwindConfig: "./tailwind.config.ts",
 
   printWidth: 100,
   tabWidth: 2,

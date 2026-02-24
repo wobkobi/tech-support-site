@@ -9,7 +9,6 @@ import { FrostedSection, PageShell, CARD } from "@/components/PageLayout";
 import { cn } from "@/lib/cn";
 import Link from "next/link";
 
-
 const linkStyle = cn(
   "text-coquelicot-500 hover:text-coquelicot-600 underline-offset-4 hover:underline",
 );
@@ -45,7 +44,10 @@ export default function AboutPage(): React.ReactElement {
             </p>
           </section>
 
-          <section aria-labelledby="about-approach-heading" className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}>
+          <section
+            aria-labelledby="about-approach-heading"
+            className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}
+          >
             <h2
               id="about-approach-heading"
               className={cn("text-russian-violet mb-3 text-xl font-bold sm:text-2xl")}
@@ -53,7 +55,7 @@ export default function AboutPage(): React.ReactElement {
               My approach
             </h2>
 
-            <ul className={cn("text-rich-black space-y-2.5 text-sm sm:text-base mb-4")}>
+            <ul className={cn("text-rich-black mb-4 space-y-2.5 text-sm sm:text-base")}>
               <li className={cn("flex gap-3")}>
                 <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
                 <span>
@@ -91,7 +93,10 @@ export default function AboutPage(): React.ReactElement {
             </p>
           </section>
 
-          <section aria-labelledby="about-who-heading" className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-200")}>
+          <section
+            aria-labelledby="about-who-heading"
+            className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-200")}
+          >
             <h2
               id="about-who-heading"
               className={cn("text-russian-violet mb-3 text-xl font-bold sm:text-2xl")}
@@ -104,7 +109,7 @@ export default function AboutPage(): React.ReactElement {
               their tech to just work, without wading through jargon or sales pitches.
             </p>
 
-            <ul className={cn("text-rich-black space-y-2.5 text-sm sm:text-base mb-4")}>
+            <ul className={cn("text-rich-black mb-4 space-y-2.5 text-sm sm:text-base")}>
               <li className={cn("flex gap-3")}>
                 <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
                 <span>Home users wanting reliable Wi-Fi, secure accounts, and proper backups.</span>

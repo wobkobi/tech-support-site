@@ -24,7 +24,7 @@ vi.mock("@/lib/prisma", () => ({
 
 describe("GET /api/cron/send-review-emails - Timing Edge Cases", () => {
   const CRON_SECRET = "test-secret-123";
-  
+
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.CRON_SECRET = CRON_SECRET;

@@ -58,8 +58,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     const isAnonymous = body.isAnonymous ?? false;
-    const firstName = isAnonymous ? null : (body.firstName?.trim() || null);
-    const lastName = isAnonymous ? null : (body.lastName?.trim() || null);
+    const firstName = isAnonymous ? null : body.firstName?.trim() || null;
+    const lastName = isAnonymous ? null : body.lastName?.trim() || null;
 
     const review = await prisma.review.create({
       data: {

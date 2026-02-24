@@ -136,7 +136,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     revalidatePath("/reviews");
     revalidatePath("/review");
 
-    // Notify the owner — fire-and-forget, never blocks the response
+    // Notify the owner - fire-and-forget, never blocks the response
     void sendOwnerReviewNotification(review);
 
     return NextResponse.json({ ok: true, id: review.id, verified }, { status: 201 });

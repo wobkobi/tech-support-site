@@ -53,7 +53,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     if (ids.length > 0) {
       await prisma.booking.updateMany({
         where: { id: { in: ids } },
-        data: { status: "cancelled" },
+        data: {
+          status: "cancelled",
+          activeSlotKey: null,
+        },
       });
     }
 

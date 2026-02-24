@@ -1,7 +1,7 @@
 // src/app/poster/page.tsx
 /**
  * @file page.tsx
- * @description Poster page — A5 at 300 DPI (1748x2480px) with even outer padding.
+ * @description Poster page - A5 at 300 DPI (1748x2480px) with even outer padding.
  */
 
 import { cn } from "@/lib/cn";
@@ -54,7 +54,7 @@ const servicesText =
  */
 export default function PosterPage(): React.ReactElement {
   return (
-    <div className={cn("h-screen w-screen relative overflow-hidden")}>
+    <div className={cn("relative h-screen w-screen overflow-hidden")}>
       {/* Backdrop */}
       <div className={cn("absolute inset-0 -z-10")}>
         <Image
@@ -71,10 +71,10 @@ export default function PosterPage(): React.ReactElement {
       <div className={cn("flex h-full w-full flex-col p-6")}>
         {/* Inner column fills available height so footer can pin to bottom */}
         <div className={cn("flex min-h-0 flex-1 flex-col")}>
-          {/* Main frosted card — flex-1 so it fills the space above the footer */}
+          {/* Main frosted card - flex-1 so it fills the space above the footer */}
           <div
             className={cn(
-              "flex-1 rounded-4xl border-seasalt-400/40 bg-seasalt-800/60 p-6 border-[3px] shadow-xl backdrop-blur-xl",
+              "rounded-4xl border-seasalt-400/40 bg-seasalt-800/60 flex-1 border-[3px] p-6 shadow-xl backdrop-blur-xl",
             )}
           >
             <div className={cn("flex h-full flex-col")}>
@@ -141,14 +141,16 @@ export default function PosterPage(): React.ReactElement {
                 </div>
               </div>
 
-              {/* Text boxes — flex-1 absorbs extra height so bottom padding stays even */}
+              {/* Text boxes - flex-1 absorbs extra height so bottom padding stays even */}
               <section className={cn("flex flex-1 flex-col gap-5")}>
                 <div
                   className={cn(
-                    "flex-1 border-seasalt-400/60 bg-seasalt-800 p-4.5 rounded-[18px] border-2 shadow-sm",
+                    "border-seasalt-400/60 bg-seasalt-800 p-4.5 flex-1 rounded-[18px] border-2 shadow-sm",
                   )}
                 >
-                  <h2 className={cn("text-russian-violet mb-1.5 text-[53px] font-bold")}>About Me</h2>
+                  <h2 className={cn("text-russian-violet mb-1.5 text-[53px] font-bold")}>
+                    About Me
+                  </h2>
                   <p className={cn("text-rich-black text-[38px] font-medium leading-tight")}>
                     {aboutMeText}
                   </p>
@@ -156,10 +158,12 @@ export default function PosterPage(): React.ReactElement {
 
                 <div
                   className={cn(
-                    "flex-1 border-seasalt-400/60 bg-seasalt-800 p-4.5 rounded-[18px] border-2 shadow-sm",
+                    "border-seasalt-400/60 bg-seasalt-800 p-4.5 flex-1 rounded-[18px] border-2 shadow-sm",
                   )}
                 >
-                  <h2 className={cn("text-russian-violet mb-1.5 text-[53px] font-bold")}>Services</h2>
+                  <h2 className={cn("text-russian-violet mb-1.5 text-[53px] font-bold")}>
+                    Services
+                  </h2>
                   <p className={cn("text-rich-black text-[38px] font-medium leading-tight")}>
                     {servicesText}
                   </p>
@@ -202,11 +206,11 @@ export default function PosterPage(): React.ReactElement {
             </div>
           </div>
 
-          {/* Footer — fixed gap from the card above */}
+          {/* Footer - fixed gap from the card above */}
           <footer className={cn("mx-auto mt-6 w-fit")}>
             <div
               className={cn(
-                "bg-seasalt-800/70 border-seasalt-400/40 p-6 rounded-[14px] border-2 shadow-xl backdrop-blur-md",
+                "bg-seasalt-800/70 border-seasalt-400/40 rounded-[14px] border-2 p-6 shadow-xl backdrop-blur-md",
               )}
             >
               <div className={cn("flex items-center gap-7")}>

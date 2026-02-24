@@ -54,7 +54,7 @@ export default function BookingSuccessPage(): React.ReactElement {
 
               <p className={cn("text-rich-black/80 mb-6 text-sm sm:text-base")}>
                 Your appointment is confirmed. Check your email for the details and a Google
-                Calendar invite — if you don&apos;t see it within a few minutes, check your spam
+                Calendar invite - if you don&apos;t see it within a few minutes, check your spam
                 folder.
               </p>
 
@@ -80,8 +80,12 @@ export default function BookingSuccessPage(): React.ReactElement {
                 )}
               >
                 <li>A confirmation email has been sent to you with the appointment details</li>
-                <li>A Google Calendar invite has been sent — accept it to add it to your calendar</li>
-                <li>To cancel or reschedule, use the link in the confirmation email or reply to it</li>
+                <li>
+                  A Google Calendar invite has been sent - accept it to add it to your calendar
+                </li>
+                <li>
+                  To cancel or reschedule, use the link in the confirmation email or reply to it
+                </li>
                 <li>I&apos;ll send you a review link after your appointment</li>
               </ol>
             </section>

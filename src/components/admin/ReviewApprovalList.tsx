@@ -26,7 +26,7 @@ interface ReviewApprovalListProps {
 
 /**
  * Renders the full admin review list with pending and approved sections.
- * Uses optimistic UI — cards are moved/removed immediately on action.
+ * Uses optimistic UI - cards are moved/removed immediately on action.
  * @param props - Component props.
  * @param props.pending - Reviews awaiting approval.
  * @param props.approved - Already-approved reviews.

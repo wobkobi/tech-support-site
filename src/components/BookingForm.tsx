@@ -453,7 +453,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
           </div>
         </div>
 
-        {/* Address (only for in-person) — animated reveal */}
+        {/* Address (only for in-person) - animated reveal */}
         <div
           className={cn(
             "grid transition-all duration-300 ease-in-out",

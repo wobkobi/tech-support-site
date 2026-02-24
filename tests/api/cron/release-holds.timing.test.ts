@@ -62,10 +62,13 @@ describe("GET /api/cron/release-holds - Timing & Edge Cases", () => {
       select: { id: true },
     });
 
-    // Verify status was updated to cancelled
+    // Verify status was updated to cancelled and activeSlotKey cleared
     expect(prisma.booking.updateMany).toHaveBeenCalledWith({
       where: { id: { in: ["booking-123"] } },
-      data: { status: "cancelled" },
+      data: {
+        status: "cancelled",
+        activeSlotKey: null,
+      },
     });
 
     vi.useRealTimers();
@@ -134,10 +137,13 @@ describe("GET /api/cron/release-holds - Timing & Edge Cases", () => {
     expect(body.releasedCount).toBe(5);
     expect(body.releasedIds).toHaveLength(5);
 
-    // Verify bulk update with all IDs
+    // Verify bulk update with all IDs and activeSlotKey cleared
     expect(prisma.booking.updateMany).toHaveBeenCalledWith({
       where: { id: { in: ["booking-1", "booking-2", "booking-3", "booking-4", "booking-5"] } },
-      data: { status: "cancelled" },
+      data: {
+        status: "cancelled",
+        activeSlotKey: null,
+      },
     });
 
     vi.useRealTimers();
