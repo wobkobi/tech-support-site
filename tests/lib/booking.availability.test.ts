@@ -376,9 +376,6 @@ describe("buildAvailableDays & validateBookingRequest", () => {
       vi.setSystemTime(new Date("2026-02-24T10:00:00.000Z"));
       const now = new Date();
 
-      const days = buildAvailableDays([], [], now, BOOKING_CONFIG);
-      const tomorrow = days.find((d) => d.dateKey === "2026-02-25");
-
       // 10am NZ = 21:00 UTC (previous day) during NZDT
       // Create booking at 10am slot
       const bookings: ExistingBooking[] = [
@@ -402,9 +399,6 @@ describe("buildAvailableDays & validateBookingRequest", () => {
       // June 15, 2026 is NZST (UTC+12)
       vi.setSystemTime(new Date("2026-06-14T10:00:00.000Z"));
       const now = new Date();
-
-      const days = buildAvailableDays([], [], now, BOOKING_CONFIG);
-      const tomorrow = days.find((d) => d.dateKey === "2026-06-15");
 
       // 10am NZ = 22:00 UTC (previous day) during NZST
       // Create booking at 10am slot during winter

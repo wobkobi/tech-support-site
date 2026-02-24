@@ -7,7 +7,6 @@
 /**
  * Get the UTC offset for Pacific/Auckland timezone on a specific date.
  * Automatically handles NZDT (UTC+13, Sep–Apr) and NZST (UTC+12, Apr–Sep).
- *
  * @param year - Full year (e.g., 2026)
  * @param month - Month as 1-12 (not 0-indexed)
  * @param day - Day of month

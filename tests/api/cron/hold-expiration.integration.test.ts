@@ -112,7 +112,7 @@ describe("Hold Expiration Integration - activeSlotKey Clearing", () => {
       headers: { authorization: `Bearer ${CRON_SECRET}` },
     });
 
-    const response = await GET(request);
+    await GET(request);
 
     // Verify activeSlotKey: null is in the update data
     const updateCall = vi.mocked(prisma.booking.updateMany).mock.calls[0];
