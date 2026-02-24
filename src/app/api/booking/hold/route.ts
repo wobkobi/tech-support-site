@@ -8,29 +8,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { BOOKING_CONFIG } from "@/lib/booking";
+import { getPacificAucklandOffset } from "@/lib/timezone-utils";
 import { createBookingEvent } from "@/lib/google-calendar";
 import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
 
 // Hold expiration time in minutes
 const HOLD_EXPIRATION_MINUTES = 15;
-
-/**
- * Get the UTC offset for Pacific/Auckland timezone on a specific date.
- * Automatically handles NZDT (UTC+13) and NZST (UTC+12).
- */
-function getPacificAucklandOffset(year: number, month: number, day: number): number {
-  const utcMidnight = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
-  const nzHour = parseInt(
-    utcMidnight.toLocaleString("en-US", {
-      timeZone: "Pacific/Auckland",
-      hour: "numeric",
-      hour12: false,
-    }),
-    10,
-  );
-  return nzHour;
-}
 
 /**
  * Request payload for creating a booking.

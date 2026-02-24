@@ -9,12 +9,6 @@
 import { cn } from "@/lib/cn";
 import React, { useState } from "react";
 
-/**
- * ReviewText component: truncates long text and allows expand/collapse on click.
- * @param text - Component props.
- * @param text.text - The review text to display.
- * @returns A span element with the review text, expandable on click.
- */
 /** Character limit for truncating long reviews. */
 const REVIEW_CHAR_LIMIT = 150;
 
@@ -27,6 +21,12 @@ function isLongReview(text: string): boolean {
   return text.length > REVIEW_CHAR_LIMIT;
 }
 
+/**
+ * ReviewText component: truncates long text and allows expand/collapse on click.
+ * @param props - Component props.
+ * @param props.text - The review text to display.
+ * @returns A span element with the review text, expandable on click.
+ */
 function ReviewText({ text }: { text: string }): React.ReactElement {
   const [expanded, setExpanded] = useState(false);
   if (!isLongReview(text)) {
@@ -34,7 +34,10 @@ function ReviewText({ text }: { text: string }): React.ReactElement {
   }
 
   // Truncate at the last space before the limit to avoid orphaned "…"
-  const truncated = text.slice(0, REVIEW_CHAR_LIMIT).replace(/\s+\S*$/, "") + "…";
+  const preview = text.slice(0, REVIEW_CHAR_LIMIT);
+  const wordSafe = preview.replace(/\s+\S*$/, "");
+  const base = wordSafe.trim().length > 0 ? wordSafe : preview;
+  const truncated = base + "…";
 
   return (
     <span

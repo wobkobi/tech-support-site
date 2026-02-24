@@ -15,27 +15,11 @@ import {
   type JobDuration,
   type ExistingBooking,
 } from "@/lib/booking";
+import { getPacificAucklandOffset } from "@/lib/timezone-utils";
 import { createBookingEvent, fetchAllCalendarEvents } from "@/lib/google-calendar";
 import { sendOwnerBookingNotification, sendCustomerBookingConfirmation } from "@/lib/email";
 import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
-
-/**
- * Get the UTC offset for Pacific/Auckland timezone on a specific date.
- * Automatically handles NZDT (UTC+13) and NZST (UTC+12).
- */
-function getPacificAucklandOffset(year: number, month: number, day: number): number {
-  const utcMidnight = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
-  const nzHour = parseInt(
-    utcMidnight.toLocaleString("en-US", {
-      timeZone: "Pacific/Auckland",
-      hour: "numeric",
-      hour12: false,
-    }),
-    10,
-  );
-  return nzHour;
-}
 
 interface BookingRequestPayload {
   dateKey: string;

@@ -318,25 +318,42 @@ describe("buildAvailableDays & validateBookingRequest", () => {
       expect(threePmSlot?.availableLong).toBe(false);
     });
 
-    it("returns hasAnySlots = false when day is fully booked", () => {
+    it("returns hasAnySlots = true with 2hr buffer blocking morning", () => {
       vi.setSystemTime(new Date("2026-02-23T10:00:00.000Z"));
       const now = new Date();
 
-      // Block entire 2026-02-25 with multiple bookings
+      // Booking 10am-11am with 2hr buffer blocks until 1pm
       const blockingBookings: ExistingBooking[] = [
         {
           id: "b1",
           startUtc: new Date("2026-02-24T21:00:00.000Z"), // 10am
           endUtc: new Date("2026-02-24T22:00:00.000Z"), // 11am
           bufferBeforeMin: 0,
-          bufferAfterMin: 120, // 2hr buffer blocks rest of day
+          bufferAfterMin: 120, // 2hr buffer blocks until 1pm
         },
       ];
 
       const days = buildAvailableDays(blockingBookings, [], now, BOOKING_CONFIG);
 
-      const fullyBookedDay = days.find((d) => d.dateKey === "2026-02-25");
-      expect(fullyBookedDay?.hasAnySlots).toBe(true); // 1pm-8pm still available
+      const day = days.find((d) => d.dateKey === "2026-02-25");
+      expect(day?.hasAnySlots).toBe(true);
+
+      // Verify morning slots are blocked
+      const tenAmSlot = day?.timeWindows.find((w) => w.value === "10am");
+      expect(tenAmSlot?.availableShort).toBe(false);
+
+      const elevenAmSlot = day?.timeWindows.find((w) => w.value === "11am");
+      expect(elevenAmSlot?.availableShort).toBe(false);
+
+      const noonSlot = day?.timeWindows.find((w) => w.value === "12pm");
+      expect(noonSlot?.availableShort).toBe(false);
+
+      // Verify 1pm onwards is available
+      const onePmSlot = day?.timeWindows.find((w) => w.value === "1pm");
+      expect(onePmSlot?.availableShort).toBe(true);
+
+      const sixPmSlot = day?.timeWindows.find((w) => w.value === "6pm");
+      expect(sixPmSlot?.availableShort).toBe(true);
     });
 
     it("returns hasAnySlots = true when at least one slot available", () => {
