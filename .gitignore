@@ -76,3 +76,7 @@ ROOT_CAUSE_ANALYSIS.md
 REVIEW_TEST_COMPLETION.md
 
 BUG_FIX_REPORT.md
+
+# generated assets (run npm run build:icons / export-poster-screenshot to regenerate)
+/poster.pdf
+/public/downloads/poster.pdf
