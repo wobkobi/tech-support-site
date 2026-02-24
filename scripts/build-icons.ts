@@ -2,15 +2,22 @@
 /**
  * @file build-icons.ts
  * @description Generates all favicon, OG, and social media images for the site.
- * Run with: npx ts-node scripts/build-icons.ts
+ * Run with: npm run build:icons
  */
 
 import sharp from "sharp";
 import fs from "node:fs/promises";
 import path from "node:path";
-import QRCodeStyling from "qr-code-styling";
+import { createRequire } from "node:module";
 import { JSDOM } from "jsdom";
-import canvas from "canvas";
+
+// Dynamic import for CommonJS module
+const QRCodeStylingModule = await import("qr-code-styling");
+const QRCodeStyling = QRCodeStylingModule.default;
+
+// Load the native Canvas addon via CJS require to avoid ERR_INTERNAL_ASSERTION
+// in Node.js v22 when the ESM loader attempts to wrap native bindings directly.
+const canvas = createRequire(import.meta.url)("canvas") as typeof import("canvas");
 
 /* ---------- Brand Palette ---------- */
 

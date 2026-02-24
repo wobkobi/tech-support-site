@@ -69,13 +69,13 @@ export default async function AdminReviewsPage({
       lastName: true,
       isAnonymous: true,
       verified: true,
-      approved: true,
+      status: true,
       createdAt: true,
     },
   });
 
-  const pending = reviews.filter((r) => !r.approved);
-  const approved = reviews.filter((r) => r.approved);
+  const pending = reviews.filter((r) => r.status !== "approved");
+  const approved = reviews.filter((r) => r.status === "approved");
 
   return (
     <PageShell>

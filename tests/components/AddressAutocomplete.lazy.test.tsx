@@ -70,7 +70,15 @@ describe("AddressAutocomplete lazy-load", () => {
     });
 
     // Verify the script is the Google Maps script
-    const mapScript = scripts.find((s) => s.src?.includes("maps.googleapis.com"));
+    const mapScript = scripts.find((s) => {
+      if (!s.src) return false;
+      try {
+        const url = new URL(s.src, window.location.origin);
+        return url.hostname === "maps.googleapis.com";
+      } catch {
+        return false;
+      }
+    });
     expect(mapScript).toBeDefined();
     expect(mapScript?.src).toContain("key=test-key");
     expect(mapScript?.src).toContain("libraries=places");

@@ -15,6 +15,12 @@ enum BookingStatus {
   completed // NEW: Added for tracking completed appointments
 }
 
+enum ReviewStatus {
+  pending
+  approved
+  revoked
+}
+
 model Booking {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 
@@ -60,7 +66,12 @@ model Review {
   firstName   String?
   lastName    String?
   isAnonymous Boolean @default(false)
-  approved    Boolean @default(false)
+
+  // Moderation status
+  status      ReviewStatus @default(pending)
+
+  // For edit/auth (magic link, booking ref, etc)
+  customerRef String?
 
   // NEW: Link to booking (optional, for verified reviews)
   bookingId String? @db.ObjectId

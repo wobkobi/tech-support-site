@@ -22,8 +22,18 @@ interface ExportOptions {
 
 /* ---------- Constants ---------- */
 
-/** A5 viewport at 300 DPI (148 mm × 210 mm → 1748 px × 2480 px). */
+/**
+ * A5 CSS viewport at 300 DPI (148 mm × 210 mm → 1748 px × 2480 px).
+ * Combined with {@link DEVICE_SCALE_FACTOR} the captured screenshot is
+ * 1748×SCALE × 2480×SCALE px, equivalent to 300×SCALE DPI.
+ */
 const A5_VIEWPORT = { width: 1748, height: 2480 } as const;
+
+/**
+ * Puppeteer device scale factor (CSS pixel → physical pixel multiplier).
+ * 2 = 600 DPI effective (3496 × 4960 px screenshot).
+ */
+const DEVICE_SCALE_FACTOR = 2 as const;
 
 /** A5 page size in PDF points (1 pt = 1/72 inch). */
 const A5_POINTS = { width: 419.53, height: 595.28 } as const;
@@ -52,7 +62,7 @@ async function exportPosterToPDF(options: ExportOptions): Promise<void> {
     await page.setViewport({
       width: A5_VIEWPORT.width,
       height: A5_VIEWPORT.height,
-      deviceScaleFactor: 1,
+      deviceScaleFactor: DEVICE_SCALE_FACTOR,
     });
 
     console.log(`Loading: ${url}`);
@@ -97,22 +107,34 @@ async function exportPosterToPDF(options: ExportOptions): Promise<void> {
 
 /* ---------- CLI ---------- */
 
+/** Production poster URL. */
+const PROD_URL = "https://tothepoint.co.nz/poster";
+
+/** Local dev-server poster URL. */
+const LOCAL_URL = "http://localhost:3000/poster";
+
 /**
- * Parses `--url=<value>` and `--out=<value>` flags from `process.argv`,
- * falling back to sensible defaults when flags are omitted.
+ * Parses CLI flags from `process.argv`.
+ *
+ * Flags:
+ * - `--local`          Use the local dev server instead of production.
+ * - `--url=<value>`    Override the target URL entirely.
+ * - `--out=<value>`    Override the output file path (default: `public/downloads/poster.pdf`).
  * @returns Parsed {@link ExportOptions} ready for {@link exportPosterToPDF}.
  */
 function parseArgs(): ExportOptions {
   const args = process.argv.slice(2);
   const options: ExportOptions = {
-    url: "http://tothepoint.co.nz/poster",
+    url: PROD_URL,
     output: "poster.pdf",
   };
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
 
-    if (arg.startsWith("--url=")) {
+    if (arg === "--local") {
+      options.url = LOCAL_URL;
+    } else if (arg.startsWith("--url=")) {
       options.url = arg.substring(6);
     } else if (arg === "--url" && args[i + 1]) {
       options.url = args[++i];

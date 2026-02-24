@@ -7,6 +7,7 @@
 
 import { timingSafeEqual } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -52,8 +53,14 @@ export async function PATCH(
   try {
     await prisma.review.update({
       where: { id },
-      data: { approved: action === "approve" },
+      data: { status: action === "approve" ? "approved" : "pending" },
     });
+
+    // Trigger ISR revalidation so public pages update immediately
+    revalidatePath("/reviews");
+    revalidatePath("/review");
+    revalidatePath("/");
+
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error(`[admin/reviews] PATCH error for ${id}:`, error);
@@ -83,6 +90,12 @@ export async function DELETE(
 
   try {
     await prisma.review.delete({ where: { id } });
+
+    // Trigger ISR revalidation so public pages update immediately
+    revalidatePath("/reviews");
+    revalidatePath("/review");
+    revalidatePath("/");
+
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error(`[admin/reviews] DELETE error for ${id}:`, error);

@@ -68,7 +68,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         lastName,
         isAnonymous,
         verified: false,
-        approved: true,
+        status: "approved",
       },
       select: {
         id: true,
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         lastName: true,
         isAnonymous: true,
         verified: true,
-        approved: true,
+        status: true,
         createdAt: true,
       },
     });

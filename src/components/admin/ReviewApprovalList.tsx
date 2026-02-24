@@ -26,8 +26,8 @@ export interface ReviewRow {
   isAnonymous: boolean;
   /** Whether the review was verified via a booking token */
   verified: boolean;
-  /** Whether the review is currently approved */
-  approved: boolean;
+  /** Review moderation status */
+  status: string;
   /** Creation timestamp */
   createdAt: Date;
 }
@@ -520,7 +520,7 @@ export function ReviewApprovalList({
     const row = pending.find((r) => r.id === id);
     if (!row) return;
     setPending((prev) => prev.filter((r) => r.id !== id));
-    setApproved((prev) => [{ ...row, approved: true }, ...prev]);
+    setApproved((prev) => [{ ...row, status: "approved" }, ...prev]);
   }
 
   /**
@@ -531,7 +531,7 @@ export function ReviewApprovalList({
     const row = approved.find((r) => r.id === id);
     if (!row) return;
     setApproved((prev) => prev.filter((r) => r.id !== id));
-    setPending((prev) => [{ ...row, approved: false }, ...prev]);
+    setPending((prev) => [{ ...row, status: "pending" }, ...prev]);
   }
 
   /**

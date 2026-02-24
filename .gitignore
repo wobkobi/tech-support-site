@@ -12,10 +12,12 @@
 
 # testing
 /coverage
+*.lcov
 
 # next.js
 /.next/
 /out/
+.turbo/
 
 # production
 /build
@@ -47,3 +49,11 @@ next-env.d.ts
 # claude
 .claude/
 docs/
+
+# temporary development docs (should be moved to wiki/docs or deleted)
+TEST_STRATEGY_GAPS.md
+ROOT_CAUSE_ANALYSIS.md
+REVIEW_TEST_COMPLETION.md
+
+# generated print assets (root-level, replaced by public/downloads/)
+/poster.pdf
