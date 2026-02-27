@@ -46,6 +46,8 @@ interface PageConfig {
   cropMarks: boolean;
   /** Output file name. */
   filename: string;
+  /** URL suffix appended to the base poster URL (e.g. "?mode=print" → /poster?mode=print). */
+  urlSuffix?: string;
 }
 
 /* ---------- Constants ---------- */
@@ -82,6 +84,7 @@ const A5_PRINT_CONFIG: PageConfig = {
   trimSize: { width: 419.53, height: 595.28 },
   cropMarks: true,
   filename: "poster-a5-print.pdf",
+  urlSuffix: "?mode=print",
 } as const;
 
 /** Configuration for digital variant (A4, no bleed). */
@@ -102,6 +105,7 @@ const A4_PRINT_CONFIG: PageConfig = {
   trimSize: { width: 595.28, height: 841.89 },
   cropMarks: true,
   filename: "poster-a4-print.pdf",
+  urlSuffix: "?mode=print",
 } as const;
 
 /** A5 page size in PDF points (1 pt = 1/72 inch). */
@@ -239,9 +243,10 @@ async function generateVariant(
       deviceScaleFactor: DEVICE_SCALE_FACTOR,
     });
 
-    console.log(`Loading: ${url}`);
+    const targetUrl = config.urlSuffix ? url + config.urlSuffix : url;
+    console.log(`Loading: ${targetUrl}`);
 
-    await page.goto(url, { waitUntil: "networkidle0", timeout: 30000 });
+    await page.goto(targetUrl, { waitUntil: "networkidle0", timeout: 30000 });
 
     // Allow fonts and lazy assets to finish rendering.
     await new Promise((resolve) => setTimeout(resolve, 3000));

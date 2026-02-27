@@ -1,7 +1,8 @@
 // src/app/poster/page.tsx
 /**
  * @file page.tsx
- * @description Poster page - A5 at 300 DPI (1748x2480px) with even outer padding.
+ * @description Poster page - A5 at 300 DPI (1748x2480px).
+ * Pass ?mode=print to add a 3mm bleed on all edges (viewport 1818x2550px).
  */
 
 import { cn } from "@/lib/cn";
@@ -49,10 +50,21 @@ const servicesText =
   "If you've got a tech issue, I've got you covered. I fix slow computers, set up new phones and laptops, sort Wi-Fi and network connections, connect printers and TVs, and ensure cloud backups and email run reliably. I can secure your devices, remove malware and scams, and safely move photos and files between devices. I'll explain everything in plain language, leave clear notes, and I won't try to upsell you. I'm local, flexible with evenings/weekends, and can help in person or remotely.";
 
 /**
- * Poster page component for A5 print export
+ * Poster page component for A5 export.
+ * Accepts an optional `mode` search param — set to "print" for a 3mm bleed version.
+ * @param root0 - Page props.
+ * @param root0.searchParams - Next.js search params promise.
  * @returns Poster page element
  */
-export default function PosterPage(): React.ReactElement {
+export default async function PosterPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ mode?: string }>;
+}): Promise<React.ReactElement> {
+  const { mode } = await searchParams;
+  // 36px base + 35px bleed (3 mm at 300 DPI) = 71px
+  const outerPadding = mode === "print" ? "71px" : "36px";
+
   return (
     <div className={cn("relative h-screen w-screen overflow-hidden")}>
       {/* Backdrop */}
@@ -68,7 +80,7 @@ export default function PosterPage(): React.ReactElement {
       </div>
 
       {/* Even outer gap on all sides */}
-      <div className={cn("flex h-full w-full flex-col p-8")}>
+      <div className={cn("flex h-full w-full flex-col")} style={{ padding: outerPadding }}>
         {/* Inner column fills available height so footer can pin to bottom */}
         <div className={cn("flex min-h-0 flex-1 flex-col justify-between gap-8")}>
           {/* Main frosted card - content-sized */}
