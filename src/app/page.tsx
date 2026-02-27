@@ -169,7 +169,7 @@ export default async function Home(): Promise<React.ReactElement> {
                 <FaMapLocationDot className={cn("text-moonstone-600 h-8 w-8")} aria-hidden />
               </div>
               <h3 className={cn("text-russian-violet mb-2 text-xl font-bold sm:text-2xl")}>
-                Pt Chev Local
+                Proudly Local
               </h3>
               <p className={cn("text-rich-black/80 text-base sm:text-lg")}>
                 Born and raised here, serving the community
@@ -340,7 +340,7 @@ export default async function Home(): Promise<React.ReactElement> {
               </div>
 
               <a
-                href="/downloads/poster.pdf"
+                href="/downloads/poster-a5.pdf"
                 download="to-the-point-tech-flyer.pdf"
                 className={cn(
                   "bg-moonstone-600 hover:bg-moonstone-700 text-seasalt inline-flex shrink-0 items-center gap-2 rounded-lg px-5 py-3 text-sm font-bold shadow-md transition-all hover:shadow-lg sm:text-base",

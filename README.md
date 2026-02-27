@@ -19,8 +19,10 @@ Every commit automatically runs:
 
 ### Manual: Poster PDF Generation
 
-The marketing flyer (`public/downloads/poster.pdf`) must be regenerated manually when the `/poster`
-page design changes.
+The marketing flyers must be regenerated manually when the `/poster` page design changes:
+
+- `public/downloads/poster.pdf` — Digital version (A5, user-facing)
+- `public/downloads/poster-print.pdf` — Print-ready version (A5 + 3mm bleed with crop marks)
 
 **When to regenerate**:
 
@@ -31,23 +33,29 @@ page design changes.
 **How to regenerate**:
 
 ```bash
-# Option 1: From production (after deploying poster changes)
+# Option 1: Generate both digital and print PDFs (recommended)
 npm run build:poster
 
-# Option 2: From localhost (during development)
-npm run dev              # Terminal 1 - keep running
+# Option 2: Generate from localhost (during development)
+npm run dev                    # Terminal 1 - keep running
 npm run build:poster -- --local    # Terminal 2
+
+# Option 3: Generate only digital or print (individual variants)
+npm run build:poster -- --variant=digital     # Only poster.pdf
+npm run build:poster -- --variant=print       # Only poster-print.pdf
+npm run build:poster -- --variant=both --local   # Both from localhost
 ```
 
 **After generation**:
 
 ```bash
-git add public/downloads/poster.pdf
-git commit -m "chore: regenerate poster PDF"
+git add public/downloads/poster.pdf public/downloads/poster-print.pdf
+git commit -m "chore: regenerate poster PDFs"
 ```
 
 **Note**: Poster generation requires Puppeteer to screenshot the `/poster` page at A5 dimensions
-(600 DPI). This is intentionally manual to avoid slowing down every commit.
+(600 DPI). The print version includes 3mm bleed and crop marks for professional printing. This is
+intentionally manual to avoid slowing down every commit.
 
 ---
 
