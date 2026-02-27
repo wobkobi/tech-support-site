@@ -32,7 +32,7 @@ export interface PageShellProps {
  */
 export function PageShell({ children }: PageShellProps): React.ReactElement {
   return (
-    <main className={cn("relative min-h-[calc(100vh-4rem)] overflow-hidden")}>
+    <main className={cn("relative min-h-[calc(100dvh-4rem)] overflow-hidden")}>
       {/* Backdrop */}
       <div className={cn("pointer-events-none fixed inset-0 -z-10 overflow-hidden")}>
         <Image

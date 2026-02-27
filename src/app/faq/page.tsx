@@ -171,11 +171,19 @@ export default function FaqPage(): React.ReactElement {
                 <details key={item.question} className={cn(SOFT_CARD, "group")}>
                   <summary
                     className={cn(
-                      "text-rich-black cursor-pointer select-text text-sm font-semibold sm:text-base",
+                      "text-rich-black flex cursor-pointer select-text items-center justify-between gap-3 text-sm font-semibold sm:text-base",
                       "list-none [&::-webkit-details-marker]:hidden",
                     )}
                   >
-                    {item.question}
+                    <span>{item.question}</span>
+                    <span
+                      className={cn(
+                        "text-moonstone-600 shrink-0 text-lg transition-transform duration-200 group-open:rotate-180",
+                      )}
+                      aria-hidden
+                    >
+                      ▾
+                    </span>
                   </summary>
                   <div className={cn("text-rich-black/90 mt-3 text-sm sm:text-base")}>
                     {item.answer}

@@ -335,16 +335,16 @@ html {
    Google Places Autocomplete Overrides
    ============================================ */
 
-.pac-container {
-  border: none !important;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
+body .pac-container {
+  border: none;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
-.pac-item {
-  border: none !important;
-  border-top: 1px solid #e5e7eb !important;
+body .pac-item {
+  border: none;
+  border-top: 1px solid #e5e7eb;
 }
 
-.pac-item:hover {
-  background-color: #f3f4f6 !important;
+body .pac-item:hover {
+  background-color: #f3f4f6;
 }

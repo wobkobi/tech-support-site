@@ -117,7 +117,7 @@ export default function Reviews({ items = [] }: ReviewsProps): React.ReactElemen
               <li
                 key={`${formatName(r)}-${i}`}
                 className={cn(
-                  "bg-seasalt-800/80 w-90 sm:w-95 flex shrink-0 flex-col rounded-lg border-2 p-4 transition-colors duration-300 sm:p-5",
+                  "bg-seasalt-800/80 sm:w-95 flex w-[min(22.5rem,calc(100vw-3rem))] shrink-0 flex-col rounded-lg border-2 p-4 transition-colors duration-300 sm:p-5",
                   isLongReview(r.text)
                     ? "border-seasalt-400/60 hover:border-coquelicot-500/60"
                     : "border-seasalt-400/60",

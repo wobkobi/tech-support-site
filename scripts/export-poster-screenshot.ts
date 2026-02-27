@@ -120,21 +120,21 @@ const CROP_MARK_THICKNESS_PT = 0.25 as const;
 
 /**
  * Adds ISO 12647 crop marks to a PDF page for print trimming.
+ *
  * Draws L-shaped trim marks at all four corners of the content area.
- * Marks are positioned at the trim edge (3mm inward from page edge) and
- * extend outward into the bleed area.
- * @param page - pdf-lib PDFPage instance with bleed dimensions.
- * @param trimWidth - Width of the trim box in points (content area).
- * @param trimHeight - Height of the trim box in points (content area).
+ * Marks are positioned at the trim edge (3mm inward from page edge)
+ * and extend outward into the bleed area.
+ * Used for print-ready PDFs to guide trimming after printing.
+ * @param page pdf-lib PDFPage instance with bleed dimensions.
+ * @param trimWidth Width of the trim box in points — the intended content width after trimming (e.g. 419.53 pt for A5).
  * @example
  * ```typescript
  * const page = pdfDoc.addPage([437.48, 612.28]); // A5 + bleed
- * addCropMarks(page, 419.53, 595.28); // A5 trim size
+ * addCropMarks(page, 419.53); // A5 trim width in points
  * ```
  * @internal
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function addCropMarks(page: PDFPage, trimWidth: number, trimHeight: number): void {
+function addCropMarks(page: PDFPage, trimWidth: number): void {
   const { width: pageWidth, height: pageHeight } = page.getSize();
 
   // Calculate bleed margin (distance from page edge to trim edge)
@@ -269,7 +269,7 @@ async function generateVariant(
 
     // Add crop marks for print variant
     if (config.cropMarks) {
-      addCropMarks(pdfPage, config.trimSize.width, config.trimSize.height);
+      addCropMarks(pdfPage, config.trimSize.width);
     }
 
     const pdfBytes = await pdfDoc.save();
