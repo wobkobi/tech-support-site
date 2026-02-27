@@ -238,7 +238,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
                         disabled={!day.hasAnySlots}
                         onClick={() => handleDaySelect(day)}
                         className={cn(
-                          "w-36 rounded-lg border px-3 py-2.5 text-base font-medium transition-colors",
+                          "w-36 rounded-lg border px-3 py-3 text-base font-medium transition-colors",
                           !day.hasAnySlots && "cursor-not-allowed opacity-50",
                           selectedDay?.dateKey === day.dateKey
                             ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
@@ -250,15 +250,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
                             "ring-coquelicot-500/50 ring-2 ring-offset-1",
                         )}
                       >
-                        <div className={cn("flex flex-col items-center")}>
-                          <span>{day.dayLabel}</span>
-                          {day.isToday && day.hasAnySlots && (
-                            <span className={cn("text-coquelicot-600 text-xs")}>today</span>
-                          )}
-                          {!day.hasAnySlots && (
-                            <span className={cn("text-rich-black/50 text-sm")}>(Fully Booked)</span>
-                          )}
-                        </div>
+                        {day.dayLabel}
                       </button>
                     ))}
                   </div>
@@ -282,7 +274,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
                         disabled={!day.hasAnySlots}
                         onClick={() => handleDaySelect(day)}
                         className={cn(
-                          "w-36 rounded-lg border px-3 py-2.5 text-base font-medium transition-colors",
+                          "w-36 rounded-lg border px-3 py-3 text-base font-medium transition-colors",
                           !day.hasAnySlots && "cursor-not-allowed opacity-50",
                           selectedDay?.dateKey === day.dateKey
                             ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
@@ -291,12 +283,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
                               : "border-seasalt-400/40 bg-seasalt-900/20 text-rich-black/60",
                         )}
                       >
-                        <div className={cn("flex flex-col items-center")}>
-                          <span>{day.dayLabel}</span>
-                          {!day.hasAnySlots && (
-                            <span className={cn("text-rich-black/50 text-sm")}>(Fully Booked)</span>
-                          )}
-                        </div>
+                        {day.dayLabel}
                       </button>
                     ))}
                   </div>

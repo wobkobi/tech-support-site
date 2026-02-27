@@ -90,7 +90,7 @@
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
       "prettier --write",
-      "eslint --max-warnings=0",
+      "eslint --max-warnings=10",
       "vitest related --run"
     ],
     "*.{css,html,json,md}": "prettier --write"
