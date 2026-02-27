@@ -10,7 +10,6 @@ import { cn } from "@/lib/cn";
 import { FaEnvelope, FaPhone, FaMapLocationDot } from "react-icons/fa6";
 import Link from "next/link";
 
-
 /**
  * Contact page component.
  * @returns React element for the contact page.
@@ -21,7 +20,10 @@ export default function ContactPage(): React.ReactElement {
       <FrostedSection>
         <div className={cn("flex flex-col gap-6 sm:gap-8")}>
           {/* Hero Section */}
-          <section aria-labelledby="contact-heading" className={cn(CARD, "animate-fade-in text-center")}>
+          <section
+            aria-labelledby="contact-heading"
+            className={cn(CARD, "animate-fade-in text-center")}
+          >
             <h1
               id="contact-heading"
               className={cn(
@@ -36,15 +38,21 @@ export default function ContactPage(): React.ReactElement {
             </p>
 
             <div className={cn("flex flex-col items-center gap-4 sm:flex-row sm:justify-center")}>
-              <a href="tel:+64212971237" className={cn(
-                "bg-russian-violet text-seasalt inline-flex w-full items-center justify-center gap-3 rounded-lg px-8 py-4 text-base font-bold sm:w-auto sm:text-lg transition-all hover:brightness-110 shadow-lg hover:shadow-xl"
-              )}>
+              <a
+                href="tel:+64212971237"
+                className={cn(
+                  "bg-russian-violet text-seasalt inline-flex w-full items-center justify-center gap-3 rounded-lg px-8 py-4 text-base font-bold shadow-lg transition-all hover:shadow-xl hover:brightness-110 sm:w-auto sm:text-lg",
+                )}
+              >
                 <FaPhone className={cn("h-6 w-6")} aria-hidden />
                 <span>021 297 1237</span>
               </a>
-              <a href="mailto:harrison@tothepoint.co.nz" className={cn(
-                "bg-moonstone-600 hover:bg-moonstone-700 text-seasalt inline-flex w-full items-center justify-center gap-3 rounded-lg px-8 py-4 text-base font-bold sm:w-auto sm:text-lg transition-all shadow-lg hover:shadow-xl"
-              )}>
+              <a
+                href="mailto:harrison@tothepoint.co.nz"
+                className={cn(
+                  "bg-moonstone-600 hover:bg-moonstone-700 text-seasalt inline-flex w-full items-center justify-center gap-3 rounded-lg px-8 py-4 text-base font-bold shadow-lg transition-all hover:shadow-xl sm:w-auto sm:text-lg",
+                )}
+              >
                 <FaEnvelope className={cn("h-6 w-6")} aria-hidden />
                 <span>Email me</span>
               </a>
@@ -56,10 +64,20 @@ export default function ContactPage(): React.ReactElement {
           </section>
 
           {/* Service Area */}
-          <section aria-labelledby="area-heading" className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}>
+          <section
+            aria-labelledby="area-heading"
+            className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}
+          >
             <div className={cn("flex items-start gap-4")}>
-              <div className={cn("border-moonstone-500/30 bg-moonstone-600/10 grid size-12 shrink-0 place-items-center rounded-lg border sm:size-14")}>
-                <FaMapLocationDot className={cn("text-moonstone-600 h-6 w-6 sm:h-7 sm:w-7")} aria-hidden />
+              <div
+                className={cn(
+                  "border-moonstone-500/30 bg-moonstone-600/10 grid size-12 shrink-0 place-items-center rounded-lg border sm:size-14",
+                )}
+              >
+                <FaMapLocationDot
+                  className={cn("text-moonstone-600 h-6 w-6 sm:h-7 sm:w-7")}
+                  aria-hidden
+                />
               </div>
               <div>
                 <h2
@@ -69,7 +87,8 @@ export default function ContactPage(): React.ReactElement {
                   Service area
                 </h2>
                 <p className={cn("text-rich-black mb-3 text-sm sm:text-base")}>
-                  Based in Point Chevalier, serving nearby suburbs including Western Springs, Mount Albert, Grey Lynn, Westmere, Kingsland, and surrounding areas.
+                  Based in Point Chevalier, serving nearby suburbs including Western Springs, Mount
+                  Albert, Grey Lynn, Westmere, Kingsland, and surrounding areas.
                 </p>
                 <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
                   Remote support available for software and account issues. No travel needed.
@@ -79,7 +98,10 @@ export default function ContactPage(): React.ReactElement {
           </section>
 
           {/* What to Include */}
-          <section aria-labelledby="details-heading" className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-200")}>
+          <section
+            aria-labelledby="details-heading"
+            className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-200")}
+          >
             <h2
               id="details-heading"
               className={cn("text-russian-violet mb-3 text-xl font-bold sm:text-2xl")}
@@ -116,14 +138,17 @@ export default function ContactPage(): React.ReactElement {
           </section>
 
           {/* CTA */}
-          <section aria-label="Ready to get started" className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-300 text-center")}>
+          <section
+            aria-label="Ready to get started"
+            className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-300 text-center")}
+          >
             <p className={cn("text-rich-black mb-4 text-sm sm:text-base")}>
               Prefer to book directly?
             </p>
             <Link
               href="/booking"
               className={cn(
-                "bg-coquelicot-500 hover:bg-coquelicot-600 text-seasalt inline-flex items-center gap-2 rounded-lg px-6 py-3 text-base font-bold sm:text-lg transition-all shadow-md hover:shadow-lg"
+                "bg-coquelicot-500 hover:bg-coquelicot-600 text-seasalt inline-flex items-center gap-2 rounded-lg px-6 py-3 text-base font-bold shadow-md transition-all hover:shadow-lg sm:text-lg",
               )}
             >
               Book an appointment

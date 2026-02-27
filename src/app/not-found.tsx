@@ -44,7 +44,7 @@ export default function NotFound(): React.ReactElement {
               <Link
                 href="/"
                 className={cn(
-                  "bg-coquelicot-500 hover:bg-coquelicot-600 text-seasalt inline-flex items-center gap-2 rounded-lg px-6 py-3 font-semibold transition-colors shadow-lg hover:shadow-xl",
+                  "bg-coquelicot-500 hover:bg-coquelicot-600 text-seasalt inline-flex items-center gap-2 rounded-lg px-6 py-3 font-semibold shadow-lg transition-colors hover:shadow-xl",
                 )}
               >
                 <FaHouse className={cn("h-5 w-5")} aria-hidden />

@@ -4,6 +4,8 @@
  * @description Booking system with duration selection (1hr quick jobs vs 2hr standard jobs).
  */
 
+import { getPacificAucklandOffset } from "@/lib/timezone-utils";
+
 export const BOOKING_CONFIG = {
   timeZone: "Pacific/Auckland",
   maxAdvanceDays: 14,
@@ -158,9 +160,12 @@ export function buildAvailableDays(
     const date = new Date(startDate);
     date.setDate(date.getDate() + i);
 
-    const dayOfWeek = date.getDay();
-
     const dateKey = date.toISOString().split("T")[0];
+
+    // Calculate day of week from dateKey to avoid timezone issues
+    // (date object might have UTC time component that shifts the day)
+    const dayOfWeek = new Date(dateKey + "T12:00:00.000Z").getUTCDay();
+
     const isToday = i === 0;
     const isTomorrow = i === 1;
     const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
@@ -188,16 +193,22 @@ export function buildAvailableDays(
 
     const timeWindows: TimeWindow[] = [];
 
+    // Extract year/month/day from dateKey for reliable timezone calculations
+    const [year, month, day] = dateKey.split("-").map(Number);
+
     for (const slot of TIME_OF_DAY_OPTIONS) {
       const slotHour = slot.startHour;
+
+      // Get dynamic UTC offset for this date (handles NZDT/NZST)
+      const utcOffset = getPacificAucklandOffset(year, month, day);
 
       // Check 1-hour availability
       const shortStart = new Date(
         Date.UTC(
-          date.getFullYear(),
-          date.getMonth(),
-          date.getDate(),
-          slotHour - 13, // NZ UTC+13
+          year,
+          month - 1, // Date.UTC expects 0-indexed month
+          day,
+          slotHour - utcOffset,
           0,
           0,
         ),
@@ -326,9 +337,12 @@ export function validateBookingRequest(
     return { valid: false, error: "Invalid time slot" };
   }
 
+  // Get dynamic UTC offset for this date (handles NZDT/NZST)
+  const utcOffset = getPacificAucklandOffset(year, month, day);
+
   // Check if slot is actually available for this duration
   const durationMinutes = duration === "short" ? 60 : 120;
-  const slotStart = new Date(Date.UTC(year, month - 1, day, slot.startHour - 13, 0, 0));
+  const slotStart = new Date(Date.UTC(year, month - 1, day, slot.startHour - utcOffset, 0, 0));
   const slotEnd = new Date(slotStart.getTime() + durationMinutes * 60 * 1000);
 
   if (!isSlotFree(slotStart, slotEnd, existingBookings, calendarEvents, config.bufferMin)) {

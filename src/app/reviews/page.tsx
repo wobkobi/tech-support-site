@@ -73,14 +73,14 @@ export default async function ReviewsPage(): Promise<React.ReactElement> {
               What clients say
             </h1>
             <p className={cn("text-rich-black/80 text-base sm:text-lg")}>
-              Real feedback from people I&apos;ve helped in Point Chevalier and nearby suburbs.
+              Real feedback from people I&apos;ve helped.
             </p>
           </section>
 
           {rows.length === 0 ? (
             <section className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}>
               <p className={cn("text-rich-black/70 text-base sm:text-lg")}>
-                No reviews yet — be the first!{" "}
+                No reviews yet - be the first!{" "}
                 <Link href="/booking" className={linkStyle}>
                   Book an appointment
                 </Link>{" "}
@@ -107,7 +107,7 @@ export default async function ReviewsPage(): Promise<React.ReactElement> {
                     </p>
                     <div className={cn("mt-4 flex items-center justify-between gap-2")}>
                       <p className={cn("text-russian-violet text-sm font-semibold")}>
-                        — {formatName(r)}
+                        - {formatName(r)}
                       </p>
                       {r.verified && (
                         <span

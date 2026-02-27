@@ -25,7 +25,6 @@ function isAuthorized(request: NextRequest): boolean {
   return request.headers.has("x-vercel-cron") || authHeader === `Bearer ${cronSecret}`;
 }
 
-
 /**
  * GET /api/cron/send-review-emails
  * Finds completed appointments from 30 minutes ago and sends review requests.

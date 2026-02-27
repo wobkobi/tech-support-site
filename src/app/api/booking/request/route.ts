@@ -15,9 +15,11 @@ import {
   type JobDuration,
   type ExistingBooking,
 } from "@/lib/booking";
+import { getPacificAucklandOffset } from "@/lib/timezone-utils";
 import { createBookingEvent, fetchAllCalendarEvents } from "@/lib/google-calendar";
 import { sendOwnerBookingNotification, sendCustomerBookingConfirmation } from "@/lib/email";
 import { randomUUID } from "crypto";
+import { Prisma } from "@prisma/client";
 
 interface BookingRequestPayload {
   dateKey: string;
@@ -147,8 +149,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const startHour = slot.startHour;
     const durationMinutes = durationOption.durationMinutes;
 
-    // NZ UTC+13
-    const startUtc = new Date(Date.UTC(year, month - 1, day, startHour - 13, 0, 0));
+    // Get dynamic UTC offset for this date (handles NZDT/NZST)
+    const utcOffset = getPacificAucklandOffset(year, month, day);
+    const startUtc = new Date(Date.UTC(year, month - 1, day, startHour - utcOffset, 0, 0));
     const endUtc = new Date(startUtc.getTime() + durationMinutes * 60 * 1000);
 
     const cancelToken = randomUUID();
@@ -193,45 +196,63 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     // Create booking
-    const booking = await prisma.booking.create({
-      data: {
-        name: name.trim(),
-        email: email.trim().toLowerCase(),
-        notes: bookingNotes,
-        startUtc,
-        endUtc,
-        status: "confirmed",
-        cancelToken,
-        reviewToken,
-        calendarEventId,
-        bufferBeforeMin: 0,
-        bufferAfterMin: BOOKING_CONFIG.bufferMin,
-      },
-    });
+    try {
+      const booking = await prisma.booking.create({
+        data: {
+          name: name.trim(),
+          email: email.trim().toLowerCase(),
+          notes: bookingNotes,
+          startUtc,
+          endUtc,
+          status: "confirmed",
+          cancelToken,
+          reviewToken,
+          calendarEventId,
+          activeSlotKey: startUtc.toISOString(), // Unique constraint for double-booking prevention
+          bufferBeforeMin: 0,
+          bufferAfterMin: BOOKING_CONFIG.bufferMin,
+        },
+      });
 
-    console.log(`[booking/request] Created ${duration} booking: ${booking.id}`);
+      console.log(`[booking/request] Created ${duration} booking: ${booking.id}`);
 
-    // Send confirmation emails — fire-and-forget, never block the response
-    void sendOwnerBookingNotification({
-      id: booking.id,
-      name: booking.name,
-      email: booking.email,
-      notes: booking.notes ?? "",
-      startUtc: booking.startUtc,
-      endUtc: booking.endUtc,
-      cancelToken: booking.cancelToken,
-    });
-    void sendCustomerBookingConfirmation({
-      id: booking.id,
-      name: booking.name,
-      email: booking.email,
-      notes: booking.notes ?? "",
-      startUtc: booking.startUtc,
-      endUtc: booking.endUtc,
-      cancelToken: booking.cancelToken,
-    });
+      // Send confirmation emails - fire-and-forget, never block the response
+      void sendOwnerBookingNotification({
+        id: booking.id,
+        name: booking.name,
+        email: booking.email,
+        notes: booking.notes ?? "",
+        startUtc: booking.startUtc,
+        endUtc: booking.endUtc,
+        cancelToken: booking.cancelToken,
+      });
+      void sendCustomerBookingConfirmation({
+        id: booking.id,
+        name: booking.name,
+        email: booking.email,
+        notes: booking.notes ?? "",
+        startUtc: booking.startUtc,
+        endUtc: booking.endUtc,
+        cancelToken: booking.cancelToken,
+      });
 
-    return NextResponse.json({ ok: true, bookingId: booking.id });
+      return NextResponse.json({ ok: true, bookingId: booking.id });
+    } catch (error) {
+      // Handle unique constraint violation (concurrent booking for same slot)
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        console.warn("[booking/request] Concurrent booking conflict", {
+          activeSlotKey: startUtc.toISOString(),
+          email: email.trim().toLowerCase(),
+          timestamp: new Date().toISOString(),
+        });
+        return NextResponse.json(
+          { ok: false, error: "This time slot is no longer available." },
+          { status: 409 },
+        );
+      }
+      // Re-throw other errors to be caught by outer handler
+      throw error;
+    }
   } catch (error) {
     console.error("[booking/request] Error:", error);
     return NextResponse.json(

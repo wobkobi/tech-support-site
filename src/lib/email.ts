@@ -34,7 +34,7 @@ export interface ReviewNotificationData {
 
 /**
  * Sends the site owner a notification email when a new review is submitted.
- * Failures are caught and logged — never throws.
+ * Failures are caught and logged - never throws.
  * @param review - The newly submitted review.
  * @returns Promise that resolves when the email is sent (or silently fails).
  */
@@ -45,7 +45,7 @@ export async function sendOwnerReviewNotification(review: ReviewNotificationData
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz";
 
   if (!adminEmail || !from || !process.env.RESEND_API_KEY) {
-    console.warn("[email] Resend not configured — skipping owner notification.");
+    console.warn("[email] Resend not configured - skipping owner notification.");
     return;
   }
 
@@ -87,7 +87,7 @@ export async function sendOwnerReviewNotification(review: ReviewNotificationData
       from,
       replyTo: adminEmail,
       to: adminEmail,
-      subject: `New review — ${displayName} (${review.verified ? "verified" : "pending"})`,
+      subject: `New review - ${displayName} (${review.verified ? "verified" : "pending"})`,
       html,
     });
   } catch (error) {
@@ -135,7 +135,7 @@ function formatNZDateTime(date: Date): string {
 
 /**
  * Sends the site owner a notification email when a new booking is submitted.
- * Failures are caught and logged — never throws.
+ * Failures are caught and logged - never throws.
  * @param booking - The new booking details.
  * @returns Promise that resolves when the email is sent (or silently fails).
  */
@@ -146,7 +146,7 @@ export async function sendOwnerBookingNotification(
   const from = process.env.EMAIL_FROM;
 
   if (!adminEmail || !from || !process.env.RESEND_API_KEY) {
-    console.warn("[email] Resend not configured — skipping owner booking notification.");
+    console.warn("[email] Resend not configured - skipping owner booking notification.");
     return;
   }
 
@@ -178,7 +178,7 @@ export async function sendOwnerBookingNotification(
       from,
       replyTo: adminEmail,
       to: adminEmail,
-      subject: `New booking — ${booking.name} (${start})`,
+      subject: `New booking - ${booking.name} (${start})`,
       html,
     });
   } catch (error) {
@@ -188,7 +188,7 @@ export async function sendOwnerBookingNotification(
 
 /**
  * Sends the customer a booking confirmation email with their appointment details and cancel link.
- * Failures are caught and logged — never throws.
+ * Failures are caught and logged - never throws.
  * @param booking - The new booking details.
  * @returns Promise that resolves when the email is sent (or silently fails).
  */
@@ -199,7 +199,7 @@ export async function sendCustomerBookingConfirmation(
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz";
 
   if (!from || !process.env.RESEND_API_KEY) {
-    console.warn("[email] Resend not configured — skipping customer booking confirmation.");
+    console.warn("[email] Resend not configured - skipping customer booking confirmation.");
     return;
   }
 
@@ -215,7 +215,7 @@ export async function sendCustomerBookingConfirmation(
 <body style="font-family:system-ui,sans-serif;background:#f6f7f8;margin:0;padding:24px">
   <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
     <h2 style="margin:0 0 12px;color:#0c0a3e;font-size:20px">Booking confirmed, ${firstName}!</h2>
-    <p style="margin:0 0 20px;color:#444;line-height:1.6">Thanks for choosing To The Point Tech — I'm looking forward to helping you out.</p>
+    <p style="margin:0 0 20px;color:#444;line-height:1.6">Thanks for choosing To The Point Tech - I'm looking forward to helping you out.</p>
 
     <p style="margin:0 0 8px;color:#888;font-size:13px;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Your appointment</p>
     <p style="margin:0 0 20px;font-size:16px;font-weight:600;color:#0c0a3e">${start}</p>
@@ -251,7 +251,7 @@ export async function sendCustomerBookingConfirmation(
       from,
       replyTo: process.env.ADMIN_EMAIL,
       to: booking.email,
-      subject: `Booking confirmed — ${start}`,
+      subject: `Booking confirmed - ${start}`,
       html,
     });
   } catch (error) {
@@ -274,8 +274,8 @@ export interface ReviewRequestData {
 }
 
 /**
- * Sends a review request email to a customer after their appointment.
- * Failures are caught and logged — never throws.
+ * Sends a review request email to a customer shortly after their appointment.
+ * Used by the cron job (30 min after visit). Failures are caught and logged - never throws.
  * @param booking - Booking details for the customer.
  * @returns Promise that resolves when the email is sent (or silently fails).
  */
@@ -284,7 +284,7 @@ export async function sendCustomerReviewRequest(booking: ReviewRequestData): Pro
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz";
 
   if (!from || !process.env.RESEND_API_KEY) {
-    console.warn("[email] Resend not configured — skipping customer review request.");
+    console.warn("[email] Resend not configured - skipping customer review request.");
     return;
   }
 
@@ -298,9 +298,9 @@ export async function sendCustomerReviewRequest(booking: ReviewRequestData): Pro
 <body style="font-family:system-ui,sans-serif;background:#f6f7f8;margin:0;padding:24px">
   <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
     <h2 style="margin:0 0 12px;color:#0c0a3e;font-size:20px">Hi ${firstName}, how did everything go?</h2>
-    <p style="margin:0 0 12px;color:#444;line-height:1.6">It was great meeting you — I hope I managed to get everything sorted and left you feeling a bit less frustrated with technology!</p>
+    <p style="margin:0 0 12px;color:#444;line-height:1.6">It was great meeting you - I hope I managed to get everything sorted and left you feeling a bit less frustrated with technology!</p>
     <p style="margin:0 0 12px;color:#444;line-height:1.6">If you have a spare moment, I'd love to hear how your experience was. A quick review makes a real difference for a small local business like mine, and helps other people in the area find reliable tech support when they need it.</p>
-    <p style="margin:0 0 24px;color:#444;line-height:1.6">It only takes a minute — and honest feedback is always welcome.</p>
+    <p style="margin:0 0 24px;color:#444;line-height:1.6">It only takes a minute - and honest feedback is always welcome.</p>
     <a href="${reviewUrl}" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:15px">Share your experience →</a>
 
     <p style="margin:28px 0 20px;color:#444;font-size:14px;line-height:1.6">Thanks again for choosing To The Point Tech. If you ever need a hand with anything else, don't hesitate to get in touch.</p>
@@ -326,10 +326,72 @@ export async function sendCustomerReviewRequest(booking: ReviewRequestData): Pro
       from,
       replyTo: process.env.ADMIN_EMAIL,
       to: booking.email,
-      subject: `Thanks for having me, ${firstName} — how did everything go?`,
+      subject: `Thanks for having me, ${firstName} - how did everything go?`,
       html,
     });
   } catch (error) {
     console.error("[email] Failed to send review request to %s:", booking.email, error);
+  }
+}
+
+/**
+ * Sends a review request email to a past client (admin-triggered).
+ * Tone is tailored for clients who were seen days/weeks ago, mentioning
+ * the site update and asking for a review. Failures are caught and logged.
+ * @param booking - Past client details.
+ * @returns Promise that resolves when the email is sent (or silently fails).
+ */
+export async function sendPastClientReviewRequest(booking: ReviewRequestData): Promise<void> {
+  const from = process.env.EMAIL_FROM;
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz";
+
+  if (!from || !process.env.RESEND_API_KEY) {
+    console.warn("[email] Resend not configured - skipping past client review request.");
+    return;
+  }
+
+  const reviewUrl = `${siteUrl}/review?token=${booking.reviewToken}`;
+  const firstName = booking.name.split(" ")[0];
+
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="font-family:system-ui,sans-serif;background:#f6f7f8;margin:0;padding:24px">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
+    <h2 style="margin:0 0 12px;color:#0c0a3e;font-size:20px">Hi ${firstName}, hope everything is still working well!</h2>
+    <p style="margin:0 0 12px;color:#444;line-height:1.6">Thanks so much for letting me help you out - I really appreciate you choosing To The Point Tech for your tech support needs.</p>
+    <p style="margin:0 0 12px;color:#444;line-height:1.6">I'm currently updating my website and building up my reviews section. If you have a spare moment, leaving a quick review would be greatly appreciated - it really helps other people in the area find reliable local tech support.</p>
+    <p style="margin:0 0 24px;color:#444;line-height:1.6">It only takes a minute - honest feedback is always welcome.</p>
+    <a href="${reviewUrl}" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:15px">Share your experience →</a>
+
+    <p style="margin:28px 0 20px;color:#444;font-size:14px;line-height:1.6">Thanks again for choosing To The Point Tech. If you ever need a hand with anything else, don't hesitate to get in touch.</p>
+
+    <div style="padding-top:20px;border-top:1px solid #e8e8e8">
+      <a href="${siteUrl}" style="display:inline-block;margin-bottom:12px">
+        <img src="${siteUrl}/assets/email-signature-400x135.png" alt="To The Point Tech" width="200" style="display:block;border:0;height:auto" />
+      </a>
+      <p style="margin:0 0 2px;font-size:14px;font-weight:600;color:#0c0a3e">Harrison Raynes</p>
+      <p style="margin:0 0 10px;font-size:13px;color:#666">Owner &amp; Technician</p>
+      <p style="margin:0 0 4px;font-size:13px;color:#555">📞 <a href="tel:+6421297237" style="color:#555;text-decoration:none">021 297 1237</a></p>
+      <p style="margin:0 0 4px;font-size:13px;color:#555">✉️ <a href="mailto:harrison@tothepoint.co.nz" style="color:#43bccd;text-decoration:none">harrison@tothepoint.co.nz</a></p>
+      <p style="margin:0 0 4px;font-size:13px;color:#555">🌐 <a href="https://tothepoint.co.nz" style="color:#43bccd;text-decoration:none">tothepoint.co.nz</a></p>
+      <p style="margin:0;font-size:12px;color:#999">Auckland, New Zealand</p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  try {
+    const resend = createResend();
+    await resend.emails.send({
+      from,
+      replyTo: process.env.ADMIN_EMAIL,
+      to: booking.email,
+      subject: `Thanks for choosing To The Point Tech, ${firstName}`,
+      html,
+    });
+  } catch (error) {
+    console.error("[email] Failed to send past client review request to %s:", booking.email, error);
   }
 }

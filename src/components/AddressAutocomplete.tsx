@@ -193,7 +193,7 @@ export default function AddressAutocomplete({
         autoComplete="off"
         className={cn(
           "border-seasalt-400/80 bg-seasalt text-rich-black rounded-md border px-3 py-2 text-sm",
-          "focus:border-russian-violet focus:ring-russian-violet/30 focus:outline-none focus:ring-1",
+          "outline-none! shadow-none!",
           showWarning && "border-yellow-500/60",
         )}
       />

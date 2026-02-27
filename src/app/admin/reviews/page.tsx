@@ -15,7 +15,7 @@ import { prisma } from "@/lib/prisma";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Admin — Reviews",
+  title: "Admin - Reviews",
   robots: { index: false, follow: false },
 };
 
@@ -35,7 +35,7 @@ function isValidToken(token: string | null): boolean {
 }
 
 /**
- * Admin reviews page — renders access-denied or the approval UI depending on token validity.
+ * Admin reviews page - renders access-denied or the approval UI depending on token validity.
  * @param props - Page props.
  * @param props.searchParams - URL search parameters (contains token).
  * @returns Admin page element.
@@ -52,7 +52,7 @@ export default async function AdminReviewsPage({
       <PageShell>
         <FrostedSection maxWidth="40rem">
           <div className="py-12 text-center">
-            <p className="text-2xl font-bold text-russian-violet">Access Denied</p>
+            <p className="text-russian-violet text-2xl font-bold">Access Denied</p>
             <p className="text-seasalt-300 mt-2 text-sm">Invalid or missing token.</p>
           </div>
         </FrostedSection>
@@ -82,7 +82,11 @@ export default async function AdminReviewsPage({
       <FrostedSection>
         <div className={cn("flex flex-col gap-6 sm:gap-8")}>
           <section className={cn(CARD, "animate-fade-in")}>
-            <h1 className={cn("text-russian-violet mb-3 text-2xl font-extrabold sm:text-3xl md:text-4xl")}>
+            <h1
+              className={cn(
+                "text-russian-violet mb-3 text-2xl font-extrabold sm:text-3xl md:text-4xl",
+              )}
+            >
               Review Approval
             </h1>
             <div className="flex gap-2">
@@ -96,11 +100,7 @@ export default async function AdminReviewsPage({
           </section>
 
           <section className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}>
-            <ReviewApprovalList
-              pending={pending}
-              approved={approved}
-              token={token!}
-            />
+            <ReviewApprovalList pending={pending} approved={approved} token={token!} />
           </section>
         </div>
       </FrostedSection>

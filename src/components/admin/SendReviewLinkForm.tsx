@@ -40,7 +40,7 @@ export function SendReviewLinkForm({ token }: SendReviewLinkFormProps): React.Re
    * @param e - Form submit event.
    * @returns Promise resolving when the submit completes.
    */
-  async function handleSubmit(e: React.FormEvent): Promise<void> {
+  async function handleSubmit(e: React.SubmitEvent): Promise<void> {
     e.preventDefault();
     setLoading(true);
     setError(null);
@@ -58,7 +58,7 @@ export function SendReviewLinkForm({ token }: SendReviewLinkFormProps): React.Re
       if (mode === "sms" && data.reviewUrl) {
         const firstName = name.trim().split(" ")[0];
         setSmsText(
-          `Hi ${firstName}, it's Harrison from To The Point Tech. Hope everything is still working well! If you have a spare moment, I'd really appreciate a quick review — it makes a big difference for a small local business: ${data.reviewUrl}`,
+          `Hi ${firstName}, it's Harrison from To The Point Tech. Thanks for letting me help you out! I'm updating my website and a quick review would be greatly appreciated - it really helps: ${data.reviewUrl}`,
         );
         setName("");
       } else {

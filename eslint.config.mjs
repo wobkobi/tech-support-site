@@ -3,6 +3,7 @@ import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 import prettier from "eslint-config-prettier/flat";
+import prettierPlugin from "eslint-plugin-prettier/recommended";
 import jsdoc from "eslint-plugin-jsdoc";
 import globals from "globals";
 
@@ -61,7 +62,7 @@ export default defineConfig([
     },
   },
 
-  // Test files — relax some rules but keep JSDoc for named helper functions
+  // Test files - relax some rules but keep JSDoc for named helper functions
   {
     files: ["tests/**/*.{ts,tsx}"],
     rules: {
@@ -88,6 +89,9 @@ export default defineConfig([
 
   // Turn off stylistic rules that clash with Prettier
   prettier,
+
+  // Re-enable prettier/prettier rule so ESLint reports formatting violations
+  prettierPlugin,
 
   // Ignores (this replaces your manual ignores + Next defaults)
   globalIgnores([

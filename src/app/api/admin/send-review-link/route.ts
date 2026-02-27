@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { sendCustomerReviewRequest } from "@/lib/email";
+import { sendPastClientReviewRequest } from "@/lib/email";
 import { timingSafeEqual } from "crypto";
 
 /**
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ ok: true, reviewUrl });
     }
 
-    await sendCustomerReviewRequest({
+    await sendPastClientReviewRequest({
       id: reviewRequest.id,
       name: name.trim(),
       email: email!.trim().toLowerCase(),

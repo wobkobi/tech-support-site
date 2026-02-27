@@ -22,13 +22,9 @@ vi.mock("@/lib/prisma", () => ({
 
 // Mock Next.js components
 vi.mock("next/link", () => ({
-  default: ({
-    href,
-    children,
-  }: {
-    href: string;
-    children: React.ReactNode;
-  }) => <a href={href}>{children}</a>,
+  default: ({ href, children }: { href: string; children: React.ReactNode }) => (
+    <a href={href}>{children}</a>
+  ),
 }));
 
 vi.mock("@/components/PageLayout", () => ({
@@ -49,10 +45,7 @@ vi.mock("@/components/PageLayout", () => ({
  * @param overrides - Optional partial overrides for review fields.
  * @returns Mock review object with default values and any applied overrides.
  */
-function createMockReview(
-  id: number,
-  overrides?: Partial<Review>,
-): Review {
+function createMockReview(id: number, overrides?: Partial<Review>): Review {
   return {
     id: `review-${id}`,
     text: `Review ${id}: Excellent service and very helpful.`,
@@ -148,9 +141,9 @@ describe("Reviews Page - Integration Tests", () => {
     it("handles 20 approved reviews", async () => {
       const mockPrisma = vi.mocked(prisma);
       const findManyMock = mockPrisma.review.findMany as unknown as Mock;
-      const reviews = Array.from({ length: 20 }, (_, i) =>
-        createMockReview(i + 1),
-      ).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      const reviews = Array.from({ length: 20 }, (_, i) => createMockReview(i + 1)).sort(
+        (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+      );
 
       findManyMock.mockResolvedValue(reviews);
 
@@ -164,9 +157,9 @@ describe("Reviews Page - Integration Tests", () => {
     it("handles 50 approved reviews without timeout", async () => {
       const mockPrisma = vi.mocked(prisma);
       const findManyMock = mockPrisma.review.findMany as unknown as Mock;
-      const reviews = Array.from({ length: 50 }, (_, i) =>
-        createMockReview(i + 1),
-      ).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      const reviews = Array.from({ length: 50 }, (_, i) => createMockReview(i + 1)).sort(
+        (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+      );
 
       findManyMock.mockResolvedValue(reviews);
 
@@ -186,9 +179,9 @@ describe("Reviews Page - Integration Tests", () => {
     it("handles 100 approved reviews", async () => {
       const mockPrisma = vi.mocked(prisma);
       const findManyMock = mockPrisma.review.findMany as unknown as Mock;
-      const reviews = Array.from({ length: 100 }, (_, i) =>
-        createMockReview(i + 1),
-      ).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      const reviews = Array.from({ length: 100 }, (_, i) => createMockReview(i + 1)).sort(
+        (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+      );
 
       findManyMock.mockResolvedValue(reviews);
 
@@ -206,9 +199,9 @@ describe("Reviews Page - Integration Tests", () => {
     it("handles 500 approved reviews (stress test)", async () => {
       const mockPrisma = vi.mocked(prisma);
       const findManyMock = mockPrisma.review.findMany as unknown as Mock;
-      const reviews = Array.from({ length: 500 }, (_, i) =>
-        createMockReview(i + 1),
-      ).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      const reviews = Array.from({ length: 500 }, (_, i) => createMockReview(i + 1)).sort(
+        (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+      );
 
       findManyMock.mockResolvedValue(reviews);
 
@@ -281,9 +274,7 @@ describe("Reviews Page - Integration Tests", () => {
     it("can limit returned reviews for pagination", async () => {
       const mockPrisma = vi.mocked(prisma);
       const findManyMock = mockPrisma.review.findMany as unknown as Mock;
-      const allReviews = Array.from({ length: 100 }, (_, i) =>
-        createMockReview(i + 1),
-      );
+      const allReviews = Array.from({ length: 100 }, (_, i) => createMockReview(i + 1));
 
       // First page: 10 reviews
       findManyMock.mockResolvedValueOnce(allReviews.slice(0, 10));
@@ -321,9 +312,7 @@ describe("Reviews Page - Integration Tests", () => {
     it("renders large dataset without rerenders", async () => {
       const mockPrisma = vi.mocked(prisma);
       const findManyMock = mockPrisma.review.findMany as unknown as Mock;
-      const reviews = Array.from({ length: 100 }, (_, i) =>
-        createMockReview(i + 1),
-      );
+      const reviews = Array.from({ length: 100 }, (_, i) => createMockReview(i + 1));
 
       findManyMock.mockResolvedValue(reviews);
 
@@ -349,8 +338,7 @@ describe("Reviews Page - Integration Tests", () => {
 
       findManyMock.mockResolvedValue(reviews);
 
-      const result = await mockPrisma.review.findMany(
-      );
+      const result = await mockPrisma.review.findMany();
 
       expect(result).toHaveLength(50);
       // Verify various lengths are preserved
@@ -385,11 +373,7 @@ describe("Reviews Page - Integration Tests", () => {
       expect(result).toHaveLength(2);
 
       // After ISR revalidation (new review added)
-      const secondFetch = [
-        createMockReview(3),
-        createMockReview(2),
-        createMockReview(1),
-      ];
+      const secondFetch = [createMockReview(3), createMockReview(2), createMockReview(1)];
       findManyMock.mockResolvedValueOnce(secondFetch);
 
       result = await mockPrisma.review.findMany({

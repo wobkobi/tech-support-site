@@ -10,7 +10,7 @@
 # SVG files are text-based but treat as binary for merge conflicts
 *.svg binary merge=ours
 
-# Ensure consistent line endings
-* text=auto
+# Ensure consistent line endings (LF everywhere, even on Windows)
+* text=auto eol=lf
 *.sh text eol=lf
 *.bash text eol=lf

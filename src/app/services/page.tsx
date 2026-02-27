@@ -23,7 +23,6 @@ import {
   FaEnvelope,
 } from "react-icons/fa6";
 
-
 interface ServiceArea {
   icon: React.ReactElement;
   label: string;
@@ -34,7 +33,7 @@ const serviceAreas: ReadonlyArray<ServiceArea> = [
   {
     icon: <FaLaptop />,
     label: "Computers & Laptops",
-    examples: ["Slow PC fixes", "Software installs", "Virus cleanup", "General tune-ups"],
+    examples: ["Slow PC investigation", "Software installs", "Virus cleanup", "General tune-ups"],
   },
   {
     icon: <FaMobileScreen />,
@@ -113,18 +112,20 @@ export default function ServicesPage(): React.ReactElement {
             </h1>
 
             <p className={cn("text-rich-black mb-4 text-sm sm:text-base")}>
-              I help with the everyday tech problems that sit between "turn it off and on again" and
-              calling a big IT company. The goal is to get things working reliably and leave you
-              with a setup you understand.
+              I help with the everyday tech problems no matter how big or small. The goal is to get
+              things working reliably and leave you with a setup you understand.
             </p>
 
             <p className={cn("text-rich-black/90 text-sm sm:text-base")}>
-              Every job includes clear explanations in plain English, and I can leave notes so you
-              know what changed and how to handle things next time.
+              Every job includes clear explanations, and I can leave notes so you know what changed
+              and how to handle things next time.
             </p>
           </section>
 
-          <section aria-labelledby="areas-heading" className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}>
+          <section
+            aria-labelledby="areas-heading"
+            className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}
+          >
             <h2
               id="areas-heading"
               className={cn("text-russian-violet mb-3 text-xl font-bold sm:text-2xl")}
@@ -175,7 +176,10 @@ export default function ServicesPage(): React.ReactElement {
           </section>
 
           <div className={cn("grid gap-5 md:grid-cols-2")}>
-            <section aria-labelledby="home-heading" className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-200")}>
+            <section
+              aria-labelledby="home-heading"
+              className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-200")}
+            >
               <h2
                 id="home-heading"
                 className={cn("text-russian-violet mb-3 text-xl font-bold sm:text-2xl")}
@@ -215,7 +219,10 @@ export default function ServicesPage(): React.ReactElement {
               </ul>
             </section>
 
-            <section aria-labelledby="business-heading" className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-300")}>
+            <section
+              aria-labelledby="business-heading"
+              className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-300")}
+            >
               <h2
                 id="business-heading"
                 className={cn("text-russian-violet mb-3 text-xl font-bold sm:text-2xl")}
@@ -256,7 +263,10 @@ export default function ServicesPage(): React.ReactElement {
             </section>
           </div>
 
-          <section aria-label="Next steps" className={cn(CARD, "text-center animate-slide-up animate-fill-both animate-delay-400")}>
+          <section
+            aria-label="Next steps"
+            className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-400 text-center")}
+          >
             <p className={cn("text-rich-black mb-4 text-sm sm:text-base")}>Ready to get started?</p>
             <div className={cn("flex flex-wrap items-center justify-center gap-3")}>
               <Link

@@ -1,7 +1,7 @@
 // src/app/poster/page.tsx
 /**
  * @file page.tsx
- * @description Poster page — A5 at 300 DPI (1748x2480px) with even outer padding.
+ * @description Poster page - A5 at 300 DPI (1748x2480px) with even outer padding.
  */
 
 import { cn } from "@/lib/cn";
@@ -54,7 +54,7 @@ const servicesText =
  */
 export default function PosterPage(): React.ReactElement {
   return (
-    <div className={cn("h-screen w-screen relative overflow-hidden")}>
+    <div className={cn("relative h-screen w-screen overflow-hidden")}>
       {/* Backdrop */}
       <div className={cn("absolute inset-0 -z-10")}>
         <Image
@@ -68,18 +68,18 @@ export default function PosterPage(): React.ReactElement {
       </div>
 
       {/* Even outer gap on all sides */}
-      <div className={cn("flex h-full w-full flex-col p-6")}>
+      <div className={cn("flex h-full w-full flex-col p-8")}>
         {/* Inner column fills available height so footer can pin to bottom */}
-        <div className={cn("flex min-h-0 flex-1 flex-col")}>
-          {/* Main frosted card — flex-1 so it fills the space above the footer */}
+        <div className={cn("flex min-h-0 flex-1 flex-col justify-between gap-8")}>
+          {/* Main frosted card - content-sized */}
           <div
             className={cn(
-              "flex-1 rounded-4xl border-seasalt-400/40 bg-seasalt-800/60 p-6 border-[3px] shadow-xl backdrop-blur-xl",
+              "rounded-4xl border-seasalt-400/40 bg-seasalt-800/60 border-[3px] p-6 shadow-xl backdrop-blur-xl",
             )}
           >
-            <div className={cn("flex h-full flex-col")}>
+            <div className={cn("flex flex-col gap-8")}>
               {/* Logo */}
-              <div className={cn("grid place-items-center pb-5")}>
+              <div className={cn("grid place-items-center")}>
                 <Image
                   src="/source/logo-full.svg"
                   alt="To The Point Tech"
@@ -91,7 +91,7 @@ export default function PosterPage(): React.ReactElement {
               </div>
 
               {/* Trust badges */}
-              <div className={cn("mx-auto mb-5 flex flex-wrap justify-center gap-3")}>
+              <div className={cn("mx-auto flex flex-wrap justify-center gap-3")}>
                 <div
                   className={cn(
                     "border-moonstone-500/30 px-4.5 relative flex items-center gap-3 rounded-xl border-2 py-1.5 shadow-sm",
@@ -120,7 +120,7 @@ export default function PosterPage(): React.ReactElement {
                   />
                   <FaLocationDot className={cn("text-moonstone-600 relative z-10 h-11 w-11")} />
                   <span className={cn("text-rich-black relative z-10 text-[34px] font-semibold")}>
-                    Pt Chev Local
+                    Proudly Local
                   </span>
                 </div>
 
@@ -141,33 +141,37 @@ export default function PosterPage(): React.ReactElement {
                 </div>
               </div>
 
-              {/* Text boxes — flex-1 absorbs extra height so bottom padding stays even */}
-              <section className={cn("flex flex-1 flex-col gap-5")}>
+              {/* Text boxes - now content-sized with gap preserved */}
+              <section className={cn("flex flex-col gap-5")}>
                 <div
                   className={cn(
-                    "flex-1 border-seasalt-400/60 bg-seasalt-800 p-4.5 rounded-[18px] border-2 shadow-sm",
+                    "border-seasalt-400/60 bg-seasalt-800 p-4.5 rounded-[18px] border-2 shadow-sm",
                   )}
                 >
-                  <h2 className={cn("text-russian-violet mb-1.5 text-[53px] font-bold")}>About Me</h2>
-                  <p className={cn("text-rich-black text-[38px] font-medium leading-tight")}>
+                  <h2 className={cn("text-russian-violet mb-1.5 text-[53px] font-bold")}>
+                    About Me
+                  </h2>
+                  <p className={cn("text-rich-black text-[40px] font-medium leading-tight")}>
                     {aboutMeText}
                   </p>
                 </div>
 
                 <div
                   className={cn(
-                    "flex-1 border-seasalt-400/60 bg-seasalt-800 p-4.5 rounded-[18px] border-2 shadow-sm",
+                    "border-seasalt-400/60 bg-seasalt-800 p-4.5 rounded-[18px] border-2 shadow-sm",
                   )}
                 >
-                  <h2 className={cn("text-russian-violet mb-1.5 text-[53px] font-bold")}>Services</h2>
-                  <p className={cn("text-rich-black text-[38px] font-medium leading-tight")}>
+                  <h2 className={cn("text-russian-violet mb-1.5 text-[53px] font-bold")}>
+                    Services
+                  </h2>
+                  <p className={cn("text-rich-black text-[40px] font-medium leading-tight")}>
                     {servicesText}
                   </p>
                 </div>
               </section>
 
               {/* Support grid */}
-              <section className={cn("mt-3")}>
+              <section>
                 <h2 className={cn("text-rich-black mb-3 text-center text-[53px] font-semibold")}>
                   Areas I Can Help With
                 </h2>
@@ -202,19 +206,19 @@ export default function PosterPage(): React.ReactElement {
             </div>
           </div>
 
-          {/* Footer — fixed gap from the card above */}
-          <footer className={cn("mx-auto mt-6 w-fit")}>
+          {/* Footer - content-sized */}
+          <footer className={cn("flex items-center justify-center")}>
             <div
               className={cn(
-                "bg-seasalt-800/70 border-seasalt-400/40 p-6 rounded-[14px] border-2 shadow-xl backdrop-blur-md",
+                "bg-seasalt-800/70 border-seasalt-400/40 rounded-3xl border-2 p-10 shadow-xl backdrop-blur-md",
               )}
             >
-              <div className={cn("flex items-center gap-7")}>
+              <div className={cn("flex items-center gap-11")}>
                 {/* QR Code */}
-                <div className={cn("flex shrink-0 flex-col items-center gap-1")}>
+                <div className={cn("flex shrink-0 flex-col items-center gap-2")}>
                   <div
                     className={cn(
-                      "border-seasalt-400/60 size-42 grid place-items-center rounded-[10px] border-2 bg-white p-2.5 shadow-sm",
+                      "border-seasalt-400/60 grid size-60 place-items-center rounded-[10px] border-2 bg-white p-3 shadow-sm",
                     )}
                   >
                     <Image
@@ -225,38 +229,35 @@ export default function PosterPage(): React.ReactElement {
                       className={cn("h-full w-full")}
                     />
                   </div>
-                  <span className={cn("text-rich-black text-center text-[24px] font-semibold")}>
+                  <span className={cn("text-rich-black text-center text-[34px] font-semibold")}>
                     Scan to Book
                   </span>
                 </div>
 
                 {/* Contact Info */}
-                <div className={cn("flex flex-col gap-2.5")}>
+                <div className={cn("flex flex-col gap-6")}>
                   <a
                     href="tel:+64212971237"
                     className={cn(
-                      "text-russian-violet flex items-center gap-3.5 text-[34px] font-semibold",
+                      "text-russian-violet flex items-center gap-4 text-[44px] font-semibold",
                     )}
                   >
-                    <FaPhone className={cn("h-7.5 w-7.5 shrink-0")} aria-hidden />
+                    <FaPhone className={cn("h-11 w-11 shrink-0")} aria-hidden />
                     <span>021 297 1237</span>
                   </a>
 
                   <a
                     href="mailto:harrison@tothepoint.co.nz"
                     className={cn(
-                      "text-russian-violet flex items-center gap-3.5 text-[34px] font-semibold",
+                      "text-russian-violet flex items-center gap-4 text-[44px] font-semibold",
                     )}
                   >
-                    <FaEnvelope className={cn("h-7.5 w-7.5 shrink-0")} aria-hidden />
+                    <FaEnvelope className={cn("h-11 w-11 shrink-0")} aria-hidden />
                     <span>harrison@tothepoint.co.nz</span>
                   </a>
 
-                  <div className={cn("flex items-center gap-3.5 text-[34px] font-semibold")}>
-                    <FaGlobe
-                      className={cn("text-russian-violet h-7.5 w-7.5 shrink-0")}
-                      aria-hidden
-                    />
+                  <div className={cn("flex items-center gap-4 text-[44px] font-semibold")}>
+                    <FaGlobe className={cn("text-russian-violet h-11 w-11 shrink-0")} aria-hidden />
                     <p className={cn("text-russian-violet")}>tothepoint.co.nz</p>
                   </div>
                 </div>

@@ -33,7 +33,7 @@ import {
 } from "react-icons/fa6";
 import type { IconType } from "react-icons";
 
-export const revalidate = 300; // ISR — regenerate every 5 minutes
+export const revalidate = 300; // ISR - regenerate every 5 minutes
 
 interface SupportItem {
   label: string;
@@ -89,7 +89,7 @@ export default async function Home(): Promise<React.ReactElement> {
       <FrostedSection>
         <div className={cn("flex flex-col gap-6 sm:gap-8")}>
           {/* Hero Section */}
-          <section aria-labelledby="hero-heading" className={cn("text-center animate-fade-in")}>
+          <section aria-labelledby="hero-heading" className={cn("animate-fade-in text-center")}>
             <div className={cn("mb-6 grid place-items-center")}>
               <Image
                 src="/source/logo-full.svg"
@@ -104,11 +104,11 @@ export default async function Home(): Promise<React.ReactElement> {
 
             <p
               className={cn(
-                "text-rich-black mx-auto mb-8 max-w-3xl text-lg font-medium sm:text-xl md:text-2xl",
+                "text-rich-black mx-auto mb-8 max-w-7xl text-lg font-medium sm:text-xl md:text-2xl",
               )}
             >
-              Professional tech help in Point Chevalier and nearby suburbs. Clear explanations, no
-              jargon, and solutions that actually work.
+              Professional tech help in your local area. Clear explanations, no jargon, and
+              solutions that actually work.
             </p>
 
             <div className={cn("flex flex-wrap items-center justify-center gap-4")}>
@@ -119,7 +119,7 @@ export default async function Home(): Promise<React.ReactElement> {
               <a
                 href="tel:+64212971237"
                 className={cn(
-                  "bg-russian-violet text-seasalt inline-flex items-center gap-2 rounded-lg px-5 py-3 text-base font-bold sm:text-lg transition-colors hover:brightness-110",
+                  "bg-russian-violet text-seasalt inline-flex items-center gap-2 rounded-lg px-5 py-3 text-base font-bold transition-colors hover:brightness-110 sm:text-lg",
                 )}
               >
                 <FaPhone className={cn("h-5 w-5")} aria-hidden />
@@ -134,7 +134,12 @@ export default async function Home(): Promise<React.ReactElement> {
 
           {/* Trust Indicators */}
           <section aria-label="Why choose us" className={cn("grid gap-4 sm:grid-cols-3 sm:gap-5")}>
-            <div className={cn(CARD, "text-center animate-slide-up animate-fill-both animate-delay-100")}>
+            <div
+              className={cn(
+                CARD,
+                "animate-slide-up animate-fill-both animate-delay-100 text-center",
+              )}
+            >
               <div
                 className={cn(
                   "bg-moonstone-500/10 border-moonstone-500/30 mx-auto mb-3 grid size-16 place-items-center rounded-full border-2",
@@ -143,14 +148,19 @@ export default async function Home(): Promise<React.ReactElement> {
                 <FaCircleCheck className={cn("text-moonstone-600 h-8 w-8")} aria-hidden />
               </div>
               <h3 className={cn("text-russian-violet mb-2 text-xl font-bold sm:text-2xl")}>
-                CS Graduate
+                Computer Science Graduate
               </h3>
               <p className={cn("text-rich-black/80 text-base sm:text-lg")}>
                 University-trained with real-world experience
               </p>
             </div>
 
-            <div className={cn(CARD, "text-center animate-slide-up animate-fill-both animate-delay-200")}>
+            <div
+              className={cn(
+                CARD,
+                "animate-slide-up animate-fill-both animate-delay-200 text-center",
+              )}
+            >
               <div
                 className={cn(
                   "bg-moonstone-500/10 border-moonstone-500/30 mx-auto mb-3 grid size-16 place-items-center rounded-full border-2",
@@ -159,14 +169,19 @@ export default async function Home(): Promise<React.ReactElement> {
                 <FaMapLocationDot className={cn("text-moonstone-600 h-8 w-8")} aria-hidden />
               </div>
               <h3 className={cn("text-russian-violet mb-2 text-xl font-bold sm:text-2xl")}>
-                Point Chev Local
+                Proudly Local
               </h3>
               <p className={cn("text-rich-black/80 text-base sm:text-lg")}>
                 Born and raised here, serving the community
               </p>
             </div>
 
-            <div className={cn(CARD, "text-center animate-slide-up animate-fill-both animate-delay-300")}>
+            <div
+              className={cn(
+                CARD,
+                "animate-slide-up animate-fill-both animate-delay-300 text-center",
+              )}
+            >
               <div
                 className={cn(
                   "bg-moonstone-500/10 border-moonstone-500/30 mx-auto mb-3 grid size-16 place-items-center rounded-full border-2",
@@ -184,12 +199,13 @@ export default async function Home(): Promise<React.ReactElement> {
           </section>
 
           {/* Services Grid */}
-          <section aria-labelledby="services-heading" className={cn("text-center animate-slide-up animate-fill-both animate-delay-200")}>
+          <section
+            aria-labelledby="services-heading"
+            className={cn("animate-slide-up animate-fill-both animate-delay-200 text-center")}
+          >
             <h2
               id="services-heading"
-              className={cn(
-                "text-rich-black mb-8 text-3xl font-bold sm:text-4xl md:text-5xl",
-              )}
+              className={cn("text-rich-black mb-8 text-3xl font-bold sm:text-4xl md:text-5xl")}
             >
               What I can help with
             </h2>
@@ -228,7 +244,7 @@ export default async function Home(): Promise<React.ReactElement> {
               <Link
                 href="/services"
                 className={cn(
-                  "bg-moonstone-600 hover:bg-moonstone-700 text-seasalt inline-flex items-center gap-2 rounded-lg px-6 py-3 text-base font-bold sm:text-lg transition-all shadow-md hover:shadow-lg",
+                  "bg-moonstone-600 hover:bg-moonstone-700 text-seasalt inline-flex items-center gap-2 rounded-lg px-6 py-3 text-base font-bold shadow-md transition-all hover:shadow-lg sm:text-lg",
                 )}
               >
                 View all services
@@ -251,8 +267,8 @@ export default async function Home(): Promise<React.ReactElement> {
                 up.
               </p>
               <p className={cn("text-rich-black/90 text-base sm:text-lg")}>
-                I focus on practical fixes and clear explanations, leaving your tech in a better
-                state than when I arrived.
+                I focus on practical fixes and clear explanations, leaving with your problems
+                solved.
               </p>
             </article>
 
@@ -273,7 +289,7 @@ export default async function Home(): Promise<React.ReactElement> {
                     className={cn("text-moonstone-600 mt-1 h-5 w-5 shrink-0")}
                     aria-hidden
                   />
-                  <span>Explain everything in plain English</span>
+                  <span>Explain everything as clearly as possible</span>
                 </li>
                 <li className={cn("flex gap-3")}>
                   <FaCircleCheck
@@ -305,7 +321,7 @@ export default async function Home(): Promise<React.ReactElement> {
             >
               <div
                 className={cn(
-                  "bg-moonstone-500/10 border-moonstone-500/30 grid shrink-0 size-16 place-items-center rounded-full border-2",
+                  "bg-moonstone-500/10 border-moonstone-500/30 grid size-16 shrink-0 place-items-center rounded-full border-2",
                 )}
               >
                 <FaDownload className={cn("text-moonstone-600 h-8 w-8")} aria-hidden />
@@ -319,12 +335,12 @@ export default async function Home(): Promise<React.ReactElement> {
                   Know someone who needs tech help?
                 </h2>
                 <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
-                  Download and print this A5 flyer to share with neighbours or pin to a noticeboard.
+                  Download this flyer to share with neighbours or pin to a noticeboard.
                 </p>
               </div>
 
               <a
-                href="/downloads/poster.pdf"
+                href="/downloads/poster-a5.pdf"
                 download="to-the-point-tech-flyer.pdf"
                 className={cn(
                   "bg-moonstone-600 hover:bg-moonstone-700 text-seasalt inline-flex shrink-0 items-center gap-2 rounded-lg px-5 py-3 text-sm font-bold shadow-md transition-all hover:shadow-lg sm:text-base",
@@ -340,7 +356,7 @@ export default async function Home(): Promise<React.ReactElement> {
 
       {/* Reviews Section */}
       {hasReviews && (
-        <div className={cn("pb-6 sm:pb-8 animate-fade-in animate-delay-500 animate-fill-both")}>
+        <div className={cn("animate-fade-in animate-delay-500 animate-fill-both pb-6 sm:pb-8")}>
           <FrostedSection>
             <Reviews items={items} />
           </FrostedSection>
