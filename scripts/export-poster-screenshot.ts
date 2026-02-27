@@ -79,8 +79,8 @@ const A5_DIGITAL_CONFIG: PageConfig = {
 /** Configuration for print variant (A5 + 3mm bleed). */
 const A5_PRINT_CONFIG: PageConfig = {
   label: "Print (A5 + 3mm bleed)",
-  viewport: { width: 1818, height: 2550 },
-  pdfSize: { width: 437.48, height: 612.28 },
+  viewport: { width: 1819, height: 2551 },
+  pdfSize: { width: 436.53, height: 612.28 },
   trimSize: { width: 419.53, height: 595.28 },
   cropMarks: true,
   filename: "poster-a5-print.pdf",
@@ -100,8 +100,8 @@ const A4_DIGITAL_CONFIG: PageConfig = {
 /** Configuration for print variant (A4 + 3mm bleed). */
 const A4_PRINT_CONFIG: PageConfig = {
   label: "Print (A4 + 3mm bleed)",
-  viewport: { width: 2550, height: 3579 },
-  pdfSize: { width: 612.28, height: 858.9 },
+  viewport: { width: 2551, height: 3579 },
+  pdfSize: { width: 612.28, height: 858.89 },
   trimSize: { width: 595.28, height: 841.89 },
   cropMarks: true,
   filename: "poster-a4-print.pdf",

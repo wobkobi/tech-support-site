@@ -62,8 +62,8 @@ export default async function PosterPage({
   searchParams: Promise<{ mode?: string }>;
 }): Promise<React.ReactElement> {
   const { mode } = await searchParams;
-  // 36px base + 35px bleed (3 mm at 300 DPI) = 71px
-  const outerPadding = mode === "print" ? "71px" : "36px";
+  // 32px base + 35px bleed (3 mm at 300 DPI) = 67px
+  const outerPadding = mode === "print" ? "67px" : "32px";
 
   return (
     <div className={cn("relative h-screen w-screen overflow-hidden")}>
@@ -82,14 +82,14 @@ export default async function PosterPage({
       {/* Even outer gap on all sides */}
       <div className={cn("flex h-full w-full flex-col")} style={{ padding: outerPadding }}>
         {/* Inner column fills available height so footer can pin to bottom */}
-        <div className={cn("flex min-h-0 flex-1 flex-col justify-between gap-8")}>
+        <div className={cn("flex min-h-0 flex-1 flex-col justify-between gap-6")}>
           {/* Main frosted card - content-sized */}
           <div
             className={cn(
               "rounded-4xl border-seasalt-400/40 bg-seasalt-800/60 border-[3px] p-6 shadow-xl backdrop-blur-xl",
             )}
           >
-            <div className={cn("flex flex-col gap-8")}>
+            <div className={cn("flex flex-col gap-6")}>
               {/* Logo */}
               <div className={cn("grid place-items-center")}>
                 <Image
