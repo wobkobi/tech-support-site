@@ -115,7 +115,7 @@ describe("Reviews Component - Scale Test", () => {
       const cards = container.querySelectorAll("li");
       expect(cards.length).toBe(100); // 50 × 2 for marquee
       // Should render in <1000ms
-      expect(end - start).toBeLessThan(1000);
+      expect(end - start).toBeLessThan(300);
     });
 
     it("handles 100 reviews without performance degradation", () => {
@@ -126,8 +126,8 @@ describe("Reviews Component - Scale Test", () => {
 
       const cards = container.querySelectorAll("li");
       expect(cards.length).toBe(200); // 100 × 2
-      // Should render in <2000ms
-      expect(end - start).toBeLessThan(2000);
+      // Should render in <500ms
+      expect(end - start).toBeLessThan(500);
     });
   });
 

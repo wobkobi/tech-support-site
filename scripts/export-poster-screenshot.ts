@@ -79,6 +79,8 @@ const A5_DIGITAL_CONFIG: PageConfig = {
 /** Configuration for print variant (A5 + 3mm bleed). */
 const A5_PRINT_CONFIG: PageConfig = {
   label: "Print (A5 + 3mm bleed)",
+  // 3 mm bleed at 300 DPI ≈ 35.43 px per side → 1748 + 2×35.43 ≈ 1818.86
+  // and 2480 + 2×35.43 ≈ 2550.86, which we round up to whole pixels: 1819×2551.
   viewport: { width: 1819, height: 2551 },
   pdfSize: { width: 436.53, height: 612.28 },
   trimSize: { width: 419.53, height: 595.28 },
