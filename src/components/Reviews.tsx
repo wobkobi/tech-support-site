@@ -22,13 +22,13 @@ function isLongReview(text: string): boolean {
 }
 
 /**
- * ReviewText component: truncates long text and allows expand/collapse on click.
+ * ReviewText component: displays full or truncated text based on expanded state.
  * @param props - Component props.
  * @param props.text - The review text to display.
- * @returns A span element with the review text, expandable on click.
+ * @param props.expanded - Whether to show the full text.
+ * @returns A span element with the review text.
  */
-function ReviewText({ text }: { text: string }): React.ReactElement {
-  const [expanded, setExpanded] = useState(false);
+function ReviewText({ text, expanded }: { text: string; expanded: boolean }): React.ReactElement {
   if (!isLongReview(text)) {
     return <span>{text}</span>;
   }
@@ -39,24 +39,61 @@ function ReviewText({ text }: { text: string }): React.ReactElement {
   const base = wordSafe.trim().length > 0 ? wordSafe : preview;
   const truncated = base + "…";
 
+  return <span>{expanded ? text : truncated}</span>;
+}
+
+/**
+ * ReviewCard component: wraps a single review card with expand/collapse on click.
+ * @param props - Component props.
+ * @param props.r - The review item.
+ * @param props.className - Additional class names for the card.
+ * @returns A list item card with expandable review text.
+ */
+function ReviewCard({ r, className }: { r: ReviewItem; className: string }): React.ReactElement {
+  const [expanded, setExpanded] = useState(false);
+  const long = isLongReview(r.text);
+
+  /** Toggles the expanded state. */
+  function toggle(): void {
+    setExpanded((v) => !v);
+  }
+
+  /**
+   * Calls toggle on Enter or Space keydown.
+   * @param e - The keyboard event.
+   */
+  function handleKeyDown(e: React.KeyboardEvent): void {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      toggle();
+    }
+  }
+
+  const interactiveProps = long
+    ? {
+        role: "button" as const,
+        tabIndex: 0,
+        "aria-expanded": expanded,
+        "aria-label": expanded ? "Collapse review" : "Expand review",
+        title: expanded ? "Click to collapse" : "Click to read more",
+        onClick: toggle,
+        onKeyDown: handleKeyDown,
+      }
+    : {
+        role: "listitem" as const,
+      };
+
   return (
-    <span
-      role="button"
-      tabIndex={0}
-      aria-expanded={expanded}
-      aria-label={expanded ? "Collapse review" : "Expand review"}
-      className={cn("cursor-pointer")}
-      title={expanded ? "Click to collapse" : "Click to read more"}
-      onClick={() => setExpanded((v) => !v)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          setExpanded((v) => !v);
-        }
-      }}
-    >
-      {expanded ? text : truncated}
-    </span>
+    <li className={cn(className, long && "cursor-pointer")} {...interactiveProps}>
+      <ReviewText text={r.text} expanded={expanded} />
+      <p
+        className={cn(
+          "text-russian-violet mt-auto pt-3 text-right text-xs font-semibold sm:text-sm",
+        )}
+      >
+        - {formatName(r)}
+      </p>
+    </li>
   );
 }
 
@@ -114,24 +151,16 @@ export default function Reviews({ items = [] }: ReviewsProps): React.ReactElemen
         <div className={cn("relative w-full overflow-hidden rounded-lg bg-transparent p-0")}>
           <ul className={cn("marquee-track animate-marquee flex w-max gap-3")}>
             {track.map((r, i) => (
-              <li
+              <ReviewCard
                 key={`${formatName(r)}-${i}`}
+                r={r}
                 className={cn(
                   "bg-seasalt-800/80 sm:w-95 flex w-[min(22.5rem,calc(100vw-3rem))] shrink-0 flex-col rounded-lg border-2 p-4 transition-colors duration-300 sm:p-5",
                   isLongReview(r.text)
                     ? "border-seasalt-400/60 hover:border-coquelicot-500/60"
                     : "border-seasalt-400/60",
                 )}
-              >
-                <ReviewText text={r.text} />
-                <p
-                  className={cn(
-                    "text-russian-violet mt-auto pt-3 text-right text-xs font-semibold sm:text-sm",
-                  )}
-                >
-                  - {formatName(r)}
-                </p>
-              </li>
+              />
             ))}
           </ul>
         </div>
@@ -158,28 +187,17 @@ export default function Reviews({ items = [] }: ReviewsProps): React.ReactElemen
         )}
       >
         {items.map((r, i) => (
-          <li
+          <ReviewCard
             key={`${formatName(r)}-${i}`}
+            r={r}
             className={cn(
-              // width rules per breakpoint:
-              // full width on mobile, two-up on sm, three-up on md+. Centering comes from justify-center.
               "w-full sm:w-[calc(50%-0.375rem)] md:w-[calc(33.333%-0.5rem)]",
-              // card styles
               "bg-seasalt-800 flex flex-col rounded-lg border-2 p-4 shadow-sm transition-colors duration-300 sm:p-5",
               isLongReview(r.text)
                 ? "border-seasalt-400/60 hover:border-coquelicot-500/60"
                 : "border-seasalt-400/60",
             )}
-          >
-            <ReviewText text={r.text} />
-            <p
-              className={cn(
-                "text-russian-violet mt-auto pt-3 text-right text-xs font-semibold sm:text-sm",
-              )}
-            >
-              - {formatName(r)}
-            </p>
-          </li>
+          />
         ))}
       </ul>
     </section>
