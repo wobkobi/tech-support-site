@@ -53,19 +53,19 @@ function ReviewCard({ r, className }: { r: ReviewItem; className: string }): Rea
   const [expanded, setExpanded] = useState(false);
   const long = isLongReview(r.text);
 
-  /** Toggles the expanded state when the card is clicked. */
-  function handleClick(): void {
+  /** Toggles the expanded state. */
+  function toggle(): void {
     setExpanded((v) => !v);
   }
 
   /**
-   * Toggles the expanded state on Enter or Space keydown.
+   * Calls toggle on Enter or Space keydown.
    * @param e - The keyboard event.
    */
   function handleKeyDown(e: React.KeyboardEvent): void {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      setExpanded((v) => !v);
+      toggle();
     }
   }
 
@@ -76,10 +76,12 @@ function ReviewCard({ r, className }: { r: ReviewItem; className: string }): Rea
         "aria-expanded": expanded,
         "aria-label": expanded ? "Collapse review" : "Expand review",
         title: expanded ? "Click to collapse" : "Click to read more",
-        onClick: handleClick,
+        onClick: toggle,
         onKeyDown: handleKeyDown,
       }
-    : {};
+    : {
+        role: "listitem" as const,
+      };
 
   return (
     <li className={cn(className, long && "cursor-pointer")} {...interactiveProps}>
