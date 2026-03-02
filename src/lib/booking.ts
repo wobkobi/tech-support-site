@@ -272,8 +272,9 @@ export function buildAvailableDays(
     // Check if day has any available slots
     const hasAnySlots = timeWindows.some((w) => w.availableShort || w.availableLong);
 
-    // Skip days with no available slots
-    if (!hasAnySlots) {
+    // Historically, only skip *today* when it has no available slots so that
+    // consumers can still see future fully-booked days in the calendar.
+    if (isToday && !hasAnySlots) {
       continue;
     }
 

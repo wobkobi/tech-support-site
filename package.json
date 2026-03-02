@@ -78,6 +78,7 @@
     "safari >= 15.4",
     "edge >= 93"
   ],
+  "browserslistNote": "These minimum versions target modern evergreen browsers (Chrome/Edge 93+, Firefox 92+, Safari 15.4+) that fully support ES2021+, modern CSS (including grid/flexbox), and Next.js 16 features. This aligns with the project's browser support policy of supporting roughly the last 3 years of auto-updating browsers while excluding legacy browsers such as Internet Explorer.",
   "engines": {
     "node": "22.x",
     "npm": ">=10.0.0"
