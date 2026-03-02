@@ -6,8 +6,8 @@
 
 import type React from "react";
 import { FrostedSection, PageShell, CARD } from "@/components/PageLayout";
+import { Button } from "@/components/Button";
 import { cn } from "@/lib/cn";
-import Link from "next/link";
 import { FaHouse } from "react-icons/fa6";
 
 /**
@@ -41,24 +41,13 @@ export default function NotFound(): React.ReactElement {
             </p>
 
             <div className={cn("flex flex-wrap items-center justify-center gap-3")}>
-              <Link
-                href="/"
-                className={cn(
-                  "bg-coquelicot-500 hover:bg-coquelicot-600 text-seasalt inline-flex items-center gap-2 rounded-lg px-6 py-3 font-semibold shadow-lg transition-colors hover:shadow-xl",
-                )}
-              >
+              <Button href="/" variant="primary">
                 <FaHouse className={cn("h-5 w-5")} aria-hidden />
                 Take me home
-              </Link>
-
-              <Link
-                href="/contact"
-                className={cn(
-                  "border-seasalt-400/60 hover:bg-seasalt-900/40 text-rich-black inline-flex items-center gap-2 rounded-lg border px-6 py-3 font-semibold transition-colors",
-                )}
-              >
+              </Button>
+              <Button href="/contact" variant="ghost">
                 Report this issue
-              </Link>
+              </Button>
             </div>
           </section>
         </div>

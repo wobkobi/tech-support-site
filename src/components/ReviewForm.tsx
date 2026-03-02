@@ -8,6 +8,7 @@
 
 import type React from "react";
 import { cn } from "@/lib/cn";
+import { Button } from "@/components/Button";
 import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -258,16 +259,14 @@ export default function ReviewFormProtected({
         />
 
         <div className={cn("mt-3 flex items-center justify-between")}>
-          <button
+          <Button
             type="submit"
+            variant="secondary"
+            size="sm"
             disabled={loading || textCount < textMin}
-            className={cn(
-              "bg-russian-violet text-seasalt rounded-md px-4 py-2 text-sm font-semibold",
-              "hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60",
-            )}
           >
             {loading ? "Sending..." : "Send review"}
-          </button>
+          </Button>
         </div>
       </div>
     </form>

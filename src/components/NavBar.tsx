@@ -1,7 +1,7 @@
 // src/components/NavBar.tsx
 /**
  * @file NavBar.tsx
- * @description Modern navigation bar with mobile menu, frosted glass effect, and smooth animations.
+ * @description Navigation bar, always in document flow at the top of the page.
  */
 
 "use client";
@@ -10,6 +10,7 @@ import type React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Button } from "@/components/Button";
 import { cn } from "@/lib/cn";
 import { useState, useEffect } from "react";
 
@@ -33,7 +34,7 @@ function isActivePrefix(pathname: string, prefix: string): boolean {
 }
 
 /**
- * Modern navigation bar with mobile menu support.
+ * Navigation bar, always rendered in normal document flow.
  * @returns The NavBar element, or null on hidden paths.
  */
 export function NavBar(): React.ReactElement | null {
@@ -41,27 +42,13 @@ export function NavBar(): React.ReactElement | null {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [prevPathname, setPrevPathname] = useState(pathname);
 
-  // Close mobile menu when route changes (state-based comparison avoids effect)
+  // Close mobile menu when route changes
   if (prevPathname !== pathname) {
     setPrevPathname(pathname);
     if (mobileMenuOpen) {
       setMobileMenuOpen(false);
     }
   }
-
-  const HIDDEN_PATHS: ReadonlyArray<string> = ["/poster"];
-  const hidden = HIDDEN_PATHS.includes(pathname);
-
-  const items: ReadonlyArray<NavItem> = [
-    { label: "Services", href: "/services", activePrefix: "/services" },
-    { label: "Pricing", href: "/pricing", activePrefix: "/pricing" },
-    { label: "About", href: "/about", activePrefix: "/about" },
-    { label: "FAQ", href: "/faq", activePrefix: "/faq" },
-    { label: "Reviews", href: "/reviews", activePrefix: "/reviews" },
-  ];
-
-  const bookingActive = isActivePrefix(pathname, "/booking");
-  const contactActive = isActivePrefix(pathname, "/contact");
 
   // Prevent body scroll when mobile menu is open
   useEffect(() => {
@@ -75,17 +62,28 @@ export function NavBar(): React.ReactElement | null {
     };
   }, [mobileMenuOpen]);
 
-  if (hidden) {
+  const HIDDEN_PATHS: ReadonlyArray<string> = ["/poster"];
+  if (HIDDEN_PATHS.includes(pathname)) {
     return null;
   }
+
+  const items: ReadonlyArray<NavItem> = [
+    { label: "Services", href: "/services", activePrefix: "/services" },
+    { label: "Pricing", href: "/pricing", activePrefix: "/pricing" },
+    { label: "About", href: "/about", activePrefix: "/about" },
+    { label: "FAQ", href: "/faq", activePrefix: "/faq" },
+    { label: "Reviews", href: "/reviews", activePrefix: "/reviews" },
+  ];
+
+  const bookingActive = isActivePrefix(pathname, "/booking");
+  const contactActive = isActivePrefix(pathname, "/contact");
 
   return (
     <>
       <header
         className={cn(
-          "sticky top-4 z-50 mx-auto w-full px-4",
+          "relative z-50 mx-auto mt-4 w-full px-4 sm:mt-5 md:mt-6",
           "max-w-[min(100vw-2rem,90rem)]",
-          "animate-slide-down",
         )}
       >
         <div
@@ -136,31 +134,25 @@ export function NavBar(): React.ReactElement | null {
 
           {/* CTA Buttons */}
           <div className={cn("flex shrink-0 items-center gap-2")}>
-            <Link
+            <Button
               href="/booking"
-              className={cn(
-                "hidden shrink-0 whitespace-nowrap rounded-lg px-6 py-3 text-lg font-bold transition-all lg:block xl:text-xl",
-                bookingActive
-                  ? "bg-coquelicot-600 text-seasalt shadow-md"
-                  : "bg-coquelicot-500 hover:bg-coquelicot-600 text-seasalt hover:shadow-md",
-              )}
+              variant="primary"
+              size="lg"
+              className={cn("hidden shrink-0 lg:inline-flex xl:text-xl")}
               aria-current={bookingActive ? "page" : undefined}
             >
               Book now
-            </Link>
+            </Button>
 
-            <Link
+            <Button
               href="/contact"
-              className={cn(
-                "hidden shrink-0 whitespace-nowrap rounded-lg px-6 py-3 text-lg font-bold transition-all lg:block xl:text-xl",
-                contactActive
-                  ? "bg-moonstone-600/30 text-russian-violet shadow-sm"
-                  : "bg-moonstone-600/20 text-russian-violet hover:bg-moonstone-600/30",
-              )}
+              variant="ghost"
+              size="lg"
+              className={cn("hidden shrink-0 lg:inline-flex xl:text-xl")}
               aria-current={contactActive ? "page" : undefined}
             >
               Contact
-            </Link>
+            </Button>
 
             {/* Mobile Menu Button */}
             <button
@@ -240,31 +232,25 @@ export function NavBar(): React.ReactElement | null {
 
           {/* Mobile CTA Buttons */}
           <div className={cn("border-seasalt-400/40 mt-4 flex flex-col gap-2 border-t pt-4")}>
-            <Link
+            <Button
               href="/booking"
-              className={cn(
-                "rounded-lg px-4 py-3 text-center text-base font-bold transition-all",
-                bookingActive
-                  ? "bg-coquelicot-600 text-seasalt shadow-md"
-                  : "bg-coquelicot-500 hover:bg-coquelicot-600 text-seasalt",
-              )}
+              variant="primary"
+              size="lg"
+              fullWidth
               aria-current={bookingActive ? "page" : undefined}
             >
               Book now
-            </Link>
+            </Button>
 
-            <Link
+            <Button
               href="/contact"
-              className={cn(
-                "rounded-lg px-4 py-3 text-center text-base font-bold transition-all",
-                contactActive
-                  ? "bg-moonstone-600/30 text-russian-violet shadow-sm"
-                  : "bg-moonstone-600/20 text-russian-violet hover:bg-moonstone-600/30",
-              )}
+              variant="ghost"
+              size="lg"
+              fullWidth
               aria-current={contactActive ? "page" : undefined}
             >
               Contact
-            </Link>
+            </Button>
           </div>
         </div>
       </nav>

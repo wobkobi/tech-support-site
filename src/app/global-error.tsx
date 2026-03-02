@@ -54,7 +54,7 @@ export default function GlobalError({
                 onClick={reset}
                 className={cn(
                   "bg-russian-violet text-seasalt-800 inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold",
-                  "hover:brightness-110 disabled:opacity-60",
+                  "hover:bg-russian-violet-600 disabled:opacity-60",
                 )}
               >
                 <FaArrowRotateRight className={cn("h-4 w-4")} aria-hidden />

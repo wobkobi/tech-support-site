@@ -9,6 +9,7 @@
 import type React from "react";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/Button";
 import { cn } from "@/lib/cn";
 import {
   DURATION_OPTIONS,
@@ -504,16 +505,14 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
       )}
 
       <div className={cn("flex flex-wrap items-center gap-4")}>
-        <button
+        <Button
           type="submit"
+          variant="secondary"
+          size="md"
           disabled={submitting || availableDays.length === 0}
-          className={cn(
-            "bg-russian-violet text-seasalt rounded-lg px-7 py-3.5 text-base font-semibold shadow-lg",
-            "transition-all hover:shadow-xl hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60",
-          )}
         >
           {submitting ? "Sending..." : "Submit request"}
-        </button>
+        </Button>
         <p className={cn("text-rich-black/60 text-sm sm:text-base")}>
           I'll confirm your exact appointment time by email.
         </p>

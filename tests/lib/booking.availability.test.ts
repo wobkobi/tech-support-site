@@ -192,8 +192,8 @@ describe("buildAvailableDays & validateBookingRequest", () => {
       expect(threepmSlot?.availableShort).toBe(true);
     });
 
-    it("blocks next-day morning slots after 8pm same-day cutoff", () => {
-      vi.setSystemTime(new Date("2026-02-24T07:30:00.000Z")); // 8:30pm NZDT = next day 7:30am UTC
+    it("allows next-day morning slots at 8:30pm (no morning cutoff, only 2hr notice applies)", () => {
+      vi.setSystemTime(new Date("2026-02-24T07:30:00.000Z")); // 8:30pm NZDT
       const now = new Date();
 
       const days = buildAvailableDays([], [], now, BOOKING_CONFIG);
@@ -201,11 +201,11 @@ describe("buildAvailableDays & validateBookingRequest", () => {
       const tomorrow = days.find((d) => !d.isToday);
       expect(tomorrow).toBeDefined();
 
-      // 10am and 11am should be blocked
+      // 10am tomorrow is ~13.5hrs away — well beyond 2hr notice, should be available
       const tenAmSlot = tomorrow?.timeWindows.find((w) => w.value === "10am");
-      expect(tenAmSlot?.availableShort).toBe(false);
+      expect(tenAmSlot?.availableShort).toBe(true);
 
-      // 12pm onwards should be available
+      // 12pm tomorrow should also be available
       const noonSlot = tomorrow?.timeWindows.find((w) => w.value === "12pm");
       expect(noonSlot?.availableShort).toBe(true);
     });

@@ -104,6 +104,7 @@ body {
   margin: 0;
   color: var(--color-foreground);
   font-family: var(--font-sans);
+  font-weight: 500;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }

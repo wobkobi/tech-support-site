@@ -12,7 +12,6 @@ export const BOOKING_CONFIG = {
   bufferMin: 15,
   minHoursNotice: 2,
   sameDayCutoffHour: 18,
-  nextDayMorningCutoffHour: 20,
   workStartHour: 10,
   workEndHour: 20,
 } as const;
@@ -171,7 +170,6 @@ export function buildAvailableDays(
     const dayOfWeek = dayUTC.getUTCDay();
 
     const isToday = i === 0;
-    const isTomorrow = i === 1;
     const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
     // Format labels
@@ -255,12 +253,6 @@ export function buildAvailableDays(
         }
       }
 
-      // Next-day morning cutoff (8pm blocks next morning)
-      if (isTomorrow && currentHourNZ >= config.nextDayMorningCutoffHour && slotHour < 12) {
-        availableShort = false;
-        availableLong = false;
-      }
-
       timeWindows.push({
         value: slot.value,
         label: slot.label,
@@ -272,9 +264,8 @@ export function buildAvailableDays(
     // Check if day has any available slots
     const hasAnySlots = timeWindows.some((w) => w.availableShort || w.availableLong);
 
-    // Historically, only skip *today* when it has no available slots so that
-    // consumers can still see future fully-booked days in the calendar.
-    if (isToday && !hasAnySlots) {
+    // Skip any day that has no available slots — fully-blocked days are not shown.
+    if (!hasAnySlots) {
       continue;
     }
 
