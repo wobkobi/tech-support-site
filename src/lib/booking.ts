@@ -149,22 +149,26 @@ export function buildAvailableDays(
   config: typeof BOOKING_CONFIG,
 ): BookableDay[] {
   const days: BookableDay[] = [];
+
+  // Use toLocaleString only for extracting NZ wall-clock hour/minute —
+  // getHours()/getMinutes() on the resulting Date give the correct NZ values
+  // regardless of whether the server is in UTC or NZ local time.
   const nzTime = new Date(now.toLocaleString("en-US", { timeZone: config.timeZone }));
   const currentHourNZ = nzTime.getHours();
   const currentMinuteNZ = nzTime.getMinutes();
 
-  const startDate = new Date(nzTime);
-  startDate.setHours(0, 0, 0, 0);
+  // Derive today's NZ calendar date independently of server timezone.
+  // en-CA locale reliably produces YYYY-MM-DD on all Node.js platforms.
+  const todayNZStr = now.toLocaleDateString("en-CA", { timeZone: config.timeZone });
+  const [startY, startM, startD] = todayNZStr.split("-").map(Number);
 
   for (let i = 0; i < config.maxAdvanceDays; i++) {
-    const date = new Date(startDate);
-    date.setDate(date.getDate() + i);
-
-    const dateKey = date.toISOString().split("T")[0];
-
-    // Calculate day of week from dateKey to avoid timezone issues
-    // (date object might have UTC time component that shifts the day)
-    const dayOfWeek = new Date(dateKey + "T12:00:00.000Z").getUTCDay();
+    // UTC noon for day i — using noon avoids any DST-induced date-boundary shift
+    // when extracting UTC date components. JavaScript's Date constructor handles
+    // month/day overflow automatically (e.g. day 32 wraps to the next month).
+    const dayUTC = new Date(Date.UTC(startY, startM - 1, startD + i, 12, 0, 0));
+    const dateKey = dayUTC.toISOString().split("T")[0];
+    const dayOfWeek = dayUTC.getUTCDay();
 
     const isToday = i === 0;
     const isTomorrow = i === 1;
@@ -188,8 +192,8 @@ export function buildAvailableDays(
       "Dec",
     ];
 
-    const dayLabel = `${shortDayNames[dayOfWeek]} ${date.getDate()} ${monthNames[date.getMonth()]}`;
-    const fullLabel = `${dayNames[dayOfWeek]}, ${monthNames[date.getMonth()]} ${date.getDate()}`;
+    const dayLabel = `${shortDayNames[dayOfWeek]} ${dayUTC.getUTCDate()} ${monthNames[dayUTC.getUTCMonth()]}`;
+    const fullLabel = `${dayNames[dayOfWeek]}, ${monthNames[dayUTC.getUTCMonth()]} ${dayUTC.getUTCDate()}`;
 
     const timeWindows: TimeWindow[] = [];
 
@@ -268,10 +272,10 @@ export function buildAvailableDays(
     // Check if day has any available slots
     const hasAnySlots = timeWindows.some((w) => w.availableShort || w.availableLong);
 
-    // Always add the day to the list (even if fully booked)
-    // Exception: Skip today if all time slots are in the past
+    // Historically, only skip *today* when it has no available slots so that
+    // consumers can still see future fully-booked days in the calendar.
     if (isToday && !hasAnySlots) {
-      continue; // Don't show today if it's fully booked (all times past)
+      continue;
     }
 
     days.push({
@@ -313,18 +317,19 @@ export function validateBookingRequest(
     return { valid: false, error: "Invalid date format" };
   }
 
-  const selectedDate = new Date(year, month - 1, day);
-  selectedDate.setHours(0, 0, 0, 0);
+  // Use UTC noon for both selected and today so comparisons are timezone-agnostic.
+  // "Today" is derived from the NZ wall-clock date (same logic as buildAvailableDays).
+  const selectedDate = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
 
-  const today = new Date(now);
-  today.setHours(0, 0, 0, 0);
+  const todayNZStr = now.toLocaleDateString("en-CA", { timeZone: config.timeZone });
+  const [ty, tm, td] = todayNZStr.split("-").map(Number);
+  const today = new Date(Date.UTC(ty, tm - 1, td, 12, 0, 0));
 
   if (selectedDate < today) {
     return { valid: false, error: "Cannot book dates in the past" };
   }
 
-  const maxDate = new Date(today);
-  maxDate.setDate(maxDate.getDate() + config.maxAdvanceDays);
+  const maxDate = new Date(Date.UTC(ty, tm - 1, td + config.maxAdvanceDays, 12, 0, 0));
   if (selectedDate > maxDate) {
     return {
       valid: false,
