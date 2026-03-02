@@ -16,6 +16,7 @@ import {
   BACKDROP,
   FAVICON_SPECS,
   SOCIAL_SPECS,
+  BACKDROP_VARIANTS,
   ADDITIONAL_ASSETS,
   QR_CODE_SPECS,
 } from "./config.js";
@@ -155,6 +156,33 @@ export async function buildSocialImages(): Promise<void> {
       .toFile(`public/${name}.jpg`);
 
     console.log(`  ✓ ${name} (${width}x${height})`);
+  }
+}
+
+/* ---------- Backdrop Variant Generation ---------- */
+
+/**
+ * Build optimised backdrop variants for site use (e.g. blurred page background).
+ * Each variant is resized and compressed according to its spec in BACKDROP_VARIANTS.
+ * @returns Promise that resolves when all backdrop variants are generated.
+ */
+export async function buildBackdropVariants(): Promise<void> {
+  console.log("🌅 Building backdrop variants...");
+  await ensureDir("public/source");
+
+  for (const { name, width, quality, format } of BACKDROP_VARIANTS) {
+    const outputPath = `public/source/${name}.${format}`;
+    const pipeline = sharp(BACKDROP).resize(width, null, { withoutEnlargement: true });
+
+    if (format === "avif") {
+      await pipeline.avif({ quality }).toFile(outputPath);
+    } else if (format === "jpeg") {
+      await pipeline.jpeg({ quality }).toFile(outputPath);
+    } else {
+      await pipeline.webp({ quality }).toFile(outputPath);
+    }
+
+    console.log(`  ✓ ${name}.${format} (${width}px @ q${quality})`);
   }
 }
 

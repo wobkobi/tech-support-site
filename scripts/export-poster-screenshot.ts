@@ -46,6 +46,8 @@ interface PageConfig {
   cropMarks: boolean;
   /** Output file name. */
   filename: string;
+  /** URL suffix appended to the base poster URL (e.g. "?mode=print" → /poster?mode=print). */
+  urlSuffix?: string;
 }
 
 /* ---------- Constants ---------- */
@@ -77,11 +79,14 @@ const A5_DIGITAL_CONFIG: PageConfig = {
 /** Configuration for print variant (A5 + 3mm bleed). */
 const A5_PRINT_CONFIG: PageConfig = {
   label: "Print (A5 + 3mm bleed)",
-  viewport: { width: 1818, height: 2550 },
-  pdfSize: { width: 437.48, height: 612.28 },
+  // 3 mm bleed at 300 DPI ≈ 35.43 px per side → 1748 + 2×35.43 ≈ 1818.86
+  // and 2480 + 2×35.43 ≈ 2550.86, which we round up to whole pixels: 1819×2551.
+  viewport: { width: 1819, height: 2551 },
+  pdfSize: { width: 436.53, height: 612.28 },
   trimSize: { width: 419.53, height: 595.28 },
   cropMarks: true,
   filename: "poster-a5-print.pdf",
+  urlSuffix: "?mode=print",
 } as const;
 
 /** Configuration for digital variant (A4, no bleed). */
@@ -97,11 +102,12 @@ const A4_DIGITAL_CONFIG: PageConfig = {
 /** Configuration for print variant (A4 + 3mm bleed). */
 const A4_PRINT_CONFIG: PageConfig = {
   label: "Print (A4 + 3mm bleed)",
-  viewport: { width: 2550, height: 3579 },
-  pdfSize: { width: 612.28, height: 858.9 },
+  viewport: { width: 2551, height: 3579 },
+  pdfSize: { width: 612.28, height: 858.89 },
   trimSize: { width: 595.28, height: 841.89 },
   cropMarks: true,
   filename: "poster-a4-print.pdf",
+  urlSuffix: "?mode=print",
 } as const;
 
 /** A5 page size in PDF points (1 pt = 1/72 inch). */
@@ -239,9 +245,10 @@ async function generateVariant(
       deviceScaleFactor: DEVICE_SCALE_FACTOR,
     });
 
-    console.log(`Loading: ${url}`);
+    const targetUrl = config.urlSuffix ? url + config.urlSuffix : url;
+    console.log(`Loading: ${targetUrl}`);
 
-    await page.goto(url, { waitUntil: "networkidle0", timeout: 30000 });
+    await page.goto(targetUrl, { waitUntil: "networkidle0", timeout: 30000 });
 
     // Allow fonts and lazy assets to finish rendering.
     await new Promise((resolve) => setTimeout(resolve, 3000));
