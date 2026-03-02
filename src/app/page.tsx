@@ -60,7 +60,7 @@ const CARD = cn(
 );
 
 const primaryBtn = cn(
-  "bg-coquelicot-500 hover:bg-coquelicot-600 text-seasalt inline-flex items-center gap-2 rounded-lg px-5 py-3 text-sm font-bold sm:text-base transition-colors",
+  "bg-coquelicot-500 hover:bg-coquelicot-600 text-russian-violet inline-flex items-center gap-2 rounded-lg px-5 py-3 text-sm font-bold sm:text-base transition-colors",
 );
 
 /**
@@ -97,6 +97,7 @@ export default async function Home(): Promise<React.ReactElement> {
                 width={640}
                 height={146}
                 priority
+                fetchPriority="high"
                 draggable={false}
                 className={cn("w-70 sm:w-95 md:w-120 lg:w-140 h-auto")}
               />
@@ -244,7 +245,7 @@ export default async function Home(): Promise<React.ReactElement> {
               <Link
                 href="/services"
                 className={cn(
-                  "bg-moonstone-600 hover:bg-moonstone-700 text-seasalt inline-flex items-center gap-2 rounded-lg px-6 py-3 text-base font-bold shadow-md transition-all hover:shadow-lg sm:text-lg",
+                  "bg-moonstone-600 hover:bg-moonstone-700 text-russian-violet inline-flex items-center gap-2 rounded-lg px-6 py-3 text-base font-bold shadow-md transition-all hover:shadow-lg sm:text-lg",
                 )}
               >
                 View all services
@@ -343,7 +344,7 @@ export default async function Home(): Promise<React.ReactElement> {
                 href="/downloads/poster-a5.pdf"
                 download="to-the-point-tech-flyer.pdf"
                 className={cn(
-                  "bg-moonstone-600 hover:bg-moonstone-700 text-seasalt inline-flex shrink-0 items-center gap-2 rounded-lg px-5 py-3 text-sm font-bold shadow-md transition-all hover:shadow-lg sm:text-base",
+                  "bg-moonstone-600 hover:bg-moonstone-700 text-russian-violet inline-flex shrink-0 items-center gap-2 rounded-lg px-5 py-3 text-sm font-bold shadow-md transition-all hover:shadow-lg sm:text-base",
                 )}
               >
                 <FaDownload className={cn("h-5 w-5")} aria-hidden />

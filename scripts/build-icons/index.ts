@@ -14,12 +14,14 @@ import {
   BACKDROP,
   FAVICON_SPECS,
   SOCIAL_SPECS,
+  BACKDROP_VARIANTS,
   ADDITIONAL_ASSETS,
   QR_CODE_SPECS,
 } from "./config.js";
 import {
   buildFavicons,
   buildSocialImages,
+  buildBackdropVariants,
   buildAdditionalAssets,
   buildQRCodes,
   buildManifest,
@@ -62,6 +64,12 @@ function printSummary(): void {
   SOCIAL_SPECS.forEach((s) => console.log(`  • ${s.name}.jpg (${s.width}x${s.height})`));
   console.log("");
 
+  console.log("Backdrop Variants (public/source/):");
+  BACKDROP_VARIANTS.forEach((v) =>
+    console.log(`  • ${v.name}.${v.format} (${v.width}px @ q${v.quality})`),
+  );
+  console.log("");
+
   console.log("Additional Assets (public/assets/):");
   ADDITIONAL_ASSETS.forEach((a) =>
     console.log(`  • ${a.name}.${a.format} (${a.width}x${a.height})`),
@@ -93,6 +101,7 @@ async function main(): Promise<void> {
   await preflight();
   await buildFavicons();
   await buildSocialImages();
+  await buildBackdropVariants();
   await buildAdditionalAssets();
   await buildQRCodes();
   await buildManifest();
