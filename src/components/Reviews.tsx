@@ -58,41 +58,36 @@ function ReviewCard({ r, className }: { r: ReviewItem; className: string }): Rea
     setExpanded((v) => !v);
   }
 
-  /**
-   * Calls toggle on Enter or Space keydown.
-   * @param e - The keyboard event.
-   */
-  function handleKeyDown(e: React.KeyboardEvent): void {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      toggle();
-    }
+  const name = (
+    <p
+      className={cn("text-russian-violet mt-auto pt-3 text-right text-xs font-semibold sm:text-sm")}
+    >
+      - {formatName(r)}
+    </p>
+  );
+
+  if (long) {
+    return (
+      <li className={cn(className)}>
+        <button
+          type="button"
+          className="flex w-full flex-1 cursor-pointer flex-col bg-transparent p-0 text-left"
+          aria-expanded={expanded}
+          aria-label={expanded ? "Collapse review" : "Expand review"}
+          title={expanded ? "Click to collapse" : "Click to read more"}
+          onClick={toggle}
+        >
+          <ReviewText text={r.text} expanded={expanded} />
+          {name}
+        </button>
+      </li>
+    );
   }
 
-  const interactiveProps = long
-    ? {
-        role: "button" as const,
-        tabIndex: 0,
-        "aria-expanded": expanded,
-        "aria-label": expanded ? "Collapse review" : "Expand review",
-        title: expanded ? "Click to collapse" : "Click to read more",
-        onClick: toggle,
-        onKeyDown: handleKeyDown,
-      }
-    : {
-        role: "listitem" as const,
-      };
-
   return (
-    <li className={cn(className, long && "cursor-pointer")} {...interactiveProps}>
+    <li className={cn(className)}>
       <ReviewText text={r.text} expanded={expanded} />
-      <p
-        className={cn(
-          "text-russian-violet mt-auto pt-3 text-right text-xs font-semibold sm:text-sm",
-        )}
-      >
-        - {formatName(r)}
-      </p>
+      {name}
     </li>
   );
 }

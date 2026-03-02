@@ -36,7 +36,7 @@ export function PageShell({ children }: PageShellProps): React.ReactElement {
       {/* Backdrop */}
       <div className={cn("pointer-events-none fixed inset-0 -z-10 overflow-hidden")}>
         <Image
-          src="/source/backdrop.jpg"
+          src="/source/backdrop-blur.webp"
           alt=""
           fill
           priority

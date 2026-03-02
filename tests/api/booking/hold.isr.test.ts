@@ -3,7 +3,7 @@
  * @description Test ISR revalidation triggered by booking creation
  */
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { POST } from "@/app/api/booking/hold/route";
 import { revalidatePath } from "next/cache";
 import { NextRequest } from "next/server";
@@ -41,7 +41,13 @@ vi.mock("@/lib/google-calendar", () => ({
 
 describe("POST /api/booking/hold - ISR Revalidation", () => {
   beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-02-28T00:00:00.000Z"));
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("should call revalidatePath('/booking') after booking confirmation", async () => {

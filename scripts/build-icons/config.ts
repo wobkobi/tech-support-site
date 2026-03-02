@@ -236,6 +236,27 @@ export const ADDITIONAL_ASSETS: AdditionalAsset[] = [
   { name: "logo-mark-bg-512", width: 512, height: 512, type: "mark-on-bg", format: "jpg" },
 ];
 
+/* ---------- Backdrop Variant Specs ---------- */
+
+/**
+ * Specification for an optimised backdrop image variant.
+ */
+export interface BackdropVariant {
+  /** Output filename without extension (written to public/source/). */
+  name: string;
+  /** Target width in pixels (height derived from aspect ratio). */
+  width: number;
+  /** Compression quality (1–100). */
+  quality: number;
+  /** Output format. */
+  format: "webp" | "avif" | "jpeg";
+}
+
+export const BACKDROP_VARIANTS: BackdropVariant[] = [
+  // Site page background — heavily blurred in CSS, so tiny size + low quality is invisible
+  { name: "backdrop-blur", width: 800, quality: 30, format: "webp" },
+];
+
 /* ---------- QR Code Specs ---------- */
 
 /**

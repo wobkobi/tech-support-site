@@ -368,6 +368,75 @@ describe("buildAvailableDays & validateBookingRequest", () => {
     });
   });
 
+  // ===== DATE LABEL / FORMAT TESTS =====
+
+  describe("date label and dateKey formatting", () => {
+    it("produces the correct NZ dateKey when UTC and NZ are on different calendar days", () => {
+      // 2026-03-01T11:00:00.000Z = midnight 2026-03-02 in NZDT (UTC+13).
+      // Old bug: setHours(0,0,0,0) used local timezone → toISOString() gave "2026-03-01" (Sunday).
+      // Fixed:  toLocaleDateString("en-CA") gives "2026-03-02" (Monday).
+      vi.setSystemTime(new Date("2026-03-01T11:00:00.000Z"));
+      const now = new Date();
+
+      const days = buildAvailableDays([], [], now, BOOKING_CONFIG);
+
+      expect(days[0].dateKey).toBe("2026-03-02");
+      expect(days[0].isToday).toBe(true);
+    });
+
+    it("dayLabel contains the correct NZ day name, not the UTC day name", () => {
+      // Same midnight-NZ scenario: NZ day is Monday 2 Mar, UTC day is Sunday 1 Mar.
+      vi.setSystemTime(new Date("2026-03-01T11:00:00.000Z"));
+      const now = new Date();
+
+      const days = buildAvailableDays([], [], now, BOOKING_CONFIG);
+
+      // dayLabel format is "Mon 2 Mar"
+      expect(days[0].dayLabel).toBe("Mon 2 Mar");
+    });
+
+    it("fullLabel contains the correct NZ day name", () => {
+      vi.setSystemTime(new Date("2026-03-01T11:00:00.000Z"));
+      const now = new Date();
+
+      const days = buildAvailableDays([], [], now, BOOKING_CONFIG);
+
+      // fullLabel format is "Monday, Mar 2"
+      expect(days[0].fullLabel).toBe("Monday, Mar 2");
+    });
+
+    it("isWeekend is false for a Monday at NZ midnight (not Sunday)", () => {
+      vi.setSystemTime(new Date("2026-03-01T11:00:00.000Z")); // NZ midnight Monday
+      const now = new Date();
+
+      const days = buildAvailableDays([], [], now, BOOKING_CONFIG);
+
+      expect(days[0].isWeekend).toBe(false);
+    });
+
+    it("dateKey rolls over correctly at NZ midnight across a month boundary", () => {
+      // 2026-02-28T11:00:00.000Z = midnight 2026-03-01 NZDT — end of Feb to start of Mar
+      vi.setSystemTime(new Date("2026-02-28T11:00:00.000Z"));
+      const now = new Date();
+
+      const days = buildAvailableDays([], [], now, BOOKING_CONFIG);
+
+      expect(days[0].dateKey).toBe("2026-03-01");
+      expect(days[0].dayLabel).toContain("Sun");
+    });
+
+    it("dateKey and labels are correct mid-afternoon NZ (both UTC and NZ same calendar day)", () => {
+      // 2026-03-02T02:00:00.000Z = 3pm Monday 2 Mar NZDT — no date boundary difference
+      vi.setSystemTime(new Date("2026-03-02T02:00:00.000Z"));
+      const now = new Date();
+
+      const days = buildAvailableDays([], [], now, BOOKING_CONFIG);
+
+      expect(days[0].dateKey).toBe("2026-03-02");
+      expect(days[0].dayLabel).toBe("Mon 2 Mar");
+    });
+  });
+
   // ===== DST TRANSITION TESTS =====
 
   describe("DST timezone handling", () => {
