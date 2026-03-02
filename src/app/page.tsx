@@ -134,7 +134,7 @@ export default async function Home(): Promise<React.ReactElement> {
             >
               <div
                 className={cn(
-                  "bg-moonstone-500/10 border-moonstone-500/30 mx-auto mb-3 grid size-16 place-items-center rounded-full border-2",
+                  "border-moonstone-500/50 bg-moonstone-600/30 mx-auto mb-3 grid size-16 place-items-center rounded-full border-2",
                 )}
               >
                 <FaCircleCheck className={cn("text-moonstone-600 h-8 w-8")} aria-hidden />
@@ -155,7 +155,7 @@ export default async function Home(): Promise<React.ReactElement> {
             >
               <div
                 className={cn(
-                  "bg-moonstone-500/10 border-moonstone-500/30 mx-auto mb-3 grid size-16 place-items-center rounded-full border-2",
+                  "border-moonstone-500/50 bg-moonstone-600/30 mx-auto mb-3 grid size-16 place-items-center rounded-full border-2",
                 )}
               >
                 <FaMapLocationDot className={cn("text-moonstone-600 h-8 w-8")} aria-hidden />
@@ -176,7 +176,7 @@ export default async function Home(): Promise<React.ReactElement> {
             >
               <div
                 className={cn(
-                  "bg-moonstone-500/10 border-moonstone-500/30 mx-auto mb-3 grid size-16 place-items-center rounded-full border-2",
+                  "border-moonstone-500/50 bg-moonstone-600/30 mx-auto mb-3 grid size-16 place-items-center rounded-full border-2",
                 )}
               >
                 <FaHandshake className={cn("text-moonstone-600 h-8 w-8")} aria-hidden />
@@ -216,7 +216,7 @@ export default async function Home(): Promise<React.ReactElement> {
                 >
                   <span
                     className={cn(
-                      "border-moonstone-500/40 bg-moonstone-600/20 grid size-12 shrink-0 place-items-center rounded-lg border sm:size-14",
+                      "border-moonstone-500/50 bg-moonstone-600/30 grid size-12 shrink-0 place-items-center rounded-lg border sm:size-14",
                     )}
                   >
                     <Icon className={cn("text-moonstone-600 h-7 w-7 sm:h-8 sm:w-8")} aria-hidden />
@@ -308,7 +308,7 @@ export default async function Home(): Promise<React.ReactElement> {
             >
               <div
                 className={cn(
-                  "bg-moonstone-500/10 border-moonstone-500/30 grid size-16 shrink-0 place-items-center rounded-full border-2",
+                  "border-moonstone-500/50 bg-moonstone-600/30 grid size-16 shrink-0 place-items-center rounded-full border-2",
                 )}
               >
                 <FaDownload className={cn("text-moonstone-600 h-8 w-8")} aria-hidden />
@@ -333,7 +333,6 @@ export default async function Home(): Promise<React.ReactElement> {
                 size="md"
                 className={cn("shrink-0")}
               >
-                <FaDownload className={cn("h-5 w-5")} aria-hidden />
                 Download flyer
               </Button>
             </div>

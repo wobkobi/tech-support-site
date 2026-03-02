@@ -231,7 +231,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
                   >
                     Weekdays
                   </p>
-                  <div className={cn("flex flex-wrap gap-2")}>
+                  <div className={cn("grid grid-cols-2 gap-2 sm:flex sm:flex-wrap")}>
                     {weekdays.map((day) => (
                       <button
                         key={day.dateKey}
@@ -239,7 +239,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
                         disabled={!day.hasAnySlots}
                         onClick={() => handleDaySelect(day)}
                         className={cn(
-                          "w-36 rounded-lg border px-3 py-3 text-base font-medium transition-colors",
+                          "rounded-lg border px-3 py-3 text-sm font-medium transition-colors sm:text-base",
                           !day.hasAnySlots && "cursor-not-allowed opacity-50",
                           selectedDay?.dateKey === day.dateKey
                             ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
@@ -267,7 +267,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
                   >
                     Weekends
                   </p>
-                  <div className={cn("flex flex-wrap gap-2")}>
+                  <div className={cn("grid grid-cols-2 gap-2 sm:flex sm:flex-wrap")}>
                     {weekends.map((day) => (
                       <button
                         key={day.dateKey}
@@ -275,7 +275,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
                         disabled={!day.hasAnySlots}
                         onClick={() => handleDaySelect(day)}
                         className={cn(
-                          "w-36 rounded-lg border px-3 py-3 text-base font-medium transition-colors",
+                          "rounded-lg border px-3 py-3 text-sm font-medium transition-colors sm:text-base",
                           !day.hasAnySlots && "cursor-not-allowed opacity-50",
                           selectedDay?.dateKey === day.dateKey
                             ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
@@ -312,7 +312,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
                 </p>
               </div>
             ) : (
-              <div className={cn("flex flex-wrap gap-2")}>
+              <div className={cn("grid grid-cols-2 gap-2 sm:flex sm:flex-wrap")}>
                 {selectedDay.timeWindows.map((window) => {
                   const available =
                     duration === "short" ? window.availableShort : window.availableLong;
@@ -323,7 +323,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
                       disabled={!available}
                       onClick={() => setSelectedTime(window.value)}
                       className={cn(
-                        "w-22 rounded-lg border px-4 py-2.5 text-base font-medium transition-colors",
+                        "rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors sm:text-base",
                         !available && "cursor-not-allowed opacity-40",
                         selectedTime === window.value
                           ? "border-russian-violet bg-russian-violet/10 text-russian-violet"

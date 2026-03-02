@@ -97,7 +97,7 @@ body {
 /* Force transparency to defeat dark-mode extensions painting body */
 html,
 body {
-  background: transparent !important;
+  background: transparent;
 }
 
 body {

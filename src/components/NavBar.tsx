@@ -203,7 +203,7 @@ export function NavBar(): React.ReactElement | null {
       {/* Mobile Menu Slide-out */}
       <nav
         className={cn(
-          "border-seasalt-400/40 bg-seasalt-800/95 fixed right-4 top-24 z-40 h-[calc(100vh-7rem)] w-72 rounded-2xl border shadow-2xl backdrop-blur-xl transition-transform duration-300 lg:hidden",
+          "border-seasalt-400/40 bg-seasalt-800/95 fixed right-4 top-24 z-40 max-h-[calc(100vh-7rem)] max-w-[min(calc(100vw-2rem),18rem)] overflow-y-auto rounded-2xl border shadow-2xl backdrop-blur-xl transition-transform duration-300 lg:hidden",
           mobileMenuOpen ? "translate-x-0" : "translate-x-full",
         )}
         aria-label="Mobile navigation"

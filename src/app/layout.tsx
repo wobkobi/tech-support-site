@@ -203,6 +203,7 @@ export const viewport: Viewport = {
     { media: "(prefers-color-scheme: light)", color: "#f6f7f8" }, // seasalt-500
     { media: "(prefers-color-scheme: dark)", color: "#001514" }, // rich-black-500
   ],
+  colorScheme: "light",
 };
 
 /**
