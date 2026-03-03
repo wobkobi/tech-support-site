@@ -170,7 +170,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
   }
 
   return (
-    <form onSubmit={handleSubmit} className={cn("flex flex-col gap-8")}>
+    <form onSubmit={handleSubmit} className={cn("flex flex-col gap-8")} autoComplete="off">
       {/* ── Section 1: Scheduling ── */}
       <fieldset className={cn("flex flex-col gap-6")}>
         <legend className={cn("text-russian-violet mb-1 text-xl font-bold sm:text-2xl")}>
@@ -304,7 +304,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
             {selectedDay.timeWindows.every((w) =>
               duration === "short" ? !w.availableShort : !w.availableLong,
             ) ? (
-              <div className={cn("border-seasalt-400/60 bg-seasalt-900/30 rounded-lg border p-4")}>
+              <div className={cn("border-seasalt-400/80 bg-seasalt-900/30 rounded-lg border p-4")}>
                 <p className={cn("text-rich-black/70 text-base")}>
                   Sorry, no {duration === "short" ? "1-hour" : "2-hour"} slots available on this
                   day.
@@ -329,7 +329,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
                           ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
                           : available
                             ? "border-seasalt-400/60 bg-seasalt text-rich-black hover:border-russian-violet/40"
-                            : "border-seasalt-400/40 bg-seasalt-900/30 text-rich-black/50",
+                            : "border-seasalt-400/40 bg-seasalt-900/30 text-rich-black/60",
                       )}
                     >
                       {window.label}
@@ -343,7 +343,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
       </fieldset>
 
       {/* Divider */}
-      <hr className={cn("border-seasalt-400/60")} />
+      <hr className={cn("border-seasalt-400/80")} />
 
       {/* ── Section 2: Your details ── */}
       <fieldset className={cn("flex flex-col gap-6")}>
@@ -392,7 +392,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
 
         <div className={cn("flex flex-col gap-1.5")}>
           <label htmlFor="booking-phone" className={cn("text-rich-black text-base font-semibold")}>
-            Phone <span className={cn("text-rich-black/50 text-sm font-normal")}>(optional)</span>
+            Phone <span className={cn("text-rich-black/70 text-sm")}>(optional)</span>
           </label>
           <input
             id="booking-phone"
@@ -450,7 +450,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
               : "grid-rows-[0fr] opacity-0",
           )}
         >
-          <div className={cn("overflow-hidden")}>
+          <div className={cn(meetingType === "in-person" ? "overflow-visible" : "overflow-hidden")}>
             <div className={cn("pb-0.5 pt-0.5")}>
               <label
                 htmlFor="booking-address"
@@ -471,7 +471,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
       </fieldset>
 
       {/* Divider */}
-      <hr className={cn("border-seasalt-400/60")} />
+      <hr className={cn("border-seasalt-400/80")} />
 
       {/* ── Section 3: Describe the issue ── */}
       <fieldset className={cn("flex flex-col gap-6")}>
@@ -485,6 +485,8 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
           </label>
           <textarea
             id="booking-notes"
+            name="booking-notes-no-autofill"
+            autoComplete="new-password"
             rows={4}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}

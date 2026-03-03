@@ -49,7 +49,7 @@ describe("Button Component", () => {
         switch (variant) {
           case "primary":
             expect(classList).toContain("bg-coquelicot-500");
-            expect(classList).toContain("text-rich-black");
+            expect(classList).toContain("text-seasalt");
             break;
           case "secondary":
             expect(classList).toContain("bg-russian-violet");

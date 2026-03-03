@@ -93,11 +93,7 @@ export type ButtonProps = ButtonAsLink | ButtonAsButton;
 function getVariantClasses(variant: ButtonVariant): string {
   switch (variant) {
     case "primary":
-      return cn(
-        "bg-coquelicot-500 text-rich-black",
-        "hover:bg-coquelicot-600",
-        "transition-colors",
-      );
+      return cn("bg-coquelicot-500 text-seasalt", "hover:bg-coquelicot-600", "transition-colors");
     case "secondary":
       return cn(
         "bg-russian-violet text-seasalt",

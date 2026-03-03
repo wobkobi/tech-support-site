@@ -98,7 +98,7 @@ export function NavBar(): React.ReactElement | null {
           >
             <Image
               src="/source/logo.svg"
-              alt="To The Point Tech"
+              alt="Logo"
               width={40}
               height={40}
               priority
