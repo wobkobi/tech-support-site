@@ -12,7 +12,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/Button";
 import { cn } from "@/lib/cn";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 interface NavItem {
   label: string;
@@ -41,6 +41,11 @@ export function NavBar(): React.ReactElement | null {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [prevPathname, setPrevPathname] = useState(pathname);
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [navHidden, setNavHidden] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(false);
+  const scrollLockRef = useRef(0);
+  const bodyLockedRef = useRef(false);
 
   // Close mobile menu when route changes
   if (prevPathname !== pathname) {
@@ -50,17 +55,114 @@ export function NavBar(): React.ReactElement | null {
     }
   }
 
-  // Prevent body scroll when mobile menu is open
+  // Prevent body scroll when mobile menu is open without jumping to top on close
   useEffect(() => {
-    if (mobileMenuOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "unset";
+    if (typeof window === "undefined") {
+      return;
     }
+
+    const body = document.body;
+
+    if (mobileMenuOpen) {
+      scrollLockRef.current = window.scrollY;
+      body.style.overflow = "hidden";
+      body.style.position = "fixed";
+      body.style.width = "100%";
+      body.style.top = `-${scrollLockRef.current}px`;
+      bodyLockedRef.current = true;
+    } else if (bodyLockedRef.current) {
+      body.style.overflow = "";
+      body.style.position = "";
+      body.style.width = "";
+      body.style.top = "";
+      window.scrollTo({ top: scrollLockRef.current });
+      bodyLockedRef.current = false;
+    }
+
     return () => {
-      document.body.style.overflow = "unset";
+      body.style.overflow = "";
+      body.style.position = "";
+      body.style.width = "";
+      body.style.top = "";
     };
   }, [mobileMenuOpen]);
+
+  // Track viewport shape to tailor scroll behavior
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const aspectQuery = window.matchMedia("(min-aspect-ratio: 3/2)");
+    const widthQuery = window.matchMedia("(min-width: 1024px)");
+
+    /**
+     * Update desktop detection by combining width and aspect ratio checks.
+     */
+    const updateDesktopFlag = (): void => {
+      setIsDesktop(widthQuery.matches && aspectQuery.matches);
+    };
+
+    updateDesktopFlag();
+    aspectQuery.addEventListener("change", updateDesktopFlag);
+    widthQuery.addEventListener("change", updateDesktopFlag);
+    return () => {
+      aspectQuery.removeEventListener("change", updateDesktopFlag);
+      widthQuery.removeEventListener("change", updateDesktopFlag);
+    };
+  }, []);
+
+  // Hide/reveal navbar based on scroll direction
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    let lastScrollY = window.scrollY;
+
+    /**
+     * Toggle navbar visibility according to scroll direction and viewport shape.
+     */
+    const handleScroll = (): void => {
+      const current = window.scrollY;
+      const scrolledPastThreshold = current > 72;
+      setIsScrolled(scrolledPastThreshold);
+
+      if (!scrolledPastThreshold || mobileMenuOpen) {
+        setNavHidden(false);
+        lastScrollY = current;
+        return;
+      }
+
+      if (!isDesktop) {
+        const doc = document.documentElement;
+        const remainingScroll = doc.scrollHeight - (current + window.innerHeight);
+        const progress = (current + window.innerHeight) / doc.scrollHeight;
+        const narrowThreshold = Math.max(360, window.innerHeight * 0.5);
+        if (remainingScroll <= narrowThreshold || progress >= 0.6) {
+          setNavHidden(false);
+          lastScrollY = current;
+          return;
+        }
+      }
+
+      const delta = current - lastScrollY;
+      const hideThreshold = isDesktop ? 6 : 2;
+      const showThreshold = isDesktop ? -6 : -1;
+
+      if (delta > hideThreshold) {
+        setNavHidden(true);
+      } else if (delta < showThreshold) {
+        setNavHidden(false);
+      }
+
+      lastScrollY = current;
+    };
+
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [mobileMenuOpen, isDesktop]);
 
   const HIDDEN_PATHS: ReadonlyArray<string> = ["/poster"];
   if (HIDDEN_PATHS.includes(pathname)) {
@@ -82,13 +184,15 @@ export function NavBar(): React.ReactElement | null {
     <>
       <header
         className={cn(
-          "relative z-50 mx-auto mt-4 w-full px-4 sm:mt-5 md:mt-6",
+          "sticky top-3 z-50 mx-auto mt-4 w-full px-4 transition-all duration-300 sm:top-4",
           "max-w-[min(100vw-2rem,90rem)]",
+          navHidden && "pointer-events-none -translate-y-[130%] opacity-0",
         )}
       >
         <div
           className={cn(
-            "border-seasalt-400/40 bg-seasalt-800/90 flex h-20 w-full items-center justify-between rounded-2xl border px-5 shadow-lg backdrop-blur-lg",
+            "border-seasalt-400/40 bg-seasalt-800/90 flex h-20 w-full items-center justify-between rounded-2xl border px-5 shadow-lg backdrop-blur-lg transition-all duration-300",
+            isScrolled && "border-opacity-70 shadow-2xl",
           )}
         >
           {/* Logo */}
@@ -104,7 +208,7 @@ export function NavBar(): React.ReactElement | null {
               priority
               className={cn("select-none")}
             />
-            <span className={cn("text-russian-violet hidden text-xl font-bold sm:inline")}>
+            <span className={cn("text-russian-violet text-lg font-bold sm:text-xl")}>
               To The Point Tech
             </span>
           </Link>
@@ -162,6 +266,7 @@ export function NavBar(): React.ReactElement | null {
               )}
               aria-label="Toggle mobile menu"
               aria-expanded={mobileMenuOpen}
+              aria-controls="mobile-nav"
             >
               <div className={cn("flex h-5 w-5 flex-col justify-center gap-1")}>
                 <span
@@ -203,9 +308,10 @@ export function NavBar(): React.ReactElement | null {
       {/* Mobile Menu Slide-out */}
       <nav
         className={cn(
-          "border-seasalt-400/40 bg-seasalt-800/95 fixed right-4 top-24 z-40 max-h-[calc(100vh-7rem)] max-w-[min(calc(100vw-2rem),18rem)] overflow-y-auto rounded-2xl border shadow-2xl backdrop-blur-xl transition-transform duration-300 lg:hidden",
+          "border-seasalt-400/40 bg-seasalt-800/95 sm:top-30 top-27 fixed right-4 z-40 max-h-[calc(100vh-7rem)] max-w-[min(calc(100vw-2rem),18rem)] overflow-y-auto rounded-2xl border shadow-2xl backdrop-blur-xl transition-transform duration-300 lg:hidden",
           mobileMenuOpen ? "translate-x-0" : "translate-x-full",
         )}
+        id="mobile-nav"
         aria-label="Mobile navigation"
       >
         <div className={cn("flex h-full flex-col gap-2 p-4")}>
