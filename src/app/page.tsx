@@ -353,7 +353,7 @@ export default async function Home(): Promise<React.ReactElement> {
       <footer className={cn("mx-auto mb-6 w-fit max-w-[calc(100vw-2rem)] sm:mb-8")}>
         <div
           className={cn(
-            "border-seasalt-400/40 bg-seasalt-800/70 flex flex-col items-center gap-4 rounded-xl border p-4 shadow-lg backdrop-blur-md sm:flex-row sm:gap-8 sm:px-6 sm:py-4",
+            "border-seasalt-400/40 bg-seasalt-800/70 flex flex-col items-center gap-1 rounded-xl border p-4 shadow-lg backdrop-blur-md sm:flex-row sm:gap-8 sm:px-6 sm:py-4",
           )}
         >
           <a

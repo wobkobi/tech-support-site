@@ -12,7 +12,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/Button";
 import { cn } from "@/lib/cn";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 interface NavItem {
   label: string;
@@ -42,10 +42,22 @@ export function NavBar(): React.ReactElement | null {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [prevPathname, setPrevPathname] = useState(pathname);
   const [isScrolled, setIsScrolled] = useState(false);
-  const [navHidden, setNavHidden] = useState(false);
-  const [isDesktop, setIsDesktop] = useState(false);
+  const headerRef = useRef<HTMLElement>(null);
   const scrollLockRef = useRef(0);
   const bodyLockedRef = useRef(false);
+
+  // Scroll tracking
+  const lastScrollY = useRef(0);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Direct DOM helpers — bypass React reconciliation for instant visual response
+  const hideNav = useCallback(() => {
+    headerRef.current?.classList.add("pointer-events-none", "-translate-y-[130%]", "opacity-0");
+  }, []);
+
+  const showNav = useCallback(() => {
+    headerRef.current?.classList.remove("pointer-events-none", "-translate-y-[130%]", "opacity-0");
+  }, []);
 
   // Close mobile menu when route changes
   if (prevPathname !== pathname) {
@@ -87,82 +99,70 @@ export function NavBar(): React.ReactElement | null {
     };
   }, [mobileMenuOpen]);
 
-  // Track viewport shape to tailor scroll behavior
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const aspectQuery = window.matchMedia("(min-aspect-ratio: 3/2)");
-    const widthQuery = window.matchMedia("(min-width: 1024px)");
-
-    /**
-     * Update desktop detection by combining width and aspect ratio checks.
-     */
-    const updateDesktopFlag = (): void => {
-      setIsDesktop(widthQuery.matches && aspectQuery.matches);
-    };
-
-    updateDesktopFlag();
-    aspectQuery.addEventListener("change", updateDesktopFlag);
-    widthQuery.addEventListener("change", updateDesktopFlag);
-    return () => {
-      aspectQuery.removeEventListener("change", updateDesktopFlag);
-      widthQuery.removeEventListener("change", updateDesktopFlag);
-    };
-  }, []);
-
   // Hide/reveal navbar based on scroll direction
   useEffect(() => {
     if (typeof window === "undefined") {
       return;
     }
 
-    let lastScrollY = window.scrollY;
+    // Initialize lastScrollY on mount
+    lastScrollY.current = window.scrollY;
 
     /**
-     * Toggle navbar visibility according to scroll direction and viewport shape.
+     * Toggle navbar visibility based on scroll direction.
+     * Hides after 500 ms of sustained downward scrolling past the threshold.
+     * Reveals immediately on any single upward scroll event.
      */
     const handleScroll = (): void => {
+      const SCROLL_THRESHOLD = 120; // px from top – always show within this zone
+      const HIDE_DELAY = 500; // ms of sustained downward scroll before hiding
+
       const current = window.scrollY;
-      const scrolledPastThreshold = current > 72;
+      const delta = current - lastScrollY.current;
+      lastScrollY.current = current;
+
+      const scrolledPastThreshold = current > SCROLL_THRESHOLD;
+
+      // Update styling state (for navbar shadow/border)
       setIsScrolled(scrolledPastThreshold);
 
+      // Always show when near top of page or mobile menu is open
       if (!scrolledPastThreshold || mobileMenuOpen) {
-        setNavHidden(false);
-        lastScrollY = current;
+        if (hideTimerRef.current) {
+          clearTimeout(hideTimerRef.current);
+          hideTimerRef.current = null;
+        }
+        showNav();
         return;
       }
 
-      if (!isDesktop) {
-        const doc = document.documentElement;
-        const remainingScroll = doc.scrollHeight - (current + window.innerHeight);
-        const progress = (current + window.innerHeight) / doc.scrollHeight;
-        const narrowThreshold = Math.max(360, window.innerHeight * 0.5);
-        if (remainingScroll <= narrowThreshold || progress >= 0.6) {
-          setNavHidden(false);
-          lastScrollY = current;
-          return;
+      if (delta < 0) {
+        // Any upward movement: cancel pending hide and reveal immediately
+        if (hideTimerRef.current) {
+          clearTimeout(hideTimerRef.current);
+          hideTimerRef.current = null;
+        }
+        showNav();
+      } else if (delta > 0) {
+        // Downward scroll: start hide timer only if one isn't already running
+        if (!hideTimerRef.current) {
+          hideTimerRef.current = setTimeout(() => {
+            hideTimerRef.current = null;
+            hideNav();
+          }, HIDE_DELAY);
         }
       }
-
-      const delta = current - lastScrollY;
-      const hideThreshold = isDesktop ? 6 : 2;
-      const showThreshold = isDesktop ? -6 : -1;
-
-      if (delta > hideThreshold) {
-        setNavHidden(true);
-      } else if (delta < showThreshold) {
-        setNavHidden(false);
-      }
-
-      lastScrollY = current;
     };
 
     handleScroll();
     window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, [mobileMenuOpen, isDesktop]);
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      if (hideTimerRef.current) {
+        clearTimeout(hideTimerRef.current);
+      }
+    };
+  }, [mobileMenuOpen, showNav, hideNav]);
 
   const HIDDEN_PATHS: ReadonlyArray<string> = ["/poster"];
   if (HIDDEN_PATHS.includes(pathname)) {
@@ -183,10 +183,10 @@ export function NavBar(): React.ReactElement | null {
   return (
     <>
       <header
+        ref={headerRef}
         className={cn(
-          "sticky top-3 z-50 mx-auto mt-4 w-full px-4 transition-all duration-300 sm:top-4",
+          "sticky top-3 z-50 mx-auto mt-4 w-full px-4 transition-[transform,opacity] duration-200 sm:top-4",
           "max-w-[min(100vw-2rem,90rem)]",
-          navHidden && "pointer-events-none -translate-y-[130%] opacity-0",
         )}
       >
         <div
@@ -308,7 +308,7 @@ export function NavBar(): React.ReactElement | null {
       {/* Mobile Menu Slide-out */}
       <nav
         className={cn(
-          "border-seasalt-400/40 bg-seasalt-800/95 sm:top-30 top-27 fixed right-4 z-40 max-h-[calc(100vh-7rem)] max-w-[min(calc(100vw-2rem),18rem)] overflow-y-auto rounded-2xl border shadow-2xl backdrop-blur-xl transition-transform duration-300 lg:hidden",
+          "border-seasalt-400/40 bg-seasalt-800/95 sm:top-30 top-27 overscroll-behavior-contain fixed right-4 z-40 max-h-[calc(100dvh-8rem)] max-w-[min(calc(100vw-2rem),18rem)] overflow-y-auto rounded-2xl border shadow-2xl backdrop-blur-xl transition-transform duration-300 lg:hidden",
           mobileMenuOpen ? "translate-x-0" : "translate-x-full",
         )}
         id="mobile-nav"
