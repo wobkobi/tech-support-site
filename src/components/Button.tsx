@@ -2,26 +2,6 @@
 /**
  * @file Button.tsx
  * @description Polymorphic button component with consistent variants and sizes.
- * @example
- * // As a Next.js Link
- * <Button href="/booking" variant="primary" size="md">
- *   <FaCalendarCheck /> Book appointment
- * </Button>
- * @example
- * // As a native button
- * <Button type="submit" variant="secondary" size="md" disabled={loading}>
- *   {loading ? "Sending..." : "Submit"}
- * </Button>
- * @example
- * // Ghost (outline) variant
- * <Button href="/pricing" variant="ghost" size="md">
- *   View pricing
- * </Button>
- * @example
- * // Full-width button
- * <Button href="/contact" variant="tertiary" size="lg" fullWidth>
- *   Contact us
- * </Button>
  */
 
 "use client";
