@@ -109,7 +109,7 @@ export default async function Home(): Promise<React.ReactElement> {
             </p>
 
             <div className={cn("flex flex-wrap items-center justify-center gap-4")}>
-              <Button href="/booking" variant="primary" size="md">
+              <Button href="/booking" variant="primary" size="md" className={cn("h-12")}>
                 <FaCalendarCheck className={cn("h-5 w-5")} aria-hidden />
                 Book appointment
               </Button>

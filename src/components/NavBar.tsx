@@ -1,24 +1,36 @@
 // src/components/NavBar.tsx
 /**
  * @file NavBar.tsx
- * @description Navigation bar, always in document flow at the top of the page.
+ * @description Navigation bar with mobile-first scroll reveal behavior.
  */
 
 "use client";
 
 import type React from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/Button";
 import { cn } from "@/lib/cn";
-import { useState, useEffect, useRef, useCallback } from "react";
 
 interface NavItem {
   label: string;
   href: string;
   activePrefix: string;
 }
+
+const HIDDEN_PATHS: ReadonlyArray<string> = ["/poster"];
+const NAV_ITEMS: ReadonlyArray<NavItem> = [
+  { label: "Services", href: "/services", activePrefix: "/services" },
+  { label: "Pricing", href: "/pricing", activePrefix: "/pricing" },
+  { label: "About", href: "/about", activePrefix: "/about" },
+  { label: "FAQ", href: "/faq", activePrefix: "/faq" },
+  { label: "Reviews", href: "/reviews", activePrefix: "/reviews" },
+];
+
+const SCROLL_THRESHOLD = 72;
+const MIN_SCROLL_DELTA = 1;
 
 /**
  * Determine whether a path is active for a given prefix route.
@@ -34,40 +46,62 @@ function isActivePrefix(pathname: string, prefix: string): boolean {
 }
 
 /**
- * Navigation bar, always rendered in normal document flow.
+ * NavBar component.
  * @returns The NavBar element, or null on hidden paths.
  */
 export function NavBar(): React.ReactElement | null {
   const pathname = usePathname();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [prevPathname, setPrevPathname] = useState(pathname);
+
+  const [mobileMenuState, setMobileMenuState] = useState<{ open: boolean; pathname: string }>({
+    open: false,
+    pathname,
+  });
+  const mobileMenuOpen = mobileMenuState.open && mobileMenuState.pathname === pathname;
+
   const [isScrolled, setIsScrolled] = useState(false);
-  const headerRef = useRef<HTMLElement>(null);
+  const [isHidden, setIsHidden] = useState(false);
+
   const scrollLockRef = useRef(0);
   const bodyLockedRef = useRef(false);
+  const lastScrollYRef = useRef(0);
 
-  // Scroll tracking
-  const lastScrollY = useRef(0);
-  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Direct DOM helpers — bypass React reconciliation for instant visual response
-  const hideNav = useCallback(() => {
-    headerRef.current?.classList.add("pointer-events-none", "-translate-y-[130%]", "opacity-0");
+  /**
+   * Set hidden state only when it changes.
+   * @param nextHidden - Target hidden state.
+   * @param reason - Why this transition happened.
+   * @param details - Optional context for debug logs.
+   */
+  const setHiddenSafely = useCallback((nextHidden: boolean): void => {
+    setIsHidden((previous) => (previous === nextHidden ? previous : nextHidden));
   }, []);
 
-  const showNav = useCallback(() => {
-    headerRef.current?.classList.remove("pointer-events-none", "-translate-y-[130%]", "opacity-0");
-  }, []);
+  /**
+   * Open the mobile menu.
+   */
+  const openMobileMenu = useCallback((): void => {
+    setMobileMenuState({ open: true, pathname });
+  }, [pathname]);
 
-  // Close mobile menu when route changes
-  if (prevPathname !== pathname) {
-    setPrevPathname(pathname);
+  /**
+   * Close the mobile menu.
+   */
+  const closeMobileMenu = useCallback((): void => {
+    setMobileMenuState({ open: false, pathname });
+  }, [pathname]);
+
+  /**
+   * Toggle the mobile menu.
+   */
+  const toggleMobileMenu = useCallback((): void => {
     if (mobileMenuOpen) {
-      setMobileMenuOpen(false);
+      closeMobileMenu();
+      return;
     }
-  }
 
-  // Prevent body scroll when mobile menu is open without jumping to top on close
+    openMobileMenu();
+  }, [mobileMenuOpen, openMobileMenu, closeMobileMenu]);
+
+  // Lock body scroll while mobile menu is open.
   useEffect(() => {
     if (typeof window === "undefined") {
       return;
@@ -99,94 +133,69 @@ export function NavBar(): React.ReactElement | null {
     };
   }, [mobileMenuOpen]);
 
-  // Hide/reveal navbar based on scroll direction
+  // Scroll behavior: hide on downward scroll, show immediately on upward scroll.
   useEffect(() => {
     if (typeof window === "undefined") {
       return;
     }
 
-    // Initialize lastScrollY on mount
-    lastScrollY.current = window.scrollY;
-
     /**
-     * Toggle navbar visibility based on scroll direction.
-     * Hides after 500 ms of sustained downward scrolling past the threshold.
-     * Reveals immediately on any single upward scroll event.
+     * Process latest scroll position.
      */
-    const handleScroll = (): void => {
-      const SCROLL_THRESHOLD = 120; // px from top – always show within this zone
-      const HIDE_DELAY = 500; // ms of sustained downward scroll before hiding
+    const processScroll = (): void => {
+      const currentY = Math.max(window.scrollY, 0);
+      const previousY = lastScrollYRef.current;
+      const delta = currentY - previousY;
+      lastScrollYRef.current = currentY;
 
-      const current = window.scrollY;
-      const delta = current - lastScrollY.current;
-      lastScrollY.current = current;
-
-      const scrolledPastThreshold = current > SCROLL_THRESHOLD;
-
-      // Update styling state (for navbar shadow/border)
+      const scrolledPastThreshold = currentY > SCROLL_THRESHOLD;
       setIsScrolled(scrolledPastThreshold);
 
-      // Always show when near top of page or mobile menu is open
       if (!scrolledPastThreshold || mobileMenuOpen) {
-        if (hideTimerRef.current) {
-          clearTimeout(hideTimerRef.current);
-          hideTimerRef.current = null;
-        }
-        showNav();
+        setHiddenSafely(false);
+        return;
+      }
+
+      if (Math.abs(delta) < MIN_SCROLL_DELTA) {
         return;
       }
 
       if (delta < 0) {
-        // Any upward movement: cancel pending hide and reveal immediately
-        if (hideTimerRef.current) {
-          clearTimeout(hideTimerRef.current);
-          hideTimerRef.current = null;
-        }
-        showNav();
-      } else if (delta > 0) {
-        // Downward scroll: start hide timer only if one isn't already running
-        if (!hideTimerRef.current) {
-          hideTimerRef.current = setTimeout(() => {
-            hideTimerRef.current = null;
-            hideNav();
-          }, HIDE_DELAY);
-        }
+        setHiddenSafely(false);
+        return;
+      }
+
+      if (delta > 0) {
+        setHiddenSafely(true);
       }
     };
 
-    handleScroll();
-    window.addEventListener("scroll", handleScroll, { passive: true });
+    lastScrollYRef.current = Math.max(window.scrollY, 0);
+    processScroll();
+
+    window.addEventListener("scroll", processScroll, { passive: true });
+
     return () => {
-      window.removeEventListener("scroll", handleScroll);
-      if (hideTimerRef.current) {
-        clearTimeout(hideTimerRef.current);
-      }
+      window.removeEventListener("scroll", processScroll);
     };
-  }, [mobileMenuOpen, showNav, hideNav]);
+  }, [mobileMenuOpen, setHiddenSafely]);
 
-  const HIDDEN_PATHS: ReadonlyArray<string> = ["/poster"];
   if (HIDDEN_PATHS.includes(pathname)) {
     return null;
   }
-
-  const items: ReadonlyArray<NavItem> = [
-    { label: "Services", href: "/services", activePrefix: "/services" },
-    { label: "Pricing", href: "/pricing", activePrefix: "/pricing" },
-    { label: "About", href: "/about", activePrefix: "/about" },
-    { label: "FAQ", href: "/faq", activePrefix: "/faq" },
-    { label: "Reviews", href: "/reviews", activePrefix: "/reviews" },
-  ];
 
   const bookingActive = isActivePrefix(pathname, "/booking");
   const contactActive = isActivePrefix(pathname, "/contact");
 
   return (
     <>
+      <div aria-hidden="true" className={cn("h-24 sm:h-28")} />
+
       <header
-        ref={headerRef}
         className={cn(
-          "sticky top-3 z-50 mx-auto mt-4 w-full px-4 transition-[transform,opacity] duration-200 sm:top-4",
+          "duration-400 fixed inset-x-0 top-3 z-50 mx-auto w-full px-4 transition-[transform,opacity] ease-in-out will-change-transform sm:top-4",
           "max-w-[min(100vw-2rem,90rem)]",
+          isHidden && "pointer-events-none -translate-y-[120%] opacity-0",
         )}
       >
         <div
@@ -195,7 +204,6 @@ export function NavBar(): React.ReactElement | null {
             isScrolled && "border-opacity-70 shadow-2xl",
           )}
         >
-          {/* Logo */}
           <Link
             href="/"
             className={cn("flex items-center gap-2.5 transition-transform hover:scale-105")}
@@ -213,9 +221,8 @@ export function NavBar(): React.ReactElement | null {
             </span>
           </Link>
 
-          {/* Desktop Navigation */}
           <nav className={cn("hidden items-center gap-1 lg:flex")} aria-label="Primary navigation">
-            {items.map((item) => {
+            {NAV_ITEMS.map((item) => {
               const active = isActivePrefix(pathname, item.activePrefix);
 
               return (
@@ -236,7 +243,6 @@ export function NavBar(): React.ReactElement | null {
             })}
           </nav>
 
-          {/* CTA Buttons */}
           <div className={cn("flex shrink-0 items-center gap-2")}>
             <Button
               href="/booking"
@@ -258,9 +264,8 @@ export function NavBar(): React.ReactElement | null {
               Contact
             </Button>
 
-            {/* Mobile Menu Button */}
             <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              onClick={toggleMobileMenu}
               className={cn(
                 "bg-seasalt-900/20 hover:bg-seasalt-900/30 flex h-11 w-11 items-center justify-center rounded-lg transition-all lg:hidden",
               )}
@@ -293,19 +298,17 @@ export function NavBar(): React.ReactElement | null {
         </div>
       </header>
 
-      {/* Mobile Menu Overlay */}
       {mobileMenuOpen && (
         <div
           className={cn(
             "bg-rich-black/50 fixed inset-0 z-40 backdrop-blur-sm lg:hidden",
             "animate-in fade-in duration-200",
           )}
-          onClick={() => setMobileMenuOpen(false)}
+          onClick={closeMobileMenu}
           aria-hidden="true"
         />
       )}
 
-      {/* Mobile Menu Slide-out */}
       <nav
         className={cn(
           "border-seasalt-400/40 bg-seasalt-800/95 sm:top-30 top-27 overscroll-behavior-contain fixed right-4 z-40 max-h-[calc(100dvh-8rem)] max-w-[min(calc(100vw-2rem),18rem)] overflow-y-auto rounded-2xl border shadow-2xl backdrop-blur-xl transition-transform duration-300 lg:hidden",
@@ -315,8 +318,7 @@ export function NavBar(): React.ReactElement | null {
         aria-label="Mobile navigation"
       >
         <div className={cn("flex h-full flex-col gap-2 p-4")}>
-          {/* Mobile Nav Links */}
-          {items.map((item) => {
+          {NAV_ITEMS.map((item) => {
             const active = isActivePrefix(pathname, item.activePrefix);
 
             return (
@@ -330,13 +332,13 @@ export function NavBar(): React.ReactElement | null {
                     : "text-rich-black hover:bg-seasalt-900/30 hover:text-russian-violet",
                 )}
                 aria-current={active ? "page" : undefined}
+                onClick={closeMobileMenu}
               >
                 {item.label}
               </Link>
             );
           })}
 
-          {/* Mobile CTA Buttons */}
           <div className={cn("border-seasalt-400/40 mt-4 flex flex-col gap-2 border-t pt-4")}>
             <Button
               href="/booking"
