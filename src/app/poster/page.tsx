@@ -148,7 +148,7 @@ export default async function PosterPage({
                   />
                   <FaClock className={cn("text-moonstone-600 relative z-10 h-11 w-11")} />
                   <span className={cn("text-rich-black relative z-10 text-[34px] font-semibold")}>
-                    Same Day Available
+                    Same-Day Available
                   </span>
                 </div>
               </div>
@@ -254,7 +254,7 @@ export default async function PosterPage({
                       "text-russian-violet flex items-center gap-4 text-[44px] font-semibold",
                     )}
                   >
-                    <FaPhone className={cn("h-11 w-11 shrink-0")} aria-hidden />
+                    <FaPhone className={cn("h-10 w-10 shrink-0")} aria-hidden />
                     <span>021 297 1237</span>
                   </a>
 

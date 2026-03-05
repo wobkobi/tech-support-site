@@ -1,5 +1,9 @@
-// POST /api/reviews/[id]/approve
-// Admin endpoint to approve a review (sets status: approved)
+// src/app/api/reviews/[id]/approve.ts
+/**
+ * @file approve.ts
+ * @description POST /api/reviews/[id]/approve - Admin endpoint to approve a review (sets status: approved).
+ */
+
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";

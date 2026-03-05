@@ -9,6 +9,7 @@
 import type React from "react";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/Button";
 import { cn } from "@/lib/cn";
 import {
   DURATION_OPTIONS,
@@ -169,7 +170,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
   }
 
   return (
-    <form onSubmit={handleSubmit} className={cn("flex flex-col gap-8")}>
+    <form onSubmit={handleSubmit} className={cn("flex flex-col gap-8")} autoComplete="off">
       {/* ── Section 1: Scheduling ── */}
       <fieldset className={cn("flex flex-col gap-6")}>
         <legend className={cn("text-russian-violet mb-1 text-xl font-bold sm:text-2xl")}>
@@ -230,7 +231,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
                   >
                     Weekdays
                   </p>
-                  <div className={cn("flex flex-wrap gap-2")}>
+                  <div className={cn("grid grid-cols-2 gap-2 sm:flex sm:flex-wrap")}>
                     {weekdays.map((day) => (
                       <button
                         key={day.dateKey}
@@ -238,7 +239,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
                         disabled={!day.hasAnySlots}
                         onClick={() => handleDaySelect(day)}
                         className={cn(
-                          "w-36 rounded-lg border px-3 py-3 text-base font-medium transition-colors",
+                          "rounded-lg border px-3 py-3 text-sm font-medium transition-colors sm:text-base",
                           !day.hasAnySlots && "cursor-not-allowed opacity-50",
                           selectedDay?.dateKey === day.dateKey
                             ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
@@ -266,7 +267,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
                   >
                     Weekends
                   </p>
-                  <div className={cn("flex flex-wrap gap-2")}>
+                  <div className={cn("grid grid-cols-2 gap-2 sm:flex sm:flex-wrap")}>
                     {weekends.map((day) => (
                       <button
                         key={day.dateKey}
@@ -274,7 +275,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
                         disabled={!day.hasAnySlots}
                         onClick={() => handleDaySelect(day)}
                         className={cn(
-                          "w-36 rounded-lg border px-3 py-3 text-base font-medium transition-colors",
+                          "rounded-lg border px-3 py-3 text-sm font-medium transition-colors sm:text-base",
                           !day.hasAnySlots && "cursor-not-allowed opacity-50",
                           selectedDay?.dateKey === day.dateKey
                             ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
@@ -303,7 +304,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
             {selectedDay.timeWindows.every((w) =>
               duration === "short" ? !w.availableShort : !w.availableLong,
             ) ? (
-              <div className={cn("border-seasalt-400/60 bg-seasalt-900/30 rounded-lg border p-4")}>
+              <div className={cn("border-seasalt-400/80 bg-seasalt-900/30 rounded-lg border p-4")}>
                 <p className={cn("text-rich-black/70 text-base")}>
                   Sorry, no {duration === "short" ? "1-hour" : "2-hour"} slots available on this
                   day.
@@ -311,7 +312,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
                 </p>
               </div>
             ) : (
-              <div className={cn("flex flex-wrap gap-2")}>
+              <div className={cn("grid grid-cols-2 gap-2 sm:flex sm:flex-wrap")}>
                 {selectedDay.timeWindows.map((window) => {
                   const available =
                     duration === "short" ? window.availableShort : window.availableLong;
@@ -322,13 +323,13 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
                       disabled={!available}
                       onClick={() => setSelectedTime(window.value)}
                       className={cn(
-                        "w-22 rounded-lg border px-4 py-2.5 text-base font-medium transition-colors",
+                        "rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors sm:text-base",
                         !available && "cursor-not-allowed opacity-40",
                         selectedTime === window.value
                           ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
                           : available
                             ? "border-seasalt-400/60 bg-seasalt text-rich-black hover:border-russian-violet/40"
-                            : "border-seasalt-400/40 bg-seasalt-900/30 text-rich-black/50",
+                            : "border-seasalt-400/40 bg-seasalt-900/30 text-rich-black/60",
                       )}
                     >
                       {window.label}
@@ -342,7 +343,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
       </fieldset>
 
       {/* Divider */}
-      <hr className={cn("border-seasalt-400/60")} />
+      <hr className={cn("border-seasalt-400/80")} />
 
       {/* ── Section 2: Your details ── */}
       <fieldset className={cn("flex flex-col gap-6")}>
@@ -391,7 +392,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
 
         <div className={cn("flex flex-col gap-1.5")}>
           <label htmlFor="booking-phone" className={cn("text-rich-black text-base font-semibold")}>
-            Phone <span className={cn("text-rich-black/50 text-sm font-normal")}>(optional)</span>
+            Phone <span className={cn("text-rich-black/70 text-sm")}>(optional)</span>
           </label>
           <input
             id="booking-phone"
@@ -449,7 +450,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
               : "grid-rows-[0fr] opacity-0",
           )}
         >
-          <div className={cn("overflow-hidden")}>
+          <div className={cn(meetingType === "in-person" ? "overflow-visible" : "overflow-hidden")}>
             <div className={cn("pb-0.5 pt-0.5")}>
               <label
                 htmlFor="booking-address"
@@ -470,7 +471,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
       </fieldset>
 
       {/* Divider */}
-      <hr className={cn("border-seasalt-400/60")} />
+      <hr className={cn("border-seasalt-400/80")} />
 
       {/* ── Section 3: Describe the issue ── */}
       <fieldset className={cn("flex flex-col gap-6")}>
@@ -484,6 +485,8 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
           </label>
           <textarea
             id="booking-notes"
+            name="booking-notes-no-autofill"
+            autoComplete="new-password"
             rows={4}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
@@ -504,16 +507,14 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
       )}
 
       <div className={cn("flex flex-wrap items-center gap-4")}>
-        <button
+        <Button
           type="submit"
+          variant="secondary"
+          size="md"
           disabled={submitting || availableDays.length === 0}
-          className={cn(
-            "bg-russian-violet text-seasalt rounded-lg px-7 py-3.5 text-base font-semibold shadow-lg",
-            "transition-all hover:shadow-xl hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60",
-          )}
         >
           {submitting ? "Sending..." : "Submit request"}
-        </button>
+        </Button>
         <p className={cn("text-rich-black/60 text-sm sm:text-base")}>
           I'll confirm your exact appointment time by email.
         </p>

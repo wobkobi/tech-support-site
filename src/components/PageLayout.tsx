@@ -9,11 +9,11 @@ import Image from "next/image";
 import { cn } from "@/lib/cn";
 
 export const CARD = cn(
-  "border-seasalt-400/60 bg-seasalt-800 rounded-xl border p-5 shadow-sm sm:p-6",
+  "border-seasalt-400/80 bg-seasalt-800 rounded-xl border p-5 shadow-sm sm:p-6",
 );
 
 export const SOFT_CARD = cn(
-  "border-seasalt-400/60 bg-seasalt-900/60 rounded-xl border p-3 text-sm sm:p-4 sm:text-base",
+  "border-seasalt-400/80 bg-seasalt-900/60 rounded-xl border p-3 text-sm sm:p-4 sm:text-base",
 );
 
 /**
