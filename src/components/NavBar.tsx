@@ -31,6 +31,8 @@ const NAV_ITEMS: ReadonlyArray<NavItem> = [
 
 const SCROLL_THRESHOLD = 72;
 const MIN_SCROLL_DELTA = 1;
+const HIDE_SCROLL_DISTANCE = 60; // Distance to scroll down before fully hiding navbar
+const HOVER_REVEAL_ZONE = 100; // Height from top of viewport to reveal navbar on hover
 
 /**
  * Determine whether a path is active for a given prefix route.
@@ -60,10 +62,14 @@ export function NavBar(): React.ReactElement | null {
 
   const [isScrolled, setIsScrolled] = useState(false);
   const [isHidden, setIsHidden] = useState(false);
+  const [scrollOffset, setScrollOffset] = useState(0);
+  const [isHoveringTop, setIsHoveringTop] = useState(false);
+  const [hasPointer, setHasPointer] = useState(false);
 
   const scrollLockRef = useRef(0);
   const bodyLockedRef = useRef(false);
   const lastScrollYRef = useRef(0);
+  const scrollDownDistanceRef = useRef(0);
 
   /**
    * Set hidden state only when it changes.
@@ -153,6 +159,8 @@ export function NavBar(): React.ReactElement | null {
 
       if (!scrolledPastThreshold || mobileMenuOpen) {
         setHiddenSafely(false);
+        setScrollOffset(0);
+        scrollDownDistanceRef.current = 0;
         return;
       }
 
@@ -161,12 +169,26 @@ export function NavBar(): React.ReactElement | null {
       }
 
       if (delta < 0) {
+        // Scrolling up - reset and show immediately
         setHiddenSafely(false);
+        setScrollOffset(0);
+        scrollDownDistanceRef.current = 0;
         return;
       }
 
       if (delta > 0) {
-        setHiddenSafely(true);
+        // Scrolling down - accumulate distance and gradually translate (like sticky that scrolls away)
+        scrollDownDistanceRef.current += delta;
+
+        if (scrollDownDistanceRef.current >= HIDE_SCROLL_DISTANCE) {
+          // Fully hide after threshold (unless hovering at top)
+          setHiddenSafely(true);
+          setScrollOffset(HIDE_SCROLL_DISTANCE);
+        } else {
+          // Gradually translate up with scroll
+          setHiddenSafely(false);
+          setScrollOffset(scrollDownDistanceRef.current);
+        }
       }
     };
 
@@ -179,6 +201,63 @@ export function NavBar(): React.ReactElement | null {
       window.removeEventListener("scroll", processScroll);
     };
   }, [mobileMenuOpen, setHiddenSafely]);
+
+  // Detect if device has pointer (mouse) capability.
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) {
+      return;
+    }
+
+    const mediaQuery = window.matchMedia("(pointer: fine)");
+
+    /**
+     * Handle media query change for pointer capability.
+     * @param e - The media query list event.
+     */
+    const handleChange = (e: MediaQueryListEvent): void => {
+      setHasPointer(e.matches);
+    };
+
+    // Set initial state
+    handleChange({ matches: mediaQuery.matches } as MediaQueryListEvent);
+
+    mediaQuery.addEventListener("change", handleChange);
+
+    return () => {
+      mediaQuery.removeEventListener("change", handleChange);
+    };
+  }, []);
+
+  // Track mouse position for hover-to-reveal at top of viewport.
+  useEffect(() => {
+    if (typeof window === "undefined" || !hasPointer) {
+      return;
+    }
+
+    /**
+     * Handle mouse movement to detect hover at top of viewport.
+     * @param e - The mouse event.
+     */
+    const handleMouseMove = (e: MouseEvent): void => {
+      const isAtTop = e.clientY <= HOVER_REVEAL_ZONE;
+      setIsHoveringTop(isAtTop);
+    };
+
+    /**
+     * Handle mouse leaving the document.
+     */
+    const handleMouseLeave = (): void => {
+      setIsHoveringTop(false);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove, { passive: true });
+    document.addEventListener("mouseleave", handleMouseLeave);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseleave", handleMouseLeave);
+    };
+  }, [hasPointer]);
 
   if (HIDDEN_PATHS.includes(pathname)) {
     return null;
@@ -195,8 +274,16 @@ export function NavBar(): React.ReactElement | null {
         className={cn(
           "duration-400 fixed inset-x-0 top-3 z-50 mx-auto w-full px-4 transition-[transform,opacity] ease-in-out will-change-transform sm:top-4",
           "max-w-[min(100vw-2rem,90rem)]",
-          isHidden && "pointer-events-none -translate-y-[120%] opacity-0",
+          isHidden && !isHoveringTop && "pointer-events-none opacity-0",
         )}
+        style={{
+          transform:
+            !isHidden && scrollOffset > 0
+              ? `translateY(-${scrollOffset}px)`
+              : isHidden && !isHoveringTop
+                ? "translateY(-120%)"
+                : "translateY(0)",
+        }}
       >
         <div
           className={cn(
@@ -230,10 +317,10 @@ export function NavBar(): React.ReactElement | null {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "shrink-0 whitespace-nowrap rounded-lg px-4 py-2.5 text-lg font-semibold transition-all xl:text-xl",
+                    "shrink-0 whitespace-nowrap rounded-lg px-4 py-2.5 text-lg font-semibold transition-all duration-200 xl:text-xl",
                     active
-                      ? "text-russian-violet bg-moonstone-600/20"
-                      : "text-rich-black hover:bg-seasalt-900/30 hover:text-russian-violet",
+                      ? "text-russian-violet bg-moonstone-600/20 shadow-sm"
+                      : "text-rich-black hover:bg-moonstone-600/15 hover:text-russian-violet hover:scale-105 hover:shadow-md",
                   )}
                   aria-current={active ? "page" : undefined}
                 >
@@ -326,10 +413,10 @@ export function NavBar(): React.ReactElement | null {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "rounded-lg px-4 py-3 text-base font-semibold transition-all",
+                  "rounded-lg px-4 py-3 text-base font-semibold transition-all duration-200",
                   active
                     ? "text-russian-violet bg-moonstone-600/20 shadow-sm"
-                    : "text-rich-black hover:bg-seasalt-900/30 hover:text-russian-violet",
+                    : "text-rich-black hover:bg-moonstone-600/15 hover:text-russian-violet hover:scale-[1.02] hover:shadow-md",
                 )}
                 aria-current={active ? "page" : undefined}
                 onClick={closeMobileMenu}

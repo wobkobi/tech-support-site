@@ -68,10 +68,20 @@ describe("NavBar Direction-Based Scroll Logic", () => {
     const header = container.querySelector("header");
     if (!header) return false;
     return (
-      header.classList.contains("pointer-events-none") &&
-      header.classList.contains("opacity-0") &&
-      header.classList.contains("-translate-y-[120%]")
+      header.classList.contains("pointer-events-none") && header.classList.contains("opacity-0")
     );
+  };
+
+  /**
+   * Helper to check if navbar is being translated (gradual hide)
+   * @param container - The DOM container element
+   * @returns True if navbar has a translateY transform applied
+   */
+  const isNavBarTranslating = (container: HTMLElement): boolean => {
+    const header = container.querySelector("header");
+    if (!header) return false;
+    const style = (header as HTMLElement).style.transform;
+    return style.includes("translateY(-") && !style.includes("translateY(-120%)");
   };
 
   describe("Near-top behavior", () => {
@@ -106,37 +116,45 @@ describe("NavBar Direction-Based Scroll Logic", () => {
     });
   });
 
-  describe("Immediate hide on downward scroll", () => {
-    it("hides navbar after any downward scroll past threshold", async () => {
+  describe("Gradual hide on downward scroll", () => {
+    it("does not hide navbar immediately after small downward scroll", async () => {
       const { container } = render(<NavBar />);
 
-      // Start past threshold
-      simulateScroll(100);
+      // Start past threshold - need to do this in small increments to avoid accumulating too much
+      simulateScroll(72); // At threshold, won't trigger scroll logic yet
 
       await waitFor(() => {
         expect(isNavBarHidden(container)).toBe(false);
       });
 
-      // Any downward scroll hides immediately
-      simulateScroll(105); // 5px down
+      // Move just past threshold
+      simulateScroll(73); // 1px past
 
       await waitFor(() => {
-        expect(isNavBarHidden(container)).toBe(true);
+        expect(isNavBarHidden(container)).toBe(false);
+      });
+
+      // Small downward scroll (5px total from threshold) should translate but not hide
+      simulateScroll(77); // 5px down from 72
+
+      await waitFor(() => {
+        expect(isNavBarHidden(container)).toBe(false);
+        expect(isNavBarTranslating(container)).toBe(true);
       });
     });
 
-    it("hides navbar even after 2px downward movement", async () => {
+    it("hides navbar only after scrolling down 60px past threshold", async () => {
       const { container } = render(<NavBar />);
 
-      // Start past threshold
-      simulateScroll(100);
+      // Start at threshold
+      simulateScroll(72);
 
       await waitFor(() => {
         expect(isNavBarHidden(container)).toBe(false);
       });
 
-      // Just 2px down is enough (> MIN_SCROLL_DELTA of 1)
-      simulateScroll(102);
+      // Scroll down 60px (HIDE_SCROLL_DISTANCE) to fully hide
+      simulateScroll(132); // 72 + 60
 
       await waitFor(() => {
         expect(isNavBarHidden(container)).toBe(true);
@@ -148,37 +166,37 @@ describe("NavBar Direction-Based Scroll Logic", () => {
     it("shows navbar after any upward scroll past the threshold", async () => {
       const { container } = render(<NavBar />);
 
-      // Start past threshold
-      simulateScroll(200);
+      // Start at threshold
+      simulateScroll(72);
 
-      // Scroll down to hide
-      simulateScroll(210);
+      // Scroll down enough to fully hide (60px)
+      simulateScroll(132); // 72 + 60
 
       await waitFor(() => {
         expect(isNavBarHidden(container)).toBe(true);
       });
 
       // Any upward movement should immediately reveal navbar
-      simulateScroll(205); // 5px up
+      simulateScroll(127); // 5px up
 
       await waitFor(() => {
         expect(isNavBarHidden(container)).toBe(false);
       });
     });
 
-    it("shows navbar immediately after even 1px upward movement", async () => {
+    it("shows navbar immediately after even 2px upward movement", async () => {
       const { container } = render(<NavBar />);
 
-      // Start past threshold and hide navbar
-      simulateScroll(200);
-      simulateScroll(210);
+      // Start at threshold and scroll down to hide
+      simulateScroll(72);
+      simulateScroll(132); // 60px down to fully hide
 
       await waitFor(() => {
         expect(isNavBarHidden(container)).toBe(true);
       });
 
-      // Just 1px up is enough (but needs > MIN_SCROLL_DELTA, so 2px)
-      simulateScroll(208);
+      // Just 2px up (> MIN_SCROLL_DELTA of 1)
+      simulateScroll(130);
 
       await waitFor(() => {
         expect(isNavBarHidden(container)).toBe(false);
@@ -189,15 +207,15 @@ describe("NavBar Direction-Based Scroll Logic", () => {
       const { container } = render(<NavBar />);
 
       // Hide navbar first
-      simulateScroll(200);
-      simulateScroll(210);
+      simulateScroll(72);
+      simulateScroll(132); // 60px down to fully hide
 
       await waitFor(() => {
         expect(isNavBarHidden(container)).toBe(true);
       });
 
       // First upward movement shows immediately
-      simulateScroll(205); // 5px up – shows
+      simulateScroll(127); // 5px up – shows
 
       await waitFor(() => {
         expect(isNavBarHidden(container)).toBe(false);
@@ -206,26 +224,26 @@ describe("NavBar Direction-Based Scroll Logic", () => {
   });
 
   describe("Direction changes (no accumulation)", () => {
-    it("re-hides navbar after showing via upward scroll then scrolling down", async () => {
+    it("re-hides navbar after showing via upward scroll then scrolling down 60px", async () => {
       const { container } = render(<NavBar />);
 
-      // Start and hide navbar first
-      simulateScroll(200);
-      simulateScroll(210); // any downward scroll hides
+      // Start at threshold and hide navbar first
+      simulateScroll(72);
+      simulateScroll(132); // 60px down to hide
 
       await waitFor(() => {
         expect(isNavBarHidden(container)).toBe(true);
       });
 
       // Any upward movement shows immediately
-      simulateScroll(200); // 10px up
+      simulateScroll(122); // 10px up
 
       await waitFor(() => {
         expect(isNavBarHidden(container)).toBe(false);
       });
 
-      // Any downward scroll hides again immediately
-      simulateScroll(205); // 5px down
+      // Need to scroll down 60px to hide again
+      simulateScroll(182); // 60px down from current position
 
       await waitFor(() => {
         expect(isNavBarHidden(container)).toBe(true);
@@ -235,33 +253,35 @@ describe("NavBar Direction-Based Scroll Logic", () => {
     it("handles rapid direction changes correctly", async () => {
       const { container } = render(<NavBar />);
 
-      // Start past threshold
-      simulateScroll(100);
+      // Start at threshold
+      simulateScroll(72);
 
       await waitFor(() => {
         expect(isNavBarHidden(container)).toBe(false);
       });
 
-      // Simulate jittery scrolling: down (hides), up (shows), down (hides), up (shows)
-      simulateScroll(105); // 5px down - hides
+      // Small down scroll - should translate but not hide
+      simulateScroll(77); // 5px down
 
       await waitFor(() => {
-        expect(isNavBarHidden(container)).toBe(true);
+        expect(isNavBarHidden(container)).toBe(false);
+        expect(isNavBarTranslating(container)).toBe(true);
       });
 
-      simulateScroll(103); // 2px up - shows
+      simulateScroll(75); // 2px up - resets
 
       await waitFor(() => {
         expect(isNavBarHidden(container)).toBe(false);
       });
 
-      simulateScroll(108); // 5px down - hides
+      // Need 60px down to hide
+      simulateScroll(135); // 60px down from reset point (75 + 60)
 
       await waitFor(() => {
         expect(isNavBarHidden(container)).toBe(true);
       });
 
-      simulateScroll(106); // 2px up - shows
+      simulateScroll(133); // 2px up - shows
 
       await waitFor(() => {
         expect(isNavBarHidden(container)).toBe(false);
@@ -291,17 +311,19 @@ describe("NavBar Direction-Based Scroll Logic", () => {
       // Now scroll down by 2px (> MIN_SCROLL_DELTA)
       simulateScroll(75);
 
-      // Should hide (downward scroll past threshold)
+      // Should be translating but not hidden (only 2px down, need 60px to hide)
       await waitFor(() => {
-        expect(isNavBarHidden(container)).toBe(true);
+        expect(isNavBarHidden(container)).toBe(false);
+        expect(isNavBarTranslating(container)).toBe(true);
       });
     });
 
     it("handles zero delta scrolls (no movement)", async () => {
       const { container } = render(<NavBar />);
 
-      // Scroll past threshold and down - this hides navbar
-      simulateScroll(150);
+      // Scroll to threshold then down 60px to hide
+      simulateScroll(72);
+      simulateScroll(132);
 
       await waitFor(() => {
         expect(isNavBarHidden(container)).toBe(true);
@@ -320,18 +342,18 @@ describe("NavBar Direction-Based Scroll Logic", () => {
     it("handles large single scroll jumps correctly", async () => {
       const { container } = render(<NavBar />);
 
-      // Start past threshold
-      simulateScroll(200);
+      // Start at threshold
+      simulateScroll(72);
 
       await waitFor(() => {
         expect(isNavBarHidden(container)).toBe(false);
       });
 
-      // Large jump down (300px at once)
-      simulateScroll(500);
+      // Large jump down (300px at once - more than 60px HIDE_SCROLL_DISTANCE)
+      simulateScroll(372); // 72 + 300
 
       await waitFor(() => {
-        // Should be hidden (downward scroll)
+        // Should be hidden (downward scroll > 60px)
         expect(isNavBarHidden(container)).toBe(true);
       });
 
@@ -347,15 +369,16 @@ describe("NavBar Direction-Based Scroll Logic", () => {
     it("ignores small movements below MIN_SCROLL_DELTA", async () => {
       const { container } = render(<NavBar />);
 
-      // Scroll past threshold to 200px (downward, hides navbar)
-      simulateScroll(200);
+      // Scroll to threshold and down 60px to hide
+      simulateScroll(72);
+      simulateScroll(132);
 
       await waitFor(() => {
         expect(isNavBarHidden(container)).toBe(true);
       });
 
       // Scroll up by 2px to reveal (delta = -2, which is > MIN_SCROLL_DELTA)
-      simulateScroll(198);
+      simulateScroll(130);
 
       await waitFor(() => {
         expect(isNavBarHidden(container)).toBe(false);
@@ -363,13 +386,14 @@ describe("NavBar Direction-Based Scroll Logic", () => {
 
       // Scroll down by exactly 1px (abs(1) < 1 is false, but we need to check the logic)
       // MIN_SCROLL_DELTA = 1, and Math.abs(delta) < MIN_SCROLL_DELTA means delta must be < 1
-      // So delta of 1 is NOT ignored (1 < 1 is false), navbar will hide
-      simulateScroll(199);
+      // So delta of 1 is NOT ignored (1 < 1 is false), navbar will start translating
+      simulateScroll(131);
 
       await waitFor(() => {
         // Delta of 1px equals MIN_SCROLL_DELTA threshold, so it IS processed (not ignored)
-        // Since it's downward (delta > 0), navbar hides
-        expect(isNavBarHidden(container)).toBe(true);
+        // Since it's downward but only 1px, navbar translates but doesn't hide
+        expect(isNavBarHidden(container)).toBe(false);
+        expect(isNavBarTranslating(container)).toBe(true);
       });
     });
   });
@@ -378,22 +402,24 @@ describe("NavBar Direction-Based Scroll Logic", () => {
     it("does NOT hide navbar when mobile menu is open, even on downward scroll", async () => {
       const { container } = render(<NavBar />);
 
-      // Start past threshold
-      simulateScroll(200);
+      // Start at threshold
+      simulateScroll(72);
 
       await waitFor(() => {
         expect(isNavBarHidden(container)).toBe(false);
       });
 
-      // Open mobile menu (would require clicking menu button in real scenario)
-      // For this test, we verify the logic: if mobile menu open, navbar stays visible
+      // Scroll down enough to normally hide (60px)
+      simulateScroll(132);
 
-      // Scroll down (would normally hide)
-      simulateScroll(210);
+      // Without mobile menu open, navbar should be hidden
+      await waitFor(() => {
+        expect(isNavBarHidden(container)).toBe(true);
+      });
 
-      // Note: In actual implementation, mobile menu state prevents hiding
+      // Note: In actual implementation with mobile menu open, navbar stays visible
       // This test documents the expected behavior
-      // The actual test would need to trigger mobile menu open via button click
+      // A full integration test would need to trigger mobile menu open via button click
     });
   });
 
@@ -408,9 +434,9 @@ describe("NavBar Direction-Based Scroll Logic", () => {
         value: 3000,
       });
 
-      // Start and hide navbar (scroll down past threshold)
-      simulateScroll(200);
-      simulateScroll(210); // hide
+      // Start at threshold and hide navbar (scroll down 60px)
+      simulateScroll(72);
+      simulateScroll(132); // hide
 
       await waitFor(() => {
         expect(isNavBarHidden(container)).toBe(true);
@@ -436,8 +462,8 @@ describe("NavBar Direction-Based Scroll Logic", () => {
       });
 
       // Scroll to bottom (navbar hidden during downward scroll)
-      simulateScroll(200);
-      simulateScroll(210); // hide
+      simulateScroll(72);
+      simulateScroll(132); // hide
       simulateScroll(2200); // At bottom
 
       await waitFor(() => {
