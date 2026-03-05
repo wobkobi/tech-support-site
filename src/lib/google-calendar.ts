@@ -5,6 +5,7 @@
  */
 
 import { google } from "googleapis";
+import { getPacificAucklandOffset } from "@/lib/timezone-utils";
 
 /**
  * The calendar where new booking events are created.
@@ -167,6 +168,8 @@ export async function fetchAllCalendarEvents(
 
   const allEvents: CalendarEvent[] = [];
 
+  const personalCalendarId = process.env.PERSONAL_CALENDAR_ID ?? "";
+
   // Fetch events from each calendar ID
   for (const calendarId of calendarIds) {
     try {
@@ -179,19 +182,46 @@ export async function fetchAllCalendarEvents(
       });
 
       const events = response.data.items || [];
-      const validEvents = events
-        .filter((event) => event.start?.dateTime && event.end?.dateTime)
-        .map((event) => ({
-          id: event.id!,
-          start: event.start!.dateTime!,
-          end: event.end!.dateTime!,
-          summary: event.summary || undefined,
-          description: event.description || undefined,
-          calendarEmail: calendarId,
-        }));
+      const isPersonal = Boolean(personalCalendarId) && calendarId === personalCalendarId;
+      const processedEvents: CalendarEvent[] = [];
 
-      console.log(`[calendar] ${calendarId}: ${validEvents.length} events`);
-      allEvents.push(...validEvents);
+      for (const event of events) {
+        if (event.start?.dateTime && event.end?.dateTime) {
+          // Timed event — always block regardless of calendar
+          processedEvents.push({
+            id: event.id!,
+            start: event.start.dateTime,
+            end: event.end.dateTime,
+            summary: event.summary || undefined,
+            description: event.description || undefined,
+            calendarEmail: calendarId,
+          });
+        } else if (event.start?.date && event.end?.date && !isPersonal) {
+          // All-day event from a non-personal calendar — block the full NZ day(s).
+          // All-day events use date strings ("YYYY-MM-DD"); end.date is exclusive.
+          // Convert NZ calendar midnight → UTC so slot checking works correctly.
+          const startDateStr = event.start.date;
+          const endDateStr = event.end.date;
+          const [sYear, sMonth, sDay] = startDateStr.split("-").map(Number);
+          const [eYear, eMonth, eDay] = endDateStr.split("-").map(Number);
+          const utcOffset = getPacificAucklandOffset(sYear, sMonth, sDay);
+          // NZ midnight = UTC hour 0 minus utcOffset (JS Date handles negative hour wrap)
+          const startUtc = new Date(Date.UTC(sYear, sMonth - 1, sDay, -utcOffset, 0, 0));
+          const endUtc = new Date(Date.UTC(eYear, eMonth - 1, eDay, -utcOffset, 0, 0));
+          processedEvents.push({
+            id: event.id!,
+            start: startUtc.toISOString(),
+            end: endUtc.toISOString(),
+            summary: event.summary || undefined,
+            description: event.description || undefined,
+            calendarEmail: calendarId,
+          });
+        }
+        // All-day events from the personal calendar are intentionally skipped
+      }
+
+      console.log(`[calendar] ${calendarId}: ${processedEvents.length} events`);
+      allEvents.push(...processedEvents);
     } catch (error) {
       console.error(`[calendar] Failed to fetch events from ${calendarId}:`, error);
       // Continue with other calendars

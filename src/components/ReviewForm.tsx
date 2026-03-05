@@ -8,6 +8,7 @@
 
 import type React from "react";
 import { cn } from "@/lib/cn";
+import { Button } from "@/components/Button";
 import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -163,7 +164,7 @@ export default function ReviewFormProtected({
 
       {/* Identity */}
       <div
-        className={cn("border-seasalt-400/60 bg-seasalt-900/60 space-y-4 rounded-xl border p-4")}
+        className={cn("border-seasalt-400/80 bg-seasalt-900/60 space-y-4 rounded-xl border p-4")}
       >
         <div className={cn("flex items-center gap-3")}>
           <input
@@ -189,6 +190,8 @@ export default function ReviewFormProtected({
             </label>
             <input
               id={firstId}
+              type="text"
+              autoComplete="given-name"
               className={cn(
                 "border-seasalt-400/60 bg-seasalt text-rich-black focus:ring-moonstone-500/50",
                 "w-full rounded-md border px-3 py-2 outline-none focus:ring-2",
@@ -209,6 +212,8 @@ export default function ReviewFormProtected({
             </label>
             <input
               id={lastId}
+              type="text"
+              autoComplete="family-name"
               className={cn(
                 "border-seasalt-400/60 bg-seasalt text-rich-black focus:ring-moonstone-500/50",
                 "w-full rounded-md border px-3 py-2 outline-none focus:ring-2",
@@ -223,7 +228,7 @@ export default function ReviewFormProtected({
       </div>
 
       {/* Review */}
-      <div className={cn("border-seasalt-400/60 bg-seasalt-900/60 rounded-xl border p-4")}>
+      <div className={cn("border-seasalt-400/80 bg-seasalt-900/60 rounded-xl border p-4")}>
         <div className={cn("flex items-baseline justify-between gap-3")}>
           <label htmlFor={textId} className={cn("text-rich-black block text-sm font-semibold")}>
             Review <span className={cn("text-coquelicot-500")}>*</span>
@@ -245,6 +250,7 @@ export default function ReviewFormProtected({
 
         <textarea
           id={textId}
+          autoComplete="off"
           placeholder={`Share your experience (at least ${textMin} characters)...`}
           className={cn(
             "border-seasalt-400/60 bg-seasalt text-rich-black focus:ring-moonstone-500/50",
@@ -258,16 +264,14 @@ export default function ReviewFormProtected({
         />
 
         <div className={cn("mt-3 flex items-center justify-between")}>
-          <button
+          <Button
             type="submit"
+            variant="secondary"
+            size="sm"
             disabled={loading || textCount < textMin}
-            className={cn(
-              "bg-russian-violet text-seasalt rounded-md px-4 py-2 text-sm font-semibold",
-              "hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60",
-            )}
           >
             {loading ? "Sending..." : "Send review"}
-          </button>
+          </Button>
         </div>
       </div>
     </form>

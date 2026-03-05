@@ -1,5 +1,9 @@
-// POST /api/reviews/[id]/revoke
-// Admin endpoint to revoke a review (sets status: pending)
+// src/app/api/reviews/[id]/revoke.ts
+/**
+ * @file revoke.ts
+ * @description POST /api/reviews/[id]/revoke - Admin endpoint to revoke a review (sets status: pending).
+ */
+
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";

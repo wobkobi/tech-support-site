@@ -128,6 +128,7 @@ export function SendReviewLinkForm({ token }: SendReviewLinkFormProps): React.Re
             <div className={cn("flex gap-3")}>
               <input
                 type="text"
+                autoComplete="off"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Full name"
@@ -139,6 +140,7 @@ export function SendReviewLinkForm({ token }: SendReviewLinkFormProps): React.Re
               {mode === "email" && (
                 <input
                   type="email"
+                  autoComplete="off"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Email address"

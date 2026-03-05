@@ -70,9 +70,3 @@ next-env.d.ts
 
 # generated docs & analysis artifacts
 /docs/
-QA_CRON_TESTING_REPORT.md
-TEST_STRATEGY_GAPS.md
-ROOT_CAUSE_ANALYSIS.md
-REVIEW_TEST_COMPLETION.md
-
-BUG_FIX_REPORT.md

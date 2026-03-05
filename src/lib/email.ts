@@ -281,7 +281,10 @@ export interface ReviewRequestData {
  */
 export async function sendCustomerReviewRequest(booking: ReviewRequestData): Promise<void> {
   const from = process.env.EMAIL_FROM;
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz";
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz").replace(
+    /\/$/,
+    "",
+  );
 
   if (!from || !process.env.RESEND_API_KEY) {
     console.warn("[email] Resend not configured - skipping customer review request.");
@@ -343,7 +346,10 @@ export async function sendCustomerReviewRequest(booking: ReviewRequestData): Pro
  */
 export async function sendPastClientReviewRequest(booking: ReviewRequestData): Promise<void> {
   const from = process.env.EMAIL_FROM;
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz";
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz").replace(
+    /\/$/,
+    "",
+  );
 
   if (!from || !process.env.RESEND_API_KEY) {
     console.warn("[email] Resend not configured - skipping past client review request.");

@@ -6,8 +6,8 @@
 
 import type React from "react";
 import { FrostedSection, PageShell, CARD } from "@/components/PageLayout";
+import { Button } from "@/components/Button";
 import { cn } from "@/lib/cn";
-import Link from "next/link";
 import {
   FaCloud,
   FaHouse,
@@ -269,22 +269,12 @@ export default function ServicesPage(): React.ReactElement {
           >
             <p className={cn("text-rich-black mb-4 text-sm sm:text-base")}>Ready to get started?</p>
             <div className={cn("flex flex-wrap items-center justify-center gap-3")}>
-              <Link
-                href="/pricing"
-                className={cn(
-                  "border-seasalt-400/60 hover:bg-seasalt-900/40 text-rich-black rounded-lg border px-5 py-3 text-sm font-bold transition-colors sm:text-base",
-                )}
-              >
+              <Button href="/pricing" variant="ghost" size="md">
                 View pricing
-              </Link>
-              <Link
-                href="/contact"
-                className={cn(
-                  "bg-coquelicot-500 hover:bg-coquelicot-600 text-seasalt rounded-lg px-5 py-3 text-sm font-bold transition-colors sm:text-base",
-                )}
-              >
+              </Button>
+              <Button href="/contact" variant="primary" size="md">
                 Get in touch
-              </Link>
+              </Button>
             </div>
           </section>
         </div>

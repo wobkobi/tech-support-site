@@ -81,6 +81,7 @@ export function AddReviewForm({ token, onAdded }: AddReviewFormProps): React.Rea
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
+            autoComplete="off"
             placeholder="Review text (10–600 characters)"
             rows={4}
             required
@@ -93,6 +94,7 @@ export function AddReviewForm({ token, onAdded }: AddReviewFormProps): React.Rea
             <div className={cn("flex gap-3")}>
               <input
                 type="text"
+                autoComplete="off"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
                 placeholder="First name"
@@ -102,6 +104,7 @@ export function AddReviewForm({ token, onAdded }: AddReviewFormProps): React.Rea
               />
               <input
                 type="text"
+                autoComplete="off"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
                 placeholder="Last name (optional)"
