@@ -169,12 +169,21 @@ export default async function BookingPage(): Promise<React.ReactElement> {
           {/* Two-column: Form + Sidebar */}
           <div className={cn("grid gap-6 sm:gap-8 lg:grid-cols-[1fr_20rem]")}>
             {/* Form Card */}
-            <section className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}>
+            <section
+              className={cn(
+                CARD,
+                "animate-slide-up animate-fill-both animate-delay-100 order-2 lg:order-1",
+              )}
+            >
               <BookingForm availableDays={availableDays} />
             </section>
 
             {/* Sidebar */}
-            <aside className={cn("flex flex-col gap-6 sm:gap-8 lg:sticky lg:top-24 lg:self-start")}>
+            <aside
+              className={cn(
+                "sticky order-1 flex flex-col gap-6 sm:gap-8 lg:top-24 lg:order-2 lg:self-start",
+              )}
+            >
               {/* How it works */}
               <div className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-200")}>
                 <h2 className={cn("text-russian-violet mb-4 text-xl font-bold sm:text-2xl")}>
