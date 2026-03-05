@@ -112,7 +112,7 @@ export default async function ReviewsPage(): Promise<React.ReactElement> {
                       {r.verified && (
                         <span
                           className={cn(
-                            "bg-moonstone-600/15 border-moonstone-500/30 text-moonstone-600 flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium",
+                            "bg-moonstone-600/15 border-moonstone-500/30 text-moonstone-600 flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs",
                           )}
                         >
                           <FaCircleCheck className={cn("h-3 w-3")} aria-hidden />

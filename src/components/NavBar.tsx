@@ -1,23 +1,36 @@
 // src/components/NavBar.tsx
 /**
  * @file NavBar.tsx
- * @description Modern navigation bar with mobile menu, frosted glass effect, and smooth animations.
+ * @description Navigation bar with mobile-first scroll reveal behavior.
  */
 
 "use client";
 
 import type React from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Button } from "@/components/Button";
 import { cn } from "@/lib/cn";
-import { useState, useEffect } from "react";
 
 interface NavItem {
   label: string;
   href: string;
   activePrefix: string;
 }
+
+const HIDDEN_PATHS: ReadonlyArray<string> = ["/poster"];
+const NAV_ITEMS: ReadonlyArray<NavItem> = [
+  { label: "Services", href: "/services", activePrefix: "/services" },
+  { label: "Pricing", href: "/pricing", activePrefix: "/pricing" },
+  { label: "About", href: "/about", activePrefix: "/about" },
+  { label: "FAQ", href: "/faq", activePrefix: "/faq" },
+  { label: "Reviews", href: "/reviews", activePrefix: "/reviews" },
+];
+
+const SCROLL_THRESHOLD = 72;
+const MIN_SCROLL_DELTA = 1;
 
 /**
  * Determine whether a path is active for a given prefix route.
@@ -33,87 +46,183 @@ function isActivePrefix(pathname: string, prefix: string): boolean {
 }
 
 /**
- * Modern navigation bar with mobile menu support.
+ * NavBar component.
  * @returns The NavBar element, or null on hidden paths.
  */
 export function NavBar(): React.ReactElement | null {
   const pathname = usePathname();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [prevPathname, setPrevPathname] = useState(pathname);
 
-  // Close mobile menu when route changes (state-based comparison avoids effect)
-  if (prevPathname !== pathname) {
-    setPrevPathname(pathname);
+  const [mobileMenuState, setMobileMenuState] = useState<{ open: boolean; pathname: string }>({
+    open: false,
+    pathname,
+  });
+  const mobileMenuOpen = mobileMenuState.open && mobileMenuState.pathname === pathname;
+
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [isHidden, setIsHidden] = useState(false);
+
+  const scrollLockRef = useRef(0);
+  const bodyLockedRef = useRef(false);
+  const lastScrollYRef = useRef(0);
+
+  /**
+   * Set hidden state only when it changes.
+   * @param nextHidden - Target hidden state.
+   * @param reason - Why this transition happened.
+   * @param details - Optional context for debug logs.
+   */
+  const setHiddenSafely = useCallback((nextHidden: boolean): void => {
+    setIsHidden((previous) => (previous === nextHidden ? previous : nextHidden));
+  }, []);
+
+  /**
+   * Open the mobile menu.
+   */
+  const openMobileMenu = useCallback((): void => {
+    setMobileMenuState({ open: true, pathname });
+  }, [pathname]);
+
+  /**
+   * Close the mobile menu.
+   */
+  const closeMobileMenu = useCallback((): void => {
+    setMobileMenuState({ open: false, pathname });
+  }, [pathname]);
+
+  /**
+   * Toggle the mobile menu.
+   */
+  const toggleMobileMenu = useCallback((): void => {
     if (mobileMenuOpen) {
-      setMobileMenuOpen(false);
+      closeMobileMenu();
+      return;
     }
+
+    openMobileMenu();
+  }, [mobileMenuOpen, openMobileMenu, closeMobileMenu]);
+
+  // Lock body scroll while mobile menu is open.
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const body = document.body;
+
+    if (mobileMenuOpen) {
+      scrollLockRef.current = window.scrollY;
+      body.style.overflow = "hidden";
+      body.style.position = "fixed";
+      body.style.width = "100%";
+      body.style.top = `-${scrollLockRef.current}px`;
+      bodyLockedRef.current = true;
+    } else if (bodyLockedRef.current) {
+      body.style.overflow = "";
+      body.style.position = "";
+      body.style.width = "";
+      body.style.top = "";
+      window.scrollTo({ top: scrollLockRef.current });
+      bodyLockedRef.current = false;
+    }
+
+    return () => {
+      body.style.overflow = "";
+      body.style.position = "";
+      body.style.width = "";
+      body.style.top = "";
+    };
+  }, [mobileMenuOpen]);
+
+  // Scroll behavior: hide on downward scroll, show immediately on upward scroll.
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    /**
+     * Process latest scroll position.
+     */
+    const processScroll = (): void => {
+      const currentY = Math.max(window.scrollY, 0);
+      const previousY = lastScrollYRef.current;
+      const delta = currentY - previousY;
+      lastScrollYRef.current = currentY;
+
+      const scrolledPastThreshold = currentY > SCROLL_THRESHOLD;
+      setIsScrolled(scrolledPastThreshold);
+
+      if (!scrolledPastThreshold || mobileMenuOpen) {
+        setHiddenSafely(false);
+        return;
+      }
+
+      if (Math.abs(delta) < MIN_SCROLL_DELTA) {
+        return;
+      }
+
+      if (delta < 0) {
+        setHiddenSafely(false);
+        return;
+      }
+
+      if (delta > 0) {
+        setHiddenSafely(true);
+      }
+    };
+
+    lastScrollYRef.current = Math.max(window.scrollY, 0);
+    processScroll();
+
+    window.addEventListener("scroll", processScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener("scroll", processScroll);
+    };
+  }, [mobileMenuOpen, setHiddenSafely]);
+
+  if (HIDDEN_PATHS.includes(pathname)) {
+    return null;
   }
-
-  const HIDDEN_PATHS: ReadonlyArray<string> = ["/poster"];
-  const hidden = HIDDEN_PATHS.includes(pathname);
-
-  const items: ReadonlyArray<NavItem> = [
-    { label: "Services", href: "/services", activePrefix: "/services" },
-    { label: "Pricing", href: "/pricing", activePrefix: "/pricing" },
-    { label: "About", href: "/about", activePrefix: "/about" },
-    { label: "FAQ", href: "/faq", activePrefix: "/faq" },
-    { label: "Reviews", href: "/reviews", activePrefix: "/reviews" },
-  ];
 
   const bookingActive = isActivePrefix(pathname, "/booking");
   const contactActive = isActivePrefix(pathname, "/contact");
 
-  // Prevent body scroll when mobile menu is open
-  useEffect(() => {
-    if (mobileMenuOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "unset";
-    }
-    return () => {
-      document.body.style.overflow = "unset";
-    };
-  }, [mobileMenuOpen]);
-
-  if (hidden) {
-    return null;
-  }
-
   return (
     <>
+      <div aria-hidden="true" className={cn("h-24 sm:h-28")} />
+
       <header
         className={cn(
-          "sticky top-4 z-50 mx-auto w-full px-4",
+          "duration-400 fixed inset-x-0 top-3 z-50 mx-auto w-full px-4 transition-[transform,opacity] ease-in-out will-change-transform sm:top-4",
           "max-w-[min(100vw-2rem,90rem)]",
-          "animate-slide-down",
+          isHidden && "pointer-events-none -translate-y-[120%] opacity-0",
         )}
       >
         <div
           className={cn(
-            "border-seasalt-400/40 bg-seasalt-800/90 flex h-20 w-full items-center justify-between rounded-2xl border px-5 shadow-lg backdrop-blur-lg",
+            "border-seasalt-400/40 bg-seasalt-800/90 flex h-20 w-full items-center justify-between rounded-2xl border px-5 shadow-lg backdrop-blur-lg transition-all duration-300",
+            isScrolled && "border-opacity-70 shadow-2xl",
           )}
         >
-          {/* Logo */}
           <Link
             href="/"
             className={cn("flex items-center gap-2.5 transition-transform hover:scale-105")}
           >
             <Image
               src="/source/logo.svg"
-              alt="To The Point Tech"
+              alt="Logo"
               width={40}
               height={40}
               priority
               className={cn("select-none")}
             />
-            <span className={cn("text-russian-violet hidden text-xl font-bold sm:inline")}>
+            <span className={cn("text-russian-violet text-lg font-bold sm:text-xl")}>
               To The Point Tech
             </span>
           </Link>
 
-          {/* Desktop Navigation */}
           <nav className={cn("hidden items-center gap-1 lg:flex")} aria-label="Primary navigation">
-            {items.map((item) => {
+            {NAV_ITEMS.map((item) => {
               const active = isActivePrefix(pathname, item.activePrefix);
 
               return (
@@ -134,42 +243,35 @@ export function NavBar(): React.ReactElement | null {
             })}
           </nav>
 
-          {/* CTA Buttons */}
           <div className={cn("flex shrink-0 items-center gap-2")}>
-            <Link
+            <Button
               href="/booking"
-              className={cn(
-                "hidden shrink-0 whitespace-nowrap rounded-lg px-6 py-3 text-lg font-bold transition-all lg:block xl:text-xl",
-                bookingActive
-                  ? "bg-coquelicot-600 text-seasalt shadow-md"
-                  : "bg-coquelicot-500 hover:bg-coquelicot-600 text-seasalt hover:shadow-md",
-              )}
+              variant="primary"
+              size="lg"
+              className={cn("hidden shrink-0 lg:inline-flex xl:text-xl")}
               aria-current={bookingActive ? "page" : undefined}
             >
               Book now
-            </Link>
+            </Button>
 
-            <Link
+            <Button
               href="/contact"
-              className={cn(
-                "hidden shrink-0 whitespace-nowrap rounded-lg px-6 py-3 text-lg font-bold transition-all lg:block xl:text-xl",
-                contactActive
-                  ? "bg-moonstone-600/30 text-russian-violet shadow-sm"
-                  : "bg-moonstone-600/20 text-russian-violet hover:bg-moonstone-600/30",
-              )}
+              variant="ghost"
+              size="lg"
+              className={cn("hidden shrink-0 lg:inline-flex xl:text-xl")}
               aria-current={contactActive ? "page" : undefined}
             >
               Contact
-            </Link>
+            </Button>
 
-            {/* Mobile Menu Button */}
             <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              onClick={toggleMobileMenu}
               className={cn(
                 "bg-seasalt-900/20 hover:bg-seasalt-900/30 flex h-11 w-11 items-center justify-center rounded-lg transition-all lg:hidden",
               )}
               aria-label="Toggle mobile menu"
               aria-expanded={mobileMenuOpen}
+              aria-controls="mobile-nav"
             >
               <div className={cn("flex h-5 w-5 flex-col justify-center gap-1")}>
                 <span
@@ -196,29 +298,27 @@ export function NavBar(): React.ReactElement | null {
         </div>
       </header>
 
-      {/* Mobile Menu Overlay */}
       {mobileMenuOpen && (
         <div
           className={cn(
             "bg-rich-black/50 fixed inset-0 z-40 backdrop-blur-sm lg:hidden",
             "animate-in fade-in duration-200",
           )}
-          onClick={() => setMobileMenuOpen(false)}
+          onClick={closeMobileMenu}
           aria-hidden="true"
         />
       )}
 
-      {/* Mobile Menu Slide-out */}
       <nav
         className={cn(
-          "border-seasalt-400/40 bg-seasalt-800/95 fixed right-4 top-24 z-40 h-[calc(100vh-7rem)] w-72 rounded-2xl border shadow-2xl backdrop-blur-xl transition-transform duration-300 lg:hidden",
+          "border-seasalt-400/40 bg-seasalt-800/95 sm:top-30 top-27 overscroll-behavior-contain fixed right-4 z-40 max-h-[calc(100dvh-8rem)] max-w-[min(calc(100vw-2rem),18rem)] overflow-y-auto rounded-2xl border shadow-2xl backdrop-blur-xl transition-transform duration-300 lg:hidden",
           mobileMenuOpen ? "translate-x-0" : "translate-x-full",
         )}
+        id="mobile-nav"
         aria-label="Mobile navigation"
       >
         <div className={cn("flex h-full flex-col gap-2 p-4")}>
-          {/* Mobile Nav Links */}
-          {items.map((item) => {
+          {NAV_ITEMS.map((item) => {
             const active = isActivePrefix(pathname, item.activePrefix);
 
             return (
@@ -232,39 +332,33 @@ export function NavBar(): React.ReactElement | null {
                     : "text-rich-black hover:bg-seasalt-900/30 hover:text-russian-violet",
                 )}
                 aria-current={active ? "page" : undefined}
+                onClick={closeMobileMenu}
               >
                 {item.label}
               </Link>
             );
           })}
 
-          {/* Mobile CTA Buttons */}
           <div className={cn("border-seasalt-400/40 mt-4 flex flex-col gap-2 border-t pt-4")}>
-            <Link
+            <Button
               href="/booking"
-              className={cn(
-                "rounded-lg px-4 py-3 text-center text-base font-bold transition-all",
-                bookingActive
-                  ? "bg-coquelicot-600 text-seasalt shadow-md"
-                  : "bg-coquelicot-500 hover:bg-coquelicot-600 text-seasalt",
-              )}
+              variant="primary"
+              size="lg"
+              fullWidth
               aria-current={bookingActive ? "page" : undefined}
             >
               Book now
-            </Link>
+            </Button>
 
-            <Link
+            <Button
               href="/contact"
-              className={cn(
-                "rounded-lg px-4 py-3 text-center text-base font-bold transition-all",
-                contactActive
-                  ? "bg-moonstone-600/30 text-russian-violet shadow-sm"
-                  : "bg-moonstone-600/20 text-russian-violet hover:bg-moonstone-600/30",
-              )}
+              variant="ghost"
+              size="lg"
+              fullWidth
               aria-current={contactActive ? "page" : undefined}
             >
               Contact
-            </Link>
+            </Button>
           </div>
         </div>
       </nav>

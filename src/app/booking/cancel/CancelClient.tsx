@@ -9,8 +9,8 @@
 import type React from "react";
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import Link from "next/link";
 import { cn } from "@/lib/cn";
+import { Button } from "@/components/Button";
 
 const CARD = "border-seasalt-400/60 bg-seasalt-800 rounded-xl border p-5 shadow-sm sm:p-6";
 
@@ -105,23 +105,12 @@ export default function BookingCancelClient({
               {state !== "loading" && <p className={cn("text-rich-black")}>{message}</p>}
 
               <div className={cn("mt-4 flex flex-wrap gap-3")}>
-                <Link
-                  href="/"
-                  className={cn(
-                    "bg-russian-violet text-seasalt rounded-md px-4 py-2 text-sm font-semibold",
-                    "hover:brightness-110",
-                  )}
-                >
+                <Button href="/" variant="secondary" size="sm">
                   Back to home
-                </Link>
-                <Link
-                  href="/booking"
-                  className={cn(
-                    "border-seasalt-400/60 text-rich-black hover:bg-seasalt-900/40 rounded-md border px-4 py-2 text-sm font-semibold",
-                  )}
-                >
+                </Button>
+                <Button href="/booking" variant="ghost" size="sm">
                   Book another time
-                </Link>
+                </Button>
               </div>
             </section>
           </div>

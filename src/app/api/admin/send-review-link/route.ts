@@ -51,7 +51,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ ok: false, error: "Valid email is required." }, { status: 400 });
     }
 
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz";
+    const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz").replace(
+      /\/$/,
+      "",
+    );
 
     const reviewRequest = await prisma.reviewRequest.create({
       data: { name: name.trim() },

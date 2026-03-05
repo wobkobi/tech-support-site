@@ -51,6 +51,7 @@ export default function AddressAutocomplete({
 }: AddressAutocompleteProps): React.ReactElement {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [scriptError, setScriptError] = useState(false);
   const [apiKeyMissing, setApiKeyMissing] = useState(false);
@@ -177,11 +178,121 @@ export default function AddressAutocomplete({
     }
   }, [isLoaded, onChange, onPlaceSelected]);
 
+  // Keep the Places dropdown aligned to the input width and position
+  useEffect(() => {
+    if (!inputRef.current) return;
+
+    const inputEl = inputRef.current;
+    let mutationObserver: MutationObserver | null = null;
+    let rafId: number | null = null;
+
+    /**
+     * Syncs the Google Places dropdown width/position with the input element so suggestions stay flush with the input.
+     */
+    const syncDropdown = (): void => {
+      const containers = Array.from(document.querySelectorAll(".pac-container")) as HTMLElement[];
+      const container = containers.findLast((node) => node.offsetParent !== null) ?? null;
+      if (!container) return;
+
+      const rect = inputEl.getBoundingClientRect();
+      const scrollTop = window.scrollY || document.documentElement.scrollTop;
+      const scrollLeft = window.scrollX || document.documentElement.scrollLeft;
+      const position = window.getComputedStyle(container).position;
+
+      const left = position === "fixed" ? rect.left : rect.left + scrollLeft;
+      const top = position === "fixed" ? rect.bottom + 6 : rect.bottom + scrollTop + 6;
+
+      const width = Math.round(rect.width);
+
+      container.style.setProperty("width", `${width}px`, "important");
+      container.style.setProperty("min-width", `${width}px`, "important");
+      container.style.setProperty("max-width", `${width}px`, "important");
+      container.style.setProperty("left", `${left}px`, "important");
+      container.style.setProperty("right", "auto", "important");
+      container.style.setProperty("top", `${top}px`, "important");
+    };
+
+    /**
+     * Starts a requestAnimationFrame loop so the dropdown keeps tracking layout changes while the user types.
+     */
+    const startSyncLoop = (): void => {
+      if (rafId !== null) return;
+      /**
+       * Ticks every animation frame to reapply dropdown positioning adjustments.
+       */
+      const tick = (): void => {
+        syncDropdown();
+        rafId = window.requestAnimationFrame(tick);
+      };
+      rafId = window.requestAnimationFrame(tick);
+    };
+
+    /**
+     * Cancels the sync loop when the dropdown hides so we do not keep scheduling RAF work.
+     */
+    const stopSyncLoop = (): void => {
+      if (rafId === null) return;
+      window.cancelAnimationFrame(rafId);
+      rafId = null;
+    };
+
+    /**
+     * Kicks off a sync pass immediately when the input gains focus.
+     */
+    const handleFocus = (): void => {
+      setTimeout(syncDropdown, 0);
+      startSyncLoop();
+    };
+
+    /**
+     * Nudges the dropdown after each keystroke to keep it flush with the field width.
+     */
+    const handleInput = (): void => {
+      setTimeout(syncDropdown, 0);
+    };
+
+    /**
+     * Stops syncing once the input loses focus so the loop does not run indefinitely.
+     */
+    const handleBlur = (): void => {
+      stopSyncLoop();
+    };
+
+    inputEl.addEventListener("focus", handleFocus);
+    inputEl.addEventListener("input", handleInput);
+    inputEl.addEventListener("blur", handleBlur);
+    window.addEventListener("resize", syncDropdown);
+    window.addEventListener("scroll", syncDropdown, true);
+
+    if (typeof MutationObserver !== "undefined") {
+      mutationObserver = new MutationObserver(() => syncDropdown());
+      mutationObserver.observe(document.body, { childList: true, subtree: true });
+    }
+
+    if (typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(syncDropdown);
+      observer.observe(inputEl);
+      resizeObserverRef.current = observer;
+    }
+
+    return () => {
+      inputEl.removeEventListener("focus", handleFocus);
+      inputEl.removeEventListener("input", handleInput);
+      inputEl.removeEventListener("blur", handleBlur);
+      window.removeEventListener("resize", syncDropdown);
+      window.removeEventListener("scroll", syncDropdown, true);
+      mutationObserver?.disconnect();
+      stopSyncLoop();
+      resizeObserverRef.current?.disconnect();
+      resizeObserverRef.current = null;
+    };
+  }, []);
+
   // Show status message if autocomplete is unavailable
   const showWarning = apiKeyMissing || scriptError;
 
   return (
-    <div ref={wrapperRef} className={cn("flex flex-col gap-1")}>
+    <div ref={wrapperRef} className={cn("flex w-full flex-col gap-1")}>
       <input
         ref={inputRef}
         type="text"
@@ -192,8 +303,8 @@ export default function AddressAutocomplete({
         required={required}
         autoComplete="off"
         className={cn(
-          "border-seasalt-400/80 bg-seasalt text-rich-black rounded-md border px-3 py-2 text-sm",
-          "outline-none! shadow-none!",
+          "border-seasalt-400/80 bg-seasalt text-rich-black w-full rounded-md border px-4 py-3 text-base",
+          "focus:border-russian-violet focus:ring-russian-violet/30 focus:outline-none focus:ring-1",
           showWarning && "border-yellow-500/60",
         )}
       />

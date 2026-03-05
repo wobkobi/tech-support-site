@@ -8,6 +8,7 @@ import type React from "react";
 import Link from "next/link";
 import ReviewFormProtected from "@/components/ReviewForm";
 import { FrostedSection, PageShell, CARD } from "@/components/PageLayout";
+import { Button } from "@/components/Button";
 import { cn } from "@/lib/cn";
 import { prisma } from "@/lib/prisma";
 
@@ -83,14 +84,9 @@ export default async function ReviewPage({
                 This review link is invalid or has expired. If you recently had an appointment,
                 please check your email for the correct link.
               </p>
-              <Link
-                href="/"
-                className={cn(
-                  "bg-russian-violet text-seasalt inline-block rounded-md px-4 py-2.5 text-sm font-semibold hover:brightness-110",
-                )}
-              >
+              <Button href="/" variant="secondary" size="sm">
                 Back to home
-              </Link>
+              </Button>
             </section>
           )}
 
@@ -107,14 +103,9 @@ export default async function ReviewPage({
               <p className={cn("text-rich-black/80 mb-4 text-sm sm:text-base")}>
                 You've already submitted a review for this appointment. Thanks for your feedback!
               </p>
-              <Link
-                href="/"
-                className={cn(
-                  "bg-russian-violet text-seasalt inline-block rounded-md px-4 py-2.5 text-sm font-semibold hover:brightness-110",
-                )}
-              >
+              <Button href="/" variant="secondary" size="sm">
                 Back to home
-              </Link>
+              </Button>
             </section>
           )}
 
@@ -168,14 +159,9 @@ export default async function ReviewPage({
                 </Link>
                 .
               </p>
-              <Link
-                href="/"
-                className={cn(
-                  "bg-russian-violet text-seasalt inline-block rounded-md px-4 py-2.5 text-sm font-semibold hover:brightness-110",
-                )}
-              >
+              <Button href="/" variant="secondary" size="sm">
                 Back to home
-              </Link>
+              </Button>
             </section>
           )}
         </div>

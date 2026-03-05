@@ -7,10 +7,10 @@
 import type React from "react";
 import Reviews, { type ReviewItem } from "@/components/Reviews";
 import { FrostedSection, PageShell } from "@/components/PageLayout";
+import { Button } from "@/components/Button";
 import { cn } from "@/lib/cn";
 import { prisma } from "@/lib/prisma";
 import Image from "next/image";
-import Link from "next/link";
 import {
   FaCalendarCheck,
   FaCircleCheck,
@@ -57,10 +57,6 @@ const supportItems: ReadonlyArray<SupportItem> = [
 
 const CARD = cn(
   "border-seasalt-400/60 bg-seasalt-800 rounded-xl border p-5 shadow-sm sm:p-6 md:p-7",
-);
-
-const primaryBtn = cn(
-  "bg-coquelicot-500 hover:bg-coquelicot-600 text-russian-violet inline-flex items-center gap-2 rounded-lg px-5 py-3 text-sm font-bold sm:text-base transition-colors",
 );
 
 /**
@@ -113,19 +109,14 @@ export default async function Home(): Promise<React.ReactElement> {
             </p>
 
             <div className={cn("flex flex-wrap items-center justify-center gap-4")}>
-              <Link href="/booking" className={primaryBtn}>
+              <Button href="/booking" variant="primary" size="md" className={cn("h-12")}>
                 <FaCalendarCheck className={cn("h-5 w-5")} aria-hidden />
                 Book appointment
-              </Link>
-              <a
-                href="tel:+64212971237"
-                className={cn(
-                  "bg-russian-violet text-seasalt inline-flex items-center gap-2 rounded-lg px-5 py-3 text-base font-bold transition-colors hover:brightness-110 sm:text-lg",
-                )}
-              >
-                <FaPhone className={cn("h-5 w-5")} aria-hidden />
-                <span>021 297 1237</span>
-              </a>
+              </Button>
+              <Button href="tel:+64212971237" variant="secondary" size="md">
+                <FaPhone className={cn("h-4 w-4")} aria-hidden />
+                021 297 1237
+              </Button>
             </div>
 
             <p className={cn("text-rich-black/70 mt-6 text-base sm:text-lg")}>
@@ -143,7 +134,7 @@ export default async function Home(): Promise<React.ReactElement> {
             >
               <div
                 className={cn(
-                  "bg-moonstone-500/10 border-moonstone-500/30 mx-auto mb-3 grid size-16 place-items-center rounded-full border-2",
+                  "border-moonstone-500/50 bg-moonstone-600/30 mx-auto mb-3 grid size-16 place-items-center rounded-full border-2",
                 )}
               >
                 <FaCircleCheck className={cn("text-moonstone-600 h-8 w-8")} aria-hidden />
@@ -164,7 +155,7 @@ export default async function Home(): Promise<React.ReactElement> {
             >
               <div
                 className={cn(
-                  "bg-moonstone-500/10 border-moonstone-500/30 mx-auto mb-3 grid size-16 place-items-center rounded-full border-2",
+                  "border-moonstone-500/50 bg-moonstone-600/30 mx-auto mb-3 grid size-16 place-items-center rounded-full border-2",
                 )}
               >
                 <FaMapLocationDot className={cn("text-moonstone-600 h-8 w-8")} aria-hidden />
@@ -185,7 +176,7 @@ export default async function Home(): Promise<React.ReactElement> {
             >
               <div
                 className={cn(
-                  "bg-moonstone-500/10 border-moonstone-500/30 mx-auto mb-3 grid size-16 place-items-center rounded-full border-2",
+                  "border-moonstone-500/50 bg-moonstone-600/30 mx-auto mb-3 grid size-16 place-items-center rounded-full border-2",
                 )}
               >
                 <FaHandshake className={cn("text-moonstone-600 h-8 w-8")} aria-hidden />
@@ -225,14 +216,14 @@ export default async function Home(): Promise<React.ReactElement> {
                 >
                   <span
                     className={cn(
-                      "border-moonstone-500/40 bg-moonstone-600/20 grid size-12 shrink-0 place-items-center rounded-lg border sm:size-14",
+                      "border-moonstone-500/50 bg-moonstone-600/30 grid size-12 shrink-0 place-items-center rounded-lg border sm:size-14",
                     )}
                   >
                     <Icon className={cn("text-moonstone-600 h-7 w-7 sm:h-8 sm:w-8")} aria-hidden />
                   </span>
                   <span
                     className={cn(
-                      "text-rich-black line-clamp-2 text-left text-sm font-semibold leading-tight sm:text-base",
+                      "text-rich-black line-clamp-2 text-left text-sm font-medium leading-tight sm:text-base",
                     )}
                   >
                     {label}
@@ -242,14 +233,9 @@ export default async function Home(): Promise<React.ReactElement> {
             </ul>
 
             <div className={cn("mt-8 text-center")}>
-              <Link
-                href="/services"
-                className={cn(
-                  "bg-moonstone-600 hover:bg-moonstone-700 text-russian-violet inline-flex items-center gap-2 rounded-lg px-6 py-3 text-base font-bold shadow-md transition-all hover:shadow-lg sm:text-lg",
-                )}
-              >
+              <Button href="/services" variant="tertiary" size="md">
                 View all services
-              </Link>
+              </Button>
             </div>
           </section>
 
@@ -322,7 +308,7 @@ export default async function Home(): Promise<React.ReactElement> {
             >
               <div
                 className={cn(
-                  "bg-moonstone-500/10 border-moonstone-500/30 grid size-16 shrink-0 place-items-center rounded-full border-2",
+                  "border-moonstone-500/50 bg-moonstone-600/30 grid size-16 shrink-0 place-items-center rounded-full border-2",
                 )}
               >
                 <FaDownload className={cn("text-moonstone-600 h-8 w-8")} aria-hidden />
@@ -340,16 +326,15 @@ export default async function Home(): Promise<React.ReactElement> {
                 </p>
               </div>
 
-              <a
+              <Button
                 href="/downloads/poster-a5.pdf"
                 download="to-the-point-tech-flyer.pdf"
-                className={cn(
-                  "bg-moonstone-600 hover:bg-moonstone-700 text-russian-violet inline-flex shrink-0 items-center gap-2 rounded-lg px-5 py-3 text-sm font-bold shadow-md transition-all hover:shadow-lg sm:text-base",
-                )}
+                variant="tertiary"
+                size="md"
+                className={cn("shrink-0")}
               >
-                <FaDownload className={cn("h-5 w-5")} aria-hidden />
                 Download flyer
-              </a>
+              </Button>
             </div>
           </section>
         </div>
@@ -368,16 +353,16 @@ export default async function Home(): Promise<React.ReactElement> {
       <footer className={cn("mx-auto mb-6 w-fit max-w-[calc(100vw-2rem)] sm:mb-8")}>
         <div
           className={cn(
-            "border-seasalt-400/40 bg-seasalt-800/70 flex flex-col items-center gap-4 rounded-xl border p-4 shadow-lg backdrop-blur-md sm:flex-row sm:gap-8 sm:px-6 sm:py-4",
+            "border-seasalt-400/40 bg-seasalt-800/70 flex flex-col items-center gap-1 rounded-xl border p-4 shadow-lg backdrop-blur-md sm:flex-row sm:gap-8 sm:px-6 sm:py-4",
           )}
         >
           <a
             href="tel:+64212971237"
             className={cn(
-              "text-russian-violet hover:text-coquelicot-500 flex items-center gap-3 rounded-md px-4 py-2 text-base font-semibold transition-colors sm:text-lg",
+              "text-russian-violet hover:text-coquelicot-500 flex items-center gap-3 rounded-md px-4 py-2 text-base font-medium transition-colors sm:text-lg",
             )}
           >
-            <FaPhone className={cn("h-6 w-6 shrink-0 sm:h-7 sm:w-7")} aria-hidden />
+            <FaPhone className={cn("h-4 w-4 shrink-0 sm:h-6 sm:w-6")} aria-hidden />
             <span>021 297 1237</span>
           </a>
 
@@ -386,7 +371,7 @@ export default async function Home(): Promise<React.ReactElement> {
           <a
             href="mailto:harrison@tothepoint.co.nz"
             className={cn(
-              "text-russian-violet hover:text-coquelicot-500 flex items-center gap-3 rounded-md px-4 py-2 text-base font-semibold transition-colors sm:text-lg",
+              "text-russian-violet hover:text-coquelicot-500 flex items-center gap-3 rounded-md px-4 py-2 text-base font-medium transition-colors sm:text-lg",
             )}
           >
             <FaEnvelope className={cn("h-6 w-6 shrink-0 sm:h-7 sm:w-7")} aria-hidden />
