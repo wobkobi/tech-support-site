@@ -8,7 +8,7 @@ import { GET } from "@/app/api/cron/release-holds/route";
 import { NextRequest } from "next/server";
 
 // Mock Prisma
-vi.mock("@/lib/prisma", () => ({
+vi.mock("@/shared/lib/prisma", () => ({
   prisma: {
     booking: {
       findMany: vi.fn(),
@@ -26,7 +26,7 @@ describe("GET /api/cron/release-holds - Timing & Edge Cases", () => {
   });
 
   it("releases hold that expired exactly at current time", async () => {
-    const { prisma } = await import("@/lib/prisma");
+    const { prisma } = await import("@/shared/lib/prisma");
 
     const now = new Date("2026-02-24T10:00:00Z");
     vi.setSystemTime(now);
@@ -75,7 +75,7 @@ describe("GET /api/cron/release-holds - Timing & Edge Cases", () => {
   });
 
   it("does NOT release hold that expires 1 second in the future", async () => {
-    const { prisma } = await import("@/lib/prisma");
+    const { prisma } = await import("@/shared/lib/prisma");
 
     const now = new Date("2026-02-24T10:00:00Z");
     vi.setSystemTime(now);
@@ -105,7 +105,7 @@ describe("GET /api/cron/release-holds - Timing & Edge Cases", () => {
   });
 
   it("releases multiple expired holds in bulk", async () => {
-    const { prisma } = await import("@/lib/prisma");
+    const { prisma } = await import("@/shared/lib/prisma");
 
     const now = new Date("2026-02-24T10:00:00Z");
     vi.setSystemTime(now);
@@ -150,7 +150,7 @@ describe("GET /api/cron/release-holds - Timing & Edge Cases", () => {
   });
 
   it("handles empty result (no expired holds)", async () => {
-    const { prisma } = await import("@/lib/prisma");
+    const { prisma } = await import("@/shared/lib/prisma");
 
     const now = new Date("2026-02-24T10:00:00Z");
     vi.setSystemTime(now);
@@ -181,7 +181,7 @@ describe("GET /api/cron/release-holds - Timing & Edge Cases", () => {
   });
 
   it("only queries bookings with status=held", async () => {
-    const { prisma } = await import("@/lib/prisma");
+    const { prisma } = await import("@/shared/lib/prisma");
 
     const now = new Date("2026-02-24T10:00:00Z");
     vi.setSystemTime(now);
@@ -207,7 +207,7 @@ describe("GET /api/cron/release-holds - Timing & Edge Cases", () => {
   });
 
   it("returns 500 on database error", async () => {
-    const { prisma } = await import("@/lib/prisma");
+    const { prisma } = await import("@/shared/lib/prisma");
 
     const now = new Date("2026-02-24T10:00:00Z");
     vi.setSystemTime(now);
@@ -230,7 +230,7 @@ describe("GET /api/cron/release-holds - Timing & Edge Cases", () => {
   });
 
   it("returns 401 if authorization header is missing", async () => {
-    const { prisma } = await import("@/lib/prisma");
+    const { prisma } = await import("@/shared/lib/prisma");
 
     const request = new NextRequest("http://localhost:3000/api/cron/release-holds", {
       method: "GET",
@@ -247,7 +247,7 @@ describe("GET /api/cron/release-holds - Timing & Edge Cases", () => {
   });
 
   it("returns 401 if authorization header has wrong secret", async () => {
-    const { prisma } = await import("@/lib/prisma");
+    const { prisma } = await import("@/shared/lib/prisma");
 
     const request = new NextRequest("http://localhost:3000/api/cron/release-holds", {
       method: "GET",
@@ -265,7 +265,7 @@ describe("GET /api/cron/release-holds - Timing & Edge Cases", () => {
   });
 
   it("accepts request with x-vercel-cron header", async () => {
-    const { prisma } = await import("@/lib/prisma");
+    const { prisma } = await import("@/shared/lib/prisma");
 
     const now = new Date("2026-02-24T10:00:00Z");
     vi.setSystemTime(now);

@@ -7,11 +7,11 @@
 import "@testing-library/react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import type { Mock } from "vitest";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/shared/lib/prisma";
 import type { Review, ReviewStatus } from "@prisma/client";
 
 // Mock Prisma
-vi.mock("@/lib/prisma", () => ({
+vi.mock("@/shared/lib/prisma", () => ({
   prisma: {
     review: {
       findMany: vi.fn(),
@@ -27,7 +27,7 @@ vi.mock("next/link", () => ({
   ),
 }));
 
-vi.mock("@/components/PageLayout", () => ({
+vi.mock("@/shared/components/PageLayout", () => ({
   FrostedSection: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="frosted-section">{children}</div>
   ),

@@ -5,7 +5,7 @@
 
 import { renderHook, waitFor, act } from "@testing-library/react";
 import { useRef } from "react";
-import useOnVisible from "@/lib/useOnVisible";
+import useOnVisible from "@/shared/lib/useOnVisible";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 describe("useOnVisible hook", () => {

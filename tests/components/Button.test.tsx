@@ -6,7 +6,7 @@
 
 import { render, screen } from "@testing-library/react";
 import { describe, it, expect } from "vitest";
-import { Button, type ButtonVariant, type ButtonSize } from "@/components/Button";
+import { Button, type ButtonVariant, type ButtonSize } from "@/shared/components/Button";
 
 describe("Button Component", () => {
   describe("Polymorphic rendering", () => {

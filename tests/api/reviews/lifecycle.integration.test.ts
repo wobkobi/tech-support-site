@@ -3,7 +3,7 @@ import { POST as createReview } from "@/app/api/reviews/route";
 import { PATCH as editReview } from "@/app/api/reviews/[id]/route";
 import { POST as approve } from "@/app/api/reviews/[id]/approve";
 import { POST as revoke } from "@/app/api/reviews/[id]/revoke";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/shared/lib/prisma";
 
 // Mock next/cache for revalidatePath
 vi.mock("next/cache", () => ({
@@ -11,11 +11,11 @@ vi.mock("next/cache", () => ({
 }));
 
 // Mock email service
-vi.mock("@/lib/email", () => ({
+vi.mock("@/features/reviews/lib/email", () => ({
   sendOwnerReviewNotification: vi.fn(),
 }));
 
-vi.mock("@/lib/prisma");
+vi.mock("@/shared/lib/prisma");
 const ADMIN_SECRET = "testsecret";
 
 let reviewId = "abc123";

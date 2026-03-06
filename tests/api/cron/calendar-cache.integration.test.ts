@@ -7,7 +7,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { GET } from "@/app/api/cron/refresh-calendar-cache/route";
 import { NextRequest } from "next/server";
 
-vi.mock("@/lib/calendar-cache");
+vi.mock("@/features/calendar/lib/calendar-cache");
 
 describe("GET /api/cron/refresh-calendar-cache - Integration", () => {
   const CRON_SECRET = "test-secret-calendar";
@@ -18,7 +18,7 @@ describe("GET /api/cron/refresh-calendar-cache - Integration", () => {
   });
 
   it("returns cached and deleted counts on success", async () => {
-    const { refreshCalendarCache } = await import("@/lib/calendar-cache");
+    const { refreshCalendarCache } = await import("@/features/calendar/lib/calendar-cache");
 
     vi.mocked(refreshCalendarCache).mockResolvedValueOnce({
       cachedCount: 15,
@@ -40,7 +40,7 @@ describe("GET /api/cron/refresh-calendar-cache - Integration", () => {
   });
 
   it("handles empty cache (zero events)", async () => {
-    const { refreshCalendarCache } = await import("@/lib/calendar-cache");
+    const { refreshCalendarCache } = await import("@/features/calendar/lib/calendar-cache");
 
     vi.mocked(refreshCalendarCache).mockResolvedValueOnce({
       cachedCount: 0,
@@ -62,7 +62,7 @@ describe("GET /api/cron/refresh-calendar-cache - Integration", () => {
   });
 
   it("returns 500 when calendar API fails", async () => {
-    const { refreshCalendarCache } = await import("@/lib/calendar-cache");
+    const { refreshCalendarCache } = await import("@/features/calendar/lib/calendar-cache");
 
     vi.mocked(refreshCalendarCache).mockRejectedValueOnce(new Error("Google Calendar API error"));
 
@@ -90,7 +90,7 @@ describe("GET /api/cron/refresh-calendar-cache - Integration", () => {
   });
 
   it("accepts x-vercel-cron header when CRON_SECRET is set", async () => {
-    const { refreshCalendarCache } = await import("@/lib/calendar-cache");
+    const { refreshCalendarCache } = await import("@/features/calendar/lib/calendar-cache");
 
     vi.mocked(refreshCalendarCache).mockResolvedValueOnce({
       cachedCount: 5,

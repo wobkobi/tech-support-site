@@ -12,7 +12,7 @@ vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
 }));
 
-vi.mock("@/lib/prisma", () => ({
+vi.mock("@/shared/lib/prisma", () => ({
   prisma: {
     booking: {
       create: vi.fn().mockResolvedValue({
@@ -30,7 +30,7 @@ vi.mock("@/lib/prisma", () => ({
   },
 }));
 
-vi.mock("@/lib/google-calendar", () => ({
+vi.mock("@/features/calendar/lib/google-calendar", () => ({
   createBookingEvent: vi.fn().mockResolvedValue({
     eventId: "event-456",
   }),
@@ -78,7 +78,7 @@ describe("POST /api/booking/hold - Edge Cases", () => {
   });
 
   it("creates booking even if calendar event creation fails", async () => {
-    const { createBookingEvent } = await import("@/lib/google-calendar");
+    const { createBookingEvent } = await import("@/features/calendar/lib/google-calendar");
     vi.mocked(createBookingEvent).mockRejectedValueOnce(new Error("Calendar API error"));
 
     const validPayload = {
@@ -107,7 +107,7 @@ describe("POST /api/booking/hold - Edge Cases", () => {
   });
 
   it("does not call revalidatePath if calendar creation fails (exception before update)", async () => {
-    const { createBookingEvent } = await import("@/lib/google-calendar");
+    const { createBookingEvent } = await import("@/features/calendar/lib/google-calendar");
 
     // Make calendar fail on first call (before prisma.booking.update)
     vi.mocked(createBookingEvent).mockRejectedValueOnce(new Error("Calendar API error"));

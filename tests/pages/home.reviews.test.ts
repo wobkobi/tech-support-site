@@ -5,10 +5,10 @@
  */
 
 import { describe, it, expect, beforeEach, vi, type Mock } from "vitest";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/shared/lib/prisma";
 
 // Mock Prisma
-vi.mock("@/lib/prisma", () => ({
+vi.mock("@/shared/lib/prisma", () => ({
   prisma: {
     review: {
       findMany: vi.fn(),

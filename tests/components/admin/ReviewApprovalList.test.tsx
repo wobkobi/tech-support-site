@@ -7,7 +7,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { ReviewApprovalList, type ReviewRow } from "@/components/admin/ReviewApprovalList";
+import {
+  ReviewApprovalList,
+  type ReviewRow,
+} from "@/features/reviews/components/admin/ReviewApprovalList";
 
 // Mock fetch globally
 global.fetch = vi.fn();

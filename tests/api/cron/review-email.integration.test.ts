@@ -7,11 +7,11 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { GET } from "@/app/api/cron/send-review-emails/route";
 import { NextRequest } from "next/server";
 
-vi.mock("@/lib/email", () => ({
+vi.mock("@/features/reviews/lib/email", () => ({
   sendCustomerReviewRequest: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock("@/lib/prisma");
+vi.mock("@/shared/lib/prisma");
 
 describe("GET /api/cron/send-review-emails - Integration (State Transitions)", () => {
   const CRON_SECRET = "test-secret-integration";
@@ -21,7 +21,7 @@ describe("GET /api/cron/send-review-emails - Integration (State Transitions)", (
     process.env.CRON_SECRET = CRON_SECRET;
 
     // Initialize prisma mocks
-    const { prisma } = await import("@/lib/prisma");
+    const { prisma } = await import("@/shared/lib/prisma");
     (prisma.booking as any) = {
       findMany: vi.fn(),
       update: vi.fn(),
@@ -29,7 +29,7 @@ describe("GET /api/cron/send-review-emails - Integration (State Transitions)", (
   });
 
   it("sets reviewSentAt timestamp when sending email", async () => {
-    const { prisma } = await import("@/lib/prisma");
+    const { prisma } = await import("@/shared/lib/prisma");
 
     const now = new Date("2026-02-24T10:00:00Z");
     const thirtyOneMinutesAgo = new Date("2026-02-24T09:29:00Z");
@@ -63,8 +63,8 @@ describe("GET /api/cron/send-review-emails - Integration (State Transitions)", (
   });
 
   it("skips booking with reviewSentAt already set (idempotency)", async () => {
-    const { prisma } = await import("@/lib/prisma");
-    const { sendCustomerReviewRequest } = await import("@/lib/email");
+    const { prisma } = await import("@/shared/lib/prisma");
+    const { sendCustomerReviewRequest } = await import("@/features/reviews/lib/email");
 
     const now = new Date("2026-02-24T10:00:00Z");
 
@@ -86,8 +86,8 @@ describe("GET /api/cron/send-review-emails - Integration (State Transitions)", (
   });
 
   it("does not email appointment that ended 20 minutes ago (too recent)", async () => {
-    const { prisma } = await import("@/lib/prisma");
-    const { sendCustomerReviewRequest } = await import("@/lib/email");
+    const { prisma } = await import("@/shared/lib/prisma");
+    const { sendCustomerReviewRequest } = await import("@/features/reviews/lib/email");
 
     const now = new Date("2026-02-24T10:00:00Z");
 
@@ -108,7 +108,7 @@ describe("GET /api/cron/send-review-emails - Integration (State Transitions)", (
   });
 
   it("handles partial failures (one email error does not stop others)", async () => {
-    const { prisma } = await import("@/lib/prisma");
+    const { prisma } = await import("@/shared/lib/prisma");
 
     const now = new Date("2026-02-24T10:00:00Z");
 

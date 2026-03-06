@@ -13,7 +13,7 @@ vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
 }));
 
-vi.mock("@/lib/prisma", () => ({
+vi.mock("@/shared/lib/prisma", () => ({
   prisma: {
     review: {
       create: vi.fn().mockResolvedValue({
@@ -34,7 +34,7 @@ vi.mock("@/lib/prisma", () => ({
   },
 }));
 
-vi.mock("@/lib/email", () => ({
+vi.mock("@/features/reviews/lib/email", () => ({
   sendOwnerReviewNotification: vi.fn(),
 }));
 
@@ -70,7 +70,7 @@ describe("POST /api/reviews - Edge Cases", () => {
   });
 
   it("creates review even if email notification fails", async () => {
-    const { sendOwnerReviewNotification } = await import("@/lib/email");
+    const { sendOwnerReviewNotification } = await import("@/features/reviews/lib/email");
     vi.mocked(sendOwnerReviewNotification).mockRejectedValueOnce(new Error("Email service error"));
 
     const validPayload = {
@@ -177,7 +177,7 @@ describe("POST /api/reviews - Edge Cases", () => {
   });
 
   it("handles invalid token gracefully", async () => {
-    const { prisma } = await import("@/lib/prisma");
+    const { prisma } = await import("@/shared/lib/prisma");
     // Token doesn't match any booking or request
     vi.mocked(prisma.booking.findFirst).mockResolvedValueOnce(null);
     vi.mocked(prisma.reviewRequest.findFirst).mockResolvedValueOnce(null);
@@ -207,7 +207,7 @@ describe("POST /api/reviews - Edge Cases", () => {
   });
 
   it("verifies review with valid booking token", async () => {
-    const { prisma } = await import("@/lib/prisma");
+    const { prisma } = await import("@/shared/lib/prisma");
     const mockBooking: Partial<Booking> = {
       id: "booking-456",
       reviewToken: "valid-token-123",

@@ -3,7 +3,7 @@
  * @description Verify Google Maps script is only injected when the component becomes visible
  */
 import { render, waitFor, act } from "@testing-library/react";
-import AddressAutocomplete from "@/components/AddressAutocomplete";
+import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 
 describe("AddressAutocomplete lazy-load", () => {

@@ -6,7 +6,7 @@
 
 import { render, waitFor } from "@testing-library/react";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { NavBar } from "@/components/NavBar";
+import { NavBar } from "@/shared/components/NavBar";
 
 // Mock Next.js navigation
 vi.mock("next/navigation", () => ({

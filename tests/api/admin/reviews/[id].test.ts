@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { PATCH, DELETE } from "@/app/api/admin/reviews/[id]/route";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/shared/lib/prisma";
 import { revalidatePath } from "next/cache";
 
 // Mock next/cache for revalidatePath
@@ -14,7 +14,7 @@ vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
 }));
 
-vi.mock("@/lib/prisma");
+vi.mock("@/shared/lib/prisma");
 const ADMIN_SECRET = "testsecret";
 
 const mockReview = {

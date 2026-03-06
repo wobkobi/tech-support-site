@@ -14,7 +14,7 @@ vi.mock("next/cache", () => ({
 }));
 
 // Mock prisma
-vi.mock("@/lib/prisma", () => ({
+vi.mock("@/shared/lib/prisma", () => ({
   prisma: {
     booking: {
       create: vi.fn().mockResolvedValue({
@@ -33,7 +33,7 @@ vi.mock("@/lib/prisma", () => ({
 }));
 
 // Mock google calendar
-vi.mock("@/lib/google-calendar", () => ({
+vi.mock("@/features/calendar/lib/google-calendar", () => ({
   createBookingEvent: vi.fn().mockResolvedValue({
     eventId: "event-456",
   }),

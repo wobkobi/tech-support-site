@@ -8,7 +8,7 @@ import { GET } from "@/app/api/cron/refresh-calendar-cache/route";
 import { NextRequest } from "next/server";
 
 // Mock calendar-cache module
-vi.mock("@/lib/calendar-cache", () => ({
+vi.mock("@/features/calendar/lib/calendar-cache", () => ({
   refreshCalendarCache: vi.fn(),
 }));
 
@@ -21,7 +21,7 @@ describe("GET /api/cron/refresh-calendar-cache", () => {
   });
 
   it("returns cache refresh results on success", async () => {
-    const { refreshCalendarCache } = await import("@/lib/calendar-cache");
+    const { refreshCalendarCache } = await import("@/features/calendar/lib/calendar-cache");
 
     vi.mocked(refreshCalendarCache).mockResolvedValueOnce({
       cachedCount: 15,
@@ -49,7 +49,7 @@ describe("GET /api/cron/refresh-calendar-cache", () => {
   });
 
   it("handles empty cache refresh (no events)", async () => {
-    const { refreshCalendarCache } = await import("@/lib/calendar-cache");
+    const { refreshCalendarCache } = await import("@/features/calendar/lib/calendar-cache");
 
     vi.mocked(refreshCalendarCache).mockResolvedValueOnce({
       cachedCount: 0,
@@ -75,7 +75,7 @@ describe("GET /api/cron/refresh-calendar-cache", () => {
   });
 
   it("returns 500 when calendar cache refresh fails", async () => {
-    const { refreshCalendarCache } = await import("@/lib/calendar-cache");
+    const { refreshCalendarCache } = await import("@/features/calendar/lib/calendar-cache");
 
     vi.mocked(refreshCalendarCache).mockRejectedValueOnce(new Error("Google Calendar API error"));
 
@@ -93,7 +93,7 @@ describe("GET /api/cron/refresh-calendar-cache", () => {
   });
 
   it("returns 401 if authorization header is missing", async () => {
-    const { refreshCalendarCache } = await import("@/lib/calendar-cache");
+    const { refreshCalendarCache } = await import("@/features/calendar/lib/calendar-cache");
 
     const request = new NextRequest("http://localhost:3000/api/cron/refresh-calendar-cache", {
       method: "GET",
@@ -110,7 +110,7 @@ describe("GET /api/cron/refresh-calendar-cache", () => {
   });
 
   it("returns 401 if authorization header has wrong secret", async () => {
-    const { refreshCalendarCache } = await import("@/lib/calendar-cache");
+    const { refreshCalendarCache } = await import("@/features/calendar/lib/calendar-cache");
 
     const request = new NextRequest("http://localhost:3000/api/cron/refresh-calendar-cache", {
       method: "GET",
@@ -128,7 +128,7 @@ describe("GET /api/cron/refresh-calendar-cache", () => {
   });
 
   it("accepts request with x-vercel-cron header", async () => {
-    const { refreshCalendarCache } = await import("@/lib/calendar-cache");
+    const { refreshCalendarCache } = await import("@/features/calendar/lib/calendar-cache");
 
     vi.mocked(refreshCalendarCache).mockResolvedValueOnce({
       cachedCount: 10,

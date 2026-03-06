@@ -1,15 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { PATCH } from "@/app/api/reviews/[id]/route";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/shared/lib/prisma";
 
 // Mock next/cache for revalidatePath
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
 }));
 
-vi.mock("@/lib/prisma");
+vi.mock("@/shared/lib/prisma");
 const mockSendOwnerReviewNotification = vi.fn();
-vi.mock("@/lib/email", () => ({ sendOwnerReviewNotification: mockSendOwnerReviewNotification }));
+vi.mock("@/features/reviews/lib/email", () => ({
+  sendOwnerReviewNotification: mockSendOwnerReviewNotification,
+}));
 
 const mockReview = {
   id: "abc123",

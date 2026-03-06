@@ -8,7 +8,7 @@ import { GET } from "@/app/api/cron/release-holds/route";
 import { NextRequest } from "next/server";
 
 // Mock Prisma
-vi.mock("@/lib/prisma", () => ({
+vi.mock("@/shared/lib/prisma", () => ({
   prisma: {
     booking: {
       findMany: vi.fn(),
@@ -26,7 +26,7 @@ describe("Hold Expiration Integration - activeSlotKey Clearing", () => {
   });
 
   it("clears activeSlotKey when releasing expired holds", async () => {
-    const { prisma } = await import("@/lib/prisma");
+    const { prisma } = await import("@/shared/lib/prisma");
 
     const now = new Date("2026-02-24T10:15:00Z");
     vi.setSystemTime(now);
@@ -72,7 +72,7 @@ describe("Hold Expiration Integration - activeSlotKey Clearing", () => {
   });
 
   it("does not modify activeSlotKey if no holds expired", async () => {
-    const { prisma } = await import("@/lib/prisma");
+    const { prisma } = await import("@/shared/lib/prisma");
 
     const now = new Date("2026-02-24T10:15:00Z");
     vi.setSystemTime(now);
@@ -99,7 +99,7 @@ describe("Hold Expiration Integration - activeSlotKey Clearing", () => {
   });
 
   it("clears activeSlotKey for single expired hold", async () => {
-    const { prisma } = await import("@/lib/prisma");
+    const { prisma } = await import("@/shared/lib/prisma");
 
     const now = new Date("2026-02-24T10:15:00Z");
     vi.setSystemTime(now);

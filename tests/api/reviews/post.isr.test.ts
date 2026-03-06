@@ -14,7 +14,7 @@ vi.mock("next/cache", () => ({
 }));
 
 // Mock prisma
-vi.mock("@/lib/prisma", () => ({
+vi.mock("@/shared/lib/prisma", () => ({
   prisma: {
     review: {
       create: vi.fn().mockResolvedValue({
@@ -39,7 +39,7 @@ vi.mock("@/lib/prisma", () => ({
 }));
 
 // Mock email service
-vi.mock("@/lib/email", () => ({
+vi.mock("@/features/reviews/lib/email", () => ({
   sendOwnerReviewNotification: vi.fn(),
 }));
 

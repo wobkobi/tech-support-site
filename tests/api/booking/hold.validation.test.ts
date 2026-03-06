@@ -3,14 +3,14 @@ import { POST } from "@/app/api/booking/hold/route";
 import { NextRequest } from "next/server";
 import { Prisma } from "@prisma/client";
 
-vi.mock("@/lib/prisma");
-vi.mock("@/lib/google-calendar");
+vi.mock("@/shared/lib/prisma");
+vi.mock("@/features/calendar/lib/google-calendar");
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
 }));
 
-import { prisma } from "@/lib/prisma";
-import * as googleCalendar from "@/lib/google-calendar";
+import { prisma } from "@/shared/lib/prisma";
+import * as googleCalendar from "@/features/calendar/lib/google-calendar";
 
 const mockPrisma = prisma as any;
 const mockGoogleCalendar = googleCalendar as any;

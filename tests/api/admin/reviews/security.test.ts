@@ -7,9 +7,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { PATCH, DELETE } from "@/app/api/admin/reviews/[id]/route";
 import { POST } from "@/app/api/admin/reviews/route";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/shared/lib/prisma";
 
-vi.mock("@/lib/prisma");
+vi.mock("@/shared/lib/prisma");
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
 }));

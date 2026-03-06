@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { POST as approve } from "@/app/api/reviews/[id]/approve";
 import { POST as revoke } from "@/app/api/reviews/[id]/revoke";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/shared/lib/prisma";
 
 // Mock next/cache for revalidatePath
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
 }));
 
-vi.mock("@/lib/prisma");
+vi.mock("@/shared/lib/prisma");
 const ADMIN_SECRET = "testsecret";
 
 const mockReview = {

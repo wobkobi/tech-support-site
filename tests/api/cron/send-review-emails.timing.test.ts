@@ -8,12 +8,12 @@ import { GET } from "@/app/api/cron/send-review-emails/route";
 import { NextRequest } from "next/server";
 
 // Mock email sending
-vi.mock("@/lib/email", () => ({
+vi.mock("@/features/reviews/lib/email", () => ({
   sendCustomerReviewRequest: vi.fn().mockResolvedValue(undefined),
 }));
 
 // Mock Prisma
-vi.mock("@/lib/prisma", () => ({
+vi.mock("@/shared/lib/prisma", () => ({
   prisma: {
     booking: {
       findMany: vi.fn(),
@@ -31,7 +31,7 @@ describe("GET /api/cron/send-review-emails - Timing Edge Cases", () => {
   });
 
   it("sends email for booking that ended exactly 30 minutes ago", async () => {
-    const { prisma } = await import("@/lib/prisma");
+    const { prisma } = await import("@/shared/lib/prisma");
 
     const now = new Date("2026-02-24T10:00:00Z");
     const thirtyMinutesAgo = new Date("2026-02-24T09:30:00Z");
@@ -95,7 +95,7 @@ describe("GET /api/cron/send-review-emails - Timing Edge Cases", () => {
   });
 
   it("does NOT send email for booking that ended only 29 minutes ago", async () => {
-    const { prisma } = await import("@/lib/prisma");
+    const { prisma } = await import("@/shared/lib/prisma");
 
     const now = new Date("2026-02-24T10:00:00Z");
 
@@ -124,14 +124,14 @@ describe("GET /api/cron/send-review-emails - Timing Edge Cases", () => {
     expect(body.sent).toBe(0);
 
     // Verify email was NOT sent
-    const { sendCustomerReviewRequest } = await import("@/lib/email");
+    const { sendCustomerReviewRequest } = await import("@/features/reviews/lib/email");
     expect(sendCustomerReviewRequest).not.toHaveBeenCalled();
 
     vi.useRealTimers();
   });
 
   it("does NOT send email if reviewSentAt is already set (duplicate prevention)", async () => {
-    const { prisma } = await import("@/lib/prisma");
+    const { prisma } = await import("@/shared/lib/prisma");
 
     const now = new Date("2026-02-24T10:00:00Z");
 
@@ -171,7 +171,7 @@ describe("GET /api/cron/send-review-emails - Timing Edge Cases", () => {
   });
 
   it("does NOT send email for non-confirmed bookings", async () => {
-    const { prisma } = await import("@/lib/prisma");
+    const { prisma } = await import("@/shared/lib/prisma");
 
     const now = new Date("2026-02-24T10:00:00Z");
 
@@ -211,7 +211,7 @@ describe("GET /api/cron/send-review-emails - Timing Edge Cases", () => {
   });
 
   it("handles partial failures without blocking other bookings", async () => {
-    const { prisma } = await import("@/lib/prisma");
+    const { prisma } = await import("@/shared/lib/prisma");
 
     const now = new Date("2026-02-24T10:00:00Z");
 
@@ -265,7 +265,7 @@ describe("GET /api/cron/send-review-emails - Timing Edge Cases", () => {
   });
 
   it("returns 401 if authorization header is missing", async () => {
-    const { prisma } = await import("@/lib/prisma");
+    const { prisma } = await import("@/shared/lib/prisma");
 
     const request = new NextRequest("http://localhost:3000/api/cron/send-review-emails", {
       method: "GET",
@@ -282,7 +282,7 @@ describe("GET /api/cron/send-review-emails - Timing Edge Cases", () => {
   });
 
   it("returns 401 if authorization header has wrong secret", async () => {
-    const { prisma } = await import("@/lib/prisma");
+    const { prisma } = await import("@/shared/lib/prisma");
 
     const request = new NextRequest("http://localhost:3000/api/cron/send-review-emails", {
       method: "GET",
@@ -302,7 +302,7 @@ describe("GET /api/cron/send-review-emails - Timing Edge Cases", () => {
   });
 
   it("accepts request with x-vercel-cron header", async () => {
-    const { prisma } = await import("@/lib/prisma");
+    const { prisma } = await import("@/shared/lib/prisma");
 
     const now = new Date("2026-02-24T10:00:00Z");
 

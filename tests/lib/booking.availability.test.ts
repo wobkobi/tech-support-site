@@ -5,7 +5,7 @@ import {
   BOOKING_CONFIG,
   type ExistingBooking,
   type ExistingEvent,
-} from "@/lib/booking";
+} from "@/features/booking/lib/booking";
 
 describe("buildAvailableDays & validateBookingRequest", () => {
   beforeEach(() => {

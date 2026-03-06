@@ -5,7 +5,7 @@
  */
 
 import { render } from "@testing-library/react";
-import Reviews, { type ReviewItem } from "@/components/Reviews";
+import Reviews, { type ReviewItem } from "@/features/reviews/components/Reviews";
 import { describe, it, expect } from "vitest";
 
 /**
