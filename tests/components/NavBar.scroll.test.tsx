@@ -62,14 +62,20 @@ describe("NavBar Direction-Based Scroll Logic", () => {
   /**
    * Helper to check if navbar is hidden
    * @param container - The DOM container element
-   * @returns True if navbar is hidden (has hide class)
+   * @returns True if navbar is hidden (has opacity 0, pointer-events none, and full translate)
    */
   const isNavBarHidden = (container: HTMLElement): boolean => {
     const header = container.querySelector("header");
     if (!header) return false;
-    return (
-      header.classList.contains("pointer-events-none") && header.classList.contains("opacity-0")
-    );
+
+    const hasHiddenClasses =
+      header.classList.contains("pointer-events-none") && header.classList.contains("opacity-0");
+
+    const style = (header as HTMLElement).style.transform;
+    const hasHiddenTransform =
+      style && typeof style === "string" && style.includes("translateY(-120%)");
+
+    return hasHiddenClasses && Boolean(hasHiddenTransform);
   };
 
   /**
@@ -81,6 +87,7 @@ describe("NavBar Direction-Based Scroll Logic", () => {
     const header = container.querySelector("header");
     if (!header) return false;
     const style = (header as HTMLElement).style.transform;
+    if (!style || typeof style !== "string") return false;
     return style.includes("translateY(-") && !style.includes("translateY(-120%)");
   };
 

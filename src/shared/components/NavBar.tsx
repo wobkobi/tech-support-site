@@ -64,7 +64,13 @@ export function NavBar(): React.ReactElement | null {
   const [isHidden, setIsHidden] = useState(false);
   const [scrollOffset, setScrollOffset] = useState(0);
   const [isHoveringTop, setIsHoveringTop] = useState(false);
-  const [hasPointer, setHasPointer] = useState(false);
+  const [hasPointer, setHasPointer] = useState(() => {
+    if (typeof window === "undefined" || !window.matchMedia) {
+      return false;
+    }
+    const mediaQuery = window.matchMedia("(pointer: fine)");
+    return mediaQuery.matches;
+  });
 
   const scrollLockRef = useRef(0);
   const bodyLockedRef = useRef(false);
@@ -218,9 +224,6 @@ export function NavBar(): React.ReactElement | null {
       setHasPointer(e.matches);
     };
 
-    // Set initial state
-    handleChange({ matches: mediaQuery.matches } as MediaQueryListEvent);
-
     mediaQuery.addEventListener("change", handleChange);
 
     return () => {
@@ -266,6 +269,20 @@ export function NavBar(): React.ReactElement | null {
   const bookingActive = isActivePrefix(pathname, "/booking");
   const contactActive = isActivePrefix(pathname, "/contact");
 
+  /**
+   * Calculate the transform value based on current scroll state
+   * @returns The translateY transform string
+   */
+  const getTransform = (): string => {
+    if (!isHidden && scrollOffset > 0) {
+      return `translateY(-${scrollOffset}px)`;
+    }
+    if (isHidden && !isHoveringTop) {
+      return "translateY(-120%)";
+    }
+    return "translateY(0)";
+  };
+
   return (
     <>
       <div aria-hidden="true" className={cn("h-24 sm:h-28")} />
@@ -277,12 +294,7 @@ export function NavBar(): React.ReactElement | null {
           isHidden && !isHoveringTop && "pointer-events-none opacity-0",
         )}
         style={{
-          transform:
-            !isHidden && scrollOffset > 0
-              ? `translateY(-${scrollOffset}px)`
-              : isHidden && !isHoveringTop
-                ? "translateY(-120%)"
-                : "translateY(0)",
+          transform: getTransform(),
         }}
       >
         <div
