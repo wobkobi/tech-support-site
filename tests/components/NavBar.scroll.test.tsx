@@ -13,12 +13,8 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/",
 }));
 
-// Mock Next.js Image component
-/* eslint-disable @next/next/no-img-element */
-vi.mock("next/image", () => ({
-  default: ({ src, alt }: { src: string; alt: string }) => <img src={src} alt={alt} />,
-}));
-/* eslint-enable @next/next/no-img-element */
+// Constants must match NavBar component
+const FULL_HIDE_TRANSLATE = "120%";
 
 describe("NavBar Direction-Based Scroll Logic", () => {
   let scrollY: number;
@@ -72,8 +68,7 @@ describe("NavBar Direction-Based Scroll Logic", () => {
       header.classList.contains("pointer-events-none") && header.classList.contains("opacity-0");
 
     const style = (header as HTMLElement).style.transform;
-    const hasHiddenTransform =
-      style && typeof style === "string" && style.includes("translateY(-120%)");
+    const hasHiddenTransform = style && style.includes(`translateY(-${FULL_HIDE_TRANSLATE})`);
 
     return hasHiddenClasses && Boolean(hasHiddenTransform);
   };
@@ -87,8 +82,8 @@ describe("NavBar Direction-Based Scroll Logic", () => {
     const header = container.querySelector("header");
     if (!header) return false;
     const style = (header as HTMLElement).style.transform;
-    if (!style || typeof style !== "string") return false;
-    return style.includes("translateY(-") && !style.includes("translateY(-120%)");
+    if (!style) return false;
+    return style.includes("translateY(-") && !style.includes(`translateY(-${FULL_HIDE_TRANSLATE})`);
   };
 
   describe("Near-top behavior", () => {

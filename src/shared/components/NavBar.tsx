@@ -31,8 +31,9 @@ const NAV_ITEMS: ReadonlyArray<NavItem> = [
 
 const SCROLL_THRESHOLD = 72;
 const MIN_SCROLL_DELTA = 1;
-const HIDE_SCROLL_DISTANCE = 60; // Distance to scroll down before fully hiding navbar
-const HOVER_REVEAL_ZONE = 100; // Height from top of viewport to reveal navbar on hover
+const HIDE_SCROLL_DISTANCE = 60; // Distance to scroll down before fully hiding navbar (in pixels)
+const FULL_HIDE_TRANSLATE = "120%"; // Vertical translate percentage when navbar is fully hidden
+const HOVER_REVEAL_ZONE = 100; // Height from top of viewport (in pixels) to reveal navbar on hover
 
 /**
  * Determine whether a path is active for a given prefix route.
@@ -45,6 +46,14 @@ function isActivePrefix(pathname: string, prefix: string): boolean {
     return pathname === "/";
   }
   return pathname === prefix || pathname.startsWith(`${prefix}/`);
+}
+
+/**
+ * Check if the environment supports pointer media queries.
+ * @returns True if window object exists and matchMedia API is available.
+ */
+function canUsePointerQuery(): boolean {
+  return typeof window !== "undefined" && window.matchMedia !== undefined;
 }
 
 /**
@@ -65,7 +74,7 @@ export function NavBar(): React.ReactElement | null {
   const [scrollOffset, setScrollOffset] = useState(0);
   const [isHoveringTop, setIsHoveringTop] = useState(false);
   const [hasPointer, setHasPointer] = useState(() => {
-    if (typeof window === "undefined" || !window.matchMedia) {
+    if (!canUsePointerQuery()) {
       return false;
     }
     const mediaQuery = window.matchMedia("(pointer: fine)");
@@ -210,7 +219,7 @@ export function NavBar(): React.ReactElement | null {
 
   // Detect if device has pointer (mouse) capability.
   useEffect(() => {
-    if (typeof window === "undefined" || !window.matchMedia) {
+    if (!canUsePointerQuery()) {
       return;
     }
 
@@ -278,7 +287,7 @@ export function NavBar(): React.ReactElement | null {
       return `translateY(-${scrollOffset}px)`;
     }
     if (isHidden && !isHoveringTop) {
-      return "translateY(-120%)";
+      return `translateY(-${FULL_HIDE_TRANSLATE})`;
     }
     return "translateY(0)";
   };
