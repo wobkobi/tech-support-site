@@ -165,7 +165,7 @@ describe("Data Model Consistency - Regression Tests", () => {
   describe("Type consistency validation", () => {
     it("Review type definitions should use status field", () => {
       // Check if types file exists
-      const typesPath = join(process.cwd(), "src", "types", "booking.ts");
+      const typesPath = join(process.cwd(), "src", "features", "booking", "types", "booking.ts");
       const content = readFileSync(typesPath, "utf-8");
 
       // If Review type is defined, it should use status

@@ -105,8 +105,8 @@ export interface ReviewsProps {
 }
 
 /**
- * Build display name like "A. Bcdef." or "Anonymous".
- * Uses first/last unless r.isAnonymous is true.
+ * Build display name with proper title casing.
+ * Returns the full name as entered by the reviewer.
  * @param r - Review item to format.
  * @returns Formatted display name.
  */
@@ -115,10 +115,43 @@ function formatName(r: ReviewItem): string {
   const f = (r.firstName ?? "").trim();
   const l = (r.lastName ?? "").trim();
   if (!f && !l) return "Anonymous";
-  const initial = f ? `${f[0].toUpperCase()}. ` : "";
-  const last = l ? `${l[0].toUpperCase()}${l.slice(1).toLowerCase()}` : "";
-  const out = `${initial}${last}`.trim();
-  return out ? `${out}.` : "Anonymous";
+
+  // Just combine and title case the full name
+  const fullName = [f, l].filter(Boolean).join(" ");
+  return fullName ? toTitleCase(fullName) : "Anonymous";
+}
+
+/**
+ * Converts a string to title case, keeping small words lowercase unless they're first.
+ * @param str - String to convert.
+ * @returns Title-cased string.
+ */
+function toTitleCase(str: string): string {
+  const smallWords = new Set([
+    "of",
+    "the",
+    "and",
+    "or",
+    "in",
+    "on",
+    "at",
+    "to",
+    "for",
+    "from",
+    "a",
+    "an",
+  ]);
+  return str
+    .toLowerCase()
+    .split(" ")
+    .map((word, index) => {
+      // Always capitalize first word, or if not a small word
+      if (index === 0 || !smallWords.has(word)) {
+        return word[0].toUpperCase() + word.slice(1);
+      }
+      return word;
+    })
+    .join(" ");
 }
 
 /**
