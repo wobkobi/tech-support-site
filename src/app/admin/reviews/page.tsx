@@ -7,10 +7,10 @@
 
 import { timingSafeEqual } from "crypto";
 import type { Metadata } from "next";
-import { FrostedSection, PageShell, CARD } from "@/components/PageLayout";
-import { cn } from "@/lib/cn";
-import { ReviewApprovalList } from "@/components/admin/ReviewApprovalList";
-import { prisma } from "@/lib/prisma";
+import { FrostedSection, PageShell, CARD } from "@/shared/components/PageLayout";
+import { cn } from "@/shared/lib/cn";
+import { ReviewApprovalList } from "@/features/reviews/components/admin/ReviewApprovalList";
+import { prisma } from "@/shared/lib/prisma";
 
 export const dynamic = "force-dynamic";
 

@@ -1,12 +1,12 @@
-// src/lib/calendar-cache.ts
+// src/features/calendar/lib/calendar-cache.ts
 /**
  * @file calendar-cache.ts
  * @description Background task to fetch and cache Google Calendar events.
  */
 
-import { prisma } from "@/lib/prisma";
-import { fetchAllCalendarEvents } from "@/lib/google-calendar";
-import { BOOKING_CONFIG } from "@/lib/booking";
+import { prisma } from "@/shared/lib/prisma";
+import { fetchAllCalendarEvents } from "@/features/calendar/lib/google-calendar";
+import { BOOKING_CONFIG } from "@/features/booking/lib/booking";
 
 interface RefreshResult {
   cachedCount: number;

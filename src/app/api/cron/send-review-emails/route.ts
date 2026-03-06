@@ -6,8 +6,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { sendCustomerReviewRequest } from "@/lib/email";
+import { prisma } from "@/shared/lib/prisma";
+import { sendCustomerReviewRequest } from "@/features/reviews/lib/email";
 
 /**
  * Verify the request is from Vercel Cron or has the correct secret.

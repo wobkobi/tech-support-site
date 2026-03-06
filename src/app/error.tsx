@@ -7,9 +7,9 @@
 "use client";
 
 import type React from "react";
-import { FrostedSection, PageShell, CARD } from "@/components/PageLayout";
-import { Button } from "@/components/Button";
-import { cn } from "@/lib/cn";
+import { FrostedSection, PageShell, CARD } from "@/shared/components/PageLayout";
+import { Button } from "@/shared/components/Button";
+import { cn } from "@/shared/lib/cn";
 import { FaArrowRotateRight, FaHouse } from "react-icons/fa6";
 
 /**

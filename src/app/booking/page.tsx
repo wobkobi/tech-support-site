@@ -5,17 +5,17 @@
  */
 
 import type React from "react";
-import { cn } from "@/lib/cn";
+import { cn } from "@/shared/lib/cn";
 import {
   BOOKING_CONFIG,
   buildAvailableDays,
   type ExistingBooking,
   type BookableDay,
-} from "@/lib/booking";
-import { prisma } from "@/lib/prisma";
-import { fetchAllCalendarEvents } from "@/lib/google-calendar";
-import BookingForm from "@/components/BookingForm";
-import { FrostedSection, PageShell, CARD, SOFT_CARD } from "@/components/PageLayout";
+} from "@/features/booking/lib/booking";
+import { prisma } from "@/shared/lib/prisma";
+import { fetchAllCalendarEvents } from "@/features/calendar/lib/google-calendar";
+import BookingForm from "@/features/booking/components/BookingForm";
+import { FrostedSection, PageShell, CARD, SOFT_CARD } from "@/shared/components/PageLayout";
 import { FaCalendarCheck, FaClock, FaEnvelopeOpenText, FaListCheck } from "react-icons/fa6";
 
 // ISR (Incremental Static Regeneration) with 5-minute revalidation window

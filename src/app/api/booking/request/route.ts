@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/shared/lib/prisma";
 import {
   BOOKING_CONFIG,
   DURATION_OPTIONS,
@@ -14,10 +14,16 @@ import {
   type TimeOfDay,
   type JobDuration,
   type ExistingBooking,
-} from "@/lib/booking";
-import { getPacificAucklandOffset } from "@/lib/timezone-utils";
-import { createBookingEvent, fetchAllCalendarEvents } from "@/lib/google-calendar";
-import { sendOwnerBookingNotification, sendCustomerBookingConfirmation } from "@/lib/email";
+} from "@/features/booking/lib/booking";
+import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
+import {
+  createBookingEvent,
+  fetchAllCalendarEvents,
+} from "@/features/calendar/lib/google-calendar";
+import {
+  sendOwnerBookingNotification,
+  sendCustomerBookingConfirmation,
+} from "@/features/reviews/lib/email";
 import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
 

@@ -1,13 +1,13 @@
 "use client";
-// src/components/admin/SendReviewLinkForm.tsx
+// src/features/reviews/components/admin/SendReviewLinkForm.tsx
 /**
  * @file SendReviewLinkForm.tsx
  * @description Form for sending a review link to a past client via email or SMS.
  */
 
 import { useState } from "react";
-import { SOFT_CARD } from "@/components/PageLayout";
-import { cn } from "@/lib/cn";
+import { SOFT_CARD } from "@/shared/components/PageLayout";
+import { cn } from "@/shared/lib/cn";
 import type React from "react";
 
 /**

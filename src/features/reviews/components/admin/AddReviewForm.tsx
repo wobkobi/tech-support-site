@@ -1,13 +1,13 @@
 "use client";
-// src/components/admin/AddReviewForm.tsx
+// src/features/reviews/components/admin/AddReviewForm.tsx
 /**
  * @file AddReviewForm.tsx
  * @description Form for manually adding a past client review.
  */
 
 import { useState } from "react";
-import { SOFT_CARD } from "@/components/PageLayout";
-import { cn } from "@/lib/cn";
+import { SOFT_CARD } from "@/shared/components/PageLayout";
+import { cn } from "@/shared/lib/cn";
 import type { ReviewRow } from "./review-types";
 import type React from "react";
 

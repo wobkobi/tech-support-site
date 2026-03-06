@@ -1,4 +1,4 @@
-// src/lib/useOnVisible.ts
+// src/shared/lib/useOnVisible.ts
 /**
  * @file useOnVisible.ts
  * @description React hook that tracks whether a DOM element is visible in the

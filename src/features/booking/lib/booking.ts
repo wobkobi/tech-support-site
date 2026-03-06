@@ -1,10 +1,10 @@
-// src/lib/booking.ts
+// src/features/booking/lib/booking.ts
 /**
  * @file booking.ts
  * @description Booking system with duration selection (1hr quick jobs vs 2hr standard jobs).
  */
 
-import { getPacificAucklandOffset } from "@/lib/timezone-utils";
+import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 
 export const BOOKING_CONFIG = {
   timeZone: "Pacific/Auckland",

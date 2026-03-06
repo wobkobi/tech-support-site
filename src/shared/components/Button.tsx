@@ -1,4 +1,4 @@
-// src/components/Button.tsx
+// src/shared/components/Button.tsx
 /**
  * @file Button.tsx
  * @description Polymorphic button component with consistent variants and sizes.
@@ -8,7 +8,7 @@
 
 import type React from "react";
 import Link from "next/link";
-import { cn } from "@/lib/cn";
+import { cn } from "@/shared/lib/cn";
 
 export type ButtonVariant = "primary" | "secondary" | "tertiary" | "ghost";
 export type ButtonSize = "sm" | "md" | "lg";

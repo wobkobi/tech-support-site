@@ -5,8 +5,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { sendPastClientReviewRequest } from "@/lib/email";
+import { prisma } from "@/shared/lib/prisma";
+import { sendPastClientReviewRequest } from "@/features/reviews/lib/email";
 import { timingSafeEqual } from "crypto";
 
 /**

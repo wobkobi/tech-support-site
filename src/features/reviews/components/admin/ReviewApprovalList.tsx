@@ -1,5 +1,5 @@
 "use client";
-// src/components/admin/ReviewApprovalList.tsx
+// src/features/reviews/components/admin/ReviewApprovalList.tsx
 /**
  * @file ReviewApprovalList.tsx
  * @description Interactive client component for approving, revoking, and deleting reviews.

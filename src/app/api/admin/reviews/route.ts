@@ -6,7 +6,7 @@
 
 import { timingSafeEqual } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/shared/lib/prisma";
 
 /**
  * Validates the token against ADMIN_SECRET using constant-time comparison.

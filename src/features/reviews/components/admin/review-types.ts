@@ -1,4 +1,4 @@
-// src/components/admin/review-types.ts
+// src/features/reviews/components/admin/review-types.ts
 /**
  * @file review-types.ts
  * @description Shared types and utility functions for review moderation.

@@ -1,11 +1,11 @@
-// src/lib/google-calendar.ts
+// src/features/calendar/lib/google-calendar.ts
 /**
  * @file google-calendar.ts
  * @description Google Calendar API integration - multi-calendar without list permission.
  */
 
 import { google } from "googleapis";
-import { getPacificAucklandOffset } from "@/lib/timezone-utils";
+import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 
 /**
  * The calendar where new booking events are created.

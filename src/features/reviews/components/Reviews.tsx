@@ -1,12 +1,12 @@
 "use client";
 
-// src/components/Reviews.tsx
+// src/features/reviews/components/Reviews.tsx
 /**
  * @file Reviews.tsx
  * @description Reviews module with responsive rows (1-3 items) or marquee scroll (4+ items).
  */
 
-import { cn } from "@/lib/cn";
+import { cn } from "@/shared/lib/cn";
 import React, { useState } from "react";
 
 /** Character limit for truncating long reviews. */

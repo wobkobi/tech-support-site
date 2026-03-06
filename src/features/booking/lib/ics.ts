@@ -1,4 +1,4 @@
-// src/lib/ics.ts
+// src/features/booking/lib/ics.ts
 /**
  * @file ics.ts
  * @description ICS (iCalendar) file generation for booking confirmations.

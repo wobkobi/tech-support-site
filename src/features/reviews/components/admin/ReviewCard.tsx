@@ -1,13 +1,13 @@
 "use client";
-// src/components/admin/ReviewCard.tsx
+// src/features/reviews/components/admin/ReviewCard.tsx
 /**
  * @file ReviewCard.tsx
  * @description Single review card with approve/revoke/delete actions.
  */
 
 import { useState } from "react";
-import { SOFT_CARD } from "@/components/PageLayout";
-import { cn } from "@/lib/cn";
+import { SOFT_CARD } from "@/shared/components/PageLayout";
+import { cn } from "@/shared/lib/cn";
 import { type ReviewRow, displayName, formatDate } from "./review-types";
 import type React from "react";
 

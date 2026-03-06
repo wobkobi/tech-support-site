@@ -1,4 +1,4 @@
-// src/components/AddressAutocomplete.tsx
+// src/features/booking/components/AddressAutocomplete.tsx
 /**
  * @file AddressAutocomplete.tsx
  * @description Address input with Google Places Autocomplete (with graceful fallback).
@@ -8,8 +8,8 @@
 
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
-import useOnVisible from "@/lib/useOnVisible";
-import { cn } from "@/lib/cn";
+import useOnVisible from "@/shared/lib/useOnVisible";
+import { cn } from "@/shared/lib/cn";
 
 /**
  * Props for AddressAutocomplete component

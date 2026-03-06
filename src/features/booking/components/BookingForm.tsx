@@ -1,4 +1,4 @@
-// src/components/BookingForm.tsx
+// src/features/booking/components/BookingForm.tsx
 /**
  * @file BookingForm.tsx
  * @description Booking form with duration selection (1hr vs 2hr jobs).
@@ -9,15 +9,15 @@
 import type React from "react";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/Button";
-import { cn } from "@/lib/cn";
+import { Button } from "@/shared/components/Button";
+import { cn } from "@/shared/lib/cn";
 import {
   DURATION_OPTIONS,
   type BookableDay,
   type TimeOfDay,
   type JobDuration,
-} from "@/lib/booking";
-import AddressAutocomplete from "@/components/AddressAutocomplete";
+} from "@/features/booking/lib/booking";
+import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 
 export interface BookingFormProps {
   availableDays: BookableDay[];

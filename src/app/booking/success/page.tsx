@@ -6,8 +6,8 @@
 
 import type React from "react";
 import Image from "next/image";
-import { cn } from "@/lib/cn";
-import { Button } from "@/components/Button";
+import { cn } from "@/shared/lib/cn";
+import { Button } from "@/shared/components/Button";
 import { FaCircleCheck, FaHouse } from "react-icons/fa6";
 
 const CARD = "border-seasalt-400/60 bg-seasalt-800 rounded-xl border p-5 shadow-sm sm:p-6";

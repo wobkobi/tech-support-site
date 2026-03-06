@@ -1,4 +1,4 @@
-// src/lib/prisma.ts
+// src/shared/lib/prisma.ts
 /**
  * @file prisma.ts
  * @description Prisma client singleton for server components and routes.

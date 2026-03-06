@@ -5,8 +5,8 @@
  */
 
 import type React from "react";
-import { FrostedSection, PageShell } from "@/components/PageLayout";
-import { cn } from "@/lib/cn";
+import { FrostedSection, PageShell } from "@/shared/components/PageLayout";
+import { cn } from "@/shared/lib/cn";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;

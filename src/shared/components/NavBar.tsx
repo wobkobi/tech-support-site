@@ -1,4 +1,4 @@
-// src/components/NavBar.tsx
+// src/shared/components/NavBar.tsx
 /**
  * @file NavBar.tsx
  * @description Navigation bar with mobile-first scroll reveal behavior.
@@ -11,8 +11,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Button } from "@/components/Button";
-import { cn } from "@/lib/cn";
+import { Button } from "@/shared/components/Button";
+import { cn } from "@/shared/lib/cn";
 
 interface NavItem {
   label: string;

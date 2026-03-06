@@ -1,4 +1,4 @@
-// src/components/ReviewForm.tsx
+// src/features/reviews/components/ReviewForm.tsx
 /**
  * @file ReviewForm.tsx
  * @description Review form that supports verified reviews via booking tokens.
@@ -7,8 +7,8 @@
 "use client";
 
 import type React from "react";
-import { cn } from "@/lib/cn";
-import { Button } from "@/components/Button";
+import { cn } from "@/shared/lib/cn";
+import { Button } from "@/shared/components/Button";
 import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 

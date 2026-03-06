@@ -6,9 +6,9 @@
 
 import type React from "react";
 import Link from "next/link";
-import { FrostedSection, PageShell, CARD } from "@/components/PageLayout";
-import { cn } from "@/lib/cn";
-import { prisma } from "@/lib/prisma";
+import { FrostedSection, PageShell, CARD } from "@/shared/components/PageLayout";
+import { cn } from "@/shared/lib/cn";
+import { prisma } from "@/shared/lib/prisma";
 import { FaCircleCheck } from "react-icons/fa6";
 
 // Enable ISR: revalidate every 5 minutes for approved reviews

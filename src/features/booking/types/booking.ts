@@ -1,4 +1,4 @@
-// src/types/booking.ts
+// src/features/booking/types/booking.ts
 /**
  * @file booking.ts
  * @description Shared TypeScript types for booking flows and API payloads.

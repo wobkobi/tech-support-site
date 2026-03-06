@@ -1,4 +1,4 @@
-// src/components/PageLayout.tsx
+// src/shared/components/PageLayout.tsx
 /**
  * @file PageLayout.tsx
  * @description Reusable layout components with frosted glass effect.
@@ -6,7 +6,7 @@
 
 import type React from "react";
 import Image from "next/image";
-import { cn } from "@/lib/cn";
+import { cn } from "@/shared/lib/cn";
 
 export const CARD = cn(
   "border-seasalt-400/80 bg-seasalt-800 rounded-xl border p-5 shadow-sm sm:p-6",

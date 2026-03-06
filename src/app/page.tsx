@@ -5,11 +5,11 @@
  */
 
 import type React from "react";
-import Reviews, { type ReviewItem } from "@/components/Reviews";
-import { FrostedSection, PageShell } from "@/components/PageLayout";
-import { Button } from "@/components/Button";
-import { cn } from "@/lib/cn";
-import { prisma } from "@/lib/prisma";
+import Reviews, { type ReviewItem } from "@/features/reviews/components/Reviews";
+import { FrostedSection, PageShell } from "@/shared/components/PageLayout";
+import { Button } from "@/shared/components/Button";
+import { cn } from "@/shared/lib/cn";
+import { prisma } from "@/shared/lib/prisma";
 import Image from "next/image";
 import {
   FaCalendarCheck,
