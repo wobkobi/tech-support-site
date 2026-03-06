@@ -8,6 +8,7 @@
 
 import { cn } from "@/shared/lib/cn";
 import React, { useState } from "react";
+import { formatReviewerName } from "@/features/reviews/lib/formatting";
 
 /** Character limit for truncating long reviews. */
 const REVIEW_CHAR_LIMIT = 150;
@@ -62,7 +63,7 @@ function ReviewCard({ r, className }: { r: ReviewItem; className: string }): Rea
     <p
       className={cn("text-russian-violet mt-auto pt-3 text-right text-xs font-semibold sm:text-sm")}
     >
-      - {formatName(r)}
+      - {formatReviewerName(r)}
     </p>
   );
 
@@ -105,56 +106,6 @@ export interface ReviewsProps {
 }
 
 /**
- * Build display name with proper title casing.
- * Returns the full name as entered by the reviewer.
- * @param r - Review item to format.
- * @returns Formatted display name.
- */
-function formatName(r: ReviewItem): string {
-  if (r.isAnonymous) return "Anonymous";
-  const f = (r.firstName ?? "").trim();
-  const l = (r.lastName ?? "").trim();
-  if (!f && !l) return "Anonymous";
-
-  // Just combine and title case the full name
-  const fullName = [f, l].filter(Boolean).join(" ");
-  return fullName ? toTitleCase(fullName) : "Anonymous";
-}
-
-/**
- * Converts a string to title case, keeping small words lowercase unless they're first.
- * @param str - String to convert.
- * @returns Title-cased string.
- */
-function toTitleCase(str: string): string {
-  const smallWords = new Set([
-    "of",
-    "the",
-    "and",
-    "or",
-    "in",
-    "on",
-    "at",
-    "to",
-    "for",
-    "from",
-    "a",
-    "an",
-  ]);
-  return str
-    .toLowerCase()
-    .split(" ")
-    .map((word, index) => {
-      // Always capitalize first word, or if not a small word
-      if (index === 0 || !smallWords.has(word)) {
-        return word[0].toUpperCase() + word.slice(1);
-      }
-      return word;
-    })
-    .join(" ");
-}
-
-/**
  * Reviews section content. No outer frosted wrapper.
  * 1-3 items render as centered wrapped cards. 4+ items use marquee.
  * @param props - Component props.
@@ -180,7 +131,7 @@ export default function Reviews({ items = [] }: ReviewsProps): React.ReactElemen
           <ul className={cn("marquee-track animate-marquee flex w-max gap-3")}>
             {track.map((r, i) => (
               <ReviewCard
-                key={`${formatName(r)}-${i}`}
+                key={`${formatReviewerName(r)}-${i}`}
                 r={r}
                 className={cn(
                   "bg-seasalt-800/80 sm:w-95 flex w-[min(22.5rem,calc(100vw-3rem))] shrink-0 flex-col rounded-lg border-2 p-4 transition-colors duration-300 sm:p-5",
@@ -216,7 +167,7 @@ export default function Reviews({ items = [] }: ReviewsProps): React.ReactElemen
       >
         {items.map((r, i) => (
           <ReviewCard
-            key={`${formatName(r)}-${i}`}
+            key={`${formatReviewerName(r)}-${i}`}
             r={r}
             className={cn(
               "w-full sm:w-[calc(50%-0.375rem)] md:w-[calc(33.333%-0.5rem)]",

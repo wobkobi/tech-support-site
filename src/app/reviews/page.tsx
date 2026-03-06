@@ -10,66 +10,10 @@ import { FrostedSection, PageShell, CARD } from "@/shared/components/PageLayout"
 import { cn } from "@/shared/lib/cn";
 import { prisma } from "@/shared/lib/prisma";
 import { FaCircleCheck } from "react-icons/fa6";
+import { formatReviewerName } from "@/features/reviews/lib/formatting";
 
 // Enable ISR: revalidate every 5 minutes for approved reviews
 export const revalidate = 300;
-
-/**
- * Formats a reviewer's display name.
- * Returns the full name with proper title casing.
- * @param r - Review fields.
- * @param r.firstName - First name or null.
- * @param r.lastName - Last name or null.
- * @param r.isAnonymous - Whether the review is posted anonymously.
- * @returns Formatted name string.
- */
-function formatName(r: {
-  firstName: string | null;
-  lastName: string | null;
-  isAnonymous: boolean;
-}): string {
-  if (r.isAnonymous) return "Anonymous";
-  const f = (r.firstName ?? "").trim();
-  const l = (r.lastName ?? "").trim();
-  if (!f && !l) return "Anonymous";
-
-  // Just combine and title case the full name
-  const fullName = [f, l].filter(Boolean).join(" ");
-  return fullName ? toTitleCase(fullName) : "Anonymous";
-}
-
-/**
- * Converts a string to title case, keeping small words lowercase unless they're first.
- * @param str - String to convert.
- * @returns Title-cased string.
- */
-function toTitleCase(str: string): string {
-  const smallWords = new Set([
-    "of",
-    "the",
-    "and",
-    "or",
-    "in",
-    "on",
-    "at",
-    "to",
-    "for",
-    "from",
-    "a",
-    "an",
-  ]);
-  return str
-    .toLowerCase()
-    .split(" ")
-    .map((word, index) => {
-      // Always capitalize first word, or if not a small word
-      if (index === 0 || !smallWords.has(word)) {
-        return word[0].toUpperCase() + word.slice(1);
-      }
-      return word;
-    })
-    .join(" ");
-}
 
 const linkStyle = cn(
   "text-coquelicot-500 hover:text-coquelicot-600 underline-offset-4 hover:underline",
@@ -141,7 +85,7 @@ export default async function ReviewsPage(): Promise<React.ReactElement> {
                     </p>
                     <div className={cn("mt-4 flex items-center justify-between gap-2")}>
                       <p className={cn("text-russian-violet text-sm font-semibold")}>
-                        - {formatName(r)}
+                        - {formatReviewerName(r)}
                       </p>
                       {r.verified && (
                         <span

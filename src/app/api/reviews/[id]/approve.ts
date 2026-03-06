@@ -7,16 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/shared/lib/prisma";
-
-/**
- * Checks if the request has valid admin credentials.
- * @param req - The incoming request.
- * @returns True if the request has valid admin credentials.
- */
-function isAdmin(req: NextRequest): boolean {
-  // Placeholder: check for X-Admin-Secret header
-  return req.headers.get("x-admin-secret") === process.env.ADMIN_SECRET;
-}
+import { isAdminRequest } from "@/shared/lib/auth";
 
 /**
  * POST /api/reviews/[id]/approve - Approves a review (sets status: approved).
@@ -30,7 +21,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } },
 ): Promise<NextResponse> {
-  if (!isAdmin(request)) {
+  if (!isAdminRequest(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
   const { id } = params;

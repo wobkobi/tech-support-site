@@ -53,7 +53,7 @@ describe("Reviews Component - Scale Test", () => {
       const { container } = render(<Reviews items={items} />);
       const cards = container.querySelectorAll("li");
       expect(cards.length).toBe(1);
-      expect(container.textContent).toContain("J. Doe0."); // formatName abbreviates first name
+      expect(container.textContent).toContain("John0 Doe0"); // formatReviewerName shows full name
     });
 
     it("renders 2 reviews in regular card layout", () => {
@@ -188,7 +188,7 @@ describe("Reviews Component - Scale Test", () => {
         },
       ];
       const { container } = render(<Reviews items={items} />);
-      expect(container.textContent).toContain("J. Smith");
+      expect(container.textContent).toContain("John Smith");
     });
 
     it("handles anonymous reviews", () => {
@@ -215,7 +215,7 @@ describe("Reviews Component - Scale Test", () => {
         },
       ];
       const { container } = render(<Reviews items={items} />);
-      expect(container.textContent).toContain("Smith."); // no initial when firstName missing
+      expect(container.textContent).toContain("Smith"); // just last name when firstName missing
     });
 
     it("handles missing last name", () => {
@@ -228,7 +228,7 @@ describe("Reviews Component - Scale Test", () => {
         },
       ];
       const { container } = render(<Reviews items={items} />);
-      expect(container.textContent).toContain("J.");
+      expect(container.textContent).toContain("John"); // just first name when lastName missing
     });
 
     it("handles both names missing (falls back to Anonymous)", () => {
