@@ -29,11 +29,19 @@ const NAV_ITEMS: ReadonlyArray<NavItem> = [
   { label: "Reviews", href: "/reviews", activePrefix: "/reviews" },
 ];
 
-const SCROLL_THRESHOLD = 72;
-const MIN_SCROLL_DELTA = 1;
-const HIDE_SCROLL_DISTANCE = 60; // Distance to scroll down before fully hiding navbar (in pixels)
+const SCROLL_THRESHOLD = 90;
+const TOP_SCROLL_ZONE_MAX = 260; // Near top: hide faster even on gentle scrolling
+const DEEP_SCROLL_ZONE_MIN = 560; // Deeper scroll: require more intent to hide
+const TOP_MIN_SCROLL_DELTA = 1;
+const DEEP_MIN_SCROLL_DELTA = 1;
+const TOP_HIDE_SCROLL_DISTANCE = 72;
+const MID_HIDE_SCROLL_DISTANCE = 120;
+const DEEP_HIDE_SCROLL_DISTANCE = 170;
 const FULL_HIDE_TRANSLATE = "120%"; // Vertical translate percentage when navbar is fully hidden
-const HOVER_REVEAL_ZONE = 100; // Height from top of viewport (in pixels) to reveal navbar on hover
+const TOP_IDLE_HIDE_DELAY_MS = 900;
+const MID_IDLE_HIDE_DELAY_MS = 1200;
+const DEEP_IDLE_HIDE_DELAY_MS = 2300;
+const HOVER_REVEAL_ZONE = 100; // Reveal hidden navbar when cursor is near top
 
 /**
  * Determine whether a path is active for a given prefix route.
@@ -49,11 +57,36 @@ function isActivePrefix(pathname: string, prefix: string): boolean {
 }
 
 /**
- * Check if the environment supports pointer media queries.
- * @returns True if window object exists and matchMedia API is available.
+ * Get scroll-based hide tuning values.
+ * @param scrollY - Current vertical scroll position.
+ * @returns Thresholds for hide distance, idle delay, and minimum delta.
  */
-function canUsePointerQuery(): boolean {
-  return typeof window !== "undefined" && window.matchMedia !== undefined;
+function getHideTuning(scrollY: number): {
+  hideDistance: number;
+  idleDelayMs: number;
+  minScrollDelta: number;
+} {
+  if (scrollY <= TOP_SCROLL_ZONE_MAX) {
+    return {
+      hideDistance: TOP_HIDE_SCROLL_DISTANCE,
+      idleDelayMs: TOP_IDLE_HIDE_DELAY_MS,
+      minScrollDelta: TOP_MIN_SCROLL_DELTA,
+    };
+  }
+
+  if (scrollY >= DEEP_SCROLL_ZONE_MIN) {
+    return {
+      hideDistance: DEEP_HIDE_SCROLL_DISTANCE,
+      idleDelayMs: DEEP_IDLE_HIDE_DELAY_MS,
+      minScrollDelta: DEEP_MIN_SCROLL_DELTA,
+    };
+  }
+
+  return {
+    hideDistance: MID_HIDE_SCROLL_DISTANCE,
+    idleDelayMs: MID_IDLE_HIDE_DELAY_MS,
+    minScrollDelta: TOP_MIN_SCROLL_DELTA,
+  };
 }
 
 /**
@@ -73,18 +106,14 @@ export function NavBar(): React.ReactElement | null {
   const [isHidden, setIsHidden] = useState(false);
   const [scrollOffset, setScrollOffset] = useState(0);
   const [isHoveringTop, setIsHoveringTop] = useState(false);
-  const [hasPointer, setHasPointer] = useState(() => {
-    if (!canUsePointerQuery()) {
-      return false;
-    }
-    const mediaQuery = window.matchMedia("(pointer: fine)");
-    return mediaQuery.matches;
-  });
 
   const scrollLockRef = useRef(0);
   const bodyLockedRef = useRef(false);
   const lastScrollYRef = useRef(0);
   const scrollDownDistanceRef = useRef(0);
+  const isScrolledRef = useRef(false);
+  const idleHideTimerRef = useRef<number | null>(null);
+  const headerRef = useRef<HTMLElement | null>(null);
 
   /**
    * Set hidden state only when it changes.
@@ -95,6 +124,55 @@ export function NavBar(): React.ReactElement | null {
   const setHiddenSafely = useCallback((nextHidden: boolean): void => {
     setIsHidden((previous) => (previous === nextHidden ? previous : nextHidden));
   }, []);
+
+  /**
+   * Clear scheduled idle hide timer.
+   */
+  const clearIdleHideTimer = useCallback((): void => {
+    if (idleHideTimerRef.current !== null) {
+      window.clearTimeout(idleHideTimerRef.current);
+      idleHideTimerRef.current = null;
+    }
+  }, []);
+
+  /**
+   * Schedule idle hide only when user is scrolled away from page top.
+   */
+  const scheduleIdleHide = useCallback((): void => {
+    if (typeof window === "undefined" || mobileMenuOpen) {
+      return;
+    }
+
+    clearIdleHideTimer();
+
+    const { hideDistance, idleDelayMs } = getHideTuning(Math.max(window.scrollY, 0));
+
+    idleHideTimerRef.current = window.setTimeout(() => {
+      if (!isScrolledRef.current || mobileMenuOpen) {
+        return;
+      }
+
+      setHiddenSafely(true);
+      setScrollOffset(hideDistance);
+    }, idleDelayMs);
+  }, [clearIdleHideTimer, mobileMenuOpen, setHiddenSafely]);
+
+  /**
+   * Keep navbar visible while it is being interacted with.
+   */
+  const handleNavInteractionStart = useCallback((): void => {
+    clearIdleHideTimer();
+    setHiddenSafely(false);
+    setScrollOffset(0);
+    scrollDownDistanceRef.current = 0;
+  }, [clearIdleHideTimer, setHiddenSafely]);
+
+  /**
+   * Restart inactivity countdown when interaction stops.
+   */
+  const handleNavInteractionEnd = useCallback((): void => {
+    scheduleIdleHide();
+  }, [scheduleIdleHide]);
 
   /**
    * Open the mobile menu.
@@ -167,19 +245,24 @@ export function NavBar(): React.ReactElement | null {
       const currentY = Math.max(window.scrollY, 0);
       const previousY = lastScrollYRef.current;
       const delta = currentY - previousY;
+      const { hideDistance, minScrollDelta } = getHideTuning(currentY);
       lastScrollYRef.current = currentY;
 
       const scrolledPastThreshold = currentY > SCROLL_THRESHOLD;
+      isScrolledRef.current = scrolledPastThreshold;
       setIsScrolled(scrolledPastThreshold);
 
       if (!scrolledPastThreshold || mobileMenuOpen) {
+        clearIdleHideTimer();
         setHiddenSafely(false);
         setScrollOffset(0);
         scrollDownDistanceRef.current = 0;
         return;
       }
 
-      if (Math.abs(delta) < MIN_SCROLL_DELTA) {
+      scheduleIdleHide();
+
+      if (Math.abs(delta) < minScrollDelta) {
         return;
       }
 
@@ -195,10 +278,10 @@ export function NavBar(): React.ReactElement | null {
         // Scrolling down - accumulate distance and gradually translate (like sticky that scrolls away)
         scrollDownDistanceRef.current += delta;
 
-        if (scrollDownDistanceRef.current >= HIDE_SCROLL_DISTANCE) {
+        if (scrollDownDistanceRef.current >= hideDistance) {
           // Fully hide after threshold (unless hovering at top)
           setHiddenSafely(true);
-          setScrollOffset(HIDE_SCROLL_DISTANCE);
+          setScrollOffset(hideDistance);
         } else {
           // Gradually translate up with scroll
           setHiddenSafely(false);
@@ -213,53 +296,50 @@ export function NavBar(): React.ReactElement | null {
     window.addEventListener("scroll", processScroll, { passive: true });
 
     return () => {
+      clearIdleHideTimer();
       window.removeEventListener("scroll", processScroll);
     };
-  }, [mobileMenuOpen, setHiddenSafely]);
+  }, [mobileMenuOpen, clearIdleHideTimer, scheduleIdleHide, setHiddenSafely]);
 
-  // Detect if device has pointer (mouse) capability.
+  // Hovering near the top edge should reveal a hidden navbar on pointer devices.
   useEffect(() => {
-    if (!canUsePointerQuery()) {
+    if (typeof window === "undefined") {
       return;
     }
 
-    const mediaQuery = window.matchMedia("(pointer: fine)");
+    let hoverTimeout: number | null = null;
 
     /**
-     * Handle media query change for pointer capability.
-     * @param e - The media query list event.
+     * Track whether the cursor is near the top viewport edge.
+     * @param event - The latest mouse move event.
      */
-    const handleChange = (e: MediaQueryListEvent): void => {
-      setHasPointer(e.matches);
-    };
-
-    mediaQuery.addEventListener("change", handleChange);
-
-    return () => {
-      mediaQuery.removeEventListener("change", handleChange);
-    };
-  }, []);
-
-  // Track mouse position for hover-to-reveal at top of viewport.
-  useEffect(() => {
-    if (typeof window === "undefined" || !hasPointer) {
-      return;
-    }
-
-    /**
-     * Handle mouse movement to detect hover at top of viewport.
-     * @param e - The mouse event.
-     */
-    const handleMouseMove = (e: MouseEvent): void => {
-      const isAtTop = e.clientY <= HOVER_REVEAL_ZONE;
-      setIsHoveringTop(isAtTop);
+    const handleMouseMove = (event: MouseEvent): void => {
+      if (event.clientY <= HOVER_REVEAL_ZONE) {
+        if (hoverTimeout) {
+          window.clearTimeout(hoverTimeout);
+          hoverTimeout = null;
+        }
+        setIsHoveringTop(true);
+      } else if (isHoveringTop) {
+        // Start a short timeout before hiding
+        if (!hoverTimeout) {
+          hoverTimeout = window.setTimeout(() => {
+            setIsHoveringTop(false);
+            hoverTimeout = null;
+          }, 350); // 350ms linger, animation unchanged
+        }
+      }
     };
 
     /**
-     * Handle mouse leaving the document.
+     * Reset top-hover state when pointer leaves the document.
      */
     const handleMouseLeave = (): void => {
       setIsHoveringTop(false);
+      if (hoverTimeout) {
+        window.clearTimeout(hoverTimeout);
+        hoverTimeout = null;
+      }
     };
 
     window.addEventListener("mousemove", handleMouseMove, { passive: true });
@@ -268,8 +348,11 @@ export function NavBar(): React.ReactElement | null {
     return () => {
       window.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseleave", handleMouseLeave);
+      if (hoverTimeout) {
+        window.clearTimeout(hoverTimeout);
+      }
     };
-  }, [hasPointer]);
+  }, [isHoveringTop]);
 
   if (HIDDEN_PATHS.includes(pathname)) {
     return null;
@@ -297,11 +380,24 @@ export function NavBar(): React.ReactElement | null {
       <div aria-hidden="true" className={cn("h-24 sm:h-28")} />
 
       <header
+        ref={headerRef}
         className={cn(
           "duration-400 fixed inset-x-0 top-3 z-50 mx-auto w-full px-4 transition-[transform,opacity] ease-in-out will-change-transform sm:top-4",
           "max-w-[min(100vw-2rem,90rem)]",
           isHidden && !isHoveringTop && "pointer-events-none opacity-0",
         )}
+        onMouseEnter={handleNavInteractionStart}
+        onMouseLeave={handleNavInteractionEnd}
+        onTouchStart={handleNavInteractionStart}
+        onTouchEnd={handleNavInteractionEnd}
+        onFocusCapture={handleNavInteractionStart}
+        onBlurCapture={(event) => {
+          const nextFocused = event.relatedTarget;
+          if (nextFocused instanceof Node && headerRef.current?.contains(nextFocused)) {
+            return;
+          }
+          handleNavInteractionEnd();
+        }}
         style={{
           transform: getTransform(),
         }}
