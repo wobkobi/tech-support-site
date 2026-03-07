@@ -5,24 +5,9 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { sendPastClientReviewRequest } from "@/lib/email";
-import { timingSafeEqual } from "crypto";
-
-/**
- * Verifies the admin token using timing-safe comparison.
- * @param provided - The token provided in the request.
- * @returns True if the token matches ADMIN_SECRET.
- */
-function verifyToken(provided: string): boolean {
-  const secret = process.env.ADMIN_SECRET;
-  if (!secret) return false;
-  try {
-    return timingSafeEqual(Buffer.from(provided), Buffer.from(secret));
-  } catch {
-    return false;
-  }
-}
+import { prisma } from "@/shared/lib/prisma";
+import { sendPastClientReviewRequest } from "@/features/reviews/lib/email";
+import { isValidAdminToken } from "@/shared/lib/auth";
 
 /**
  * POST /api/admin/send-review-link
@@ -40,7 +25,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     };
     const { token, name, email, mode = "email" } = body;
 
-    if (!token || !verifyToken(token)) {
+    if (!isValidAdminToken(token ?? null)) {
       return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
     }
 

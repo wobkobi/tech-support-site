@@ -5,14 +5,14 @@
  */
 
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/shared/lib/prisma";
 import {
   BOOKING_CONFIG,
   buildAvailableDays,
   type ExistingBooking,
   type ExistingEvent,
-} from "@/lib/booking";
-import { fetchAllCalendarEvents } from "@/lib/google-calendar";
+} from "@/features/booking/lib/booking";
+import { fetchAllCalendarEvents } from "@/features/calendar/lib/google-calendar";
 
 /**
  * Response containing available slots.

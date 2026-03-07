@@ -4,24 +4,9 @@
  * @description Admin API for manually creating reviews (for past clients).
  */
 
-import { timingSafeEqual } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-
-/**
- * Validates the token against ADMIN_SECRET using constant-time comparison.
- * @param token - Token to validate.
- * @returns True if valid.
- */
-function isValidToken(token: string | null): boolean {
-  const secret = process.env.ADMIN_SECRET;
-  if (!secret || !token) return false;
-  try {
-    return timingSafeEqual(Buffer.from(token), Buffer.from(secret));
-  } catch {
-    return false;
-  }
-}
+import { prisma } from "@/shared/lib/prisma";
+import { isValidAdminToken } from "@/shared/lib/auth";
 
 /**
  * POST /api/admin/reviews
@@ -39,7 +24,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       isAnonymous?: boolean;
     };
 
-    if (!isValidToken(body.token ?? null)) {
+    if (!isValidAdminToken(body.token ?? null)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

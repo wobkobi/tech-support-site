@@ -10,7 +10,7 @@ import type { Metadata, Viewport } from "next";
 import { Exo } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
-import { NavBar } from "@/components/NavBar";
+import { NavBar } from "@/shared/components/NavBar";
 
 const exo = Exo({
   subsets: ["latin"],

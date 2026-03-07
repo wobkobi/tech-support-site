@@ -5,11 +5,11 @@
  */
 
 import type React from "react";
-import Reviews, { type ReviewItem } from "@/components/Reviews";
-import { FrostedSection, PageShell } from "@/components/PageLayout";
-import { Button } from "@/components/Button";
-import { cn } from "@/lib/cn";
-import { prisma } from "@/lib/prisma";
+import Reviews, { type ReviewItem } from "@/features/reviews/components/Reviews";
+import { FrostedSection, PageShell } from "@/shared/components/PageLayout";
+import { Button } from "@/shared/components/Button";
+import { cn } from "@/shared/lib/cn";
+import { prisma } from "@/shared/lib/prisma";
 import Image from "next/image";
 import {
   FaCalendarCheck,
@@ -72,9 +72,10 @@ export default async function Home(): Promise<React.ReactElement> {
   });
 
   const items: ReviewItem[] = rows.map((r) => ({
-    text: r.text,
-    firstName: r.firstName,
-    lastName: r.lastName,
+    // Normalize whitespace: collapse newlines/multiple spaces to single space, trim edges
+    text: r.text.trim().replace(/\s+/g, " "),
+    firstName: r.firstName?.trim() || null,
+    lastName: r.lastName?.trim() || null,
     isAnonymous: r.isAnonymous,
   }));
 

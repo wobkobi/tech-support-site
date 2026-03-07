@@ -6,8 +6,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { prisma } from "@/lib/prisma";
-import { sendOwnerReviewNotification } from "@/lib/email";
+import { prisma } from "@/shared/lib/prisma";
+import { sendOwnerReviewNotification } from "@/features/reviews/lib/email";
 
 /**
  * GET /api/reviews

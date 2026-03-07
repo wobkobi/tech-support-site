@@ -5,12 +5,12 @@
  * Access via: /admin/reviews?token=<ADMIN_SECRET>
  */
 
-import { timingSafeEqual } from "crypto";
 import type { Metadata } from "next";
-import { FrostedSection, PageShell, CARD } from "@/components/PageLayout";
-import { cn } from "@/lib/cn";
-import { ReviewApprovalList } from "@/components/admin/ReviewApprovalList";
-import { prisma } from "@/lib/prisma";
+import { FrostedSection, PageShell, CARD } from "@/shared/components/PageLayout";
+import { cn } from "@/shared/lib/cn";
+import { ReviewApprovalList } from "@/features/reviews/components/admin/ReviewApprovalList";
+import { prisma } from "@/shared/lib/prisma";
+import { isValidAdminToken } from "@/shared/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -18,21 +18,6 @@ export const metadata: Metadata = {
   title: "Admin - Reviews",
   robots: { index: false, follow: false },
 };
-
-/**
- * Validates the URL token against ADMIN_SECRET using constant-time comparison.
- * @param token - Token from the URL search params.
- * @returns True if valid.
- */
-function isValidToken(token: string | null): boolean {
-  const secret = process.env.ADMIN_SECRET;
-  if (!secret || !token) return false;
-  try {
-    return timingSafeEqual(Buffer.from(token), Buffer.from(secret));
-  } catch {
-    return false;
-  }
-}
 
 /**
  * Admin reviews page - renders access-denied or the approval UI depending on token validity.
@@ -47,7 +32,7 @@ export default async function AdminReviewsPage({
 }): Promise<React.ReactElement> {
   const { token } = await searchParams;
 
-  if (!isValidToken(token ?? null)) {
+  if (!isValidAdminToken(token ?? null)) {
     return (
       <PageShell>
         <FrostedSection maxWidth="40rem">
@@ -68,7 +53,6 @@ export default async function AdminReviewsPage({
       firstName: true,
       lastName: true,
       isAnonymous: true,
-      verified: true,
       status: true,
       createdAt: true,
     },

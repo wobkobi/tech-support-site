@@ -6,26 +6,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { refreshCalendarCache } from "@/lib/calendar-cache";
-
-/**
- * Verify the request is from Vercel Cron or has the correct secret.
- * @param request - The incoming request to verify.
- * @returns True if authorized, false otherwise.
- */
-function isAuthorized(request: NextRequest): boolean {
-  // Vercel Cron sends this header
-  const authHeader = request.headers.get("authorization");
-  const cronSecret = process.env.CRON_SECRET;
-
-  // If no secret is configured, only allow from Vercel Cron
-  if (!cronSecret) {
-    return request.headers.has("x-vercel-cron");
-  }
-
-  // Check both Vercel Cron header and Bearer token
-  return request.headers.has("x-vercel-cron") || authHeader === `Bearer ${cronSecret}`;
-}
+import { refreshCalendarCache } from "@/features/calendar/lib/calendar-cache";
+import { isCronAuthorized } from "@/shared/lib/auth";
 
 /**
  * GET /api/cron/refresh-calendar-cache
@@ -34,7 +16,7 @@ function isAuthorized(request: NextRequest): boolean {
  * @returns JSON response with cache refresh results.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  if (!isAuthorized(request)) {
+  if (!isCronAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
