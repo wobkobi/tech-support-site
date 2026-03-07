@@ -6,24 +6,9 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { sendCustomerReviewRequest } from "@/lib/email";
-
-/**
- * Verify the request is from Vercel Cron or has the correct secret.
- * @param request - The incoming request to verify.
- * @returns True if authorized, false otherwise.
- */
-function isAuthorized(request: NextRequest): boolean {
-  const authHeader = request.headers.get("authorization");
-  const cronSecret = process.env.CRON_SECRET;
-
-  if (!cronSecret) {
-    return request.headers.has("x-vercel-cron");
-  }
-
-  return request.headers.has("x-vercel-cron") || authHeader === `Bearer ${cronSecret}`;
-}
+import { prisma } from "@/shared/lib/prisma";
+import { sendCustomerReviewRequest } from "@/features/reviews/lib/email";
+import { isCronAuthorized } from "@/shared/lib/auth";
 
 /**
  * GET /api/cron/send-review-emails
@@ -33,7 +18,7 @@ function isAuthorized(request: NextRequest): boolean {
  * @returns JSON response with results
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  if (!isAuthorized(request)) {
+  if (!isCronAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

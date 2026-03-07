@@ -5,7 +5,7 @@
  * Pass ?mode=print to add a 3mm bleed on all edges (viewport 1818x2550px).
  */
 
-import { cn } from "@/lib/cn";
+import { cn } from "@/shared/lib/cn";
 import Image from "next/image";
 import type React from "react";
 import {

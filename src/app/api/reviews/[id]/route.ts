@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/shared/lib/prisma";
 
 /**
  * PATCH /api/reviews/[id] - Allows a customer to edit their review.
@@ -78,7 +78,7 @@ export async function PATCH(
         isAnonymous: anon,
         verified,
       } = updated;
-      void import("@/lib/email").then((m) =>
+      void import("@/features/reviews/lib/email").then((m) =>
         m.sendOwnerReviewNotification({
           id: reviewId,
           text: reviewText,

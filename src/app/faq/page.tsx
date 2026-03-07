@@ -6,8 +6,8 @@
 
 import type React from "react";
 import Link from "next/link";
-import { FrostedSection, PageShell, CARD, SOFT_CARD } from "@/components/PageLayout";
-import { cn } from "@/lib/cn";
+import { FrostedSection, PageShell, CARD, SOFT_CARD } from "@/shared/components/PageLayout";
+import { cn } from "@/shared/lib/cn";
 
 interface FaqItem {
   question: string;

@@ -5,13 +5,13 @@
  */
 
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/shared/lib/prisma";
 import {
   BOOKING_CONFIG,
   buildAvailableDays,
   type ExistingBooking,
   type BookableDay,
-} from "@/lib/booking";
+} from "@/features/booking/lib/booking";
 
 /**
  * Response containing available days.
@@ -35,7 +35,7 @@ async function fetchCalendarEventsSafe(
 ): Promise<Array<{ id: string; start: string; end: string }>> {
   try {
     // Try to import the calendar module
-    const { fetchAllCalendarEvents } = await import("@/lib/google-calendar");
+    const { fetchAllCalendarEvents } = await import("@/features/calendar/lib/google-calendar");
     const rawEvents = await fetchAllCalendarEvents(now, maxDate);
     const events = rawEvents.map((e) => ({
       id: e.id,

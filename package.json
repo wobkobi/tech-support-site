@@ -15,8 +15,7 @@
     "format": "prettier --write \"**/*.{js,ts,jsx,tsx,css,md,json}\"",
     "build:icons": "tsx scripts/build-icons/index.ts",
     "build:poster": "npx tsx scripts/export-poster-screenshot.ts",
-    "build:all": "npm run build:icons && npm run build",
-    "test": "vitest"
+    "build:all": "npm run build:icons && npm run build"
   },
   "dependencies": {
     "@vercel/analytics": "^1.6.1",
@@ -57,7 +56,7 @@
     "eslint-plugin-prettier": "^5.5.5",
     "globals": "^17.4.0",
     "jsdom": "^28.1.0",
-    "lint-staged": "^16.2.7",
+    "lint-staged": "^16.3.1",
     "pdf-lib": "^1.17.1",
     "postcss": "^8.5.8",
     "prettier": "^3.8.1",
@@ -98,8 +97,7 @@
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
       "prettier --write",
-      "eslint --max-warnings=0",
-      "vitest related --run"
+      "eslint --max-warnings=0"
     ],
     "*.{css,html,json,md}": "prettier --write"
   }

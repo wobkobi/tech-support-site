@@ -6,11 +6,11 @@
 
 import type React from "react";
 import Link from "next/link";
-import ReviewFormProtected from "@/components/ReviewForm";
-import { FrostedSection, PageShell, CARD } from "@/components/PageLayout";
-import { Button } from "@/components/Button";
-import { cn } from "@/lib/cn";
-import { prisma } from "@/lib/prisma";
+import ReviewFormProtected from "@/features/reviews/components/ReviewForm";
+import { FrostedSection, PageShell, CARD } from "@/shared/components/PageLayout";
+import { Button } from "@/shared/components/Button";
+import { cn } from "@/shared/lib/cn";
+import { prisma } from "@/shared/lib/prisma";
 
 // Enable ISR: revalidate every 10 minutes
 // Reviews are submitted infrequently; 10-min staleness is acceptable

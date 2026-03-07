@@ -6,10 +6,10 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { prisma } from "@/lib/prisma";
-import { BOOKING_CONFIG } from "@/lib/booking";
-import { getPacificAucklandOffset } from "@/lib/timezone-utils";
-import { createBookingEvent } from "@/lib/google-calendar";
+import { prisma } from "@/shared/lib/prisma";
+import { BOOKING_CONFIG } from "@/features/booking/lib/booking";
+import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
+import { createBookingEvent } from "@/features/calendar/lib/google-calendar";
 import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
 

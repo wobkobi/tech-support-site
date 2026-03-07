@@ -8,7 +8,7 @@
 
 import type React from "react";
 import Link from "next/link";
-import { cn } from "@/lib/cn";
+import { cn } from "@/shared/lib/cn";
 import { FaArrowRotateRight, FaHouse } from "react-icons/fa6";
 
 /**
