@@ -19,7 +19,7 @@ export interface ReviewRow {
   /** Whether the reviewer posted anonymously */
   isAnonymous: boolean;
   /** Whether the review was verified via a booking token */
-  verified: boolean;
+  verified?: boolean;
   /** Review moderation status */
   status: string;
   /** Creation timestamp */

@@ -73,12 +73,14 @@ describe("Reviews Component - Scale Test", () => {
       expect(marqueeTrack).toBeNull();
     });
 
-    it("centers cards with flex-wrap layout for 1-3 items", () => {
+    it("uses grid layout for 1-3 items", () => {
       const items = createReviews(2);
       const { container } = render(<Reviews items={items} />);
       const list = container.querySelector("ul");
-      expect(list?.className).toContain("flex-wrap");
-      expect(list?.className).toContain("justify-center");
+      expect(list?.className).toContain("grid");
+      expect(list?.className).toContain("grid-cols-1");
+      expect(list?.className).toContain("sm:grid-cols-2");
+      expect(list?.className).toContain("md:grid-cols-3");
     });
   });
 
@@ -295,8 +297,8 @@ describe("Reviews Component - Scale Test", () => {
       const { container } = render(<Reviews items={items} />);
       const cards = container.querySelectorAll("li");
       cards.forEach((card) => {
-        // Should have responsive width: full on mobile, 50% on sm, 33% on md
-        expect(card.className).toMatch(/w-full\s+sm:w-\[calc\(50%-.*\)\]\s+md:w-\[calc\(33/);
+        // Should have w-full for all cards
+        expect(card.className).toContain("w-full");
       });
     });
 

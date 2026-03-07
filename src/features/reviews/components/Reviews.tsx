@@ -14,6 +14,15 @@ import { formatReviewerName } from "@/features/reviews/lib/formatting";
 const REVIEW_CHAR_LIMIT = 150;
 
 /**
+ * Normalizes whitespace: trims edges and collapses internal newlines/spaces to single spaces.
+ * @param text - Text to normalize.
+ * @returns Normalized text.
+ */
+function normalizeText(text: string): string {
+  return text.trim().replace(/\s+/g, " ");
+}
+
+/**
  * Returns true when a review exceeds the truncation limit.
  * @param text - Review text to check.
  * @returns Whether the text is long enough to truncate.
@@ -30,17 +39,24 @@ function isLongReview(text: string): boolean {
  * @returns A span element with the review text.
  */
 function ReviewText({ text, expanded }: { text: string; expanded: boolean }): React.ReactElement {
-  if (!isLongReview(text)) {
-    return <span>{text}</span>;
+  // Normalize whitespace: trim edges and collapse internal newlines/spaces to single spaces
+  const normalizedText = normalizeText(text);
+
+  if (!isLongReview(normalizedText)) {
+    return <span className="wrap-break-word inline whitespace-normal">{normalizedText}</span>;
   }
 
   // Truncate at the last space before the limit to avoid orphaned "…"
-  const preview = text.slice(0, REVIEW_CHAR_LIMIT);
+  const preview = normalizedText.slice(0, REVIEW_CHAR_LIMIT);
   const wordSafe = preview.replace(/\s+\S*$/, "");
   const base = wordSafe.trim().length > 0 ? wordSafe : preview;
   const truncated = base + "…";
 
-  return <span>{expanded ? text : truncated}</span>;
+  return (
+    <span className="wrap-break-word inline whitespace-normal">
+      {expanded ? normalizedText : truncated}
+    </span>
+  );
 }
 
 /**
@@ -48,16 +64,24 @@ function ReviewText({ text, expanded }: { text: string; expanded: boolean }): Re
  * @param props - Component props.
  * @param props.r - The review item.
  * @param props.className - Additional class names for the card.
+ * @param props.expanded - Whether all reviews are expanded.
+ * @param props.onToggle - Callback to toggle expanded state.
  * @returns A list item card with expandable review text.
  */
-function ReviewCard({ r, className }: { r: ReviewItem; className: string }): React.ReactElement {
-  const [expanded, setExpanded] = useState(false);
-  const long = isLongReview(r.text);
-
-  /** Toggles the expanded state. */
-  function toggle(): void {
-    setExpanded((v) => !v);
-  }
+function ReviewCard({
+  r,
+  className,
+  expanded,
+  onToggle,
+}: {
+  r: ReviewItem;
+  className: string;
+  expanded: boolean;
+  onToggle: () => void;
+}): React.ReactElement {
+  // Normalize text the same way ReviewText does to ensure consistent length check
+  const normalizedText = normalizeText(r.text);
+  const long = isLongReview(normalizedText);
 
   const name = (
     <p
@@ -72,11 +96,14 @@ function ReviewCard({ r, className }: { r: ReviewItem; className: string }): Rea
       <li className={cn(className)}>
         <button
           type="button"
-          className="flex w-full flex-1 cursor-pointer flex-col bg-transparent p-0 text-left"
+          className="flex w-full flex-1 cursor-pointer flex-col overflow-hidden bg-transparent p-0 text-left transition-all duration-300 ease-in-out"
+          style={{
+            maxHeight: expanded ? "1000px" : "300px",
+          }}
           aria-expanded={expanded}
           aria-label={expanded ? "Collapse review" : "Expand review"}
           title={expanded ? "Click to collapse" : "Click to read more"}
-          onClick={toggle}
+          onClick={onToggle}
         >
           <ReviewText text={r.text} expanded={expanded} />
           {name}
@@ -113,7 +140,14 @@ export interface ReviewsProps {
  * @returns The reviews section, or null if empty.
  */
 export default function Reviews({ items = [] }: ReviewsProps): React.ReactElement | null {
+  const [expanded, setExpanded] = useState(false);
+
   if (!items.length) return null;
+
+  /** Toggles the expanded state for all reviews. */
+  function toggleAll(): void {
+    setExpanded((v) => !v);
+  }
 
   // Marquee when more than three reviews
   if (items.length > 3) {
@@ -133,9 +167,11 @@ export default function Reviews({ items = [] }: ReviewsProps): React.ReactElemen
               <ReviewCard
                 key={`${formatReviewerName(r)}-${i}`}
                 r={r}
+                expanded={expanded}
+                onToggle={toggleAll}
                 className={cn(
                   "bg-seasalt-800/80 sm:w-95 flex w-[min(22.5rem,calc(100vw-3rem))] shrink-0 flex-col rounded-lg border-2 p-4 transition-colors duration-300 sm:p-5",
-                  isLongReview(r.text)
+                  isLongReview(normalizeText(r.text))
                     ? "border-seasalt-400/60 hover:border-coquelicot-500/60"
                     : "border-seasalt-400/60",
                 )}
@@ -159,20 +195,20 @@ export default function Reviews({ items = [] }: ReviewsProps): React.ReactElemen
 
       <ul
         className={cn(
-          // rows
-          "flex flex-wrap justify-center gap-3",
-          // prevent odd spacing due to rounding
-          "content-start",
+          // grid layout for equal-height cards
+          "grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3",
         )}
       >
         {items.map((r, i) => (
           <ReviewCard
             key={`${formatReviewerName(r)}-${i}`}
             r={r}
+            expanded={expanded}
+            onToggle={toggleAll}
             className={cn(
-              "w-full sm:w-[calc(50%-0.375rem)] md:w-[calc(33.333%-0.5rem)]",
+              "w-full",
               "bg-seasalt-800 flex flex-col rounded-lg border-2 p-4 shadow-sm transition-colors duration-300 sm:p-5",
-              isLongReview(r.text)
+              isLongReview(normalizeText(r.text))
                 ? "border-seasalt-400/60 hover:border-coquelicot-500/60"
                 : "border-seasalt-400/60",
             )}

@@ -72,9 +72,10 @@ export default async function Home(): Promise<React.ReactElement> {
   });
 
   const items: ReviewItem[] = rows.map((r) => ({
-    text: r.text,
-    firstName: r.firstName,
-    lastName: r.lastName,
+    // Normalize whitespace: collapse newlines/multiple spaces to single space, trim edges
+    text: r.text.trim().replace(/\s+/g, " "),
+    firstName: r.firstName?.trim() || null,
+    lastName: r.lastName?.trim() || null,
     isAnonymous: r.isAnonymous,
   }));
 

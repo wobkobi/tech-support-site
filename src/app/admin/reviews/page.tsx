@@ -53,7 +53,6 @@ export default async function AdminReviewsPage({
       firstName: true,
       lastName: true,
       isAnonymous: true,
-      verified: true,
       status: true,
       createdAt: true,
     },
