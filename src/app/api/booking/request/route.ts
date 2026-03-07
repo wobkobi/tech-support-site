@@ -177,8 +177,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Create calendar event
     let calendarEventId: string | null = null;
     try {
+      // Remove parentheses from duration label for summary to avoid double brackets
+      const cleanDurationLabel = durationOption.label
+        .replace(/[()]/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+      const summary = `Tech Support: ${name.trim()} - ${cleanDurationLabel}`;
       const calendarResult = await createBookingEvent({
-        summary: `Tech Support: ${name.trim()} (${durationOption.label})`,
+        summary,
         description: bookingNotes,
         startUtc,
         endUtc,
