@@ -62,7 +62,7 @@
     "prettier": "^3.8.1",
     "prettier-plugin-tailwindcss": "^0.7.2",
     "prisma": "6.19.2",
-    "puppeteer": "^24.37.5",
+    "puppeteer": "^24.38.0",
     "qr-code-styling": "^1.9.2",
     "sharp": "^0.34.5",
     "simple-git-hooks": "^2.13.1",
