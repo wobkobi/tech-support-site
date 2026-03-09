@@ -4,7 +4,9 @@
  * @description Google Calendar API integration - multi-calendar without list permission.
  */
 
-import { google } from "googleapis";
+import { google as googleapis } from "googleapis";
+export const google = googleapis;
+
 import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 
 /**
@@ -13,7 +15,7 @@ import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
  * Falls back to "primary" if not set.
  * @returns Booking calendar ID string.
  */
-function getBookingCalendarId(): string {
+export function getBookingCalendarId(): string {
   return process.env.BOOKING_CALENDAR_ID ?? "primary";
 }
 
@@ -23,7 +25,7 @@ function getBookingCalendarId(): string {
  * Duplicate/empty values are filtered out automatically.
  * @returns Array of calendar ID strings to check for availability.
  */
-function getCalendarIds(): string[] {
+export function getCalendarIds(): string[] {
   const ids = [
     process.env.BOOKING_CALENDAR_ID,
     process.env.WORK_CALENDAR_ID,
@@ -36,7 +38,7 @@ function getCalendarIds(): string[] {
  * Gets OAuth2 client with credentials from environment variables
  * @returns Authenticated OAuth2 client
  */
-function getOAuth2Client(): InstanceType<typeof google.auth.OAuth2> {
+export function getOAuth2Client(): InstanceType<typeof google.auth.OAuth2> {
   const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
   const redirectUri = process.env.GOOGLE_OAUTH_REDIRECT_URI;
@@ -56,7 +58,7 @@ function getOAuth2Client(): InstanceType<typeof google.auth.OAuth2> {
  * Gets authenticated Calendar API client
  * @returns Calendar API instance
  */
-function getCalendarClient(): ReturnType<typeof google.calendar> {
+function getCalendarClient(): ReturnType<typeof googleapis.calendar> {
   const auth = getOAuth2Client();
   return google.calendar({ version: "v3", auth });
 }

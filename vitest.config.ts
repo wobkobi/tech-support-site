@@ -8,7 +8,13 @@ export default defineConfig({
     },
   },
   test: {
+    include: ["test/**/*.test.ts"],
+    environment: "node",
     globals: true,
-    environment: "jsdom",
+    coverage: {
+      reporter: ["text", "html"],
+      enabled: true,
+      // threshold property removed; not valid for coverage config
+    },
   },
 });

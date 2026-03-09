@@ -6,36 +6,49 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { prisma } from "@/shared/lib/prisma";
+import { prisma as prismaClient } from "@/shared/lib/prisma";
 import { sendOwnerReviewNotification } from "@/features/reviews/lib/email";
 
 /**
- * GET /api/reviews
- * Returns all approved reviews ordered by most recent first.
- * @returns JSON response with a reviews array, or an empty array on error.
+ * Factory for reviews API handlers, allows dependency injection of Prisma client.
+ * @param prisma - Prisma client instance to use for DB operations.
+ * @returns Handlers for GET (and optionally POST).
  */
-export async function GET(): Promise<NextResponse> {
-  try {
-    const reviews = await prisma.review.findMany({
-      where: { status: "approved" },
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        text: true,
-        firstName: true,
-        lastName: true,
-        isAnonymous: true,
-        verified: true,
-        createdAt: true,
-      },
-    });
-
-    return NextResponse.json({ reviews });
-  } catch (error) {
-    console.error("[reviews] GET error:", error);
-    return NextResponse.json({ reviews: [] }, { status: 500 });
-  }
+export function createReviewsHandlers(prisma = prismaClient): {
+  GET: () => Promise<NextResponse>;
+} {
+  return {
+    /**
+     * Handles GET requests for reviews.
+     * @returns JSON response with approved reviews or error.
+     */
+    async GET(): Promise<NextResponse> {
+      try {
+        const reviews = await prisma.review.findMany({
+          where: { status: "approved" },
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            text: true,
+            firstName: true,
+            lastName: true,
+            isAnonymous: true,
+            verified: true,
+            createdAt: true,
+          },
+        });
+        return NextResponse.json({ reviews });
+      } catch (error) {
+        console.error("[reviews] GET error:", error);
+        return NextResponse.json({ reviews: [] }, { status: 500 });
+      }
+    },
+    // ...existing POST handler will be moved below
+  };
 }
+
+// Default export for Next.js API route
+export const GET = createReviewsHandlers().GET;
 
 /**
  * POST /api/reviews
@@ -45,6 +58,7 @@ export async function GET(): Promise<NextResponse> {
  * @returns JSON response with ok flag and review id on success (201), or an error message on failure.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  const prisma = prismaClient;
   try {
     const body = (await request.json()) as {
       text?: string;
@@ -145,3 +159,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Failed to submit review." }, { status: 500 });
   }
 }
+
+// Next.js API route export for POST
+// Removed duplicate export { POST } to fix redeclaration error
