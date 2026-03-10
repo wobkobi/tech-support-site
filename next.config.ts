@@ -35,9 +35,18 @@ const nextConfig: NextConfig = {
   output: "standalone",
   typescript: { ignoreBuildErrors: false },
 
-  // Silence "inferred workspace root" warning
+  // Silence "inferred workspace root" warning + skip Next.js polyfills for modern browsers
   turbopack: {
     root: path.resolve(__dirname),
+    resolveAlias: {
+      // All APIs polyfilled here are natively supported by our browserslist targets
+      // (Chrome 93+, Firefox 92+, Safari 15.4+, Edge 93+). Replacing with an empty
+      // module removes ~14 KiB of flagged-but-never-executed legacy JS from the bundle.
+      "next/dist/build/polyfills/polyfill-module": path.resolve(
+        __dirname,
+        "src/empty-polyfills.js",
+      ),
+    },
   },
 
   /**
@@ -58,13 +67,13 @@ const nextConfig: NextConfig = {
           { key: "Content-Security-Policy", value: isDev ? cspDev : cspProd },
         ],
       },
-      // Cache static assets in /source/ for 7 days (they are not hash-named)
+      // Cache static assets in /source/ for 30 days (they are not hash-named)
       {
         source: "/source/:path*",
         headers: [
           {
             key: "Cache-Control",
-            value: "public, max-age=604800, stale-while-revalidate=86400",
+            value: "public, max-age=2592000, stale-while-revalidate=86400",
           },
         ],
       },
