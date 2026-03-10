@@ -82,8 +82,8 @@ export interface BookableDay {
 
 export interface ExistingBooking {
   id: string;
-  startUtc: Date;
-  endUtc: Date;
+  startAt: Date;
+  endAt: Date;
   bufferBeforeMin: number;
   bufferAfterMin: number;
 }
@@ -112,8 +112,8 @@ function isSlotFree(
 ): boolean {
   // Check database bookings
   for (const booking of existingBookings) {
-    const bookingStart = new Date(booking.startUtc.getTime() - booking.bufferBeforeMin * 60 * 1000);
-    const bookingEnd = new Date(booking.endUtc.getTime() + booking.bufferAfterMin * 60 * 1000);
+    const bookingStart = new Date(booking.startAt.getTime() - booking.bufferBeforeMin * 60 * 1000);
+    const bookingEnd = new Date(booking.endAt.getTime() + booking.bufferAfterMin * 60 * 1000);
 
     if (slotStart < bookingEnd && slotEnd > bookingStart) {
       return false;
@@ -149,7 +149,7 @@ export function buildAvailableDays(
 ): BookableDay[] {
   const days: BookableDay[] = [];
 
-  // Use toLocaleString only for extracting NZ wall-clock hour/minute —
+  // Use toLocaleString only for extracting NZ wall-clock hour/minute -
   // getHours()/getMinutes() on the resulting Date give the correct NZ values
   // regardless of whether the server is in UTC or NZ local time.
   const nzTime = new Date(now.toLocaleString("en-US", { timeZone: config.timeZone }));
@@ -162,7 +162,7 @@ export function buildAvailableDays(
   const [startY, startM, startD] = todayNZStr.split("-").map(Number);
 
   for (let i = 0; i < config.maxAdvanceDays; i++) {
-    // UTC noon for day i — using noon avoids any DST-induced date-boundary shift
+    // UTC noon for day i - using noon avoids any DST-induced date-boundary shift
     // when extracting UTC date components. JavaScript's Date constructor handles
     // month/day overflow automatically (e.g. day 32 wraps to the next month).
     const dayUTC = new Date(Date.UTC(startY, startM - 1, startD + i, 12, 0, 0));
@@ -264,7 +264,7 @@ export function buildAvailableDays(
     // Check if day has any available slots
     const hasAnySlots = timeWindows.some((w) => w.availableShort || w.availableLong);
 
-    // Skip any day that has no available slots — fully-blocked days are not shown.
+    // Skip any day that has no available slots - fully-blocked days are not shown.
     if (!hasAnySlots) {
       continue;
     }

@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { isValidAdminToken } from "@/shared/lib/auth";
+import { reviewTextError } from "@/features/reviews/lib/validation";
 
 /**
  * POST /api/admin/reviews
@@ -28,19 +29,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const text = body.text?.trim();
-    if (!text || text.length < 10) {
-      return NextResponse.json(
-        { error: "Review must be at least 10 characters." },
-        { status: 400 },
-      );
-    }
-    if (text.length > 600) {
-      return NextResponse.json(
-        { error: "Review must be 600 characters or less." },
-        { status: 400 },
-      );
-    }
+    const text = body.text?.trim() ?? "";
+    const textErr = reviewTextError(text);
+    if (textErr) return NextResponse.json({ error: textErr }, { status: 400 });
 
     const isAnonymous = body.isAnonymous ?? false;
     const firstName = isAnonymous ? null : body.firstName?.trim() || null;

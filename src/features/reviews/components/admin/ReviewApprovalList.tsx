@@ -9,7 +9,6 @@ import { useState } from "react";
 import type React from "react";
 import type { ReviewRow } from "./review-types";
 import { ReviewCard } from "./ReviewCard";
-import { AddReviewForm } from "./AddReviewForm";
 import { SendReviewLinkForm } from "./SendReviewLinkForm";
 
 /**
@@ -76,9 +75,6 @@ export function ReviewApprovalList({
     <div className="flex flex-col gap-8">
       {/* Send review link to past client */}
       <SendReviewLinkForm token={token} />
-
-      {/* Add past review */}
-      <AddReviewForm token={token} onAdded={(row) => setApproved((prev) => [row, ...prev])} />
 
       {/* Pending */}
       <section>

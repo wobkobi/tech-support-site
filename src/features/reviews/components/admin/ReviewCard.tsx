@@ -5,10 +5,11 @@
  * @description Single review card with approve/revoke/delete actions.
  */
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { SOFT_CARD } from "@/shared/components/PageLayout";
 import { cn } from "@/shared/lib/cn";
-import { type ReviewRow, displayName, formatDate } from "./review-types";
+import { type ReviewRow, formatDate } from "./review-types";
+import { formatReviewerName } from "@/features/reviews/lib/formatting";
 import type React from "react";
 
 /**
@@ -46,6 +47,23 @@ export function ReviewCard({
 }: ReviewCardProps): React.ReactElement {
   const [loading, setLoading] = useState<"approve" | "revoke" | "delete" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    /**
+     * Closes the menu when a click occurs outside the menu element.
+     * @param e - The mouse event.
+     */
+    function handleClickOutside(e: MouseEvent): void {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [menuOpen]);
 
   /**
    * Calls the admin API to approve or revoke a review.
@@ -65,7 +83,7 @@ export function ReviewCard({
       if (action === "approve") onApprove?.();
       else onRevoke?.();
     } catch {
-      setError("Something went wrong. Try again.");
+      setError("Something went wrong.");
     } finally {
       setLoading(null);
     }
@@ -85,7 +103,7 @@ export function ReviewCard({
       if (!res.ok) throw new Error("Request failed");
       onDelete();
     } catch {
-      setError("Something went wrong. Try again.");
+      setError("Something went wrong.");
     } finally {
       setLoading(null);
     }
@@ -95,7 +113,7 @@ export function ReviewCard({
     <div className={cn(SOFT_CARD, "flex flex-col gap-3")}>
       {/* Header row */}
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-russian-violet font-semibold">{displayName(row)}</span>
+        <span className="text-russian-violet font-semibold">{formatReviewerName(row)}</span>
         {row.verified && (
           <span className="bg-moonstone-600/20 text-moonstone-600 rounded-full px-2 py-0.5 text-xs font-medium">
             Verified
@@ -113,7 +131,7 @@ export function ReviewCard({
       {error && <p className="text-coquelicot-400 text-xs">{error}</p>}
 
       {/* Actions */}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {onApprove && (
           <button
             onClick={() => patch("approve")}
@@ -125,26 +143,58 @@ export function ReviewCard({
             {loading === "approve" ? "Approving…" : "Approve"}
           </button>
         )}
-        {onRevoke && (
+
+        {/* More actions menu (Revoke + Delete) */}
+        <div ref={menuRef} className="relative ml-auto">
           <button
-            onClick={() => patch("revoke")}
+            type="button"
+            onClick={() => setMenuOpen((v) => !v)}
             disabled={loading !== null}
             className={cn(
-              "border-seasalt-400/60 hover:bg-seasalt-700 rounded-lg border px-4 py-1.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+              "border-seasalt-400/60 hover:bg-seasalt-700 rounded-lg border px-3 py-1.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50",
             )}
+            aria-label="More actions"
           >
-            {loading === "revoke" ? "Revoking…" : "Revoke"}
+            ⋯
           </button>
-        )}
-        <button
-          onClick={remove}
-          disabled={loading !== null}
-          className={cn(
-            "bg-coquelicot-500 hover:bg-coquelicot-600 ml-auto rounded-lg px-4 py-1.5 text-sm font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+          {menuOpen && (
+            <div
+              className={cn(
+                "border-seasalt-400/30 bg-seasalt absolute right-0 z-10 mt-1 flex min-w-32 flex-col rounded-lg border shadow-lg",
+              )}
+            >
+              {onRevoke && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    void patch("revoke");
+                  }}
+                  disabled={loading !== null}
+                  className={cn(
+                    "text-rich-black hover:bg-seasalt-700 rounded-t-lg px-4 py-2 text-left text-sm font-medium transition-colors disabled:opacity-50",
+                  )}
+                >
+                  {loading === "revoke" ? "Revoking…" : "Revoke"}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  void remove();
+                }}
+                disabled={loading !== null}
+                className={cn(
+                  "text-coquelicot-500 hover:bg-coquelicot-500/10 px-4 py-2 text-left text-sm font-medium transition-colors disabled:opacity-50",
+                  onRevoke ? "rounded-b-lg" : "rounded-lg",
+                )}
+              >
+                {loading === "delete" ? "Deleting…" : "Delete"}
+              </button>
+            </div>
           )}
-        >
-          {loading === "delete" ? "Deleting…" : "Delete"}
-        </button>
+        </div>
       </div>
     </div>
   );

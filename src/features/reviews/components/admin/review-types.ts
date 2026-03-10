@@ -27,17 +27,6 @@ export interface ReviewRow {
 }
 
 /**
- * Formats a reviewer's display name.
- * @param row - Review row data.
- * @returns Formatted display name string.
- */
-export function displayName(row: ReviewRow): string {
-  if (row.isAnonymous) return "Anonymous";
-  const name = [row.firstName, row.lastName].filter(Boolean).join(" ");
-  return name || "Unknown";
-}
-
-/**
  * Formats a date as a short localised string.
  * @param date - Date to format.
  * @returns Formatted date string.

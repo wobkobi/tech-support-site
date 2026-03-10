@@ -25,7 +25,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const expired = await prisma.booking.findMany({
       where: {
         status: "held",
-        holdExpiresUtc: { lte: now },
+        holdExpiresAt: { lte: now },
       },
       select: { id: true },
     });
