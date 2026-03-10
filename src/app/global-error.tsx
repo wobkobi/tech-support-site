@@ -25,7 +25,7 @@ export default function GlobalError({
   error: Error;
   reset: () => void;
 }): React.ReactElement {
-  const msg = (error?.message || "").trim().slice(0, 300) || "The app hit an unexpected error.";
+  const msg = (error?.message || "").trim().slice(0, 300) || "An unexpected error occurred.";
 
   return (
     <html lang="en-NZ">

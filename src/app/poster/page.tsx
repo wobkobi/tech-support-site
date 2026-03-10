@@ -51,7 +51,7 @@ const servicesText =
 
 /**
  * Poster page component for A5 export.
- * Accepts an optional `mode` search param — set to "print" for a 3mm bleed version.
+ * Accepts an optional `mode` search param - set to "print" for a 3mm bleed version.
  * @param root0 - Page props.
  * @param root0.searchParams - Next.js search params promise.
  * @returns Poster page element

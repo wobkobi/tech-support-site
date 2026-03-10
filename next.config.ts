@@ -58,6 +58,16 @@ const nextConfig: NextConfig = {
           { key: "Content-Security-Policy", value: isDev ? cspDev : cspProd },
         ],
       },
+      // Cache static assets in /source/ for 7 days (they are not hash-named)
+      {
+        source: "/source/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=604800, stale-while-revalidate=86400",
+          },
+        ],
+      },
     ];
   },
 

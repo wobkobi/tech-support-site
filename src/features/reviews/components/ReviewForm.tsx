@@ -11,12 +11,26 @@ import { cn } from "@/shared/lib/cn";
 import { Button } from "@/shared/components/Button";
 import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
+import { formatNZPhone, normalizePhone, isValidPhone } from "@/shared/lib/normalize-phone";
+
+type NameDisplay = "name" | "anonymous";
 
 interface ReviewFormProtectedProps {
   bookingId?: string;
   reviewRequestId?: string;
   token?: string;
   prefillName?: string;
+  /** Pre-filled email from the booking or review request record */
+  prefillEmail?: string;
+  /** Pre-filled phone from the review request record */
+  prefillPhone?: string;
+  existingReview?: {
+    id: string;
+    text: string;
+    firstName: string | null;
+    lastName: string | null;
+    isAnonymous: boolean;
+  };
 }
 
 /**
@@ -26,6 +40,9 @@ interface ReviewFormProtectedProps {
  * @param props.reviewRequestId - ReviewRequest ID for verified reviews from manual requests
  * @param props.token - Review token for verification
  * @param props.prefillName - Pre-fill customer name
+ * @param props.prefillEmail - Pre-fill email from booking/review request
+ * @param props.prefillPhone - Pre-fill phone from review request
+ * @param props.existingReview - Existing review data for editing
  * @returns Review form element
  */
 export default function ReviewFormProtected({
@@ -33,22 +50,46 @@ export default function ReviewFormProtected({
   reviewRequestId,
   token,
   prefillName,
+  prefillEmail,
+  prefillPhone,
+  existingReview,
 }: ReviewFormProtectedProps): React.ReactElement {
   const router = useRouter();
   const firstId = useId();
   const lastId = useId();
-  const anonId = useId();
   const textId = useId();
+  const emailId = useId();
+  const phoneId = useId();
 
+  const isEditing = !!existingReview;
   const isVerified = !!((bookingId || reviewRequestId) && token);
-  const nameParts = prefillName?.split(" ") || [];
-  const defaultFirst = nameParts[0] || "";
-  const defaultLast = nameParts.slice(1).join(" ") || "";
 
+  // Derive initial name display mode from existing review or booking name
+  /**
+   * Returns the initial name display mode based on existing review data or booking name.
+   * @returns The name display mode: "anonymous", "full", or "first".
+   */
+  function initialNameDisplay(): NameDisplay {
+    if (existingReview) {
+      if (existingReview.isAnonymous) return "anonymous";
+    }
+    return "name";
+  }
+
+  const nameParts = prefillName?.split(" ") || [];
+  const defaultFirst = existingReview?.firstName ?? nameParts[0] ?? "";
+  const defaultLast = existingReview?.lastName ?? nameParts.slice(1).join(" ") ?? "";
+
+  const [nameDisplay, setNameDisplay] = useState<NameDisplay>(initialNameDisplay);
   const [firstName, setFirstName] = useState(defaultFirst);
   const [lastName, setLastName] = useState(defaultLast);
-  const [text, setText] = useState("");
-  const [isAnonymous, setIsAnonymous] = useState(false);
+  const [text, setText] = useState(existingReview?.text ?? "");
+  // Contact details - pre-filled from booking/review request if available
+  const [contactEmail, setContactEmail] = useState(prefillEmail ?? "");
+  // Store raw phone digits internally; display formatted
+  const [phoneInput, setPhoneInput] = useState(
+    prefillPhone ? formatNZPhone(normalizePhone(prefillPhone)) : "",
+  );
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
@@ -56,6 +97,15 @@ export default function ReviewFormProtected({
   const textMax = 600;
   const textMin = 10;
   const textCount = text.length;
+  const isAnonymous = nameDisplay === "anonymous";
+
+  const phoneNormalized = normalizePhone(phoneInput);
+  const phoneInvalid = !!phoneInput.trim() && !isValidPhone(phoneNormalized);
+
+  const NAME_OPTIONS: { value: NameDisplay; label: string }[] = [
+    { value: "name", label: "Name" },
+    { value: "anonymous", label: "Anonymous" },
+  ];
 
   /**
    * Submit handler
@@ -70,7 +120,6 @@ export default function ReviewFormProtected({
     const f = firstName.trim();
     const l = lastName.trim();
 
-    // Validation
     if (!t) {
       setErrorMsg("Please write a short review.");
       return;
@@ -87,32 +136,50 @@ export default function ReviewFormProtected({
       setErrorMsg("First name is required unless posting anonymously.");
       return;
     }
+    if (phoneInvalid) {
+      setErrorMsg("Please enter a valid phone number or leave it blank.");
+      return;
+    }
 
     setLoading(true);
     try {
-      const res = await fetch("/api/reviews", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text: t,
-          firstName: isAnonymous ? null : f,
-          lastName: isAnonymous ? null : l,
-          isAnonymous,
-          bookingId: isVerified ? bookingId : undefined,
-          reviewRequestId: isVerified ? reviewRequestId : undefined,
-          reviewToken: isVerified ? token : undefined,
-        }),
-      });
+      let res: Response;
+
+      const payload = {
+        text: t,
+        firstName: isAnonymous ? null : f,
+        lastName: isAnonymous ? null : l || null,
+        isAnonymous,
+        contactEmail: contactEmail.trim() || null,
+        contactPhone: phoneNormalized || null,
+      };
+
+      if (isEditing) {
+        res = await fetch(`/api/reviews/${existingReview.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...payload, customerRef: token }),
+        });
+      } else {
+        res = await fetch("/api/reviews", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...payload,
+            bookingId: isVerified ? bookingId : undefined,
+            reviewRequestId: isVerified ? reviewRequestId : undefined,
+            reviewToken: isVerified ? token : undefined,
+          }),
+        });
+      }
 
       if (!res.ok) {
         const data = await res.json().catch(() => null);
-        const errorMessage = data?.error || `Request failed with ${res.status}`;
-        throw new Error(errorMessage);
+        throw new Error(data?.error || `Request failed with ${res.status}`);
       }
 
       setSent(true);
 
-      // Redirect to thank you page after 2 seconds
       setTimeout(() => {
         router.push("/");
       }, 2000);
@@ -158,7 +225,9 @@ export default function ReviewFormProtected({
           )}
         >
           {errorMsg ??
-            "Thanks for your review! It will appear on the site after approval. Redirecting..."}
+            (isEditing
+              ? "Review updated! It will reappear on the site after approval. Redirecting..."
+              : "Thanks for your review! It will appear on the site after approval. Redirecting...")}
         </div>
       )}
 
@@ -166,62 +235,160 @@ export default function ReviewFormProtected({
       <div
         className={cn("border-seasalt-400/80 bg-seasalt-900/60 space-y-4 rounded-xl border p-4")}
       >
-        <div className={cn("flex items-center gap-3")}>
-          <input
-            id={anonId}
-            type="checkbox"
-            className={cn("accent-moonstone-600 h-4 w-4")}
-            checked={isAnonymous}
-            onChange={(e) => setIsAnonymous(e.target.checked)}
-            disabled={loading}
-          />
-          <label htmlFor={anonId} className={cn("text-rich-black text-sm font-semibold")}>
-            Post as Anonymous
-          </label>
+        {/* Name display options */}
+        <div>
+          <p className={cn("text-rich-black mb-2 text-sm font-semibold")}>
+            How do you want to appear?
+          </p>
+          <div className={cn("flex flex-wrap gap-2")}>
+            {NAME_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                disabled={loading}
+                onClick={() => setNameDisplay(opt.value)}
+                className={cn(
+                  "rounded-lg border px-4 py-1.5 text-sm font-medium transition-colors",
+                  nameDisplay === opt.value
+                    ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
+                    : "border-seasalt-400/60 bg-seasalt text-rich-black hover:border-russian-violet/40",
+                )}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Live name preview */}
+        <p className={cn("text-rich-black/60 text-xs")}>
+          {"Appears as: "}
+          <span className={cn("text-russian-violet font-semibold")}>
+            {nameDisplay === "anonymous"
+              ? "Anonymous"
+              : (() => {
+                  const f = firstName.trim();
+                  const l = lastName.trim();
+                  if (!f) return "(enter first name)";
+                  return l ? `${f} ${l}` : f;
+                })()}
+          </span>
+        </p>
+
+        {/* Name inputs - hidden when anonymous */}
+        {!isAnonymous && (
+          <div className={cn("grid grid-cols-1 gap-3 sm:grid-cols-2")}>
+            <div>
+              <label
+                htmlFor={firstId}
+                className={cn("text-rich-black mb-1 block text-sm font-semibold")}
+              >
+                First name <span className={cn("text-coquelicot-500")}>*</span>
+              </label>
+              <input
+                id={firstId}
+                type="text"
+                autoComplete="given-name"
+                className={cn(
+                  "border-seasalt-400/60 bg-seasalt text-rich-black focus:ring-moonstone-500/50",
+                  "w-full rounded-md border px-3 py-2 outline-none focus:ring-2",
+                )}
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                maxLength={60}
+                required
+                disabled={loading}
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor={lastId}
+                className={cn("text-rich-black mb-1 block text-sm font-semibold")}
+              >
+                Last name <span className={cn("text-rich-black/50 font-normal")}>(optional)</span>
+              </label>
+              <input
+                id={lastId}
+                type="text"
+                autoComplete="family-name"
+                className={cn(
+                  "border-seasalt-400/60 bg-seasalt text-rich-black focus:ring-moonstone-500/50",
+                  "w-full rounded-md border px-3 py-2 outline-none focus:ring-2",
+                )}
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                maxLength={60}
+                disabled={loading}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Optional contact details */}
+      <div
+        className={cn("border-seasalt-400/80 bg-seasalt-900/60 space-y-3 rounded-xl border p-4")}
+      >
+        <div>
+          <p className={cn("text-rich-black text-sm font-semibold")}>
+            Stay in touch <span className={cn("text-rich-black/40 font-normal")}>(optional)</span>
+          </p>
+          <p className={cn("text-rich-black/50 mt-0.5 text-xs")}>
+            Leave your number or email if you&apos;d like me to be able to reach you - totally up to
+            you.
+          </p>
         </div>
 
         <div className={cn("grid grid-cols-1 gap-3 sm:grid-cols-2")}>
-          <div className={cn(isAnonymous && "opacity-60")}>
+          <div>
             <label
-              htmlFor={firstId}
+              htmlFor={phoneId}
               className={cn("text-rich-black mb-1 block text-sm font-semibold")}
             >
-              First name {!isAnonymous && <span className={cn("text-coquelicot-500")}>*</span>}
+              Phone
             </label>
             <input
-              id={firstId}
-              type="text"
-              autoComplete="given-name"
+              id={phoneId}
+              type="tel"
+              autoComplete="tel"
+              placeholder="021 123 1234"
               className={cn(
                 "border-seasalt-400/60 bg-seasalt text-rich-black focus:ring-moonstone-500/50",
                 "w-full rounded-md border px-3 py-2 outline-none focus:ring-2",
+                phoneInvalid ? "border-coquelicot-500/60" : "",
               )}
-              value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
-              maxLength={60}
-              required={!isAnonymous}
-              disabled={loading || isAnonymous}
+              value={phoneInput}
+              onChange={(e) => setPhoneInput(e.target.value)}
+              onBlur={(e) => setPhoneInput(formatNZPhone(e.target.value))}
+              disabled={loading}
             />
+            {phoneInvalid && (
+              <p className={cn("text-coquelicot-400 mt-1 text-xs")}>
+                Doesn&apos;t look right - check the number.
+              </p>
+            )}
           </div>
-          <div className={cn(isAnonymous && "opacity-60")}>
+
+          <div>
             <label
-              htmlFor={lastId}
+              htmlFor={emailId}
               className={cn("text-rich-black mb-1 block text-sm font-semibold")}
             >
-              Last name
+              Email
             </label>
             <input
-              id={lastId}
-              type="text"
-              autoComplete="family-name"
+              id={emailId}
+              type="email"
+              autoComplete="email"
+              placeholder="you@example.com"
               className={cn(
                 "border-seasalt-400/60 bg-seasalt text-rich-black focus:ring-moonstone-500/50",
                 "w-full rounded-md border px-3 py-2 outline-none focus:ring-2",
               )}
-              value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
-              maxLength={60}
-              disabled={loading || isAnonymous}
+              value={contactEmail}
+              onChange={(e) => setContactEmail(e.target.value)}
+              disabled={loading}
             />
           </div>
         </div>
@@ -268,9 +435,9 @@ export default function ReviewFormProtected({
             type="submit"
             variant="secondary"
             size="sm"
-            disabled={loading || textCount < textMin}
+            disabled={loading || textCount < textMin || phoneInvalid}
           >
-            {loading ? "Sending..." : "Send review"}
+            {loading ? "Sending..." : isEditing ? "Update review" : "Send review"}
           </Button>
         </div>
       </div>

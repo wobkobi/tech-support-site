@@ -37,12 +37,12 @@ async function getCalendarEvents(
   const cachedEvents = await prisma.calendarEventCache.findMany({
     where: {
       expiresAt: { gt: now },
-      endUtc: { gte: now },
+      endAt: { gte: now },
     },
     select: {
       eventId: true,
-      startUtc: true,
-      endUtc: true,
+      startAt: true,
+      endAt: true,
     },
   });
 
@@ -50,8 +50,8 @@ async function getCalendarEvents(
     console.log(`[booking/page] Using ${cachedEvents.length} cached calendar events`);
     return cachedEvents.map((e) => ({
       id: e.eventId,
-      start: e.startUtc.toISOString(),
-      end: e.endUtc.toISOString(),
+      start: e.startAt.toISOString(),
+      end: e.endAt.toISOString(),
     }));
   }
 
@@ -71,14 +71,14 @@ async function getCalendarEvents(
           create: {
             eventId: e.id,
             calendarEmail: e.calendarEmail,
-            startUtc: new Date(e.start),
-            endUtc: new Date(e.end),
+            startAt: new Date(e.start),
+            endAt: new Date(e.end),
             fetchedAt: now,
             expiresAt: cacheExpiry,
           },
           update: {
-            startUtc: new Date(e.start),
-            endUtc: new Date(e.end),
+            startAt: new Date(e.start),
+            endAt: new Date(e.end),
             fetchedAt: now,
             expiresAt: cacheExpiry,
           },
@@ -110,12 +110,12 @@ async function getAvailableDays(): Promise<BookableDay[]> {
     prisma.booking.findMany({
       where: {
         status: { in: ["held", "confirmed"] },
-        endUtc: { gte: now },
+        endAt: { gte: now },
       },
       select: {
         id: true,
-        startUtc: true,
-        endUtc: true,
+        startAt: true,
+        endAt: true,
         bufferBeforeMin: true,
         bufferAfterMin: true,
       },
@@ -125,8 +125,8 @@ async function getAvailableDays(): Promise<BookableDay[]> {
 
   const existingForSlots: ExistingBooking[] = existingBookings.map((b) => ({
     id: b.id,
-    startUtc: b.startUtc,
-    endUtc: b.endUtc,
+    startAt: b.startAt,
+    endAt: b.endAt,
     bufferBeforeMin: b.bufferBeforeMin,
     bufferAfterMin: b.bufferAfterMin,
   }));

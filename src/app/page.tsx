@@ -6,6 +6,7 @@
 
 import type React from "react";
 import Reviews, { type ReviewItem } from "@/features/reviews/components/Reviews";
+import { formatReviewerName } from "@/features/reviews/lib/formatting";
 import { FrostedSection, PageShell } from "@/shared/components/PageLayout";
 import { Button } from "@/shared/components/Button";
 import { cn } from "@/shared/lib/cn";
@@ -72,11 +73,12 @@ export default async function Home(): Promise<React.ReactElement> {
   });
 
   const items: ReviewItem[] = rows.map((r) => ({
-    // Normalize whitespace: collapse newlines/multiple spaces to single space, trim edges
     text: r.text.trim().replace(/\s+/g, " "),
-    firstName: r.firstName?.trim() || null,
-    lastName: r.lastName?.trim() || null,
-    isAnonymous: r.isAnonymous,
+    name: formatReviewerName({
+      firstName: r.firstName?.trim() || null,
+      lastName: r.lastName?.trim() || null,
+      isAnonymous: r.isAnonymous,
+    }),
   }));
 
   const hasReviews = items.length > 0;
@@ -86,7 +88,7 @@ export default async function Home(): Promise<React.ReactElement> {
       <FrostedSection>
         <div className={cn("flex flex-col gap-6 sm:gap-8")}>
           {/* Hero Section */}
-          <section aria-labelledby="hero-heading" className={cn("animate-fade-in text-center")}>
+          <section aria-labelledby="hero-heading" className={cn("text-center")}>
             <div className={cn("mb-6 grid place-items-center")}>
               <Image
                 src="/source/logo-full.svg"

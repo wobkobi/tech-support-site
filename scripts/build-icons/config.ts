@@ -253,7 +253,7 @@ export interface BackdropVariant {
 }
 
 export const BACKDROP_VARIANTS: BackdropVariant[] = [
-  // Site page background — heavily blurred in CSS, so tiny size + low quality is invisible
+  // Site page background - heavily blurred in CSS, so tiny size + low quality is invisible
   { name: "backdrop-blur", width: 800, quality: 30, format: "webp" },
 ];
 
