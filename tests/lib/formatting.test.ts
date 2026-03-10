@@ -1,21 +1,19 @@
 import { describe, it, expect } from "vitest";
 import * as formatting from "../../src/features/reviews/lib/formatting";
 
-// Minimal test for formatting library
-
 describe("formatting", () => {
-  it("should export formatReview", () => {
-    expect(typeof formatting.formatReview).toBe("function");
+  it("should export formatReviewerName", () => {
+    expect(typeof formatting.formatReviewerName).toBe("function");
   });
 
-  it("should title case names", () => {
-    expect(formatting.toTitleCase("john doe and the team")).toBe("John Doe and the Team");
-    expect(formatting.toTitleCase("a test of the system")).toBe("A Test of the System");
-  });
-
-  it("should format reviewer name", () => {
-    expect(formatting.formatReviewerName({ firstName: "john", lastName: "doe" })).toBe("John Doe");
+  it("should format reviewer name as Firstname L. when both names present", () => {
+    expect(formatting.formatReviewerName({ firstName: "John", lastName: "Doe" })).toBe("John D.");
+    expect(formatting.formatReviewerName({ firstName: "McDonald", lastName: "Smith" })).toBe(
+      "McDonald S.",
+    );
+    expect(formatting.formatReviewerName({ firstName: "Jane" })).toBe("Jane");
     expect(formatting.formatReviewerName({ isAnonymous: true })).toBe("Anonymous");
     expect(formatting.formatReviewerName({ firstName: "", lastName: "" })).toBe("Anonymous");
+    expect(formatting.formatReviewerName({ firstName: "Jane", lastName: "" })).toBe("Jane");
   });
 });

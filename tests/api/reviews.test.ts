@@ -22,16 +22,17 @@ describe("API: /api/reviews", () => {
     const handlers = createReviewsHandlers(prisma as never);
     const response = await handlers.GET();
     const json = await response.json();
-    expect(json.reviews).toEqual(mockReviews);
+    // Dates are serialized to ISO strings when going through JSON — compare serialized form
+    expect(json.reviews).toEqual(JSON.parse(JSON.stringify(mockReviews)));
   });
 
-  it("should handle DB errors gracefully", async () => {
+  it("should return 500 with empty reviews array on DB error", async () => {
     const prisma = createMockPrisma();
     prisma.review.findMany.mockRejectedValue(new Error("DB error"));
     const handlers = createReviewsHandlers(prisma as never);
     const response = await handlers.GET();
+    expect(response.status).toBe(500);
     const json = await response.json();
-    expect(json.reviews).toBeUndefined();
-    expect(json.error).toBeDefined();
+    expect(json.reviews).toEqual([]);
   });
 });

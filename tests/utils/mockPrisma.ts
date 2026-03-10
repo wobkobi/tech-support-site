@@ -1,4 +1,4 @@
-// test/utils/mockPrisma.ts
+// tests/utils/mockPrisma.ts
 
 import { vi } from "vitest";
 import { type Mock } from "vitest";
@@ -28,6 +28,7 @@ export function mockPrisma(): {
     findFirst: Mock;
     create: Mock;
     update: Mock;
+    updateMany: Mock;
     delete: Mock;
   };
   reviewRequest: {
@@ -36,7 +37,13 @@ export function mockPrisma(): {
     findFirst: Mock;
     create: Mock;
     update: Mock;
+    updateMany: Mock;
     delete: Mock;
+  };
+  calendarEventCache: {
+    findMany: Mock;
+    deleteMany: Mock;
+    upsert: Mock;
   };
 } {
   return {
@@ -60,6 +67,7 @@ export function mockPrisma(): {
       findFirst: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
       delete: vi.fn(),
     },
     reviewRequest: {
@@ -68,7 +76,13 @@ export function mockPrisma(): {
       findFirst: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
       delete: vi.fn(),
+    },
+    calendarEventCache: {
+      findMany: vi.fn(),
+      deleteMany: vi.fn(),
+      upsert: vi.fn(),
     },
   };
 }
