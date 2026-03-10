@@ -12,7 +12,7 @@
     "db:push": "prisma db push",
     "seed": "tsx prisma/seed.ts",
     "lint": "eslint \"{src,tests,scripts}/**/*.{js,ts,jsx,tsx}\"",
-    "format": "prettier --write \"**/*.{js,ts,jsx,tsx,css,md,json}\"",
+    "format": "prettier --write \"**/*.{js,ts,jsx,tsx,mjs,css,html,md,json,yml,yaml}\"",
     "build:icons": "tsx scripts/build-icons/index.ts",
     "build:poster": "npx tsx scripts/export-poster-screenshot.ts",
     "build:all": "npm run build:icons && npm run build",
@@ -98,10 +98,10 @@
     "pre-commit": "npx lint-staged"
   },
   "lint-staged": {
-    "*.{js,jsx,ts,tsx}": [
+    "**/*.{js,jsx,ts,tsx}": [
       "prettier --write",
       "eslint --max-warnings=0"
     ],
-    "*.{css,html,json,md,mjs,yml,yaml}": "prettier --write"
+    "**/*.{css,html,json,md,mjs,yml,yaml}": "prettier --write"
   }
 }
