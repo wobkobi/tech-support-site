@@ -32,7 +32,7 @@ async function main(): Promise<void> {
   const docs = raw as unknown as LegacyReview[];
 
   if (docs.length === 0) {
-    console.log("No legacy reviews found — nothing to migrate.");
+    console.log("No legacy reviews found - nothing to migrate.");
     return;
   }
 

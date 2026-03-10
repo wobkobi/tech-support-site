@@ -68,7 +68,7 @@ function ReviewCard({ r, className }: { r: ReviewItem; className: string }): Rea
             "text-russian-violet mt-auto pt-3 text-right text-xs font-semibold sm:text-sm",
           )}
         >
-          — {r.name}
+          - {r.name}
         </p>
       </Link>
     </li>

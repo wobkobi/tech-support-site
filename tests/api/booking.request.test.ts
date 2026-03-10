@@ -44,10 +44,10 @@ function makeRequest(body: object): NextRequest {
 // A valid payload for a remote booking tomorrow (date must stay in the future relative to test run)
 // Using a date far in advance ensures it doesn't accidentally become "past" during CI runs.
 // The test bypasses validateBookingRequest's "too far in advance" check by using a date
-// within 14 days — we rely on the mocked prisma/calendar to skip actual DB checks.
+// within 14 days - we rely on the mocked prisma/calendar to skip actual DB checks.
 // For simplicity we re-use 2026-03-10 which is 1 day after the fixed NOW used in unit tests.
 // In integration testing, "now" comes from `new Date()` inside the route, so we need a real
-// future date. Use 2099-06-15 (well within the future) — validateBookingRequest will reject
+// future date. Use 2099-06-15 (well within the future) - validateBookingRequest will reject
 // it as >14 days ahead. So we pick a date that falls within the next 14 days from when the
 // tests actually run by computing it dynamically.
 /**
@@ -60,7 +60,7 @@ function futureDateKey(): string {
   return d.toLocaleDateString("en-CA", { timeZone: "Pacific/Auckland" });
 }
 
-describe("POST /api/booking/request — success and error paths", () => {
+describe("POST /api/booking/request - success and error paths", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.bookingFindMany.mockResolvedValue([]);

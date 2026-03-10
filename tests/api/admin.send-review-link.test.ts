@@ -124,7 +124,7 @@ describe("API: /api/admin/send-review-link POST", () => {
     expect(json.error).toMatch(/email/i);
   });
 
-  it("creates a reviewRequest and sends email — returns ok:true", async () => {
+  it("creates a reviewRequest and sends email - returns ok:true", async () => {
     (isValidAdminToken as ReturnType<typeof vi.fn>).mockReturnValue(true);
     (prisma.reviewRequest.create as ReturnType<typeof vi.fn>).mockResolvedValue({
       id: "rr-1",

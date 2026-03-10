@@ -160,6 +160,3 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Failed to submit review." }, { status: 500 });
   }
 }
-
-// Next.js API route export for POST
-// Removed duplicate export { POST } to fix redeclaration error

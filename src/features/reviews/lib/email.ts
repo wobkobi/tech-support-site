@@ -39,7 +39,6 @@ export interface ReviewNotificationData {
  * @returns Promise that resolves when the email is sent (or silently fails).
  */
 export async function sendOwnerReviewNotification(review: ReviewNotificationData): Promise<void> {
-  // Removed unused adminSecret variable
   const adminEmail = process.env.ADMIN_EMAIL;
   const from = process.env.EMAIL_FROM;
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz";
@@ -73,7 +72,7 @@ export async function sendOwnerReviewNotification(review: ReviewNotificationData
     ${
       !review.verified
         ? `<a href="${adminUrl}" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:600;font-size:14px">Review &amp; Approve →</a>`
-        : ""
+        : `<p style="margin-top:12px;margin-bottom:0;color:#555;font-size:14px">This review has been verified.</p>`
     }
   </div>
 </body>

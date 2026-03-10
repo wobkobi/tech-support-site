@@ -45,7 +45,7 @@ export default async function ReviewsPage(): Promise<React.ReactElement> {
 
   return (
     <PageShell>
-      <FrostedSection maxWidth="72rem">
+      <FrostedSection maxWidth="56rem">
         <div className={cn("flex flex-col gap-6 sm:gap-8")}>
           <section aria-labelledby="reviews-heading" className={cn(CARD, "animate-fade-in")}>
             <h1

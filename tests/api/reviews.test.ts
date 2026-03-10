@@ -22,7 +22,7 @@ describe("API: /api/reviews", () => {
     const handlers = createReviewsHandlers(prisma as never);
     const response = await handlers.GET();
     const json = await response.json();
-    // Dates are serialized to ISO strings when going through JSON — compare serialized form
+    // Dates are serialized to ISO strings when going through JSON - compare serialized form
     expect(json.reviews).toEqual(JSON.parse(JSON.stringify(mockReviews)));
   });
 

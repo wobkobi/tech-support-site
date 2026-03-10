@@ -56,7 +56,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
 
     if (customerRef) {
-      // Legacy review with existing token — create or update ReviewRequest with that token
+      // Legacy review with existing token - create or update ReviewRequest with that token
       const existing = await prisma.reviewRequest.findUnique({
         where: { reviewToken: customerRef },
         select: { id: true },
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       });
     }
 
-    // Tokenless legacy review — generate a fresh token, create ReviewRequest,
+    // Tokenless legacy review - generate a fresh token, create ReviewRequest,
     // and back-link the original Review record so it no longer appears as tokenless.
     const reviewRequest = await prisma.reviewRequest.create({
       data: {

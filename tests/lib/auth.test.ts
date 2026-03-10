@@ -38,7 +38,7 @@ describe("isValidAdminToken", () => {
     expect(isValidAdminToken("wrong-secret")).toBe(false);
   });
 
-  it("returns false when token length differs from secret (timingSafeEqual throws — caught)", () => {
+  it("returns false when token length differs from secret (timingSafeEqual throws - caught)", () => {
     // timingSafeEqual requires equal-length buffers; mismatch is caught and returns false
     expect(isValidAdminToken("short")).toBe(false);
   });

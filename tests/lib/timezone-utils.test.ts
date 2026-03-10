@@ -5,25 +5,25 @@ describe("getPacificAucklandOffset", () => {
   // NZ Daylight Time (NZDT) = UTC+13: roughly October through April
   // NZ Standard Time (NZST) = UTC+12: roughly April through September
 
-  it("returns 13 (NZDT) for a summer date — January", () => {
+  it("returns 13 (NZDT) for a summer date - January", () => {
     expect(getPacificAucklandOffset(2026, 1, 15)).toBe(13);
   });
 
-  it("returns 13 (NZDT) for a late-summer date — March", () => {
+  it("returns 13 (NZDT) for a late-summer date - March", () => {
     expect(getPacificAucklandOffset(2026, 3, 1)).toBe(13);
   });
 
-  it("returns 12 (NZST) for a winter date — July", () => {
+  it("returns 12 (NZST) for a winter date - July", () => {
     expect(getPacificAucklandOffset(2026, 7, 15)).toBe(12);
   });
 
-  it("returns 12 (NZST) for a mid-winter date — August", () => {
+  it("returns 12 (NZST) for a mid-winter date - August", () => {
     expect(getPacificAucklandOffset(2026, 8, 1)).toBe(12);
   });
 
-  it("returns 12 (NZST) for a late-winter date — September (before DST end)", () => {
-    // DST in NZ ends in April (clocks go back); Sep is still standard time
-    expect(getPacificAucklandOffset(2026, 6, 15)).toBe(12);
+  it("returns 12 (NZST) for a late-winter date - September (before DST restarts)", () => {
+    // DST in NZ restarts late September; Sep 15 is still standard time
+    expect(getPacificAucklandOffset(2026, 9, 15)).toBe(12);
   });
 
   it("returns a number (12 or 13) for any valid date", () => {

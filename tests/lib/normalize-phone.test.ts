@@ -83,7 +83,7 @@ describe("toE164NZ", () => {
   });
 
   it("returns raw digits for unknown format without +", () => {
-    // 10-digit number not matching NZ mobile short prefixes — returned as digits
+    // 10-digit number not matching NZ mobile short prefixes - returned as digits
     expect(toE164NZ("1234567890")).toBe("1234567890");
   });
 });

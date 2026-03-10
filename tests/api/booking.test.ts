@@ -41,7 +41,7 @@ function makeRequest(body: object): NextRequest {
   return { json: async () => body } as unknown as NextRequest;
 }
 
-describe("POST /api/booking/request — input validation", () => {
+describe("POST /api/booking/request - input validation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.bookingFindMany.mockResolvedValue([]);
