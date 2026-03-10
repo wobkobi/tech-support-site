@@ -32,7 +32,7 @@ export const metadata: Metadata = {
   applicationName: "To The Point Tech",
   authors: [{ name: "Harrison Raynes" }],
   verification: {
-    google: "googlee1c4a0306ab147cb",
+    google: "4Pldue9HoMplv4Rs8C8I_r1FXtenFKX_O4f0_fdhOtw",
   },
 
   alternates: {
