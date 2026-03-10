@@ -69,12 +69,12 @@ export async function GET(): Promise<NextResponse<AvailableDaysResponse>> {
     const existingBookings = await prisma.booking.findMany({
       where: {
         status: { in: ["held", "confirmed"] },
-        endUtc: { gte: now }, // Only future bookings matter
+        endAt: { gte: now }, // Only future bookings matter
       },
       select: {
         id: true,
-        startUtc: true,
-        endUtc: true,
+        startAt: true,
+        endAt: true,
         bufferBeforeMin: true,
         bufferAfterMin: true,
       },
@@ -82,8 +82,8 @@ export async function GET(): Promise<NextResponse<AvailableDaysResponse>> {
 
     const existingForSlots: ExistingBooking[] = existingBookings.map((b) => ({
       id: b.id,
-      startUtc: b.startUtc,
-      endUtc: b.endUtc,
+      startAt: b.startAt,
+      endAt: b.endAt,
       bufferBeforeMin: b.bufferBeforeMin,
       bufferAfterMin: b.bufferAfterMin,
     }));

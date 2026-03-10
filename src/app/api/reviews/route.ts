@@ -6,36 +6,51 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { prisma } from "@/shared/lib/prisma";
+import { prisma as prismaClient } from "@/shared/lib/prisma";
 import { sendOwnerReviewNotification } from "@/features/reviews/lib/email";
+import { normalizePhone } from "@/shared/lib/normalize-phone";
+import { reviewTextError } from "@/features/reviews/lib/validation";
 
 /**
- * GET /api/reviews
- * Returns all approved reviews ordered by most recent first.
- * @returns JSON response with a reviews array, or an empty array on error.
+ * Factory for reviews API handlers, allows dependency injection of Prisma client.
+ * @param prisma - Prisma client instance to use for DB operations.
+ * @returns Handlers for GET (and optionally POST).
  */
-export async function GET(): Promise<NextResponse> {
-  try {
-    const reviews = await prisma.review.findMany({
-      where: { status: "approved" },
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        text: true,
-        firstName: true,
-        lastName: true,
-        isAnonymous: true,
-        verified: true,
-        createdAt: true,
-      },
-    });
-
-    return NextResponse.json({ reviews });
-  } catch (error) {
-    console.error("[reviews] GET error:", error);
-    return NextResponse.json({ reviews: [] }, { status: 500 });
-  }
+export function createReviewsHandlers(prisma = prismaClient): {
+  GET: () => Promise<NextResponse>;
+} {
+  return {
+    /**
+     * Handles GET requests for reviews.
+     * @returns JSON response with approved reviews or error.
+     */
+    async GET(): Promise<NextResponse> {
+      try {
+        const reviews = await prisma.review.findMany({
+          where: { status: "approved" },
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            text: true,
+            firstName: true,
+            lastName: true,
+            isAnonymous: true,
+            verified: true,
+            createdAt: true,
+          },
+        });
+        return NextResponse.json({ reviews });
+      } catch (error) {
+        console.error("[reviews] GET error:", error);
+        return NextResponse.json({ reviews: [] }, { status: 500 });
+      }
+    },
+    // ...existing POST handler will be moved below
+  };
 }
+
+// Default export for Next.js API route
+export const GET = createReviewsHandlers().GET;
 
 /**
  * POST /api/reviews
@@ -45,6 +60,7 @@ export async function GET(): Promise<NextResponse> {
  * @returns JSON response with ok flag and review id on success (201), or an error message on failure.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  const prisma = prismaClient;
   try {
     const body = (await request.json()) as {
       text?: string;
@@ -54,21 +70,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       bookingId?: string;
       reviewRequestId?: string;
       reviewToken?: string;
+      contactEmail?: string;
+      contactPhone?: string;
     };
 
-    const text = body.text?.trim();
-    if (!text || text.length < 10) {
-      return NextResponse.json(
-        { error: "Review must be at least 10 characters." },
-        { status: 400 },
-      );
-    }
-    if (text.length > 600) {
-      return NextResponse.json(
-        { error: "Review must be 600 characters or less." },
-        { status: 400 },
-      );
-    }
+    const text = body.text?.trim() ?? "";
+    const textErr = reviewTextError(text);
+    if (textErr) return NextResponse.json({ error: textErr }, { status: 400 });
 
     const firstName = body.firstName?.trim() || null;
     const lastName = body.lastName?.trim() || null;
@@ -111,9 +119,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       if (reviewRequest) {
         verified = true;
         customerRef = reviewRequest.reviewToken;
+        // Store any contact details the customer provided (only fill blanks, never overwrite)
+        const contactEmail = body.contactEmail?.trim().toLowerCase() || null;
+        const contactPhone = body.contactPhone ? normalizePhone(body.contactPhone) : null;
         await prisma.reviewRequest.update({
           where: { id: reviewRequest.id },
-          data: { reviewSubmittedAt: new Date() },
+          data: {
+            reviewSubmittedAt: new Date(),
+            email: reviewRequest.email ?? contactEmail,
+            phone: reviewRequest.phone ?? contactPhone,
+          },
         });
       }
     }

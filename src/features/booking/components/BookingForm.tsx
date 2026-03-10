@@ -108,7 +108,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
       return;
     }
     if (!selectedDay) {
-      setError("Please select a day.");
+      setError("Please select a day and time.");
       return;
     }
     if (!selectedTime) {

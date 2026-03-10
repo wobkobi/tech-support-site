@@ -53,14 +53,14 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
       create: {
         eventId: event.id,
         calendarEmail: event.calendarEmail,
-        startUtc: new Date(event.start),
-        endUtc: new Date(event.end),
+        startAt: new Date(event.start),
+        endAt: new Date(event.end),
         fetchedAt: now,
         expiresAt: cacheExpiry,
       },
       update: {
-        startUtc: new Date(event.start),
-        endUtc: new Date(event.end),
+        startAt: new Date(event.start),
+        endAt: new Date(event.end),
         fetchedAt: now,
         expiresAt: cacheExpiry,
       },

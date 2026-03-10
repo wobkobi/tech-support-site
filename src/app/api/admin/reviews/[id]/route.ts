@@ -6,9 +6,9 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
 import { prisma } from "@/shared/lib/prisma";
 import { isValidAdminToken } from "@/shared/lib/auth";
+import { revalidateReviewPaths } from "@/features/reviews/lib/revalidate";
 
 /**
  * PATCH /api/admin/reviews/[id]
@@ -42,9 +42,7 @@ export async function PATCH(
     });
 
     // Trigger ISR revalidation so public pages update immediately
-    revalidatePath("/reviews");
-    revalidatePath("/review");
-    revalidatePath("/");
+    revalidateReviewPaths();
 
     return NextResponse.json({ ok: true });
   } catch (error) {
@@ -77,9 +75,7 @@ export async function DELETE(
     await prisma.review.delete({ where: { id } });
 
     // Trigger ISR revalidation so public pages update immediately
-    revalidatePath("/reviews");
-    revalidatePath("/review");
-    revalidatePath("/");
+    revalidateReviewPaths();
 
     return NextResponse.json({ ok: true });
   } catch (error) {

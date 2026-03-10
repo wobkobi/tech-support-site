@@ -39,7 +39,6 @@ export interface ReviewNotificationData {
  * @returns Promise that resolves when the email is sent (or silently fails).
  */
 export async function sendOwnerReviewNotification(review: ReviewNotificationData): Promise<void> {
-  const adminSecret = process.env.ADMIN_SECRET;
   const adminEmail = process.env.ADMIN_EMAIL;
   const from = process.env.EMAIL_FROM;
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz";
@@ -54,9 +53,7 @@ export async function sendOwnerReviewNotification(review: ReviewNotificationData
     : [review.firstName, review.lastName].filter(Boolean).join(" ") || "Unknown";
 
   const badge = review.verified ? "✅ Verified (auto-approved)" : "⏳ Pending approval";
-  const adminUrl = adminSecret
-    ? `${siteUrl}/admin/reviews?token=${encodeURIComponent(adminSecret)}`
-    : `${siteUrl}/admin/reviews`;
+  const adminUrl = `${siteUrl}/admin/reviews`;
 
   const html = `
 <!DOCTYPE html>
@@ -75,7 +72,7 @@ export async function sendOwnerReviewNotification(review: ReviewNotificationData
     ${
       !review.verified
         ? `<a href="${adminUrl}" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:600;font-size:14px">Review &amp; Approve →</a>`
-        : `<p style="color:#555;font-size:14px">This review was automatically approved because it came from a verified booking link.</p>`
+        : `<p style="margin-top:12px;margin-bottom:0;color:#555;font-size:14px">This review has been verified.</p>`
     }
   </div>
 </body>
@@ -108,9 +105,9 @@ export interface BookingNotificationData {
   /** Formatted notes (includes time slot, duration, meeting type, address, phone, description) */
   notes: string;
   /** Appointment start (UTC) */
-  startUtc: Date;
+  startAt: Date;
   /** Appointment end (UTC) */
-  endUtc: Date;
+  endAt: Date;
   /** Cancel token for the cancel link */
   cancelToken: string;
 }
@@ -150,7 +147,7 @@ export async function sendOwnerBookingNotification(
     return;
   }
 
-  const start = formatNZDateTime(booking.startUtc);
+  const start = formatNZDateTime(booking.startAt);
   const notesHtml = booking.notes.replace(/\n/g, "<br>");
 
   const html = `
@@ -204,7 +201,7 @@ export async function sendCustomerBookingConfirmation(
   }
 
   const firstName = booking.name.split(" ")[0];
-  const start = formatNZDateTime(booking.startUtc);
+  const start = formatNZDateTime(booking.startAt);
   const cancelUrl = `${siteUrl}/booking/cancel?token=${booking.cancelToken}`;
   const notesHtml = booking.notes.replace(/\n/g, "<br>");
 
