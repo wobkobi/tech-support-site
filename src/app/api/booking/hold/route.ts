@@ -6,10 +6,10 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { prisma } from "@/lib/prisma";
-import { BOOKING_CONFIG } from "@/lib/booking";
-import { getPacificAucklandOffset } from "@/lib/timezone-utils";
-import { createBookingEvent } from "@/lib/google-calendar";
+import { prisma } from "@/shared/lib/prisma";
+import { BOOKING_CONFIG } from "@/features/booking/lib/booking";
+import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
+import { createBookingEvent } from "@/features/calendar/lib/google-calendar";
 import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
 
@@ -102,16 +102,14 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreateBoo
     const utcOffset = getPacificAucklandOffset(year, month, day);
 
     // Create UTC dates from NZ local time
-    const startUtc = new Date(
-      Date.UTC(year, month - 1, day, startHour - utcOffset, startMinute, 0),
-    );
-    const endUtc = new Date(Date.UTC(year, month - 1, day, endHour - utcOffset, endMinute, 0));
+    const startAt = new Date(Date.UTC(year, month - 1, day, startHour - utcOffset, startMinute, 0));
+    const endAt = new Date(Date.UTC(year, month - 1, day, endHour - utcOffset, endMinute, 0));
 
-    if (startUtc >= endUtc) {
+    if (startAt >= endAt) {
       return NextResponse.json({ ok: false, error: "Invalid time range." }, { status: 400 });
     }
 
-    if (startUtc < now) {
+    if (startAt < now) {
       return NextResponse.json(
         { ok: false, error: "Cannot book times in the past." },
         { status: 400 },
@@ -119,7 +117,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreateBoo
     }
 
     const cancelToken = randomUUID();
-    const holdExpiresUtc = new Date(now.getTime() + HOLD_EXPIRATION_MINUTES * 60 * 1000);
+    const holdExpiresAt = new Date(now.getTime() + HOLD_EXPIRATION_MINUTES * 60 * 1000);
 
     // Build notes with meeting details
     let bookingNotes = `Meeting type: ${meetingType === "in-person" ? "In-person" : "Remote"}\n`;
@@ -140,12 +138,12 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreateBoo
           name: name.trim(),
           email: email.trim().toLowerCase(),
           notes: bookingNotes,
-          startUtc,
-          endUtc,
+          startAt,
+          endAt,
           status: "held",
           cancelToken,
-          holdExpiresUtc,
-          activeSlotKey: startUtc.toISOString(), // Unique constraint for double-booking prevention
+          holdExpiresAt,
+          activeSlotKey: startAt.toISOString(), // Unique constraint for double-booking prevention
           bufferBeforeMin: BOOKING_CONFIG.bufferMin,
           bufferAfterMin: BOOKING_CONFIG.bufferMin,
         },
@@ -157,8 +155,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreateBoo
         const calendarResult = await createBookingEvent({
           summary: `Booking: ${name.trim()}`,
           description: bookingNotes,
-          startUtc,
-          endUtc,
+          startAt,
+          endAt,
           timeZone: BOOKING_CONFIG.timeZone,
           attendeeEmail: email.trim().toLowerCase(),
           attendeeName: name.trim(),
@@ -173,7 +171,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreateBoo
           data: {
             status: "confirmed",
             calendarEventId,
-            holdExpiresUtc: null, // Clear hold expiry since it's confirmed
+            holdExpiresAt: null, // Clear hold expiry since it's confirmed
           },
         });
 
@@ -191,7 +189,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreateBoo
       // Handle unique constraint violation (concurrent booking for same slot)
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
         console.warn("[booking/hold] Concurrent booking conflict", {
-          activeSlotKey: startUtc.toISOString(),
+          activeSlotKey: startAt.toISOString(),
           email: email.trim().toLowerCase(),
           timestamp: new Date().toISOString(),
         });

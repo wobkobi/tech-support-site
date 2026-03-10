@@ -5,17 +5,17 @@
  */
 
 import type React from "react";
-import { cn } from "@/lib/cn";
+import { cn } from "@/shared/lib/cn";
 import {
   BOOKING_CONFIG,
   buildAvailableDays,
   type ExistingBooking,
   type BookableDay,
-} from "@/lib/booking";
-import { prisma } from "@/lib/prisma";
-import { fetchAllCalendarEvents } from "@/lib/google-calendar";
-import BookingForm from "@/components/BookingForm";
-import { FrostedSection, PageShell, CARD, SOFT_CARD } from "@/components/PageLayout";
+} from "@/features/booking/lib/booking";
+import { prisma } from "@/shared/lib/prisma";
+import { fetchAllCalendarEvents } from "@/features/calendar/lib/google-calendar";
+import BookingForm from "@/features/booking/components/BookingForm";
+import { FrostedSection, PageShell, CARD, SOFT_CARD } from "@/shared/components/PageLayout";
 import { FaCalendarCheck, FaClock, FaEnvelopeOpenText, FaListCheck } from "react-icons/fa6";
 
 // ISR (Incremental Static Regeneration) with 5-minute revalidation window
@@ -37,12 +37,12 @@ async function getCalendarEvents(
   const cachedEvents = await prisma.calendarEventCache.findMany({
     where: {
       expiresAt: { gt: now },
-      endUtc: { gte: now },
+      endAt: { gte: now },
     },
     select: {
       eventId: true,
-      startUtc: true,
-      endUtc: true,
+      startAt: true,
+      endAt: true,
     },
   });
 
@@ -50,8 +50,8 @@ async function getCalendarEvents(
     console.log(`[booking/page] Using ${cachedEvents.length} cached calendar events`);
     return cachedEvents.map((e) => ({
       id: e.eventId,
-      start: e.startUtc.toISOString(),
-      end: e.endUtc.toISOString(),
+      start: e.startAt.toISOString(),
+      end: e.endAt.toISOString(),
     }));
   }
 
@@ -71,14 +71,14 @@ async function getCalendarEvents(
           create: {
             eventId: e.id,
             calendarEmail: e.calendarEmail,
-            startUtc: new Date(e.start),
-            endUtc: new Date(e.end),
+            startAt: new Date(e.start),
+            endAt: new Date(e.end),
             fetchedAt: now,
             expiresAt: cacheExpiry,
           },
           update: {
-            startUtc: new Date(e.start),
-            endUtc: new Date(e.end),
+            startAt: new Date(e.start),
+            endAt: new Date(e.end),
             fetchedAt: now,
             expiresAt: cacheExpiry,
           },
@@ -110,12 +110,12 @@ async function getAvailableDays(): Promise<BookableDay[]> {
     prisma.booking.findMany({
       where: {
         status: { in: ["held", "confirmed"] },
-        endUtc: { gte: now },
+        endAt: { gte: now },
       },
       select: {
         id: true,
-        startUtc: true,
-        endUtc: true,
+        startAt: true,
+        endAt: true,
         bufferBeforeMin: true,
         bufferAfterMin: true,
       },
@@ -125,8 +125,8 @@ async function getAvailableDays(): Promise<BookableDay[]> {
 
   const existingForSlots: ExistingBooking[] = existingBookings.map((b) => ({
     id: b.id,
-    startUtc: b.startUtc,
-    endUtc: b.endUtc,
+    startAt: b.startAt,
+    endAt: b.endAt,
     bufferBeforeMin: b.bufferBeforeMin,
     bufferAfterMin: b.bufferAfterMin,
   }));
@@ -169,12 +169,21 @@ export default async function BookingPage(): Promise<React.ReactElement> {
           {/* Two-column: Form + Sidebar */}
           <div className={cn("grid gap-6 sm:gap-8 lg:grid-cols-[1fr_20rem]")}>
             {/* Form Card */}
-            <section className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}>
+            <section
+              className={cn(
+                CARD,
+                "animate-slide-up animate-fill-both animate-delay-100 order-2 lg:order-1",
+              )}
+            >
               <BookingForm availableDays={availableDays} />
             </section>
 
             {/* Sidebar */}
-            <aside className={cn("flex flex-col gap-6 sm:gap-8 lg:sticky lg:top-24 lg:self-start")}>
+            <aside
+              className={cn(
+                "sticky order-1 flex flex-col gap-6 sm:gap-8 lg:top-24 lg:order-2 lg:self-start",
+              )}
+            >
               {/* How it works */}
               <div className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-200")}>
                 <h2 className={cn("text-russian-violet mb-4 text-xl font-bold sm:text-2xl")}>

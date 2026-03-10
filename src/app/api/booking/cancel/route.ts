@@ -5,8 +5,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { deleteBookingEvent } from "@/lib/google-calendar";
+import { prisma } from "@/shared/lib/prisma";
+import { deleteBookingEvent } from "@/features/calendar/lib/google-calendar";
 
 interface CancelPayload {
   cancelToken: string;

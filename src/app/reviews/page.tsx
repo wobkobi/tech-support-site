@@ -6,36 +6,13 @@
 
 import type React from "react";
 import Link from "next/link";
-import { FrostedSection, PageShell, CARD } from "@/components/PageLayout";
-import { cn } from "@/lib/cn";
-import { prisma } from "@/lib/prisma";
-import { FaCircleCheck } from "react-icons/fa6";
+import { FrostedSection, PageShell, CARD } from "@/shared/components/PageLayout";
+import { cn } from "@/shared/lib/cn";
+import { prisma } from "@/shared/lib/prisma";
+import { formatReviewerName } from "@/features/reviews/lib/formatting";
 
 // Enable ISR: revalidate every 5 minutes for approved reviews
 export const revalidate = 300;
-
-/**
- * Formats a reviewer's display name.
- * @param r - Review fields.
- * @param r.firstName - First name or null.
- * @param r.lastName - Last name or null.
- * @param r.isAnonymous - Whether the review is posted anonymously.
- * @returns Formatted name string.
- */
-function formatName(r: {
-  firstName: string | null;
-  lastName: string | null;
-  isAnonymous: boolean;
-}): string {
-  if (r.isAnonymous) return "Anonymous";
-  const f = (r.firstName ?? "").trim();
-  const l = (r.lastName ?? "").trim();
-  if (!f && !l) return "Anonymous";
-  const initial = f ? `${f[0].toUpperCase()}. ` : "";
-  const last = l ? `${l[0].toUpperCase()}${l.slice(1).toLowerCase()}` : "";
-  const out = `${initial}${last}`.trim();
-  return out ? `${out}.` : "Anonymous";
-}
 
 const linkStyle = cn(
   "text-coquelicot-500 hover:text-coquelicot-600 underline-offset-4 hover:underline",
@@ -54,10 +31,17 @@ export default async function ReviewsPage(): Promise<React.ReactElement> {
       firstName: true,
       lastName: true,
       isAnonymous: true,
-      verified: true,
     },
     where: { status: "approved" },
   });
+
+  // Normalize whitespace in all reviews
+  const normalizedRows = rows.map((r) => ({
+    ...r,
+    text: r.text.trim().replace(/\s+/g, " "),
+    firstName: r.firstName?.trim() || null,
+    lastName: r.lastName?.trim() || null,
+  }));
 
   return (
     <PageShell>
@@ -93,7 +77,7 @@ export default async function ReviewsPage(): Promise<React.ReactElement> {
               className={cn("animate-slide-up animate-fill-both animate-delay-100")}
             >
               <ul className={cn("grid gap-4 sm:grid-cols-2")}>
-                {rows.map((r) => (
+                {normalizedRows.map((r) => (
                   <li
                     key={r.id}
                     className={cn(
@@ -105,21 +89,9 @@ export default async function ReviewsPage(): Promise<React.ReactElement> {
                     >
                       {r.text}
                     </p>
-                    <div className={cn("mt-4 flex items-center justify-between gap-2")}>
-                      <p className={cn("text-russian-violet text-sm font-semibold")}>
-                        - {formatName(r)}
-                      </p>
-                      {r.verified && (
-                        <span
-                          className={cn(
-                            "bg-moonstone-600/15 border-moonstone-500/30 text-moonstone-600 flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium",
-                          )}
-                        >
-                          <FaCircleCheck className={cn("h-3 w-3")} aria-hidden />
-                          Verified
-                        </span>
-                      )}
-                    </div>
+                    <p className={cn("text-russian-violet mt-4 text-sm font-semibold")}>
+                      - {formatReviewerName(r)}
+                    </p>
                   </li>
                 ))}
               </ul>

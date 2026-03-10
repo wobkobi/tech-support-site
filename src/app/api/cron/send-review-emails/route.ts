@@ -6,24 +6,9 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { sendCustomerReviewRequest } from "@/lib/email";
-
-/**
- * Verify the request is from Vercel Cron or has the correct secret.
- * @param request - The incoming request to verify.
- * @returns True if authorized, false otherwise.
- */
-function isAuthorized(request: NextRequest): boolean {
-  const authHeader = request.headers.get("authorization");
-  const cronSecret = process.env.CRON_SECRET;
-
-  if (!cronSecret) {
-    return request.headers.has("x-vercel-cron");
-  }
-
-  return request.headers.has("x-vercel-cron") || authHeader === `Bearer ${cronSecret}`;
-}
+import { prisma } from "@/shared/lib/prisma";
+import { sendCustomerReviewRequest } from "@/features/reviews/lib/email";
+import { isCronAuthorized } from "@/shared/lib/auth";
 
 /**
  * GET /api/cron/send-review-emails
@@ -33,7 +18,7 @@ function isAuthorized(request: NextRequest): boolean {
  * @returns JSON response with results
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  if (!isAuthorized(request)) {
+  if (!isCronAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -48,7 +33,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     // reviewSentAt prevents duplicates across runs
     const bookingsToEmail = await prisma.booking.findMany({
       where: {
-        endUtc: {
+        endAt: {
           lte: thirtyMinutesAgo,
         },
         status: "confirmed",
@@ -62,14 +47,52 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       },
     });
 
+    // Deduplicate by email: skip bookings whose email already received a review request
+    // (either from another booking or a manual ReviewRequest record)
+    const alreadyEmailedBookings = await prisma.booking.findMany({
+      where: { reviewSentAt: { not: null } },
+      select: { email: true },
+    });
+    const alreadyEmailedRequests = await prisma.reviewRequest.findMany({
+      where: { email: { not: null } },
+      select: { email: true },
+    });
+    const reviewedEmails = new Set([
+      ...alreadyEmailedBookings.map((b) => b.email.toLowerCase()),
+      ...alreadyEmailedRequests.map((r) => r.email!.toLowerCase()),
+    ]);
+
+    // Within-batch dedup: only send once per email if multiple bookings for same person
+    const seenInBatch = new Set<string>();
+    const toSend: typeof bookingsToEmail = [];
+    const toSuppress: typeof bookingsToEmail = [];
+    for (const b of bookingsToEmail) {
+      const key = b.email.toLowerCase();
+      if (reviewedEmails.has(key) || seenInBatch.has(key)) {
+        toSuppress.push(b);
+      } else {
+        seenInBatch.add(key);
+        toSend.push(b);
+      }
+    }
+
+    // Mark suppressed bookings as sent so they don't reappear in future cron runs
+    if (toSuppress.length > 0) {
+      await prisma.booking.updateMany({
+        where: { id: { in: toSuppress.map((b) => b.id) } },
+        data: { reviewSentAt: now },
+      });
+    }
+
     const results = {
       found: bookingsToEmail.length,
+      suppressed: toSuppress.length,
       sent: 0,
       failed: 0,
       errors: [] as string[],
     };
 
-    for (const booking of bookingsToEmail) {
+    for (const booking of toSend) {
       try {
         // Mark as sent FIRST to prevent duplicate emails if send fails after DB update
         // Trade-off: if send fails, we've marked it (won't retry), but this prevents spam

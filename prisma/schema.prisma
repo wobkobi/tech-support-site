@@ -12,7 +12,7 @@ enum BookingStatus {
   held
   confirmed
   cancelled
-  completed // NEW: Added for tracking completed appointments
+  completed
 }
 
 enum ReviewStatus {
@@ -29,42 +29,45 @@ model Booking {
   email String
   notes String?
 
-  // When the appointment actually runs (in server time / UTC).
-  startUtc DateTime
-  endUtc   DateTime
+  // When the appointment runs (UTC).
+  startAt DateTime
+  endAt   DateTime
 
-  // Per-booking buffer, in minutes, before and after the appointment.
+  // Per-booking buffer in minutes before and after the appointment.
   bufferBeforeMin Int @default(0)
   bufferAfterMin  Int @default(0)
 
-  // Status and hold expiry for possible future multi-step flows.
+  // Booking lifecycle state and hold expiry.
   status         BookingStatus @default(confirmed)
-  holdExpiresUtc DateTime?
+  holdExpiresAt DateTime?
 
-  // Secret tokens for management links
-  cancelToken String @unique
-  reviewToken String @unique @default(uuid()) // NEW: Token for review link
+  // Secret tokens for cancel and review magic links.
+  cancelToken String  @unique
+  reviewToken String  @unique @default(uuid())
 
-  // Double-booking prevention: Unique constraint on active time slots
-  // Set to startUtc.toISOString() when booking is active (held or confirmed)
-  // Set to null (field omitted in MongoDB) when cancelled or expired; the sparse unique index
-  // only enforces uniqueness for documents where activeSlotKey is present/non-null, so multiple
-  // bookings can safely have activeSlotKey = null.
+  // Double-booking prevention: set to startAt.toISOString() when active (held/confirmed),
+  // null when cancelled or expired. Sparse unique index only enforces uniqueness on
+  // non-null values, so multiple cancelled bookings can coexist safely.
   activeSlotKey String? @unique
 
-  // Optional reference to the Google Calendar event, for future cancellation.
+  // Google Calendar event ID, used to delete the event on cancellation.
   calendarEventId String?
 
-  // Review tracking - NEW
-  reviewSentAt      DateTime? // When review email was sent
-  reviewSubmittedAt DateTime? // When they submitted a review
+  // Review email tracking.
+  reviewSentAt      DateTime? // When the review request email was sent
+  reviewSubmittedAt DateTime? // When the client submitted a review
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([startUtc, endUtc])
-  @@index([status, holdExpiresUtc])
+  // Expired hold cleanup cron: WHERE status="held" AND holdExpiresAt <= now
+  @@index([status, holdExpiresAt])
+  // Cancellation flow: look up by Google Calendar event ID
   @@index([calendarEventId])
+  // Slot availability (slots, days, request, booking page): WHERE status IN [held,confirmed] AND endAt >= now
+  @@index([status, endAt])
+  // Review email cron and admin page: filter/sort on reviewSentAt
+  @@index([reviewSentAt])
 }
 
 model Review {
@@ -74,44 +77,56 @@ model Review {
   lastName    String?
   isAnonymous Boolean @default(false)
 
-  // Moderation status
-  status      ReviewStatus @default(pending)
+  // Moderation state.
+  status ReviewStatus @default(pending)
 
-  // For edit/auth (magic link, booking ref, etc)
+  // Optional reference used for magic-link edit/auth.
   customerRef String?
 
-  // NEW: Link to booking (optional, for verified reviews)
+  // Optional link to the originating booking (verified reviews only).
   bookingId String? @db.ObjectId
-  verified  Boolean @default(false) // True if from a booking link
+  verified  Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Public and admin review listing: WHERE status="approved" ORDER BY createdAt DESC
+  @@index([status, createdAt(sort: Desc)])
 }
 
-// Standalone review requests for past clients (email or SMS)
+// Standalone review requests sent to past clients by email or SMS.
 model ReviewRequest {
   id                String    @id @default(auto()) @map("_id") @db.ObjectId
   name              String
+  email             String?   // Null for SMS-only records; used for deduplication
+  phone             String?   // Null for email-only records; used for deduplication
   reviewToken       String    @unique @default(uuid())
   reviewSubmittedAt DateTime?
   createdAt         DateTime  @default(now())
+
+  // Admin page listing: ORDER BY createdAt DESC
+  @@index([createdAt(sort: Desc)])
+  // Deduplication before sending a new review link
+  @@index([email])
+  @@index([phone])
 }
 
-// Cached calendar events for fast booking page loads
+// Cached Google Calendar events for fast booking page loads.
 model CalendarEventCache {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 
-  // Event details from Google Calendar
   eventId       String   // Google Calendar event ID
-  calendarEmail String   // Which calendar this event is from
-  startUtc      DateTime // Event start time
-  endUtc        DateTime // Event end time
+  calendarEmail String   // Which calendar this event belongs to
+  startAt      DateTime // Event start (UTC)
+  endAt        DateTime // Event end (UTC)
 
-  // Cache metadata
-  fetchedAt DateTime @default(now()) // When this was cached
-  expiresAt DateTime // When to refresh this cache entry
+  fetchedAt DateTime @default(now()) // When this entry was cached
+  expiresAt DateTime                 // When this entry should be refreshed
 
+  // Cache cleanup cron: WHERE expiresAt < now
   @@index([expiresAt])
-  @@index([startUtc, endUtc])
+  // Upsert by natural key
   @@unique([eventId, calendarEmail])
+  // Booking page query: WHERE endAt >= now AND expiresAt > now
+  @@index([endAt, expiresAt])
 }

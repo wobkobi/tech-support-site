@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/shared/lib/prisma";
 import {
   BOOKING_CONFIG,
   DURATION_OPTIONS,
@@ -14,10 +14,16 @@ import {
   type TimeOfDay,
   type JobDuration,
   type ExistingBooking,
-} from "@/lib/booking";
-import { getPacificAucklandOffset } from "@/lib/timezone-utils";
-import { createBookingEvent, fetchAllCalendarEvents } from "@/lib/google-calendar";
-import { sendOwnerBookingNotification, sendCustomerBookingConfirmation } from "@/lib/email";
+} from "@/features/booking/lib/booking";
+import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
+import {
+  createBookingEvent,
+  fetchAllCalendarEvents,
+} from "@/features/calendar/lib/google-calendar";
+import {
+  sendOwnerBookingNotification,
+  sendCustomerBookingConfirmation,
+} from "@/features/reviews/lib/email";
 import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
 
@@ -89,12 +95,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const existingBookings = await prisma.booking.findMany({
       where: {
         status: { in: ["held", "confirmed"] },
-        endUtc: { gte: now },
+        endAt: { gte: now },
       },
       select: {
         id: true,
-        startUtc: true,
-        endUtc: true,
+        startAt: true,
+        endAt: true,
         bufferBeforeMin: true,
         bufferAfterMin: true,
       },
@@ -102,8 +108,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const existingForValidation: ExistingBooking[] = existingBookings.map((b) => ({
       id: b.id,
-      startUtc: b.startUtc,
-      endUtc: b.endUtc,
+      startAt: b.startAt,
+      endAt: b.endAt,
       bufferBeforeMin: b.bufferBeforeMin,
       bufferAfterMin: b.bufferAfterMin,
     }));
@@ -151,8 +157,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Get dynamic UTC offset for this date (handles NZDT/NZST)
     const utcOffset = getPacificAucklandOffset(year, month, day);
-    const startUtc = new Date(Date.UTC(year, month - 1, day, startHour - utcOffset, 0, 0));
-    const endUtc = new Date(startUtc.getTime() + durationMinutes * 60 * 1000);
+    const startAt = new Date(Date.UTC(year, month - 1, day, startHour - utcOffset, 0, 0));
+    const endAt = new Date(startAt.getTime() + durationMinutes * 60 * 1000);
 
     const cancelToken = randomUUID();
     const reviewToken = randomUUID();
@@ -171,11 +177,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Create calendar event
     let calendarEventId: string | null = null;
     try {
+      // Remove parentheses from duration label for summary to avoid double brackets
+      const cleanDurationLabel = durationOption.label
+        .replace(/[()]/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+      const summary = `Tech Support: ${name.trim()} - ${cleanDurationLabel}`;
       const calendarResult = await createBookingEvent({
-        summary: `Tech Support: ${name.trim()} (${durationOption.label})`,
+        summary,
         description: bookingNotes,
-        startUtc,
-        endUtc,
+        startAt,
+        endAt,
         timeZone: BOOKING_CONFIG.timeZone,
         attendeeEmail: email.trim().toLowerCase(),
         attendeeName: name.trim(),
@@ -202,13 +214,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           name: name.trim(),
           email: email.trim().toLowerCase(),
           notes: bookingNotes,
-          startUtc,
-          endUtc,
+          startAt,
+          endAt,
           status: "confirmed",
           cancelToken,
           reviewToken,
           calendarEventId,
-          activeSlotKey: startUtc.toISOString(), // Unique constraint for double-booking prevention
+          activeSlotKey: startAt.toISOString(), // Unique constraint for double-booking prevention
           bufferBeforeMin: 0,
           bufferAfterMin: BOOKING_CONFIG.bufferMin,
         },
@@ -222,8 +234,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         name: booking.name,
         email: booking.email,
         notes: booking.notes ?? "",
-        startUtc: booking.startUtc,
-        endUtc: booking.endUtc,
+        startAt: booking.startAt,
+        endAt: booking.endAt,
         cancelToken: booking.cancelToken,
       });
       void sendCustomerBookingConfirmation({
@@ -231,8 +243,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         name: booking.name,
         email: booking.email,
         notes: booking.notes ?? "",
-        startUtc: booking.startUtc,
-        endUtc: booking.endUtc,
+        startAt: booking.startAt,
+        endAt: booking.endAt,
         cancelToken: booking.cancelToken,
       });
 
@@ -241,7 +253,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       // Handle unique constraint violation (concurrent booking for same slot)
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
         console.warn("[booking/request] Concurrent booking conflict", {
-          activeSlotKey: startUtc.toISOString(),
+          activeSlotKey: startAt.toISOString(),
           email: email.trim().toLowerCase(),
           timestamp: new Date().toISOString(),
         });

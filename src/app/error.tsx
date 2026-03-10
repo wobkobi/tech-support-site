@@ -7,9 +7,9 @@
 "use client";
 
 import type React from "react";
-import { FrostedSection, PageShell, CARD } from "@/components/PageLayout";
-import { cn } from "@/lib/cn";
-import Link from "next/link";
+import { FrostedSection, PageShell, CARD } from "@/shared/components/PageLayout";
+import { Button } from "@/shared/components/Button";
+import { cn } from "@/shared/lib/cn";
 import { FaArrowRotateRight, FaHouse } from "react-icons/fa6";
 
 /**
@@ -62,26 +62,14 @@ export default function Error({
             </p>
 
             <div className={cn("flex flex-wrap items-center justify-center gap-3")}>
-              <button
-                type="button"
-                onClick={reset}
-                className={cn(
-                  "bg-coquelicot-500 hover:bg-coquelicot-600 text-seasalt inline-flex items-center gap-2 rounded-lg px-6 py-3 font-semibold shadow-lg transition-colors hover:shadow-xl",
-                )}
-              >
+              <Button type="button" onClick={reset} variant="primary">
                 <FaArrowRotateRight className={cn("h-5 w-5")} aria-hidden />
                 Try again
-              </button>
-
-              <Link
-                href="/"
-                className={cn(
-                  "border-seasalt-400/60 hover:bg-seasalt-900/40 text-rich-black inline-flex items-center gap-2 rounded-lg border px-6 py-3 font-semibold transition-colors",
-                )}
-              >
+              </Button>
+              <Button href="/" variant="ghost">
                 <FaHouse className={cn("h-5 w-5")} aria-hidden />
                 Go home
-              </Link>
+              </Button>
             </div>
 
             <details className={cn("text-rich-black/80 mt-6 text-sm")}>

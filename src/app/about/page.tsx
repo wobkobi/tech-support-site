@@ -5,8 +5,8 @@
  */
 
 import type React from "react";
-import { FrostedSection, PageShell, CARD } from "@/components/PageLayout";
-import { cn } from "@/lib/cn";
+import { FrostedSection, PageShell, CARD } from "@/shared/components/PageLayout";
+import { cn } from "@/shared/lib/cn";
 import Link from "next/link";
 
 const linkStyle = cn(

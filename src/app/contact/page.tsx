@@ -5,10 +5,10 @@
  */
 
 import type React from "react";
-import { FrostedSection, PageShell, CARD } from "@/components/PageLayout";
-import { cn } from "@/lib/cn";
+import { FrostedSection, PageShell, CARD } from "@/shared/components/PageLayout";
+import { Button } from "@/shared/components/Button";
+import { cn } from "@/shared/lib/cn";
 import { FaEnvelope, FaPhone, FaMapLocationDot } from "react-icons/fa6";
-import Link from "next/link";
 
 /**
  * Contact page component.
@@ -38,24 +38,24 @@ export default function ContactPage(): React.ReactElement {
             </p>
 
             <div className={cn("flex flex-col items-center gap-4 sm:flex-row sm:justify-center")}>
-              <a
+              <Button
                 href="tel:+64212971237"
-                className={cn(
-                  "bg-russian-violet text-seasalt inline-flex w-full items-center justify-center gap-3 rounded-lg px-8 py-4 text-base font-bold shadow-lg transition-all hover:shadow-xl hover:brightness-110 sm:w-auto sm:text-lg",
-                )}
+                variant="secondary"
+                size="lg"
+                className={cn("w-full sm:w-auto")}
               >
                 <FaPhone className={cn("h-6 w-6")} aria-hidden />
-                <span>021 297 1237</span>
-              </a>
-              <a
+                021 297 1237
+              </Button>
+              <Button
                 href="mailto:harrison@tothepoint.co.nz"
-                className={cn(
-                  "bg-moonstone-600 hover:bg-moonstone-700 text-seasalt inline-flex w-full items-center justify-center gap-3 rounded-lg px-8 py-4 text-base font-bold shadow-lg transition-all hover:shadow-xl sm:w-auto sm:text-lg",
-                )}
+                variant="tertiary"
+                size="lg"
+                className={cn("w-full sm:w-auto")}
               >
                 <FaEnvelope className={cn("h-6 w-6")} aria-hidden />
-                <span>Email me</span>
-              </a>
+                Email me
+              </Button>
             </div>
 
             <p className={cn("text-rich-black/70 mx-auto mt-6 max-w-xl text-sm sm:text-base")}>
@@ -145,14 +145,9 @@ export default function ContactPage(): React.ReactElement {
             <p className={cn("text-rich-black mb-4 text-sm sm:text-base")}>
               Prefer to book directly?
             </p>
-            <Link
-              href="/booking"
-              className={cn(
-                "bg-coquelicot-500 hover:bg-coquelicot-600 text-seasalt inline-flex items-center gap-2 rounded-lg px-6 py-3 text-base font-bold shadow-md transition-all hover:shadow-lg sm:text-lg",
-              )}
-            >
+            <Button href="/booking" variant="primary" size="md">
               Book an appointment
-            </Link>
+            </Button>
           </section>
         </div>
       </FrostedSection>
