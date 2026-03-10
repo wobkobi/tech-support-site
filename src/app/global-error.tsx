@@ -53,7 +53,7 @@ export default function GlobalError({
                 type="button"
                 onClick={reset}
                 className={cn(
-                  "bg-russian-violet text-seasalt-800 inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold",
+                  "bg-russian-violet text-seasalt-800 inline-flex items-center gap-2 rounded-md px-4 py-2 text-base font-semibold",
                   "hover:bg-russian-violet-600 disabled:opacity-60",
                 )}
               >
@@ -64,7 +64,7 @@ export default function GlobalError({
               <Link
                 href="/"
                 className={cn(
-                  "text-russian-violet hover:text-coquelicot-500 inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold",
+                  "text-russian-violet hover:text-coquelicot-500 inline-flex items-center gap-2 rounded-md px-3 py-2 text-base font-semibold",
                 )}
               >
                 <FaHouse className={cn("h-4 w-4")} aria-hidden />
@@ -72,7 +72,7 @@ export default function GlobalError({
               </Link>
             </div>
 
-            <details className={cn("text-rich-black/80 mt-4 text-sm")}>
+            <details className={cn("text-rich-black/80 mt-4 text-base")}>
               <summary className={cn("cursor-pointer")}>Technical details</summary>
               <pre
                 className={cn(

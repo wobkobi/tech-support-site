@@ -7,6 +7,7 @@
 
 import type { Metadata } from "next";
 import type React from "react";
+import { notFound } from "next/navigation";
 import { FrostedSection, PageShell, CARD } from "@/shared/components/PageLayout";
 import { cn } from "@/shared/lib/cn";
 import { ReviewApprovalList } from "@/features/reviews/components/admin/ReviewApprovalList";
@@ -35,16 +36,12 @@ export default async function AdminReviewsPage({
   const { token } = await searchParams;
 
   if (!isValidAdminToken(token ?? null)) {
-    return (
-      <PageShell>
-        <FrostedSection maxWidth="40rem">
-          <div className="py-12 text-center">
-            <p className="text-russian-violet text-2xl font-bold">Access Denied</p>
-            <p className="text-seasalt-300 mt-2 text-sm">Invalid or missing token.</p>
-          </div>
-        </FrostedSection>
-      </PageShell>
-    );
+    // Log invalid admin access attempts for monitoring and debugging without exposing the token value.
+    console.warn("Invalid admin token used to access /admin/reviews", {
+      tokenPresent: Boolean(token),
+    });
+    console.warn("[admin/reviews] Invalid token attempt", { tokenPresent: Boolean(token) });
+    notFound();
   }
 
   const [reviews, sentBookings, sentRequests, allReviews, allBookings] = await Promise.all([
