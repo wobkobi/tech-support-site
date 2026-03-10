@@ -120,8 +120,8 @@ describe("validateBookingRequest", () => {
   it("returns invalid when slot conflicts with an existing booking", () => {
     const existing: ExistingBooking = {
       id: "booking-1",
-      startUtc: SLOT_10AM_UTC,
-      endUtc: SLOT_10AM_END_UTC,
+      startAt: SLOT_10AM_UTC,
+      endAt: SLOT_10AM_END_UTC,
       bufferBeforeMin: 0,
       bufferAfterMin: 0,
     };
@@ -240,8 +240,8 @@ describe("buildAvailableDays", () => {
     // Booking at 10am NZ tomorrow with 15-min buffer after
     const booking: ExistingBooking = {
       id: "b1",
-      startUtc: SLOT_10AM_UTC,
-      endUtc: SLOT_10AM_END_UTC,
+      startAt: SLOT_10AM_UTC,
+      endAt: SLOT_10AM_END_UTC,
       bufferBeforeMin: 0,
       bufferAfterMin: 15,
     };

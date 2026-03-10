@@ -30,8 +30,8 @@ model Booking {
   notes String?
 
   // When the appointment runs (UTC).
-  startUtc DateTime
-  endUtc   DateTime
+  startAt DateTime
+  endAt   DateTime
 
   // Per-booking buffer in minutes before and after the appointment.
   bufferBeforeMin Int @default(0)
@@ -45,7 +45,7 @@ model Booking {
   cancelToken String  @unique
   reviewToken String  @unique @default(uuid())
 
-  // Double-booking prevention: set to startUtc.toISOString() when active (held/confirmed),
+  // Double-booking prevention: set to startAt.toISOString() when active (held/confirmed),
   // null when cancelled or expired. Sparse unique index only enforces uniqueness on
   // non-null values, so multiple cancelled bookings can coexist safely.
   activeSlotKey String? @unique
@@ -64,8 +64,8 @@ model Booking {
   @@index([status, holdExpiresAt])
   // Cancellation flow: look up by Google Calendar event ID
   @@index([calendarEventId])
-  // Slot availability (slots, days, request, booking page): WHERE status IN [held,confirmed] AND endUtc >= now
-  @@index([status, endUtc])
+  // Slot availability (slots, days, request, booking page): WHERE status IN [held,confirmed] AND endAt >= now
+  @@index([status, endAt])
   // Review email cron and admin page: filter/sort on reviewSentAt
   @@index([reviewSentAt])
 }
@@ -117,8 +117,8 @@ model CalendarEventCache {
 
   eventId       String   // Google Calendar event ID
   calendarEmail String   // Which calendar this event belongs to
-  startUtc      DateTime // Event start (UTC)
-  endUtc        DateTime // Event end (UTC)
+  startAt      DateTime // Event start (UTC)
+  endAt        DateTime // Event end (UTC)
 
   fetchedAt DateTime @default(now()) // When this entry was cached
   expiresAt DateTime                 // When this entry should be refreshed
@@ -127,6 +127,6 @@ model CalendarEventCache {
   @@index([expiresAt])
   // Upsert by natural key
   @@unique([eventId, calendarEmail])
-  // Booking page query: WHERE endUtc >= now AND expiresAt > now
-  @@index([endUtc, expiresAt])
+  // Booking page query: WHERE endAt >= now AND expiresAt > now
+  @@index([endAt, expiresAt])
 }

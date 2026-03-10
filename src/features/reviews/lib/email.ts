@@ -76,7 +76,7 @@ export async function sendOwnerReviewNotification(review: ReviewNotificationData
         : ""
     }
   </div>
-          : ""
+</body>
 </html>`;
 
   try {
@@ -106,9 +106,9 @@ export interface BookingNotificationData {
   /** Formatted notes (includes time slot, duration, meeting type, address, phone, description) */
   notes: string;
   /** Appointment start (UTC) */
-  startUtc: Date;
+  startAt: Date;
   /** Appointment end (UTC) */
-  endUtc: Date;
+  endAt: Date;
   /** Cancel token for the cancel link */
   cancelToken: string;
 }
@@ -148,7 +148,7 @@ export async function sendOwnerBookingNotification(
     return;
   }
 
-  const start = formatNZDateTime(booking.startUtc);
+  const start = formatNZDateTime(booking.startAt);
   const notesHtml = booking.notes.replace(/\n/g, "<br>");
 
   const html = `
@@ -202,7 +202,7 @@ export async function sendCustomerBookingConfirmation(
   }
 
   const firstName = booking.name.split(" ")[0];
-  const start = formatNZDateTime(booking.startUtc);
+  const start = formatNZDateTime(booking.startAt);
   const cancelUrl = `${siteUrl}/booking/cancel?token=${booking.cancelToken}`;
   const notesHtml = booking.notes.replace(/\n/g, "<br>");
 

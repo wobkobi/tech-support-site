@@ -93,8 +93,8 @@ describe("POST /api/booking/request — success and error paths", () => {
       name: "Alice",
       email: "alice@example.com",
       notes: "Fix my computer please",
-      startUtc: new Date(),
-      endUtc: new Date(),
+      startAt: new Date(),
+      endAt: new Date(),
       cancelToken: "cancel-tok",
     });
     const req = makeRequest({

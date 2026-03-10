@@ -76,8 +76,8 @@ export interface CalendarEvent {
  * @param params - Event parameters
  * @param params.summary - Event title
  * @param params.description - Event description
- * @param params.startUtc - Start time (UTC Date object)
- * @param params.endUtc - End time (UTC Date object)
+ * @param params.startAt - Start time (UTC Date object)
+ * @param params.endAt - End time (UTC Date object)
  * @param params.timeZone - Timezone for display
  * @param params.attendeeEmail - Attendee email address
  * @param params.attendeeName - Attendee name
@@ -87,8 +87,8 @@ export interface CalendarEvent {
 export async function createBookingEvent(params: {
   summary: string;
   description: string;
-  startUtc: Date;
-  endUtc: Date;
+  startAt: Date;
+  endAt: Date;
   timeZone: string;
   attendeeEmail: string;
   attendeeName: string;
@@ -101,11 +101,11 @@ export async function createBookingEvent(params: {
     description: params.description,
     location: params.location,
     start: {
-      dateTime: params.startUtc.toISOString(),
+      dateTime: params.startAt.toISOString(),
       timeZone: params.timeZone,
     },
     end: {
-      dateTime: params.endUtc.toISOString(),
+      dateTime: params.endAt.toISOString(),
       timeZone: params.timeZone,
     },
     attendees: [
@@ -207,12 +207,12 @@ export async function fetchAllCalendarEvents(
           const [eYear, eMonth, eDay] = endDateStr.split("-").map(Number);
           const utcOffset = getPacificAucklandOffset(sYear, sMonth, sDay);
           // NZ midnight = UTC hour 0 minus utcOffset (JS Date handles negative hour wrap)
-          const startUtc = new Date(Date.UTC(sYear, sMonth - 1, sDay, -utcOffset, 0, 0));
-          const endUtc = new Date(Date.UTC(eYear, eMonth - 1, eDay, -utcOffset, 0, 0));
+          const startAt = new Date(Date.UTC(sYear, sMonth - 1, sDay, -utcOffset, 0, 0));
+          const endAt = new Date(Date.UTC(eYear, eMonth - 1, eDay, -utcOffset, 0, 0));
           processedEvents.push({
             id: event.id!,
-            start: startUtc.toISOString(),
-            end: endUtc.toISOString(),
+            start: startAt.toISOString(),
+            end: endAt.toISOString(),
             summary: event.summary || undefined,
             description: event.description || undefined,
             calendarEmail: calendarId,

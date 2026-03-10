@@ -231,7 +231,7 @@ export function ReviewLinkHistoryTable({
             const canEdit = key !== null;
 
             if (isEditing) {
-              const phoneValid = isValidPhone(editPhoneInput);
+              const phoneValid = isValidPhone(toE164NZ(editPhoneInput));
 
               return (
                 <tr key={key} className={cn("border-seasalt-400/20 border-b last:border-0")}>

@@ -33,7 +33,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     // reviewSentAt prevents duplicates across runs
     const bookingsToEmail = await prisma.booking.findMany({
       where: {
-        endUtc: {
+        endAt: {
           lte: thirtyMinutesAgo,
         },
         status: "confirmed",

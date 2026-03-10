@@ -36,8 +36,6 @@ describe("reviewTextError", () => {
 
   it("trims whitespace before checking length", () => {
     // 9 visible chars + surrounding spaces → trims to 9 → invalid
-    expect(reviewTextError("  123456789  ".trim().slice(0, 9))).toBe(
-      "Review must be at least 10 characters.",
-    );
+    expect(reviewTextError("  123456789  ")).toBe("Review must be at least 10 characters.");
   });
 });

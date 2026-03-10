@@ -82,8 +82,8 @@ export interface BookableDay {
 
 export interface ExistingBooking {
   id: string;
-  startUtc: Date;
-  endUtc: Date;
+  startAt: Date;
+  endAt: Date;
   bufferBeforeMin: number;
   bufferAfterMin: number;
 }
@@ -112,8 +112,8 @@ function isSlotFree(
 ): boolean {
   // Check database bookings
   for (const booking of existingBookings) {
-    const bookingStart = new Date(booking.startUtc.getTime() - booking.bufferBeforeMin * 60 * 1000);
-    const bookingEnd = new Date(booking.endUtc.getTime() + booking.bufferAfterMin * 60 * 1000);
+    const bookingStart = new Date(booking.startAt.getTime() - booking.bufferBeforeMin * 60 * 1000);
+    const bookingEnd = new Date(booking.endAt.getTime() + booking.bufferAfterMin * 60 * 1000);
 
     if (slotStart < bookingEnd && slotEnd > bookingStart) {
       return false;

@@ -102,16 +102,14 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreateBoo
     const utcOffset = getPacificAucklandOffset(year, month, day);
 
     // Create UTC dates from NZ local time
-    const startUtc = new Date(
-      Date.UTC(year, month - 1, day, startHour - utcOffset, startMinute, 0),
-    );
-    const endUtc = new Date(Date.UTC(year, month - 1, day, endHour - utcOffset, endMinute, 0));
+    const startAt = new Date(Date.UTC(year, month - 1, day, startHour - utcOffset, startMinute, 0));
+    const endAt = new Date(Date.UTC(year, month - 1, day, endHour - utcOffset, endMinute, 0));
 
-    if (startUtc >= endUtc) {
+    if (startAt >= endAt) {
       return NextResponse.json({ ok: false, error: "Invalid time range." }, { status: 400 });
     }
 
-    if (startUtc < now) {
+    if (startAt < now) {
       return NextResponse.json(
         { ok: false, error: "Cannot book times in the past." },
         { status: 400 },
@@ -140,12 +138,12 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreateBoo
           name: name.trim(),
           email: email.trim().toLowerCase(),
           notes: bookingNotes,
-          startUtc,
-          endUtc,
+          startAt,
+          endAt,
           status: "held",
           cancelToken,
           holdExpiresAt,
-          activeSlotKey: startUtc.toISOString(), // Unique constraint for double-booking prevention
+          activeSlotKey: startAt.toISOString(), // Unique constraint for double-booking prevention
           bufferBeforeMin: BOOKING_CONFIG.bufferMin,
           bufferAfterMin: BOOKING_CONFIG.bufferMin,
         },
@@ -157,8 +155,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreateBoo
         const calendarResult = await createBookingEvent({
           summary: `Booking: ${name.trim()}`,
           description: bookingNotes,
-          startUtc,
-          endUtc,
+          startAt,
+          endAt,
           timeZone: BOOKING_CONFIG.timeZone,
           attendeeEmail: email.trim().toLowerCase(),
           attendeeName: name.trim(),
@@ -191,7 +189,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreateBoo
       // Handle unique constraint violation (concurrent booking for same slot)
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
         console.warn("[booking/hold] Concurrent booking conflict", {
-          activeSlotKey: startUtc.toISOString(),
+          activeSlotKey: startAt.toISOString(),
           email: email.trim().toLowerCase(),
           timestamp: new Date().toISOString(),
         });
