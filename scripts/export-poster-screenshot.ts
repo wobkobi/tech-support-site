@@ -132,12 +132,7 @@ const CROP_MARK_THICKNESS_PT = 0.25 as const;
  * and extend outward into the bleed area.
  * Used for print-ready PDFs to guide trimming after printing.
  * @param page pdf-lib PDFPage instance with bleed dimensions.
- * @param trimWidth Width of the trim box in points — the intended content width after trimming (e.g. 419.53 pt for A5).
- * @example
- * ```typescript
- * const page = pdfDoc.addPage([437.48, 612.28]); // A5 + bleed
- * addCropMarks(page, 419.53); // A5 trim width in points
- * ```
+ * @param trimWidth Width of the trim box in points - the intended content width after trimming (e.g. 419.53 pt for A5).
  * @internal
  */
 function addCropMarks(page: PDFPage, trimWidth: number): void {

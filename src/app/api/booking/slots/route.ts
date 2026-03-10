@@ -5,14 +5,14 @@
  */
 
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/shared/lib/prisma";
 import {
   BOOKING_CONFIG,
   buildAvailableDays,
   type ExistingBooking,
   type ExistingEvent,
-} from "@/lib/booking";
-import { fetchAllCalendarEvents } from "@/lib/google-calendar";
+} from "@/features/booking/lib/booking";
+import { fetchAllCalendarEvents } from "@/features/calendar/lib/google-calendar";
 
 /**
  * Response containing available slots.
@@ -38,12 +38,12 @@ export async function GET(): Promise<NextResponse<AvailableSlotsResponse>> {
     const existingBookings = await prisma.booking.findMany({
       where: {
         status: { in: ["held", "confirmed"] },
-        endUtc: { gte: now }, // Only future bookings matter
+        endAt: { gte: now }, // Only future bookings matter
       },
       select: {
         id: true,
-        startUtc: true,
-        endUtc: true,
+        startAt: true,
+        endAt: true,
         bufferBeforeMin: true,
         bufferAfterMin: true,
       },
@@ -51,8 +51,8 @@ export async function GET(): Promise<NextResponse<AvailableSlotsResponse>> {
 
     const existingForSlots: ExistingBooking[] = existingBookings.map((b) => ({
       id: b.id,
-      startUtc: b.startUtc,
-      endUtc: b.endUtc,
+      startAt: b.startAt,
+      endAt: b.endAt,
       bufferBeforeMin: b.bufferBeforeMin,
       bufferAfterMin: b.bufferAfterMin,
     }));

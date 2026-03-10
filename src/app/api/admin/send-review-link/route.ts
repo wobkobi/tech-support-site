@@ -5,24 +5,10 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { sendPastClientReviewRequest } from "@/lib/email";
-import { timingSafeEqual } from "crypto";
-
-/**
- * Verifies the admin token using timing-safe comparison.
- * @param provided - The token provided in the request.
- * @returns True if the token matches ADMIN_SECRET.
- */
-function verifyToken(provided: string): boolean {
-  const secret = process.env.ADMIN_SECRET;
-  if (!secret) return false;
-  try {
-    return timingSafeEqual(Buffer.from(provided), Buffer.from(secret));
-  } catch {
-    return false;
-  }
-}
+import { prisma } from "@/shared/lib/prisma";
+import { sendPastClientReviewRequest } from "@/features/reviews/lib/email";
+import { isValidAdminToken } from "@/shared/lib/auth";
+import { toE164NZ, isValidPhone } from "@/shared/lib/normalize-phone";
 
 /**
  * POST /api/admin/send-review-link
@@ -36,11 +22,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       token?: string;
       name?: string;
       email?: string;
+      phone?: string;
       mode?: "email" | "sms";
     };
-    const { token, name, email, mode = "email" } = body;
+    const { token, name, email, phone, mode = "email" } = body;
 
-    if (!token || !verifyToken(token)) {
+    if (!isValidAdminToken(token ?? null)) {
       return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
     }
 
@@ -51,10 +38,57 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ ok: false, error: "Valid email is required." }, { status: 400 });
     }
 
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz";
+    const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz").replace(
+      /\/$/,
+      "",
+    );
+
+    // Deduplication for SMS: if this phone already received a link, return the existing one
+    if (mode === "sms" && phone) {
+      const normalizedPhone = toE164NZ(phone);
+      if (!isValidPhone(normalizedPhone)) {
+        return NextResponse.json({ ok: false, error: "Invalid phone number." }, { status: 400 });
+      }
+      const existingRequest = await prisma.reviewRequest.findFirst({
+        where: { phone: normalizedPhone },
+        select: { reviewToken: true },
+      });
+      if (existingRequest) {
+        const reviewUrl = `${siteUrl}/review?token=${existingRequest.reviewToken}`;
+        return NextResponse.json({ ok: true, reviewUrl, existing: true });
+      }
+    }
+
+    // Deduplication for email: if this email already received a link, return the existing one
+    if (mode === "email" && email) {
+      const normalizedEmail = email.trim().toLowerCase();
+      const existingRequest = await prisma.reviewRequest.findFirst({
+        where: { email: normalizedEmail },
+        select: { reviewToken: true },
+      });
+      if (existingRequest) {
+        const reviewUrl = `${siteUrl}/review?token=${existingRequest.reviewToken}`;
+        return NextResponse.json({ ok: true, reviewUrl, existing: true });
+      }
+      const existingBooking = await prisma.booking.findFirst({
+        where: {
+          email: { equals: normalizedEmail, mode: "insensitive" },
+          reviewSentAt: { not: null },
+        },
+        select: { reviewToken: true },
+      });
+      if (existingBooking) {
+        const reviewUrl = `${siteUrl}/review?token=${existingBooking.reviewToken}`;
+        return NextResponse.json({ ok: true, reviewUrl, existing: true });
+      }
+    }
 
     const reviewRequest = await prisma.reviewRequest.create({
-      data: { name: name.trim() },
+      data: {
+        name: name.trim(),
+        email: mode === "email" ? email!.trim().toLowerCase() : null,
+        phone: mode === "sms" && phone ? toE164NZ(phone) : null,
+      },
     });
 
     const reviewUrl = `${siteUrl}/review?token=${reviewRequest.reviewToken}`;

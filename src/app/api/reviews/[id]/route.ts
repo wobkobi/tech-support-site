@@ -1,7 +1,11 @@
-// PATCH /api/reviews/[id]
-// Allows a customer to edit their review (with valid customerRef), resets status to pending
+// src/app/api/reviews/[id]/route.ts
+/**
+ * @file route.ts
+ * @description PATCH /api/reviews/[id] - Allows a customer to edit their review (with valid customerRef), resets status to pending.
+ */
+
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "@/shared/lib/prisma";
 
 /**
  * PATCH /api/reviews/[id] - Allows a customer to edit their review.
@@ -74,7 +78,7 @@ export async function PATCH(
         isAnonymous: anon,
         verified,
       } = updated;
-      void import("@/lib/email").then((m) =>
+      void import("@/features/reviews/lib/email").then((m) =>
         m.sendOwnerReviewNotification({
           id: reviewId,
           text: reviewText,

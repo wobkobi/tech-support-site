@@ -6,10 +6,11 @@
 
 import type React from "react";
 import Link from "next/link";
-import ReviewFormProtected from "@/components/ReviewForm";
-import { FrostedSection, PageShell, CARD } from "@/components/PageLayout";
-import { cn } from "@/lib/cn";
-import { prisma } from "@/lib/prisma";
+import ReviewFormProtected from "@/features/reviews/components/ReviewForm";
+import { FrostedSection, PageShell, CARD } from "@/shared/components/PageLayout";
+import { Button } from "@/shared/components/Button";
+import { cn } from "@/shared/lib/cn";
+import { prisma } from "@/shared/lib/prisma";
 
 // Enable ISR: revalidate every 10 minutes
 // Reviews are submitted infrequently; 10-min staleness is acceptable
@@ -33,35 +34,55 @@ export default async function ReviewPage({
   let sourceId: string | null = null;
   let sourceType: "booking" | "reviewRequest" | null = null;
   let prefillName: string | null = null;
+  let prefillEmail: string | null = null;
+  let prefillPhone: string | null = null;
   let tokenValid = false;
   let alreadyReviewed = false;
+  let existingReview: {
+    id: string;
+    text: string;
+    firstName: string | null;
+    lastName: string | null;
+    isAnonymous: boolean;
+  } | null = null;
 
   // If token provided, validate against both Booking and ReviewRequest tables
   if (token) {
     const booking = await prisma.booking.findFirst({
       where: { reviewToken: token },
-      select: { id: true, name: true, reviewSubmittedAt: true },
+      select: { id: true, name: true, email: true, reviewSubmittedAt: true },
     });
 
     if (booking) {
       sourceId = booking.id;
       sourceType = "booking";
       prefillName = booking.name;
+      prefillEmail = booking.email;
       tokenValid = true;
       alreadyReviewed = !!booking.reviewSubmittedAt;
     } else {
       const reviewRequest = await prisma.reviewRequest.findFirst({
         where: { reviewToken: token },
-        select: { id: true, name: true, reviewSubmittedAt: true },
+        select: { id: true, name: true, email: true, phone: true, reviewSubmittedAt: true },
       });
 
       if (reviewRequest) {
         sourceId = reviewRequest.id;
         sourceType = "reviewRequest";
         prefillName = reviewRequest.name;
+        prefillEmail = reviewRequest.email;
+        prefillPhone = reviewRequest.phone;
         tokenValid = true;
         alreadyReviewed = !!reviewRequest.reviewSubmittedAt;
       }
+    }
+
+    // Fetch existing review for pre-filling the edit form
+    if (tokenValid && alreadyReviewed) {
+      existingReview = await prisma.review.findFirst({
+        where: { customerRef: token },
+        select: { id: true, text: true, firstName: true, lastName: true, isAnonymous: true },
+      });
     }
   }
 
@@ -83,43 +104,14 @@ export default async function ReviewPage({
                 This review link is invalid or has expired. If you recently had an appointment,
                 please check your email for the correct link.
               </p>
-              <Link
-                href="/"
-                className={cn(
-                  "bg-russian-violet text-seasalt inline-block rounded-md px-4 py-2.5 text-sm font-semibold hover:brightness-110",
-                )}
-              >
+              <Button href="/" variant="secondary" size="sm">
                 Back to home
-              </Link>
+              </Button>
             </section>
           )}
 
-          {/* Already reviewed */}
-          {tokenValid && alreadyReviewed && (
-            <section className={cn(CARD)}>
-              <h1
-                className={cn(
-                  "text-russian-violet mb-2 text-2xl font-extrabold sm:text-3xl md:text-4xl",
-                )}
-              >
-                Thanks for your review!
-              </h1>
-              <p className={cn("text-rich-black/80 mb-4 text-sm sm:text-base")}>
-                You've already submitted a review for this appointment. Thanks for your feedback!
-              </p>
-              <Link
-                href="/"
-                className={cn(
-                  "bg-russian-violet text-seasalt inline-block rounded-md px-4 py-2.5 text-sm font-semibold hover:brightness-110",
-                )}
-              >
-                Back to home
-              </Link>
-            </section>
-          )}
-
-          {/* Valid token, not yet reviewed */}
-          {tokenValid && !alreadyReviewed && (
+          {/* Valid token - new or editing existing review */}
+          {tokenValid && (
             <>
               <section className={cn(CARD)}>
                 <h1
@@ -127,11 +119,12 @@ export default async function ReviewPage({
                     "text-russian-violet mb-2 text-2xl font-extrabold sm:text-3xl md:text-4xl",
                   )}
                 >
-                  How was your appointment?
+                  {alreadyReviewed ? "Edit your review" : "How was your appointment?"}
                 </h1>
                 <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
-                  Hi {prefillName}! Thanks for choosing To The Point Tech. I'd love to hear about
-                  your experience.
+                  {alreadyReviewed
+                    ? `Hi ${prefillName}! You can update your review any time using this link.`
+                    : `Hi ${prefillName}! Thanks for choosing To The Point Tech. I'd love to hear about your experience.`}
                 </p>
               </section>
 
@@ -141,6 +134,9 @@ export default async function ReviewPage({
                   reviewRequestId={sourceType === "reviewRequest" ? sourceId! : undefined}
                   token={token!}
                   prefillName={prefillName!}
+                  prefillEmail={prefillEmail ?? undefined}
+                  prefillPhone={prefillPhone ?? undefined}
+                  existingReview={existingReview ?? undefined}
                 />
               </section>
             </>
@@ -168,14 +164,9 @@ export default async function ReviewPage({
                 </Link>
                 .
               </p>
-              <Link
-                href="/"
-                className={cn(
-                  "bg-russian-violet text-seasalt inline-block rounded-md px-4 py-2.5 text-sm font-semibold hover:brightness-110",
-                )}
-              >
+              <Button href="/" variant="secondary" size="sm">
                 Back to home
-              </Link>
+              </Button>
             </section>
           )}
         </div>

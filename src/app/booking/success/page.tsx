@@ -6,8 +6,8 @@
 
 import type React from "react";
 import Image from "next/image";
-import Link from "next/link";
-import { cn } from "@/lib/cn";
+import { cn } from "@/shared/lib/cn";
+import { Button } from "@/shared/components/Button";
 import { FaCircleCheck, FaHouse } from "react-icons/fa6";
 
 const CARD = "border-seasalt-400/60 bg-seasalt-800 rounded-xl border p-5 shadow-sm sm:p-6";
@@ -58,16 +58,10 @@ export default function BookingSuccessPage(): React.ReactElement {
                 folder.
               </p>
 
-              <Link
-                href="/"
-                className={cn(
-                  "bg-russian-violet text-seasalt inline-flex items-center gap-2 rounded-md px-5 py-2.5 text-sm font-semibold",
-                  "hover:brightness-110",
-                )}
-              >
+              <Button href="/" variant="secondary" size="sm">
                 <FaHouse className={cn("h-4 w-4")} aria-hidden />
                 Back to home
-              </Link>
+              </Button>
             </section>
 
             <section className={cn(CARD)}>

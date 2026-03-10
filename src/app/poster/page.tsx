@@ -5,7 +5,7 @@
  * Pass ?mode=print to add a 3mm bleed on all edges (viewport 1818x2550px).
  */
 
-import { cn } from "@/lib/cn";
+import { cn } from "@/shared/lib/cn";
 import Image from "next/image";
 import type React from "react";
 import {
@@ -51,7 +51,7 @@ const servicesText =
 
 /**
  * Poster page component for A5 export.
- * Accepts an optional `mode` search param — set to "print" for a 3mm bleed version.
+ * Accepts an optional `mode` search param - set to "print" for a 3mm bleed version.
  * @param root0 - Page props.
  * @param root0.searchParams - Next.js search params promise.
  * @returns Poster page element
@@ -148,7 +148,7 @@ export default async function PosterPage({
                   />
                   <FaClock className={cn("text-moonstone-600 relative z-10 h-11 w-11")} />
                   <span className={cn("text-rich-black relative z-10 text-[34px] font-semibold")}>
-                    Same Day Available
+                    Same-Day Available
                   </span>
                 </div>
               </div>
@@ -254,7 +254,7 @@ export default async function PosterPage({
                       "text-russian-violet flex items-center gap-4 text-[44px] font-semibold",
                     )}
                   >
-                    <FaPhone className={cn("h-11 w-11 shrink-0")} aria-hidden />
+                    <FaPhone className={cn("h-10 w-10 shrink-0")} aria-hidden />
                     <span>021 297 1237</span>
                   </a>
 

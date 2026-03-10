@@ -6,8 +6,8 @@
 
 import type React from "react";
 import Link from "next/link";
-import { FrostedSection, PageShell, CARD, SOFT_CARD } from "@/components/PageLayout";
-import { cn } from "@/lib/cn";
+import { FrostedSection, PageShell, CARD, SOFT_CARD } from "@/shared/components/PageLayout";
+import { cn } from "@/shared/lib/cn";
 
 const linkStyle = cn(
   "text-coquelicot-500 hover:text-coquelicot-600 underline-offset-4 hover:underline",

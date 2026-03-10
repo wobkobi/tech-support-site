@@ -10,7 +10,7 @@ import type { Metadata, Viewport } from "next";
 import { Exo } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
-import { NavBar } from "@/components/NavBar";
+import { NavBar } from "@/shared/components/NavBar";
 
 const exo = Exo({
   subsets: ["latin"],
@@ -189,7 +189,6 @@ export const metadata: Metadata = {
         media: "(prefers-color-scheme: dark)",
       },
     ],
-    shortcut: ["/favicon.ico"],
   },
   manifest: "/site.webmanifest",
 };
@@ -203,6 +202,7 @@ export const viewport: Viewport = {
     { media: "(prefers-color-scheme: light)", color: "#f6f7f8" }, // seasalt-500
     { media: "(prefers-color-scheme: dark)", color: "#001514" }, // rich-black-500
   ],
+  colorScheme: "light",
 };
 
 /**

@@ -5,25 +5,10 @@
  * Protected by ADMIN_SECRET via constant-time comparison.
  */
 
-import { timingSafeEqual } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
-import { prisma } from "@/lib/prisma";
-
-/**
- * Validates an admin token against ADMIN_SECRET using a constant-time comparison.
- * @param token - Token to validate.
- * @returns True if the token matches ADMIN_SECRET.
- */
-function isValidToken(token: string | null | undefined): boolean {
-  const secret = process.env.ADMIN_SECRET;
-  if (!secret || !token) return false;
-  try {
-    return timingSafeEqual(Buffer.from(token), Buffer.from(secret));
-  } catch {
-    return false;
-  }
-}
+import { prisma } from "@/shared/lib/prisma";
+import { isValidAdminToken } from "@/shared/lib/auth";
+import { revalidateReviewPaths } from "@/features/reviews/lib/revalidate";
 
 /**
  * PATCH /api/admin/reviews/[id]
@@ -39,7 +24,7 @@ export async function PATCH(
 ): Promise<NextResponse> {
   const body = (await request.json()) as { action?: string; token?: string };
 
-  if (!isValidToken(body.token)) {
+  if (!isValidAdminToken(body.token)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -57,9 +42,7 @@ export async function PATCH(
     });
 
     // Trigger ISR revalidation so public pages update immediately
-    revalidatePath("/reviews");
-    revalidatePath("/review");
-    revalidatePath("/");
+    revalidateReviewPaths();
 
     return NextResponse.json({ ok: true });
   } catch (error) {
@@ -82,7 +65,7 @@ export async function DELETE(
 ): Promise<NextResponse> {
   const token = request.nextUrl.searchParams.get("token");
 
-  if (!isValidToken(token)) {
+  if (!isValidAdminToken(token)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -92,9 +75,7 @@ export async function DELETE(
     await prisma.review.delete({ where: { id } });
 
     // Trigger ISR revalidation so public pages update immediately
-    revalidatePath("/reviews");
-    revalidatePath("/review");
-    revalidatePath("/");
+    revalidateReviewPaths();
 
     return NextResponse.json({ ok: true });
   } catch (error) {
