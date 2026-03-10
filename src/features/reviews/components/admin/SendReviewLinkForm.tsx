@@ -8,6 +8,8 @@
 import { useState } from "react";
 import { SOFT_CARD } from "@/shared/components/PageLayout";
 import { cn } from "@/shared/lib/cn";
+import { CopyLinkButton } from "./CopyLinkButton";
+import { toE164NZ, formatNZPhone, isValidPhone } from "@/shared/lib/normalize-phone";
 import type React from "react";
 
 /**
@@ -29,11 +31,24 @@ export function SendReviewLinkForm({ token }: SendReviewLinkFormProps): React.Re
   const [mode, setMode] = useState<"email" | "sms">("email");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  /** Normalized phone digits/E.164 (e.g. "+64211231234"). Display via formatNZPhone. */
+  const [phoneRaw, setPhoneRaw] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [smsText, setSmsText] = useState<string | null>(null);
+  const [existingUrl, setExistingUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+
+  /**
+   * Handles phone input changes, keeping only digits and an optional leading '+'.
+   * @param raw - Raw input value from the phone field.
+   */
+  function handlePhoneChange(raw: string): void {
+    const hasPlus = raw.trimStart().startsWith("+");
+    const digits = raw.replace(/\D/g, "");
+    setPhoneRaw((hasPlus ? "+" : "") + digits);
+  }
 
   /**
    * Handles form submission to send a review link or generate an SMS message.
@@ -46,21 +61,30 @@ export function SendReviewLinkForm({ token }: SendReviewLinkFormProps): React.Re
     setError(null);
     setSuccess(false);
     setSmsText(null);
+    setExistingUrl(null);
     try {
       const res = await fetch("/api/admin/send-review-link", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, name, email, mode }),
+        body: JSON.stringify({ token, name, email, phone: phoneRaw, mode }),
       });
-      const data = (await res.json()) as { ok?: boolean; error?: string; reviewUrl?: string };
+      const data = (await res.json()) as {
+        ok?: boolean;
+        error?: string;
+        reviewUrl?: string;
+        existing?: boolean;
+      };
       if (!res.ok) throw new Error(data.error ?? "Request failed");
 
-      if (mode === "sms" && data.reviewUrl) {
+      if (data.existing && data.reviewUrl) {
+        setExistingUrl(data.reviewUrl);
+      } else if (mode === "sms" && data.reviewUrl) {
         const firstName = name.trim().split(" ")[0];
         setSmsText(
           `Hi ${firstName}, it's Harrison from To The Point Tech. Thanks for letting me help you out! I'm updating my website and a quick review would be greatly appreciated - it really helps: ${data.reviewUrl}`,
         );
         setName("");
+        setPhoneRaw("");
       } else {
         setSuccess(true);
         setName("");
@@ -84,6 +108,9 @@ export function SendReviewLinkForm({ token }: SendReviewLinkFormProps): React.Re
     setTimeout(() => setCopied(false), 2000);
   }
 
+  const phoneE164 = toE164NZ(phoneRaw);
+  const phoneValid = isValidPhone(phoneE164);
+
   return (
     <div className={cn(SOFT_CARD)}>
       <button
@@ -92,6 +119,8 @@ export function SendReviewLinkForm({ token }: SendReviewLinkFormProps): React.Re
           setSuccess(false);
           setError(null);
           setSmsText(null);
+          setExistingUrl(null);
+          setPhoneRaw("");
         }}
         className={cn("text-russian-violet w-full text-left text-sm font-semibold hover:underline")}
       >
@@ -110,7 +139,9 @@ export function SendReviewLinkForm({ token }: SendReviewLinkFormProps): React.Re
                   setMode(m);
                   setSuccess(false);
                   setSmsText(null);
+                  setExistingUrl(null);
                   setError(null);
+                  setPhoneRaw("");
                 }}
                 className={cn(
                   "rounded-lg border px-4 py-1.5 text-xs font-semibold transition-colors",
@@ -125,7 +156,7 @@ export function SendReviewLinkForm({ token }: SendReviewLinkFormProps): React.Re
           </div>
 
           <form onSubmit={handleSubmit} className={cn("flex flex-col gap-3")}>
-            <div className={cn("flex gap-3")}>
+            <div className={cn("flex items-start gap-3")}>
               <input
                 type="text"
                 autoComplete="off"
@@ -150,7 +181,30 @@ export function SendReviewLinkForm({ token }: SendReviewLinkFormProps): React.Re
                   )}
                 />
               )}
+              {mode === "sms" && (
+                <input
+                  type="tel"
+                  autoComplete="off"
+                  value={formatNZPhone(phoneRaw)}
+                  onChange={(e) => handlePhoneChange(e.target.value)}
+                  placeholder="021 123 1234"
+                  className={cn(
+                    "border-seasalt-400/60 bg-seasalt-800 text-rich-black flex-1 rounded-lg border p-3 text-sm focus:outline-none",
+                    phoneRaw && !phoneValid ? "border-coquelicot-500/60" : "",
+                  )}
+                />
+              )}
             </div>
+            {mode === "sms" && phoneRaw && (
+              <p
+                className={cn(
+                  "-mt-1 text-xs",
+                  phoneValid ? "text-rich-black/40" : "text-coquelicot-400",
+                )}
+              >
+                {phoneValid ? `Stored as: ${phoneE164}` : "Invalid phone number"}
+              </p>
+            )}
 
             {error && <p className={cn("text-coquelicot-400 text-xs")}>{error}</p>}
             {success && (
@@ -159,14 +213,29 @@ export function SendReviewLinkForm({ token }: SendReviewLinkFormProps): React.Re
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || (mode === "sms" && !!phoneRaw && !phoneValid)}
               className={cn(
                 "bg-moonstone-600 hover:bg-moonstone-700 self-start rounded-lg px-5 py-2 text-sm font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50",
               )}
             >
-              {loading ? "Generating…" : mode === "sms" ? "Generate text" : "Send link"}
+              {loading ? "Generating..." : mode === "sms" ? "Generate text" : "Send link"}
             </button>
           </form>
+
+          {/* Existing link - already sent to this client before */}
+          {existingUrl && (
+            <div className={cn("border-seasalt-400/60 bg-seasalt rounded-lg border p-3")}>
+              <p
+                className={cn(
+                  "text-coquelicot-500 mb-2 text-xs font-semibold uppercase tracking-wide",
+                )}
+              >
+                Already sent - here is their existing link
+              </p>
+              <p className={cn("text-rich-black/60 mb-3 break-all text-xs")}>{existingUrl}</p>
+              <CopyLinkButton url={existingUrl} />
+            </div>
+          )}
 
           {/* SMS copy box */}
           {smsText && (

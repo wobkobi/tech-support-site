@@ -8,6 +8,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma as prismaClient } from "@/shared/lib/prisma";
 import { sendOwnerReviewNotification } from "@/features/reviews/lib/email";
+import { normalizePhone } from "@/shared/lib/normalize-phone";
+import { reviewTextError } from "@/features/reviews/lib/validation";
 
 /**
  * Factory for reviews API handlers, allows dependency injection of Prisma client.
@@ -68,21 +70,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       bookingId?: string;
       reviewRequestId?: string;
       reviewToken?: string;
+      contactEmail?: string;
+      contactPhone?: string;
     };
 
-    const text = body.text?.trim();
-    if (!text || text.length < 10) {
-      return NextResponse.json(
-        { error: "Review must be at least 10 characters." },
-        { status: 400 },
-      );
-    }
-    if (text.length > 600) {
-      return NextResponse.json(
-        { error: "Review must be 600 characters or less." },
-        { status: 400 },
-      );
-    }
+    const text = body.text?.trim() ?? "";
+    const textErr = reviewTextError(text);
+    if (textErr) return NextResponse.json({ error: textErr }, { status: 400 });
 
     const firstName = body.firstName?.trim() || null;
     const lastName = body.lastName?.trim() || null;
@@ -125,9 +119,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       if (reviewRequest) {
         verified = true;
         customerRef = reviewRequest.reviewToken;
+        // Store any contact details the customer provided (only fill blanks, never overwrite)
+        const contactEmail = body.contactEmail?.trim().toLowerCase() || null;
+        const contactPhone = body.contactPhone ? normalizePhone(body.contactPhone) : null;
         await prisma.reviewRequest.update({
           where: { id: reviewRequest.id },
-          data: { reviewSubmittedAt: new Date() },
+          data: {
+            reviewSubmittedAt: new Date(),
+            email: reviewRequest.email ?? contactEmail,
+            phone: reviewRequest.phone ?? contactPhone,
+          },
         });
       }
     }

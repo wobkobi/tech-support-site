@@ -5,7 +5,6 @@
  */
 
 import { google as googleapis } from "googleapis";
-export const google = googleapis;
 
 import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 
@@ -189,7 +188,7 @@ export async function fetchAllCalendarEvents(
 
       for (const event of events) {
         if (event.start?.dateTime && event.end?.dateTime) {
-          // Timed event — always block regardless of calendar
+          // Timed event - always block regardless of calendar
           processedEvents.push({
             id: event.id!,
             start: event.start.dateTime,
@@ -199,7 +198,7 @@ export async function fetchAllCalendarEvents(
             calendarEmail: calendarId,
           });
         } else if (event.start?.date && event.end?.date && !isPersonal) {
-          // All-day event from a non-personal calendar — block the full NZ day(s).
+          // All-day event from a non-personal calendar - block the full NZ day(s).
           // All-day events use date strings ("YYYY-MM-DD"); end.date is exclusive.
           // Convert NZ calendar midnight → UTC so slot checking works correctly.
           const startDateStr = event.start.date;

@@ -156,7 +156,7 @@ export function Button(props: ButtonProps): React.ReactElement {
       "aria-label": ariaLabel,
     } = props;
 
-    // Protocol-based and download links bypass the Next.js router — render as a plain <a>.
+    // Protocol-based and download links bypass the Next.js router - render as a plain <a>.
     // This includes file downloads, tel:, mailto:, and any other non-path hrefs.
     const isPassthrough =
       download !== undefined || (!href.startsWith("/") && !href.startsWith("#"));

@@ -92,6 +92,8 @@ model Review {
 model ReviewRequest {
   id                String    @id @default(auto()) @map("_id") @db.ObjectId
   name              String
+  email             String?   // Stored for deduplication (null for SMS-only records)
+  phone             String?   // Stored for deduplication of SMS clients
   reviewToken       String    @unique @default(uuid())
   reviewSubmittedAt DateTime?
   createdAt         DateTime  @default(now())
