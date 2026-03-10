@@ -89,7 +89,7 @@ export default async function ReviewsPage(): Promise<React.ReactElement> {
                     >
                       {r.text}
                     </p>
-                    <p className={cn("text-russian-violet mt-4 text-sm font-semibold")}>
+                    <p className={cn("text-russian-violet mt-4 text-base font-semibold")}>
                       - {formatReviewerName(r)}
                     </p>
                   </li>

@@ -196,7 +196,7 @@ export default function ReviewFormProtected({
       {isVerified && (
         <div
           className={cn(
-            "border-moonstone-500/50 bg-moonstone-600/10 text-moonstone-600 flex items-center gap-2 rounded-lg border p-3 text-sm",
+            "border-moonstone-500/50 bg-moonstone-600/10 text-moonstone-600 flex items-center gap-2 rounded-lg border p-3 text-base",
           )}
         >
           <svg className={cn("h-5 w-5")} fill="currentColor" viewBox="0 0 20 20">
@@ -218,7 +218,7 @@ export default function ReviewFormProtected({
         <div
           role="status"
           className={cn(
-            "rounded-lg border p-3 text-sm",
+            "rounded-lg border p-3 text-base",
             errorMsg
               ? "border-coquelicot-500/50 bg-coquelicot-500/10 text-coquelicot-500"
               : "border-moonstone-500/50 bg-moonstone-600/10 text-moonstone-600",
@@ -237,10 +237,10 @@ export default function ReviewFormProtected({
       >
         {/* Name display options */}
         <div>
-          <p className={cn("text-rich-black mb-2 text-sm font-semibold")}>
+          <p className={cn("text-rich-black mb-2 text-base font-semibold")}>
             How do you want to appear?
           </p>
-          <div className={cn("flex flex-wrap gap-2")}>
+          <div className={cn("grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-2")}>
             {NAME_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
@@ -248,7 +248,7 @@ export default function ReviewFormProtected({
                 disabled={loading}
                 onClick={() => setNameDisplay(opt.value)}
                 className={cn(
-                  "rounded-lg border px-4 py-1.5 text-sm font-medium transition-colors",
+                  "whitespace-nowrap rounded-lg border px-4 py-1.5 text-base font-medium transition-colors",
                   nameDisplay === opt.value
                     ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
                     : "border-seasalt-400/60 bg-seasalt text-rich-black hover:border-russian-violet/40",
@@ -261,7 +261,7 @@ export default function ReviewFormProtected({
         </div>
 
         {/* Live name preview */}
-        <p className={cn("text-rich-black/60 text-xs")}>
+        <p className={cn("text-rich-black/60 text-base")}>
           {"Appears as: "}
           <span className={cn("text-russian-violet font-semibold")}>
             {nameDisplay === "anonymous"
@@ -281,7 +281,7 @@ export default function ReviewFormProtected({
             <div>
               <label
                 htmlFor={firstId}
-                className={cn("text-rich-black mb-1 block text-sm font-semibold")}
+                className={cn("text-rich-black mb-1 block text-base font-semibold")}
               >
                 First name <span className={cn("text-coquelicot-500")}>*</span>
               </label>
@@ -304,7 +304,7 @@ export default function ReviewFormProtected({
             <div>
               <label
                 htmlFor={lastId}
-                className={cn("text-rich-black mb-1 block text-sm font-semibold")}
+                className={cn("text-rich-black mb-1 block text-base font-semibold")}
               >
                 Last name <span className={cn("text-rich-black/50 font-normal")}>(optional)</span>
               </label>
@@ -331,10 +331,10 @@ export default function ReviewFormProtected({
         className={cn("border-seasalt-400/80 bg-seasalt-900/60 space-y-3 rounded-xl border p-4")}
       >
         <div>
-          <p className={cn("text-rich-black text-sm font-semibold")}>
+          <p className={cn("text-rich-black text-base font-semibold")}>
             Stay in touch <span className={cn("text-rich-black/40 font-normal")}>(optional)</span>
           </p>
-          <p className={cn("text-rich-black/50 mt-0.5 text-xs")}>
+          <p className={cn("text-rich-black/50 mt-0.5 text-base")}>
             Leave your number or email if you&apos;d like me to be able to reach you - totally up to
             you.
           </p>
@@ -344,7 +344,7 @@ export default function ReviewFormProtected({
           <div>
             <label
               htmlFor={phoneId}
-              className={cn("text-rich-black mb-1 block text-sm font-semibold")}
+              className={cn("text-rich-black mb-1 block text-base font-semibold")}
             >
               Phone
             </label>
@@ -364,7 +364,7 @@ export default function ReviewFormProtected({
               disabled={loading}
             />
             {phoneInvalid && (
-              <p className={cn("text-coquelicot-400 mt-1 text-xs")}>
+              <p className={cn("text-coquelicot-400 mt-1 text-base")}>
                 Doesn&apos;t look right - check the number.
               </p>
             )}
@@ -373,7 +373,7 @@ export default function ReviewFormProtected({
           <div>
             <label
               htmlFor={emailId}
-              className={cn("text-rich-black mb-1 block text-sm font-semibold")}
+              className={cn("text-rich-black mb-1 block text-base font-semibold")}
             >
               Email
             </label>
@@ -397,12 +397,12 @@ export default function ReviewFormProtected({
       {/* Review */}
       <div className={cn("border-seasalt-400/80 bg-seasalt-900/60 rounded-xl border p-4")}>
         <div className={cn("flex items-baseline justify-between gap-3")}>
-          <label htmlFor={textId} className={cn("text-rich-black block text-sm font-semibold")}>
+          <label htmlFor={textId} className={cn("text-rich-black block text-base font-semibold")}>
             Review <span className={cn("text-coquelicot-500")}>*</span>
           </label>
           <span
             className={cn(
-              "text-rich-black/60 text-[11px] tabular-nums",
+              "text-rich-black/60 text-xs tabular-nums",
               textCount > textMax
                 ? "text-coquelicot-500"
                 : textCount < textMin && textCount > 0

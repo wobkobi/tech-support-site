@@ -198,13 +198,13 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
                 <div className={cn("flex items-start justify-between")}>
                   <div>
                     <p className={cn("text-rich-black text-base font-semibold")}>{opt.label}</p>
-                    <p className={cn("text-rich-black/70 mt-1 text-sm")}>{opt.description}</p>
+                    <p className={cn("text-rich-black/70 mt-1 text-base")}>{opt.description}</p>
                   </div>
                 </div>
               </button>
             ))}
           </div>
-          <p className={cn("text-rich-black/60 mt-2 text-sm")}>
+          <p className={cn("text-rich-black/60 mt-2 text-base")}>
             Duration is just an estimate for scheduling. Most appointments are 1 hour. Choose 2
             hours if you have multiple issues or complex setup needs.
           </p>
@@ -226,12 +226,12 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
                 <div>
                   <p
                     className={cn(
-                      "text-rich-black/60 mb-1.5 text-sm font-medium uppercase tracking-wide",
+                      "text-rich-black/60 mb-1.5 text-base font-medium uppercase tracking-wide",
                     )}
                   >
                     Weekdays
                   </p>
-                  <div className={cn("grid grid-cols-2 gap-2 sm:flex sm:flex-wrap")}>
+                  <div className={cn("grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-2")}>
                     {weekdays.map((day) => (
                       <button
                         key={day.dateKey}
@@ -239,7 +239,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
                         disabled={!day.hasAnySlots}
                         onClick={() => handleDaySelect(day)}
                         className={cn(
-                          "rounded-lg border px-3 py-3 text-sm font-medium transition-colors sm:text-base",
+                          "whitespace-nowrap rounded-lg border px-3 py-3 text-base font-medium transition-colors",
                           !day.hasAnySlots && "cursor-not-allowed opacity-50",
                           selectedDay?.dateKey === day.dateKey
                             ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
@@ -262,12 +262,12 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
                 <div>
                   <p
                     className={cn(
-                      "text-rich-black/60 mb-1.5 text-sm font-medium uppercase tracking-wide",
+                      "text-rich-black/60 mb-1.5 text-base font-medium uppercase tracking-wide",
                     )}
                   >
                     Weekends
                   </p>
-                  <div className={cn("grid grid-cols-2 gap-2 sm:flex sm:flex-wrap")}>
+                  <div className={cn("grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-2")}>
                     {weekends.map((day) => (
                       <button
                         key={day.dateKey}
@@ -275,7 +275,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
                         disabled={!day.hasAnySlots}
                         onClick={() => handleDaySelect(day)}
                         className={cn(
-                          "rounded-lg border px-3 py-3 text-sm font-medium transition-colors sm:text-base",
+                          "whitespace-nowrap rounded-lg border px-3 py-3 text-base font-medium transition-colors",
                           !day.hasAnySlots && "cursor-not-allowed opacity-50",
                           selectedDay?.dateKey === day.dateKey
                             ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
@@ -312,7 +312,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
                 </p>
               </div>
             ) : (
-              <div className={cn("grid grid-cols-2 gap-2 sm:flex sm:flex-wrap")}>
+              <div className={cn("grid grid-cols-[repeat(auto-fill,minmax(5rem,1fr))] gap-2")}>
                 {selectedDay.timeWindows.map((window) => {
                   const available =
                     duration === "short" ? window.availableShort : window.availableLong;
@@ -323,7 +323,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
                       disabled={!available}
                       onClick={() => setSelectedTime(window.value)}
                       className={cn(
-                        "rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors sm:text-base",
+                        "rounded-lg border px-4 py-2.5 text-base font-medium transition-colors",
                         !available && "cursor-not-allowed opacity-40",
                         selectedTime === window.value
                           ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
@@ -392,7 +392,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
 
         <div className={cn("flex flex-col gap-1.5")}>
           <label htmlFor="booking-phone" className={cn("text-rich-black text-base font-semibold")}>
-            Phone <span className={cn("text-rich-black/70 text-sm")}>(optional)</span>
+            Phone <span className={cn("text-rich-black/70 text-base")}>(optional)</span>
           </label>
           <input
             id="booking-phone"
@@ -413,12 +413,12 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
           <label className={cn("text-rich-black text-base font-semibold")}>
             Meeting type <span className={cn("text-coquelicot-500")}>*</span>
           </label>
-          <div className={cn("flex flex-wrap gap-2")}>
+          <div className={cn("grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-2")}>
             <button
               type="button"
               onClick={() => setMeetingType("in-person")}
               className={cn(
-                "rounded-lg border px-5 py-2.5 text-base font-medium transition-colors",
+                "whitespace-nowrap rounded-lg border px-5 py-2.5 text-base font-medium transition-colors",
                 meetingType === "in-person"
                   ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
                   : "border-seasalt-400/60 bg-seasalt text-rich-black hover:border-russian-violet/40",
@@ -430,7 +430,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
               type="button"
               onClick={() => setMeetingType("remote")}
               className={cn(
-                "rounded-lg border px-5 py-2.5 text-base font-medium transition-colors",
+                "whitespace-nowrap rounded-lg border px-5 py-2.5 text-base font-medium transition-colors",
                 meetingType === "remote"
                   ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
                   : "border-seasalt-400/60 bg-seasalt text-rich-black hover:border-russian-violet/40",
@@ -515,7 +515,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
         >
           {submitting ? "Sending..." : "Submit request"}
         </Button>
-        <p className={cn("text-rich-black/60 text-sm sm:text-base")}>
+        <p className={cn("text-rich-black/60 text-base")}>
           I'll confirm your exact appointment time by email.
         </p>
       </div>

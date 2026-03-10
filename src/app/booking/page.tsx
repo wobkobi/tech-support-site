@@ -196,7 +196,7 @@ export default async function BookingPage(): Promise<React.ReactElement> {
                     </span>
                     <div>
                       <p className={cn("text-rich-black text-base font-semibold")}>Choose length</p>
-                      <p className={cn("text-rich-black/70 text-sm")}>1 or 2 hours</p>
+                      <p className={cn("text-rich-black/70 text-base")}>1 or 2 hours</p>
                     </div>
                   </li>
                   <li className={cn("flex gap-3")}>
@@ -205,7 +205,7 @@ export default async function BookingPage(): Promise<React.ReactElement> {
                     </span>
                     <div>
                       <p className={cn("text-rich-black text-base font-semibold")}>Pick a time</p>
-                      <p className={cn("text-rich-black/70 text-sm")}>Day and start time</p>
+                      <p className={cn("text-rich-black/70 text-base")}>Day and start time</p>
                     </div>
                   </li>
                   <li className={cn("flex gap-3")}>
@@ -216,7 +216,7 @@ export default async function BookingPage(): Promise<React.ReactElement> {
                       <p className={cn("text-rich-black text-base font-semibold")}>
                         Describe the issue
                       </p>
-                      <p className={cn("text-rich-black/70 text-sm")}>What you need help with</p>
+                      <p className={cn("text-rich-black/70 text-base")}>What you need help with</p>
                     </div>
                   </li>
                   <li className={cn("flex gap-3")}>
@@ -228,7 +228,7 @@ export default async function BookingPage(): Promise<React.ReactElement> {
                     </span>
                     <div>
                       <p className={cn("text-rich-black text-base font-semibold")}>Get confirmed</p>
-                      <p className={cn("text-rich-black/70 text-sm")}>Calendar invite by email</p>
+                      <p className={cn("text-rich-black/70 text-base")}>Calendar invite by email</p>
                     </div>
                   </li>
                 </ol>
