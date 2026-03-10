@@ -36,6 +36,11 @@ export default async function AdminReviewsPage({
   const { token } = await searchParams;
 
   if (!isValidAdminToken(token ?? null)) {
+    // Log invalid admin access attempts for monitoring and debugging without exposing the token value.
+    console.warn("Invalid admin token used to access /admin/reviews", {
+      tokenPresent: Boolean(token),
+    });
+    console.warn("[admin/reviews] Invalid token attempt", { tokenPresent: Boolean(token) });
     notFound();
   }
 
