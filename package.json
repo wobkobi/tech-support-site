@@ -71,7 +71,7 @@
     "simple-git-hooks": "^2.13.1",
     "tailwindcss": "^4.2.1",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.4",
+    "typescript": "latest",
     "vitest": "^4.0.18"
   },
   "browserslist": [
