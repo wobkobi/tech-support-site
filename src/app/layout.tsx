@@ -31,10 +31,6 @@ export const metadata: Metadata = {
     "Local IT & computer support in Auckland. Same-day, evening & weekend appointments available. No jargon — clear fixes for computers, Wi-Fi, phones, printers, and more.",
   applicationName: "To The Point Tech",
   authors: [{ name: "Harrison Raynes" }],
-  verification: {
-    google: "4Pldue9HoMplv4Rs8C8I_r1FXtenFKX_O4f0_fdhOtw",
-  },
-
   alternates: {
     canonical: "/",
     languages: { "en-NZ": "/" },
