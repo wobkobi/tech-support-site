@@ -31,24 +31,13 @@ export function SendReviewLinkForm({ token }: SendReviewLinkFormProps): React.Re
   const [mode, setMode] = useState<"email" | "sms">("email");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  /** Normalized phone digits/E.164 (e.g. "+64211231234"). Display via formatNZPhone. */
-  const [phoneRaw, setPhoneRaw] = useState("");
+  const [phoneInput, setPhoneInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [smsText, setSmsText] = useState<string | null>(null);
   const [existingUrl, setExistingUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-
-  /**
-   * Handles phone input changes, keeping only digits and an optional leading '+'.
-   * @param raw - Raw input value from the phone field.
-   */
-  function handlePhoneChange(raw: string): void {
-    const hasPlus = raw.trimStart().startsWith("+");
-    const digits = raw.replace(/\D/g, "");
-    setPhoneRaw((hasPlus ? "+" : "") + digits);
-  }
 
   /**
    * Handles form submission to send a review link or generate an SMS message.
@@ -66,7 +55,7 @@ export function SendReviewLinkForm({ token }: SendReviewLinkFormProps): React.Re
       const res = await fetch("/api/admin/send-review-link", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, name, email, phone: phoneRaw, mode }),
+        body: JSON.stringify({ token, name, email, phone: phoneInput, mode }),
       });
       const data = (await res.json()) as {
         ok?: boolean;
@@ -84,7 +73,7 @@ export function SendReviewLinkForm({ token }: SendReviewLinkFormProps): React.Re
           `Hi ${firstName}, it's Harrison from To The Point Tech. Thanks for letting me help you out! I'm updating my website and a quick review would be greatly appreciated - it really helps: ${data.reviewUrl}`,
         );
         setName("");
-        setPhoneRaw("");
+        setPhoneInput("");
       } else {
         setSuccess(true);
         setName("");
@@ -108,7 +97,7 @@ export function SendReviewLinkForm({ token }: SendReviewLinkFormProps): React.Re
     setTimeout(() => setCopied(false), 2000);
   }
 
-  const phoneE164 = toE164NZ(phoneRaw);
+  const phoneE164 = toE164NZ(phoneInput);
   const phoneValid = isValidPhone(phoneE164);
 
   return (
@@ -120,7 +109,7 @@ export function SendReviewLinkForm({ token }: SendReviewLinkFormProps): React.Re
           setError(null);
           setSmsText(null);
           setExistingUrl(null);
-          setPhoneRaw("");
+          setPhoneInput("");
         }}
         className={cn("text-russian-violet w-full text-left text-sm font-semibold hover:underline")}
       >
@@ -141,7 +130,7 @@ export function SendReviewLinkForm({ token }: SendReviewLinkFormProps): React.Re
                   setSmsText(null);
                   setExistingUrl(null);
                   setError(null);
-                  setPhoneRaw("");
+                  setPhoneInput("");
                 }}
                 className={cn(
                   "rounded-lg border px-4 py-1.5 text-xs font-semibold transition-colors",
@@ -185,17 +174,18 @@ export function SendReviewLinkForm({ token }: SendReviewLinkFormProps): React.Re
                 <input
                   type="tel"
                   autoComplete="off"
-                  value={formatNZPhone(phoneRaw)}
-                  onChange={(e) => handlePhoneChange(e.target.value)}
+                  value={phoneInput}
+                  onChange={(e) => setPhoneInput(e.target.value)}
+                  onBlur={(e) => setPhoneInput(formatNZPhone(e.target.value))}
                   placeholder="021 123 1234"
                   className={cn(
                     "border-seasalt-400/60 bg-seasalt-800 text-rich-black flex-1 rounded-lg border p-3 text-sm focus:outline-none",
-                    phoneRaw && !phoneValid ? "border-coquelicot-500/60" : "",
+                    phoneInput && !phoneValid ? "border-coquelicot-500/60" : "",
                   )}
                 />
               )}
             </div>
-            {mode === "sms" && phoneRaw && (
+            {mode === "sms" && phoneInput && (
               <p
                 className={cn(
                   "-mt-1 text-xs",
@@ -213,7 +203,7 @@ export function SendReviewLinkForm({ token }: SendReviewLinkFormProps): React.Re
 
             <button
               type="submit"
-              disabled={loading || (mode === "sms" && !!phoneRaw && !phoneValid)}
+              disabled={loading || (mode === "sms" && !!phoneInput && !phoneValid)}
               className={cn(
                 "bg-moonstone-600 hover:bg-moonstone-700 self-start rounded-lg px-5 py-2 text-sm font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50",
               )}

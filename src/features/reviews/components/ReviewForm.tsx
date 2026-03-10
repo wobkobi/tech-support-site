@@ -13,7 +13,7 @@ import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatNZPhone, normalizePhone, isValidPhone } from "@/shared/lib/normalize-phone";
 
-type NameDisplay = "first" | "full" | "anonymous";
+type NameDisplay = "name" | "anonymous";
 
 interface ReviewFormProtectedProps {
   bookingId?: string;
@@ -72,11 +72,8 @@ export default function ReviewFormProtected({
   function initialNameDisplay(): NameDisplay {
     if (existingReview) {
       if (existingReview.isAnonymous) return "anonymous";
-      if (existingReview.lastName) return "full";
-      return "first";
     }
-    const parts = prefillName?.trim().split(" ") ?? [];
-    return parts.length > 1 ? "full" : "first";
+    return "name";
   }
 
   const nameParts = prefillName?.split(" ") || [];
@@ -90,7 +87,9 @@ export default function ReviewFormProtected({
   // Contact details - pre-filled from booking/review request if available
   const [contactEmail, setContactEmail] = useState(prefillEmail ?? "");
   // Store raw phone digits internally; display formatted
-  const [phoneRaw, setPhoneRaw] = useState(normalizePhone(prefillPhone ?? ""));
+  const [phoneInput, setPhoneInput] = useState(
+    prefillPhone ? formatNZPhone(normalizePhone(prefillPhone)) : "",
+  );
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
@@ -100,25 +99,11 @@ export default function ReviewFormProtected({
   const textCount = text.length;
   const isAnonymous = nameDisplay === "anonymous";
 
-  // Derived display value for the phone input
-  const phoneDisplay = formatNZPhone(phoneRaw);
-  const phoneNormalized = normalizePhone(phoneRaw);
-  const phoneInvalid = !!phoneRaw && !isValidPhone(phoneNormalized);
-
-  /**
-   * Handles phone input change - strips non-digits and keeps leading +.
-   * @param e - Change event
-   */
-  function handlePhoneChange(e: React.ChangeEvent<HTMLInputElement>): void {
-    const val = e.target.value;
-    const hasPlus = val.trimStart().startsWith("+");
-    const digits = val.replace(/\D/g, "");
-    setPhoneRaw((hasPlus ? "+" : "") + digits);
-  }
+  const phoneNormalized = normalizePhone(phoneInput);
+  const phoneInvalid = !!phoneInput.trim() && !isValidPhone(phoneNormalized);
 
   const NAME_OPTIONS: { value: NameDisplay; label: string }[] = [
-    { value: "first", label: "First name only" },
-    { value: "full", label: "Full name" },
+    { value: "name", label: "Name" },
     { value: "anonymous", label: "Anonymous" },
   ];
 
@@ -160,13 +145,10 @@ export default function ReviewFormProtected({
     try {
       let res: Response;
 
-      // "first" mode stores only the last initial (e.g. "Smith" → "S.") for "John S." display
-      const lastInitial = nameDisplay === "first" && l ? l.charAt(0).toUpperCase() + "." : null;
-
       const payload = {
         text: t,
         firstName: isAnonymous ? null : f,
-        lastName: isAnonymous ? null : nameDisplay === "first" ? lastInitial : l || null,
+        lastName: isAnonymous ? null : l || null,
         isAnonymous,
         contactEmail: contactEmail.trim() || null,
         contactPhone: phoneNormalized || null,
@@ -288,8 +270,7 @@ export default function ReviewFormProtected({
                   const f = firstName.trim();
                   const l = lastName.trim();
                   if (!f) return "(enter first name)";
-                  if (nameDisplay === "first") return l ? `${f} ${l.charAt(0).toUpperCase()}.` : f;
-                  return [f, l].filter(Boolean).join(" ");
+                  return l ? `${f} ${l}` : f;
                 })()}
           </span>
         </p>
@@ -325,12 +306,7 @@ export default function ReviewFormProtected({
                 htmlFor={lastId}
                 className={cn("text-rich-black mb-1 block text-sm font-semibold")}
               >
-                Last name{" "}
-                {nameDisplay === "first" && (
-                  <span className={cn("text-rich-black/50 font-normal")}>
-                    (optional - shows as initial)
-                  </span>
-                )}
+                Last name <span className={cn("text-rich-black/50 font-normal")}>(optional)</span>
               </label>
               <input
                 id={lastId}
@@ -382,8 +358,9 @@ export default function ReviewFormProtected({
                 "w-full rounded-md border px-3 py-2 outline-none focus:ring-2",
                 phoneInvalid ? "border-coquelicot-500/60" : "",
               )}
-              value={phoneDisplay}
-              onChange={handlePhoneChange}
+              value={phoneInput}
+              onChange={(e) => setPhoneInput(e.target.value)}
+              onBlur={(e) => setPhoneInput(formatNZPhone(e.target.value))}
               disabled={loading}
             />
             {phoneInvalid && (

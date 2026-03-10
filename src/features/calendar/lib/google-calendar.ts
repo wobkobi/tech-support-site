@@ -4,7 +4,7 @@
  * @description Google Calendar API integration - multi-calendar without list permission.
  */
 
-import { google as googleapis } from "googleapis";
+import { google } from "googleapis";
 
 import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 
@@ -57,7 +57,7 @@ export function getOAuth2Client(): InstanceType<typeof google.auth.OAuth2> {
  * Gets authenticated Calendar API client
  * @returns Calendar API instance
  */
-function getCalendarClient(): ReturnType<typeof googleapis.calendar> {
+function getCalendarClient(): ReturnType<typeof google.calendar> {
   const auth = getOAuth2Client();
   return google.calendar({ version: "v3", auth });
 }

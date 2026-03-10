@@ -63,10 +63,8 @@ export function ReviewLinkHistoryTable({
    * For tokenless legacy entries: "rev:<reviewId>".
    */
   const [editingKey, setEditingKey] = useState<string | null>(null);
-  const [editName, setEditName] = useState("");
   const [editEmail, setEditEmail] = useState("");
-  /** Normalized phone digits (e.g. "0211231234" or "+642112341234") */
-  const [editPhoneRaw, setEditPhoneRaw] = useState("");
+  const [editPhoneInput, setEditPhoneInput] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -83,16 +81,6 @@ export function ReviewLinkHistoryTable({
   }
 
   /**
-   * Handles changes to the phone input, stripping non-digit characters.
-   * @param raw - Raw input value.
-   */
-  function handlePhoneChange(raw: string): void {
-    const hasPlus = raw.trimStart().startsWith("+");
-    const digits = raw.replace(/\D/g, "");
-    setEditPhoneRaw((hasPlus ? "+" : "") + digits);
-  }
-
-  /**
    * Opens the inline edit form for a row.
    * @param entry - The entry to edit.
    */
@@ -100,10 +88,8 @@ export function ReviewLinkHistoryTable({
     const key = entryKey(entry);
     if (!key) return;
     setEditingKey(key);
-    // Don't pre-fill placeholder names — let admin type the real one
-    setEditName(entry.name === "Unknown" || entry.name === "Anonymous" ? "" : entry.name);
     setEditEmail(entry.email ?? "");
-    setEditPhoneRaw(entry.phone ?? "");
+    setEditPhoneInput(entry.phone ? formatNZPhone(entry.phone) : "");
     setSaveError(null);
   }
 
@@ -118,10 +104,6 @@ export function ReviewLinkHistoryTable({
    * @param entry - The entry being saved.
    */
   async function handleSave(entry: LinkHistoryEntry): Promise<void> {
-    if (!editName.trim()) {
-      setSaveError("Name is required.");
-      return;
-    }
     setSaving(true);
     setSaveError(null);
     try {
@@ -136,9 +118,9 @@ export function ReviewLinkHistoryTable({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             token,
-            name: editName,
+            name: entry.name,
             email: editEmail,
-            phone: editPhoneRaw,
+            phone: editPhoneInput,
           }),
         });
         const data = (await res.json()) as { ok?: boolean; error?: string };
@@ -151,9 +133,9 @@ export function ReviewLinkHistoryTable({
           body: JSON.stringify({
             token,
             customerRef: entry.customerRef,
-            name: editName,
+            name: entry.name,
             email: editEmail,
-            phone: editPhoneRaw,
+            phone: editPhoneInput,
           }),
         });
         const data = (await res.json()) as { ok?: boolean; id?: string; error?: string };
@@ -168,9 +150,9 @@ export function ReviewLinkHistoryTable({
           body: JSON.stringify({
             token,
             reviewId: entry.reviewId,
-            name: editName,
+            name: entry.name,
             email: editEmail,
-            phone: editPhoneRaw,
+            phone: editPhoneInput,
           }),
         });
         const data = (await res.json()) as {
@@ -194,9 +176,8 @@ export function ReviewLinkHistoryTable({
                 id: savedId,
                 customerRef: savedCustomerRef,
                 reviewUrl: savedReviewUrl,
-                name: editName.trim(),
                 email: editEmail.trim().toLowerCase() || null,
-                phone: toE164NZ(editPhoneRaw) || null,
+                phone: toE164NZ(editPhoneInput) || null,
               }
             : e,
         ),
@@ -250,23 +231,13 @@ export function ReviewLinkHistoryTable({
             const canEdit = key !== null;
 
             if (isEditing) {
-              const phoneDisplay = formatNZPhone(editPhoneRaw);
-              const phoneValid = isValidPhone(editPhoneRaw);
+              const phoneValid = isValidPhone(editPhoneInput);
 
               return (
                 <tr key={key} className={cn("border-seasalt-400/20 border-b last:border-0")}>
                   <td colSpan={6} className={cn("py-3")}>
                     <div className={cn("flex flex-col gap-2")}>
                       <div className={cn("flex flex-wrap gap-2")}>
-                        <input
-                          type="text"
-                          value={editName}
-                          onChange={(e) => setEditName(e.target.value)}
-                          placeholder="Full name"
-                          className={cn(
-                            "border-seasalt-400/60 bg-seasalt-800 text-rich-black w-40 rounded-lg border px-3 py-1.5 text-sm focus:outline-none",
-                          )}
-                        />
                         <input
                           type="email"
                           value={editEmail}
@@ -278,16 +249,17 @@ export function ReviewLinkHistoryTable({
                         />
                         <input
                           type="tel"
-                          value={phoneDisplay}
-                          onChange={(e) => handlePhoneChange(e.target.value)}
+                          value={editPhoneInput}
+                          onChange={(e) => setEditPhoneInput(e.target.value)}
+                          onBlur={(e) => setEditPhoneInput(formatNZPhone(e.target.value))}
                           placeholder="021 123 1234"
                           className={cn(
                             "border-seasalt-400/60 bg-seasalt-800 text-rich-black w-40 rounded-lg border px-3 py-1.5 text-sm focus:outline-none",
-                            editPhoneRaw && !phoneValid ? "border-coquelicot-500/60" : "",
+                            editPhoneInput && !phoneValid ? "border-coquelicot-500/60" : "",
                           )}
                         />
                       </div>
-                      {editPhoneRaw && (
+                      {editPhoneInput && (
                         <p
                           className={cn(
                             "text-xs",
@@ -295,7 +267,7 @@ export function ReviewLinkHistoryTable({
                           )}
                         >
                           {phoneValid
-                            ? `Stored as: ${toE164NZ(editPhoneRaw)}`
+                            ? `Stored as: ${toE164NZ(editPhoneInput)}`
                             : "Invalid phone number"}
                         </p>
                       )}
@@ -305,7 +277,7 @@ export function ReviewLinkHistoryTable({
                       <div className={cn("flex gap-2")}>
                         <button
                           type="button"
-                          disabled={saving || (!!editPhoneRaw && !phoneValid)}
+                          disabled={saving || (!!editPhoneInput && !phoneValid)}
                           onClick={() => handleSave(entry)}
                           className={cn(
                             "bg-moonstone-600 hover:bg-moonstone-700 rounded-lg px-4 py-1.5 text-xs font-semibold text-white transition-colors disabled:opacity-50",

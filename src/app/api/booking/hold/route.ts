@@ -119,7 +119,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreateBoo
     }
 
     const cancelToken = randomUUID();
-    const holdExpiresUtc = new Date(now.getTime() + HOLD_EXPIRATION_MINUTES * 60 * 1000);
+    const holdExpiresAt = new Date(now.getTime() + HOLD_EXPIRATION_MINUTES * 60 * 1000);
 
     // Build notes with meeting details
     let bookingNotes = `Meeting type: ${meetingType === "in-person" ? "In-person" : "Remote"}\n`;
@@ -144,7 +144,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreateBoo
           endUtc,
           status: "held",
           cancelToken,
-          holdExpiresUtc,
+          holdExpiresAt,
           activeSlotKey: startUtc.toISOString(), // Unique constraint for double-booking prevention
           bufferBeforeMin: BOOKING_CONFIG.bufferMin,
           bufferAfterMin: BOOKING_CONFIG.bufferMin,
@@ -173,7 +173,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreateBoo
           data: {
             status: "confirmed",
             calendarEventId,
-            holdExpiresUtc: null, // Clear hold expiry since it's confirmed
+            holdExpiresAt: null, // Clear hold expiry since it's confirmed
           },
         });
 
