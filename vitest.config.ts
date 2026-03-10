@@ -12,7 +12,7 @@ export default defineConfig({
     environment: "node",
     globals: true,
     coverage: {
-      reporter: ["text", "html"],
+      reporter: ["text", "html", "json-summary"],
       enabled: true,
       // threshold property removed; not valid for coverage config
     },
