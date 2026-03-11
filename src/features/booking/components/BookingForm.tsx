@@ -239,7 +239,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
                         disabled={!day.hasAnySlots}
                         onClick={() => handleDaySelect(day)}
                         className={cn(
-                          "whitespace-nowrap rounded-lg border px-3 py-3 text-base font-medium transition-colors",
+                          "whitespace-nowrap rounded-lg border px-3 py-3 text-base font-medium",
                           !day.hasAnySlots && "cursor-not-allowed opacity-50",
                           selectedDay?.dateKey === day.dateKey
                             ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
@@ -275,7 +275,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
                         disabled={!day.hasAnySlots}
                         onClick={() => handleDaySelect(day)}
                         className={cn(
-                          "whitespace-nowrap rounded-lg border px-3 py-3 text-base font-medium transition-colors",
+                          "whitespace-nowrap rounded-lg border px-3 py-3 text-base font-medium",
                           !day.hasAnySlots && "cursor-not-allowed opacity-50",
                           selectedDay?.dateKey === day.dateKey
                             ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
@@ -323,7 +323,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
                       disabled={!available}
                       onClick={() => setSelectedTime(window.value)}
                       className={cn(
-                        "rounded-lg border px-4 py-2.5 text-base font-medium transition-colors",
+                        "rounded-lg border px-4 py-2.5 text-base font-medium",
                         !available && "cursor-not-allowed opacity-40",
                         selectedTime === window.value
                           ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
@@ -458,13 +458,16 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
               >
                 Address <span className={cn("text-coquelicot-500")}>*</span>
               </label>
-              <AddressAutocomplete
-                id="booking-address"
-                value={address}
-                onChange={setAddress}
-                placeholder="Start typing your address..."
-                required={meetingType === "in-person"}
-              />
+              {/* Only mount when in-person so Google Maps script never loads for remote sessions */}
+              {meetingType === "in-person" && (
+                <AddressAutocomplete
+                  id="booking-address"
+                  value={address}
+                  onChange={setAddress}
+                  placeholder="Start typing your address..."
+                  required
+                />
+              )}
             </div>
           </div>
         </div>
