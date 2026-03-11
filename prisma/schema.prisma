@@ -68,6 +68,8 @@ model Booking {
   @@index([status, endAt])
   // Review email cron and admin page: filter/sort on reviewSentAt
   @@index([reviewSentAt])
+  // Review email cron: WHERE status="confirmed" AND reviewSentAt=null AND endAt<=threshold
+  @@index([status, reviewSentAt, endAt])
 }
 
 model Review {

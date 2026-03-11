@@ -67,6 +67,9 @@ export function ReviewLinkHistoryTable({
   const [editPhoneInput, setEditPhoneInput] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [confirmRevokeKey, setConfirmRevokeKey] = useState<string | null>(null);
+  const [revoking, setRevoking] = useState(false);
+  const [revokeError, setRevokeError] = useState<string | null>(null);
 
   /**
    * Returns the edit key for a given entry.
@@ -97,6 +100,30 @@ export function ReviewLinkHistoryTable({
   function cancelEdit(): void {
     setEditingKey(null);
     setSaveError(null);
+  }
+
+  /**
+   * Revokes a review link by deleting the ReviewRequest record.
+   * @param entry - The entry to revoke.
+   */
+  async function handleRevoke(entry: LinkHistoryEntry): Promise<void> {
+    if (!entry.id) return;
+    setRevoking(true);
+    setRevokeError(null);
+    try {
+      const res = await fetch(
+        `/api/admin/review-requests/${entry.id}?token=${encodeURIComponent(token)}`,
+        { method: "DELETE" },
+      );
+      const data = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok) throw new Error(data.error ?? "Request failed");
+      setEntries((prev) => prev.filter((e) => e.id !== entry.id));
+      setConfirmRevokeKey(null);
+    } catch (err) {
+      setRevokeError(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setRevoking(false);
+    }
   }
 
   /**
@@ -221,7 +248,8 @@ export function ReviewLinkHistoryTable({
             <th className={cn("pb-2 pr-4 font-semibold")}>Sent</th>
             <th className={cn("pb-2 pr-4 font-semibold")}>Via</th>
             <th className={cn("pb-2 pr-4 font-semibold")}>Reviewed?</th>
-            <th className={cn("pb-2 font-semibold")}>Link</th>
+            <th className={cn("pb-2 pr-4 font-semibold")}>Link</th>
+            <th className={cn("pb-2 font-semibold")}></th>
           </tr>
         </thead>
         <tbody>
@@ -235,7 +263,7 @@ export function ReviewLinkHistoryTable({
 
               return (
                 <tr key={key} className={cn("border-seasalt-400/20 border-b last:border-0")}>
-                  <td colSpan={6} className={cn("py-3")}>
+                  <td colSpan={7} className={cn("py-3")}>
                     <div className={cn("flex flex-col gap-2")}>
                       <div className={cn("flex flex-wrap gap-2")}>
                         <input
@@ -360,8 +388,52 @@ export function ReviewLinkHistoryTable({
                     <span className={cn("text-rich-black/40 text-xs")}>Not yet</span>
                   )}
                 </td>
-                <td className={cn("py-2")}>
+                <td className={cn("py-2 pr-4")}>
                   <CopyLinkButton url={entry.reviewUrl} />
+                </td>
+                <td className={cn("py-2")}>
+                  {entry.id && confirmRevokeKey === key ? (
+                    <div className={cn("flex flex-col gap-1")}>
+                      <div className={cn("flex items-center gap-2")}>
+                        <span className={cn("text-rich-black/60 text-xs")}>Revoke this link?</span>
+                        <button
+                          type="button"
+                          disabled={revoking}
+                          onClick={() => handleRevoke(entry)}
+                          className={cn(
+                            "text-coquelicot-500 hover:text-coquelicot-600 text-xs font-semibold transition-colors disabled:opacity-50",
+                          )}
+                        >
+                          {revoking ? "Revoking…" : "Yes, revoke"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setConfirmRevokeKey(null);
+                            setRevokeError(null);
+                          }}
+                          className={cn(
+                            "text-rich-black/40 hover:text-rich-black/60 text-xs transition-colors",
+                          )}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                      {revokeError && (
+                        <p className={cn("text-coquelicot-400 text-xs")}>{revokeError}</p>
+                      )}
+                    </div>
+                  ) : entry.id && !entry.reviewed ? (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmRevokeKey(key)}
+                      className={cn(
+                        "text-rich-black/30 hover:text-coquelicot-500 text-xs transition-colors",
+                      )}
+                    >
+                      Revoke
+                    </button>
+                  ) : null}
                 </td>
               </tr>
             );

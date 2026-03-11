@@ -44,7 +44,8 @@ export default async function AdminReviewsPage({
     notFound();
   }
 
-  const [reviews, sentBookings, sentRequests, allReviews, allBookings] = await Promise.all([
+  const [reviews, sentBookings, sentRequests, allBookings] = await Promise.all([
+    // Single query with all fields needed for approval list + legacy review dedup
     prisma.review.findMany({
       orderBy: { createdAt: "desc" },
       select: {
@@ -54,6 +55,8 @@ export default async function AdminReviewsPage({
         lastName: true,
         isAnonymous: true,
         status: true,
+        customerRef: true,
+        bookingId: true,
         createdAt: true,
       },
     }),
@@ -83,19 +86,6 @@ export default async function AdminReviewsPage({
         reviewToken: true,
       },
     }),
-    // All reviews - used to find any not covered by Auto or Manual lists
-    prisma.review.findMany({
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        isAnonymous: true,
-        customerRef: true,
-        bookingId: true,
-        createdAt: true,
-      },
-    }),
     // All booking id→reviewToken pairs (for legacy reviews linked via bookingId only)
     prisma.booking.findMany({
       select: { id: true, reviewToken: true },
@@ -120,7 +110,7 @@ export default async function AdminReviewsPage({
   // Map bookingId → reviewToken for all bookings (used when review has bookingId but no customerRef)
   const bookingTokenMap = new Map(allBookings.map((b) => [b.id, b.reviewToken]));
 
-  const legacyReviews = allReviews.filter((r) => {
+  const legacyReviews = reviews.filter((r) => {
     if (r.customerRef && knownTokens.has(r.customerRef)) return false;
     if (r.bookingId && knownBookingIds.has(r.bookingId)) return false;
     return true;

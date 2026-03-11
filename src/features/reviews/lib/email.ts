@@ -6,12 +6,15 @@
 
 import { Resend } from "resend";
 
+// Lazy singleton — created on first use so module import never throws in test environments.
+let _resend: Resend | null = null;
 /**
- * Creates a Resend client from the RESEND_API_KEY environment variable.
+ * Returns the shared Resend client, initialising it on first call.
  * @returns Resend client instance.
  */
-function createResend(): Resend {
-  return new Resend(process.env.RESEND_API_KEY);
+function getResend(): Resend {
+  if (!_resend) _resend = new Resend(process.env.RESEND_API_KEY);
+  return _resend;
 }
 
 /**
@@ -79,8 +82,7 @@ export async function sendOwnerReviewNotification(review: ReviewNotificationData
 </html>`;
 
   try {
-    const resend = createResend();
-    await resend.emails.send({
+    await getResend().emails.send({
       from,
       replyTo: adminEmail,
       to: adminEmail,
@@ -170,8 +172,7 @@ export async function sendOwnerBookingNotification(
 </html>`;
 
   try {
-    const resend = createResend();
-    await resend.emails.send({
+    await getResend().emails.send({
       from,
       replyTo: adminEmail,
       to: adminEmail,
@@ -243,8 +244,7 @@ export async function sendCustomerBookingConfirmation(
 </html>`;
 
   try {
-    const resend = createResend();
-    await resend.emails.send({
+    await getResend().emails.send({
       from,
       replyTo: process.env.ADMIN_EMAIL,
       to: booking.email,
@@ -321,8 +321,7 @@ export async function sendCustomerReviewRequest(booking: ReviewRequestData): Pro
 </html>`;
 
   try {
-    const resend = createResend();
-    await resend.emails.send({
+    await getResend().emails.send({
       from,
       replyTo: process.env.ADMIN_EMAIL,
       to: booking.email,
@@ -332,6 +331,47 @@ export async function sendCustomerReviewRequest(booking: ReviewRequestData): Pro
   } catch (error) {
     console.error("[email] Failed to send review request to %s:", booking.email, error);
   }
+}
+
+/**
+ * Builds the HTML body for a past-client review request email.
+ * @param firstName - Customer's first name.
+ * @param reviewUrl - The personalised review link URL.
+ * @returns HTML string ready to send.
+ */
+export function buildPastClientReviewEmailHtml(firstName: string, reviewUrl: string): string {
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz").replace(
+    /\/$/,
+    "",
+  );
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="font-family:system-ui,sans-serif;background:#f6f7f8;margin:0;padding:24px">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
+    <h2 style="margin:0 0 12px;color:#0c0a3e;font-size:20px">Hi ${firstName},</h2>
+    <p style="margin:0 0 12px;color:#444;line-height:1.6">It's Harrison from To The Point Tech - thanks again for letting me help you out!</p>
+    <p style="margin:0 0 12px;color:#444;line-height:1.6">I'm in the process of updating my website and building up my reviews section. If you have a spare moment, a quick review would mean a lot - it really helps other people in the area find reliable local tech support.</p>
+    <p style="margin:0 0 24px;color:#444;line-height:1.6">No pressure at all, but if you're happy to, I'd really appreciate it.</p>
+    <a href="${reviewUrl}" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:15px">Leave a review →</a>
+
+    <p style="margin:28px 0 20px;color:#444;font-size:14px;line-height:1.6">If you ever need a hand with anything else, don't hesitate to get in touch.</p>
+
+    <div style="padding-top:20px;border-top:1px solid #e8e8e8">
+      <a href="${siteUrl}" style="display:inline-block;margin-bottom:12px">
+        <img src="${siteUrl}/assets/email-signature-400x135.png" alt="To The Point Tech" width="200" style="display:block;border:0;height:auto" />
+      </a>
+      <p style="margin:0 0 2px;font-size:14px;font-weight:600;color:#0c0a3e">Harrison Raynes</p>
+      <p style="margin:0 0 10px;font-size:13px;color:#666">Owner &amp; Technician</p>
+      <p style="margin:0 0 4px;font-size:13px;color:#555">📞 <a href="tel:+6421297237" style="color:#555;text-decoration:none">021 297 1237</a></p>
+      <p style="margin:0 0 4px;font-size:13px;color:#555">✉️ <a href="mailto:harrison@tothepoint.co.nz" style="color:#43bccd;text-decoration:none">harrison@tothepoint.co.nz</a></p>
+      <p style="margin:0 0 4px;font-size:13px;color:#555">🌐 <a href="https://tothepoint.co.nz" style="color:#43bccd;text-decoration:none">tothepoint.co.nz</a></p>
+      <p style="margin:0;font-size:12px;color:#999">Auckland, New Zealand</p>
+    </div>
+  </div>
+</body>
+</html>`;
 }
 
 /**
@@ -355,43 +395,14 @@ export async function sendPastClientReviewRequest(booking: ReviewRequestData): P
 
   const reviewUrl = `${siteUrl}/review?token=${booking.reviewToken}`;
   const firstName = booking.name.split(" ")[0];
-
-  const html = `
-<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="font-family:system-ui,sans-serif;background:#f6f7f8;margin:0;padding:24px">
-  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
-    <h2 style="margin:0 0 12px;color:#0c0a3e;font-size:20px">Hi ${firstName}, hope everything is still working well!</h2>
-    <p style="margin:0 0 12px;color:#444;line-height:1.6">Thanks so much for letting me help you out - I really appreciate you choosing To The Point Tech for your tech support needs.</p>
-    <p style="margin:0 0 12px;color:#444;line-height:1.6">I'm currently updating my website and building up my reviews section. If you have a spare moment, leaving a quick review would be greatly appreciated - it really helps other people in the area find reliable local tech support.</p>
-    <p style="margin:0 0 24px;color:#444;line-height:1.6">It only takes a minute - honest feedback is always welcome.</p>
-    <a href="${reviewUrl}" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:15px">Share your experience →</a>
-
-    <p style="margin:28px 0 20px;color:#444;font-size:14px;line-height:1.6">Thanks again for choosing To The Point Tech. If you ever need a hand with anything else, don't hesitate to get in touch.</p>
-
-    <div style="padding-top:20px;border-top:1px solid #e8e8e8">
-      <a href="${siteUrl}" style="display:inline-block;margin-bottom:12px">
-        <img src="${siteUrl}/assets/email-signature-400x135.png" alt="To The Point Tech" width="200" style="display:block;border:0;height:auto" />
-      </a>
-      <p style="margin:0 0 2px;font-size:14px;font-weight:600;color:#0c0a3e">Harrison Raynes</p>
-      <p style="margin:0 0 10px;font-size:13px;color:#666">Owner &amp; Technician</p>
-      <p style="margin:0 0 4px;font-size:13px;color:#555">📞 <a href="tel:+6421297237" style="color:#555;text-decoration:none">021 297 1237</a></p>
-      <p style="margin:0 0 4px;font-size:13px;color:#555">✉️ <a href="mailto:harrison@tothepoint.co.nz" style="color:#43bccd;text-decoration:none">harrison@tothepoint.co.nz</a></p>
-      <p style="margin:0 0 4px;font-size:13px;color:#555">🌐 <a href="https://tothepoint.co.nz" style="color:#43bccd;text-decoration:none">tothepoint.co.nz</a></p>
-      <p style="margin:0;font-size:12px;color:#999">Auckland, New Zealand</p>
-    </div>
-  </div>
-</body>
-</html>`;
+  const html = buildPastClientReviewEmailHtml(firstName, reviewUrl);
 
   try {
-    const resend = createResend();
-    await resend.emails.send({
+    await getResend().emails.send({
       from,
       replyTo: process.env.ADMIN_EMAIL,
       to: booking.email,
-      subject: `Thanks for choosing To The Point Tech, ${firstName}`,
+      subject: `Hi ${firstName}, it's Harrison from To The Point Tech`,
       html,
     });
   } catch (error) {

@@ -1,7 +1,7 @@
 // src/app/api/admin/review-requests/[id]/route.ts
 /**
  * @file route.ts
- * @description Admin endpoint to update a review request's contact details.
+ * @description Admin endpoint to update or revoke a review request.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -57,5 +57,34 @@ export async function PATCH(
   } catch (error) {
     console.error("[admin/review-requests/PATCH] Error:", error);
     return NextResponse.json({ ok: false, error: "Failed to update." }, { status: 500 });
+  }
+}
+
+/**
+ * DELETE /api/admin/review-requests/[id]
+ * Revokes a review link by deleting the ReviewRequest record so the token is no longer valid.
+ * @param request - The incoming request with ?token= query param.
+ * @param params - Route params containing the ReviewRequest id.
+ * @param params.params - The dynamic route params promise.
+ * @returns JSON response indicating success or failure.
+ */
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+): Promise<NextResponse> {
+  const adminToken = request.nextUrl.searchParams.get("token");
+
+  if (!isValidAdminToken(adminToken)) {
+    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id } = await params;
+
+  try {
+    await prisma.reviewRequest.delete({ where: { id } });
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error(`[admin/review-requests] DELETE error for ${id}:`, error);
+    return NextResponse.json({ ok: false, error: "Failed to revoke." }, { status: 500 });
   }
 }

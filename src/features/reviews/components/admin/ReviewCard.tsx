@@ -48,6 +48,7 @@ export function ReviewCard({
   const [loading, setLoading] = useState<"approve" | "revoke" | "delete" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -59,6 +60,7 @@ export function ReviewCard({
     function handleClickOutside(e: MouseEvent): void {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setMenuOpen(false);
+        setConfirmDelete(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -178,20 +180,50 @@ export function ReviewCard({
                   {loading === "revoke" ? "Revoking…" : "Revoke"}
                 </button>
               )}
-              <button
-                type="button"
-                onClick={() => {
-                  setMenuOpen(false);
-                  void remove();
-                }}
-                disabled={loading !== null}
-                className={cn(
-                  "text-coquelicot-500 hover:bg-coquelicot-500/10 px-4 py-2 text-left text-sm font-medium transition-colors disabled:opacity-50",
-                  onRevoke ? "rounded-b-lg" : "rounded-lg",
-                )}
-              >
-                {loading === "delete" ? "Deleting…" : "Delete"}
-              </button>
+              {confirmDelete ? (
+                <div
+                  className={cn(
+                    "flex flex-col gap-1 px-4 py-2",
+                    onRevoke ? "rounded-b-lg" : "rounded-lg",
+                  )}
+                >
+                  <span className={cn("text-rich-black/60 text-xs")}>Delete permanently?</span>
+                  <div className={cn("flex gap-3")}>
+                    <button
+                      type="button"
+                      disabled={loading !== null}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        void remove();
+                      }}
+                      className={cn(
+                        "text-coquelicot-500 text-xs font-semibold disabled:opacity-50",
+                      )}
+                    >
+                      {loading === "delete" ? "Deleting…" : "Yes, delete"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDelete(false)}
+                      className={cn("text-rich-black/40 hover:text-rich-black/60 text-xs")}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirmDelete(true)}
+                  disabled={loading !== null}
+                  className={cn(
+                    "text-coquelicot-500 hover:bg-coquelicot-500/10 px-4 py-2 text-left text-sm font-medium transition-colors disabled:opacity-50",
+                    onRevoke ? "rounded-b-lg" : "rounded-lg",
+                  )}
+                >
+                  Delete
+                </button>
+              )}
             </div>
           )}
         </div>
