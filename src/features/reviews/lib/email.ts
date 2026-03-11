@@ -334,28 +334,17 @@ export async function sendCustomerReviewRequest(booking: ReviewRequestData): Pro
 }
 
 /**
- * Sends a review request email to a past client (admin-triggered).
- * Tone is tailored for clients who were seen days/weeks ago, mentioning
- * the site update and asking for a review. Failures are caught and logged.
- * @param booking - Past client details.
- * @returns Promise that resolves when the email is sent (or silently fails).
+ * Builds the HTML body for a past-client review request email.
+ * @param firstName - Customer's first name.
+ * @param reviewUrl - The personalised review link URL.
+ * @returns HTML string ready to send.
  */
-export async function sendPastClientReviewRequest(booking: ReviewRequestData): Promise<void> {
-  const from = process.env.EMAIL_FROM;
+export function buildPastClientReviewEmailHtml(firstName: string, reviewUrl: string): string {
   const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz").replace(
     /\/$/,
     "",
   );
-
-  if (!from || !process.env.RESEND_API_KEY) {
-    console.warn("[email] Resend not configured - skipping past client review request.");
-    return;
-  }
-
-  const reviewUrl = `${siteUrl}/review?token=${booking.reviewToken}`;
-  const firstName = booking.name.split(" ")[0];
-
-  const html = `
+  return `
 <!DOCTYPE html>
 <html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
@@ -383,6 +372,30 @@ export async function sendPastClientReviewRequest(booking: ReviewRequestData): P
   </div>
 </body>
 </html>`;
+}
+
+/**
+ * Sends a review request email to a past client (admin-triggered).
+ * Tone is tailored for clients who were seen days/weeks ago, mentioning
+ * the site update and asking for a review. Failures are caught and logged.
+ * @param booking - Past client details.
+ * @returns Promise that resolves when the email is sent (or silently fails).
+ */
+export async function sendPastClientReviewRequest(booking: ReviewRequestData): Promise<void> {
+  const from = process.env.EMAIL_FROM;
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz").replace(
+    /\/$/,
+    "",
+  );
+
+  if (!from || !process.env.RESEND_API_KEY) {
+    console.warn("[email] Resend not configured - skipping past client review request.");
+    return;
+  }
+
+  const reviewUrl = `${siteUrl}/review?token=${booking.reviewToken}`;
+  const firstName = booking.name.split(" ")[0];
+  const html = buildPastClientReviewEmailHtml(firstName, reviewUrl);
 
   try {
     await getResend().emails.send({
