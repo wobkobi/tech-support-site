@@ -314,7 +314,10 @@ export default async function Home(): Promise<React.ReactElement> {
                   "border-moonstone-500/50 bg-moonstone-600/30 grid size-16 shrink-0 place-items-center rounded-full border-2",
                 )}
               >
-                <FaDownload className={cn("text-moonstone-600 h-8 w-8")} aria-hidden />
+                <FaDownload
+                  className={cn("text-moonstone-600 h-8 w-8 -translate-y-0.5")}
+                  aria-hidden
+                />
               </div>
 
               <div className={cn("flex-1")}>
