@@ -1,7 +1,7 @@
-// src/app/api/booking/request/route.ts
+// src/app/api/booking/edit/route.ts
 /**
  * @file route.ts
- * @description API route with duration support (1hr vs 2hr jobs).
+ * @description API route to edit an existing booking by cancel token.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -18,21 +18,17 @@ import {
 import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 import {
   createBookingEvent,
+  deleteBookingEvent,
   fetchAllCalendarEvents,
 } from "@/features/calendar/lib/google-calendar";
-import {
-  sendOwnerBookingNotification,
-  sendCustomerBookingConfirmation,
-} from "@/features/reviews/lib/email";
-import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
 
-interface BookingRequestPayload {
+interface EditBookingPayload {
+  cancelToken: string;
   dateKey: string;
   timeOfDay: TimeOfDay;
   duration: JobDuration;
   name: string;
-  email: string;
   phone?: string;
   address?: string;
   meetingType: "in-person" | "remote";
@@ -40,22 +36,36 @@ interface BookingRequestPayload {
 }
 
 /**
- * POST /api/booking/request
- * Creates a booking with calendar event for the specified duration
- * @param request - Next.js request object containing booking details
- * @returns JSON response with booking ID or error message
+ * POST /api/booking/edit
+ * Updates an existing booking's details and reschedules the calendar event.
+ * @param request - Next.js request containing edit payload.
+ * @returns JSON response with ok flag or error.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
-    const body = (await request.json()) as BookingRequestPayload;
-    const { dateKey, timeOfDay, duration, name, email, phone, address, meetingType, notes } = body;
+    const body = (await request.json()) as EditBookingPayload;
+    const { cancelToken, dateKey, timeOfDay, duration, name, phone, address, meetingType, notes } =
+      body;
 
-    // Validation
+    if (!cancelToken) {
+      return NextResponse.json({ ok: false, error: "Missing cancel token." }, { status: 400 });
+    }
+
+    // Find booking
+    const booking = await prisma.booking.findFirst({ where: { cancelToken } });
+    if (!booking) {
+      return NextResponse.json({ ok: false, error: "Booking not found." }, { status: 404 });
+    }
+    if (booking.status === "cancelled") {
+      return NextResponse.json(
+        { ok: false, error: "Cannot edit a cancelled booking." },
+        { status: 400 },
+      );
+    }
+
+    // Validate fields
     if (!name?.trim()) {
       return NextResponse.json({ ok: false, error: "Name is required." }, { status: 400 });
-    }
-    if (!email?.trim() || !email.includes("@")) {
-      return NextResponse.json({ ok: false, error: "Valid email is required." }, { status: 400 });
     }
     if (!notes?.trim()) {
       return NextResponse.json(
@@ -91,9 +101,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const now = new Date();
     const maxDate = new Date(now.getTime() + BOOKING_CONFIG.maxAdvanceDays * 24 * 60 * 60 * 1000);
 
-    // Get existing bookings
+    // Get existing bookings, excluding the one being edited
     const existingBookings = await prisma.booking.findMany({
       where: {
+        id: { not: booking.id },
         status: { in: ["held", "confirmed"] },
         endAt: { gte: now },
       },
@@ -114,20 +125,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       bufferAfterMin: b.bufferAfterMin,
     }));
 
-    // Fetch calendar events
+    // Fetch calendar events, excluding the current booking's event
     let calendarEvents: Array<{ id: string; start: string; end: string }> = [];
     try {
       const rawEvents = await fetchAllCalendarEvents(now, maxDate);
-      calendarEvents = rawEvents.map((e) => ({
-        id: e.id,
-        start: e.start,
-        end: e.end,
-      }));
+      calendarEvents = rawEvents
+        .filter((e) => e.id !== booking.calendarEventId)
+        .map((e) => ({ id: e.id, start: e.start, end: e.end }));
     } catch (error) {
-      console.error("[booking/request] Failed to fetch calendar events:", error);
+      console.error("[booking/edit] Failed to fetch calendar events:", error);
     }
 
-    // Validate with duration
     const validation = validateBookingRequest(
       dateKey,
       timeOfDay,
@@ -142,28 +150,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ ok: false, error: validation.error }, { status: 400 });
     }
 
-    // Get time details
+    // Calculate new times
     const slot = TIME_OF_DAY_OPTIONS.find((t) => t.value === timeOfDay);
     const durationOption = DURATION_OPTIONS.find((d) => d.value === duration);
-
     if (!slot || !durationOption) {
-      return NextResponse.json({ ok: false, error: "Invalid time or duration" }, { status: 400 });
+      return NextResponse.json({ ok: false, error: "Invalid time or duration." }, { status: 400 });
     }
 
-    // Calculate start/end times
     const [year, month, day] = dateKey.split("-").map(Number);
-    const startHour = slot.startHour;
-    const durationMinutes = durationOption.durationMinutes;
-
-    // Get dynamic UTC offset for this date (handles NZDT/NZST)
     const utcOffset = getPacificAucklandOffset(year, month, day);
-    const startAt = new Date(Date.UTC(year, month - 1, day, startHour - utcOffset, 0, 0));
-    const endAt = new Date(startAt.getTime() + durationMinutes * 60 * 1000);
+    const startAt = new Date(Date.UTC(year, month - 1, day, slot.startHour - utcOffset, 0, 0));
+    const endAt = new Date(startAt.getTime() + durationOption.durationMinutes * 60 * 1000);
 
-    const cancelToken = randomUUID();
-    const reviewToken = randomUUID();
-
-    // Build notes
+    // Build updated notes
     let bookingNotes = `${notes.trim()}\n\n`;
     bookingNotes += `[${slot.label} - ${durationOption.label}]\n`;
     bookingNotes += `Meeting type: ${meetingType === "in-person" ? "In-person" : "Remote"}\n`;
@@ -174,10 +173,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       bookingNotes += `Phone: ${phone.trim()}\n`;
     }
 
-    // Create calendar event
+    // Delete old calendar event
+    if (booking.calendarEventId) {
+      try {
+        await deleteBookingEvent({ eventId: booking.calendarEventId });
+      } catch (err) {
+        console.error("[booking/edit] Failed to delete old calendar event:", err);
+      }
+    }
+
+    // Create new calendar event
     let calendarEventId: string | null = null;
     try {
-      // Remove parentheses from duration label for summary to avoid double brackets
       const cleanDurationLabel = durationOption.label
         .replace(/[()]/g, "")
         .replace(/\s+/g, " ")
@@ -189,94 +196,48 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         startAt,
         endAt,
         timeZone: BOOKING_CONFIG.timeZone,
-        attendeeEmail: email.trim().toLowerCase(),
+        attendeeEmail: booking.email,
         attendeeName: name.trim(),
         location: meetingType === "in-person" && address ? address.trim() : undefined,
       });
-
       calendarEventId = calendarResult.eventId;
-      console.log(`[booking/request] Created calendar event: ${calendarEventId}`);
+      console.log(`[booking/edit] Created new calendar event: ${calendarEventId}`);
     } catch (calendarError) {
-      console.error("[booking/request] Failed to create calendar event:", calendarError);
+      console.error("[booking/edit] Failed to create new calendar event:", calendarError);
       return NextResponse.json(
-        {
-          ok: false,
-          error: "Failed to create calendar event. Please try again or contact us directly.",
-        },
+        { ok: false, error: "Failed to update calendar event. Please try again." },
         { status: 500 },
       );
     }
 
-    // Create booking
+    // Update booking
     try {
-      const booking = await prisma.booking.create({
+      await prisma.booking.update({
+        where: { id: booking.id },
         data: {
           name: name.trim(),
-          email: email.trim().toLowerCase(),
           notes: bookingNotes,
           startAt,
           endAt,
-          status: "confirmed",
-          cancelToken,
-          reviewToken,
           calendarEventId,
-          activeSlotKey: startAt.toISOString(), // Unique constraint for double-booking prevention
-          bufferBeforeMin: 0,
-          bufferAfterMin: BOOKING_CONFIG.bufferMin,
+          activeSlotKey: startAt.toISOString(),
         },
       });
-
-      console.log(`[booking/request] Created ${duration} booking: ${booking.id}`);
-
-      // Send confirmation emails before returning so Vercel doesn't kill the
-      // function before the Resend requests complete. Both functions catch all
-      // errors internally and never throw.
-      await Promise.all([
-        sendOwnerBookingNotification({
-          id: booking.id,
-          name: booking.name,
-          email: booking.email,
-          notes: booking.notes ?? "",
-          startAt: booking.startAt,
-          endAt: booking.endAt,
-          cancelToken: booking.cancelToken,
-        }),
-        sendCustomerBookingConfirmation({
-          id: booking.id,
-          name: booking.name,
-          email: booking.email,
-          notes: booking.notes ?? "",
-          startAt: booking.startAt,
-          endAt: booking.endAt,
-          cancelToken: booking.cancelToken,
-        }),
-      ]);
-
-      return NextResponse.json({
-        ok: true,
-        bookingId: booking.id,
-        cancelToken: booking.cancelToken,
-      });
+      console.log(`[booking/edit] Updated booking: ${booking.id}`);
+      return NextResponse.json({ ok: true });
     } catch (error) {
-      // Handle unique constraint violation (concurrent booking for same slot)
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-        console.warn("[booking/request] Concurrent booking conflict", {
-          activeSlotKey: startAt.toISOString(),
-          email: email.trim().toLowerCase(),
-          timestamp: new Date().toISOString(),
-        });
         return NextResponse.json(
           { ok: false, error: "This time slot is no longer available." },
           { status: 409 },
         );
       }
-      // Re-throw other errors to be caught by outer handler
       throw error;
     }
   } catch (error) {
-    console.error("[booking/request] Error:", error);
+    console.error("[booking/edit] Error:", error);
     return NextResponse.json(
-      { ok: false, error: "Failed to submit request. Please try again." },
+      { ok: false, error: "Failed to update booking. Please try again." },
       { status: 500 },
     );
   }
