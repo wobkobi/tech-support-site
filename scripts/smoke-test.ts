@@ -15,6 +15,8 @@
  */
 
 import { execSync, spawn, type ChildProcess } from "child_process";
+import fs from "fs";
+import path from "path";
 import puppeteer, { type Browser } from "puppeteer";
 
 /* ------------------------------------------------------------------ types */
@@ -66,6 +68,12 @@ const TTFB_WARN_MS = 1_500;
 /** Fail when TTFB exceeds this — something is clearly broken. */
 const TTFB_FAIL_MS = 10_000;
 
+/**
+ * URL substrings for resources that are expected to 404 locally.
+ * Vercel Analytics and Speed Insights only exist on the Vercel platform.
+ */
+const IGNORE_404_URLS = ["/_vercel/insights/", "/_vercel/speed-insights/"];
+
 /* ---------------------------------------------------------------- helpers */
 
 /**
@@ -95,15 +103,49 @@ function runBuild(): void {
 }
 
 /**
- * Spawns `next start` on the given port and returns the child process.
+ * Copies static assets and native modules into the standalone output directory.
+ * Next.js standalone only bundles server JS — static files, public assets, and
+ * platform-specific native binaries (e.g. sharp) must be copied manually.
+ */
+function copyStandaloneAssets(): void {
+  console.log("  Copying static assets into standalone…");
+
+  // Built JS/CSS chunks and fonts
+  fs.cpSync(path.join(".next", "static"), path.join(".next", "standalone", ".next", "static"), {
+    recursive: true,
+    force: true,
+  });
+
+  // Public folder (images, manifests, favicons, etc.)
+  fs.cpSync("public", path.join(".next", "standalone", "public"), {
+    recursive: true,
+    force: true,
+  });
+
+  // Sharp and its platform-specific binary are not auto-traced by Next.js
+  for (const pkg of ["sharp", "@img"]) {
+    const src = path.join("node_modules", pkg);
+    const dst = path.join(".next", "standalone", "node_modules", pkg);
+    if (fs.existsSync(src)) {
+      fs.cpSync(src, dst, { recursive: true, force: true });
+    }
+  }
+
+  console.log("  ✓ Assets copied\n");
+}
+
+/**
+ * Spawns the production server on the given port and returns the child process.
+ * Uses the standalone server when output: "standalone" is configured.
  * @param port - Port to listen on.
  * @returns Spawned child process.
  */
 function startServer(port: number): ChildProcess {
   console.log(`▶ Starting server on port ${port}…`);
-  return spawn("npx", ["next", "start", "-p", String(port)], {
+  return spawn("node", [".next/standalone/server.js"], {
     stdio: "pipe",
-    shell: true,
+    shell: false,
+    env: { ...process.env, PORT: String(port), HOSTNAME: "localhost" },
   });
 }
 
@@ -146,19 +188,21 @@ async function checkPage(browser: Browser, baseUrl: string, spec: PageSpec): Pro
   const page = await browser.newPage();
 
   try {
-    // Capture console errors, filtering out expected ones
-    page.on("console", (msg) => {
-      if (msg.type() !== "error") return;
-      const text = msg.text();
-      const ignored = spec.ignoreErrors?.some((s) => text.includes(s)) ?? false;
-      if (!ignored) errors.push(text);
+    // Track 4xx/5xx responses by URL so we can filter known-missing local endpoints
+    page.on("response", (response) => {
+      const status = response.status();
+      if (status < 400) return;
+      const resUrl = response.url();
+      if (IGNORE_404_URLS.some((s) => resUrl.includes(s))) return;
+      if (spec.ignoreErrors?.some((s) => resUrl.includes(s)) ?? false) return;
+      errors.push(`HTTP ${status}: ${resUrl}`);
     });
 
-    // Capture unhandled page errors
+    // Capture unhandled JS errors
     page.on("pageerror", (err: unknown) => {
       const text = err instanceof Error ? err.message : String(err);
-      const ignored = spec.ignoreErrors?.some((s) => text.includes(s)) ?? false;
-      if (!ignored) errors.push(`[pageerror] ${text}`);
+      if (spec.ignoreErrors?.some((s) => text.includes(s)) ?? false) return;
+      errors.push(`[pageerror] ${text}`);
     });
 
     await page.goto(url, { waitUntil: "networkidle2", timeout: 30_000 });
@@ -268,6 +312,7 @@ function printTable(results: PageResult[]): void {
 
   try {
     if (!skipBuild) runBuild();
+    copyStandaloneAssets();
 
     server = startServer(port);
 
@@ -310,7 +355,15 @@ function printTable(results: PageResult[]): void {
     exitCode = 1;
   } finally {
     await browser?.close();
-    server?.kill("SIGTERM");
+    if (server?.pid) {
+      // On Windows, SIGTERM doesn't propagate to child processes — use taskkill to
+      // kill the whole process tree so the Prisma DLL is released before npm can update it.
+      try {
+        execSync(`taskkill //F //T //PID ${server.pid}`, { stdio: "ignore" });
+      } catch {
+        server.kill("SIGTERM");
+      }
+    }
   }
 
   process.exit(exitCode);
