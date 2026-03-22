@@ -13,7 +13,7 @@ export default defineConfig({
     globals: true,
     coverage: {
       reporter: ["text", "html", "json-summary", "json"],
-      include: ["src/**"],
+      include: ["src/**/lib/**", "src/app/api/**"],
     },
   },
 });
