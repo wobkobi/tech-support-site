@@ -34,7 +34,9 @@ import {
 } from "react-icons/fa6";
 import type { IconType } from "react-icons";
 
-export const revalidate = 300; // ISR - regenerate every 5 minutes
+// Rely on on-demand revalidation (revalidateReviewPaths fires on every review change).
+// Long fallback avoids waking a cold DB on a fixed timer.
+export const revalidate = 86400;
 
 interface SupportItem {
   label: string;

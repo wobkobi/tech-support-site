@@ -78,12 +78,12 @@ export default function BookingCancelClient({
       {/* Backdrop */}
       <div className={cn("pointer-events-none absolute inset-0 -z-10 overflow-hidden")}>
         <Image
-          src="/source/backdrop.jpg"
+          src="/source/backdrop-blur.webp"
           alt=""
           fill
           priority
           sizes="100vw"
-          className={cn("scale-110 transform-gpu object-cover blur-xl")}
+          className={cn("scale-110 transform-gpu object-cover")}
         />
       </div>
 

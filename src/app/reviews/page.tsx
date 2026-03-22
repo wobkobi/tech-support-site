@@ -11,8 +11,9 @@ import { cn } from "@/shared/lib/cn";
 import { prisma } from "@/shared/lib/prisma";
 import { formatReviewerName } from "@/features/reviews/lib/formatting";
 
-// Enable ISR: revalidate every 5 minutes for approved reviews
-export const revalidate = 300;
+// Rely on on-demand revalidation (triggered by admin approve/delete/submit).
+// Long fallback avoids waking a cold DB on a fixed timer.
+export const revalidate = 86400;
 
 const linkStyle = cn(
   "text-coquelicot-500 hover:text-coquelicot-600 underline-offset-4 hover:underline",

@@ -16,7 +16,9 @@
     "build:icons": "tsx scripts/build-icons/index.ts",
     "build:poster": "npx tsx scripts/export-poster-screenshot.ts",
     "build:all": "npm run build:icons && npm run build",
-    "test": "vitest"
+    "test": "vitest",
+    "smoke": "tsx scripts/smoke-test.ts",
+    "smoke:fast": "tsx scripts/smoke-test.ts --skip-build"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.0",
@@ -95,7 +97,8 @@
     }
   },
   "simple-git-hooks": {
-    "pre-commit": "npx lint-staged"
+    "pre-commit": "npx lint-staged",
+    "pre-push": "npm run smoke:fast"
   },
   "lint-staged": {
     "**/*.{js,jsx,ts,tsx}": [
