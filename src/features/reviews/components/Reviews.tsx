@@ -1,5 +1,3 @@
-"use client";
-
 // src/features/reviews/components/Reviews.tsx
 /**
  * @file Reviews.tsx

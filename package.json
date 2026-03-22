@@ -16,7 +16,9 @@
     "build:icons": "tsx scripts/build-icons/index.ts",
     "build:poster": "npx tsx scripts/export-poster-screenshot.ts",
     "build:all": "npm run build:icons && npm run build",
-    "test": "vitest"
+    "test": "vitest",
+    "smoke": "tsx scripts/smoke-test.ts",
+    "smoke:fast": "tsx scripts/smoke-test.ts --skip-build"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.0",
@@ -34,42 +36,42 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.5",
     "@eslint/js": "^9.39.4",
-    "@next/bundle-analyzer": "^16.1.7",
+    "@next/bundle-analyzer": "^16.2.1",
     "@prisma/client": "6.19.2",
-    "@tailwindcss/postcss": "^4.2.1",
+    "@tailwindcss/postcss": "^4.2.2",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
     "@types/google.maps": "^3.58.1",
-    "@types/jsdom": "^28.0.0",
+    "@types/jsdom": "^28.0.1",
     "@types/node": "^25.5.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@typescript-eslint/eslint-plugin": "8.57.1",
     "@typescript-eslint/parser": "8.57.1",
     "@vitest/coverage-v8": "^4.1.0",
-    "canvas": "^3.2.1",
+    "canvas": "^3.2.2",
     "dotenv-cli": "^11.0.0",
     "eslint": "^9.0.0",
-    "eslint-config-next": "^16.1.7",
+    "eslint-config-next": "^16.2.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-jsdoc": "^62.8.0",
     "eslint-plugin-prettier": "^5.5.5",
     "eslint-plugin-react": "^7.37.5",
     "globals": "^17.4.0",
-    "jsdom": "^29.0.0",
+    "jsdom": "^29.0.1",
     "lint-staged": "^16.4.0",
     "pdf-lib": "^1.17.1",
     "postcss": "^8.5.8",
     "prettier": "^3.8.1",
     "prettier-plugin-tailwindcss": "^0.7.2",
     "prisma": "6.19.2",
-    "puppeteer": "^24.39.1",
+    "puppeteer": "^24.40.0",
     "qr-code-styling": "^1.9.2",
     "sharp": "^0.34.5",
     "simple-git-hooks": "^2.13.1",
-    "tailwindcss": "^4.2.1",
+    "tailwindcss": "^4.2.2",
     "tsx": "^4.21.0",
     "typescript": "latest",
     "vitest": "^4.1.0"
@@ -95,7 +97,8 @@
     }
   },
   "simple-git-hooks": {
-    "pre-commit": "npx lint-staged"
+    "pre-commit": "npx lint-staged",
+    "pre-push": "npm run smoke:fast"
   },
   "lint-staged": {
     "**/*.{js,jsx,ts,tsx}": [

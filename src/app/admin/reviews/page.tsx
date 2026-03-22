@@ -44,7 +44,7 @@ export default async function AdminReviewsPage({
     notFound();
   }
 
-  const [reviews, sentBookings, sentRequests, allBookings] = await Promise.all([
+  const [reviews, sentBookings, sentRequests] = await Promise.all([
     // Single query with all fields needed for approval list + legacy review dedup
     prisma.review.findMany({
       orderBy: { createdAt: "desc" },
@@ -86,10 +86,6 @@ export default async function AdminReviewsPage({
         reviewToken: true,
       },
     }),
-    // All booking id→reviewToken pairs (for legacy reviews linked via bookingId only)
-    prisma.booking.findMany({
-      select: { id: true, reviewToken: true },
-    }),
   ]);
 
   const pending = reviews.filter((r) => r.status !== "approved");
@@ -107,8 +103,28 @@ export default async function AdminReviewsPage({
   ]);
   // Booking ids already shown as Auto entries (to avoid duplicating via bookingId)
   const knownBookingIds = new Set(sentBookings.map((b) => b.id));
-  // Map bookingId → reviewToken for all bookings (used when review has bookingId but no customerRef)
-  const bookingTokenMap = new Map(allBookings.map((b) => [b.id, b.reviewToken]));
+
+  // Collect only the bookingIds needed for legacy reviews (not already in sentBookings)
+  const legacyBookingIds = reviews
+    .filter((r) => {
+      if (r.customerRef && knownTokens.has(r.customerRef)) return false;
+      if (r.bookingId && knownBookingIds.has(r.bookingId)) return false;
+      return true;
+    })
+    .map((r) => r.bookingId)
+    .filter((id): id is string => !!id && !knownBookingIds.has(id));
+
+  // Fetch only the specific bookings needed — avoids a full table scan
+  const legacyBookings =
+    legacyBookingIds.length > 0
+      ? await prisma.booking.findMany({
+          where: { id: { in: legacyBookingIds } },
+          select: { id: true, reviewToken: true },
+        })
+      : [];
+
+  // Map bookingId → reviewToken for legacy reviews linked via bookingId only
+  const bookingTokenMap = new Map(legacyBookings.map((b) => [b.id, b.reviewToken]));
 
   const legacyReviews = reviews.filter((r) => {
     if (r.customerRef && knownTokens.has(r.customerRef)) return false;

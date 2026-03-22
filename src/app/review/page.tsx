@@ -12,9 +12,8 @@ import { Button } from "@/shared/components/Button";
 import { cn } from "@/shared/lib/cn";
 import { prisma } from "@/shared/lib/prisma";
 
-// Enable ISR: revalidate every 10 minutes
-// Reviews are submitted infrequently; 10-min staleness is acceptable
-export const revalidate = 600;
+// This page reads searchParams so it is always dynamic — revalidate has no effect.
+export const dynamic = "force-dynamic";
 
 /**
  * Review page with optional token-based protection
@@ -46,12 +45,23 @@ export default async function ReviewPage({
     isAnonymous: boolean;
   } | null = null;
 
-  // If token provided, validate against both Booking and ReviewRequest tables
+  // If token provided, validate against both Booking and ReviewRequest tables in parallel
   if (token) {
-    const booking = await prisma.booking.findFirst({
-      where: { reviewToken: token },
-      select: { id: true, name: true, email: true, reviewSubmittedAt: true },
-    });
+    const [booking, reviewRequest, maybeExistingReview] = await Promise.all([
+      prisma.booking.findFirst({
+        where: { reviewToken: token },
+        select: { id: true, name: true, email: true, reviewSubmittedAt: true },
+      }),
+      prisma.reviewRequest.findFirst({
+        where: { reviewToken: token },
+        select: { id: true, name: true, email: true, phone: true, reviewSubmittedAt: true },
+      }),
+      // Fetch speculatively — only used if the token maps to an already-reviewed source
+      prisma.review.findFirst({
+        where: { customerRef: token },
+        select: { id: true, text: true, firstName: true, lastName: true, isAnonymous: true },
+      }),
+    ]);
 
     if (booking) {
       sourceId = booking.id;
@@ -60,29 +70,18 @@ export default async function ReviewPage({
       prefillEmail = booking.email;
       tokenValid = true;
       alreadyReviewed = !!booking.reviewSubmittedAt;
-    } else {
-      const reviewRequest = await prisma.reviewRequest.findFirst({
-        where: { reviewToken: token },
-        select: { id: true, name: true, email: true, phone: true, reviewSubmittedAt: true },
-      });
-
-      if (reviewRequest) {
-        sourceId = reviewRequest.id;
-        sourceType = "reviewRequest";
-        prefillName = reviewRequest.name;
-        prefillEmail = reviewRequest.email;
-        prefillPhone = reviewRequest.phone;
-        tokenValid = true;
-        alreadyReviewed = !!reviewRequest.reviewSubmittedAt;
-      }
+    } else if (reviewRequest) {
+      sourceId = reviewRequest.id;
+      sourceType = "reviewRequest";
+      prefillName = reviewRequest.name;
+      prefillEmail = reviewRequest.email;
+      prefillPhone = reviewRequest.phone;
+      tokenValid = true;
+      alreadyReviewed = !!reviewRequest.reviewSubmittedAt;
     }
 
-    // Fetch existing review for pre-filling the edit form
     if (tokenValid && alreadyReviewed) {
-      existingReview = await prisma.review.findFirst({
-        where: { customerRef: token },
-        select: { id: true, text: true, firstName: true, lastName: true, isAnonymous: true },
-      });
+      existingReview = maybeExistingReview;
     }
   }
 
