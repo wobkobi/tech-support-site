@@ -1,26 +1,130 @@
 // src/app/booking/cancel/page.tsx
 /**
  * @file page.tsx
- * @description Booking cancel page - reads token from URL.
+ * @description Booking cancel page. Statically rendered shell — token is read
+ * client-side via useSearchParams, so this page has no server-side dependencies.
  */
+
+"use client";
 
 import type React from "react";
-import BookingCancelClient from "./CancelClient";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import Image from "next/image";
+import { cn } from "@/shared/lib/cn";
+import { Button } from "@/shared/components/Button";
+
+const CARD = "border-seasalt-400/60 bg-seasalt-800 rounded-xl border p-5 shadow-sm sm:p-6";
 
 /**
- * Cancel page that reads token from search params.
- * @param props - Page props.
- * @param props.searchParams - URL search params containing the cancel token.
+ * Cancel page inner content. Reads the token from the URL and fires the cancel API.
+ * Wrapped in Suspense by the page export to satisfy the useSearchParams requirement.
+ * @returns The cancel UI element.
+ */
+function CancelContent(): React.ReactElement {
+  const searchParams = useSearchParams();
+  const token = searchParams.get("token") ?? undefined;
+  const [state, setState] = useState<"idle" | "loading" | "done" | "error">("idle");
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    /** Executes the cancellation API call. */
+    async function runCancel(): Promise<void> {
+      if (!token) {
+        setState("error");
+        setMessage("Missing cancel token.");
+        return;
+      }
+
+      setState("loading");
+
+      try {
+        const res = await fetch("/api/booking/cancel", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ cancelToken: token }),
+        });
+
+        const data = (await res.json()) as { ok?: boolean; error?: string };
+        if (cancelled) return;
+
+        if (data.ok) {
+          setState("done");
+          setMessage("Booking cancelled successfully.");
+        } else {
+          setState("error");
+          setMessage(data.error || "Could not cancel booking.");
+        }
+      } catch {
+        if (cancelled) return;
+        setState("error");
+        setMessage("Network error.");
+      }
+    }
+
+    void runCancel();
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
+  return (
+    <main className={cn("relative min-h-dvh overflow-hidden")}>
+      {/* Backdrop */}
+      <div className={cn("pointer-events-none absolute inset-0 -z-10 overflow-hidden")}>
+        <Image
+          src="/source/backdrop-blur.webp"
+          alt=""
+          fill
+          priority
+          sizes="100vw"
+          className={cn("scale-110 transform-gpu object-cover")}
+        />
+      </div>
+
+      {/* Frosted container */}
+      <div className={cn("mx-auto my-5 w-full max-w-[min(100vw-2rem,56rem)] sm:my-10")}>
+        <div
+          className={cn(
+            "border-seasalt-400/40 bg-seasalt-800/60 rounded-2xl border p-5 shadow-lg backdrop-blur-xl sm:p-10",
+          )}
+        >
+          <div className={cn("flex flex-col gap-4 sm:gap-5")}>
+            <section className={cn(CARD)}>
+              <h1 className={cn("text-russian-violet mb-3 text-2xl font-extrabold sm:text-3xl")}>
+                Cancel booking
+              </h1>
+
+              {state === "loading" && <p className={cn("text-rich-black")}>Cancelling...</p>}
+
+              {state !== "loading" && <p className={cn("text-rich-black")}>{message}</p>}
+
+              <div className={cn("mt-4 flex flex-wrap gap-3")}>
+                <Button href="/" variant="secondary" size="sm">
+                  Back to home
+                </Button>
+                <Button href="/booking" variant="ghost" size="sm">
+                  Book another time
+                </Button>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+/**
+ * Booking cancel page. Suspense is required because CancelContent uses useSearchParams.
  * @returns The cancel page element.
  */
-export default async function BookingCancelPage({
-  searchParams,
-}: {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-}): Promise<React.ReactElement> {
-  const params = await searchParams;
-  const tokenValue = params.token;
-  const token = Array.isArray(tokenValue) ? tokenValue[0] : tokenValue;
-
-  return <BookingCancelClient token={token} />;
+export default function BookingCancelPage(): React.ReactElement {
+  return (
+    <Suspense>
+      <CancelContent />
+    </Suspense>
+  );
 }
