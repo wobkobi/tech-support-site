@@ -22,6 +22,7 @@ interface SendReviewLinkFormProps {
 
 /**
  * Form for sending a review link to a past client via email or generating SMS text.
+ * Email mode shows a rendered preview before sending.
  * @param props - Component props.
  * @param props.token - Admin token for API calls.
  * @returns Send review link form element.
@@ -38,24 +39,96 @@ export function SendReviewLinkForm({ token }: SendReviewLinkFormProps): React.Re
   const [smsText, setSmsText] = useState<string | null>(null);
   const [existingUrl, setExistingUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  /** Rendered HTML preview returned from the preview API (email mode only). */
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+
+  /** Resets all transient state when toggling the panel or switching mode. */
+  function resetState(): void {
+    setSuccess(false);
+    setError(null);
+    setSmsText(null);
+    setExistingUrl(null);
+    setPreviewHtml(null);
+    setPhoneInput("");
+  }
 
   /**
-   * Handles form submission to send a review link or generate an SMS message.
+   * Fetches the email preview HTML from the server and stores it in state.
    * @param e - Form submit event.
-   * @returns Promise resolving when the submit completes.
+   * @returns Promise resolving when the preview is loaded.
    */
-  async function handleSubmit(e: React.SubmitEvent): Promise<void> {
+  async function handlePreview(e: React.SyntheticEvent): Promise<void> {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    setSuccess(false);
+    try {
+      const res = await fetch("/api/admin/preview-review-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, name }),
+      });
+      const data = (await res.json()) as { ok?: boolean; html?: string; error?: string };
+      if (!res.ok) throw new Error(data.error ?? "Request failed");
+      setPreviewHtml(data.html ?? "");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  /**
+   * Sends the review link email (called after the admin confirms the preview).
+   * @returns Promise resolving when the send completes.
+   */
+  async function handleSend(): Promise<void> {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/send-review-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, name, email, mode: "email" }),
+      });
+      const data = (await res.json()) as {
+        ok?: boolean;
+        error?: string;
+        reviewUrl?: string;
+        existing?: boolean;
+      };
+      if (!res.ok) throw new Error(data.error ?? "Request failed");
+
+      setPreviewHtml(null);
+      if (data.existing && data.reviewUrl) {
+        setExistingUrl(data.reviewUrl);
+      } else {
+        setSuccess(true);
+        setName("");
+        setEmail("");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  /**
+   * Handles SMS form submission to generate the SMS copy text.
+   * @param e - Form submit event.
+   * @returns Promise resolving when the submit completes.
+   */
+  async function handleSmsSubmit(e: React.SyntheticEvent): Promise<void> {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
     setSmsText(null);
     setExistingUrl(null);
     try {
       const res = await fetch("/api/admin/send-review-link", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, name, email, phone: phoneInput, mode }),
+        body: JSON.stringify({ token, name, phone: phoneInput, mode: "sms" }),
       });
       const data = (await res.json()) as {
         ok?: boolean;
@@ -67,17 +140,13 @@ export function SendReviewLinkForm({ token }: SendReviewLinkFormProps): React.Re
 
       if (data.existing && data.reviewUrl) {
         setExistingUrl(data.reviewUrl);
-      } else if (mode === "sms" && data.reviewUrl) {
+      } else if (data.reviewUrl) {
         const firstName = name.trim().split(" ")[0];
         setSmsText(
           `Hi ${firstName}, it's Harrison from To The Point Tech. Thanks for letting me help you out! I'm updating my website and a quick review would be greatly appreciated - it really helps: ${data.reviewUrl}`,
         );
         setName("");
         setPhoneInput("");
-      } else {
-        setSuccess(true);
-        setName("");
-        setEmail("");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
@@ -105,11 +174,7 @@ export function SendReviewLinkForm({ token }: SendReviewLinkFormProps): React.Re
       <button
         onClick={() => {
           setOpen((v) => !v);
-          setSuccess(false);
-          setError(null);
-          setSmsText(null);
-          setExistingUrl(null);
-          setPhoneInput("");
+          resetState();
         }}
         className={cn("text-russian-violet w-full text-left text-sm font-semibold hover:underline")}
       >
@@ -126,11 +191,7 @@ export function SendReviewLinkForm({ token }: SendReviewLinkFormProps): React.Re
                 type="button"
                 onClick={() => {
                   setMode(m);
-                  setSuccess(false);
-                  setSmsText(null);
-                  setExistingUrl(null);
-                  setError(null);
-                  setPhoneInput("");
+                  resetState();
                 }}
                 className={cn(
                   "rounded-lg border px-4 py-1.5 text-xs font-semibold transition-colors",
@@ -144,20 +205,21 @@ export function SendReviewLinkForm({ token }: SendReviewLinkFormProps): React.Re
             ))}
           </div>
 
-          <form onSubmit={handleSubmit} className={cn("flex flex-col gap-3")}>
-            <div className={cn("flex items-start gap-3")}>
-              <input
-                type="text"
-                autoComplete="off"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Full name"
-                required
-                className={cn(
-                  "border-seasalt-400/60 bg-seasalt-800 text-rich-black flex-1 rounded-lg border p-3 text-sm focus:outline-none",
-                )}
-              />
-              {mode === "email" && (
+          {/* Email mode: form → preview → confirm send */}
+          {mode === "email" && !previewHtml && (
+            <form onSubmit={handlePreview} className={cn("flex flex-col gap-3")}>
+              <div className={cn("flex items-start gap-3")}>
+                <input
+                  type="text"
+                  autoComplete="off"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Full name"
+                  required
+                  className={cn(
+                    "border-seasalt-400/60 bg-seasalt-800 text-rich-black flex-1 rounded-lg border p-3 text-sm focus:outline-none",
+                  )}
+                />
                 <input
                   type="email"
                   autoComplete="off"
@@ -169,8 +231,79 @@ export function SendReviewLinkForm({ token }: SendReviewLinkFormProps): React.Re
                     "border-seasalt-400/60 bg-seasalt-800 text-rich-black flex-1 rounded-lg border p-3 text-sm focus:outline-none",
                   )}
                 />
+              </div>
+              {error && <p className={cn("text-coquelicot-400 text-xs")}>{error}</p>}
+              {success && (
+                <p className={cn("text-moonstone-600 text-xs")}>Review link sent successfully.</p>
               )}
-              {mode === "sms" && (
+              <button
+                type="submit"
+                disabled={loading}
+                className={cn(
+                  "bg-moonstone-600 hover:bg-moonstone-700 self-start rounded-lg px-5 py-2 text-sm font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+                )}
+              >
+                {loading ? "Loading preview..." : "Preview email"}
+              </button>
+            </form>
+          )}
+
+          {/* Email preview */}
+          {mode === "email" && previewHtml && (
+            <div className={cn("flex flex-col gap-3")}>
+              <p className={cn("text-rich-black/50 text-xs font-semibold uppercase tracking-wide")}>
+                Preview — sending to {email}
+              </p>
+              <iframe
+                srcDoc={previewHtml}
+                title="Email preview"
+                className={cn("border-seasalt-400/40 w-full rounded-lg border")}
+                style={{ height: "480px" }}
+                sandbox="allow-same-origin"
+              />
+              {error && <p className={cn("text-coquelicot-400 text-xs")}>{error}</p>}
+              <div className={cn("flex gap-2")}>
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() => void handleSend()}
+                  className={cn(
+                    "bg-moonstone-600 hover:bg-moonstone-700 rounded-lg px-5 py-2 text-sm font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+                  )}
+                >
+                  {loading ? "Sending..." : "Send email"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPreviewHtml(null);
+                    setError(null);
+                  }}
+                  className={cn(
+                    "border-seasalt-400/60 text-rich-black/60 hover:border-russian-violet/40 rounded-lg border px-5 py-2 text-sm font-semibold transition-colors",
+                  )}
+                >
+                  ← Back
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* SMS mode */}
+          {mode === "sms" && (
+            <form onSubmit={handleSmsSubmit} className={cn("flex flex-col gap-3")}>
+              <div className={cn("flex items-start gap-3")}>
+                <input
+                  type="text"
+                  autoComplete="off"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Full name"
+                  required
+                  className={cn(
+                    "border-seasalt-400/60 bg-seasalt-800 text-rich-black flex-1 rounded-lg border p-3 text-sm focus:outline-none",
+                  )}
+                />
                 <input
                   type="tel"
                   autoComplete="off"
@@ -183,34 +316,29 @@ export function SendReviewLinkForm({ token }: SendReviewLinkFormProps): React.Re
                     phoneInput && !phoneValid ? "border-coquelicot-500/60" : "",
                   )}
                 />
+              </div>
+              {phoneInput && (
+                <p
+                  className={cn(
+                    "-mt-1 text-xs",
+                    phoneValid ? "text-rich-black/40" : "text-coquelicot-400",
+                  )}
+                >
+                  {phoneValid ? `Stored as: ${phoneE164}` : "Invalid phone number"}
+                </p>
               )}
-            </div>
-            {mode === "sms" && phoneInput && (
-              <p
+              {error && <p className={cn("text-coquelicot-400 text-xs")}>{error}</p>}
+              <button
+                type="submit"
+                disabled={loading || (!!phoneInput && !phoneValid)}
                 className={cn(
-                  "-mt-1 text-xs",
-                  phoneValid ? "text-rich-black/40" : "text-coquelicot-400",
+                  "bg-moonstone-600 hover:bg-moonstone-700 self-start rounded-lg px-5 py-2 text-sm font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50",
                 )}
               >
-                {phoneValid ? `Stored as: ${phoneE164}` : "Invalid phone number"}
-              </p>
-            )}
-
-            {error && <p className={cn("text-coquelicot-400 text-xs")}>{error}</p>}
-            {success && (
-              <p className={cn("text-moonstone-600 text-xs")}>Review link sent successfully.</p>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading || (mode === "sms" && !!phoneInput && !phoneValid)}
-              className={cn(
-                "bg-moonstone-600 hover:bg-moonstone-700 self-start rounded-lg px-5 py-2 text-sm font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50",
-              )}
-            >
-              {loading ? "Generating..." : mode === "sms" ? "Generate text" : "Send link"}
-            </button>
-          </form>
+                {loading ? "Generating..." : "Generate text"}
+              </button>
+            </form>
+          )}
 
           {/* Existing link - already sent to this client before */}
           {existingUrl && (

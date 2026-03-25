@@ -19,42 +19,69 @@ import {
 } from "@/features/booking/lib/booking";
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 
+export interface BookingFormInitialValues {
+  duration: JobDuration;
+  dateKey: string;
+  timeOfDay: TimeOfDay;
+  name: string;
+  email: string;
+  phone: string;
+  meetingType: "in-person" | "remote" | "";
+  address: string;
+  notes: string;
+}
+
 export interface BookingFormProps {
   availableDays: BookableDay[];
+  cancelToken?: string;
+  initialValues?: BookingFormInitialValues;
 }
 
 /**
  * Booking form component with duration selection
  * @param props - Component props
  * @param props.availableDays - Array of available booking days
+ * @param props.cancelToken - Cancel token for edit mode; omit for new bookings
+ * @param props.initialValues - Pre-filled values for edit mode
  * @returns Booking form element
  */
-export default function BookingForm({ availableDays }: BookingFormProps): React.ReactElement {
+export default function BookingForm({
+  availableDays,
+  cancelToken,
+  initialValues,
+}: BookingFormProps): React.ReactElement {
   const router = useRouter();
+  const isEditMode = Boolean(cancelToken);
 
   // Form state
-  const [duration, setDuration] = useState<JobDuration>("short"); // Default to 1hr
+  const [duration, setDuration] = useState<JobDuration>(initialValues?.duration ?? "short");
   const [selectedDay, setSelectedDay] = useState<BookableDay | null>(null);
-  const [selectedTime, setSelectedTime] = useState<TimeOfDay | null>(null);
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [meetingType, setMeetingType] = useState<"in-person" | "remote" | "">("");
-  const [address, setAddress] = useState("");
-  const [notes, setNotes] = useState("");
+  const [selectedTime, setSelectedTime] = useState<TimeOfDay | null>(
+    initialValues?.timeOfDay ?? null,
+  );
+  const [name, setName] = useState(initialValues?.name ?? "");
+  const [email, setEmail] = useState(initialValues?.email ?? "");
+  const [phone, setPhone] = useState(initialValues?.phone ?? "");
+  const [meetingType, setMeetingType] = useState<"in-person" | "remote" | "">(
+    initialValues?.meetingType ?? "",
+  );
+  const [address, setAddress] = useState(initialValues?.address ?? "");
+  const [notes, setNotes] = useState(initialValues?.notes ?? "");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Auto-select first available day - runs only once on mount
+  // Auto-select day on mount: pre-select initial day in edit mode, else first available
   useEffect(() => {
     if (availableDays.length > 0) {
-      // Find first day with available slots
-      const firstAvailable = availableDays.find((d) => d.hasAnySlots);
-      if (firstAvailable) {
-        setSelectedDay(firstAvailable);
-      } else {
-        setSelectedDay(availableDays[0]); // Fallback to first day
+      if (initialValues?.dateKey) {
+        const preselected = availableDays.find((d) => d.dateKey === initialValues.dateKey);
+        if (preselected) {
+          setSelectedDay(preselected);
+          return;
+        }
       }
+      const firstAvailable = availableDays.find((d) => d.hasAnySlots);
+      setSelectedDay(firstAvailable ?? availableDays[0]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run on mount
@@ -139,30 +166,53 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
     setSubmitting(true);
 
     try {
-      const res = await fetch("/api/booking/request", {
+      const endpoint = isEditMode ? "/api/booking/edit" : "/api/booking/request";
+      const payload = isEditMode
+        ? {
+            cancelToken,
+            dateKey: selectedDay.dateKey,
+            timeOfDay: selectedTime,
+            duration,
+            name: name.trim(),
+            phone: phone.trim() || undefined,
+            meetingType,
+            address: meetingType === "in-person" ? address.trim() : undefined,
+            notes: notes.trim(),
+          }
+        : {
+            dateKey: selectedDay.dateKey,
+            timeOfDay: selectedTime,
+            duration,
+            name: name.trim(),
+            email: email.trim(),
+            phone: phone.trim() || undefined,
+            meetingType,
+            address: meetingType === "in-person" ? address.trim() : undefined,
+            notes: notes.trim(),
+          };
+
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          dateKey: selectedDay.dateKey,
-          timeOfDay: selectedTime,
-          duration,
-          name: name.trim(),
-          email: email.trim(),
-          phone: phone.trim() || undefined,
-          meetingType,
-          address: meetingType === "in-person" ? address.trim() : undefined,
-          notes: notes.trim(),
-        }),
+        body: JSON.stringify(payload),
       });
 
+      const data = (await res.json()) as { ok?: boolean; error?: string; cancelToken?: string };
+
       if (!res.ok) {
-        const data = (await res.json()) as { error?: string };
         setError(data.error || "Could not submit request.");
         setSubmitting(false);
         return;
       }
 
-      router.push("/booking/success");
+      if (isEditMode) {
+        router.push(`/booking/success?cancelToken=${encodeURIComponent(cancelToken!)}`);
+      } else {
+        const successUrl = data.cancelToken
+          ? `/booking/success?cancelToken=${encodeURIComponent(data.cancelToken)}`
+          : "/booking/success";
+        router.push(successUrl);
+      }
     } catch {
       setError("Network error. Please try again.");
       setSubmitting(false);
@@ -239,7 +289,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
                         disabled={!day.hasAnySlots}
                         onClick={() => handleDaySelect(day)}
                         className={cn(
-                          "whitespace-nowrap rounded-lg border px-3 py-3 text-base font-medium transition-colors",
+                          "whitespace-nowrap rounded-lg border px-3 py-3 text-base font-medium",
                           !day.hasAnySlots && "cursor-not-allowed opacity-50",
                           selectedDay?.dateKey === day.dateKey
                             ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
@@ -275,7 +325,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
                         disabled={!day.hasAnySlots}
                         onClick={() => handleDaySelect(day)}
                         className={cn(
-                          "whitespace-nowrap rounded-lg border px-3 py-3 text-base font-medium transition-colors",
+                          "whitespace-nowrap rounded-lg border px-3 py-3 text-base font-medium",
                           !day.hasAnySlots && "cursor-not-allowed opacity-50",
                           selectedDay?.dateKey === day.dateKey
                             ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
@@ -323,7 +373,7 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
                       disabled={!available}
                       onClick={() => setSelectedTime(window.value)}
                       className={cn(
-                        "rounded-lg border px-4 py-2.5 text-base font-medium transition-colors",
+                        "rounded-lg border px-4 py-2.5 text-base font-medium",
                         !available && "cursor-not-allowed opacity-40",
                         selectedTime === window.value
                           ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
@@ -458,13 +508,16 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
               >
                 Address <span className={cn("text-coquelicot-500")}>*</span>
               </label>
-              <AddressAutocomplete
-                id="booking-address"
-                value={address}
-                onChange={setAddress}
-                placeholder="Start typing your address..."
-                required={meetingType === "in-person"}
-              />
+              {/* Only mount when in-person so Google Maps script never loads for remote sessions */}
+              {meetingType === "in-person" && (
+                <AddressAutocomplete
+                  id="booking-address"
+                  value={address}
+                  onChange={setAddress}
+                  placeholder="Start typing your address..."
+                  required
+                />
+              )}
             </div>
           </div>
         </div>
@@ -513,11 +566,19 @@ export default function BookingForm({ availableDays }: BookingFormProps): React.
           size="md"
           disabled={submitting || availableDays.length === 0}
         >
-          {submitting ? "Sending..." : "Submit request"}
+          {submitting
+            ? isEditMode
+              ? "Saving..."
+              : "Sending..."
+            : isEditMode
+              ? "Save changes"
+              : "Submit request"}
         </Button>
-        <p className={cn("text-rich-black/60 text-base")}>
-          I'll confirm your exact appointment time by email.
-        </p>
+        {!isEditMode && (
+          <p className={cn("text-rich-black/60 text-base")}>
+            I'll confirm your exact appointment time by email.
+          </p>
+        )}
       </div>
     </form>
   );

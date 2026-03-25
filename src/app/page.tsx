@@ -34,7 +34,9 @@ import {
 } from "react-icons/fa6";
 import type { IconType } from "react-icons";
 
-export const revalidate = 300; // ISR - regenerate every 5 minutes
+// Rely on on-demand revalidation (revalidateReviewPaths fires on every review change).
+// Long fallback avoids waking a cold DB on a fixed timer.
+export const revalidate = 86400;
 
 interface SupportItem {
   label: string;
@@ -314,7 +316,10 @@ export default async function Home(): Promise<React.ReactElement> {
                   "border-moonstone-500/50 bg-moonstone-600/30 grid size-16 shrink-0 place-items-center rounded-full border-2",
                 )}
               >
-                <FaDownload className={cn("text-moonstone-600 h-8 w-8")} aria-hidden />
+                <FaDownload
+                  className={cn("text-moonstone-600 h-8 w-8 -translate-y-0.5")}
+                  aria-hidden
+                />
               </div>
 
               <div className={cn("flex-1")}>

@@ -94,9 +94,11 @@ export default function ReviewFormProtected({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
 
-  const textMax = 600;
+  const textMax = 1000;
+  const textHardMax = 1100;
   const textMin = 10;
   const textCount = text.length;
+  const remaining = textMax - textCount;
   const isAnonymous = nameDisplay === "anonymous";
 
   const phoneNormalized = normalizePhone(phoneInput);
@@ -128,7 +130,7 @@ export default function ReviewFormProtected({
       setErrorMsg(`Review must be at least ${textMin} characters.`);
       return;
     }
-    if (t.length > textMax) {
+    if (t.length > textHardMax) {
       setErrorMsg(`Review must be ${textMax} characters or less.`);
       return;
     }
@@ -402,16 +404,21 @@ export default function ReviewFormProtected({
           </label>
           <span
             className={cn(
-              "text-rich-black/60 text-xs tabular-nums",
+              "tabular-nums transition-all duration-200",
               textCount > textMax
-                ? "text-coquelicot-500"
-                : textCount < textMin && textCount > 0
-                  ? "text-coquelicot-500/70"
-                  : "",
+                ? "text-coquelicot-500 text-sm font-bold"
+                : remaining <= 50
+                  ? "text-coquelicot-500 text-xs font-semibold"
+                  : remaining <= 150
+                    ? "text-coquelicot-500/60 text-xs font-medium"
+                    : textCount > 0 && textCount < textMin
+                      ? "text-coquelicot-500/70 text-xs"
+                      : "text-rich-black/40 text-xs",
             )}
             aria-live="polite"
           >
-            {textCount}/{textMax} {textCount > 0 && textCount < textMin && `(min ${textMin})`}
+            {textCount}/{textMax}
+            {textCount > 0 && textCount < textMin && ` (min ${textMin})`}
           </span>
         </div>
 
@@ -425,7 +432,7 @@ export default function ReviewFormProtected({
           )}
           value={text}
           onChange={(e) => setText(e.target.value)}
-          maxLength={textMax}
+          maxLength={textHardMax}
           required
           disabled={loading}
         />
@@ -435,7 +442,7 @@ export default function ReviewFormProtected({
             type="submit"
             variant="secondary"
             size="sm"
-            disabled={loading || textCount < textMin || phoneInvalid}
+            disabled={loading || textCount < textMin || textCount > textHardMax || phoneInvalid}
           >
             {loading ? "Sending..." : isEditing ? "Update review" : "Send review"}
           </Button>

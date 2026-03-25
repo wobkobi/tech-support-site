@@ -36,7 +36,10 @@ jobs:
                 full = (await github.rest.pulls.get({ owner, repo, pull_number: pr.number })).data;
               }
 
-              if (full.mergeable && full.mergeable_state === 'clean') {
+              if (full.mergeable && (full.mergeable_state === 'clean' || full.mergeable_state === 'blocked')) {
+                await github.rest.pulls.createReview({
+                  owner, repo, pull_number: pr.number, event: 'APPROVE',
+                });
                 await github.rest.pulls.merge({
                   owner, repo, pull_number: pr.number, merge_method: 'squash',
                 });

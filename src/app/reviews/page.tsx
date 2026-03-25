@@ -11,8 +11,9 @@ import { cn } from "@/shared/lib/cn";
 import { prisma } from "@/shared/lib/prisma";
 import { formatReviewerName } from "@/features/reviews/lib/formatting";
 
-// Enable ISR: revalidate every 5 minutes for approved reviews
-export const revalidate = 300;
+// Rely on on-demand revalidation (triggered by admin approve/delete/submit).
+// Long fallback avoids waking a cold DB on a fixed timer.
+export const revalidate = 86400;
 
 const linkStyle = cn(
   "text-coquelicot-500 hover:text-coquelicot-600 underline-offset-4 hover:underline",
@@ -81,15 +82,15 @@ export default async function ReviewsPage(): Promise<React.ReactElement> {
                   <li
                     key={r.id}
                     className={cn(
-                      "border-seasalt-400/60 bg-seasalt-800 flex flex-col rounded-xl border p-5 shadow-sm sm:p-6",
+                      "bg-seasalt-800/80 border-seasalt-400/60 flex flex-col rounded-lg border-2 p-4 sm:p-5",
                     )}
                   >
+                    <p className={cn("text-rich-black flex-1 text-sm sm:text-base")}>{r.text}</p>
                     <p
-                      className={cn("text-rich-black flex-1 text-sm leading-relaxed sm:text-base")}
+                      className={cn(
+                        "text-russian-violet pt-3 text-right text-sm font-semibold sm:text-base",
+                      )}
                     >
-                      {r.text}
-                    </p>
-                    <p className={cn("text-russian-violet mt-4 text-base font-semibold")}>
                       - {formatReviewerName(r)}
                     </p>
                   </li>
