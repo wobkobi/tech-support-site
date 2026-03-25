@@ -99,12 +99,12 @@ describe("POST /api/reviews", () => {
     expect(json.error).toMatch(/at least 10 characters/);
   });
 
-  it("returns 400 when text is too long", async () => {
-    const req = makeRequest({ text: "a".repeat(601), firstName: "Alice" });
+  it("returns 400 when text exceeds the hard limit of 1100 characters", async () => {
+    const req = makeRequest({ text: "a".repeat(1101), firstName: "Alice" });
     const res = await POST(req);
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toMatch(/600 characters/);
+    expect(json.error).toMatch(/1000 characters/);
   });
 
   it("returns 400 when non-anonymous and firstName is missing", async () => {

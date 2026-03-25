@@ -22,12 +22,16 @@ describe("reviewTextError", () => {
     expect(reviewTextError("1234567890")).toBeNull();
   });
 
-  it("returns null for text exactly 600 characters long", () => {
-    expect(reviewTextError("a".repeat(600))).toBeNull();
+  it("returns null for text exactly 1000 characters long", () => {
+    expect(reviewTextError("a".repeat(1000))).toBeNull();
   });
 
-  it("returns error for text over 600 characters", () => {
-    expect(reviewTextError("a".repeat(601))).toBe("Review must be 600 characters or less.");
+  it("returns null for text up to the hard limit of 1100 characters", () => {
+    expect(reviewTextError("a".repeat(1100))).toBeNull();
+  });
+
+  it("returns error for text over 1100 characters", () => {
+    expect(reviewTextError("a".repeat(1101))).toBe("Review must be 1000 characters or less.");
   });
 
   it("returns null for normal review text", () => {
