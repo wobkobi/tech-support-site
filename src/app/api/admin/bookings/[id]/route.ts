@@ -68,3 +68,40 @@ export async function PATCH(
 
   return NextResponse.json({ ok: true });
 }
+
+/**
+ * DELETE /api/admin/bookings/[id]
+ * Permanently deletes a booking and its calendar event.
+ * Requires X-Admin-Secret header.
+ * @param request - Incoming request.
+ * @param params - Route params.
+ * @param params.params - Destructured route params containing booking id.
+ * @returns JSON with ok flag or error.
+ */
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+): Promise<NextResponse> {
+  if (!isAdminRequest(request)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id } = await params;
+
+  const booking = await prisma.booking.findUnique({ where: { id } });
+  if (!booking) {
+    return NextResponse.json({ error: "Booking not found." }, { status: 404 });
+  }
+
+  if (booking.calendarEventId) {
+    try {
+      await deleteBookingEvent({ eventId: booking.calendarEventId });
+    } catch (err) {
+      console.error("[admin/bookings] Failed to delete calendar event:", err);
+    }
+  }
+
+  await prisma.booking.delete({ where: { id } });
+
+  return NextResponse.json({ ok: true });
+}

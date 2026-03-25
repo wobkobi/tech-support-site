@@ -159,6 +159,30 @@ export function BookingAdminList({
     }
   }
 
+  /**
+   * Permanently deletes a booking and its calendar event.
+   * @param id - Booking ID to delete.
+   */
+  async function deleteBooking(id: string): Promise<void> {
+    setSaving(id);
+    setErrors((prev) => ({ ...prev, [id]: "" }));
+    try {
+      const res = await fetch(`/api/admin/bookings/${id}`, {
+        method: "DELETE",
+        headers: { "x-admin-secret": token },
+      });
+      if (!res.ok) {
+        const data = (await res.json()) as { error?: string };
+        setErrors((prev) => ({ ...prev, [id]: data.error ?? "Failed." }));
+        return;
+      }
+      setBookings((prev) => prev.filter((b) => b.id !== id));
+      setExpandedId(null);
+    } finally {
+      setSaving(null);
+    }
+  }
+
   const FILTERS: StatusFilter[] = ["all", "confirmed", "held", "completed", "cancelled"];
 
   return (
@@ -213,6 +237,21 @@ export function BookingAdminList({
                 </div>
 
                 <div className="flex shrink-0 gap-2">
+                  {b.name.toLowerCase().includes("test") && (
+                    <button
+                      onClick={() => {
+                        if (
+                          confirm("Permanently delete this test booking? This cannot be undone.")
+                        ) {
+                          void deleteBooking(b.id);
+                        }
+                      }}
+                      disabled={isSaving}
+                      className="rounded-lg bg-red-500/20 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-500/30 disabled:opacity-50"
+                    >
+                      Delete
+                    </button>
+                  )}
                   {b.status !== "cancelled" && (
                     <>
                       <a
