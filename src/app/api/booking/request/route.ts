@@ -228,27 +228,35 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
       console.log(`[booking/request] Created ${duration} booking: ${booking.id}`);
 
-      // Send confirmation emails - fire-and-forget, never block the response
-      void sendOwnerBookingNotification({
-        id: booking.id,
-        name: booking.name,
-        email: booking.email,
-        notes: booking.notes ?? "",
-        startAt: booking.startAt,
-        endAt: booking.endAt,
-        cancelToken: booking.cancelToken,
-      });
-      void sendCustomerBookingConfirmation({
-        id: booking.id,
-        name: booking.name,
-        email: booking.email,
-        notes: booking.notes ?? "",
-        startAt: booking.startAt,
-        endAt: booking.endAt,
-        cancelToken: booking.cancelToken,
-      });
+      // Send confirmation emails before returning so Vercel doesn't kill the
+      // function before the Resend requests complete. Both functions catch all
+      // errors internally and never throw.
+      await Promise.all([
+        sendOwnerBookingNotification({
+          id: booking.id,
+          name: booking.name,
+          email: booking.email,
+          notes: booking.notes ?? "",
+          startAt: booking.startAt,
+          endAt: booking.endAt,
+          cancelToken: booking.cancelToken,
+        }),
+        sendCustomerBookingConfirmation({
+          id: booking.id,
+          name: booking.name,
+          email: booking.email,
+          notes: booking.notes ?? "",
+          startAt: booking.startAt,
+          endAt: booking.endAt,
+          cancelToken: booking.cancelToken,
+        }),
+      ]);
 
-      return NextResponse.json({ ok: true, bookingId: booking.id });
+      return NextResponse.json({
+        ok: true,
+        bookingId: booking.id,
+        cancelToken: booking.cancelToken,
+      });
     } catch (error) {
       // Handle unique constraint violation (concurrent booking for same slot)
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {

@@ -12,12 +12,12 @@ with how the mobile responsiveness turned out.
 
 - Next.js 16 (App Router + Turbopack)
 - TypeScript & TSX
-- Prisma ORM (PostgreSQL)
+- Prisma ORM (MongoDB)
 - Tailwind CSS v4 with custom design tokens (5-color palette: Rich Black, Seasalt, Coquelicot,
   Russian Violet, Moonstone)
 - Google Calendar API for real-time availability
-- Automated emails via SMTP
-- Vitest for testing (323+ tests passing)
+- Transactional emails via Resend
+- Vitest for testing (162+ tests passing)
 - Deployed on Vercel
 
 **Features:**
@@ -25,7 +25,7 @@ with how the mobile responsiveness turned out.
 - Real-time booking system with 15-min hold TTL to prevent double-bookings
 - Google Calendar integration for availability checks (cached every 15min)
 - Automated review requests sent 30min after appointments
-- Admin dashboard for review moderation
+- Admin dashboard for review moderation with email preview before sending
 - Mobile-first responsive design (navbar and booking form were tricky to get right)
 - Custom lazy-loading hook with IntersectionObserver
 - Polymorphic Button component (works as links or buttons)

@@ -8,6 +8,6 @@
 export function reviewTextError(text: string | undefined): string | null {
   const t = text?.trim() ?? "";
   if (t.length < 10) return "Review must be at least 10 characters.";
-  if (t.length > 600) return "Review must be 600 characters or less.";
+  if (t.length > 1100) return "Review must be 1000 characters or less.";
   return null;
 }

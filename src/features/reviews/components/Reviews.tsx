@@ -1,5 +1,3 @@
-"use client";
-
 // src/features/reviews/components/Reviews.tsx
 /**
  * @file Reviews.tsx
@@ -10,8 +8,8 @@ import { cn } from "@/shared/lib/cn";
 import Link from "next/link";
 import React from "react";
 
-/** Character limit for truncating long reviews. */
-const REVIEW_CHAR_LIMIT = 150;
+/** Character limit for truncating long reviews before CSS line-clamp takes over. */
+const REVIEW_CHAR_LIMIT = 280;
 
 /**
  * Normalizes whitespace: trims edges and collapses internal newlines/spaces to single spaces.
@@ -56,18 +54,25 @@ function ReviewText({ text }: { text: string }): React.ReactElement {
  * @param props - Component props.
  * @param props.r - The review item.
  * @param props.className - Additional class names for the card.
+ * @param props.style - Optional inline styles for the card.
  * @returns A list item card linking to the reviews page.
  */
-function ReviewCard({ r, className }: { r: ReviewItem; className: string }): React.ReactElement {
+function ReviewCard({
+  r,
+  className,
+  style,
+}: {
+  r: ReviewItem;
+  className: string;
+  style?: React.CSSProperties;
+}): React.ReactElement {
   return (
-    <li className={cn(className)}>
-      <Link href="/reviews" className="flex h-full flex-col text-inherit no-underline">
-        <ReviewText text={r.text} />
-        <p
-          className={cn(
-            "text-russian-violet mt-auto pt-3 text-right text-xs font-semibold sm:text-sm",
-          )}
-        >
+    <li className={cn("cursor-pointer", className)} style={style}>
+      <Link href="/reviews" className="flex h-full flex-col p-4 text-inherit no-underline sm:p-5">
+        <p className={cn("line-clamp-4")}>
+          <ReviewText text={r.text} />
+        </p>
+        <p className={cn("text-russian-violet pt-3 text-right text-sm font-semibold sm:text-base")}>
           - {r.name}
         </p>
       </Link>
@@ -96,8 +101,12 @@ export default function Reviews({ items = [] }: ReviewsProps): React.ReactElemen
   if (!items.length) return null;
 
   const cardBase = cn(
-    "bg-seasalt-800/80 flex flex-col rounded-lg border-2 p-4 sm:p-5",
-    "min-h-36 sm:min-h-40",
+    "bg-seasalt-800/80 flex flex-col rounded-lg border-2",
+    "border-seasalt-400/60 hover:border-coquelicot-500/60 transition-colors",
+  );
+
+  const marqueeCardBase = cn(
+    "bg-seasalt-800/80 flex flex-col rounded-lg border-2",
     "border-seasalt-400/60 hover:border-coquelicot-500/60 transition-colors",
   );
 
@@ -123,7 +132,12 @@ export default function Reviews({ items = [] }: ReviewsProps): React.ReactElemen
               <ReviewCard
                 key={`${r.name}-${i}`}
                 r={r}
-                className={cn(cardBase, "sm:w-md w-[min(26rem,calc(100vw-3rem))] shrink-0")}
+                className={cn(
+                  marqueeCardBase,
+                  "sm:w-md w-[min(26rem,calc(100vw-3rem))] shrink-0",
+                  i < items.length && "animate-fade-in animate-fill-both",
+                )}
+                style={i < items.length ? { animationDelay: `${i * 150}ms` } : undefined}
               />
             ))}
           </ul>

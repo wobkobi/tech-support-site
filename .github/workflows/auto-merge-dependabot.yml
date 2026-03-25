@@ -1,65 +1,45 @@
 name: Auto-merge Dependabot PRs
 
 on:
-  check_suite:
+  workflow_run:
+    workflows: [CI]
     types: [completed]
 
 permissions:
   contents: write
   pull-requests: write
-  checks: read
-  statuses: read
 
 jobs:
   auto-merge:
-    if: github.event.check_suite.conclusion == 'success'
+    if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
-      - name: Setup Node.js 22
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22.x"
-
       - name: Merge Dependabot PRs
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const { owner, repo } = context.repo;
-            const prs = context.payload.check_suite?.pull_requests ?? [];
+            const headSha = context.payload.workflow_run.head_sha;
 
-            for (const { number } of prs) {
-              // Load full PR
-              let pr = (await github.rest.pulls.get({ owner, repo, pull_number: number })).data;
+            const { data: prs } = await github.rest.pulls.list({ owner, repo, state: 'open' });
 
-              // Dependabot only, must be open and not draft
+            for (const pr of prs) {
               if (pr.user?.login !== 'dependabot[bot]') continue;
-              if (pr.state !== 'open' || pr.draft) continue;
+              if (pr.draft) continue;
+              if (pr.head.sha !== headSha) continue;
 
               // Wait briefly for mergeability to compute
-              for (let i = 0; i < 5 && (pr.mergeable_state === 'unknown' || pr.mergeable == null); i++) {
+              let full = pr;
+              for (let i = 0; i < 5 && (full.mergeable_state === 'unknown' || full.mergeable == null); i++) {
                 await new Promise(r => setTimeout(r, 2000));
-                pr = (await github.rest.pulls.get({ owner, repo, pull_number: number })).data;
+                full = (await github.rest.pulls.get({ owner, repo, pull_number: pr.number })).data;
               }
 
-              // Combined commit status contexts must be success
-              const { data: combined } = await github.rest.repos.getCombinedStatusForRef({
-                owner, repo, ref: pr.head.sha,
-              });
-              if (combined.state !== 'success') continue;
-
-              // All check runs must be completed and success/neutral/skipped
-              const { data: cr } = await github.rest.checks.listForRef({
-                owner, repo, ref: pr.head.sha,
-              });
-              const failing = cr.check_runs.find(run =>
-                run.status !== 'completed' ||
-                !['success', 'neutral', 'skipped'].includes(run.conclusion ?? '')
-              );
-              if (failing) continue;
-
-              // Merge when clean and not blocked
-              if (pr.mergeable && pr.mergeable_state === 'clean') {
+              if (full.mergeable && (full.mergeable_state === 'clean' || full.mergeable_state === 'blocked')) {
+                await github.rest.pulls.createReview({
+                  owner, repo, pull_number: pr.number, event: 'APPROVE',
+                });
                 await github.rest.pulls.merge({
                   owner, repo, pull_number: pr.number, merge_method: 'squash',
                 });

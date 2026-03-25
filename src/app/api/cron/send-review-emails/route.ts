@@ -47,16 +47,31 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       },
     });
 
+    if (bookingsToEmail.length === 0) {
+      return NextResponse.json({
+        ok: true,
+        found: 0,
+        suppressed: 0,
+        sent: 0,
+        failed: 0,
+        errors: [],
+      });
+    }
+
     // Deduplicate by email: skip bookings whose email already received a review request
-    // (either from another booking or a manual ReviewRequest record)
-    const alreadyEmailedBookings = await prisma.booking.findMany({
-      where: { reviewSentAt: { not: null } },
-      select: { email: true },
-    });
-    const alreadyEmailedRequests = await prisma.reviewRequest.findMany({
-      where: { email: { not: null } },
-      select: { email: true },
-    });
+    // (either from another booking or a manual ReviewRequest record).
+    // Only query emails that are actually in this batch to avoid full-table scans.
+    const batchEmails = bookingsToEmail.map((b) => b.email);
+    const [alreadyEmailedBookings, alreadyEmailedRequests] = await Promise.all([
+      prisma.booking.findMany({
+        where: { reviewSentAt: { not: null }, email: { in: batchEmails } },
+        select: { email: true },
+      }),
+      prisma.reviewRequest.findMany({
+        where: { email: { in: batchEmails } },
+        select: { email: true },
+      }),
+    ]);
     const reviewedEmails = new Set([
       ...alreadyEmailedBookings.map((b) => b.email.toLowerCase()),
       ...alreadyEmailedRequests.map((r) => r.email!.toLowerCase()),

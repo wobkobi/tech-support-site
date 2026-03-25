@@ -8,26 +8,35 @@ import type React from "react";
 import Image from "next/image";
 import { cn } from "@/shared/lib/cn";
 import { Button } from "@/shared/components/Button";
-import { FaCircleCheck, FaHouse } from "react-icons/fa6";
+import { FaCircleCheck, FaHouse, FaPenToSquare } from "react-icons/fa6";
 
 const CARD = "border-seasalt-400/60 bg-seasalt-800 rounded-xl border p-5 shadow-sm sm:p-6";
 
 /**
  * Booking success page component.
+ * @param props - Page props.
+ * @param props.searchParams - URL search params.
  * @returns The success page element.
  */
-export default function BookingSuccessPage(): React.ReactElement {
+export default async function BookingSuccessPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}): Promise<React.ReactElement> {
+  const params = await searchParams;
+  const tokenValue = params.cancelToken;
+  const cancelToken = Array.isArray(tokenValue) ? tokenValue[0] : tokenValue;
   return (
     <main className={cn("relative min-h-dvh overflow-hidden")}>
       {/* Backdrop */}
       <div className={cn("pointer-events-none absolute inset-0 -z-10 overflow-hidden")}>
         <Image
-          src="/source/backdrop.jpg"
+          src="/source/backdrop-blur.webp"
           alt=""
           fill
           priority
           sizes="100vw"
-          className={cn("scale-110 transform-gpu object-cover blur-xl")}
+          className={cn("scale-110 transform-gpu object-cover")}
         />
       </div>
 
@@ -58,10 +67,31 @@ export default function BookingSuccessPage(): React.ReactElement {
                 folder.
               </p>
 
-              <Button href="/" variant="secondary" size="sm">
-                <FaHouse className={cn("h-4 w-4")} aria-hidden />
-                Back to home
-              </Button>
+              <div className={cn("flex flex-wrap justify-center gap-3")}>
+                <Button href="/" variant="secondary" size="sm">
+                  <FaHouse className={cn("h-4 w-4")} aria-hidden />
+                  Back to home
+                </Button>
+                {cancelToken && (
+                  <Button
+                    href={`/booking/edit?token=${encodeURIComponent(cancelToken)}`}
+                    variant="ghost"
+                    size="sm"
+                  >
+                    <FaPenToSquare className={cn("h-4 w-4")} aria-hidden />
+                    Edit booking
+                  </Button>
+                )}
+                {cancelToken && (
+                  <Button
+                    href={`/booking/cancel?token=${encodeURIComponent(cancelToken)}`}
+                    variant="ghost"
+                    size="sm"
+                  >
+                    Cancel booking
+                  </Button>
+                )}
+              </div>
             </section>
 
             <section className={cn(CARD)}>

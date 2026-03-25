@@ -12,9 +12,8 @@ import { Button } from "@/shared/components/Button";
 import { cn } from "@/shared/lib/cn";
 import { prisma } from "@/shared/lib/prisma";
 
-// Enable ISR: revalidate every 10 minutes
-// Reviews are submitted infrequently; 10-min staleness is acceptable
-export const revalidate = 600;
+// This page reads searchParams so it is always dynamic — revalidate has no effect.
+export const dynamic = "force-dynamic";
 
 /**
  * Review page with optional token-based protection
@@ -46,12 +45,23 @@ export default async function ReviewPage({
     isAnonymous: boolean;
   } | null = null;
 
-  // If token provided, validate against both Booking and ReviewRequest tables
+  // If token provided, validate against both Booking and ReviewRequest tables in parallel
   if (token) {
-    const booking = await prisma.booking.findFirst({
-      where: { reviewToken: token },
-      select: { id: true, name: true, email: true, reviewSubmittedAt: true },
-    });
+    const [booking, reviewRequest, maybeExistingReview] = await Promise.all([
+      prisma.booking.findFirst({
+        where: { reviewToken: token },
+        select: { id: true, name: true, email: true, reviewSubmittedAt: true },
+      }),
+      prisma.reviewRequest.findFirst({
+        where: { reviewToken: token },
+        select: { id: true, name: true, email: true, phone: true, reviewSubmittedAt: true },
+      }),
+      // Fetch speculatively — only used if the token maps to an already-reviewed source
+      prisma.review.findFirst({
+        where: { customerRef: token },
+        select: { id: true, text: true, firstName: true, lastName: true, isAnonymous: true },
+      }),
+    ]);
 
     if (booking) {
       sourceId = booking.id;
@@ -60,35 +70,24 @@ export default async function ReviewPage({
       prefillEmail = booking.email;
       tokenValid = true;
       alreadyReviewed = !!booking.reviewSubmittedAt;
-    } else {
-      const reviewRequest = await prisma.reviewRequest.findFirst({
-        where: { reviewToken: token },
-        select: { id: true, name: true, email: true, phone: true, reviewSubmittedAt: true },
-      });
-
-      if (reviewRequest) {
-        sourceId = reviewRequest.id;
-        sourceType = "reviewRequest";
-        prefillName = reviewRequest.name;
-        prefillEmail = reviewRequest.email;
-        prefillPhone = reviewRequest.phone;
-        tokenValid = true;
-        alreadyReviewed = !!reviewRequest.reviewSubmittedAt;
-      }
+    } else if (reviewRequest) {
+      sourceId = reviewRequest.id;
+      sourceType = "reviewRequest";
+      prefillName = reviewRequest.name;
+      prefillEmail = reviewRequest.email;
+      prefillPhone = reviewRequest.phone;
+      tokenValid = true;
+      alreadyReviewed = !!reviewRequest.reviewSubmittedAt;
     }
 
-    // Fetch existing review for pre-filling the edit form
     if (tokenValid && alreadyReviewed) {
-      existingReview = await prisma.review.findFirst({
-        where: { customerRef: token },
-        select: { id: true, text: true, firstName: true, lastName: true, isAnonymous: true },
-      });
+      existingReview = maybeExistingReview;
     }
   }
 
   return (
     <PageShell>
-      <FrostedSection maxWidth="48rem">
+      <FrostedSection maxWidth="56rem">
         <div className={cn("flex flex-col gap-4 sm:gap-5")}>
           {/* Token invalid warning */}
           {token && !tokenValid && (
@@ -100,7 +99,7 @@ export default async function ReviewPage({
               >
                 Invalid Review Link
               </h1>
-              <p className={cn("text-rich-black/80 mb-4 text-sm sm:text-base")}>
+              <p className={cn("text-rich-black/80 mb-4 text-base")}>
                 This review link is invalid or has expired. If you recently had an appointment,
                 please check your email for the correct link.
               </p>
@@ -121,7 +120,7 @@ export default async function ReviewPage({
                 >
                   {alreadyReviewed ? "Edit your review" : "How was your appointment?"}
                 </h1>
-                <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
+                <p className={cn("text-rich-black/80 text-base")}>
                   {alreadyReviewed
                     ? `Hi ${prefillName}! You can update your review any time using this link.`
                     : `Hi ${prefillName}! Thanks for choosing To The Point Tech. I'd love to hear about your experience.`}
@@ -152,11 +151,11 @@ export default async function ReviewPage({
               >
                 Review Link Required
               </h1>
-              <p className={cn("text-rich-black/80 mb-4 text-sm sm:text-base")}>
+              <p className={cn("text-rich-black/80 mb-4 text-base")}>
                 To leave a review, please use the personalized review link sent to your email after
                 your appointment.
               </p>
-              <p className={cn("text-rich-black/80 mb-4 text-sm sm:text-base")}>
+              <p className={cn("text-rich-black/80 mb-4 text-base")}>
                 This helps ensure all reviews are from verified customers. If you can't find your
                 review link, feel free to{" "}
                 <Link href="/contact" className={cn("text-coquelicot-500 hover:underline")}>
