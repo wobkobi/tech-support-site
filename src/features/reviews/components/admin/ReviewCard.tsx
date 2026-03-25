@@ -134,6 +134,19 @@ export function ReviewCard({
 
       {/* Actions */}
       <div className="flex flex-wrap items-center gap-2">
+        {`${row.firstName ?? ""} ${row.lastName ?? ""}`.toLowerCase().includes("test") && (
+          <button
+            onClick={() => {
+              if (confirm("Permanently delete this test review? This cannot be undone.")) {
+                void remove();
+              }
+            }}
+            disabled={loading !== null}
+            className="rounded-lg bg-red-500/20 px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-500/30 disabled:opacity-50"
+          >
+            {loading === "delete" ? "Deleting…" : "Delete"}
+          </button>
+        )}
         {onApprove && (
           <button
             onClick={() => patch("approve")}
