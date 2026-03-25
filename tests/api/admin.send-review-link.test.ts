@@ -83,6 +83,44 @@ describe("API: /api/admin/reviews POST", () => {
     const json = await res.json();
     expect(json.error).toMatch(/at least 10 characters/);
   });
+
+  it("sets firstName and lastName to null when isAnonymous is true", async () => {
+    (isValidAdminToken as ReturnType<typeof vi.fn>).mockReturnValue(true);
+    (prisma.review.create as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: "r2",
+      text: "Anonymous review text here!",
+      firstName: null,
+      lastName: null,
+      isAnonymous: true,
+      verified: false,
+      status: "approved",
+      createdAt: new Date(),
+    });
+    const req = makeRequest({
+      token: "valid-admin-token",
+      text: "Anonymous review text here!",
+      firstName: "Should",
+      lastName: "BeIgnored",
+      isAnonymous: true,
+    });
+    const res = await adminReviewsPost(req);
+    expect(res.status).toBe(201);
+    expect(prisma.review.create as ReturnType<typeof vi.fn>).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ firstName: null, lastName: null, isAnonymous: true }),
+      }),
+    );
+  });
+
+  it("returns 500 when the database throws", async () => {
+    (isValidAdminToken as ReturnType<typeof vi.fn>).mockReturnValue(true);
+    (prisma.review.create as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("DB down"));
+    const req = makeRequest({ token: "valid-admin-token", text: "Long enough review text" });
+    const res = await adminReviewsPost(req);
+    expect(res.status).toBe(500);
+    const json = await res.json();
+    expect(json.error).toMatch(/failed/i);
+  });
 });
 
 // ─── /api/admin/send-review-link POST ─────────────────────────────────────────
@@ -186,5 +224,42 @@ describe("API: /api/admin/send-review-link POST", () => {
     const json = await res.json();
     expect(json.ok).toBe(true);
     expect(json.reviewUrl).toContain("sms-tok");
+  });
+
+  it("returns existing reviewUrl when a booking with that email already has a review token", async () => {
+    (isValidAdminToken as ReturnType<typeof vi.fn>).mockReturnValue(true);
+    // No ReviewRequest for this email, but a Booking has already been sent a review link
+    (prisma.reviewRequest.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+    (prisma.booking.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue({
+      reviewToken: "booking-tok",
+    });
+    const req = makeRequest({
+      token: "good",
+      name: "Alice",
+      email: "alice@example.com",
+      mode: "email",
+    });
+    const res = await sendReviewLinkPost(req);
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.existing).toBe(true);
+    expect(json.reviewUrl).toContain("booking-tok");
+  });
+
+  it("returns 500 when the database throws", async () => {
+    (isValidAdminToken as ReturnType<typeof vi.fn>).mockReturnValue(true);
+    (prisma.reviewRequest.findFirst as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new Error("DB down"),
+    );
+    const req = makeRequest({
+      token: "good",
+      name: "Alice",
+      email: "alice@example.com",
+      mode: "email",
+    });
+    const res = await sendReviewLinkPost(req);
+    expect(res.status).toBe(500);
+    const json = await res.json();
+    expect(json.ok).toBe(false);
   });
 });

@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   isAdminRequest: vi.fn(),
   bookingFindUnique: vi.fn(),
   bookingUpdate: vi.fn(),
+  bookingDelete: vi.fn(),
   deleteBookingEvent: vi.fn(),
 }));
 
@@ -17,6 +18,7 @@ vi.mock("@/shared/lib/prisma", () => ({
     booking: {
       findUnique: mocks.bookingFindUnique,
       update: mocks.bookingUpdate,
+      delete: mocks.bookingDelete,
     },
   },
 }));
@@ -25,7 +27,7 @@ vi.mock("@/features/calendar/lib/google-calendar", () => ({
   deleteBookingEvent: mocks.deleteBookingEvent,
 }));
 
-import { PATCH } from "../../src/app/api/admin/bookings/[id]/route";
+import { PATCH, DELETE } from "../../src/app/api/admin/bookings/[id]/route";
 
 const BOOKING = {
   id: "booking-123",
@@ -141,5 +143,66 @@ describe("PATCH /api/admin/bookings/[id]", () => {
       where: { id: "booking-123" },
       data: { status: "confirmed" },
     });
+  });
+});
+
+describe("DELETE /api/admin/bookings/[id]", () => {
+  /**
+   * Creates a minimal fake NextRequest (no body needed for DELETE).
+   * @returns A minimal fake NextRequest.
+   */
+  function makeDeleteRequest(): NextRequest {
+    return {} as unknown as NextRequest;
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.bookingFindUnique.mockResolvedValue(BOOKING);
+    mocks.bookingDelete.mockResolvedValue({});
+    mocks.deleteBookingEvent.mockResolvedValue(undefined);
+  });
+
+  it("returns 401 when request is not from admin", async () => {
+    mocks.isAdminRequest.mockReturnValue(false);
+    const res = await DELETE(makeDeleteRequest(), PARAMS);
+    expect(res.status).toBe(401);
+    const json = await res.json();
+    expect(json.error).toBe("Unauthorized");
+  });
+
+  it("returns 404 when booking does not exist", async () => {
+    mocks.isAdminRequest.mockReturnValue(true);
+    mocks.bookingFindUnique.mockResolvedValue(null);
+    const res = await DELETE(makeDeleteRequest(), PARAMS);
+    expect(res.status).toBe(404);
+    const json = await res.json();
+    expect(json.error).toMatch(/not found/i);
+  });
+
+  it("deletes the calendar event and the booking", async () => {
+    mocks.isAdminRequest.mockReturnValue(true);
+    const res = await DELETE(makeDeleteRequest(), PARAMS);
+    expect(res.status).toBe(200);
+    expect((await res.json()).ok).toBe(true);
+    expect(mocks.deleteBookingEvent).toHaveBeenCalledWith({ eventId: "cal-event-1" });
+    expect(mocks.bookingDelete).toHaveBeenCalledWith({ where: { id: "booking-123" } });
+  });
+
+  it("skips calendar delete when booking has no calendarEventId", async () => {
+    mocks.isAdminRequest.mockReturnValue(true);
+    mocks.bookingFindUnique.mockResolvedValue({ ...BOOKING, calendarEventId: null });
+    const res = await DELETE(makeDeleteRequest(), PARAMS);
+    expect(res.status).toBe(200);
+    expect(mocks.deleteBookingEvent).not.toHaveBeenCalled();
+    expect(mocks.bookingDelete).toHaveBeenCalledWith({ where: { id: "booking-123" } });
+  });
+
+  it("calendar delete failure does not fail the request", async () => {
+    mocks.isAdminRequest.mockReturnValue(true);
+    mocks.deleteBookingEvent.mockRejectedValue(new Error("Calendar error"));
+    const res = await DELETE(makeDeleteRequest(), PARAMS);
+    expect(res.status).toBe(200);
+    expect((await res.json()).ok).toBe(true);
+    expect(mocks.bookingDelete).toHaveBeenCalledWith({ where: { id: "booking-123" } });
   });
 });
