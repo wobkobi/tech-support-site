@@ -19,12 +19,12 @@ export function getBookingCalendarId(): string {
 }
 
 /**
- * All calendars checked when computing availability.
- * Reads BOOKING_CALENDAR_ID, WORK_CALENDAR_ID, and PERSONAL_CALENDAR_ID from env.
- * Duplicate/empty values are filtered out automatically.
- * @returns Array of calendar ID strings to check for availability.
+ * Returns the configured calendar IDs from environment variables.
+ * Using explicit env-var calendars prevents subscribed Google calendars
+ * (Holidays, Birthdays, etc.) from unexpectedly blocking booking slots.
+ * @returns Array of calendar ID strings.
  */
-export function getCalendarIds(): string[] {
+function fetchAccessibleCalendarIds(): string[] {
   const ids = [
     process.env.BOOKING_CALENDAR_ID,
     process.env.WORK_CALENDAR_ID,
@@ -68,6 +68,7 @@ export interface CalendarEvent {
   end: string;
   summary?: string;
   description?: string;
+  location?: string;
   calendarEmail: string; // Which calendar this event is from
 }
 
@@ -164,10 +165,11 @@ export async function fetchAllCalendarEvents(
 ): Promise<CalendarEvent[]> {
   const calendar = getCalendarClient();
 
-  const calendarIds = getCalendarIds();
+  const calendarIds = await fetchAccessibleCalendarIds();
   console.log(`[calendar] Checking ${calendarIds.length} calendars...`);
 
   const allEvents: CalendarEvent[] = [];
+  let errorCount = 0;
 
   const personalCalendarId = process.env.PERSONAL_CALENDAR_ID ?? "";
 
@@ -195,6 +197,7 @@ export async function fetchAllCalendarEvents(
             end: event.end.dateTime,
             summary: event.summary || undefined,
             description: event.description || undefined,
+            location: event.location || undefined,
             calendarEmail: calendarId,
           });
         } else if (event.start?.date && event.end?.date && !isPersonal) {
@@ -215,6 +218,7 @@ export async function fetchAllCalendarEvents(
             end: endAt.toISOString(),
             summary: event.summary || undefined,
             description: event.description || undefined,
+            location: event.location || undefined,
             calendarEmail: calendarId,
           });
         }
@@ -225,12 +229,53 @@ export async function fetchAllCalendarEvents(
       allEvents.push(...processedEvents);
     } catch (error) {
       console.error(`[calendar] Failed to fetch events from ${calendarId}:`, error);
-      // Continue with other calendars
+      errorCount++;
     }
+  }
+
+  if (errorCount === calendarIds.length) {
+    throw new Error(
+      `Failed to fetch events from all ${calendarIds.length} calendars — check API credentials`,
+    );
   }
 
   console.log(
     `[calendar] Total: ${allEvents.length} events across ${calendarIds.length} calendars`,
   );
   return allEvents;
+}
+
+/**
+ * Creates a travel time blocking event in the booking calendar.
+ * Unlike booking events, travel blocks have no attendees and send no notifications.
+ * @param params - Event parameters.
+ * @param params.summary - Event title (e.g. "Travel to: Dentist").
+ * @param params.startAt - Block start time.
+ * @param params.endAt - Block end time.
+ * @param params.timeZone - Timezone for display.
+ * @returns Created event ID.
+ */
+export async function createTravelBlockEvent(params: {
+  summary: string;
+  startAt: Date;
+  endAt: Date;
+  timeZone: string;
+}): Promise<{ eventId: string }> {
+  const calendar = getCalendarClient();
+
+  const response = await calendar.events.insert({
+    calendarId: getBookingCalendarId(),
+    requestBody: {
+      summary: params.summary,
+      start: { dateTime: params.startAt.toISOString(), timeZone: params.timeZone },
+      end: { dateTime: params.endAt.toISOString(), timeZone: params.timeZone },
+    },
+    sendUpdates: "none",
+  });
+
+  if (!response.data.id) {
+    throw new Error("Failed to create travel block event - no event ID returned");
+  }
+
+  return { eventId: response.data.id };
 }

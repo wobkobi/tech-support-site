@@ -89,6 +89,9 @@ model Review {
   bookingId String? @db.ObjectId
   verified  Boolean @default(false)
 
+  // Optional link to a Contact record (matched by email or set manually).
+  contactId String? @db.ObjectId
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -111,6 +114,37 @@ model ReviewRequest {
   // Deduplication before sending a new review link
   @@index([email])
   @@index([phone])
+}
+
+// Contacts built from booking submissions.
+model Contact {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  name            String
+  email           String   @unique
+  phone           String?
+  address         String?
+  googleContactId String? // Google People API resource name (e.g. "people/c1234567890")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// Travel time blocks created for external calendar events with a location.
+model TravelBlock {
+  id               String    @id @default(auto()) @map("_id") @db.ObjectId
+  sourceEventId    String
+  calendarEmail    String
+  summary          String?   // Google Calendar event title (e.g. "Dentist", "Mario Movie")
+  eventStartAt     DateTime? // Source event start — used to detect time changes
+  eventEndAt       DateTime? // Source event end — used to detect time changes
+  rawTravelMinutes     Int?    // Raw travel-to time from Distance Matrix API
+  roundedMinutes       Int?    // Rounded travel-to value used for block window
+  rawTravelBackMinutes Int?    // Raw return-trip travel time
+  roundedBackMinutes   Int?    // Rounded return-trip value used for block window
+  beforeEventId        String? // Synthetic CalendarEventCache ID blocking travel-to
+  afterEventId         String? // Synthetic CalendarEventCache ID blocking travel-back
+  createdAt        DateTime  @default(now())
+
+  @@unique([sourceEventId, calendarEmail])
 }
 
 // Cached Google Calendar events for fast booking page loads.

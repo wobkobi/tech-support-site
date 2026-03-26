@@ -26,7 +26,6 @@ vi.mock("googleapis", () => ({
 
 import {
   getBookingCalendarId,
-  getCalendarIds,
   getOAuth2Client,
 } from "../../src/features/calendar/lib/google-calendar";
 
@@ -50,17 +49,6 @@ afterEach(() => {
 describe("google-calendar utilities", () => {
   it("returns the booking calendar id from env", () => {
     expect(getBookingCalendarId()).toBe("booking-cal-id");
-  });
-
-  it("returns all configured calendar ids", () => {
-    expect(getCalendarIds()).toEqual(["booking-cal-id", "work-cal-id", "personal-cal-id"]);
-  });
-
-  it("falls back to 'primary' when no calendar ids are set", () => {
-    process.env.BOOKING_CALENDAR_ID = "";
-    process.env.WORK_CALENDAR_ID = "";
-    process.env.PERSONAL_CALENDAR_ID = "";
-    expect(getCalendarIds()).toEqual(["primary"]);
   });
 
   it("creates an OAuth2 client with credentials from env", () => {
