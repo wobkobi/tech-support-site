@@ -12,6 +12,7 @@ import type React from "react";
 import { useState } from "react";
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import { formatReviewerName } from "@/features/reviews/lib/formatting";
+import { normalizePhone, isValidPhone } from "@/shared/lib/normalize-phone";
 
 export interface ContactRow {
   id: string;
@@ -47,6 +48,8 @@ interface ContactCardProps {
   editPhone: string;
   editAddress: string;
   saving: boolean;
+  editError: string | null;
+  phoneBlurError: string | null;
   syncingId: string | null;
   expandedReviewsId: string | null;
   onStartEdit: (c: ContactRow) => void;
@@ -57,6 +60,7 @@ interface ContactCardProps {
   onEditName: (v: string) => void;
   onEditPhone: (v: string) => void;
   onEditAddress: (v: string) => void;
+  onPhoneBlur: () => void;
 }
 
 /**
@@ -68,6 +72,8 @@ interface ContactCardProps {
  * @param props.editPhone - Current value of the phone edit field.
  * @param props.editAddress - Current value of the address edit field.
  * @param props.saving - Whether a save is in progress.
+ * @param props.editError - Validation or API error message for the current edit, or null.
+ * @param props.phoneBlurError - Inline phone validation error shown on blur, or null.
  * @param props.syncingId - ID of the contact currently being synced, or null.
  * @param props.expandedReviewsId - ID of the contact whose reviews are expanded, or null.
  * @param props.onStartEdit - Opens the edit form for the given contact.
@@ -78,6 +84,7 @@ interface ContactCardProps {
  * @param props.onEditName - Updates the name edit field value.
  * @param props.onEditPhone - Updates the phone edit field value.
  * @param props.onEditAddress - Updates the address edit field value.
+ * @param props.onPhoneBlur - Validates the phone field when the input loses focus.
  * @returns Contact card element.
  */
 function ContactCard({
@@ -87,6 +94,8 @@ function ContactCard({
   editPhone,
   editAddress,
   saving,
+  editError,
+  phoneBlurError,
   syncingId,
   expandedReviewsId,
   onStartEdit,
@@ -97,6 +106,7 @@ function ContactCard({
   onEditName,
   onEditPhone,
   onEditAddress,
+  onPhoneBlur,
 }: ContactCardProps): React.ReactElement {
   if (editingId === c.id) {
     return (
@@ -133,9 +143,13 @@ function ContactCard({
             id={`edit-phone-${c.id}`}
             type="text"
             value={editPhone}
-            onChange={(e) => onEditPhone(e.target.value)}
+            onChange={(e) => {
+              onEditPhone(e.target.value);
+            }}
+            onBlur={onPhoneBlur}
             className="border-seasalt-400/80 bg-seasalt text-rich-black focus:border-russian-violet focus:ring-russian-violet/30 w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-1"
           />
+          {phoneBlurError && <p className="text-coquelicot-600 text-xs">{phoneBlurError}</p>}
         </div>
         <div className="flex flex-col gap-1">
           <label
@@ -151,6 +165,7 @@ function ContactCard({
             placeholder="Start typing address..."
           />
         </div>
+        {editError && <p className="text-coquelicot-600 text-xs font-medium">{editError}</p>}
         <div className="flex gap-2">
           <button
             onClick={() => onSaveEdit(c.id)}
@@ -266,9 +281,11 @@ export function ContactAdminList({
   const [editPhone, setEditPhone] = useState("");
   const [editAddress, setEditAddress] = useState("");
   const [saving, setSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [phoneBlurError, setPhoneBlurError] = useState<string | null>(null);
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [expandedReviewsId, setExpandedReviewsId] = useState<string | null>(null);
-  const [syncedOpen, setSyncedOpen] = useState(false);
+  const [syncedOpen, setSyncedOpen] = useState(true);
 
   const unsynced = contacts.filter((c) => !c.googleContactId);
   const synced = contacts.filter((c) => !!c.googleContactId);
@@ -282,6 +299,8 @@ export function ContactAdminList({
     setEditName(c.name);
     setEditPhone(c.phone ?? "");
     setEditAddress(c.address ?? "");
+    setEditError(null);
+    setPhoneBlurError(null);
   }
 
   /**
@@ -289,6 +308,8 @@ export function ContactAdminList({
    */
   function cancelEdit(): void {
     setEditingId(null);
+    setEditError(null);
+    setPhoneBlurError(null);
   }
 
   /**
@@ -323,6 +344,15 @@ export function ContactAdminList({
    * @param id - The contact ID being saved.
    */
   async function saveEdit(id: string): Promise<void> {
+    if (!editName.trim()) {
+      setEditError("Name is required.");
+      return;
+    }
+    if (editPhone.trim() && !isValidPhone(normalizePhone(editPhone))) {
+      setEditError("Please enter a valid phone number.");
+      return;
+    }
+    setEditError(null);
     setSaving(true);
     try {
       const res = await fetch(`/api/admin/contacts/${id}`, {
@@ -362,11 +392,12 @@ export function ContactAdminList({
           ),
         );
         setEditingId(null);
+        setEditError(null);
       } else {
-        console.error("[ContactAdminList] Save failed:", data.error);
+        setEditError(data.error ?? "Save failed. Please try again.");
       }
-    } catch (err) {
-      console.error("[ContactAdminList] Network error:", err);
+    } catch {
+      setEditError("Network error. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -396,12 +427,32 @@ export function ContactAdminList({
     void syncToGoogle(id);
   }
 
+  /**
+   * Updates the phone edit field and clears any blur validation error.
+   * @param v - New phone value.
+   */
+  function handleEditPhone(v: string): void {
+    setEditPhone(v);
+    setPhoneBlurError(null);
+  }
+
+  /**
+   * Validates the phone field when the input loses focus.
+   */
+  function handlePhoneBlur(): void {
+    if (editPhone.trim() && !isValidPhone(normalizePhone(editPhone))) {
+      setPhoneBlurError("Please enter a valid phone number.");
+    }
+  }
+
   const sharedCardProps = {
     editingId,
     editName,
     editPhone,
     editAddress,
     saving,
+    editError,
+    phoneBlurError,
     syncingId,
     expandedReviewsId,
     onStartEdit: startEdit,
@@ -410,8 +461,9 @@ export function ContactAdminList({
     onSyncToGoogle: handleSyncToGoogle,
     onToggleReviews: toggleReviews,
     onEditName: setEditName,
-    onEditPhone: setEditPhone,
+    onEditPhone: handleEditPhone,
     onEditAddress: setEditAddress,
+    onPhoneBlur: handlePhoneBlur,
   };
 
   if (contacts.length === 0) {
