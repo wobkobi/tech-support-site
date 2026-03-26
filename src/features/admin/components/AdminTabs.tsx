@@ -70,8 +70,8 @@ export function AdminTabs({
   );
   const [backfilling, setBackfilling] = useState(false);
   const [backfillResult, setBackfillResult] = useState<string | null>(null);
-  const [importing, setImporting] = useState(false);
-  const [importResult, setImportResult] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<string | null>(null);
   const [matching, setMatching] = useState(false);
   const [matchResult, setMatchResult] = useState<string | null>(null);
 
@@ -105,24 +105,31 @@ export function AdminTabs({
     }
   }, [token]);
 
-  const runImport = useCallback(async () => {
-    setImporting(true);
-    setImportResult(null);
+  const runSync = useCallback(async () => {
+    setSyncing(true);
+    setSyncResult(null);
     try {
-      const res = await fetch("/api/admin/contacts/import", {
+      const res = await fetch("/api/admin/contacts/sync", {
         method: "POST",
         headers: { "X-Admin-Secret": token },
       });
-      const data = (await res.json()) as { ok: boolean; importedCount?: number; error?: string };
+      const data = (await res.json()) as {
+        ok: boolean;
+        importedCount?: number;
+        syncedCount?: number;
+        error?: string;
+      };
       if (data.ok) {
-        setImportResult(`Done — ${data.importedCount} contacts imported. Reload to see updates.`);
+        setSyncResult(
+          `Done — ${data.importedCount ?? 0} imported from Google, ${data.syncedCount ?? 0} pushed to Google. Reload to see updates.`,
+        );
       } else {
-        setImportResult(`Error: ${data.error ?? "unknown"}`);
+        setSyncResult(`Error: ${data.error ?? "unknown"}`);
       }
     } catch {
-      setImportResult("Network error — try again.");
+      setSyncResult("Network error — try again.");
     } finally {
-      setImporting(false);
+      setSyncing(false);
     }
   }, [token]);
 
@@ -326,23 +333,23 @@ export function AdminTabs({
                   {backfilling ? "Backfilling…" : "Backfill from bookings"}
                 </button>
                 <button
-                  onClick={runImport}
-                  disabled={importing}
+                  onClick={runSync}
+                  disabled={syncing}
                   className={cn(
                     "rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
-                    importing
+                    syncing
                       ? "bg-seasalt-400/40 text-rich-black/40 cursor-not-allowed"
                       : "bg-russian-violet/10 text-russian-violet hover:bg-russian-violet/20",
                   )}
                 >
-                  {importing ? "Importing…" : "Import from Google"}
+                  {syncing ? "Syncing…" : "Sync with Google"}
                 </button>
               </div>
               {backfillResult && (
                 <p className="text-rich-black/50 max-w-xs text-right text-xs">{backfillResult}</p>
               )}
-              {importResult && (
-                <p className="text-rich-black/50 max-w-xs text-right text-xs">{importResult}</p>
+              {syncResult && (
+                <p className="text-rich-black/50 max-w-xs text-right text-xs">{syncResult}</p>
               )}
             </div>
           </div>

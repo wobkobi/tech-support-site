@@ -199,6 +199,25 @@ export async function upsertToGoogleContacts(params: UpsertContactParams): Promi
 }
 
 /**
+ * Pushes every local contact to Google Contacts and returns the number synced.
+ * Errors on individual contacts are logged and skipped.
+ * @returns Number of contacts successfully synced.
+ */
+export async function syncAllContactsToGoogle(): Promise<number> {
+  const contacts = await prisma.contact.findMany({ select: { id: true } });
+  let count = 0;
+  for (const { id } of contacts) {
+    try {
+      await syncContactToGoogle(id);
+      count++;
+    } catch (err) {
+      console.error(`[google-contacts] syncAllContactsToGoogle: failed for ${id}:`, err);
+    }
+  }
+  return count;
+}
+
+/**
  * Loads a contact from the local DB and syncs it to Google Contacts.
  * Updates `googleContactId` in the DB if it changed.
  * Never throws — all errors are logged and swallowed.
