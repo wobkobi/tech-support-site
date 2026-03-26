@@ -97,7 +97,7 @@
     }
   },
   "simple-git-hooks": {
-    "pre-commit": "npm install && npx lint-staged",
+    "pre-commit": "npm install && git add package-lock.json && npx lint-staged",
     "pre-push": "npm run smoke:fast"
   },
   "lint-staged": {
