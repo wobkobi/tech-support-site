@@ -58,7 +58,7 @@ export default async function ReviewsPage(): Promise<React.ReactElement> {
               What clients say
             </h1>
             <p className={cn("text-rich-black/80 text-base sm:text-lg")}>
-              Real feedback from people I&apos;ve helped.
+              Feedback from people I&apos;ve helped.
             </p>
           </section>
 

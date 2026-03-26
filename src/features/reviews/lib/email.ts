@@ -234,7 +234,7 @@ export async function sendCustomerBookingConfirmation(
       </a>
       <p style="margin:0 0 2px;font-size:14px;font-weight:600;color:#0c0a3e">Harrison Raynes</p>
       <p style="margin:0 0 10px;font-size:13px;color:#666">Owner &amp; Technician</p>
-      <p style="margin:0 0 4px;font-size:13px;color:#555">📞 <a href="tel:+6421297237" style="color:#555;text-decoration:none">021 297 1237</a></p>
+      <p style="margin:0 0 4px;font-size:13px;color:#555">📞 <a href="tel:+64212971237" style="color:#555;text-decoration:none">021 297 1237</a></p>
       <p style="margin:0 0 4px;font-size:13px;color:#555">✉️ <a href="mailto:harrison@tothepoint.co.nz" style="color:#43bccd;text-decoration:none">harrison@tothepoint.co.nz</a></p>
       <p style="margin:0 0 4px;font-size:13px;color:#555">🌐 <a href="${siteUrl}" style="color:#43bccd;text-decoration:none">tothepoint.co.nz</a></p>
       <p style="margin:0;font-size:12px;color:#999">Auckland, New Zealand</p>
@@ -311,7 +311,7 @@ export async function sendCustomerReviewRequest(booking: ReviewRequestData): Pro
       </a>
       <p style="margin:0 0 2px;font-size:14px;font-weight:600;color:#0c0a3e">Harrison Raynes</p>
       <p style="margin:0 0 10px;font-size:13px;color:#666">Owner &amp; Technician</p>
-      <p style="margin:0 0 4px;font-size:13px;color:#555">📞 <a href="tel:+6421297237" style="color:#555;text-decoration:none">021 297 1237</a></p>
+      <p style="margin:0 0 4px;font-size:13px;color:#555">📞 <a href="tel:+64212971237" style="color:#555;text-decoration:none">021 297 1237</a></p>
       <p style="margin:0 0 4px;font-size:13px;color:#555">✉️ <a href="mailto:harrison@tothepoint.co.nz" style="color:#43bccd;text-decoration:none">harrison@tothepoint.co.nz</a></p>
       <p style="margin:0 0 4px;font-size:13px;color:#555">🌐 <a href="https://tothepoint.co.nz" style="color:#43bccd;text-decoration:none">tothepoint.co.nz</a></p>
       <p style="margin:0;font-size:12px;color:#999">Auckland, New Zealand</p>
@@ -364,7 +364,7 @@ export function buildPastClientReviewEmailHtml(firstName: string, reviewUrl: str
       </a>
       <p style="margin:0 0 2px;font-size:14px;font-weight:600;color:#0c0a3e">Harrison Raynes</p>
       <p style="margin:0 0 10px;font-size:13px;color:#666">Owner &amp; Technician</p>
-      <p style="margin:0 0 4px;font-size:13px;color:#555">📞 <a href="tel:+6421297237" style="color:#555;text-decoration:none">021 297 1237</a></p>
+      <p style="margin:0 0 4px;font-size:13px;color:#555">📞 <a href="tel:+64212971237" style="color:#555;text-decoration:none">021 297 1237</a></p>
       <p style="margin:0 0 4px;font-size:13px;color:#555">✉️ <a href="mailto:harrison@tothepoint.co.nz" style="color:#43bccd;text-decoration:none">harrison@tothepoint.co.nz</a></p>
       <p style="margin:0 0 4px;font-size:13px;color:#555">🌐 <a href="https://tothepoint.co.nz" style="color:#43bccd;text-decoration:none">tothepoint.co.nz</a></p>
       <p style="margin:0;font-size:12px;color:#999">Auckland, New Zealand</p>
