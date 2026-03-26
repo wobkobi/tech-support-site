@@ -1,6 +1,6 @@
 {
   "name": "tech-support-site",
-  "version": "1.4.1",
+  "version": "1.7.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -50,13 +50,13 @@
     "@types/react-dom": "^19.2.3",
     "@typescript-eslint/eslint-plugin": "8.57.2",
     "@typescript-eslint/parser": "8.57.2",
-    "@vitest/coverage-v8": "^4.1.1",
+    "@vitest/coverage-v8": "^4.1.2",
     "canvas": "^3.2.2",
     "dotenv-cli": "^11.0.0",
     "eslint": "^9.0.0",
     "eslint-config-next": "^16.2.1",
     "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-jsdoc": "^62.8.0",
+    "eslint-plugin-jsdoc": "^62.8.1",
     "eslint-plugin-prettier": "^5.5.5",
     "eslint-plugin-react": "^7.37.5",
     "globals": "^17.4.0",

@@ -35,6 +35,11 @@ const nextConfig: NextConfig = {
   output: "standalone",
   typescript: { ignoreBuildErrors: false },
 
+  // Expose GOOGLE_MAPS_API_KEY to both server and client without the NEXT_PUBLIC_ prefix.
+  env: {
+    GOOGLE_MAPS_API_KEY: process.env.GOOGLE_MAPS_API_KEY ?? "",
+  },
+
   // Silence "inferred workspace root" warning + skip Next.js polyfills for modern browsers
   turbopack: {
     root: path.resolve(__dirname),
