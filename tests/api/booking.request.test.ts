@@ -5,10 +5,12 @@ import { Prisma } from "@prisma/client";
 const mocks = vi.hoisted(() => ({
   bookingFindMany: vi.fn(),
   bookingCreate: vi.fn(),
+  contactUpsert: vi.fn(),
   fetchAllCalendarEvents: vi.fn(),
   createBookingEvent: vi.fn(),
   sendOwnerBookingNotification: vi.fn(),
   sendCustomerBookingConfirmation: vi.fn(),
+  syncContactToGoogle: vi.fn(),
 }));
 
 vi.mock("@/shared/lib/prisma", () => ({
@@ -16,6 +18,9 @@ vi.mock("@/shared/lib/prisma", () => ({
     booking: {
       findMany: mocks.bookingFindMany,
       create: mocks.bookingCreate,
+    },
+    contact: {
+      upsert: mocks.contactUpsert,
     },
   },
 }));
@@ -28,6 +33,10 @@ vi.mock("@/features/calendar/lib/google-calendar", () => ({
 vi.mock("@/features/reviews/lib/email", () => ({
   sendOwnerBookingNotification: mocks.sendOwnerBookingNotification,
   sendCustomerBookingConfirmation: mocks.sendCustomerBookingConfirmation,
+}));
+
+vi.mock("@/features/contacts/lib/google-contacts", () => ({
+  syncContactToGoogle: mocks.syncContactToGoogle,
 }));
 
 import { POST } from "../../src/app/api/booking/request/route";
@@ -65,6 +74,8 @@ describe("POST /api/booking/request - success and error paths", () => {
     vi.clearAllMocks();
     mocks.bookingFindMany.mockResolvedValue([]);
     mocks.fetchAllCalendarEvents.mockResolvedValue([]);
+    mocks.contactUpsert.mockResolvedValue({ id: "contact-abc" });
+    mocks.syncContactToGoogle.mockResolvedValue(undefined);
     mocks.sendOwnerBookingNotification.mockResolvedValue(undefined);
     mocks.sendCustomerBookingConfirmation.mockResolvedValue(undefined);
   });
@@ -133,5 +144,64 @@ describe("POST /api/booking/request - success and error paths", () => {
     expect(res.status).toBe(409);
     const json = await res.json();
     expect(json.error).toMatch(/no longer available/i);
+  });
+
+  it("upserts a contact with name, email, phone, and address on successful booking", async () => {
+    mocks.createBookingEvent.mockResolvedValue({ eventId: "cal-event-123" });
+    mocks.bookingCreate.mockResolvedValue({
+      id: "booking-abc",
+      name: "Alice",
+      email: "alice@example.com",
+      notes: "",
+      startAt: new Date(),
+      endAt: new Date(),
+      cancelToken: "cancel-tok",
+    });
+    const req = makeRequest({
+      name: "Alice",
+      email: "ALICE@example.com",
+      phone: "021 111 2222",
+      address: "1 Main St, Auckland",
+      notes: "Fix printer",
+      dateKey: futureDateKey(),
+      timeOfDay: "10am",
+      duration: "short",
+      meetingType: "in-person",
+    });
+    await POST(req);
+    expect(mocks.contactUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { email: "alice@example.com" },
+        create: expect.objectContaining({ email: "alice@example.com", phone: "021 111 2222" }),
+        update: expect.objectContaining({ phone: "021 111 2222" }),
+      }),
+    );
+  });
+
+  it("still returns ok:true even if contact upsert throws", async () => {
+    mocks.createBookingEvent.mockResolvedValue({ eventId: "cal-event-789" });
+    mocks.bookingCreate.mockResolvedValue({
+      id: "booking-xyz",
+      name: "Bob",
+      email: "bob@example.com",
+      notes: "",
+      startAt: new Date(),
+      endAt: new Date(),
+      cancelToken: "cancel-tok2",
+    });
+    mocks.contactUpsert.mockRejectedValue(new Error("Contact DB error"));
+    const req = makeRequest({
+      name: "Bob",
+      email: "bob@example.com",
+      notes: "Help with laptop",
+      dateKey: futureDateKey(),
+      timeOfDay: "10am",
+      duration: "short",
+      meetingType: "remote",
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.ok).toBe(true);
   });
 });

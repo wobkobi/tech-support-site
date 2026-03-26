@@ -13,8 +13,10 @@ import { Button } from "@/shared/components/Button";
 import { cn } from "@/shared/lib/cn";
 import {
   DURATION_OPTIONS,
+  SUB_SLOT_MINUTES,
   type BookableDay,
   type TimeOfDay,
+  type StartMinute,
   type JobDuration,
 } from "@/features/booking/lib/booking";
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
@@ -23,6 +25,7 @@ export interface BookingFormInitialValues {
   duration: JobDuration;
   dateKey: string;
   timeOfDay: TimeOfDay;
+  startMinute?: StartMinute;
   name: string;
   email: string;
   phone: string;
@@ -59,6 +62,9 @@ export default function BookingForm({
   const [selectedTime, setSelectedTime] = useState<TimeOfDay | null>(
     initialValues?.timeOfDay ?? null,
   );
+  const [selectedMinute, setSelectedMinute] = useState<StartMinute>(
+    initialValues?.startMinute ?? 0,
+  );
   const [name, setName] = useState(initialValues?.name ?? "");
   const [email, setEmail] = useState(initialValues?.email ?? "");
   const [phone, setPhone] = useState(initialValues?.phone ?? "");
@@ -69,6 +75,46 @@ export default function BookingForm({
   const [notes, setNotes] = useState(initialValues?.notes ?? "");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [contactHint, setContactHint] = useState<string | null>(null);
+
+  /**
+   * On email blur (new bookings only): look up the email in contacts and
+   * pre-fill name / phone / address for any fields the user left empty.
+   */
+  async function handleEmailBlur(): Promise<void> {
+    if (isEditMode) return;
+    const trimmed = email.trim().toLowerCase();
+    if (!trimmed || !trimmed.includes("@")) return;
+    try {
+      const res = await fetch(`/api/booking/contact-lookup?email=${encodeURIComponent(trimmed)}`);
+      if (!res.ok) return;
+      const data = (await res.json()) as {
+        ok: boolean;
+        name?: string;
+        phone?: string | null;
+        address?: string | null;
+      };
+      if (!data.ok) return;
+      const filled: string[] = [];
+      if (data.name && !name.trim()) {
+        setName(data.name);
+        filled.push("name");
+      }
+      if (data.phone && !phone.trim()) {
+        setPhone(data.phone);
+        filled.push("phone");
+      }
+      if (data.address && !address.trim()) {
+        setAddress(data.address);
+        filled.push("address");
+      }
+      if (filled.length > 0) {
+        setContactHint(`Pre-filled from your previous booking: ${filled.join(", ")}.`);
+      }
+    } catch {
+      // Silently ignore — pre-fill is best-effort
+    }
+  }
 
   // Auto-select day on mount: pre-select initial day in edit mode, else first available
   useEffect(() => {
@@ -96,12 +142,14 @@ export default function BookingForm({
    */
   function handleDaySelect(day: BookableDay): void {
     setSelectedDay(day);
-    // Reset time if current selection not available on new day
+    // Reset time if current selection + minute not available on new day
     if (selectedTime) {
-      const slot = day.timeWindows.find((w) => w.value === selectedTime);
-      const available = duration === "short" ? slot?.availableShort : slot?.availableLong;
+      const window = day.timeWindows.find((w) => w.value === selectedTime);
+      const sub = window?.subSlots.find((s) => s.minute === selectedMinute);
+      const available = duration === "short" ? sub?.availableShort : sub?.availableLong;
       if (!available) {
         setSelectedTime(null);
+        setSelectedMinute(0);
       }
     }
   }
@@ -112,14 +160,28 @@ export default function BookingForm({
    */
   function handleDurationChange(newDuration: JobDuration): void {
     setDuration(newDuration);
-    // Reset time if current selection not available for new duration
+    // Reset time if current selection + minute not available for new duration
     if (selectedTime && selectedDay) {
-      const slot = selectedDay.timeWindows.find((w) => w.value === selectedTime);
-      const available = newDuration === "short" ? slot?.availableShort : slot?.availableLong;
+      const window = selectedDay.timeWindows.find((w) => w.value === selectedTime);
+      const sub = window?.subSlots.find((s) => s.minute === selectedMinute);
+      const available = newDuration === "short" ? sub?.availableShort : sub?.availableLong;
       if (!available) {
         setSelectedTime(null);
+        setSelectedMinute(0);
       }
     }
+  }
+
+  /**
+   * Format a sub-slot time label, e.g. startHour=14, minute=15 → "2:15pm"
+   * @param startHour - The hour in 24h format (e.g. 14 for 2pm)
+   * @param minute - Minutes past the hour (0, 15, 30, or 45)
+   * @returns Formatted time string (e.g. "2:15pm")
+   */
+  function subSlotLabel(startHour: number, minute: StartMinute): string {
+    const period = startHour < 12 ? "am" : "pm";
+    const h = startHour > 12 ? startHour - 12 : startHour;
+    return minute === 0 ? `${h}:00${period}` : `${h}:${String(minute).padStart(2, "0")}${period}`;
   }
 
   /**
@@ -172,6 +234,7 @@ export default function BookingForm({
             cancelToken,
             dateKey: selectedDay.dateKey,
             timeOfDay: selectedTime,
+            startMinute: selectedMinute,
             duration,
             name: name.trim(),
             phone: phone.trim() || undefined,
@@ -182,6 +245,7 @@ export default function BookingForm({
         : {
             dateKey: selectedDay.dateKey,
             timeOfDay: selectedTime,
+            startMinute: selectedMinute,
             duration,
             name: name.trim(),
             email: email.trim(),
@@ -266,7 +330,7 @@ export default function BookingForm({
             Choose a day
           </label>
 
-          {availableDays.length === 0 ? (
+          {!availableDays.some((d) => d.hasAnySlots) ? (
             <p className={cn("text-rich-black/70 text-base")}>
               No availability in the next two weeks. Please call or text me directly.
             </p>
@@ -346,8 +410,8 @@ export default function BookingForm({
 
         {/* Time Selection */}
         {selectedDay && (
-          <div>
-            <label className={cn("text-rich-black mb-2 block text-base font-semibold")}>
+          <div className={cn("flex flex-col gap-3")}>
+            <label className={cn("text-rich-black block text-base font-semibold")}>
               Start time for {selectedDay.fullLabel}
             </label>
 
@@ -362,31 +426,75 @@ export default function BookingForm({
                 </p>
               </div>
             ) : (
-              <div className={cn("grid grid-cols-[repeat(auto-fill,minmax(5rem,1fr))] gap-2")}>
-                {selectedDay.timeWindows.map((window) => {
-                  const available =
-                    duration === "short" ? window.availableShort : window.availableLong;
-                  return (
-                    <button
-                      key={window.value}
-                      type="button"
-                      disabled={!available}
-                      onClick={() => setSelectedTime(window.value)}
-                      className={cn(
-                        "rounded-lg border px-4 py-2.5 text-base font-medium",
-                        !available && "cursor-not-allowed opacity-40",
-                        selectedTime === window.value
-                          ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
-                          : available
-                            ? "border-seasalt-400/60 bg-seasalt text-rich-black hover:border-russian-violet/40"
-                            : "border-seasalt-400/40 bg-seasalt-900/30 text-rich-black/60",
-                      )}
-                    >
-                      {window.label}
-                    </button>
-                  );
-                })}
-              </div>
+              <>
+                {/* Hour picker */}
+                <div className={cn("grid grid-cols-[repeat(auto-fill,minmax(5rem,1fr))] gap-2")}>
+                  {selectedDay.timeWindows.map((window) => {
+                    const available =
+                      duration === "short" ? window.availableShort : window.availableLong;
+                    const isSelected = selectedTime === window.value;
+                    return (
+                      <button
+                        key={window.value}
+                        type="button"
+                        disabled={!available}
+                        onClick={() => {
+                          setSelectedTime(window.value);
+                          setSelectedMinute(0);
+                        }}
+                        className={cn(
+                          "rounded-lg border px-4 py-2.5 text-base font-medium",
+                          !available && "cursor-not-allowed opacity-40",
+                          isSelected
+                            ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
+                            : available
+                              ? "border-seasalt-400/60 bg-seasalt text-rich-black hover:border-russian-violet/40"
+                              : "border-seasalt-400/40 bg-seasalt-900/30 text-rich-black/60",
+                        )}
+                      >
+                        {window.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Sub-slot picker — shown once an hour is selected */}
+                {selectedTime &&
+                  (() => {
+                    const activeWindow = selectedDay.timeWindows.find(
+                      (w) => w.value === selectedTime,
+                    );
+                    if (!activeWindow) return null;
+                    return (
+                      <div className={cn("flex flex-wrap gap-2")}>
+                        {SUB_SLOT_MINUTES.map((minute) => {
+                          const sub = activeWindow.subSlots.find((s) => s.minute === minute)!;
+                          const available =
+                            duration === "short" ? sub.availableShort : sub.availableLong;
+                          return (
+                            <button
+                              key={minute}
+                              type="button"
+                              disabled={!available}
+                              onClick={() => setSelectedMinute(minute)}
+                              className={cn(
+                                "rounded-lg border px-4 py-2 text-base font-medium",
+                                !available && "cursor-not-allowed opacity-40",
+                                selectedMinute === minute
+                                  ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
+                                  : available
+                                    ? "border-seasalt-400/60 bg-seasalt text-rich-black hover:border-russian-violet/40"
+                                    : "border-seasalt-400/40 bg-seasalt-900/30 text-rich-black/60",
+                              )}
+                            >
+                              {subSlotLabel(activeWindow.startHour, minute)}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+              </>
             )}
           </div>
         )}
@@ -431,12 +539,17 @@ export default function BookingForm({
               type="email"
               autoComplete="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setContactHint(null);
+              }}
+              onBlur={handleEmailBlur}
               className={cn(
                 "border-seasalt-400/80 bg-seasalt text-rich-black rounded-md border px-4 py-3 text-base",
                 "focus:border-russian-violet focus:ring-russian-violet/30 focus:outline-none focus:ring-1",
               )}
             />
+            {contactHint && <p className={cn("text-rich-black/50 text-xs")}>{contactHint}</p>}
           </div>
         </div>
 
@@ -564,7 +677,7 @@ export default function BookingForm({
           type="submit"
           variant="secondary"
           size="md"
-          disabled={submitting || availableDays.length === 0}
+          disabled={submitting || !availableDays.some((d) => d.hasAnySlots)}
         >
           {submitting
             ? isEditMode

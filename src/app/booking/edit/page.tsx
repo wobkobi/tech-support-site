@@ -11,11 +11,13 @@ import {
   BOOKING_CONFIG,
   DURATION_OPTIONS,
   TIME_OF_DAY_OPTIONS,
+  SUB_SLOT_MINUTES,
   buildAvailableDays,
   type ExistingBooking,
   type BookableDay,
   type JobDuration,
   type TimeOfDay,
+  type StartMinute,
 } from "@/features/booking/lib/booking";
 import { prisma } from "@/shared/lib/prisma";
 import { fetchAllCalendarEvents } from "@/features/calendar/lib/google-calendar";
@@ -177,6 +179,8 @@ export default async function EditBookingPage({
   const nzHour = getNZHour(booking.startAt);
   const matchedSlot = TIME_OF_DAY_OPTIONS.find((t) => t.startHour === nzHour);
   const timeOfDay: TimeOfDay = (matchedSlot?.value ?? "10am") as TimeOfDay;
+  // Minutes are timezone-independent — preserve the sub-slot offset
+  const startMinute = (booking.startAt.getUTCMinutes() as StartMinute) ?? 0;
 
   const { userNotes, meetingType, address, phone } = parseBookingNotes(booking.notes);
 
@@ -184,6 +188,7 @@ export default async function EditBookingPage({
     duration,
     dateKey,
     timeOfDay,
+    startMinute,
     name: booking.name,
     email: booking.email,
     phone,
@@ -215,12 +220,23 @@ export default async function EditBookingPage({
       isToday: false,
       isWeekend: [0, 6].includes(booking.startAt.getDay()),
       hasAnySlots: true,
-      timeWindows: TIME_OF_DAY_OPTIONS.map((t) => ({
-        value: t.value as TimeOfDay,
-        label: t.label,
-        availableShort: t.value === timeOfDay,
-        availableLong: t.value === timeOfDay && (durationOption?.durationMinutes ?? 60) >= 120,
-      })),
+      timeWindows: TIME_OF_DAY_OPTIONS.map((t) => {
+        const isSelected = t.value === timeOfDay;
+        const subSlots = SUB_SLOT_MINUTES.map((m) => ({
+          minute: m,
+          availableShort: isSelected && m === startMinute,
+          availableLong:
+            isSelected && m === startMinute && (durationOption?.durationMinutes ?? 60) >= 120,
+        }));
+        return {
+          value: t.value as TimeOfDay,
+          label: t.label,
+          startHour: t.startHour,
+          availableShort: isSelected,
+          availableLong: isSelected && (durationOption?.durationMinutes ?? 60) >= 120,
+          subSlots,
+        };
+      }),
     });
   }
 

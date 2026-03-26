@@ -57,7 +57,16 @@ describe("TIME_OF_DAY_OPTIONS", () => {
 
 describe("validateBookingRequest", () => {
   it("returns valid for a free slot tomorrow", () => {
-    const result = validateBookingRequest(TOMORROW, "10am", "short", [], [], NOW, BOOKING_CONFIG);
+    const result = validateBookingRequest(
+      TOMORROW,
+      "10am",
+      0,
+      "short",
+      [],
+      [],
+      NOW,
+      BOOKING_CONFIG,
+    );
     expect(result.valid).toBe(true);
   });
 
@@ -65,6 +74,7 @@ describe("validateBookingRequest", () => {
     const result = validateBookingRequest(
       "2020-01-01",
       "10am",
+      0,
       "short",
       [],
       [],
@@ -79,6 +89,7 @@ describe("validateBookingRequest", () => {
     const result = validateBookingRequest(
       "2026-04-01",
       "10am",
+      0,
       "short",
       [],
       [],
@@ -93,6 +104,7 @@ describe("validateBookingRequest", () => {
     const result = validateBookingRequest(
       "not-a-date",
       "10am",
+      0,
       "short",
       [],
       [],
@@ -107,6 +119,7 @@ describe("validateBookingRequest", () => {
     const result = validateBookingRequest(
       TOMORROW,
       "3am" as never,
+      0,
       "short",
       [],
       [],
@@ -128,6 +141,7 @@ describe("validateBookingRequest", () => {
     const result = validateBookingRequest(
       TOMORROW,
       "10am",
+      0,
       "short",
       [existing],
       [],
@@ -147,6 +161,7 @@ describe("validateBookingRequest", () => {
     const result = validateBookingRequest(
       TOMORROW,
       "10am",
+      0,
       "short",
       [],
       [calEvent],
@@ -158,7 +173,7 @@ describe("validateBookingRequest", () => {
   });
 
   it("returns valid for a long (2hr) job with no conflicts", () => {
-    const result = validateBookingRequest(TOMORROW, "10am", "long", [], [], NOW, BOOKING_CONFIG);
+    const result = validateBookingRequest(TOMORROW, "10am", 0, "long", [], [], NOW, BOOKING_CONFIG);
     expect(result.valid).toBe(true);
   });
 
@@ -174,6 +189,7 @@ describe("validateBookingRequest", () => {
     const result = validateBookingRequest(
       TOMORROW,
       "10am",
+      0,
       "long",
       [],
       [calEvent],
@@ -220,7 +236,7 @@ describe("buildAvailableDays", () => {
     expect(slot4pm.availableShort).toBe(true);
   });
 
-  it("excludes a day that has no available slots at all", () => {
+  it("shows a future fully-booked day as greyed out (hasAnySlots=false) rather than hiding it", () => {
     // Block all of tomorrow with a very wide calendar event
     const blockAll = {
       id: "block-all",
@@ -229,11 +245,22 @@ describe("buildAvailableDays", () => {
     };
     const before = buildAvailableDays([], [], NOW, BOOKING_CONFIG);
     const after = buildAvailableDays([], [blockAll], NOW, BOOKING_CONFIG);
-    // Tomorrow should be removed from results
+    // Tomorrow should be present but marked as having no available slots
     const tomorrowBefore = before.find((d) => d.dateKey === TOMORROW);
     const tomorrowAfter = after.find((d) => d.dateKey === TOMORROW);
     expect(tomorrowBefore).toBeDefined();
-    expect(tomorrowAfter).toBeUndefined();
+    expect(tomorrowAfter).toBeDefined();
+    expect(tomorrowAfter?.hasAnySlots).toBe(false);
+  });
+
+  it("hides today when it has no bookable slots (past same-day cutoff)", () => {
+    // NOW_LATE = 2026-03-09 at 10pm NZ = past sameDayCutoffHour (18)
+    const NOW_LATE = new Date("2026-03-09T09:00:00Z"); // 09:00 UTC = 22:00 NZ
+    const days = buildAvailableDays([], [], NOW_LATE, BOOKING_CONFIG);
+    const today = days.find((d) => d.isToday);
+    expect(today).toBeUndefined();
+    // Tomorrow should still appear as the first day
+    expect(days[0]?.dateKey).toBe(TOMORROW);
   });
 
   it("marks slot unavailable when it conflicts with an existing booking (with buffer)", () => {
