@@ -19,6 +19,7 @@ import {
   type StartMinute,
   type JobDuration,
 } from "@/features/booking/lib/booking";
+import { normalizePhone, isValidPhone } from "@/shared/lib/normalize-phone";
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 
 export interface BookingFormInitialValues {
@@ -73,6 +74,7 @@ export default function BookingForm({
   );
   const [address, setAddress] = useState(initialValues?.address ?? "");
   const [notes, setNotes] = useState(initialValues?.notes ?? "");
+  const [phoneError, setPhoneError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [contactHint, setContactHint] = useState<string | null>(null);
@@ -440,7 +442,10 @@ export default function BookingForm({
                         disabled={!available}
                         onClick={() => {
                           setSelectedTime(window.value);
-                          setSelectedMinute(0);
+                          const firstAvailable = window.subSlots.find((s) =>
+                            duration === "short" ? s.availableShort : s.availableLong,
+                          );
+                          setSelectedMinute(firstAvailable?.minute ?? 0);
                         }}
                         className={cn(
                           "rounded-lg border px-4 py-2.5 text-base font-medium",
@@ -562,13 +567,23 @@ export default function BookingForm({
             type="tel"
             autoComplete="tel"
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
+            onChange={(e) => {
+              setPhone(e.target.value);
+              setPhoneError(null);
+            }}
+            onBlur={() => {
+              if (phone.trim() && !isValidPhone(normalizePhone(phone))) {
+                setPhoneError("Please enter a valid phone number.");
+              }
+            }}
             className={cn(
               "border-seasalt-400/80 bg-seasalt text-rich-black rounded-md border px-4 py-3 text-base",
               "focus:border-russian-violet focus:ring-russian-violet/30 focus:outline-none focus:ring-1",
               "sm:max-w-sm",
+              phoneError && "border-coquelicot-500/60",
             )}
           />
+          {phoneError && <p className={cn("text-coquelicot-600 text-sm")}>{phoneError}</p>}
         </div>
 
         {/* Meeting Type */}
