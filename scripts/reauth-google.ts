@@ -1,14 +1,14 @@
 #!/usr/bin/env npx ts-node --project tsconfig.json
 /**
  * @file reauth-google.ts
- * @description Re-authorise Google OAuth with Calendar + Contacts scopes and print the new refresh token.
+ * @description Re-authorise Google OAuth for both dev and prod redirect URIs.
+ * Generates two refresh tokens and writes them to google-tokens.txt.
  *
- * Run:  npx ts-node scripts/reauth-google.ts
- *
- * Then paste the new GOOGLE_OAUTH_REFRESH_TOKEN value into .env.local and Vercel env vars.
+ * Run:  npx tsx scripts/reauth-google.ts
  */
 
 import * as readline from "readline";
+import * as fs from "fs";
 import * as dotenv from "dotenv";
 import { google } from "googleapis";
 
@@ -16,74 +16,115 @@ dotenv.config({ path: ".env.local" });
 
 const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
 const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
-const redirectUri = process.env.GOOGLE_OAUTH_REDIRECT_URI;
 
-if (!clientId || !clientSecret || !redirectUri) {
-  console.error(
-    "Missing env vars: GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET, GOOGLE_OAUTH_REDIRECT_URI",
-  );
+if (!clientId || !clientSecret) {
+  console.error("Missing env vars: GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET");
   process.exit(1);
 }
 
+const DEV_REDIRECT = "http://localhost:3000/api/google/oauth/callback";
+const PROD_REDIRECT = "https://tothepoint.co.nz/api/google/oauth/callback";
+
 const SCOPES = [
-  // Calendar — read/write all calendars
   "https://www.googleapis.com/auth/calendar",
-  // People API — read + write Google Contacts
   "https://www.googleapis.com/auth/contacts",
 ];
 
-const oauth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
+/**
+ * Prompts the user for a line of input.
+ * @param rl - Readline interface.
+ * @param question - Question to display.
+ * @returns The user's answer.
+ */
+function ask(rl: readline.Interface, question: string): Promise<string> {
+  return new Promise((resolve) => rl.question(question, resolve));
+}
 
-const authUrl = oauth2Client.generateAuthUrl({
-  access_type: "offline",
-  prompt: "consent", // force consent screen so a refresh_token is always returned
-  scope: SCOPES,
-});
+/**
+ * Extracts the auth code from a full redirect URL or returns the input as-is.
+ * @param input - Raw input from the user (full URL or bare code).
+ * @returns The auth code string.
+ */
+function extractCode(input: string): string {
+  const trimmed = input.trim();
+  try {
+    const parsed = new URL(trimmed);
+    return parsed.searchParams.get("code") ?? trimmed;
+  } catch {
+    return trimmed;
+  }
+}
 
-console.log("\n=== Google OAuth Re-authorisation ===\n");
-console.log("1. Open this URL in your browser:\n");
-console.log(`   ${authUrl}\n`);
-console.log('2. Authorise the app, then copy the "code" from the redirect URL.');
-console.log("   (The URL will look like: http://localhost/?code=4/0AXxxx...&scope=...)\n");
+/**
+ * Generates an auth URL and exchanges the code for a refresh token.
+ * @param rl - Readline interface.
+ * @param label - Human-readable label (e.g. "dev" or "prod").
+ * @param redirectUri - The OAuth redirect URI for this environment.
+ * @returns The refresh token string, or null on failure.
+ */
+async function authorise(
+  rl: readline.Interface,
+  label: string,
+  redirectUri: string,
+): Promise<string | null> {
+  const client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
+  const authUrl = client.generateAuthUrl({
+    access_type: "offline",
+    prompt: "consent",
+    scope: SCOPES,
+  });
+
+  console.log(`\n--- ${label.toUpperCase()} (${redirectUri}) ---`);
+  console.log("Open this URL in your browser:\n");
+  console.log(`  ${authUrl}\n`);
+
+  const input = await ask(rl, "Paste the full redirect URL (or just the code): ");
+  const code = extractCode(input);
+
+  try {
+    const { tokens } = await client.getToken(code);
+    if (!tokens.refresh_token) {
+      console.warn(
+        `WARNING: No refresh_token returned for ${label}.\n` +
+          "Revoke access at https://myaccount.google.com/permissions and run the script again.",
+      );
+      return null;
+    }
+    console.log(`✓ Got ${label} token.`);
+    return tokens.refresh_token;
+  } catch (err) {
+    console.error(`Failed to exchange code for ${label} token:`, err);
+    return null;
+  }
+}
 
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
-rl.question(
-  "3. Paste the full redirect URL (or just the code) and press Enter: ",
-  async (input) => {
-    rl.close();
+console.log("\n=== Google OAuth Re-authorisation (dev + prod) ===");
+console.log("You will authorise twice — once for dev, once for prod.");
+console.log("Make sure both redirect URIs are registered in Google Cloud Console.\n");
 
-    // Accept either the full redirect URL or just the bare code value
-    let code = input.trim();
-    try {
-      const parsed = new URL(code);
-      const fromParam = parsed.searchParams.get("code");
-      if (fromParam) code = fromParam;
-    } catch {
-      // Not a URL — use as-is
-    }
+(async () => {
+  const devToken = await authorise(rl, "dev", DEV_REDIRECT);
+  const prodToken = await authorise(rl, "prod", PROD_REDIRECT);
+  rl.close();
 
-    try {
-      const { tokens } = await oauth2Client.getToken(code);
-      console.log("\n=== Success! ===\n");
-      console.log("New refresh token:");
-      console.log(`\n  GOOGLE_OAUTH_REFRESH_TOKEN="${tokens.refresh_token}"\n`);
-      console.log("Steps:");
-      console.log(
-        "  1. Replace GOOGLE_OAUTH_REFRESH_TOKEN in your .env.local with the value above.",
-      );
-      console.log("  2. Update the same var in Vercel → Settings → Environment Variables.f");
-      console.log("  3. Redeploy on Vercel (or restart your dev server).\n");
-      if (!tokens.refresh_token) {
-        console.warn(
-          "WARNING: No refresh_token returned. This usually means the app was already authorised\n" +
-            "without the 'consent' prompt. Revoke access at https://myaccount.google.com/permissions\n" +
-            "and run this script again.\n",
-        );
-      }
-    } catch (err) {
-      console.error("Failed to exchange code for tokens:", err);
-      process.exit(1);
-    }
-  },
-);
+  const lines: string[] = [
+    "# Google OAuth Refresh Tokens",
+    "# Generated by scripts/reauth-google.ts",
+    "",
+    "# .env.local (dev)",
+    `GOOGLE_OAUTH_REFRESH_TOKEN="${devToken ?? "FAILED - run script again"}"`,
+    "",
+    "# Vercel / .env.production.local (prod)",
+    `GOOGLE_OAUTH_REFRESH_TOKEN="${prodToken ?? "FAILED - run script again"}"`,
+  ];
+
+  const outPath = "google-tokens.txt";
+  fs.writeFileSync(outPath, lines.join("\n") + "\n");
+
+  console.log(`\n=== Done! Tokens written to ${outPath} ===`);
+  console.log("  1. Copy the dev token into .env.local");
+  console.log("  2. Copy the prod token into .env.production.local, then import to Vercel");
+  console.log("  3. Delete google-tokens.txt when done\n");
+})();
