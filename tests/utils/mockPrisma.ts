@@ -45,6 +45,21 @@ export function mockPrisma(): {
     deleteMany: Mock;
     upsert: Mock;
   };
+  contact: {
+    findMany: Mock;
+    findUnique: Mock;
+    create: Mock;
+    upsert: Mock;
+    update: Mock;
+    delete: Mock;
+  };
+  travelBlock: {
+    findMany: Mock;
+    findUnique: Mock;
+    create: Mock;
+    update: Mock;
+    delete: Mock;
+  };
 } {
   return {
     user: {
@@ -83,6 +98,21 @@ export function mockPrisma(): {
       findMany: vi.fn(),
       deleteMany: vi.fn(),
       upsert: vi.fn(),
+    },
+    contact: {
+      findMany: vi.fn(),
+      findUnique: vi.fn(),
+      create: vi.fn(),
+      upsert: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+    },
+    travelBlock: {
+      findMany: vi.fn(),
+      findUnique: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
     },
   };
 }

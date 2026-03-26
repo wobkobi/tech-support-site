@@ -4,6 +4,8 @@
  * @file ContactAdminList.tsx
  * @description Admin component listing contacts saved from booking submissions,
  * with inline editing and Google Places autocomplete for the address field.
+ * Contacts are split into two sections: unsynced (needs attention) and synced
+ * (already linked to Google Contacts, shown in a collapsible drawer).
  */
 
 import type React from "react";
@@ -38,10 +40,214 @@ function formatDate(iso: string): string {
   }).format(new Date(iso));
 }
 
+interface ContactCardProps {
+  c: ContactRow;
+  editingId: string | null;
+  editName: string;
+  editPhone: string;
+  editAddress: string;
+  saving: boolean;
+  syncingId: string | null;
+  expandedReviewsId: string | null;
+  onStartEdit: (c: ContactRow) => void;
+  onCancelEdit: () => void;
+  onSaveEdit: (id: string) => void;
+  onSyncToGoogle: (id: string) => void;
+  onToggleReviews: (id: string) => void;
+  onEditName: (v: string) => void;
+  onEditPhone: (v: string) => void;
+  onEditAddress: (v: string) => void;
+}
+
+/**
+ * Renders a single contact row, either in view or edit mode.
+ * @param props - Contact card props.
+ * @param props.c - The contact row data.
+ * @param props.editingId - ID of the contact currently being edited, or null.
+ * @param props.editName - Current value of the name edit field.
+ * @param props.editPhone - Current value of the phone edit field.
+ * @param props.editAddress - Current value of the address edit field.
+ * @param props.saving - Whether a save is in progress.
+ * @param props.syncingId - ID of the contact currently being synced, or null.
+ * @param props.expandedReviewsId - ID of the contact whose reviews are expanded, or null.
+ * @param props.onStartEdit - Opens the edit form for the given contact.
+ * @param props.onCancelEdit - Closes the edit form without saving.
+ * @param props.onSaveEdit - Saves the edited contact with the given ID.
+ * @param props.onSyncToGoogle - Syncs the contact with the given ID to Google Contacts.
+ * @param props.onToggleReviews - Toggles the reviews panel for the given contact ID.
+ * @param props.onEditName - Updates the name edit field value.
+ * @param props.onEditPhone - Updates the phone edit field value.
+ * @param props.onEditAddress - Updates the address edit field value.
+ * @returns Contact card element.
+ */
+function ContactCard({
+  c,
+  editingId,
+  editName,
+  editPhone,
+  editAddress,
+  saving,
+  syncingId,
+  expandedReviewsId,
+  onStartEdit,
+  onCancelEdit,
+  onSaveEdit,
+  onSyncToGoogle,
+  onToggleReviews,
+  onEditName,
+  onEditPhone,
+  onEditAddress,
+}: ContactCardProps): React.ReactElement {
+  if (editingId === c.id) {
+    return (
+      <div className="border-seasalt-400/30 flex flex-col gap-3 rounded-xl border bg-white/50 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="text-russian-violet text-xs font-semibold uppercase tracking-wide">
+            Editing
+          </span>
+          <span className="text-rich-black/40 text-xs">{formatDate(c.createdAt)}</span>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label
+            className="text-russian-violet text-xs font-semibold"
+            htmlFor={`edit-name-${c.id}`}
+          >
+            Name
+          </label>
+          <input
+            id={`edit-name-${c.id}`}
+            type="text"
+            value={editName}
+            onChange={(e) => onEditName(e.target.value)}
+            className="border-seasalt-400/80 bg-seasalt text-rich-black focus:border-russian-violet focus:ring-russian-violet/30 w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-1"
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label
+            className="text-russian-violet text-xs font-semibold"
+            htmlFor={`edit-phone-${c.id}`}
+          >
+            Phone
+          </label>
+          <input
+            id={`edit-phone-${c.id}`}
+            type="text"
+            value={editPhone}
+            onChange={(e) => onEditPhone(e.target.value)}
+            className="border-seasalt-400/80 bg-seasalt text-rich-black focus:border-russian-violet focus:ring-russian-violet/30 w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-1"
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label
+            className="text-russian-violet text-xs font-semibold"
+            htmlFor={`edit-address-${c.id}`}
+          >
+            Address
+          </label>
+          <AddressAutocomplete
+            id={`edit-address-${c.id}`}
+            value={editAddress}
+            onChange={onEditAddress}
+            placeholder="Start typing address..."
+          />
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => onSaveEdit(c.id)}
+            disabled={saving}
+            className="bg-russian-violet hover:bg-russian-violet/90 disabled:bg-russian-violet/40 rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition-colors"
+          >
+            {saving ? "Saving…" : "Save"}
+          </button>
+          <button
+            onClick={onCancelEdit}
+            disabled={saving}
+            className="bg-seasalt-400/40 text-rich-black/70 hover:bg-seasalt-400/60 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-40"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="border-seasalt-400/30 flex flex-col gap-1 rounded-xl border bg-white/50 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-russian-violet font-semibold">{c.name}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-rich-black/40 text-xs">{formatDate(c.createdAt)}</span>
+          {!c.googleContactId ? (
+            <button
+              onClick={() => onSyncToGoogle(c.id)}
+              disabled={syncingId === c.id}
+              className="text-russian-violet/70 hover:text-russian-violet rounded px-1.5 py-0.5 text-xs font-medium transition-colors disabled:opacity-40"
+            >
+              {syncingId === c.id ? "Syncing…" : "Sync to Google"}
+            </button>
+          ) : (
+            <span className="text-rich-black/30 rounded px-1.5 py-0.5 text-xs">Synced</span>
+          )}
+          <button
+            onClick={() => onStartEdit(c)}
+            className="text-russian-violet/70 hover:text-russian-violet rounded px-1.5 py-0.5 text-xs font-medium transition-colors"
+          >
+            Edit
+          </button>
+        </div>
+      </div>
+      <a
+        href={`mailto:${c.email}`}
+        className="text-moonstone-600 hover:text-moonstone-700 text-sm transition-colors"
+      >
+        {c.email}
+      </a>
+      {c.phone && (
+        <a
+          href={`tel:${c.phone}`}
+          className="text-rich-black/60 hover:text-rich-black text-sm transition-colors"
+        >
+          {c.phone}
+        </a>
+      )}
+      {c.address && <p className="text-rich-black/50 text-sm">{c.address}</p>}
+      {c.reviews.length > 0 && (
+        <div className="mt-1">
+          <button
+            onClick={() => onToggleReviews(c.id)}
+            className="text-russian-violet/60 hover:text-russian-violet text-xs font-medium transition-colors"
+          >
+            {expandedReviewsId === c.id
+              ? "Hide reviews"
+              : `${c.reviews.length} linked review${c.reviews.length === 1 ? "" : "s"}`}
+          </button>
+          {expandedReviewsId === c.id && (
+            <div className="mt-2 flex flex-col gap-1.5">
+              {c.reviews.map((rv) => (
+                <div
+                  key={rv.id}
+                  className="border-seasalt-400/20 bg-seasalt-900/20 rounded-lg border px-3 py-2"
+                >
+                  <span className="text-russian-violet/70 text-xs font-medium">
+                    {formatReviewerName(rv)}
+                  </span>
+                  <p className="text-rich-black/50 mt-0.5 text-xs leading-relaxed">
+                    {rv.text.length > 80 ? `${rv.text.slice(0, 80)}…` : rv.text}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /**
  * Editable list of contacts captured from booking submissions.
- * Each row supports inline editing with Google Places autocomplete for the address field.
- * Shows linked reviews and a "Sync to Google" button for contacts not yet synced.
+ * Unsynced contacts (no Google Contact link) are shown prominently at the top.
+ * Synced contacts are grouped in a collapsible section below.
  * @param props - Component props.
  * @param props.contacts - Contact rows to display.
  * @param props.token - Admin token for authenticated PATCH calls.
@@ -62,6 +268,10 @@ export function ContactAdminList({
   const [saving, setSaving] = useState(false);
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [expandedReviewsId, setExpandedReviewsId] = useState<string | null>(null);
+  const [syncedOpen, setSyncedOpen] = useState(false);
+
+  const unsynced = contacts.filter((c) => !c.googleContactId);
+  const synced = contacts.filter((c) => !!c.googleContactId);
 
   /**
    * Opens the inline edit form for a contact row.
@@ -162,6 +372,48 @@ export function ContactAdminList({
     }
   }
 
+  /**
+   * Toggles the expanded reviews panel for a contact.
+   * @param id - Contact ID whose reviews panel should be toggled.
+   */
+  function toggleReviews(id: string): void {
+    setExpandedReviewsId((prev) => (prev === id ? null : id));
+  }
+
+  /**
+   * Wraps saveEdit to return void for use as an event handler.
+   * @param id - Contact ID to save.
+   */
+  function handleSaveEdit(id: string): void {
+    void saveEdit(id);
+  }
+
+  /**
+   * Wraps syncToGoogle to return void for use as an event handler.
+   * @param id - Contact ID to sync.
+   */
+  function handleSyncToGoogle(id: string): void {
+    void syncToGoogle(id);
+  }
+
+  const sharedCardProps = {
+    editingId,
+    editName,
+    editPhone,
+    editAddress,
+    saving,
+    syncingId,
+    expandedReviewsId,
+    onStartEdit: startEdit,
+    onCancelEdit: cancelEdit,
+    onSaveEdit: handleSaveEdit,
+    onSyncToGoogle: handleSyncToGoogle,
+    onToggleReviews: toggleReviews,
+    onEditName: setEditName,
+    onEditPhone: setEditPhone,
+    onEditAddress: setEditAddress,
+  };
+
   if (contacts.length === 0) {
     return (
       <p className="text-rich-black/40 text-sm">
@@ -171,154 +423,41 @@ export function ContactAdminList({
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      {contacts.map((c) =>
-        editingId === c.id ? (
-          <div
-            key={c.id}
-            className="border-seasalt-400/30 flex flex-col gap-3 rounded-xl border bg-white/50 p-4"
+    <div className="flex flex-col gap-6">
+      {/* Unsynced contacts — shown prominently */}
+      {unsynced.length > 0 ? (
+        <div className="flex flex-col gap-3">
+          <h3 className="text-russian-violet text-xs font-semibold uppercase tracking-wide">
+            Needs syncing ({unsynced.length})
+          </h3>
+          {unsynced.map((c) => (
+            <ContactCard key={c.id} c={c} {...sharedCardProps} />
+          ))}
+        </div>
+      ) : (
+        <p className="text-rich-black/40 text-sm">All contacts are synced to Google.</p>
+      )}
+
+      {/* Synced contacts — collapsible */}
+      {synced.length > 0 && (
+        <div className="flex flex-col gap-3">
+          <button
+            onClick={() => setSyncedOpen((o) => !o)}
+            className="flex items-center gap-2 text-left"
           >
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-russian-violet text-xs font-semibold uppercase tracking-wide">
-                Editing
-              </span>
-              <span className="text-rich-black/40 text-xs">{formatDate(c.createdAt)}</span>
+            <span className="text-rich-black/50 text-xs font-semibold uppercase tracking-wide">
+              Synced contacts ({synced.length})
+            </span>
+            <span className="text-rich-black/30 text-xs">{syncedOpen ? "▲" : "▼"}</span>
+          </button>
+          {syncedOpen && (
+            <div className="flex flex-col gap-3">
+              {synced.map((c) => (
+                <ContactCard key={c.id} c={c} {...sharedCardProps} />
+              ))}
             </div>
-            <div className="flex flex-col gap-1">
-              <label
-                className="text-russian-violet text-xs font-semibold"
-                htmlFor={`edit-name-${c.id}`}
-              >
-                Name
-              </label>
-              <input
-                id={`edit-name-${c.id}`}
-                type="text"
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-                className="border-seasalt-400/80 bg-seasalt text-rich-black focus:border-russian-violet focus:ring-russian-violet/30 w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-1"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label
-                className="text-russian-violet text-xs font-semibold"
-                htmlFor={`edit-phone-${c.id}`}
-              >
-                Phone
-              </label>
-              <input
-                id={`edit-phone-${c.id}`}
-                type="text"
-                value={editPhone}
-                onChange={(e) => setEditPhone(e.target.value)}
-                className="border-seasalt-400/80 bg-seasalt text-rich-black focus:border-russian-violet focus:ring-russian-violet/30 w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-1"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label
-                className="text-russian-violet text-xs font-semibold"
-                htmlFor={`edit-address-${c.id}`}
-              >
-                Address
-              </label>
-              <AddressAutocomplete
-                id={`edit-address-${c.id}`}
-                value={editAddress}
-                onChange={setEditAddress}
-                placeholder="Start typing address..."
-              />
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => void saveEdit(c.id)}
-                disabled={saving}
-                className="bg-russian-violet hover:bg-russian-violet/90 disabled:bg-russian-violet/40 rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition-colors"
-              >
-                {saving ? "Saving…" : "Save"}
-              </button>
-              <button
-                onClick={cancelEdit}
-                disabled={saving}
-                className="bg-seasalt-400/40 text-rich-black/70 hover:bg-seasalt-400/60 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-40"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div
-            key={c.id}
-            className="border-seasalt-400/30 flex flex-col gap-1 rounded-xl border bg-white/50 p-4"
-          >
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-russian-violet font-semibold">{c.name}</span>
-              <div className="flex items-center gap-2">
-                <span className="text-rich-black/40 text-xs">{formatDate(c.createdAt)}</span>
-                {!c.googleContactId ? (
-                  <button
-                    onClick={() => void syncToGoogle(c.id)}
-                    disabled={syncingId === c.id}
-                    className="text-russian-violet/70 hover:text-russian-violet rounded px-1.5 py-0.5 text-xs font-medium transition-colors disabled:opacity-40"
-                  >
-                    {syncingId === c.id ? "Syncing…" : "Sync to Google"}
-                  </button>
-                ) : (
-                  <span className="text-rich-black/30 rounded px-1.5 py-0.5 text-xs">Synced</span>
-                )}
-                <button
-                  onClick={() => startEdit(c)}
-                  className="text-russian-violet/70 hover:text-russian-violet rounded px-1.5 py-0.5 text-xs font-medium transition-colors"
-                >
-                  Edit
-                </button>
-              </div>
-            </div>
-            <a
-              href={`mailto:${c.email}`}
-              className="text-moonstone-600 hover:text-moonstone-700 text-sm transition-colors"
-            >
-              {c.email}
-            </a>
-            {c.phone && (
-              <a
-                href={`tel:${c.phone}`}
-                className="text-rich-black/60 hover:text-rich-black text-sm transition-colors"
-              >
-                {c.phone}
-              </a>
-            )}
-            {c.address && <p className="text-rich-black/50 text-sm">{c.address}</p>}
-            {c.reviews.length > 0 && (
-              <div className="mt-1">
-                <button
-                  onClick={() => setExpandedReviewsId((prev) => (prev === c.id ? null : c.id))}
-                  className="text-russian-violet/60 hover:text-russian-violet text-xs font-medium transition-colors"
-                >
-                  {expandedReviewsId === c.id
-                    ? "Hide reviews"
-                    : `${c.reviews.length} linked review${c.reviews.length === 1 ? "" : "s"}`}
-                </button>
-                {expandedReviewsId === c.id && (
-                  <div className="mt-2 flex flex-col gap-1.5">
-                    {c.reviews.map((rv) => (
-                      <div
-                        key={rv.id}
-                        className="border-seasalt-400/20 bg-seasalt-900/20 rounded-lg border px-3 py-2"
-                      >
-                        <span className="text-russian-violet/70 text-xs font-medium">
-                          {formatReviewerName(rv)}
-                        </span>
-                        <p className="text-rich-black/50 mt-0.5 text-xs leading-relaxed">
-                          {rv.text.length > 80 ? `${rv.text.slice(0, 80)}…` : rv.text}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        ),
+          )}
+        </div>
       )}
     </div>
   );

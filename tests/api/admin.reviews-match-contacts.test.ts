@@ -1,0 +1,121 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { NextRequest } from "next/server";
+
+const mocks = vi.hoisted(() => ({
+  isAdminRequest: vi.fn(),
+  reviewFindMany: vi.fn(),
+  reviewUpdate: vi.fn(),
+  bookingFindMany: vi.fn(),
+  contactFindMany: vi.fn(),
+}));
+
+vi.mock("@/shared/lib/auth", () => ({
+  isAdminRequest: mocks.isAdminRequest,
+}));
+
+vi.mock("@/shared/lib/prisma", () => ({
+  prisma: {
+    review: {
+      findMany: mocks.reviewFindMany,
+      update: mocks.reviewUpdate,
+    },
+    booking: {
+      findMany: mocks.bookingFindMany,
+    },
+    contact: {
+      findMany: mocks.contactFindMany,
+    },
+  },
+}));
+
+import { POST } from "../../src/app/api/admin/reviews/match-contacts/route";
+
+const FAKE_REQ = {} as unknown as NextRequest;
+
+const UNMATCHED_REVIEWS = [
+  { id: "r1", bookingId: "b1", customerRef: null },
+  { id: "r2", bookingId: null, customerRef: "bob@example.com" },
+  { id: "r3", bookingId: null, customerRef: null },
+];
+
+const BOOKINGS = [{ id: "b1", email: "alice@example.com" }];
+
+const CONTACTS = [
+  { id: "c1", email: "alice@example.com" },
+  { id: "c2", email: "bob@example.com" },
+];
+
+describe("POST /api/admin/reviews/match-contacts", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.isAdminRequest.mockReturnValue(true);
+    mocks.reviewFindMany.mockResolvedValue(UNMATCHED_REVIEWS);
+    mocks.bookingFindMany.mockResolvedValue(BOOKINGS);
+    mocks.contactFindMany.mockResolvedValue(CONTACTS);
+    mocks.reviewUpdate.mockResolvedValue({});
+  });
+
+  it("returns 401 when not admin", async () => {
+    mocks.isAdminRequest.mockReturnValue(false);
+    const res = await POST(FAKE_REQ);
+    expect(res.status).toBe(401);
+    const json = await res.json();
+    expect(json.error).toBe("Unauthorized");
+  });
+
+  it("returns matchedCount 0 when no unmatched reviews", async () => {
+    mocks.reviewFindMany.mockResolvedValue([]);
+    const res = await POST(FAKE_REQ);
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.ok).toBe(true);
+    expect(json.matchedCount).toBe(0);
+    expect(mocks.reviewUpdate).not.toHaveBeenCalled();
+  });
+
+  it("matches reviews via bookingId email", async () => {
+    const res = await POST(FAKE_REQ);
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.ok).toBe(true);
+    // r1 matched via booking email, r2 matched via customerRef email
+    expect(json.matchedCount).toBe(2);
+  });
+
+  it("calls review.update with correct contactId for booking-based match", async () => {
+    await POST(FAKE_REQ);
+    expect(mocks.reviewUpdate).toHaveBeenCalledWith({
+      where: { id: "r1" },
+      data: { contactId: "c1" },
+    });
+  });
+
+  it("calls review.update with correct contactId for customerRef-based match", async () => {
+    await POST(FAKE_REQ);
+    expect(mocks.reviewUpdate).toHaveBeenCalledWith({
+      where: { id: "r2" },
+      data: { contactId: "c2" },
+    });
+  });
+
+  it("does not update reviews with no bookingId and no customerRef", async () => {
+    await POST(FAKE_REQ);
+    const calls = mocks.reviewUpdate.mock.calls.map((c) => c[0].where.id);
+    expect(calls).not.toContain("r3");
+  });
+
+  it("returns matchedCount 0 when no contacts match", async () => {
+    mocks.contactFindMany.mockResolvedValue([]);
+    const res = await POST(FAKE_REQ);
+    const json = await res.json();
+    expect(json.matchedCount).toBe(0);
+  });
+
+  it("returns 500 on unexpected error", async () => {
+    mocks.reviewFindMany.mockRejectedValue(new Error("DB error"));
+    const res = await POST(FAKE_REQ);
+    expect(res.status).toBe(500);
+    const json = await res.json();
+    expect(json.error).toMatch(/failed/i);
+  });
+});
