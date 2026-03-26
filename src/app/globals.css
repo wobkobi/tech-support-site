@@ -344,6 +344,26 @@ html {
   scrollbar-gutter: auto;
 }
 /* ============================================
+   Google Maps PlaceAutocompleteElement (new Places API)
+   ============================================ */
+
+/* Style the gmp-place-autocomplete host element to match our design-system inputs.
+   CSS custom properties set here inherit into the component's shadow DOM via var(). */
+gmp-place-autocomplete {
+  display: block;
+  width: 100%;
+  color-scheme: light;
+  background-color: #f6f7f8;
+  --gmp-color-surface: #f6f7f8;
+  --gmp-color-surface-container-low: #f6f7f8;
+  --gmp-color-surface-container: #f6f7f8;
+  --gmp-color-on-surface: #001514;
+  --gmp-color-on-surface-variant: rgba(0, 21, 20, 0.5);
+  --gmp-color-primary: #0c0a3e;
+  --gmp-color-outline: rgba(0, 21, 20, 0.2);
+}
+
+/* ============================================
    Google Places Autocomplete Overrides
    ============================================ */
 

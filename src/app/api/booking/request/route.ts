@@ -12,6 +12,7 @@ import {
   validateBookingRequest,
   TIME_OF_DAY_OPTIONS,
   type TimeOfDay,
+  type StartMinute,
   type JobDuration,
   type ExistingBooking,
 } from "@/features/booking/lib/booking";
@@ -26,10 +27,12 @@ import {
 } from "@/features/reviews/lib/email";
 import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
+import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
 
 interface BookingRequestPayload {
   dateKey: string;
   timeOfDay: TimeOfDay;
+  startMinute?: StartMinute;
   duration: JobDuration;
   name: string;
   email: string;
@@ -48,7 +51,18 @@ interface BookingRequestPayload {
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const body = (await request.json()) as BookingRequestPayload;
-    const { dateKey, timeOfDay, duration, name, email, phone, address, meetingType, notes } = body;
+    const {
+      dateKey,
+      timeOfDay,
+      startMinute = 0,
+      duration,
+      name,
+      email,
+      phone,
+      address,
+      meetingType,
+      notes,
+    } = body;
 
     // Validation
     if (!name?.trim()) {
@@ -131,6 +145,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const validation = validateBookingRequest(
       dateKey,
       timeOfDay,
+      startMinute,
       duration,
       existingForValidation,
       calendarEvents,
@@ -157,7 +172,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Get dynamic UTC offset for this date (handles NZDT/NZST)
     const utcOffset = getPacificAucklandOffset(year, month, day);
-    const startAt = new Date(Date.UTC(year, month - 1, day, startHour - utcOffset, 0, 0));
+    const startAt = new Date(Date.UTC(year, month - 1, day, startHour - utcOffset, startMinute, 0));
     const endAt = new Date(startAt.getTime() + durationMinutes * 60 * 1000);
 
     const cancelToken = randomUUID();
@@ -165,7 +180,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Build notes
     let bookingNotes = `${notes.trim()}\n\n`;
-    bookingNotes += `[${slot.label} - ${durationOption.label}]\n`;
+    const timeLabel =
+      startMinute === 0
+        ? slot.label
+        : slot.label.replace(/(am|pm)$/i, `:${String(startMinute).padStart(2, "0")}$1`);
+    bookingNotes += `[${timeLabel} - ${durationOption.label}]\n`;
     bookingNotes += `Meeting type: ${meetingType === "in-person" ? "In-person" : "Remote"}\n`;
     if (meetingType === "in-person" && address) {
       bookingNotes += `Address: ${address.trim()}\n`;
@@ -222,11 +241,33 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           calendarEventId,
           activeSlotKey: startAt.toISOString(), // Unique constraint for double-booking prevention
           bufferBeforeMin: 0,
-          bufferAfterMin: BOOKING_CONFIG.bufferMin,
+          bufferAfterMin: BOOKING_CONFIG.bookingBufferAfterMin,
         },
       });
 
       console.log(`[booking/request] Created ${duration} booking: ${booking.id}`);
+
+      // Upsert contact record - best effort, never fail the booking on write error
+      try {
+        const contact = await prisma.contact.upsert({
+          where: { email: email.trim().toLowerCase() },
+          create: {
+            name: name.trim(),
+            email: email.trim().toLowerCase(),
+            phone: phone?.trim() || null,
+            address: address?.trim() || null,
+          },
+          update: {
+            name: name.trim(),
+            phone: phone?.trim() || null,
+            address: address?.trim() || null,
+          },
+        });
+        // Best-effort sync to Google Contacts — never fail the booking if it errors.
+        await syncContactToGoogle(contact.id);
+      } catch (contactError) {
+        console.error("[booking/request] Failed to upsert contact:", contactError);
+      }
 
       // Send confirmation emails before returning so Vercel doesn't kill the
       // function before the Resend requests complete. Both functions catch all

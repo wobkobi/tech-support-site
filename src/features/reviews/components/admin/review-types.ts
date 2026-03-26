@@ -24,6 +24,10 @@ export interface ReviewRow {
   status: string;
   /** Creation timestamp */
   createdAt: Date;
+  /** Linked contact ID, or null if not yet matched */
+  contactId: string | null;
+  /** Denormalised contact display name for quick rendering, or null */
+  contactName: string | null;
 }
 
 /**

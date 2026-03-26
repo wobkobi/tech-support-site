@@ -12,6 +12,18 @@ import { ReviewCard } from "./ReviewCard";
 import { SendReviewLinkForm } from "./SendReviewLinkForm";
 
 /**
+ * A slim contact entry for the contact picker.
+ */
+interface ContactPickerEntry {
+  /** Contact database ID */
+  id: string;
+  /** Display name */
+  name: string;
+  /** Email address */
+  email: string;
+}
+
+/**
  * Props for ReviewApprovalList component.
  */
 interface ReviewApprovalListProps {
@@ -21,6 +33,8 @@ interface ReviewApprovalListProps {
   approved: ReviewRow[];
   /** Admin token for API calls */
   token: string;
+  /** Contacts available for linking to reviews */
+  contacts: ContactPickerEntry[];
 }
 
 /**
@@ -30,15 +44,19 @@ interface ReviewApprovalListProps {
  * @param props.pending - Reviews awaiting approval.
  * @param props.approved - Already-approved reviews.
  * @param props.token - Admin token.
+ * @param props.contacts - Contacts available for linking.
  * @returns Review approval list element.
  */
 export function ReviewApprovalList({
   pending: initialPending,
   approved: initialApproved,
   token,
+  contacts,
 }: ReviewApprovalListProps): React.ReactElement {
   const [pending, setPending] = useState<ReviewRow[]>(initialPending);
   const [approved, setApproved] = useState<ReviewRow[]>(initialApproved);
+  const [linkingId, setLinkingId] = useState<string | null>(null);
+  const [linkSaving, setLinkSaving] = useState<string | null>(null);
 
   /**
    * Moves a review from pending to approved.
@@ -71,6 +89,98 @@ export function ReviewApprovalList({
     setApproved((prev) => prev.filter((r) => r.id !== id));
   }
 
+  /**
+   * Updates the contactId for a review via the admin API, then updates local state.
+   * @param reviewId - The review to link.
+   * @param contactId - The contact to link to, or null to unlink.
+   */
+  async function handleLinkContact(reviewId: string, contactId: string | null): Promise<void> {
+    setLinkSaving(reviewId);
+    try {
+      const res = await fetch(`/api/admin/reviews/${reviewId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Admin-Secret": token,
+        },
+        body: JSON.stringify({ contactId }),
+      });
+      if (!res.ok) return;
+      const contactName = contactId
+        ? (contacts.find((c) => c.id === contactId)?.name ?? null)
+        : null;
+      setPending((prev) =>
+        prev.map((r) => (r.id === reviewId ? { ...r, contactId, contactName } : r)),
+      );
+      setApproved((prev) =>
+        prev.map((r) => (r.id === reviewId ? { ...r, contactId, contactName } : r)),
+      );
+      setLinkingId(null);
+    } catch {
+      // silently ignore
+    } finally {
+      setLinkSaving(null);
+    }
+  }
+
+  /**
+   * Renders the contact-link UI for a single review row.
+   * @param row - The review row to render the link UI for.
+   * @returns Contact link element.
+   */
+  function renderContactLink(row: ReviewRow): React.ReactElement {
+    if (linkingId === row.id) {
+      return (
+        <div className="flex items-center gap-2">
+          <select
+            aria-label="Select contact"
+            defaultValue=""
+            disabled={linkSaving === row.id}
+            onChange={(e) => {
+              const val = e.target.value;
+              void handleLinkContact(row.id, val || null);
+            }}
+            className="border-seasalt-400/80 bg-seasalt text-rich-black focus:border-russian-violet focus:ring-russian-violet/30 rounded-md border px-2 py-1 text-xs focus:outline-none focus:ring-1"
+          >
+            <option value="">-- no contact --</option>
+            {contacts.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name} ({c.email})
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={() => setLinkingId(null)}
+            className="text-rich-black/40 hover:text-rich-black/60 text-xs"
+          >
+            Cancel
+          </button>
+        </div>
+      );
+    }
+
+    if (row.contactId && row.contactName) {
+      return (
+        <button
+          onClick={() => setLinkingId(row.id)}
+          className="bg-moonstone-600/10 text-moonstone-600 hover:bg-moonstone-600/20 rounded-full px-2 py-0.5 text-xs font-medium transition-colors"
+          title="Change linked contact"
+        >
+          {row.contactName}
+        </button>
+      );
+    }
+
+    return (
+      <button
+        onClick={() => setLinkingId(row.id)}
+        className="text-russian-violet/50 hover:text-russian-violet rounded px-1 py-0.5 text-xs transition-colors"
+      >
+        Link contact
+      </button>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-8">
       {/* Send review link to past client */}
@@ -91,13 +201,15 @@ export function ReviewApprovalList({
         ) : (
           <div className="flex flex-col gap-3">
             {pending.map((row) => (
-              <ReviewCard
-                key={row.id}
-                row={row}
-                token={token}
-                onApprove={() => handleApprove(row.id)}
-                onDelete={() => handleDelete(row.id)}
-              />
+              <div key={row.id} className="flex flex-col gap-1">
+                <ReviewCard
+                  row={row}
+                  token={token}
+                  onApprove={() => handleApprove(row.id)}
+                  onDelete={() => handleDelete(row.id)}
+                />
+                <div className="pl-1">{renderContactLink(row)}</div>
+              </div>
             ))}
           </div>
         )}
@@ -120,13 +232,15 @@ export function ReviewApprovalList({
         ) : (
           <div className="flex flex-col gap-3">
             {approved.map((row) => (
-              <ReviewCard
-                key={row.id}
-                row={row}
-                token={token}
-                onRevoke={() => handleRevoke(row.id)}
-                onDelete={() => handleDelete(row.id)}
-              />
+              <div key={row.id} className="flex flex-col gap-1">
+                <ReviewCard
+                  row={row}
+                  token={token}
+                  onRevoke={() => handleRevoke(row.id)}
+                  onDelete={() => handleDelete(row.id)}
+                />
+                <div className="pl-1">{renderContactLink(row)}</div>
+              </div>
             ))}
           </div>
         )}

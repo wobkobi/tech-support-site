@@ -14,6 +14,8 @@ import { prisma } from "@/shared/lib/prisma";
 import { isValidAdminToken } from "@/shared/lib/auth";
 import { AdminTabs } from "@/features/admin/components/AdminTabs";
 import type { AdminBookingRow } from "@/features/booking/components/admin/BookingAdminList";
+import type { ContactRow } from "@/features/admin/components/ContactAdminList";
+import type { TravelBlockRow } from "@/features/admin/components/TravelBlockAdminList";
 
 export const dynamic = "force-dynamic";
 
@@ -31,16 +33,16 @@ export const metadata: Metadata = {
 export default async function AdminPage({
   searchParams,
 }: {
-  searchParams: Promise<{ token?: string }>;
+  searchParams: Promise<{ token?: string; tab?: string }>;
 }): Promise<React.ReactElement> {
-  const { token } = await searchParams;
+  const { token, tab } = await searchParams;
 
   if (!isValidAdminToken(token ?? null)) {
     console.warn("[admin] Invalid token attempt", { tokenPresent: Boolean(token) });
     notFound();
   }
 
-  const [reviews, sentBookings, sentRequests, allBookings] = await Promise.all([
+  const [reviews, sentBookings, sentRequests, allBookings, allContacts] = await Promise.all([
     prisma.review.findMany({
       orderBy: { createdAt: "desc" },
       select: {
@@ -52,6 +54,7 @@ export default async function AdminPage({
         status: true,
         customerRef: true,
         bookingId: true,
+        contactId: true,
         createdAt: true,
       },
     }),
@@ -88,14 +91,51 @@ export default async function AdminPage({
         notes: true,
         startAt: true,
         endAt: true,
+        createdAt: true,
         status: true,
         cancelToken: true,
+        reviewSentAt: true,
+      },
+    }),
+    prisma.contact.findMany({
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        address: true,
+        createdAt: true,
+        googleContactId: true,
       },
     }),
   ]);
 
-  const pending = reviews.filter((r) => r.status !== "approved");
-  const approved = reviews.filter((r) => r.status === "approved");
+  // Build a map of contactId → contact name for denormalised display.
+  const contactMap = new Map(allContacts.map((c) => [c.id, c.name]));
+
+  // Group reviews that have a contactId by that contactId for per-contact display.
+  const reviewsByContactId = new Map<
+    string,
+    Array<{ id: string; text: string; firstName: string | null; lastName: string | null }>
+  >();
+  for (const r of reviews) {
+    if (r.contactId) {
+      const existing = reviewsByContactId.get(r.contactId) ?? [];
+      existing.push({ id: r.id, text: r.text, firstName: r.firstName, lastName: r.lastName });
+      reviewsByContactId.set(r.contactId, existing);
+    }
+  }
+
+  // Map raw DB review rows to ReviewRow (adding contactName from contactMap).
+  const reviewRows = reviews.map((r) => ({
+    ...r,
+    contactId: r.contactId ?? null,
+    contactName: r.contactId ? (contactMap.get(r.contactId) ?? null) : null,
+  }));
+
+  const pending = reviewRows.filter((r) => r.status !== "approved");
+  const approved = reviewRows.filter((r) => r.status === "approved");
 
   const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz").replace(
     /\/$/,
@@ -190,25 +230,105 @@ export default async function AdminPage({
     notes: b.notes ?? null,
     startAt: b.startAt.toISOString(),
     endAt: b.endAt.toISOString(),
+    createdAt: b.createdAt.toISOString(),
     status: b.status as AdminBookingRow["status"],
     cancelToken: b.cancelToken,
+    reviewSentAt: b.reviewSentAt?.toISOString() ?? null,
   }));
+
+  const contactRows: ContactRow[] = allContacts.map((c) => ({
+    id: c.id,
+    name: c.name,
+    email: c.email,
+    phone: c.phone ?? null,
+    address: c.address ?? null,
+    createdAt: c.createdAt.toISOString(),
+    googleContactId: c.googleContactId ?? null,
+    reviews: reviewsByContactId.get(c.id) ?? [],
+  }));
+
+  const travelBlocks = await prisma.travelBlock.findMany({
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      sourceEventId: true,
+      calendarEmail: true,
+      summary: true,
+      eventStartAt: true,
+      eventEndAt: true,
+      rawTravelMinutes: true,
+      roundedMinutes: true,
+      rawTravelBackMinutes: true,
+      roundedBackMinutes: true,
+      beforeEventId: true,
+      afterEventId: true,
+      createdAt: true,
+    },
+  });
+  const syntheticIds = travelBlocks
+    .flatMap((b) => [b.beforeEventId, b.afterEventId])
+    .filter((id): id is string => id !== null);
+  const travelCacheEntries =
+    syntheticIds.length > 0
+      ? await prisma.calendarEventCache.findMany({
+          where: { eventId: { in: syntheticIds } },
+          select: { eventId: true, expiresAt: true },
+        })
+      : [];
+  const travelCacheMap = new Map(travelCacheEntries.map((e) => [e.eventId, e.expiresAt]));
+
+  const travelBlockRows: TravelBlockRow[] = travelBlocks.map((b) => ({
+    id: b.id,
+    sourceEventId: b.sourceEventId,
+    calendarEmail: b.calendarEmail,
+    summary: b.summary ?? null,
+    eventStartAt: b.eventStartAt?.toISOString() ?? null,
+    eventEndAt: b.eventEndAt?.toISOString() ?? null,
+    rawTravelMinutes: b.rawTravelMinutes ?? null,
+    roundedMinutes: b.roundedMinutes ?? null,
+    rawTravelBackMinutes: b.rawTravelBackMinutes ?? null,
+    roundedBackMinutes: b.roundedBackMinutes ?? null,
+    beforeEventId: b.beforeEventId ?? null,
+    afterEventId: b.afterEventId ?? null,
+    beforeExpiresAt: b.beforeEventId
+      ? (travelCacheMap.get(b.beforeEventId)?.toISOString() ?? null)
+      : null,
+    afterExpiresAt: b.afterEventId
+      ? (travelCacheMap.get(b.afterEventId)?.toISOString() ?? null)
+      : null,
+    createdAt: b.createdAt.toISOString(),
+  }));
+
+  const confirmedCount = allBookings.filter((b) => b.status === "confirmed").length;
+  const heldCount = allBookings.filter((b) => b.status === "held").length;
 
   return (
     <PageShell>
       <FrostedSection>
         <div className={cn("flex flex-col gap-6 sm:gap-8")}>
           <section className={cn(CARD, "animate-fade-in")}>
-            <h1 className="text-russian-violet mb-3 text-2xl font-extrabold sm:text-3xl md:text-4xl">
-              Admin
-            </h1>
-            <div className="flex gap-2">
-              <span className="bg-coquelicot-500/20 text-coquelicot-400 rounded-full px-2.5 py-0.5 text-xs font-medium">
-                {pending.length} pending reviews
-              </span>
-              <span className="bg-moonstone-600/20 text-moonstone-600 rounded-full px-2.5 py-0.5 text-xs font-medium">
-                {approved.length} approved reviews
-              </span>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h1 className="text-russian-violet text-2xl font-extrabold sm:text-3xl">Admin</h1>
+              <div className="flex flex-wrap gap-2">
+                {pending.length > 0 && (
+                  <span className="bg-coquelicot-500/20 text-coquelicot-400 rounded-full px-2.5 py-0.5 text-xs font-medium">
+                    {pending.length} pending
+                  </span>
+                )}
+                <span className="bg-moonstone-600/20 text-moonstone-600 rounded-full px-2.5 py-0.5 text-xs font-medium">
+                  {approved.length} approved
+                </span>
+                {confirmedCount > 0 && (
+                  <span className="bg-russian-violet/10 text-russian-violet rounded-full px-2.5 py-0.5 text-xs font-medium">
+                    {confirmedCount} confirmed
+                  </span>
+                )}
+                {heldCount > 0 && (
+                  <span className="bg-mustard-400/20 text-mustard-200 rounded-full px-2.5 py-0.5 text-xs font-medium">
+                    {heldCount} held
+                  </span>
+                )}
+              </div>
             </div>
           </section>
 
@@ -217,7 +337,10 @@ export default async function AdminPage({
             approved={approved}
             linkHistory={linkHistory}
             bookings={bookingRows}
+            contacts={contactRows}
+            travelBlocks={travelBlockRows}
             token={token!}
+            initialTab={tab}
           />
         </div>
       </FrostedSection>

@@ -9,7 +9,8 @@ import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 export const BOOKING_CONFIG = {
   timeZone: "Pacific/Auckland",
   maxAdvanceDays: 14,
-  bufferMin: 15,
+  bufferMin: 15, // buffer applied around Google Calendar events
+  bookingBufferAfterMin: 30, // buffer blocked after each booking ends (in case it runs long)
   minHoursNotice: 2,
   sameDayCutoffHour: 18,
   workStartHour: 10,
@@ -63,11 +64,23 @@ export const TIME_OF_DAY_OPTIONS: ReadonlyArray<TimeOfDayOption> = [
 
 export type TimeOfDay = (typeof TIME_OF_DAY_OPTIONS)[number]["value"];
 
+// 15-minute sub-slot offsets within each hour
+export const SUB_SLOT_MINUTES = [0, 15, 30, 45] as const;
+export type StartMinute = (typeof SUB_SLOT_MINUTES)[number];
+
+export interface SubSlot {
+  minute: StartMinute;
+  availableShort: boolean;
+  availableLong: boolean;
+}
+
 export interface TimeWindow {
   value: TimeOfDay;
   label: string;
-  availableShort: boolean; // Can fit 1hr job
-  availableLong: boolean; // Can fit 2hr job
+  startHour: number; // used for sub-slot label generation in the UI
+  availableShort: boolean; // true if any sub-slot can fit a 1hr job
+  availableLong: boolean; // true if any sub-slot can fit a 2hr job
+  subSlots: SubSlot[];
 }
 
 export interface BookableDay {
@@ -107,7 +120,7 @@ function isSlotFree(
   slotStart: Date,
   slotEnd: Date,
   existingBookings: ExistingBooking[],
-  calendarEvents: Array<{ start: string; end: string }>,
+  calendarEvents: Array<{ id: string; start: string; end: string }>,
   bufferMin: number,
 ): boolean {
   // Check database bookings
@@ -120,10 +133,15 @@ function isSlotFree(
     }
   }
 
-  // Check calendar events
+  // Check calendar events.
+  // Travel blocks (synthetic entries) already represent padding, so no additional
+  // buffer is applied to them — only real calendar events get the bufferMin gap.
   for (const event of calendarEvents) {
-    const eventStart = new Date(new Date(event.start).getTime() - bufferMin * 60 * 1000);
-    const eventEnd = new Date(new Date(event.end).getTime() + bufferMin * 60 * 1000);
+    const isTravelBlock =
+      event.id.startsWith("travel-before:") || event.id.startsWith("travel-after:");
+    const effectiveBuffer = isTravelBlock ? 0 : bufferMin;
+    const eventStart = new Date(new Date(event.start).getTime() - effectiveBuffer * 60 * 1000);
+    const eventEnd = new Date(new Date(event.end).getTime() + effectiveBuffer * 60 * 1000);
 
     if (slotStart < eventEnd && slotEnd > eventStart) {
       return false;
@@ -198,76 +216,86 @@ export function buildAvailableDays(
     // Extract year/month/day from dateKey for reliable timezone calculations
     const [year, month, day] = dateKey.split("-").map(Number);
 
+    // Get dynamic UTC offset once per day (handles NZDT/NZST)
+    const utcOffset = getPacificAucklandOffset(year, month, day);
+
     for (const slot of TIME_OF_DAY_OPTIONS) {
       const slotHour = slot.startHour;
 
-      // Get dynamic UTC offset for this date (handles NZDT/NZST)
-      const utcOffset = getPacificAucklandOffset(year, month, day);
+      const subSlots: SubSlot[] = [];
 
-      // Check 1-hour availability
-      const shortStart = new Date(
-        Date.UTC(
-          year,
-          month - 1, // Date.UTC expects 0-indexed month
-          day,
-          slotHour - utcOffset,
-          0,
-          0,
-        ),
-      );
-      const shortEnd = new Date(shortStart.getTime() + 60 * 60 * 1000); // 1 hour
+      for (const minute of SUB_SLOT_MINUTES) {
+        const slotTotalMinutes = slotHour * 60 + minute;
 
-      let availableShort = isSlotFree(
-        shortStart,
-        shortEnd,
-        existingBookings,
-        calendarEvents,
-        config.bufferMin,
-      );
+        // Bounds check: job must finish by workEndHour
+        const shortInBounds = slotTotalMinutes + 60 <= config.workEndHour * 60;
+        const longInBounds = slotTotalMinutes + 120 <= config.workEndHour * 60;
 
-      // Check 2-hour availability
-      const longEnd = new Date(shortStart.getTime() + 120 * 60 * 1000); // 2 hours
-      let availableLong = isSlotFree(
-        shortStart,
-        longEnd,
-        existingBookings,
-        calendarEvents,
-        config.bufferMin,
-      );
+        const subStart = new Date(Date.UTC(year, month - 1, day, slotHour - utcOffset, minute, 0));
 
-      // Apply time-based rules
-      if (isToday) {
-        const minutesUntilSlot = (slotHour - currentHourNZ) * 60 - currentMinuteNZ;
-        const hoursUntilSlot = minutesUntilSlot / 60;
+        let subAvailableShort =
+          shortInBounds &&
+          isSlotFree(
+            subStart,
+            new Date(subStart.getTime() + 60 * 60 * 1000),
+            existingBookings,
+            calendarEvents,
+            config.bufferMin,
+          );
 
-        // 2-hour minimum notice
-        if (hoursUntilSlot < config.minHoursNotice) {
-          availableShort = false;
-          availableLong = false;
+        let subAvailableLong =
+          longInBounds &&
+          isSlotFree(
+            subStart,
+            new Date(subStart.getTime() + 120 * 60 * 1000),
+            existingBookings,
+            calendarEvents,
+            config.bufferMin,
+          );
+
+        // Apply time-based rules for today
+        if (isToday) {
+          const minutesUntilSubSlot = (slotHour - currentHourNZ) * 60 + minute - currentMinuteNZ;
+
+          // 2-hour minimum notice
+          if (minutesUntilSubSlot < config.minHoursNotice * 60) {
+            subAvailableShort = false;
+            subAvailableLong = false;
+          }
+
+          // 6pm same-day cutoff
+          if (currentHourNZ >= config.sameDayCutoffHour) {
+            subAvailableShort = false;
+            subAvailableLong = false;
+          }
         }
 
-        // 6pm same day cutoff
-        if (currentHourNZ >= config.sameDayCutoffHour) {
-          availableShort = false;
-          availableLong = false;
-        }
+        subSlots.push({
+          minute,
+          availableShort: subAvailableShort,
+          availableLong: subAvailableLong,
+        });
       }
+
+      const availableShort = subSlots.some((s) => s.availableShort);
+      const availableLong = subSlots.some((s) => s.availableLong);
 
       timeWindows.push({
         value: slot.value,
         label: slot.label,
+        startHour: slotHour,
         availableShort,
         availableLong,
+        subSlots,
       });
     }
 
     // Check if day has any available slots
     const hasAnySlots = timeWindows.some((w) => w.availableShort || w.availableLong);
 
-    // Skip any day that has no available slots - fully-blocked days are not shown.
-    if (!hasAnySlots) {
-      continue;
-    }
+    // Hide today when nothing is bookable (e.g. past same-day cutoff).
+    // Future fully-booked days stay in the array so they appear greyed out.
+    if (isToday && !hasAnySlots) continue;
 
     days.push({
       dateKey,
@@ -287,6 +315,7 @@ export function buildAvailableDays(
  * Validate booking request
  * @param dateKey - Selected date in YYYY-MM-DD format
  * @param timeOfDay - Selected time slot value
+ * @param startMinute - Minutes past the hour (0, 15, 30, or 45)
  * @param duration - Job duration (short or long)
  * @param existingBookings - Array of existing bookings from database
  * @param calendarEvents - Array of calendar events to check against
@@ -297,6 +326,7 @@ export function buildAvailableDays(
 export function validateBookingRequest(
   dateKey: string,
   timeOfDay: TimeOfDay,
+  startMinute: StartMinute,
   duration: JobDuration,
   existingBookings: ExistingBooking[],
   calendarEvents: Array<{ id: string; start: string; end: string }>,
@@ -338,7 +368,9 @@ export function validateBookingRequest(
 
   // Check if slot is actually available for this duration
   const durationMinutes = duration === "short" ? 60 : 120;
-  const slotStart = new Date(Date.UTC(year, month - 1, day, slot.startHour - utcOffset, 0, 0));
+  const slotStart = new Date(
+    Date.UTC(year, month - 1, day, slot.startHour - utcOffset, startMinute, 0),
+  );
   const slotEnd = new Date(slotStart.getTime() + durationMinutes * 60 * 1000);
 
   if (!isSlotFree(slotStart, slotEnd, existingBookings, calendarEvents, config.bufferMin)) {

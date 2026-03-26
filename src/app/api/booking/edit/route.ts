@@ -12,6 +12,7 @@ import {
   validateBookingRequest,
   TIME_OF_DAY_OPTIONS,
   type TimeOfDay,
+  type StartMinute,
   type JobDuration,
   type ExistingBooking,
 } from "@/features/booking/lib/booking";
@@ -27,6 +28,7 @@ interface EditBookingPayload {
   cancelToken: string;
   dateKey: string;
   timeOfDay: TimeOfDay;
+  startMinute?: StartMinute;
   duration: JobDuration;
   name: string;
   phone?: string;
@@ -44,8 +46,18 @@ interface EditBookingPayload {
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const body = (await request.json()) as EditBookingPayload;
-    const { cancelToken, dateKey, timeOfDay, duration, name, phone, address, meetingType, notes } =
-      body;
+    const {
+      cancelToken,
+      dateKey,
+      timeOfDay,
+      startMinute = 0,
+      duration,
+      name,
+      phone,
+      address,
+      meetingType,
+      notes,
+    } = body;
 
     if (!cancelToken) {
       return NextResponse.json({ ok: false, error: "Missing cancel token." }, { status: 400 });
@@ -139,6 +151,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const validation = validateBookingRequest(
       dateKey,
       timeOfDay,
+      startMinute,
       duration,
       existingForValidation,
       calendarEvents,
@@ -159,12 +172,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const [year, month, day] = dateKey.split("-").map(Number);
     const utcOffset = getPacificAucklandOffset(year, month, day);
-    const startAt = new Date(Date.UTC(year, month - 1, day, slot.startHour - utcOffset, 0, 0));
+    const startAt = new Date(
+      Date.UTC(year, month - 1, day, slot.startHour - utcOffset, startMinute, 0),
+    );
     const endAt = new Date(startAt.getTime() + durationOption.durationMinutes * 60 * 1000);
 
     // Build updated notes
     let bookingNotes = `${notes.trim()}\n\n`;
-    bookingNotes += `[${slot.label} - ${durationOption.label}]\n`;
+    const timeLabel =
+      startMinute === 0
+        ? slot.label
+        : slot.label.replace(/(am|pm)$/i, `:${String(startMinute).padStart(2, "0")}$1`);
+    bookingNotes += `[${timeLabel} - ${durationOption.label}]\n`;
     bookingNotes += `Meeting type: ${meetingType === "in-person" ? "In-person" : "Remote"}\n`;
     if (meetingType === "in-person" && address) {
       bookingNotes += `Address: ${address.trim()}\n`;
@@ -221,6 +240,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           endAt,
           calendarEventId,
           activeSlotKey: startAt.toISOString(),
+          bufferAfterMin: BOOKING_CONFIG.bookingBufferAfterMin,
         },
       });
       console.log(`[booking/edit] Updated booking: ${booking.id}`);

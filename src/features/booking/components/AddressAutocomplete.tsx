@@ -1,7 +1,8 @@
 // src/features/booking/components/AddressAutocomplete.tsx
 /**
  * @file AddressAutocomplete.tsx
- * @description Address input with Google Places Autocomplete (with graceful fallback).
+ * @description Address input using google.maps.places.Autocomplete.
+ * Falls back to a plain text input if the API key is missing or fails to load.
  */
 
 "use client";
@@ -30,14 +31,14 @@ export interface AddressAutocompleteProps {
 }
 
 /**
- * Address input with Google Places Autocomplete
- * Falls back to plain text input if API key is missing or fails to load
+ * Address input with Google Places autocomplete.
+ * Falls back to a plain text input if the API key is missing or fails to load.
  * @param props - Component props
  * @param props.value - Current address value
  * @param props.onChange - Callback when address changes
- * @param props.onPlaceSelected - Optional callback when place selected from autocomplete
+ * @param props.onPlaceSelected - Optional callback when a place is selected
  * @param props.placeholder - Input placeholder text
- * @param props.required - Whether field is required
+ * @param props.required - Whether the field is required
  * @param props.id - Input ID for label association
  * @returns Address autocomplete input element
  */
@@ -51,50 +52,37 @@ export default function AddressAutocomplete({
 }: AddressAutocompleteProps): React.ReactElement {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [scriptError, setScriptError] = useState(false);
   const [apiKeyMissing, setApiKeyMissing] = useState(false);
 
-  // Only load the Maps script when this component becomes visible or receives focus
   const isVisible = useOnVisible(wrapperRef);
 
-  // Load Google Maps script when visible
+  // Load Google Maps script when component becomes visible
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!isVisible) return;
+    if (typeof window === "undefined" || !isVisible) return;
 
-    /**
-     * Returns true if the Google Maps Places API is already loaded.
-     * @returns Whether the Places API is available on window.google.
-     */
-    const checkLoaded = (): boolean => Boolean(window.google?.maps?.places);
-
-    if (checkLoaded()) {
+    if (window.google?.maps?.places) {
       const timer = setTimeout(() => setIsLoaded(true), 0);
       return () => clearTimeout(timer);
     }
 
-    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
     if (!apiKey) {
-      console.warn(
-        "NEXT_PUBLIC_GOOGLE_MAPS_API_KEY not set - address autocomplete disabled. Add your API key to .env.local",
-      );
+      console.warn("GOOGLE_MAPS_API_KEY not set — address autocomplete disabled.");
       const timer = setTimeout(() => setApiKeyMissing(true), 0);
       return () => clearTimeout(timer);
     }
 
-    // Check if script already exists
     const existingScript = document.querySelector(`script[src*="maps.googleapis.com/maps/api/js"]`);
-
     if (existingScript) {
       /**
-       * Marks the component as loaded when the existing script fires its load event.
+       * Marks the component as loaded when the already-present script fires its load event.
        * @returns void
        */
-      const handleExistingLoad = (): void => setIsLoaded(true);
-      existingScript.addEventListener("load", handleExistingLoad);
-      return () => existingScript.removeEventListener("load", handleExistingLoad);
+      const handler = (): void => setIsLoaded(true);
+      existingScript.addEventListener("load", handler);
+      return () => existingScript.removeEventListener("load", handler);
     }
 
     const script = document.createElement("script");
@@ -103,15 +91,13 @@ export default function AddressAutocomplete({
     script.defer = true;
 
     /**
-     * Marks the component as loaded once the Maps script has finished loading.
+     * Marks the component as loaded once the Maps script finishes loading.
+     * @returns void
      */
-    const handleLoad = (): void => {
-      console.log("✅ Google Maps loaded successfully");
-      setIsLoaded(true);
-    };
+    const handleLoad = (): void => setIsLoaded(true);
 
     /**
-     * Logs a detailed error and marks the component in a failed-load state.
+     * Logs a detailed error and marks the component as failed.
      */
     const handleError = (): void => {
       console.error(
@@ -121,8 +107,7 @@ export default function AddressAutocomplete({
           "3. API key has HTTP referrer restrictions blocking the request\n" +
           "   → Solution: Set 'Application restrictions' to 'None' in Google Cloud Console\n" +
           "   → Keep 'API restrictions' to 'Places API' for security\n" +
-          "4. Network error\n\n" +
-          "See the setup guide for instructions.",
+          "4. Network error",
       );
       setScriptError(true);
     };
@@ -137,158 +122,43 @@ export default function AddressAutocomplete({
     };
   }, [isVisible]);
 
-  // Initialize autocomplete when Maps API is loaded
+  // Initialise Autocomplete once the Maps API is ready
   useEffect(() => {
     if (!isLoaded || !inputRef.current) return;
 
-    let autocompleteInstance: google.maps.places.Autocomplete | null = null;
-
-    try {
-      autocompleteInstance = new google.maps.places.Autocomplete(inputRef.current, {
-        componentRestrictions: { country: "nz" },
-        fields: ["address_components", "formatted_address", "geometry", "name"],
-        types: ["address"],
-      });
-
-      /**
-       * Handler for place selection
-       */
-      const handlePlaceChanged = (): void => {
-        if (!autocompleteInstance) return;
-        const place = autocompleteInstance.getPlace();
-        if (place.formatted_address) {
-          onChange(place.formatted_address);
-          onPlaceSelected?.(place);
-        }
-      };
-
-      autocompleteInstance.addListener("place_changed", handlePlaceChanged);
-
-      // Cleanup function
-      return () => {
-        if (autocompleteInstance) {
-          google.maps.event.clearInstanceListeners(autocompleteInstance);
-        }
-      };
-    } catch (error) {
-      console.error("Failed to initialize autocomplete:", error);
-      // Defer setState to avoid cascading renders
-      const timer = setTimeout(() => setScriptError(true), 0);
-      return () => clearTimeout(timer);
-    }
-  }, [isLoaded, onChange, onPlaceSelected]);
-
-  // Keep the Places dropdown aligned to the input width and position
-  useEffect(() => {
-    if (!inputRef.current) return;
-
-    const inputEl = inputRef.current;
-    let mutationObserver: MutationObserver | null = null;
-    let rafId: number | null = null;
-
-    /**
-     * Syncs the Google Places dropdown width/position with the input element so suggestions stay flush with the input.
-     */
-    const syncDropdown = (): void => {
-      const containers = Array.from(document.querySelectorAll(".pac-container")) as HTMLElement[];
-      const container = containers.findLast((node) => node.offsetParent !== null) ?? null;
-      if (!container) return;
-
-      const rect = inputEl.getBoundingClientRect();
-      const scrollTop = window.scrollY || document.documentElement.scrollTop;
-      const scrollLeft = window.scrollX || document.documentElement.scrollLeft;
-      const position = window.getComputedStyle(container).position;
-
-      const left = position === "fixed" ? rect.left : rect.left + scrollLeft;
-      const top = position === "fixed" ? rect.bottom + 6 : rect.bottom + scrollTop + 6;
-
-      const width = Math.round(rect.width);
-
-      container.style.setProperty("width", `${width}px`, "important");
-      container.style.setProperty("min-width", `${width}px`, "important");
-      container.style.setProperty("max-width", `${width}px`, "important");
-      container.style.setProperty("left", `${left}px`, "important");
-      container.style.setProperty("right", "auto", "important");
-      container.style.setProperty("top", `${top}px`, "important");
-    };
-
-    /**
-     * Starts a requestAnimationFrame loop so the dropdown keeps tracking layout changes while the user types.
-     */
-    const startSyncLoop = (): void => {
-      if (rafId !== null) return;
-      /**
-       * Ticks every animation frame to reapply dropdown positioning adjustments.
-       */
-      const tick = (): void => {
-        syncDropdown();
-        rafId = window.requestAnimationFrame(tick);
-      };
-      rafId = window.requestAnimationFrame(tick);
-    };
-
-    /**
-     * Cancels the sync loop when the dropdown hides so we do not keep scheduling RAF work.
-     */
-    const stopSyncLoop = (): void => {
-      if (rafId === null) return;
-      window.cancelAnimationFrame(rafId);
-      rafId = null;
-    };
-
-    /**
-     * Kicks off a sync pass immediately when the input gains focus.
-     */
-    const handleFocus = (): void => {
-      setTimeout(syncDropdown, 0);
-      startSyncLoop();
-    };
-
-    /**
-     * Nudges the dropdown after each keystroke to keep it flush with the field width.
-     */
-    const handleInput = (): void => {
-      setTimeout(syncDropdown, 0);
-    };
-
-    /**
-     * Stops syncing once the input loses focus so the loop does not run indefinitely.
-     */
-    const handleBlur = (): void => {
-      stopSyncLoop();
-    };
-
-    inputEl.addEventListener("focus", handleFocus);
-    inputEl.addEventListener("input", handleInput);
-    inputEl.addEventListener("blur", handleBlur);
-    window.addEventListener("resize", syncDropdown);
-    window.addEventListener("scroll", syncDropdown, true);
-
-    if (typeof MutationObserver !== "undefined") {
-      mutationObserver = new MutationObserver(() => syncDropdown());
-      mutationObserver.observe(document.body, { childList: true, subtree: true });
+    if (!window.google?.maps?.places?.Autocomplete) {
+      console.error("[AddressAutocomplete] google.maps.places.Autocomplete not found");
+      setScriptError(true);
+      return;
     }
 
-    if (typeof ResizeObserver !== "undefined") {
-      const observer = new ResizeObserver(syncDropdown);
-      observer.observe(inputEl);
-      resizeObserverRef.current = observer;
-    }
+    const autocomplete = new google.maps.places.Autocomplete(inputRef.current, {
+      componentRestrictions: { country: "nz" },
+      types: ["address"],
+      fields: ["formatted_address"],
+    });
+
+    /**
+     * Called when the user selects a prediction from the suggestion list.
+     */
+    const handlePlaceChanged = (): void => {
+      const place = autocomplete.getPlace();
+      const addr = place.formatted_address ?? "";
+      if (addr) {
+        onChange(addr);
+        onPlaceSelected?.(place);
+      }
+    };
+
+    const listener = autocomplete.addListener("place_changed", handlePlaceChanged);
 
     return () => {
-      inputEl.removeEventListener("focus", handleFocus);
-      inputEl.removeEventListener("input", handleInput);
-      inputEl.removeEventListener("blur", handleBlur);
-      window.removeEventListener("resize", syncDropdown);
-      window.removeEventListener("scroll", syncDropdown, true);
-      mutationObserver?.disconnect();
-      stopSyncLoop();
-      resizeObserverRef.current?.disconnect();
-      resizeObserverRef.current = null;
+      google.maps.event.removeListener(listener);
     };
-  }, []);
+    // onChange/onPlaceSelected intentionally omitted: autocomplete is uncontrolled after mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoaded]);
 
-  // Show status message if autocomplete is unavailable
   const showWarning = apiKeyMissing || scriptError;
 
   return (
@@ -309,7 +179,7 @@ export default function AddressAutocomplete({
         )}
       />
 
-      {/* Warning message */}
+      {/* Warning messages */}
       {apiKeyMissing && (
         <p className={cn("flex items-start gap-1 text-xs text-yellow-700")}>
           <span className={cn("mt-0.5")}>⚠️</span>
@@ -325,7 +195,7 @@ export default function AddressAutocomplete({
           <span className={cn("mt-0.5")}>⚠️</span>
           <span>
             Address autocomplete unavailable. Please type your full address manually. (Failed to
-            load Google Maps - check Application restrictions in Google Cloud Console)
+            load Google Maps — check Application restrictions in Google Cloud Console)
           </span>
         </p>
       )}
@@ -334,8 +204,6 @@ export default function AddressAutocomplete({
       {!showWarning && !isLoaded && (
         <p className={cn("text-rich-black/60 text-xs")}>Loading address autocomplete...</p>
       )}
-
-      {/* Success - no message needed, autocomplete just works */}
     </div>
   );
 }

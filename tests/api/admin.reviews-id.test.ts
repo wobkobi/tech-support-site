@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 
 const mocks = vi.hoisted(() => ({
   isValidAdminToken: vi.fn(),
+  isAdminRequest: vi.fn(),
   reviewUpdate: vi.fn(),
   reviewDelete: vi.fn(),
   revalidateReviewPaths: vi.fn(),
@@ -10,6 +11,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/shared/lib/auth", () => ({
   isValidAdminToken: mocks.isValidAdminToken,
+  isAdminRequest: mocks.isAdminRequest,
 }));
 
 vi.mock("@/shared/lib/prisma", () => ({
@@ -28,12 +30,16 @@ vi.mock("@/features/reviews/lib/revalidate", () => ({
 import { PATCH, DELETE } from "../../src/app/api/admin/reviews/[id]/route";
 
 /**
- * Creates a fake NextRequest with the given JSON body.
+ * Creates a fake NextRequest with the given JSON body and optional headers.
  * @param body - The request body object.
+ * @param headers - Optional HTTP headers map.
  * @returns A minimal fake NextRequest.
  */
-function makePatchRequest(body: object): NextRequest {
-  return { json: async () => body } as unknown as NextRequest;
+function makePatchRequest(body: object, headers: Record<string, string> = {}): NextRequest {
+  return {
+    json: async () => body,
+    headers: { get: (k: string) => headers[k.toLowerCase()] ?? null },
+  } as unknown as NextRequest;
 }
 
 /**
@@ -103,6 +109,52 @@ describe("PATCH /api/admin/reviews/[id]", () => {
     mocks.isValidAdminToken.mockReturnValue(true);
     mocks.reviewUpdate.mockRejectedValue(new Error("DB error"));
     const req = makePatchRequest({ action: "approve", token: "valid" });
+    const res = await PATCH(req, PARAMS);
+    expect(res.status).toBe(500);
+  });
+});
+
+describe("PATCH /api/admin/reviews/[id] — contactId link flow", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.isAdminRequest.mockReturnValue(true);
+    mocks.reviewUpdate.mockResolvedValue({});
+  });
+
+  it("returns 401 when X-Admin-Secret is missing", async () => {
+    mocks.isAdminRequest.mockReturnValue(false);
+    const req = makePatchRequest({ contactId: "c1" });
+    const res = await PATCH(req, PARAMS);
+    expect(res.status).toBe(401);
+    const json = await res.json();
+    expect(json.error).toBe("Unauthorized");
+  });
+
+  it("updates contactId to a string value", async () => {
+    const req = makePatchRequest({ contactId: "c1" }, { "x-admin-secret": "secret" });
+    const res = await PATCH(req, PARAMS);
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.ok).toBe(true);
+    expect(mocks.reviewUpdate).toHaveBeenCalledWith({
+      where: { id: "review-123" },
+      data: { contactId: "c1" },
+    });
+  });
+
+  it("updates contactId to null (unlink)", async () => {
+    const req = makePatchRequest({ contactId: null }, { "x-admin-secret": "secret" });
+    const res = await PATCH(req, PARAMS);
+    expect(res.status).toBe(200);
+    expect(mocks.reviewUpdate).toHaveBeenCalledWith({
+      where: { id: "review-123" },
+      data: { contactId: null },
+    });
+  });
+
+  it("returns 500 on DB error during contact-link", async () => {
+    mocks.reviewUpdate.mockRejectedValue(new Error("DB error"));
+    const req = makePatchRequest({ contactId: "c1" }, { "x-admin-secret": "secret" });
     const res = await PATCH(req, PARAMS);
     expect(res.status).toBe(500);
   });

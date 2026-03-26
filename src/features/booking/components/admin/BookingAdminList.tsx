@@ -16,8 +16,10 @@ export interface AdminBookingRow {
   notes: string | null;
   startAt: string;
   endAt: string;
+  createdAt: string;
   status: "held" | "confirmed" | "cancelled" | "completed";
   cancelToken: string;
+  reviewSentAt: string | null;
 }
 
 type StatusFilter = "all" | "held" | "confirmed" | "cancelled" | "completed";
@@ -26,6 +28,7 @@ interface EditState {
   name: string;
   email: string;
   notes: string;
+  address: string;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -71,6 +74,7 @@ export function BookingAdminList({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [edits, setEdits] = useState<Record<string, EditState>>({});
   const [saving, setSaving] = useState<string | null>(null);
+  const [resending, setResending] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const counts = {
@@ -89,9 +93,10 @@ export function BookingAdminList({
   function openEdit(b: AdminBookingRow): void {
     setExpandedId(b.id);
     if (!edits[b.id]) {
+      const address = (b.notes ?? "").match(/Address:\s*(.+)/i)?.[1]?.trim() ?? "";
       setEdits((prev) => ({
         ...prev,
-        [b.id]: { name: b.name, email: b.email, notes: b.notes ?? "" },
+        [b.id]: { name: b.name, email: b.email, notes: b.notes ?? "", address },
       }));
     }
   }
@@ -139,9 +144,21 @@ export function BookingAdminList({
   async function saveEdit(b: AdminBookingRow): Promise<void> {
     const edit = edits[b.id];
     if (!edit) return;
-    const ok = await patch(b.id, { name: edit.name, email: edit.email, notes: edit.notes });
+    const updatedNotes = edit.address
+      ? edit.notes.replace(/^(Address:\s*).*$/im, `$1${edit.address.trim()}`)
+      : edit.notes;
+    const ok = await patch(b.id, {
+      name: edit.name,
+      email: edit.email,
+      notes: updatedNotes,
+      address: edit.address || undefined,
+    });
     if (ok) {
-      setBookings((prev) => prev.map((r) => (r.id === b.id ? { ...r, ...edit } : r)));
+      setBookings((prev) =>
+        prev.map((r) =>
+          r.id === b.id ? { ...r, name: edit.name, email: edit.email, notes: updatedNotes } : r,
+        ),
+      );
       setExpandedId(null);
     }
   }
@@ -183,6 +200,31 @@ export function BookingAdminList({
     }
   }
 
+  /**
+   * Sends or resends the review request email for a booking.
+   * @param id - Booking ID.
+   */
+  async function resendReview(id: string): Promise<void> {
+    setResending(id);
+    setErrors((prev) => ({ ...prev, [id]: "" }));
+    try {
+      const res = await fetch(`/api/admin/bookings/${id}/resend-review`, {
+        method: "POST",
+        headers: { "x-admin-secret": token },
+      });
+      if (!res.ok) {
+        const data = (await res.json()) as { error?: string };
+        setErrors((prev) => ({ ...prev, [id]: data.error ?? "Failed to send." }));
+        return;
+      }
+      setBookings((prev) =>
+        prev.map((b) => (b.id === id ? { ...b, reviewSentAt: new Date().toISOString() } : b)),
+      );
+    } finally {
+      setResending(null);
+    }
+  }
+
   const FILTERS: StatusFilter[] = ["all", "confirmed", "held", "completed", "cancelled"];
 
   return (
@@ -212,13 +254,39 @@ export function BookingAdminList({
       <div className="flex flex-col gap-3">
         {filtered.map((b) => {
           const isExpanded = expandedId === b.id;
-          const edit = edits[b.id] ?? { name: b.name, email: b.email, notes: b.notes ?? "" };
+          const edit = edits[b.id] ?? {
+            name: b.name,
+            email: b.email,
+            notes: b.notes ?? "",
+            address: (b.notes ?? "").match(/Address:\s*(.+)/i)?.[1]?.trim() ?? "",
+          };
           const isSaving = saving === b.id;
+          const isResending = resending === b.id;
 
           return (
             <div key={b.id} className="border-seasalt-400/30 rounded-xl border bg-white/50 p-4">
               <div className="flex items-start justify-between gap-3">
-                <div className="flex min-w-0 flex-col gap-1">
+                <div
+                  className="flex min-w-0 cursor-pointer flex-col gap-1"
+                  onClick={() => {
+                    if (isExpanded) {
+                      setExpandedId(null);
+                    } else {
+                      openEdit(b);
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      if (isExpanded) {
+                        setExpandedId(null);
+                      } else {
+                        openEdit(b);
+                      }
+                    }
+                  }}
+                >
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-russian-violet font-semibold">{b.name}</span>
                     <span
@@ -275,6 +343,9 @@ export function BookingAdminList({
 
               {isExpanded && (
                 <div className="border-seasalt-400/20 mt-4 flex flex-col gap-3 border-t pt-4">
+                  <p className="text-rich-black/40 text-xs">
+                    Booked on {formatNZDateTime(b.createdAt)}
+                  </p>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <label className="flex flex-col gap-1">
                       <span className="text-rich-black/60 text-xs font-medium">Name</span>
@@ -294,6 +365,18 @@ export function BookingAdminList({
                       />
                     </label>
                   </div>
+
+                  {edit.address !== undefined && edit.address !== "" && (
+                    <label className="flex flex-col gap-1">
+                      <span className="text-rich-black/60 text-xs font-medium">Address</span>
+                      <input
+                        className="border-seasalt-400/30 rounded-lg border bg-white/80 px-3 py-2 text-sm"
+                        value={edit.address}
+                        onChange={(e) => setField(b.id, "address", e.target.value)}
+                        placeholder="Full address for travel time calculations"
+                      />
+                    </label>
+                  )}
 
                   <label className="flex flex-col gap-1">
                     <span className="text-rich-black/60 text-xs font-medium">Notes</span>
@@ -336,6 +419,20 @@ export function BookingAdminList({
                     >
                       Cancel booking
                     </button>
+
+                    {(b.status === "confirmed" || b.status === "completed") && (
+                      <button
+                        onClick={() => void resendReview(b.id)}
+                        disabled={isSaving || isResending}
+                        className="bg-moonstone-600/15 text-moonstone-700 hover:bg-moonstone-600/25 rounded-lg px-4 py-2 text-xs font-medium transition-colors disabled:opacity-50"
+                      >
+                        {isResending
+                          ? "Sending\u2026"
+                          : b.reviewSentAt
+                            ? "Resend review email"
+                            : "Send review email"}
+                      </button>
+                    )}
                   </div>
                 </div>
               )}

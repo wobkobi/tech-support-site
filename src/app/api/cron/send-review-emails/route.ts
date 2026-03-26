@@ -36,7 +36,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         endAt: {
           lte: thirtyMinutesAgo,
         },
-        status: "confirmed",
+        status: { in: ["confirmed", "completed"] },
         reviewSentAt: null, // Haven't sent review email yet
       },
       select: {

@@ -13,6 +13,7 @@ interface PatchPayload {
   name?: string;
   email?: string;
   notes?: string;
+  address?: string;
   status?: "confirmed" | "cancelled" | "completed";
 }
 
@@ -47,6 +48,14 @@ export async function PATCH(
   if (body.email !== undefined) data.email = body.email.trim();
   if (body.notes !== undefined) data.notes = body.notes;
 
+  if (body.address !== undefined && body.notes === undefined) {
+    const currentNotes = booking.notes ?? "";
+    const newAddress = body.address.trim();
+    if (/^Address:\s*/im.test(currentNotes)) {
+      data.notes = currentNotes.replace(/^(Address:\s*).*$/im, newAddress ? `$1${newAddress}` : "");
+    }
+  }
+
   if (body.status === "cancelled" && booking.status !== "cancelled") {
     if (booking.calendarEventId) {
       try {
@@ -65,6 +74,17 @@ export async function PATCH(
   }
 
   await prisma.booking.update({ where: { id }, data });
+
+  if (body.address !== undefined && booking.email) {
+    try {
+      await prisma.contact.updateMany({
+        where: { email: booking.email },
+        data: { address: body.address.trim() || null },
+      });
+    } catch (err) {
+      console.error("[admin/bookings] Failed to update contact address:", err);
+    }
+  }
 
   return NextResponse.json({ ok: true });
 }
