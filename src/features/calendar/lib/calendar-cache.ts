@@ -78,7 +78,7 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
     `[refreshCalendarCache] Cached ${rawEvents.length} events, deleted ${deleteResult.count} expired entries`,
   );
 
-  // ─── Travel Block Management ──────────────────────────────────────────────
+  // Travel Block Management
   const homeAddress = process.env.HOME_ADDRESS;
   if (!homeAddress) {
     console.warn("[refreshCalendarCache] HOME_ADDRESS not set - skipping travel blocks");
@@ -259,18 +259,20 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
     // Effective destination: dedicated location field, or fall back to event title
     const eventLocation = (event.location ?? event.summary)!;
 
-    // ── Travel-to leg ──────────────────────────────────────────────────────
+    // Travel-to leg
     let rawTravelToMinutes: number | null = null;
     if (reuseRawToMinutes !== null) {
       rawTravelToMinutes = reuseRawToMinutes;
     } else {
       if (isDev) console.log(`[travel] Calculating travel-to: ${homeAddress} → ${eventLocation}`);
-      rawTravelToMinutes = await calculateTravelMinutes(homeAddress, eventLocation, eventStart);
+      rawTravelToMinutes = await calculateTravelMinutes(homeAddress, eventLocation, eventStart, {
+        useArrivalTime: true,
+      });
       if (isDev)
         console.log(`[travel] Travel-to result: ${rawTravelToMinutes ?? "null (skipping)"} min`);
     }
 
-    // ── Travel-back leg ────────────────────────────────────────────────────
+    // Travel-back leg
     let rawTravelBackMinutes: number | null = null;
     if (reuseRawBackMinutes !== null) {
       rawTravelBackMinutes = reuseRawBackMinutes;
@@ -296,7 +298,7 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
       continue;
     }
 
-    // ── Write cache-only blocks ────────────────────────────────────────────
+    // Write cache-only blocks
     let storedBeforeId: string | null = null;
     if (rawTravelToMinutes !== null) {
       const roundedTo = Math.ceil(rawTravelToMinutes / 15) * 15;
@@ -363,7 +365,7 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
       }
     }
 
-    // ── Persist TravelBlock record ─────────────────────────────────────────
+    // Persist TravelBlock record
     try {
       await prisma.travelBlock.create({
         data: {

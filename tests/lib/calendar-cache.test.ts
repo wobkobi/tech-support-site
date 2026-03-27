@@ -161,6 +161,7 @@ describe("refreshCalendarCache", () => {
       "1 Home St, Auckland",
       "456 Dentist Ave",
       new Date(futureStart),
+      { useArrivalTime: true },
     );
     expect(mocks.calculateTravelMinutes).toHaveBeenNthCalledWith(
       2,

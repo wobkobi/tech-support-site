@@ -64,6 +64,21 @@ describe("calculateTravelMinutes", () => {
     expect(calledUrl).toContain(`departure_time=${Math.floor(departure.getTime() / 1000)}`);
   });
 
+  it("sends arrival_time instead of departure_time when useArrivalTime is true", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        status: "OK",
+        rows: [{ elements: [{ status: "OK", duration: { value: 600 } }] }],
+      }),
+    });
+    await calculateTravelMinutes("1 Home St", "2 Work Ave", departure, { useArrivalTime: true });
+    const calledUrl: string = mockFetch.mock.calls[0][0];
+    expect(calledUrl).toContain("mode=transit");
+    expect(calledUrl).toContain(`arrival_time=${Math.floor(departure.getTime() / 1000)}`);
+    expect(calledUrl).not.toContain("departure_time");
+  });
+
   it("returns null when API top-level status is not OK", async () => {
     mockFetch.mockResolvedValue({
       ok: true,

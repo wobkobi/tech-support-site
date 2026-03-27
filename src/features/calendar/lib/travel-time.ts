@@ -47,20 +47,23 @@ function toReliableDeparture(departureTime: Date, now: Date): Date {
 
 /**
  * Calculates public-transport travel time in minutes between two addresses.
- * When the departure time is more than {@link SCHEDULE_HORIZON_DAYS} days away,
+ * When the departure/arrival time is more than {@link SCHEDULE_HORIZON_DAYS} days away,
  * the nearest upcoming date with the same day-of-week is used so that transit
  * schedule data is available.
  * Returns null if the API key is not configured, the route cannot be determined,
  * or any error occurs. Never throws.
  * @param origin - Starting address or coordinates.
  * @param destination - Destination address or coordinates.
- * @param departureTime - Desired departure time (used for transit schedule lookup).
+ * @param departureTime - Desired departure (or arrival) time for transit schedule lookup.
+ * @param options - Optional flags.
+ * @param options.useArrivalTime - When true, uses arrival_time instead of departure_time.
  * @returns Travel time in minutes (ceiling), or null.
  */
 export async function calculateTravelMinutes(
   origin: string,
   destination: string,
   departureTime: Date,
+  options?: { useArrivalTime?: boolean },
 ): Promise<number | null> {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
   if (!apiKey) {
@@ -74,10 +77,8 @@ export async function calculateTravelMinutes(
   url.searchParams.set("origins", origin);
   url.searchParams.set("destinations", destination);
   url.searchParams.set("mode", "transit");
-  url.searchParams.set(
-    "departure_time",
-    Math.floor(effectiveDeparture.getTime() / 1000).toString(),
-  );
+  const timeParam = options?.useArrivalTime ? "arrival_time" : "departure_time";
+  url.searchParams.set(timeParam, Math.floor(effectiveDeparture.getTime() / 1000).toString());
   url.searchParams.set("key", apiKey);
 
   try {
