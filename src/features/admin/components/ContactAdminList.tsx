@@ -24,7 +24,14 @@ export interface ContactRow {
   /** Google People API resource name if synced, or null */
   googleContactId: string | null;
   /** Reviews linked to this contact */
-  reviews: Array<{ id: string; text: string; firstName: string | null; lastName: string | null }>;
+  reviews: Array<{
+    id: string;
+    text: string;
+    firstName: string | null;
+    lastName: string | null;
+    /** Review token used to construct the /review?token= link, or null for old records. */
+    customerRef: string | null;
+  }>;
 }
 
 /**
@@ -243,9 +250,21 @@ function ContactCard({
                   key={rv.id}
                   className="border-seasalt-400/20 bg-seasalt-900/20 rounded-lg border px-3 py-2"
                 >
-                  <span className="text-russian-violet/70 text-xs font-medium">
-                    {formatReviewerName(rv)}
-                  </span>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-russian-violet/70 text-xs font-medium">
+                      {formatReviewerName(rv)}
+                    </span>
+                    {rv.customerRef && (
+                      <a
+                        href={`/review?token=${rv.customerRef}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-moonstone-600 hover:text-moonstone-700 shrink-0 text-xs font-medium transition-colors"
+                      >
+                        Review link ↗
+                      </a>
+                    )}
+                  </div>
                   <p className="text-rich-black/50 mt-0.5 text-xs leading-relaxed">
                     {rv.text.length > 80 ? `${rv.text.slice(0, 80)}…` : rv.text}
                   </p>

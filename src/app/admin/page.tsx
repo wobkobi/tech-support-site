@@ -117,12 +117,24 @@ export default async function AdminPage({
   // Group reviews that have a contactId by that contactId for per-contact display.
   const reviewsByContactId = new Map<
     string,
-    Array<{ id: string; text: string; firstName: string | null; lastName: string | null }>
+    Array<{
+      id: string;
+      text: string;
+      firstName: string | null;
+      lastName: string | null;
+      customerRef: string | null;
+    }>
   >();
   for (const r of reviews) {
     if (r.contactId) {
       const existing = reviewsByContactId.get(r.contactId) ?? [];
-      existing.push({ id: r.id, text: r.text, firstName: r.firstName, lastName: r.lastName });
+      existing.push({
+        id: r.id,
+        text: r.text,
+        firstName: r.firstName,
+        lastName: r.lastName,
+        customerRef: r.customerRef ?? null,
+      });
       reviewsByContactId.set(r.contactId, existing);
     }
   }
