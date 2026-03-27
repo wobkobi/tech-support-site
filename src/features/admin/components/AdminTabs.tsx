@@ -100,7 +100,8 @@ export function AdminTabs({
       });
       const data = (await res.json()) as { ok: boolean; upsertedCount?: number; error?: string };
       if (data.ok) {
-        setBackfillResult(`Done — ${data.upsertedCount} contacts upserted. Reload to see updates.`);
+        setBackfillResult(`Done — ${data.upsertedCount} contacts upserted.`);
+        router.refresh();
       } else {
         setBackfillResult(`Error: ${data.error ?? "unknown"}`);
       }
@@ -109,7 +110,7 @@ export function AdminTabs({
     } finally {
       setBackfilling(false);
     }
-  }, [token]);
+  }, [token, router]);
 
   const runSync = useCallback(async () => {
     setSyncing(true);
@@ -127,8 +128,9 @@ export function AdminTabs({
       };
       if (data.ok) {
         setSyncResult(
-          `Done — ${data.importedCount ?? 0} imported from Google, ${data.syncedCount ?? 0} pushed to Google. Reload to see updates.`,
+          `Done — ${data.importedCount ?? 0} imported from Google, ${data.syncedCount ?? 0} pushed to Google.`,
         );
+        router.refresh();
       } else {
         setSyncResult(`Error: ${data.error ?? "unknown"}`);
       }
@@ -137,7 +139,7 @@ export function AdminTabs({
     } finally {
       setSyncing(false);
     }
-  }, [token]);
+  }, [token, router]);
 
   const runMatchContacts = useCallback(async () => {
     setMatching(true);
@@ -149,7 +151,8 @@ export function AdminTabs({
       });
       const data = (await res.json()) as { ok: boolean; matchedCount?: number; error?: string };
       if (data.ok) {
-        setMatchResult(`Done — ${data.matchedCount ?? 0} reviews matched. Reload to see updates.`);
+        setMatchResult(`Done — ${data.matchedCount ?? 0} reviews matched.`);
+        router.refresh();
       } else {
         setMatchResult(`Error: ${data.error ?? "unknown"}`);
       }
@@ -158,7 +161,7 @@ export function AdminTabs({
     } finally {
       setMatching(false);
     }
-  }, [token]);
+  }, [token, router]);
 
   const runEnrich = useCallback(async () => {
     setEnriching(true);
@@ -209,12 +212,13 @@ export function AdminTabs({
           headers: { "X-Admin-Secret": token, "Content-Type": "application/json" },
           body: JSON.stringify(updates),
         });
+        router.refresh();
       } catch {
         // best-effort
       }
       setConflicts((prev) => prev?.filter((c) => c.sourceId !== conflict.sourceId) ?? null);
     },
-    [token],
+    [token, router],
   );
 
   const skipConflict = useCallback((sourceId: string) => {
@@ -231,9 +235,8 @@ export function AdminTabs({
       });
       const data = (await res.json()) as { ok: boolean; cachedCount?: number; error?: string };
       if (data.ok) {
-        setRecalculateResult(
-          `Done — ${data.cachedCount ?? 0} events cached. Reload to see updates.`,
-        );
+        setRecalculateResult(`Done — ${data.cachedCount ?? 0} events cached.`);
+        router.refresh();
       } else {
         setRecalculateResult(`Error: ${data.error ?? "unknown"}`);
       }
@@ -242,7 +245,7 @@ export function AdminTabs({
     } finally {
       setRecalculating(false);
     }
-  }, [token]);
+  }, [token, router]);
 
   const pendingCount = initialPending.length;
   const confirmedCount = bookings.filter((b) => b.status === "confirmed").length;
