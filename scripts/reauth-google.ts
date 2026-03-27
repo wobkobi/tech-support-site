@@ -23,7 +23,7 @@ if (!clientId || !clientSecret) {
 }
 
 const DEV_REDIRECT = "http://localhost:3000/api/google/oauth/callback";
-const PROD_REDIRECT = "https://tothepoint.co.nz/api/google/oauth/callback";
+const PROD_REDIRECT = "https://www.tothepoint.co.nz/api/google/oauth/callback";
 
 const SCOPES = [
   "https://www.googleapis.com/auth/calendar",
