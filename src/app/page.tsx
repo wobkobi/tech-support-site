@@ -10,6 +10,7 @@ import { formatReviewerName } from "@/features/reviews/lib/formatting";
 import { FrostedSection, PageShell } from "@/shared/components/PageLayout";
 import { Button } from "@/shared/components/Button";
 import { cn } from "@/shared/lib/cn";
+import { unstable_cache } from "next/cache";
 import { prisma } from "@/shared/lib/prisma";
 import Image from "next/image";
 import {
@@ -37,6 +38,23 @@ import type { IconType } from "react-icons";
 // Rely on on-demand revalidation (revalidateReviewPaths fires on every review change).
 // Long fallback avoids waking a cold DB on a fixed timer.
 export const revalidate = 86400;
+
+/**
+ * Cached review query, tagged so revalidateReviewPaths() can invalidate it.
+ * Caching the query separately from the page means repeated ISR regenerations
+ * within the TTL window skip the DB round-trip entirely.
+ */
+const getApprovedReviews = unstable_cache(
+  async () =>
+    prisma.review.findMany({
+      orderBy: { createdAt: "desc" },
+      select: { text: true, firstName: true, lastName: true, isAnonymous: true },
+      where: { status: "approved" },
+      take: 20,
+    }),
+  ["home-approved-reviews"],
+  { tags: ["reviews"], revalidate: 86400 },
+);
 
 interface SupportItem {
   label: string;
@@ -67,12 +85,7 @@ const CARD = cn(
  * @returns Home page element
  */
 export default async function Home(): Promise<React.ReactElement> {
-  const rows = await prisma.review.findMany({
-    orderBy: { createdAt: "desc" },
-    select: { text: true, firstName: true, lastName: true, isAnonymous: true },
-    where: { status: "approved" },
-    take: 20,
-  });
+  const rows = await getApprovedReviews();
 
   const items: ReviewItem[] = rows.map((r) => ({
     text: r.text.trim().replace(/\s+/g, " "),
