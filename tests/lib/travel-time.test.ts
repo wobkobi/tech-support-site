@@ -112,6 +112,37 @@ describe("calculateTravelMinutes", () => {
     expect(result).toBeNull();
   });
 
+  it("bumps proxy forward a week when candidate lands within 1 hour of now", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        status: "OK",
+        rows: [{ elements: [{ status: "OK", duration: { value: 600 } }] }],
+      }),
+    });
+
+    // now = Saturday 23:30 UTC; departure is a Sunday far in the future at 00:15 UTC.
+    // candidate = tomorrow (Sunday) at 00:15 UTC, which is only 45 min from now —
+    // within the 1 h safety margin → must be bumped an extra week.
+    const fakeNow = new Date("2026-03-28T23:30:00Z"); // Saturday
+    vi.setSystemTime(fakeNow);
+
+    const farDeparture = new Date("2026-06-07T00:15:00Z"); // Sunday, > 7 days away
+    await calculateTravelMinutes("home", "dest", farDeparture);
+
+    const calledUrl: string = mockFetch.mock.calls[0][0];
+    const params = new URL(calledUrl).searchParams;
+    const usedTimestamp = Number(params.get("departure_time")) * 1000;
+    const usedDate = new Date(usedTimestamp);
+
+    // Proxy must be at least 1 h after fakeNow (not in the near-past danger zone)
+    expect(usedDate.getTime()).toBeGreaterThan(fakeNow.getTime() + 60 * 60 * 1000);
+    // Proxy must still land on a Sunday
+    expect(usedDate.getUTCDay()).toBe(farDeparture.getUTCDay());
+
+    vi.useRealTimers();
+  });
+
   it("proxies departure_time to nearest same-day-of-week when event is more than 7 days away", async () => {
     mockFetch.mockResolvedValue({
       ok: true,

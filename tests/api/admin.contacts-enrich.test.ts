@@ -238,4 +238,30 @@ describe("POST /api/admin/contacts/enrich-from-reviews", () => {
     const json = await res.json();
     expect(json.conflicts).toHaveLength(1);
   });
+
+  it("skips ReviewRequest records with null email", async () => {
+    mocks.contactFindMany.mockResolvedValue([CONTACT]);
+    mocks.reviewRequestFindMany.mockResolvedValue([
+      { id: "rr-null", name: "Nobody", email: null, phone: null },
+    ]);
+    mocks.reviewFindMany.mockResolvedValue([]);
+    const res = await POST(makeRequest());
+    const json = await res.json();
+    expect(json.enrichedCount).toBe(0);
+    expect(json.conflicts).toEqual([]);
+  });
+
+  it("processes only the first Review per contact and skips duplicates", async () => {
+    mocks.contactFindMany.mockResolvedValue([CONTACT]);
+    mocks.reviewRequestFindMany.mockResolvedValue([]);
+    mocks.reviewFindMany.mockResolvedValue([
+      // Both reference the same contact email; only the first should produce a conflict
+      { id: "rev-first", firstName: "Alice", lastName: "S.", customerRef: "alice@example.com" },
+      { id: "rev-second", firstName: "A.", lastName: "Smith", customerRef: "alice@example.com" },
+    ]);
+    const res = await POST(makeRequest());
+    const json = await res.json();
+    expect(json.conflicts).toHaveLength(1);
+    expect(json.conflicts[0].sourceId).toBe("rev-first");
+  });
 });
