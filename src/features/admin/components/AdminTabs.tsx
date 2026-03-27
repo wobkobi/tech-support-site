@@ -24,6 +24,7 @@ import {
   TravelBlockAdminList,
   type TravelBlockRow,
 } from "@/features/admin/components/TravelBlockAdminList";
+import type { ConflictEntry } from "@/app/api/admin/contacts/enrich-from-reviews/route";
 
 const TABS = ["reviews", "calendar", "contacts", "travel"] as const;
 type Tab = (typeof TABS)[number];
@@ -74,6 +75,11 @@ export function AdminTabs({
   const [syncResult, setSyncResult] = useState<string | null>(null);
   const [matching, setMatching] = useState(false);
   const [matchResult, setMatchResult] = useState<string | null>(null);
+  const [enriching, setEnriching] = useState(false);
+  const [enrichResult, setEnrichResult] = useState<string | null>(null);
+  const [conflicts, setConflicts] = useState<ConflictEntry[] | null>(null);
+  const [recalculating, setRecalculating] = useState(false);
+  const [recalculateResult, setRecalculateResult] = useState<string | null>(null);
 
   /**
    * Switches the active tab and updates the URL without adding a history entry.
@@ -151,6 +157,90 @@ export function AdminTabs({
       setMatchResult("Network error — try again.");
     } finally {
       setMatching(false);
+    }
+  }, [token]);
+
+  const runEnrich = useCallback(async () => {
+    setEnriching(true);
+    setEnrichResult(null);
+    setConflicts(null);
+    try {
+      const res = await fetch("/api/admin/contacts/enrich-from-reviews", {
+        method: "POST",
+        headers: { "X-Admin-Secret": token },
+      });
+      const data = (await res.json()) as {
+        ok: boolean;
+        enrichedCount?: number;
+        conflicts?: ConflictEntry[];
+        error?: string;
+      };
+      if (data.ok) {
+        const parts: string[] = [];
+        if ((data.enrichedCount ?? 0) > 0)
+          parts.push(`${data.enrichedCount} phone${data.enrichedCount === 1 ? "" : "s"} filled in`);
+        const conflictCount = data.conflicts?.length ?? 0;
+        if (conflictCount > 0)
+          parts.push(`${conflictCount} conflict${conflictCount === 1 ? "" : "s"} found`);
+        setEnrichResult(
+          parts.length > 0 ? parts.join(", ") + "." : "No missing data or conflicts found.",
+        );
+        setConflicts(data.conflicts ?? []);
+      } else {
+        setEnrichResult(`Error: ${data.error ?? "unknown"}`);
+      }
+    } catch {
+      setEnrichResult("Network error — try again.");
+    } finally {
+      setEnriching(false);
+    }
+  }, [token]);
+
+  const acceptConflict = useCallback(
+    async (conflict: ConflictEntry) => {
+      const updates: { name?: string; phone?: string } = {};
+      if (conflict.conflictFields.includes("name") && conflict.sourceName)
+        updates.name = conflict.sourceName;
+      if (conflict.conflictFields.includes("phone") && conflict.sourcePhone)
+        updates.phone = conflict.sourcePhone;
+      try {
+        await fetch(`/api/admin/contacts/${conflict.contactId}`, {
+          method: "PATCH",
+          headers: { "X-Admin-Secret": token, "Content-Type": "application/json" },
+          body: JSON.stringify(updates),
+        });
+      } catch {
+        // best-effort
+      }
+      setConflicts((prev) => prev?.filter((c) => c.sourceId !== conflict.sourceId) ?? null);
+    },
+    [token],
+  );
+
+  const skipConflict = useCallback((sourceId: string) => {
+    setConflicts((prev) => prev?.filter((c) => c.sourceId !== sourceId) ?? null);
+  }, []);
+
+  const runRecalculate = useCallback(async () => {
+    setRecalculating(true);
+    setRecalculateResult(null);
+    try {
+      const res = await fetch("/api/admin/travel/recalculate", {
+        method: "POST",
+        headers: { "X-Admin-Secret": token },
+      });
+      const data = (await res.json()) as { ok: boolean; cachedCount?: number; error?: string };
+      if (data.ok) {
+        setRecalculateResult(
+          `Done — ${data.cachedCount ?? 0} events cached. Reload to see updates.`,
+        );
+      } else {
+        setRecalculateResult(`Error: ${data.error ?? "unknown"}`);
+      }
+    } catch {
+      setRecalculateResult("Network error — try again.");
+    } finally {
+      setRecalculating(false);
     }
   }, [token]);
 
@@ -344,6 +434,18 @@ export function AdminTabs({
                 >
                   {syncing ? "Syncing…" : "Sync with Google"}
                 </button>
+                <button
+                  onClick={runEnrich}
+                  disabled={enriching}
+                  className={cn(
+                    "rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
+                    enriching
+                      ? "bg-seasalt-400/40 text-rich-black/40 cursor-not-allowed"
+                      : "bg-russian-violet/10 text-russian-violet hover:bg-russian-violet/20",
+                  )}
+                >
+                  {enriching ? "Checking…" : "Enrich from reviews"}
+                </button>
               </div>
               {backfillResult && (
                 <p className="text-rich-black/50 max-w-xs text-right text-xs">{backfillResult}</p>
@@ -351,20 +453,118 @@ export function AdminTabs({
               {syncResult && (
                 <p className="text-rich-black/50 max-w-xs text-right text-xs">{syncResult}</p>
               )}
+              {enrichResult && (
+                <p className="text-rich-black/50 max-w-xs text-right text-xs">{enrichResult}</p>
+              )}
             </div>
           </div>
           <ContactAdminList contacts={contacts} token={token} />
+
+          {conflicts !== null && conflicts.length > 0 && (
+            <div className="mt-6">
+              <h3 className="text-russian-violet mb-1 text-sm font-bold">
+                Conflicts ({conflicts.length})
+              </h3>
+              <p className="text-rich-black/50 mb-3 text-xs">
+                These records have data that differs from your contacts. Accept to update the
+                contact, or skip to leave it as-is.
+              </p>
+              <div className="flex flex-col gap-2">
+                {conflicts.map((conflict) => (
+                  <div
+                    key={conflict.sourceId}
+                    className="border-coquelicot-500/30 bg-coquelicot-500/5 rounded-lg border p-3"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-rich-black text-sm font-medium">
+                            {conflict.contactEmail}
+                          </span>
+                          <span className="bg-seasalt-400/60 text-rich-black/60 rounded px-1.5 py-0.5 text-xs font-medium">
+                            {conflict.source === "ReviewRequest" ? "Review request" : "Review"}
+                          </span>
+                        </div>
+                        <div className="mt-1.5 space-y-0.5">
+                          {conflict.conflictFields.includes("name") && (
+                            <p className="text-rich-black/70 text-xs">
+                              Name: <span className="font-medium">{conflict.contactName}</span>
+                              <span className="text-rich-black/30 mx-1">→</span>
+                              <span className="text-coquelicot-500 font-medium">
+                                {conflict.sourceName}
+                              </span>
+                            </p>
+                          )}
+                          {conflict.conflictFields.includes("phone") && (
+                            <p className="text-rich-black/70 text-xs">
+                              Phone:{" "}
+                              <span className="font-medium">{conflict.contactPhone ?? "—"}</span>
+                              <span className="text-rich-black/30 mx-1">→</span>
+                              <span className="text-coquelicot-500 font-medium">
+                                {conflict.sourcePhone}
+                              </span>
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <button
+                          onClick={() => void acceptConflict(conflict)}
+                          className="bg-russian-violet/10 text-russian-violet hover:bg-russian-violet/20 rounded px-2 py-1 text-xs font-semibold transition-colors"
+                        >
+                          Accept suggested
+                        </button>
+                        <button
+                          onClick={() => skipConflict(conflict.sourceId)}
+                          className="text-rich-black/40 hover:text-rich-black/70 rounded px-2 py-1 text-xs font-semibold transition-colors"
+                        >
+                          Skip
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {conflicts !== null && conflicts.length === 0 && enrichResult && (
+            <p className="text-rich-black/40 mt-4 text-xs">No conflicts remaining.</p>
+          )}
         </section>
       )}
 
       {/* Travel view */}
       {tab === "travel" && (
         <section className={cn(CARD, "animate-fade-in")}>
-          <h2 className="text-russian-violet mb-1 text-lg font-bold">Travel blocks</h2>
-          <p className="text-rich-black/50 mb-4 text-xs">
-            Travel time blocks computed for calendar events with a location. Refreshed every 15
-            minutes by the cron job.
-          </p>
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-russian-violet mb-1 text-lg font-bold">Travel blocks</h2>
+              <p className="text-rich-black/50 text-xs">
+                Travel time blocks computed for calendar events with a location. Refreshed every 15
+                minutes by the cron job.
+              </p>
+            </div>
+            <div className="flex flex-col items-end gap-2">
+              <button
+                onClick={() => void runRecalculate()}
+                disabled={recalculating}
+                className={cn(
+                  "rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
+                  recalculating
+                    ? "bg-seasalt-400/40 text-rich-black/40 cursor-not-allowed"
+                    : "bg-russian-violet/10 text-russian-violet hover:bg-russian-violet/20",
+                )}
+              >
+                {recalculating ? "Recalculating…" : "Recalculate travel times"}
+              </button>
+              {recalculateResult && (
+                <p className="text-rich-black/50 max-w-xs text-right text-xs">
+                  {recalculateResult}
+                </p>
+              )}
+            </div>
+          </div>
           <TravelBlockAdminList blocks={travelBlocks} />
         </section>
       )}

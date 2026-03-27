@@ -106,4 +106,16 @@ describe("PATCH /api/admin/contacts/[id]", () => {
       }),
     );
   });
+
+  it("returns 400 when name is an empty string", async () => {
+    const res = await PATCH(makeRequest({ name: "" }), PARAMS);
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/name is required/i);
+  });
+
+  it("returns 400 when phone is not a valid phone number", async () => {
+    const res = await PATCH(makeRequest({ phone: "123" }), PARAMS);
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/valid phone/i);
+  });
 });

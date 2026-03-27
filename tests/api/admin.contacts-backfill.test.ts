@@ -109,4 +109,16 @@ describe("POST /api/admin/contacts/backfill", () => {
     expect(json.upsertedCount).toBe(0);
     expect(mocks.contactUpsert).not.toHaveBeenCalled();
   });
+
+  it("handles bookings with null notes gracefully", async () => {
+    mocks.bookingFindMany.mockResolvedValue([
+      { name: "Dana", email: "dana@example.com", notes: null },
+    ]);
+    await POST(FAKE_REQ);
+    expect(mocks.contactUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ phone: null, address: null }),
+      }),
+    );
+  });
 });

@@ -118,4 +118,14 @@ describe("POST /api/admin/reviews/match-contacts", () => {
     const json = await res.json();
     expect(json.error).toMatch(/failed/i);
   });
+
+  it("returns matchedCount 0 and skips DB lookup when all reviews have no resolvable email", async () => {
+    mocks.reviewFindMany.mockResolvedValue([{ id: "r4", bookingId: null, customerRef: null }]);
+    const res = await POST(FAKE_REQ);
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.ok).toBe(true);
+    expect(json.matchedCount).toBe(0);
+    expect(mocks.contactFindMany).not.toHaveBeenCalled();
+  });
 });
