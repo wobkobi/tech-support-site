@@ -50,12 +50,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     }
 
-    // Update booking status and clear activeSlotKey to free up the slot
     await prisma.booking.update({
       where: { id: booking.id },
       data: {
         status: "cancelled",
-        activeSlotKey: null,
+        activeSlotKey: `released:${booking.id}`,
       },
     });
 

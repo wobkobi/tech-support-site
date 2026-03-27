@@ -4,7 +4,7 @@ import { NextRequest } from "next/server";
 const mocks = vi.hoisted(() => ({
   isCronAuthorized: vi.fn(),
   bookingFindMany: vi.fn(),
-  bookingUpdateMany: vi.fn(),
+  bookingUpdate: vi.fn(),
 }));
 
 vi.mock("@/shared/lib/auth", () => ({
@@ -15,7 +15,7 @@ vi.mock("@/shared/lib/prisma", () => ({
   prisma: {
     booking: {
       findMany: mocks.bookingFindMany,
-      updateMany: mocks.bookingUpdateMany,
+      update: mocks.bookingUpdate,
     },
   },
 }));
@@ -46,22 +46,26 @@ describe("GET /api/cron/release-holds", () => {
     expect(json.ok).toBe(true);
     expect(json.releasedCount).toBe(0);
     expect(json.releasedIds).toEqual([]);
-    expect(mocks.bookingUpdateMany).not.toHaveBeenCalled();
+    expect(mocks.bookingUpdate).not.toHaveBeenCalled();
   });
 
   it("cancels expired holds and returns their IDs", async () => {
     mocks.isCronAuthorized.mockReturnValue(true);
     mocks.bookingFindMany.mockResolvedValue([{ id: "hold-1" }, { id: "hold-2" }]);
-    mocks.bookingUpdateMany.mockResolvedValue({ count: 2 });
+    mocks.bookingUpdate.mockResolvedValue({});
     const res = await GET(FAKE_REQ);
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.ok).toBe(true);
     expect(json.releasedCount).toBe(2);
     expect(json.releasedIds).toEqual(["hold-1", "hold-2"]);
-    expect(mocks.bookingUpdateMany).toHaveBeenCalledWith({
-      where: { id: { in: ["hold-1", "hold-2"] } },
-      data: { status: "cancelled", activeSlotKey: null },
+    expect(mocks.bookingUpdate).toHaveBeenCalledWith({
+      where: { id: "hold-1" },
+      data: { status: "cancelled", activeSlotKey: "released:hold-1" },
+    });
+    expect(mocks.bookingUpdate).toHaveBeenCalledWith({
+      where: { id: "hold-2" },
+      data: { status: "cancelled", activeSlotKey: "released:hold-2" },
     });
   });
 

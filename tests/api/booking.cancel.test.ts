@@ -80,7 +80,7 @@ describe("POST /api/booking/cancel", () => {
     expect(json.ok).toBe(true);
     expect(mocks.bookingUpdate).toHaveBeenCalledWith({
       where: { id: "booking-2" },
-      data: { status: "cancelled", activeSlotKey: null },
+      data: { status: "cancelled", activeSlotKey: "released:booking-2" },
     });
   });
 

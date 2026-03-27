@@ -65,10 +65,10 @@ export async function PATCH(
       }
     }
     data.status = "cancelled";
-    data.activeSlotKey = null;
+    data.activeSlotKey = `released:${id}`;
   } else if (body.status === "completed") {
     data.status = "completed";
-    data.activeSlotKey = null;
+    data.activeSlotKey = `released:${id}`;
   } else if (body.status === "confirmed") {
     data.status = "confirmed";
   }

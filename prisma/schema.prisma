@@ -46,8 +46,7 @@ model Booking {
   reviewToken String  @unique @default(uuid())
 
   // Double-booking prevention: set to startAt.toISOString() when active (held/confirmed),
-  // null when cancelled or expired. Sparse unique index only enforces uniqueness on
-  // non-null values, so multiple cancelled bookings can coexist safely.
+  // set to "released:<id>" when cancelled or expired so the slot is freed without null collisions.
   activeSlotKey String? @unique
 
   // Google Calendar event ID, used to delete the event on cancellation.

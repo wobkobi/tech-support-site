@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   bookingUpdate: vi.fn(),
   bookingDelete: vi.fn(),
   deleteBookingEvent: vi.fn(),
+  contactUpdateMany: vi.fn(),
 }));
 
 vi.mock("@/shared/lib/auth", () => ({
@@ -20,6 +21,7 @@ vi.mock("@/shared/lib/prisma", () => ({
       update: mocks.bookingUpdate,
       delete: mocks.bookingDelete,
     },
+    contact: { updateMany: mocks.contactUpdateMany },
   },
 }));
 
@@ -56,6 +58,7 @@ describe("PATCH /api/admin/bookings/[id]", () => {
     mocks.bookingFindUnique.mockResolvedValue(BOOKING);
     mocks.bookingUpdate.mockResolvedValue({});
     mocks.deleteBookingEvent.mockResolvedValue(undefined);
+    mocks.contactUpdateMany.mockResolvedValue({});
   });
 
   it("returns 401 when request is not from admin", async () => {
@@ -89,14 +92,14 @@ describe("PATCH /api/admin/bookings/[id]", () => {
     });
   });
 
-  it("cancels booking, deletes calendar event, and clears activeSlotKey", async () => {
+  it("cancels booking, deletes calendar event, and sets activeSlotKey to released", async () => {
     mocks.isAdminRequest.mockReturnValue(true);
     const res = await PATCH(makeRequest({ status: "cancelled" }), PARAMS);
     expect(res.status).toBe(200);
     expect(mocks.deleteBookingEvent).toHaveBeenCalledWith({ eventId: "cal-event-1" });
     expect(mocks.bookingUpdate).toHaveBeenCalledWith({
       where: { id: "booking-123" },
-      data: { status: "cancelled", activeSlotKey: null },
+      data: { status: "cancelled", activeSlotKey: "released:booking-123" },
     });
   });
 
@@ -107,7 +110,7 @@ describe("PATCH /api/admin/bookings/[id]", () => {
     expect(mocks.deleteBookingEvent).not.toHaveBeenCalled();
     expect(mocks.bookingUpdate).toHaveBeenCalledWith({
       where: { id: "booking-123" },
-      data: { status: "cancelled", activeSlotKey: null },
+      data: { status: "cancelled", activeSlotKey: "released:booking-123" },
     });
   });
 
@@ -126,12 +129,12 @@ describe("PATCH /api/admin/bookings/[id]", () => {
     expect((await res.json()).ok).toBe(true);
   });
 
-  it("marks booking as completed and clears activeSlotKey", async () => {
+  it("marks booking as completed and sets activeSlotKey to released", async () => {
     mocks.isAdminRequest.mockReturnValue(true);
     await PATCH(makeRequest({ status: "completed" }), PARAMS);
     expect(mocks.bookingUpdate).toHaveBeenCalledWith({
       where: { id: "booking-123" },
-      data: { status: "completed", activeSlotKey: null },
+      data: { status: "completed", activeSlotKey: "released:booking-123" },
     });
   });
 
@@ -143,6 +146,36 @@ describe("PATCH /api/admin/bookings/[id]", () => {
       where: { id: "booking-123" },
       data: { status: "confirmed" },
     });
+  });
+
+  it("updates the contact address when address is provided in the request body", async () => {
+    mocks.isAdminRequest.mockReturnValue(true);
+    await PATCH(makeRequest({ address: "2 New St, Auckland" }), PARAMS);
+    expect(mocks.contactUpdateMany).toHaveBeenCalledWith({
+      where: { email: "alice@example.com" },
+      data: { address: "2 New St, Auckland" },
+    });
+  });
+
+  it("contact address update failure does not fail the PATCH request", async () => {
+    mocks.isAdminRequest.mockReturnValue(true);
+    mocks.contactUpdateMany.mockRejectedValue(new Error("Contact DB error"));
+    const res = await PATCH(makeRequest({ address: "2 New St" }), PARAMS);
+    expect(res.status).toBe(200);
+    expect((await res.json()).ok).toBe(true);
+  });
+
+  it("replaces the address line in notes when address is given without notes field", async () => {
+    mocks.isAdminRequest.mockReturnValue(true);
+    mocks.bookingFindUnique.mockResolvedValue({
+      ...BOOKING,
+      notes:
+        "Fix my printer.\n\n[10am - 1 hr]\nMeeting type: In-person\nAddress: 1 Old St\nPhone: 021 111\n",
+    });
+    await PATCH(makeRequest({ address: "2 New St" }), PARAMS);
+    const updateCall = mocks.bookingUpdate.mock.calls[0][0];
+    expect(updateCall.data.notes).toContain("Address: 2 New St");
+    expect(updateCall.data.notes).not.toContain("1 Old St");
   });
 });
 
