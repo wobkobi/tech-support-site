@@ -12,6 +12,7 @@ import { deleteBookingEvent } from "@/features/calendar/lib/google-calendar";
 interface PatchPayload {
   name?: string;
   email?: string;
+  phone?: string;
   notes?: string;
   address?: string;
   status?: "confirmed" | "cancelled" | "completed";
@@ -46,6 +47,7 @@ export async function PATCH(
 
   if (body.name !== undefined) data.name = body.name.trim();
   if (body.email !== undefined) data.email = body.email.trim();
+  if (body.phone !== undefined) data.phone = body.phone.trim() || null;
   if (body.notes !== undefined) data.notes = body.notes;
 
   if (body.address !== undefined && body.notes === undefined) {
@@ -83,6 +85,17 @@ export async function PATCH(
       });
     } catch (err) {
       console.error("[admin/bookings] Failed to update contact address:", err);
+    }
+  }
+
+  if (body.phone !== undefined && booking.email) {
+    try {
+      await prisma.contact.updateMany({
+        where: { email: booking.email },
+        data: { phone: body.phone.trim() || null },
+      });
+    } catch (err) {
+      console.error("[admin/bookings] Failed to update contact phone:", err);
     }
   }
 

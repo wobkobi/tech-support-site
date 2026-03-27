@@ -13,6 +13,7 @@ export interface AdminBookingRow {
   id: string;
   name: string;
   email: string;
+  phone: string | null;
   notes: string | null;
   startAt: string;
   endAt: string;
@@ -27,6 +28,7 @@ type StatusFilter = "all" | "held" | "confirmed" | "cancelled" | "completed";
 interface EditState {
   name: string;
   email: string;
+  phone: string;
   notes: string;
   address: string;
 }
@@ -96,7 +98,13 @@ export function BookingAdminList({
       const address = (b.notes ?? "").match(/Address:\s*(.+)/i)?.[1]?.trim() ?? "";
       setEdits((prev) => ({
         ...prev,
-        [b.id]: { name: b.name, email: b.email, notes: b.notes ?? "", address },
+        [b.id]: {
+          name: b.name,
+          email: b.email,
+          phone: b.phone ?? "",
+          notes: b.notes ?? "",
+          address,
+        },
       }));
     }
   }
@@ -150,13 +158,22 @@ export function BookingAdminList({
     const ok = await patch(b.id, {
       name: edit.name,
       email: edit.email,
+      phone: edit.phone || undefined,
       notes: updatedNotes,
       address: edit.address || undefined,
     });
     if (ok) {
       setBookings((prev) =>
         prev.map((r) =>
-          r.id === b.id ? { ...r, name: edit.name, email: edit.email, notes: updatedNotes } : r,
+          r.id === b.id
+            ? {
+                ...r,
+                name: edit.name,
+                email: edit.email,
+                phone: edit.phone || null,
+                notes: updatedNotes,
+              }
+            : r,
         ),
       );
       setExpandedId(null);
@@ -257,6 +274,7 @@ export function BookingAdminList({
           const edit = edits[b.id] ?? {
             name: b.name,
             email: b.email,
+            phone: b.phone ?? "",
             notes: b.notes ?? "",
             address: (b.notes ?? "").match(/Address:\s*(.+)/i)?.[1]?.trim() ?? "",
           };
@@ -299,6 +317,7 @@ export function BookingAdminList({
                     </span>
                   </div>
                   <span className="text-rich-black/50 text-xs">{b.email}</span>
+                  {b.phone && <span className="text-rich-black/50 text-xs">{b.phone}</span>}
                   <span className="text-rich-black/60 text-xs">
                     {formatNZDateTime(b.startAt)} &ndash; {formatNZDateTime(b.endAt)}
                   </span>
@@ -362,6 +381,16 @@ export function BookingAdminList({
                         className="border-seasalt-400/30 rounded-lg border bg-white/80 px-3 py-2 text-sm"
                         value={edit.email}
                         onChange={(e) => setField(b.id, "email", e.target.value)}
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className="text-rich-black/60 text-xs font-medium">Phone</span>
+                      <input
+                        type="tel"
+                        className="border-seasalt-400/30 rounded-lg border bg-white/80 px-3 py-2 text-sm"
+                        value={edit.phone}
+                        onChange={(e) => setField(b.id, "phone", e.target.value)}
+                        placeholder="Phone number"
                       />
                     </label>
                   </div>

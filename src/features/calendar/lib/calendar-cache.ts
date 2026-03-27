@@ -152,8 +152,8 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
 
     if (existing) {
       const eventTimesMatch =
-        existing.eventStartAt?.getTime() === eventStart.getTime() &&
-        existing.eventEndAt?.getTime() === eventEnd.getTime();
+        existing.eventStartAt.getTime() === eventStart.getTime() &&
+        existing.eventEndAt.getTime() === eventEnd.getTime();
 
       if (eventTimesMatch) {
         // null means the direction was never successfully calculated — treat as needing retry
@@ -205,11 +205,7 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
 
     if (!needsRebuild && existing != null) {
       // Upsert cache entries so they are recreated if they expired and were deleted
-      if (
-        existing.beforeEventId != null &&
-        existing.eventStartAt != null &&
-        existing.roundedMinutes != null
-      ) {
+      if (existing.beforeEventId != null && existing.roundedMinutes != null) {
         const travelToStart = new Date(
           existing.eventStartAt.getTime() - existing.roundedMinutes * 60_000,
         );

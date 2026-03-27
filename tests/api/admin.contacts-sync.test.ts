@@ -78,4 +78,18 @@ describe("POST /api/admin/contacts/sync", () => {
     expect(res.status).toBe(500);
     expect((await res.json()).error).toBe("Unknown error");
   });
+
+  it("calls syncAllContactsToGoogle before importFromGoogleContacts", async () => {
+    const order: string[] = [];
+    mocks.syncAllContactsToGoogle.mockImplementation(async () => {
+      order.push("sync");
+      return 0;
+    });
+    mocks.importFromGoogleContacts.mockImplementation(async () => {
+      order.push("import");
+      return 0;
+    });
+    await POST(FAKE_REQ);
+    expect(order).toEqual(["sync", "import"]);
+  });
 });

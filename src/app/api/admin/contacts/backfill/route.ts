@@ -50,11 +50,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     await prisma.contact.upsert({
       where: { email },
       create: { name, email, phone, address },
-      update: {
-        name,
-        ...(phone !== null && { phone }),
-        ...(address !== null && { address }),
-      },
+      // Never overwrite an existing contact — admin edits are the source of truth.
+      update: {},
     });
     upsertedCount++;
   }

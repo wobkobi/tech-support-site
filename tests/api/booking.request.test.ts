@@ -173,7 +173,7 @@ describe("POST /api/booking/request - success and error paths", () => {
       expect.objectContaining({
         where: { email: "alice@example.com" },
         create: expect.objectContaining({ email: "alice@example.com", phone: "021 111 2222" }),
-        update: expect.objectContaining({ phone: "021 111 2222" }),
+        update: {},
       }),
     );
   });

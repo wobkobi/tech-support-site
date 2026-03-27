@@ -64,10 +64,9 @@ export async function importFromGoogleContacts(): Promise<number> {
               address,
               googleContactId: resourceName,
             },
+            // For existing contacts, only link the Google resource name.
+            // Local name/phone/address are the source of truth and must not be overwritten.
             update: {
-              name,
-              phone,
-              address,
               googleContactId: resourceName,
             },
           });

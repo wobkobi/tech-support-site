@@ -113,8 +113,34 @@ describe("importFromGoogleContacts", () => {
           phone: "021 111 2222",
           address: "1 Main St",
         }),
+        // update must NOT overwrite local name/phone/address — local DB is source of truth
+        update: { googleContactId: "people/1" },
       }),
     );
+  });
+
+  it("does not overwrite local name, phone, or address for existing contacts", async () => {
+    mocks.connectionsList.mockResolvedValue({
+      data: {
+        connections: [
+          {
+            resourceName: "people/1",
+            names: [{ displayName: "Google Name" }],
+            emailAddresses: [{ value: "alice@example.com" }],
+            phoneNumbers: [{ value: "000 000 0000" }],
+          },
+        ],
+        nextPageToken: undefined,
+      },
+    });
+    await importFromGoogleContacts();
+    const call = mocks.contactUpsert.mock.calls[0][0] as {
+      update: Record<string, unknown>;
+    };
+    expect(call.update).toEqual({ googleContactId: "people/1" });
+    expect(call.update).not.toHaveProperty("name");
+    expect(call.update).not.toHaveProperty("phone");
+    expect(call.update).not.toHaveProperty("address");
   });
 
   it("skips persons without a resourceName", async () => {

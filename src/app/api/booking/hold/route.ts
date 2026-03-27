@@ -124,9 +124,6 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreateBoo
     if (meetingType === "in-person" && address) {
       bookingNotes += `Address: ${address.trim()}\n`;
     }
-    if (phone) {
-      bookingNotes += `Phone: ${phone.trim()}\n`;
-    }
     if (notes?.trim()) {
       bookingNotes += `\nNotes: ${notes.trim()}`;
     }
@@ -137,6 +134,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreateBoo
         data: {
           name: name.trim(),
           email: email.trim().toLowerCase(),
+          phone: phone?.trim() || null,
           notes: bookingNotes,
           startAt,
           endAt,

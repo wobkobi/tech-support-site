@@ -25,8 +25,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    const importedCount = await importFromGoogleContacts();
+    // Push local contacts to Google first so local edits are not overwritten by the import.
     const syncedCount = await syncAllContactsToGoogle();
+    // Then pull new Google contacts in (existing records only get googleContactId linked).
+    const importedCount = await importFromGoogleContacts();
     return NextResponse.json({ ok: true, importedCount, syncedCount });
   } catch (error) {
     console.error("[api/admin/contacts/sync] Error:", error);
