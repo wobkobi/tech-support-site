@@ -71,7 +71,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       select: { id: true, email: true, phone: true },
     });
 
-    const contactIdByEmail = new Map(contacts.map((c) => [c.email.toLowerCase(), c.id]));
+    const contactIdByEmail = new Map(
+      contacts.filter((c) => c.email).map((c) => [c.email!.toLowerCase(), c.id]),
+    );
     const contactIdByPhone = new Map<string, string>();
     for (const c of contacts) {
       if (c.phone) {

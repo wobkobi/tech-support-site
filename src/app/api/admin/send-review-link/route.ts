@@ -91,15 +91,26 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       },
     });
 
-    // Upsert a Contact record for email-mode review requests — best effort, never blocks.
+    // Upsert a Contact record — best effort, never blocks.
     if (mode === "email" && reviewRequest.email) {
       try {
-        await prisma.contact.upsert({
-          where: { email: reviewRequest.email },
-          create: { name: name.trim(), email: reviewRequest.email, phone: null },
-          // Never overwrite an existing contact — admin edits are the source of truth.
-          update: {},
-        });
+        const exists = await prisma.contact.findFirst({ where: { email: reviewRequest.email } });
+        if (!exists) {
+          await prisma.contact.create({
+            data: { name: name.trim(), email: reviewRequest.email, phone: null },
+          });
+        }
+      } catch {
+        // best-effort
+      }
+    } else if (mode === "sms" && reviewRequest.phone) {
+      try {
+        const exists = await prisma.contact.findFirst({ where: { phone: reviewRequest.phone } });
+        if (!exists) {
+          await prisma.contact.create({
+            data: { name: name.trim(), email: null, phone: reviewRequest.phone },
+          });
+        }
       } catch {
         // best-effort
       }

@@ -37,49 +37,71 @@ async function backfillContacts(prisma: PrismaClient): Promise<void> {
       select: { name: true, email: true, phone: true, notes: true },
     }),
     prisma.reviewRequest.findMany({
-      where: { email: { not: null } },
       orderBy: { createdAt: "asc" },
       select: { name: true, email: true, phone: true },
     }),
-    prisma.contact.findMany({ select: { email: true } }),
+    prisma.contact.findMany({ select: { email: true, phone: true } }),
   ]);
 
-  const existingEmails = new Set(existing.map((c) => c.email.toLowerCase()));
+  const existingEmails = new Set(
+    existing.filter((c) => c.email).map((c) => c.email!.toLowerCase()),
+  );
+  const existingPhones = new Set(
+    existing.filter((c) => c.phone).map((c) => normalizePhone(toE164NZ(c.phone!) || c.phone!)),
+  );
 
-  const toCreate = new Map<
+  const toCreateByEmail = new Map<
     string,
     { name: string; email: string; phone: string | null; address: string | null }
   >();
+  const toCreateByPhone = new Map<string, { name: string; email: null; phone: string }>();
 
   // Bookings sorted asc — most recent overwrites earlier entries in the Map
   for (const b of bookings) {
     const email = b.email.toLowerCase();
     if (existingEmails.has(email)) continue;
     const address = b.notes?.match(/Address:\s*(.+)/i)?.[1]?.trim() ?? null;
-    toCreate.set(email, { name: b.name, email, phone: b.phone ?? null, address });
+    toCreateByEmail.set(email, { name: b.name, email, phone: b.phone ?? null, address });
   }
 
-  // ReviewRequests sorted asc — most recent overwrites, but keep booking phone/address if present
+  // ReviewRequests sorted asc — email-based update existing map, phone-only go in separate map
   for (const rr of reviewRequests) {
-    if (!rr.email) continue;
-    const email = rr.email.toLowerCase();
-    if (existingEmails.has(email)) continue;
-    const prev = toCreate.get(email);
-    toCreate.set(email, {
-      name: rr.name,
-      email,
-      phone: prev?.phone ?? rr.phone ?? null,
-      address: prev?.address ?? null,
-    });
+    if (rr.email) {
+      const email = rr.email.toLowerCase();
+      if (existingEmails.has(email)) continue;
+      const prev = toCreateByEmail.get(email);
+      toCreateByEmail.set(email, {
+        name: rr.name,
+        email,
+        phone: prev?.phone ?? rr.phone ?? null,
+        address: prev?.address ?? null,
+      });
+    } else if (rr.phone) {
+      const phone = toE164NZ(rr.phone) || rr.phone;
+      const normPhone = normalizePhone(phone);
+      if (!normPhone || existingPhones.has(normPhone)) continue;
+      if (!toCreateByPhone.has(normPhone)) {
+        toCreateByPhone.set(normPhone, { name: rr.name, email: null, phone });
+      }
+    }
   }
 
-  if (toCreate.size === 0) return;
+  if (toCreateByEmail.size === 0 && toCreateByPhone.size === 0) return;
 
-  await Promise.all(
-    [...toCreate.values()].map((d) =>
-      prisma.contact.upsert({ where: { email: d.email }, create: d, update: {} }).catch(() => null),
+  await Promise.all([
+    ...[...toCreateByEmail.values()].map((d) =>
+      prisma.contact
+        .findFirst({ where: { email: d.email } })
+        .then((exists) => (exists ? null : prisma.contact.create({ data: d })))
+        .catch(() => null),
     ),
-  );
+    ...[...toCreateByPhone.values()].map((d) =>
+      prisma.contact
+        .findFirst({ where: { phone: d.phone } })
+        .then((exists) => (exists ? null : prisma.contact.create({ data: d })))
+        .catch(() => null),
+    ),
+  ]);
 }
 
 /**
@@ -120,7 +142,9 @@ async function matchReviewContacts(prisma: PrismaClient): Promise<void> {
     }
   }
 
-  const contactIdByEmail = new Map(contacts.map((c) => [c.email.toLowerCase(), c.id]));
+  const contactIdByEmail = new Map(
+    contacts.filter((c) => c.email).map((c) => [c.email!.toLowerCase(), c.id]),
+  );
   const contactIdByPhone = new Map<string, string>();
   for (const c of contacts) {
     if (c.phone) {
@@ -188,7 +212,9 @@ async function autoEnrich(prisma: PrismaClient): Promise<ConflictEntry[]> {
     }),
   ]);
 
-  const contactByEmail = new Map(contacts.map((c) => [c.email.toLowerCase(), c]));
+  const contactByEmail = new Map(
+    contacts.filter((c) => c.email).map((c) => [c.email!.toLowerCase(), c]),
+  );
   const contactByPhone = new Map<string, (typeof contacts)[0]>();
   for (const c of contacts) {
     if (c.phone) {

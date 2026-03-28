@@ -17,8 +17,10 @@ const mocks = vi.hoisted(() => {
   });
   const contactUpsert = vi.fn();
   const contactFindMany = vi.fn();
+  const contactFindFirst = vi.fn();
   const contactFindUnique = vi.fn();
   const contactUpdate = vi.fn();
+  const contactCreate = vi.fn();
   const reviewRequestFindMany = vi.fn();
   return {
     connectionsList,
@@ -29,8 +31,10 @@ const mocks = vi.hoisted(() => {
     peopleFactory,
     contactUpsert,
     contactFindMany,
+    contactFindFirst,
     contactFindUnique,
     contactUpdate,
+    contactCreate,
     reviewRequestFindMany,
   };
 });
@@ -50,8 +54,10 @@ vi.mock("@/shared/lib/prisma", () => ({
     contact: {
       upsert: mocks.contactUpsert,
       findMany: mocks.contactFindMany,
+      findFirst: mocks.contactFindFirst,
       findUnique: mocks.contactFindUnique,
       update: mocks.contactUpdate,
+      create: mocks.contactCreate,
     },
     reviewRequest: {
       findMany: mocks.reviewRequestFindMany,
@@ -73,10 +79,11 @@ describe("importFromGoogleContacts", () => {
       data: { connections: [], nextPageToken: undefined },
     });
     mocks.contactUpsert.mockResolvedValue({});
+    mocks.contactFindFirst.mockResolvedValue(null);
     mocks.contactUpdate.mockResolvedValue({});
-    // Default: no ReviewRequest or phone-bearing Contact rows
+    mocks.contactCreate.mockResolvedValue({});
+    // Default: no ReviewRequest rows
     mocks.reviewRequestFindMany.mockResolvedValue([]);
-    mocks.contactFindMany.mockResolvedValue([]);
   });
 
   it("returns 0 when the API call throws", async () => {
@@ -88,10 +95,11 @@ describe("importFromGoogleContacts", () => {
   it("returns 0 when there are no connections", async () => {
     const count = await importFromGoogleContacts();
     expect(count).toBe(0);
-    expect(mocks.contactUpsert).not.toHaveBeenCalled();
+    expect(mocks.contactCreate).not.toHaveBeenCalled();
+    expect(mocks.contactUpdate).not.toHaveBeenCalled();
   });
 
-  it("upserts each contact and returns the total count", async () => {
+  it("creates each contact and returns the total count", async () => {
     mocks.connectionsList.mockResolvedValue({
       data: {
         connections: [
@@ -113,22 +121,19 @@ describe("importFromGoogleContacts", () => {
     });
     const count = await importFromGoogleContacts();
     expect(count).toBe(2);
-    expect(mocks.contactUpsert).toHaveBeenCalledTimes(2);
-    expect(mocks.contactUpsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { email: "alice@example.com" },
-        create: expect.objectContaining({
-          googleContactId: "people/1",
-          phone: "+64211112222",
-          address: "1 Main St",
-        }),
-        // update must NOT overwrite local name/phone/address — local DB is source of truth
-        update: { googleContactId: "people/1" },
+    expect(mocks.contactCreate).toHaveBeenCalledTimes(2);
+    expect(mocks.contactCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        email: "alice@example.com",
+        googleContactId: "people/1",
+        phone: "+64211112222",
+        address: "1 Main St",
       }),
-    );
+    });
   });
 
   it("does not overwrite local name, phone, or address for existing contacts", async () => {
+    mocks.contactFindFirst.mockResolvedValue({ id: "existing-1" });
     mocks.connectionsList.mockResolvedValue({
       data: {
         connections: [
@@ -143,13 +148,12 @@ describe("importFromGoogleContacts", () => {
       },
     });
     await importFromGoogleContacts();
-    const call = mocks.contactUpsert.mock.calls[0][0] as {
-      update: Record<string, unknown>;
-    };
-    expect(call.update).toEqual({ googleContactId: "people/1" });
-    expect(call.update).not.toHaveProperty("name");
-    expect(call.update).not.toHaveProperty("phone");
-    expect(call.update).not.toHaveProperty("address");
+    // Must update only googleContactId — never name/phone/address
+    expect(mocks.contactUpdate).toHaveBeenCalledWith({
+      where: { id: "existing-1" },
+      data: { googleContactId: "people/1" },
+    });
+    expect(mocks.contactCreate).not.toHaveBeenCalled();
   });
 
   it("skips persons without a resourceName", async () => {
@@ -194,17 +198,17 @@ describe("importFromGoogleContacts", () => {
     });
     const count = await importFromGoogleContacts();
     expect(count).toBe(1);
-    expect(mocks.contactUpsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { email: "carol@example.com" },
-        create: expect.objectContaining({ googleContactId: "people/3", name: "Carol" }),
-        update: { googleContactId: "people/3" },
+    expect(mocks.contactCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        email: "carol@example.com",
+        googleContactId: "people/3",
+        name: "Carol",
       }),
-    );
+    });
   });
 
   it("links googleContactId by phone when no email is found anywhere", async () => {
-    mocks.contactFindMany.mockResolvedValue([{ id: "contact-9", phone: "+64211112222" }]);
+    mocks.contactFindFirst.mockResolvedValue({ id: "contact-9" });
     mocks.connectionsList.mockResolvedValue({
       data: {
         connections: [
@@ -226,7 +230,7 @@ describe("importFromGoogleContacts", () => {
     });
   });
 
-  it("skips a phone-only Google contact when no ReviewRequest or existing contact matches the phone", async () => {
+  it("creates a phone-only contact when no ReviewRequest or existing contact matches the phone", async () => {
     mocks.connectionsList.mockResolvedValue({
       data: {
         connections: [
@@ -240,9 +244,16 @@ describe("importFromGoogleContacts", () => {
       },
     });
     const count = await importFromGoogleContacts();
-    expect(count).toBe(0);
+    expect(count).toBe(1);
     expect(mocks.contactUpsert).not.toHaveBeenCalled();
-    expect(mocks.contactUpdate).not.toHaveBeenCalled();
+    expect(mocks.contactCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        name: "Eve",
+        email: null,
+        phone: "+64219998888",
+        googleContactId: "people/5",
+      }),
+    });
   });
 
   it("continues processing after a per-contact upsert error", async () => {
@@ -263,8 +274,8 @@ describe("importFromGoogleContacts", () => {
         nextPageToken: undefined,
       },
     });
-    mocks.contactUpsert.mockRejectedValueOnce(new Error("DB error"));
-    mocks.contactUpsert.mockResolvedValueOnce({});
+    mocks.contactCreate.mockRejectedValueOnce(new Error("DB error"));
+    mocks.contactCreate.mockResolvedValueOnce({});
     const count = await importFromGoogleContacts();
     expect(count).toBe(1);
   });
@@ -314,11 +325,9 @@ describe("importFromGoogleContacts", () => {
       },
     });
     await importFromGoogleContacts();
-    expect(mocks.contactUpsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        create: expect.objectContaining({ name: "Charlie" }),
-      }),
-    );
+    expect(mocks.contactCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({ name: "Charlie" }),
+    });
   });
 });
 

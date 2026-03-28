@@ -141,10 +141,12 @@ describe("PATCH /api/admin/contacts/[id]", () => {
     );
   });
 
-  it("returns 400 when email is an empty string", async () => {
+  it("sets email to null when an empty string is sent", async () => {
     const res = await PATCH(makeRequest({ email: "" }), PARAMS);
-    expect(res.status).toBe(400);
-    expect((await res.json()).error).toMatch(/email is required/i);
+    expect(res.status).toBe(200);
+    expect(mocks.contactUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ email: null }) }),
+    );
   });
 
   it("returns 400 when email format is invalid", async () => {

@@ -66,12 +66,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     ): Promise<void> {
       if (!contactEmail) return;
       try {
-        await prisma.contact.upsert({
-          where: { email: contactEmail },
-          create: { name: contactName, email: contactEmail, phone: normalizedPhone || null },
-          // Never overwrite an existing contact — admin edits are the source of truth.
-          update: {},
-        });
+        const exists = await prisma.contact.findFirst({ where: { email: contactEmail } });
+        if (!exists) {
+          await prisma.contact.create({
+            data: { name: contactName, email: contactEmail, phone: normalizedPhone || null },
+          });
+        }
       } catch {
         // best-effort
       }

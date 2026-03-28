@@ -43,18 +43,17 @@ export async function PATCH(
   }
   if (body.email !== undefined) {
     const trimmedEmail = body.email.trim().toLowerCase();
-    if (!trimmedEmail) {
-      return NextResponse.json({ error: "Email is required." }, { status: 400 });
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
       return NextResponse.json({ error: "Please enter a valid email address." }, { status: 400 });
     }
-    const dupe = await prisma.contact.findFirst({
-      where: { email: trimmedEmail, id: { not: id } },
-      select: { id: true },
-    });
-    if (dupe) {
-      return NextResponse.json({ error: "That email is already in use." }, { status: 409 });
+    if (trimmedEmail) {
+      const dupe = await prisma.contact.findFirst({
+        where: { email: trimmedEmail, id: { not: id } },
+        select: { id: true },
+      });
+      if (dupe) {
+        return NextResponse.json({ error: "That email is already in use." }, { status: 409 });
+      }
     }
   }
   if (body.phone !== undefined && body.phone.trim() && !isValidPhone(normalizePhone(body.phone))) {
@@ -63,7 +62,7 @@ export async function PATCH(
 
   const updateData: Record<string, string | null> = {};
   if (body.name !== undefined) updateData.name = body.name.trim();
-  if (body.email !== undefined) updateData.email = body.email.trim().toLowerCase();
+  if (body.email !== undefined) updateData.email = body.email.trim().toLowerCase() || null;
   if (body.phone !== undefined) updateData.phone = toE164NZ(body.phone) || null;
   if (body.address !== undefined) updateData.address = body.address.trim() || null;
 

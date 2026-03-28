@@ -19,8 +19,8 @@ interface ContactPickerEntry {
   id: string;
   /** Display name */
   name: string;
-  /** Email address */
-  email: string;
+  /** Email address, or null for phone-only contacts */
+  email: string | null;
   /** Number of reviews already linked to this contact */
   reviewCount: number;
 }
@@ -149,7 +149,8 @@ export function ReviewApprovalList({
               .filter((c) => c.id !== row.contactId && c.reviewCount === 0)
               .map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.name} ({c.email})
+                  {c.name}
+                  {c.email ? ` (${c.email})` : ""}
                 </option>
               ))}
           </select>

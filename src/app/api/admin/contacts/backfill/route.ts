@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
-import { toE164NZ } from "@/shared/lib/normalize-phone";
+import { toE164NZ, normalizePhone } from "@/shared/lib/normalize-phone";
 
 /**
  * Parse phone and address from structured booking notes.
@@ -40,10 +40,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // Build a unified map of email → contact data from all sources.
   // Sources are processed oldest-first so the most recent entry wins.
 
-  const merged = new Map<
+  const mergedByEmail = new Map<
     string,
     { name: string; email: string; phone: string | null; address: string | null }
   >();
+  const mergedByPhone = new Map<string, { name: string; email: null; phone: string }>();
 
   // 1. Bookings (sorted ascending — most recent wins the Map)
   const bookings = await prisma.booking.findMany({
@@ -52,36 +53,47 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   });
   for (const b of bookings) {
     const { phone, address } = parseNotes(b.notes);
-    merged.set(b.email.toLowerCase(), { name: b.name, email: b.email, phone, address });
+    mergedByEmail.set(b.email.toLowerCase(), { name: b.name, email: b.email, phone, address });
   }
 
-  // 2. ReviewRequests with email (sorted ascending — most recent wins the Map)
+  // 2. ReviewRequests — email-based and phone-only (sorted ascending — most recent wins)
   const reviewRequests = await prisma.reviewRequest.findMany({
-    where: { email: { not: null } },
     orderBy: { createdAt: "asc" },
     select: { name: true, email: true, phone: true },
   });
   for (const rr of reviewRequests) {
-    if (!rr.email) continue;
-    const existing = merged.get(rr.email.toLowerCase());
-    merged.set(rr.email.toLowerCase(), {
-      name: rr.name,
-      email: rr.email,
-      // Prefer booking phone/address if we already have them from a booking record
-      phone: existing?.phone ?? (rr.phone ? toE164NZ(rr.phone) || rr.phone : null),
-      address: existing?.address ?? null,
-    });
+    if (rr.email) {
+      const existing = mergedByEmail.get(rr.email.toLowerCase());
+      mergedByEmail.set(rr.email.toLowerCase(), {
+        name: rr.name,
+        email: rr.email,
+        // Prefer booking phone/address if we already have them from a booking record
+        phone: existing?.phone ?? (rr.phone ? toE164NZ(rr.phone) || rr.phone : null),
+        address: existing?.address ?? null,
+      });
+    } else if (rr.phone) {
+      const phone = toE164NZ(rr.phone) || rr.phone;
+      const normPhone = normalizePhone(phone);
+      if (normPhone && !mergedByPhone.has(normPhone)) {
+        mergedByPhone.set(normPhone, { name: rr.name, email: null, phone });
+      }
+    }
   }
 
   let upsertedCount = 0;
-  for (const { name, email, phone, address } of merged.values()) {
-    await prisma.contact.upsert({
-      where: { email },
-      create: { name, email, phone, address },
-      // Never overwrite an existing contact — admin edits are the source of truth.
-      update: {},
-    });
-    upsertedCount++;
+  for (const { name, email, phone, address } of mergedByEmail.values()) {
+    const exists = await prisma.contact.findFirst({ where: { email } });
+    if (!exists) {
+      await prisma.contact.create({ data: { name, email, phone, address } });
+      upsertedCount++;
+    }
+  }
+  for (const { name, email, phone } of mergedByPhone.values()) {
+    const exists = await prisma.contact.findFirst({ where: { phone } });
+    if (!exists) {
+      await prisma.contact.create({ data: { name, email, phone } });
+      upsertedCount++;
+    }
   }
 
   return NextResponse.json({ ok: true, upsertedCount });

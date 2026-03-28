@@ -14,7 +14,7 @@ import { toE164NZ, normalizePhone } from "@/shared/lib/normalize-phone";
 export interface ConflictEntry {
   contactId: string;
   contactName: string;
-  contactEmail: string;
+  contactEmail: string | null;
   contactPhone: string | null;
   /** Where the conflicting data came from. */
   source: "ReviewRequest" | "Review" | "Booking";
@@ -44,11 +44,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const allContacts = await prisma.contact.findMany({
     select: { id: true, name: true, email: true, phone: true },
   });
-  const contactByEmail = new Map(allContacts.map((c) => [c.email.toLowerCase(), c]));
+  const contactByEmail = new Map(
+    allContacts.filter((c) => c.email).map((c) => [c.email!.toLowerCase(), c]),
+  );
+  const contactByPhone = new Map<string, (typeof allContacts)[0]>();
+  for (const c of allContacts) {
+    if (c.phone) {
+      const norm = normalizePhone(toE164NZ(c.phone) || c.phone);
+      if (norm && !contactByPhone.has(norm)) contactByPhone.set(norm, c);
+    }
+  }
 
-  // Most recent first so the first match per contact wins
+  // Most recent first so the first match per contact wins (include SMS-only review requests)
   const reviewRequests = await prisma.reviewRequest.findMany({
-    where: { email: { not: null } },
     orderBy: { createdAt: "desc" },
     select: { id: true, name: true, email: true, phone: true },
   });
@@ -68,8 +76,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const nameEnrichments = new Map<string, string>();
 
   for (const rr of reviewRequests) {
-    if (!rr.email) continue;
-    const contact = contactByEmail.get(rr.email.toLowerCase());
+    let contact = rr.email ? contactByEmail.get(rr.email.toLowerCase()) : undefined;
+    if (!contact && rr.phone) {
+      const normPhone = normalizePhone(toE164NZ(rr.phone) || rr.phone);
+      if (normPhone) contact = contactByPhone.get(normPhone);
+    }
     if (!contact || seenRR.has(contact.id)) continue;
     seenRR.add(contact.id);
 

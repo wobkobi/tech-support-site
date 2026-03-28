@@ -123,7 +123,7 @@ model ReviewRequest {
 model Contact {
   id              String   @id @default(auto()) @map("_id") @db.ObjectId
   name            String
-  email           String   @unique
+  email           String?
   phone           String?
   address         String?
   googleContactId String? // Google People API resource name (e.g. "people/c1234567890")

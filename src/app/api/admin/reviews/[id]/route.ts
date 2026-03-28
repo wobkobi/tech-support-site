@@ -109,15 +109,16 @@ export async function PATCH(
         if (email) {
           const fallbackName =
             [review.firstName, review.lastName].filter(Boolean).join(" ") || "Unknown";
-          const contact = await prisma.contact.upsert({
-            where: { email },
-            create: {
-              name: contactName ?? fallbackName,
-              email,
-              ...(contactPhone && { phone: contactPhone }),
-            },
-            update: {},
-          });
+          let contact = await prisma.contact.findFirst({ where: { email } });
+          if (!contact) {
+            contact = await prisma.contact.create({
+              data: {
+                name: contactName ?? fallbackName,
+                email,
+                ...(contactPhone && { phone: contactPhone }),
+              },
+            });
+          }
           await prisma.review.update({
             where: { id },
             data: { contactId: contact.id },

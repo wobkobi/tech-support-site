@@ -9,7 +9,8 @@ const mocks = vi.hoisted(() => ({
   reviewDelete: vi.fn(),
   bookingFindUnique: vi.fn(),
   reviewRequestFindFirst: vi.fn(),
-  contactUpsert: vi.fn(),
+  contactFindFirst: vi.fn(),
+  contactCreate: vi.fn(),
   revalidateReviewPaths: vi.fn(),
 }));
 
@@ -27,7 +28,7 @@ vi.mock("@/shared/lib/prisma", () => ({
     },
     booking: { findUnique: mocks.bookingFindUnique },
     reviewRequest: { findFirst: mocks.reviewRequestFindFirst },
-    contact: { upsert: mocks.contactUpsert },
+    contact: { findFirst: mocks.contactFindFirst, create: mocks.contactCreate },
   },
 }));
 
@@ -79,6 +80,8 @@ describe("PATCH /api/admin/reviews/[id]", () => {
     mocks.reviewFindUnique.mockResolvedValue(NO_SOURCE_REVIEW);
     mocks.reviewUpdate.mockResolvedValue({});
     mocks.revalidateReviewPaths.mockReturnValue(undefined);
+    mocks.contactFindFirst.mockResolvedValue(null);
+    mocks.contactCreate.mockResolvedValue({ id: "contact-new" });
   });
 
   it("returns 401 when token is invalid", async () => {
@@ -141,7 +144,7 @@ describe("PATCH /api/admin/reviews/[id]", () => {
       lastName: "Smith",
     });
     mocks.bookingFindUnique.mockResolvedValue({ email: "alice@example.com", name: "Alice Smith" });
-    mocks.contactUpsert.mockResolvedValue({ id: "contact-1" });
+    mocks.contactCreate.mockResolvedValue({ id: "contact-1" });
 
     const req = makePatchRequest({ action: "approve", token: "valid" });
     await PATCH(req, PARAMS);
@@ -150,13 +153,9 @@ describe("PATCH /api/admin/reviews/[id]", () => {
       where: { id: "booking-abc" },
       select: { email: true, name: true },
     });
-    expect(mocks.contactUpsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { email: "alice@example.com" },
-        create: expect.objectContaining({ name: "Alice Smith", email: "alice@example.com" }),
-        update: {},
-      }),
-    );
+    expect(mocks.contactCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({ name: "Alice Smith", email: "alice@example.com" }),
+    });
     expect(mocks.reviewUpdate).toHaveBeenCalledWith({
       where: { id: "review-123" },
       data: { contactId: "contact-1" },
@@ -177,7 +176,7 @@ describe("PATCH /api/admin/reviews/[id]", () => {
       name: "Bob Jones",
       phone: "021 000 0000",
     });
-    mocks.contactUpsert.mockResolvedValue({ id: "contact-2" });
+    mocks.contactCreate.mockResolvedValue({ id: "contact-2" });
 
     const req = makePatchRequest({ action: "approve", token: "valid" });
     await PATCH(req, PARAMS);
@@ -186,17 +185,13 @@ describe("PATCH /api/admin/reviews/[id]", () => {
       where: { reviewToken: "token-xyz" },
       select: { email: true, name: true, phone: true },
     });
-    expect(mocks.contactUpsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { email: "bob@example.com" },
-        create: expect.objectContaining({
-          name: "Bob Jones",
-          email: "bob@example.com",
-          phone: "021 000 0000",
-        }),
-        update: {},
+    expect(mocks.contactCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        name: "Bob Jones",
+        email: "bob@example.com",
+        phone: "021 000 0000",
       }),
-    );
+    });
   });
 
   it("skips auto-link when review already has a contactId", async () => {
@@ -212,7 +207,7 @@ describe("PATCH /api/admin/reviews/[id]", () => {
     const req = makePatchRequest({ action: "approve", token: "valid" });
     await PATCH(req, PARAMS);
 
-    expect(mocks.contactUpsert).not.toHaveBeenCalled();
+    expect(mocks.contactCreate).not.toHaveBeenCalled();
   });
 
   it("skips auto-link when no booking or review request is found", async () => {
@@ -230,7 +225,7 @@ describe("PATCH /api/admin/reviews/[id]", () => {
     const res = await PATCH(req, PARAMS);
 
     expect(res.status).toBe(200);
-    expect(mocks.contactUpsert).not.toHaveBeenCalled();
+    expect(mocks.contactCreate).not.toHaveBeenCalled();
   });
 
   it("still approves review when auto-link contact upsert throws", async () => {
@@ -247,7 +242,7 @@ describe("PATCH /api/admin/reviews/[id]", () => {
       name: "Test User",
       phone: null,
     });
-    mocks.contactUpsert.mockRejectedValue(new Error("DB upsert failed"));
+    mocks.contactCreate.mockRejectedValue(new Error("DB create failed"));
 
     const req = makePatchRequest({ action: "approve", token: "valid" });
     const res = await PATCH(req, PARAMS);

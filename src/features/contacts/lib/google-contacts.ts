@@ -42,19 +42,6 @@ export async function importFromGoogleContacts(): Promise<number> {
       if (norm && !reviewRequestsByPhone.has(norm)) reviewRequestsByPhone.set(norm, rr.email);
     }
 
-    // Build phone → contactId map so phone-only Google contacts can at least
-    // have their googleContactId linked to an existing local contact.
-    const contactsByPhone = new Map<string, string>();
-    const phoneContacts = await prisma.contact.findMany({
-      where: { phone: { not: null } },
-      select: { id: true, phone: true },
-    });
-    for (const c of phoneContacts) {
-      if (!c.phone) continue;
-      const norm = normalizePhone(c.phone);
-      if (norm && !contactsByPhone.has(norm)) contactsByPhone.set(norm, c.id);
-    }
-
     let pageToken: string | undefined;
     let count = 0;
 
@@ -87,38 +74,51 @@ export async function importFromGoogleContacts(): Promise<number> {
 
         if (email) {
           try {
-            await prisma.contact.upsert({
-              where: { email },
-              create: {
-                name: name ?? email,
-                email,
-                phone,
-                address,
-                googleContactId: resourceName,
-              },
-              // Local name/phone/address are the source of truth — only link the resource name.
-              update: { googleContactId: resourceName },
-            });
-            count++;
-          } catch (upsertError) {
-            console.error(`[google-contacts] Failed to upsert contact ${email}:`, upsertError);
-          }
-        } else if (normPhone) {
-          // No email anywhere — link googleContactId to an existing contact matched by phone.
-          const existingId = contactsByPhone.get(normPhone);
-          if (existingId) {
-            try {
+            const existing = await prisma.contact.findFirst({ where: { email } });
+            if (existing) {
               await prisma.contact.update({
-                where: { id: existingId },
+                where: { id: existing.id },
+                // Local name/phone/address are the source of truth — only link the resource name.
                 data: { googleContactId: resourceName },
               });
-              count++;
-            } catch (updateError) {
-              console.error(
-                `[google-contacts] Failed to link googleContactId for phone ${normPhone}:`,
-                updateError,
-              );
+            } else {
+              await prisma.contact.create({
+                data: { name: name ?? email, email, phone, address, googleContactId: resourceName },
+              });
             }
+            count++;
+          } catch (upsertError) {
+            console.error(`[google-contacts] Failed to import contact ${email}:`, upsertError);
+          }
+        } else if (normPhone) {
+          // No email anywhere — create a phone-only contact or link to an existing one.
+          try {
+            const existing = await prisma.contact.findFirst({
+              where: { phone },
+              select: { id: true },
+            });
+            if (existing) {
+              await prisma.contact.update({
+                where: { id: existing.id },
+                data: { googleContactId: resourceName },
+              });
+            } else {
+              await prisma.contact.create({
+                data: {
+                  name: name ?? phone!,
+                  email: null,
+                  phone,
+                  address,
+                  googleContactId: resourceName,
+                },
+              });
+            }
+            count++;
+          } catch (importError) {
+            console.error(
+              `[google-contacts] Failed to import phone-only contact ${normPhone}:`,
+              importError,
+            );
           }
         }
       }
@@ -326,6 +326,10 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
     });
     if (!contact) {
       console.warn(`[google-contacts] syncContactToGoogle: contact ${contactId} not found`);
+      return;
+    }
+    if (!contact.email) {
+      // Phone-only contacts have no email — they are imported FROM Google, not pushed to it.
       return;
     }
 

@@ -5,7 +5,8 @@ import { Prisma } from "@prisma/client";
 const mocks = vi.hoisted(() => ({
   bookingFindMany: vi.fn(),
   bookingCreate: vi.fn(),
-  contactUpsert: vi.fn(),
+  contactFindFirst: vi.fn(),
+  contactCreate: vi.fn(),
   fetchAllCalendarEvents: vi.fn(),
   createBookingEvent: vi.fn(),
   sendOwnerBookingNotification: vi.fn(),
@@ -20,7 +21,8 @@ vi.mock("@/shared/lib/prisma", () => ({
       create: mocks.bookingCreate,
     },
     contact: {
-      upsert: mocks.contactUpsert,
+      findFirst: mocks.contactFindFirst,
+      create: mocks.contactCreate,
     },
   },
 }));
@@ -74,7 +76,8 @@ describe("POST /api/booking/request - success and error paths", () => {
     vi.clearAllMocks();
     mocks.bookingFindMany.mockResolvedValue([]);
     mocks.fetchAllCalendarEvents.mockResolvedValue([]);
-    mocks.contactUpsert.mockResolvedValue({ id: "contact-abc" });
+    mocks.contactFindFirst.mockResolvedValue(null);
+    mocks.contactCreate.mockResolvedValue({ id: "contact-abc" });
     mocks.syncContactToGoogle.mockResolvedValue(undefined);
     mocks.sendOwnerBookingNotification.mockResolvedValue(undefined);
     mocks.sendCustomerBookingConfirmation.mockResolvedValue(undefined);
@@ -169,13 +172,9 @@ describe("POST /api/booking/request - success and error paths", () => {
       meetingType: "in-person",
     });
     await POST(req);
-    expect(mocks.contactUpsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { email: "alice@example.com" },
-        create: expect.objectContaining({ email: "alice@example.com", phone: "+64211112222" }),
-        update: {},
-      }),
-    );
+    expect(mocks.contactCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({ email: "alice@example.com", phone: "+64211112222" }),
+    });
   });
 
   it("still returns ok:true even if contact upsert throws", async () => {
@@ -189,7 +188,7 @@ describe("POST /api/booking/request - success and error paths", () => {
       endAt: new Date(),
       cancelToken: "cancel-tok2",
     });
-    mocks.contactUpsert.mockRejectedValue(new Error("Contact DB error"));
+    mocks.contactCreate.mockRejectedValue(new Error("Contact DB error"));
     const req = makeRequest({
       name: "Bob",
       email: "bob@example.com",

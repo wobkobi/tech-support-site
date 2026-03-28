@@ -17,7 +17,7 @@ import { normalizePhone, isValidPhone } from "@/shared/lib/normalize-phone";
 export interface ContactRow {
   id: string;
   name: string;
-  email: string;
+  email: string | null;
   phone: string | null;
   address: string | null;
   createdAt: string;
@@ -237,7 +237,7 @@ function ContactCard({
                 <p className="text-rich-black/70 font-medium">Sync to Google?</p>
                 <div className="text-rich-black/50 space-y-0.5">
                   <p>{c.name}</p>
-                  <p>{c.email}</p>
+                  {c.email && <p>{c.email}</p>}
                   {c.phone && <p>{c.phone}</p>}
                   {c.address && <p>{c.address}</p>}
                 </div>
@@ -275,12 +275,16 @@ function ContactCard({
           </button>
         </div>
       </div>
-      <a
-        href={`mailto:${c.email}`}
-        className="text-moonstone-600 hover:text-moonstone-700 text-sm transition-colors"
-      >
-        {c.email}
-      </a>
+      {c.email ? (
+        <a
+          href={`mailto:${c.email}`}
+          className="text-moonstone-600 hover:text-moonstone-700 text-sm transition-colors"
+        >
+          {c.email}
+        </a>
+      ) : (
+        <span className="text-rich-black/30 text-sm italic">No email</span>
+      )}
       {c.phone && (
         <a
           href={`tel:${c.phone}`}
@@ -375,7 +379,7 @@ export function ContactAdminList({
   function startEdit(c: ContactRow): void {
     setEditingId(c.id);
     setEditName(c.name);
-    setEditEmail(c.email);
+    setEditEmail(c.email ?? "");
     setEditPhone(c.phone ?? "");
     setEditAddress(c.address ?? "");
     setEditError(null);
@@ -457,7 +461,7 @@ export function ContactAdminList({
         contact?: {
           id: string;
           name: string;
-          email: string;
+          email: string | null;
           phone: string | null;
           address: string | null;
         };

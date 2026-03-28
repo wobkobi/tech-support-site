@@ -525,7 +525,7 @@ export function AdminTabs({
                   >
                     <div className="mb-2 flex flex-wrap items-center gap-2">
                       <span className="text-rich-black text-sm font-medium">
-                        {conflict.contactEmail}
+                        {conflict.contactEmail ?? conflict.contactPhone ?? "Unknown"}
                       </span>
                       <span className="bg-seasalt-400/60 text-rich-black/60 rounded px-1.5 py-0.5 text-xs font-medium">
                         {conflict.source === "ReviewRequest"
