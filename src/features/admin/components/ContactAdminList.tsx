@@ -24,7 +24,14 @@ export interface ContactRow {
   /** Google People API resource name if synced, or null */
   googleContactId: string | null;
   /** Reviews linked to this contact */
-  reviews: Array<{ id: string; text: string; firstName: string | null; lastName: string | null }>;
+  reviews: Array<{
+    id: string;
+    text: string;
+    firstName: string | null;
+    lastName: string | null;
+    /** Review token used to construct the /review?token= link, or null for old records. */
+    customerRef: string | null;
+  }>;
 }
 
 /**
@@ -45,19 +52,24 @@ interface ContactCardProps {
   c: ContactRow;
   editingId: string | null;
   editName: string;
+  editEmail: string;
   editPhone: string;
   editAddress: string;
   saving: boolean;
   editError: string | null;
   phoneBlurError: string | null;
   syncingId: string | null;
+  confirmSyncId: string | null;
   expandedReviewsId: string | null;
   onStartEdit: (c: ContactRow) => void;
   onCancelEdit: () => void;
   onSaveEdit: (id: string) => void;
-  onSyncToGoogle: (id: string) => void;
+  onRequestSyncToGoogle: (id: string) => void;
+  onConfirmSyncToGoogle: (id: string) => void;
+  onCancelSyncToGoogle: () => void;
   onToggleReviews: (id: string) => void;
   onEditName: (v: string) => void;
+  onEditEmail: (v: string) => void;
   onEditPhone: (v: string) => void;
   onEditAddress: (v: string) => void;
   onPhoneBlur: () => void;
@@ -69,19 +81,24 @@ interface ContactCardProps {
  * @param props.c - The contact row data.
  * @param props.editingId - ID of the contact currently being edited, or null.
  * @param props.editName - Current value of the name edit field.
+ * @param props.editEmail - Current value of the email edit field.
  * @param props.editPhone - Current value of the phone edit field.
  * @param props.editAddress - Current value of the address edit field.
  * @param props.saving - Whether a save is in progress.
  * @param props.editError - Validation or API error message for the current edit, or null.
  * @param props.phoneBlurError - Inline phone validation error shown on blur, or null.
  * @param props.syncingId - ID of the contact currently being synced, or null.
+ * @param props.confirmSyncId - ID of the contact awaiting sync confirmation, or null.
  * @param props.expandedReviewsId - ID of the contact whose reviews are expanded, or null.
  * @param props.onStartEdit - Opens the edit form for the given contact.
  * @param props.onCancelEdit - Closes the edit form without saving.
  * @param props.onSaveEdit - Saves the edited contact with the given ID.
- * @param props.onSyncToGoogle - Syncs the contact with the given ID to Google Contacts.
+ * @param props.onRequestSyncToGoogle - Opens the sync confirmation for the given contact.
+ * @param props.onConfirmSyncToGoogle - Confirms and executes the sync for the given contact.
+ * @param props.onCancelSyncToGoogle - Cancels the pending sync confirmation.
  * @param props.onToggleReviews - Toggles the reviews panel for the given contact ID.
  * @param props.onEditName - Updates the name edit field value.
+ * @param props.onEditEmail - Updates the email edit field value.
  * @param props.onEditPhone - Updates the phone edit field value.
  * @param props.onEditAddress - Updates the address edit field value.
  * @param props.onPhoneBlur - Validates the phone field when the input loses focus.
@@ -91,19 +108,24 @@ function ContactCard({
   c,
   editingId,
   editName,
+  editEmail,
   editPhone,
   editAddress,
   saving,
   editError,
   phoneBlurError,
   syncingId,
+  confirmSyncId,
   expandedReviewsId,
   onStartEdit,
   onCancelEdit,
   onSaveEdit,
-  onSyncToGoogle,
+  onRequestSyncToGoogle,
+  onConfirmSyncToGoogle,
+  onCancelSyncToGoogle,
   onToggleReviews,
   onEditName,
+  onEditEmail,
   onEditPhone,
   onEditAddress,
   onPhoneBlur,
@@ -129,6 +151,21 @@ function ContactCard({
             type="text"
             value={editName}
             onChange={(e) => onEditName(e.target.value)}
+            className="border-seasalt-400/80 bg-seasalt text-rich-black focus:border-russian-violet focus:ring-russian-violet/30 w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-1"
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label
+            className="text-russian-violet text-xs font-semibold"
+            htmlFor={`edit-email-${c.id}`}
+          >
+            Email
+          </label>
+          <input
+            id={`edit-email-${c.id}`}
+            type="email"
+            value={editEmail}
+            onChange={(e) => onEditEmail(e.target.value)}
             className="border-seasalt-400/80 bg-seasalt text-rich-black focus:border-russian-violet focus:ring-russian-violet/30 w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-1"
           />
         </div>
@@ -192,15 +229,42 @@ function ContactCard({
         <span className="text-russian-violet font-semibold">{c.name}</span>
         <div className="flex items-center gap-2">
           <span className="text-rich-black/40 text-xs">{formatDate(c.createdAt)}</span>
-          {!c.googleContactId ? (
-            <button
-              onClick={() => onSyncToGoogle(c.id)}
-              disabled={syncingId === c.id}
-              className="text-russian-violet/70 hover:text-russian-violet rounded px-1.5 py-0.5 text-xs font-medium transition-colors disabled:opacity-40"
-            >
-              {syncingId === c.id ? "Syncing…" : "Sync to Google"}
-            </button>
-          ) : (
+          {!c.googleContactId &&
+            (syncingId === c.id ? (
+              <span className="text-rich-black/40 text-xs">Syncing…</span>
+            ) : confirmSyncId === c.id ? (
+              <div className="border-seasalt-400/40 bg-seasalt flex flex-col gap-2 rounded-lg border p-2 text-xs">
+                <p className="text-rich-black/70 font-medium">Sync to Google?</p>
+                <div className="text-rich-black/50 space-y-0.5">
+                  <p>{c.name}</p>
+                  <p>{c.email}</p>
+                  {c.phone && <p>{c.phone}</p>}
+                  {c.address && <p>{c.address}</p>}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => onConfirmSyncToGoogle(c.id)}
+                    className="bg-russian-violet hover:bg-russian-violet/90 rounded px-2 py-0.5 text-xs font-semibold text-white transition-colors"
+                  >
+                    Confirm
+                  </button>
+                  <button
+                    onClick={onCancelSyncToGoogle}
+                    className="bg-seasalt-400/40 text-rich-black/70 hover:bg-seasalt-400/60 rounded px-2 py-0.5 text-xs font-semibold transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => onRequestSyncToGoogle(c.id)}
+                className="text-russian-violet/70 hover:text-russian-violet rounded px-1.5 py-0.5 text-xs font-medium transition-colors"
+              >
+                Sync to Google
+              </button>
+            ))}
+          {c.googleContactId && (
             <span className="text-rich-black/30 rounded px-1.5 py-0.5 text-xs">Synced</span>
           )}
           <button
@@ -243,9 +307,21 @@ function ContactCard({
                   key={rv.id}
                   className="border-seasalt-400/20 bg-seasalt-900/20 rounded-lg border px-3 py-2"
                 >
-                  <span className="text-russian-violet/70 text-xs font-medium">
-                    {formatReviewerName(rv)}
-                  </span>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-russian-violet/70 text-xs font-medium">
+                      {formatReviewerName(rv)}
+                    </span>
+                    {rv.customerRef && (
+                      <a
+                        href={`/review?token=${rv.customerRef}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-moonstone-600 hover:text-moonstone-700 shrink-0 text-xs font-medium transition-colors"
+                      >
+                        Review link ↗
+                      </a>
+                    )}
+                  </div>
                   <p className="text-rich-black/50 mt-0.5 text-xs leading-relaxed">
                     {rv.text.length > 80 ? `${rv.text.slice(0, 80)}…` : rv.text}
                   </p>
@@ -278,12 +354,14 @@ export function ContactAdminList({
   const [contacts, setContacts] = useState<ContactRow[]>(initialContacts);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
   const [editPhone, setEditPhone] = useState("");
   const [editAddress, setEditAddress] = useState("");
   const [saving, setSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [phoneBlurError, setPhoneBlurError] = useState<string | null>(null);
   const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [confirmSyncId, setConfirmSyncId] = useState<string | null>(null);
   const [expandedReviewsId, setExpandedReviewsId] = useState<string | null>(null);
   const [syncedOpen, setSyncedOpen] = useState(true);
 
@@ -297,6 +375,7 @@ export function ContactAdminList({
   function startEdit(c: ContactRow): void {
     setEditingId(c.id);
     setEditName(c.name);
+    setEditEmail(c.email);
     setEditPhone(c.phone ?? "");
     setEditAddress(c.address ?? "");
     setEditError(null);
@@ -318,6 +397,7 @@ export function ContactAdminList({
    * @param id - Contact ID to sync.
    */
   async function syncToGoogle(id: string): Promise<void> {
+    setConfirmSyncId(null);
     setSyncingId(id);
     try {
       const res = await fetch(`/api/admin/contacts/${id}/sync-google`, {
@@ -348,6 +428,10 @@ export function ContactAdminList({
       setEditError("Name is required.");
       return;
     }
+    if (!editEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editEmail.trim())) {
+      setEditError("Please enter a valid email address.");
+      return;
+    }
     if (editPhone.trim() && !isValidPhone(normalizePhone(editPhone))) {
       setEditError("Please enter a valid phone number.");
       return;
@@ -363,6 +447,7 @@ export function ContactAdminList({
         },
         body: JSON.stringify({
           name: editName,
+          email: editEmail,
           phone: editPhone,
           address: editAddress,
         }),
@@ -385,6 +470,7 @@ export function ContactAdminList({
               ? {
                   ...c,
                   name: data.contact!.name,
+                  email: data.contact!.email,
                   phone: data.contact!.phone,
                   address: data.contact!.address,
                 }
@@ -420,11 +506,18 @@ export function ContactAdminList({
   }
 
   /**
-   * Wraps syncToGoogle to return void for use as an event handler.
+   * Confirms and executes the sync for the given contact ID.
    * @param id - Contact ID to sync.
    */
-  function handleSyncToGoogle(id: string): void {
+  function handleConfirmSyncToGoogle(id: string): void {
     void syncToGoogle(id);
+  }
+
+  /**
+   * Clears the pending sync confirmation.
+   */
+  function handleCancelSyncToGoogle(): void {
+    setConfirmSyncId(null);
   }
 
   /**
@@ -448,19 +541,24 @@ export function ContactAdminList({
   const sharedCardProps = {
     editingId,
     editName,
+    editEmail,
     editPhone,
     editAddress,
     saving,
     editError,
     phoneBlurError,
     syncingId,
+    confirmSyncId,
     expandedReviewsId,
     onStartEdit: startEdit,
     onCancelEdit: cancelEdit,
     onSaveEdit: handleSaveEdit,
-    onSyncToGoogle: handleSyncToGoogle,
+    onRequestSyncToGoogle: setConfirmSyncId,
+    onConfirmSyncToGoogle: handleConfirmSyncToGoogle,
+    onCancelSyncToGoogle: handleCancelSyncToGoogle,
     onToggleReviews: toggleReviews,
     onEditName: setEditName,
+    onEditEmail: setEditEmail,
     onEditPhone: handleEditPhone,
     onEditAddress: setEditAddress,
     onPhoneBlur: handlePhoneBlur,
@@ -476,6 +574,17 @@ export function ContactAdminList({
 
   return (
     <div className="flex flex-col gap-6">
+      {/* Export action */}
+      <div className="flex justify-end">
+        <a
+          href={`/api/admin/contacts/export?token=${encodeURIComponent(token)}`}
+          download="contacts.csv"
+          className="text-moonstone-600 hover:text-moonstone-700 text-xs font-medium underline underline-offset-2"
+        >
+          Export CSV
+        </a>
+      </div>
+
       {/* Unsynced contacts — shown prominently */}
       {unsynced.length > 0 ? (
         <div className="flex flex-col gap-3">

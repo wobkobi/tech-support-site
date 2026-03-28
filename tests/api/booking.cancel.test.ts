@@ -80,7 +80,7 @@ describe("POST /api/booking/cancel", () => {
     expect(json.ok).toBe(true);
     expect(mocks.bookingUpdate).toHaveBeenCalledWith({
       where: { id: "booking-2" },
-      data: { status: "cancelled", activeSlotKey: null },
+      data: { status: "cancelled", activeSlotKey: "released:booking-2" },
     });
   });
 
@@ -112,5 +112,17 @@ describe("POST /api/booking/cancel", () => {
     const json = await res.json();
     expect(json.ok).toBe(true);
     expect(mocks.bookingUpdate).toHaveBeenCalled();
+  });
+
+  it("returns 500 when request.json() throws", async () => {
+    const req = {
+      json: async () => {
+        throw new Error("bad body");
+      },
+    } as unknown as import("next/server").NextRequest;
+    const res = await POST(req);
+    expect(res.status).toBe(500);
+    const json = await res.json();
+    expect(json.ok).toBe(false);
   });
 });

@@ -91,6 +91,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       },
     });
 
+    // Upsert a Contact record for email-mode review requests — best effort, never blocks.
+    if (mode === "email" && reviewRequest.email) {
+      try {
+        await prisma.contact.upsert({
+          where: { email: reviewRequest.email },
+          create: { name: name.trim(), email: reviewRequest.email, phone: null },
+          // Never overwrite an existing contact — admin edits are the source of truth.
+          update: {},
+        });
+      } catch {
+        // best-effort
+      }
+    }
+
     const reviewUrl = `${siteUrl}/review?token=${reviewRequest.reviewToken}`;
 
     if (mode === "sms") {

@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   bookingUpdate: vi.fn(),
   reviewRequestFindFirst: vi.fn(),
   reviewRequestUpdate: vi.fn(),
+  contactFindUnique: vi.fn(),
   revalidatePath: vi.fn(),
   sendOwnerReviewNotification: vi.fn(),
 }));
@@ -22,6 +23,7 @@ vi.mock("@/shared/lib/prisma", () => ({
       findFirst: mocks.reviewRequestFindFirst,
       update: mocks.reviewRequestUpdate,
     },
+    contact: { findUnique: mocks.contactFindUnique },
   },
 }));
 
@@ -58,6 +60,7 @@ describe("POST /api/reviews", () => {
     });
     mocks.bookingFindFirst.mockResolvedValue(null);
     mocks.reviewRequestFindFirst.mockResolvedValue(null);
+    mocks.contactFindUnique.mockResolvedValue(null);
     mocks.sendOwnerReviewNotification.mockResolvedValue(undefined);
   });
 

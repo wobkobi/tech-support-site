@@ -179,7 +179,7 @@ export function buildAvailableDays(
   const todayNZStr = now.toLocaleDateString("en-CA", { timeZone: config.timeZone });
   const [startY, startM, startD] = todayNZStr.split("-").map(Number);
 
-  for (let i = 0; i < config.maxAdvanceDays; i++) {
+  for (let i = 0; days.length < config.maxAdvanceDays && i <= config.maxAdvanceDays; i++) {
     // UTC noon for day i - using noon avoids any DST-induced date-boundary shift
     // when extracting UTC date components. JavaScript's Date constructor handles
     // month/day overflow automatically (e.g. day 32 wraps to the next month).

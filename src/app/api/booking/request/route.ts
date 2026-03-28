@@ -28,6 +28,7 @@ import {
 import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
 import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
+import { toE164NZ } from "@/shared/lib/normalize-phone";
 
 interface BookingRequestPayload {
   dateKey: string;
@@ -189,10 +190,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (meetingType === "in-person" && address) {
       bookingNotes += `Address: ${address.trim()}\n`;
     }
-    if (phone) {
-      bookingNotes += `Phone: ${phone.trim()}\n`;
-    }
-
     // Create calendar event
     let calendarEventId: string | null = null;
     try {
@@ -232,6 +229,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         data: {
           name: name.trim(),
           email: email.trim().toLowerCase(),
+          phone: phone ? toE164NZ(phone) || null : null,
           notes: bookingNotes,
           startAt,
           endAt,
@@ -254,14 +252,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           create: {
             name: name.trim(),
             email: email.trim().toLowerCase(),
-            phone: phone?.trim() || null,
+            phone: phone ? toE164NZ(phone) || null : null,
             address: address?.trim() || null,
           },
-          update: {
-            name: name.trim(),
-            phone: phone?.trim() || null,
-            address: address?.trim() || null,
-          },
+          // Never overwrite an existing contact — admin edits are the source of truth.
+          update: {},
         });
         // Best-effort sync to Google Contacts — never fail the booking if it errors.
         await syncContactToGoogle(contact.id);

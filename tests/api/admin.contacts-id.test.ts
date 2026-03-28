@@ -4,6 +4,7 @@ import { NextRequest } from "next/server";
 const mocks = vi.hoisted(() => ({
   isAdminRequest: vi.fn(),
   contactUpdate: vi.fn(),
+  contactFindFirst: vi.fn(),
   syncContactToGoogle: vi.fn(),
 }));
 
@@ -15,6 +16,7 @@ vi.mock("@/shared/lib/prisma", () => ({
   prisma: {
     contact: {
       update: mocks.contactUpdate,
+      findFirst: mocks.contactFindFirst,
     },
   },
 }));
@@ -49,6 +51,7 @@ describe("PATCH /api/admin/contacts/[id]", () => {
     vi.clearAllMocks();
     mocks.isAdminRequest.mockReturnValue(true);
     mocks.contactUpdate.mockResolvedValue(CONTACT);
+    mocks.contactFindFirst.mockResolvedValue(null);
     mocks.syncContactToGoogle.mockResolvedValue(undefined);
   });
 
@@ -105,5 +108,55 @@ describe("PATCH /api/admin/contacts/[id]", () => {
         data: expect.objectContaining({ phone: null }),
       }),
     );
+  });
+
+  it("returns 400 when name is an empty string", async () => {
+    const res = await PATCH(makeRequest({ name: "" }), PARAMS);
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/name is required/i);
+  });
+
+  it("returns 400 when phone is not a valid phone number", async () => {
+    const res = await PATCH(makeRequest({ phone: "123" }), PARAMS);
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/valid phone/i);
+  });
+
+  it("updates email when a valid email is provided", async () => {
+    const res = await PATCH(makeRequest({ email: "newalice@example.com" }), PARAMS);
+    expect(res.status).toBe(200);
+    expect(mocks.contactUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ email: "newalice@example.com" }),
+      }),
+    );
+  });
+
+  it("normalises email to lowercase", async () => {
+    await PATCH(makeRequest({ email: "Alice@Example.COM" }), PARAMS);
+    expect(mocks.contactUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ email: "alice@example.com" }),
+      }),
+    );
+  });
+
+  it("returns 400 when email is an empty string", async () => {
+    const res = await PATCH(makeRequest({ email: "" }), PARAMS);
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/email is required/i);
+  });
+
+  it("returns 400 when email format is invalid", async () => {
+    const res = await PATCH(makeRequest({ email: "not-an-email" }), PARAMS);
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/valid email/i);
+  });
+
+  it("returns 409 when email is already used by another contact", async () => {
+    mocks.contactFindFirst.mockResolvedValue({ id: "other-contact" });
+    const res = await PATCH(makeRequest({ email: "taken@example.com" }), PARAMS);
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toMatch(/already in use/i);
   });
 });

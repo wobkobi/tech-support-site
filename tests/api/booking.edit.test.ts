@@ -175,4 +175,142 @@ describe("POST /api/booking/edit", () => {
     expect(res.status).toBe(200);
     expect((await res.json()).ok).toBe(true);
   });
+
+  it("returns 400 when dateKey is missing", async () => {
+    mocks.bookingFindFirst.mockResolvedValue(EXISTING_BOOKING);
+    const res = await POST(makeRequest({ ...VALID_BODY, dateKey: "" }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/day and time/i);
+  });
+
+  it("returns 400 when duration is missing", async () => {
+    mocks.bookingFindFirst.mockResolvedValue(EXISTING_BOOKING);
+    const res = await POST(makeRequest({ ...VALID_BODY, duration: undefined }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/job duration/i);
+  });
+
+  it("returns 400 when meetingType is missing", async () => {
+    mocks.bookingFindFirst.mockResolvedValue(EXISTING_BOOKING);
+    const res = await POST(makeRequest({ ...VALID_BODY, meetingType: undefined }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/in-person or remote/i);
+  });
+
+  it("passes existing bookings to validateBookingRequest", async () => {
+    mocks.bookingFindFirst.mockResolvedValue(EXISTING_BOOKING);
+    mocks.bookingFindMany.mockResolvedValue([
+      {
+        id: "other-booking",
+        startAt: new Date("2099-05-01T08:00:00Z"),
+        endAt: new Date("2099-05-01T09:00:00Z"),
+        bufferBeforeMin: 0,
+        bufferAfterMin: 30,
+      },
+    ]);
+    mocks.createBookingEvent.mockResolvedValue({ eventId: "cal-new-x" });
+    mocks.bookingUpdate.mockResolvedValue({});
+    const res = await POST(makeRequest(VALID_BODY));
+    expect(res.status).toBe(200);
+    expect(mocks.validateBookingRequest).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.arrayContaining([expect.objectContaining({ id: "other-booking" })]),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+    );
+  });
+
+  it("filters the current booking's calendar event from available slots", async () => {
+    mocks.bookingFindFirst.mockResolvedValue(EXISTING_BOOKING);
+    mocks.fetchAllCalendarEvents.mockResolvedValue([
+      {
+        id: "cal-old-1",
+        start: "2099-06-15T08:00:00Z",
+        end: "2099-06-15T09:00:00Z",
+        calendarEmail: "cal@example.com",
+      },
+      {
+        id: "cal-other",
+        start: "2099-06-15T09:00:00Z",
+        end: "2099-06-15T10:00:00Z",
+        calendarEmail: "cal@example.com",
+      },
+    ]);
+    mocks.createBookingEvent.mockResolvedValue({ eventId: "cal-new-y" });
+    mocks.bookingUpdate.mockResolvedValue({});
+    const res = await POST(makeRequest(VALID_BODY));
+    expect(res.status).toBe(200);
+    expect(mocks.validateBookingRequest).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      [{ id: "cal-other", start: "2099-06-15T09:00:00Z", end: "2099-06-15T10:00:00Z" }],
+      expect.anything(),
+      expect.anything(),
+    );
+  });
+
+  it("includes address in notes for in-person bookings", async () => {
+    mocks.bookingFindFirst.mockResolvedValue(EXISTING_BOOKING);
+    mocks.createBookingEvent.mockResolvedValue({ eventId: "cal-new-z" });
+    mocks.bookingUpdate.mockResolvedValue({});
+    const res = await POST(
+      makeRequest({ ...VALID_BODY, meetingType: "in-person", address: "123 Main St" }),
+    );
+    expect(res.status).toBe(200);
+    const updateCall = mocks.bookingUpdate.mock.calls[0][0];
+    expect(updateCall.data.notes).toContain("Address: 123 Main St");
+  });
+
+  it("includes phone in notes when a phone number is provided", async () => {
+    mocks.bookingFindFirst.mockResolvedValue(EXISTING_BOOKING);
+    mocks.createBookingEvent.mockResolvedValue({ eventId: "cal-new-w" });
+    mocks.bookingUpdate.mockResolvedValue({});
+    const res = await POST(makeRequest({ ...VALID_BODY, phone: "021 123 4567" }));
+    expect(res.status).toBe(200);
+    const updateCall = mocks.bookingUpdate.mock.calls[0][0];
+    expect(updateCall.data.notes).toContain("Phone: 021 123 4567");
+  });
+
+  it("returns 500 when request.json() throws an unexpected error", async () => {
+    const badReq = {
+      json: async () => {
+        throw new Error("Parse error");
+      },
+    } as unknown as NextRequest;
+    const res = await POST(badReq);
+    expect(res.status).toBe(500);
+    expect((await res.json()).error).toMatch(/failed to update booking/i);
+  });
+
+  it("continues with empty calendar events when calendar fetch throws", async () => {
+    mocks.bookingFindFirst.mockResolvedValue(EXISTING_BOOKING);
+    mocks.fetchAllCalendarEvents.mockRejectedValue(new Error("Calendar API error"));
+    mocks.createBookingEvent.mockResolvedValue({ eventId: "cal-new-u" });
+    mocks.bookingUpdate.mockResolvedValue({});
+    const res = await POST(makeRequest(VALID_BODY));
+    expect(res.status).toBe(200);
+  });
+
+  it("returns 400 for an unrecognised timeOfDay that passes validation", async () => {
+    mocks.bookingFindFirst.mockResolvedValue(EXISTING_BOOKING);
+    const res = await POST(makeRequest({ ...VALID_BODY, timeOfDay: "99am" as never }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/invalid time or duration/i);
+  });
+
+  it("returns 500 when a non-P2002 booking update error is thrown", async () => {
+    mocks.bookingFindFirst.mockResolvedValue(EXISTING_BOOKING);
+    mocks.createBookingEvent.mockResolvedValue({ eventId: "cal-new-v" });
+    mocks.bookingUpdate.mockRejectedValue(new Error("Unexpected DB error"));
+    const res = await POST(makeRequest(VALID_BODY));
+    expect(res.status).toBe(500);
+    expect((await res.json()).error).toMatch(/failed to update booking/i);
+  });
 });
