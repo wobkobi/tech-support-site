@@ -172,7 +172,7 @@ describe("POST /api/booking/request - success and error paths", () => {
     expect(mocks.contactUpsert).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { email: "alice@example.com" },
-        create: expect.objectContaining({ email: "alice@example.com", phone: "021 111 2222" }),
+        create: expect.objectContaining({ email: "alice@example.com", phone: "+64211112222" }),
         update: {},
       }),
     );

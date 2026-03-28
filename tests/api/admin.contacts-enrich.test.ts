@@ -107,6 +107,35 @@ describe("POST /api/admin/contacts/enrich-from-reviews", () => {
     });
   });
 
+  it("auto-fills last name when contact has only first name and ReviewRequest has full name", async () => {
+    mocks.contactFindMany.mockResolvedValue([
+      { id: "contact-1", name: "Alice", email: "alice@example.com", phone: null },
+    ]);
+    mocks.reviewRequestFindMany.mockResolvedValue([
+      { id: "rr-1", name: "Alice Smith", email: "alice@example.com", phone: null },
+    ]);
+    mocks.reviewFindMany.mockResolvedValue([]);
+    const res = await POST(makeRequest());
+    const json = await res.json();
+    expect(json.conflicts).toEqual([]);
+    expect(json.enrichedCount).toBe(1);
+    expect(mocks.contactUpdate).toHaveBeenCalledWith({
+      where: { id: "contact-1" },
+      data: { name: "Alice Smith" },
+    });
+  });
+
+  it("does not conflict when ReviewRequest name is only the contact's first name", async () => {
+    mocks.contactFindMany.mockResolvedValue([CONTACT]); // name: "Alice Smith"
+    mocks.reviewRequestFindMany.mockResolvedValue([
+      { id: "rr-1", name: "Alice", email: "alice@example.com", phone: null },
+    ]);
+    mocks.reviewFindMany.mockResolvedValue([]);
+    const res = await POST(makeRequest());
+    const json = await res.json();
+    expect(json.conflicts).toEqual([]);
+  });
+
   it("returns a phone conflict when ReviewRequest phone differs from contact phone", async () => {
     mocks.contactFindMany.mockResolvedValue([CONTACT]);
     mocks.reviewRequestFindMany.mockResolvedValue([
@@ -137,7 +166,7 @@ describe("POST /api/admin/contacts/enrich-from-reviews", () => {
     expect(json.conflicts).toEqual([]);
     expect(mocks.contactUpdate).toHaveBeenCalledWith({
       where: { id: "contact-2" },
-      data: { phone: "021 999 9999" },
+      data: { phone: "+64219999999" },
     });
   });
 
@@ -211,6 +240,18 @@ describe("POST /api/admin/contacts/enrich-from-reviews", () => {
     mocks.reviewRequestFindMany.mockResolvedValue([]);
     mocks.reviewFindMany.mockResolvedValue([
       { id: "rev-1", firstName: "Bob", lastName: "Doe", customerRef: null },
+    ]);
+    const res = await POST(makeRequest());
+    const json = await res.json();
+    expect(json.conflicts).toEqual([]);
+  });
+
+  it("does not conflict when Review has no lastName even if firstName differs from contact name", async () => {
+    mocks.contactFindMany.mockResolvedValue([CONTACT]);
+    mocks.reviewRequestFindMany.mockResolvedValue([]);
+    mocks.reviewFindMany.mockResolvedValue([
+      // Reviewer chose to display only their first name — don't suggest dropping "Smith"
+      { id: "rev-1", firstName: "Alice", lastName: null, customerRef: "alice@example.com" },
     ]);
     const res = await POST(makeRequest());
     const json = await res.json();

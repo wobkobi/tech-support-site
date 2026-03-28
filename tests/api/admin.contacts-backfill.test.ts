@@ -4,6 +4,7 @@ import { NextRequest } from "next/server";
 const mocks = vi.hoisted(() => ({
   isAdminRequest: vi.fn(),
   bookingFindMany: vi.fn(),
+  reviewRequestFindMany: vi.fn(),
   contactUpsert: vi.fn(),
 }));
 
@@ -15,6 +16,9 @@ vi.mock("@/shared/lib/prisma", () => ({
   prisma: {
     booking: {
       findMany: mocks.bookingFindMany,
+    },
+    reviewRequest: {
+      findMany: mocks.reviewRequestFindMany,
     },
     contact: {
       upsert: mocks.contactUpsert,
@@ -30,6 +34,8 @@ describe("POST /api/admin/contacts/backfill", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.isAdminRequest.mockReturnValue(true);
+    mocks.bookingFindMany.mockResolvedValue([]);
+    mocks.reviewRequestFindMany.mockResolvedValue([]);
     mocks.contactUpsert.mockResolvedValue({});
   });
 
@@ -78,7 +84,11 @@ describe("POST /api/admin/contacts/backfill", () => {
     expect(mocks.contactUpsert).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { email: "alice@example.com" },
-        create: expect.objectContaining({ name: "Alice New", address: "New St", phone: "021 999" }),
+        create: expect.objectContaining({
+          name: "Alice New",
+          address: "New St",
+          phone: "+6421999",
+        }),
       }),
     );
   });

@@ -9,7 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
-import { normalizePhone } from "@/shared/lib/normalize-phone";
+import { toE164NZ, normalizePhone } from "@/shared/lib/normalize-phone";
 
 export interface ConflictEntry {
   contactId: string;
@@ -17,7 +17,7 @@ export interface ConflictEntry {
   contactEmail: string;
   contactPhone: string | null;
   /** Where the conflicting data came from. */
-  source: "ReviewRequest" | "Review";
+  source: "ReviewRequest" | "Review" | "Booking";
   sourceId: string;
   /** Suggested name (present when name is a conflicting field). */
   sourceName: string | null;
@@ -63,8 +63,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // One entry per source type per contact (most-recent wins)
   const seenRR = new Set<string>();
   const seenRev = new Set<string>();
-  // contactId → raw phone string to enrich
+  // contactId → enriched value
   const phoneEnrichments = new Map<string, string>();
+  const nameEnrichments = new Map<string, string>();
 
   for (const rr of reviewRequests) {
     if (!rr.email) continue;
@@ -77,15 +78,30 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const proposedPhone = proposedPhoneRaw ? normalizePhone(proposedPhoneRaw) : null;
     const existingPhone = contact.phone ? normalizePhone(contact.phone) : null;
 
+    // Auto-fill name when contact has only a first name and source provides full name.
+    if (
+      proposedName &&
+      contact.name &&
+      proposedName.toLowerCase().startsWith(contact.name.toLowerCase() + " ")
+    ) {
+      nameEnrichments.set(contact.id, proposedName);
+    }
+
     const conflictFields: ("name" | "phone")[] = [];
 
-    if (proposedName && contact.name && proposedName.toLowerCase() !== contact.name.toLowerCase()) {
+    if (
+      proposedName &&
+      contact.name &&
+      proposedName.toLowerCase() !== contact.name.toLowerCase() &&
+      !contact.name.toLowerCase().startsWith(proposedName.toLowerCase() + " ") &&
+      !proposedName.toLowerCase().startsWith(contact.name.toLowerCase() + " ")
+    ) {
       conflictFields.push("name");
     }
 
     if (proposedPhone) {
       if (!existingPhone) {
-        phoneEnrichments.set(contact.id, proposedPhoneRaw!);
+        phoneEnrichments.set(contact.id, toE164NZ(proposedPhoneRaw!) || proposedPhoneRaw!);
       } else if (proposedPhone !== existingPhone) {
         conflictFields.push("phone");
       }
@@ -112,6 +128,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (!contact || seenRev.has(contact.id)) continue;
     seenRev.add(contact.id);
 
+    // If the review has no last name, don't flag a name conflict — the reviewer's
+    // choice of display name (first name only) is not a suggestion to drop the
+    // contact's last name.
+    if (!review.lastName) continue;
     const proposedName = [review.firstName, review.lastName].filter(Boolean).join(" ").trim();
     if (!proposedName || !contact.name) continue;
     if (proposedName.toLowerCase() === contact.name.toLowerCase()) continue;
@@ -129,11 +149,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     });
   }
 
-  await Promise.all(
-    [...phoneEnrichments.entries()].map(([id, phone]) =>
+  await Promise.all([
+    ...[...phoneEnrichments.entries()].map(([id, phone]) =>
       prisma.contact.update({ where: { id }, data: { phone } }),
     ),
-  );
+    ...[...nameEnrichments.entries()].map(([id, name]) =>
+      prisma.contact.update({ where: { id }, data: { name } }),
+    ),
+  ]);
 
-  return NextResponse.json({ ok: true, enrichedCount: phoneEnrichments.size, conflicts });
+  return NextResponse.json({
+    ok: true,
+    enrichedCount: phoneEnrichments.size + nameEnrichments.size,
+    conflicts,
+  });
 }

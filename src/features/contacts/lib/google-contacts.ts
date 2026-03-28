@@ -7,6 +7,7 @@
 import { google } from "googleapis";
 import { prisma } from "@/shared/lib/prisma";
 import { getOAuth2Client } from "@/features/calendar/lib/google-calendar";
+import { normalizePhone, toE164NZ } from "@/shared/lib/normalize-phone";
 
 /**
  * Returns an authenticated Google People API client.
@@ -26,6 +27,34 @@ function getPeopleClient(): ReturnType<typeof google.people> {
 export async function importFromGoogleContacts(): Promise<number> {
   try {
     const people = getPeopleClient();
+
+    // Build phone → email map from ReviewRequest history so phone-only Google
+    // contacts can be matched to a known email and imported.
+    const reviewRequestsByPhone = new Map<string, string>();
+    const rrRows = await prisma.reviewRequest.findMany({
+      where: { phone: { not: null }, email: { not: null } },
+      orderBy: { createdAt: "desc" },
+      select: { phone: true, email: true },
+    });
+    for (const rr of rrRows) {
+      if (!rr.phone || !rr.email) continue;
+      const norm = normalizePhone(toE164NZ(rr.phone) || rr.phone);
+      if (norm && !reviewRequestsByPhone.has(norm)) reviewRequestsByPhone.set(norm, rr.email);
+    }
+
+    // Build phone → contactId map so phone-only Google contacts can at least
+    // have their googleContactId linked to an existing local contact.
+    const contactsByPhone = new Map<string, string>();
+    const phoneContacts = await prisma.contact.findMany({
+      where: { phone: { not: null } },
+      select: { id: true, phone: true },
+    });
+    for (const c of phoneContacts) {
+      if (!c.phone) continue;
+      const norm = normalizePhone(c.phone);
+      if (norm && !contactsByPhone.has(norm)) contactsByPhone.set(norm, c.id);
+    }
+
     let pageToken: string | undefined;
     let count = 0;
 
@@ -44,35 +73,53 @@ export async function importFromGoogleContacts(): Promise<number> {
         const resourceName = person.resourceName;
         if (!resourceName) continue;
 
-        const emailEntry = person.emailAddresses?.[0]?.value;
-        if (!emailEntry) continue;
-
-        const email = emailEntry.trim().toLowerCase();
+        const emailEntry = person.emailAddresses?.[0]?.value?.trim().toLowerCase() ?? null;
+        const rawPhone = person.phoneNumbers?.[0]?.value?.trim() ?? null;
+        const phone = rawPhone ? toE164NZ(rawPhone) || rawPhone : null;
+        const normPhone = rawPhone ? normalizePhone(toE164NZ(rawPhone) || rawPhone) : null;
         const name =
-          person.names?.[0]?.displayName?.trim() ?? person.names?.[0]?.givenName?.trim() ?? email;
-        const phone = person.phoneNumbers?.[0]?.value?.trim() ?? null;
-        const addressParts = person.addresses?.[0];
-        const address = addressParts?.formattedValue?.trim() ?? null;
+          person.names?.[0]?.displayName?.trim() ?? person.names?.[0]?.givenName?.trim() ?? null;
+        const address = person.addresses?.[0]?.formattedValue?.trim() ?? null;
 
-        try {
-          await prisma.contact.upsert({
-            where: { email },
-            create: {
-              name,
-              email,
-              phone,
-              address,
-              googleContactId: resourceName,
-            },
-            // For existing contacts, only link the Google resource name.
-            // Local name/phone/address are the source of truth and must not be overwritten.
-            update: {
-              googleContactId: resourceName,
-            },
-          });
-          count++;
-        } catch (upsertError) {
-          console.error(`[google-contacts] Failed to upsert contact ${email}:`, upsertError);
+        // Resolve email: direct from Google, or looked up via phone in ReviewRequest history.
+        const email =
+          emailEntry ?? (normPhone ? (reviewRequestsByPhone.get(normPhone) ?? null) : null);
+
+        if (email) {
+          try {
+            await prisma.contact.upsert({
+              where: { email },
+              create: {
+                name: name ?? email,
+                email,
+                phone,
+                address,
+                googleContactId: resourceName,
+              },
+              // Local name/phone/address are the source of truth — only link the resource name.
+              update: { googleContactId: resourceName },
+            });
+            count++;
+          } catch (upsertError) {
+            console.error(`[google-contacts] Failed to upsert contact ${email}:`, upsertError);
+          }
+        } else if (normPhone) {
+          // No email anywhere — link googleContactId to an existing contact matched by phone.
+          const existingId = contactsByPhone.get(normPhone);
+          if (existingId) {
+            try {
+              await prisma.contact.update({
+                where: { id: existingId },
+                data: { googleContactId: resourceName },
+              });
+              count++;
+            } catch (updateError) {
+              console.error(
+                `[google-contacts] Failed to link googleContactId for phone ${normPhone}:`,
+                updateError,
+              );
+            }
+          }
         }
       }
     } while (pageToken);
@@ -101,6 +148,18 @@ export interface UpsertContactParams {
 }
 
 /**
+ * Splits a full display name into given (first) and family (last) name parts.
+ * @param fullName - Full display name.
+ * @returns Object with givenName and familyName strings.
+ */
+function splitName(fullName: string): { givenName: string; familyName: string } {
+  const parts = (fullName ?? "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return { givenName: "", familyName: "" };
+  if (parts.length === 1) return { givenName: parts[0], familyName: "" };
+  return { givenName: parts.slice(0, -1).join(" "), familyName: parts[parts.length - 1] };
+}
+
+/**
  * Creates or updates a contact in Google Contacts.
  * - If `googleContactId` is provided, updates the existing contact (fetching etag first).
  * - Otherwise searches by email; updates if found, creates if not.
@@ -112,12 +171,47 @@ export async function upsertToGoogleContacts(params: UpsertContactParams): Promi
   try {
     const people = getPeopleClient();
 
-    const contactBody = {
-      names: [{ displayName: params.name }],
+    const { givenName, familyName } = splitName(params.name);
+
+    // Full body used only when CREATING a new contact — includes the local name.
+    const createBody = {
+      names: [{ displayName: params.name, givenName, familyName }],
       emailAddresses: [{ value: params.email }],
       ...(params.phone ? { phoneNumbers: [{ value: params.phone }] } : {}),
       ...(params.address ? { addresses: [{ formattedValue: params.address }] } : {}),
     };
+
+    // Base update fields — always sync email, phone, address.
+    // `names` is added only when the existing Google contact has no name.
+    const baseUpdateBody = {
+      emailAddresses: [{ value: params.email }],
+      ...(params.phone ? { phoneNumbers: [{ value: params.phone }] } : {}),
+      ...(params.address ? { addresses: [{ formattedValue: params.address }] } : {}),
+    };
+
+    /**
+     * Builds the request body and personFields for an update, adding `names`
+     * only when the existing Google contact has no display name.
+     * @param existingNames - The `names` array from the fetched Google contact.
+     * @returns Body and personFields string to pass to updateContact.
+     */
+    function buildUpdate(
+      existingNames: Array<{ displayName?: string | null }> | null | undefined,
+    ): {
+      body: typeof baseUpdateBody & {
+        names?: Array<{ displayName: string; givenName: string; familyName: string }>;
+      };
+      fields: string;
+    } {
+      const hasName = existingNames?.some((n) => n.displayName?.trim());
+      if (!hasName && params.name) {
+        return {
+          body: { names: [{ displayName: params.name, givenName, familyName }], ...baseUpdateBody },
+          fields: "names,emailAddresses,phoneNumbers,addresses",
+        };
+      }
+      return { body: baseUpdateBody, fields: "emailAddresses,phoneNumbers,addresses" };
+    }
 
     // If we already have a resource name, try to update in place.
     if (params.googleContactId) {
@@ -128,10 +222,11 @@ export async function upsertToGoogleContacts(params: UpsertContactParams): Promi
         });
         const etag = existing.data.etag;
         if (etag) {
+          const { body, fields } = buildUpdate(existing.data.names);
           const updated = await people.people.updateContact({
             resourceName: params.googleContactId,
-            updatePersonFields: "names,emailAddresses,phoneNumbers,addresses",
-            requestBody: { etag, ...contactBody },
+            updatePersonFields: fields,
+            requestBody: { etag, ...body },
           });
           return updated.data.resourceName ?? params.googleContactId;
         }
@@ -167,10 +262,11 @@ export async function upsertToGoogleContacts(params: UpsertContactParams): Promi
           });
           const etag = existing.data.etag;
           if (etag) {
+            const { body, fields } = buildUpdate(existing.data.names);
             const updated = await people.people.updateContact({
               resourceName,
-              updatePersonFields: "names,emailAddresses,phoneNumbers,addresses",
-              requestBody: { etag, ...contactBody },
+              updatePersonFields: fields,
+              requestBody: { etag, ...body },
             });
             return updated.data.resourceName ?? resourceName;
           }
@@ -186,9 +282,9 @@ export async function upsertToGoogleContacts(params: UpsertContactParams): Promi
       console.error("[google-contacts] Search failed, will attempt create:", searchError);
     }
 
-    // Create a new contact.
+    // Create a new contact — use the full body including name.
     const created = await people.people.createContact({
-      requestBody: contactBody,
+      requestBody: createBody,
     });
     return created.data.resourceName ?? null;
   } catch (error) {

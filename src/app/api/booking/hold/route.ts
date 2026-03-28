@@ -12,6 +12,7 @@ import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 import { createBookingEvent } from "@/features/calendar/lib/google-calendar";
 import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
+import { toE164NZ } from "@/shared/lib/normalize-phone";
 
 // Hold expiration time in minutes
 const HOLD_EXPIRATION_MINUTES = 15;
@@ -134,7 +135,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreateBoo
         data: {
           name: name.trim(),
           email: email.trim().toLowerCase(),
-          phone: phone?.trim() || null,
+          phone: phone ? toE164NZ(phone) || null : null,
           notes: bookingNotes,
           startAt,
           endAt,

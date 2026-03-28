@@ -16,6 +16,7 @@ import { AdminTabs } from "@/features/admin/components/AdminTabs";
 import type { AdminBookingRow } from "@/features/booking/components/admin/BookingAdminList";
 import type { ContactRow } from "@/features/admin/components/ContactAdminList";
 import type { TravelBlockRow } from "@/features/admin/components/TravelBlockAdminList";
+import { autoMaintain } from "@/features/admin/lib/auto-maintain";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +42,9 @@ export default async function AdminPage({
     console.warn("[admin] Invalid token attempt", { tokenPresent: Boolean(token) });
     notFound();
   }
+
+  // Backfill missing contacts, link unlinked reviews, auto-fill fields, and collect conflicts.
+  const initialConflicts = await autoMaintain(prisma);
 
   const [reviews, sentBookings, sentRequests, allBookings, allContacts] = await Promise.all([
     prisma.review.findMany({
@@ -355,6 +359,7 @@ export default async function AdminPage({
             travelBlocks={travelBlockRows}
             token={token!}
             initialTab={tab}
+            initialConflicts={initialConflicts}
           />
         </div>
       </FrostedSection>

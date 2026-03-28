@@ -21,6 +21,8 @@ interface ContactPickerEntry {
   name: string;
   /** Email address */
   email: string;
+  /** Number of reviews already linked to this contact */
+  reviewCount: number;
 }
 
 /**
@@ -143,11 +145,13 @@ export function ReviewApprovalList({
             className="border-seasalt-400/80 bg-seasalt text-rich-black focus:border-russian-violet focus:ring-russian-violet/30 rounded-md border px-2 py-1 text-xs focus:outline-none focus:ring-1"
           >
             <option value="">-- no contact --</option>
-            {contacts.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name} ({c.email})
-              </option>
-            ))}
+            {contacts
+              .filter((c) => c.id !== row.contactId && c.reviewCount === 0)
+              .map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name} ({c.email})
+                </option>
+              ))}
           </select>
           <button
             onClick={() => setLinkingId(null)}

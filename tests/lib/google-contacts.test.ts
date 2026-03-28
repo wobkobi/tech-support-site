@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => {
   const contactFindMany = vi.fn();
   const contactFindUnique = vi.fn();
   const contactUpdate = vi.fn();
+  const reviewRequestFindMany = vi.fn();
   return {
     connectionsList,
     get,
@@ -30,6 +31,7 @@ const mocks = vi.hoisted(() => {
     contactFindMany,
     contactFindUnique,
     contactUpdate,
+    reviewRequestFindMany,
   };
 });
 
@@ -51,6 +53,9 @@ vi.mock("@/shared/lib/prisma", () => ({
       findUnique: mocks.contactFindUnique,
       update: mocks.contactUpdate,
     },
+    reviewRequest: {
+      findMany: mocks.reviewRequestFindMany,
+    },
   },
 }));
 
@@ -68,6 +73,10 @@ describe("importFromGoogleContacts", () => {
       data: { connections: [], nextPageToken: undefined },
     });
     mocks.contactUpsert.mockResolvedValue({});
+    mocks.contactUpdate.mockResolvedValue({});
+    // Default: no ReviewRequest or phone-bearing Contact rows
+    mocks.reviewRequestFindMany.mockResolvedValue([]);
+    mocks.contactFindMany.mockResolvedValue([]);
   });
 
   it("returns 0 when the API call throws", async () => {
@@ -110,7 +119,7 @@ describe("importFromGoogleContacts", () => {
         where: { email: "alice@example.com" },
         create: expect.objectContaining({
           googleContactId: "people/1",
-          phone: "021 111 2222",
+          phone: "+64211112222",
           address: "1 Main St",
         }),
         // update must NOT overwrite local name/phone/address — local DB is source of truth
@@ -154,15 +163,86 @@ describe("importFromGoogleContacts", () => {
     expect(count).toBe(0);
   });
 
-  it("skips persons without an email address", async () => {
+  it("skips persons with no email and no phone", async () => {
     mocks.connectionsList.mockResolvedValue({
       data: {
-        connections: [{ resourceName: "people/1", names: [{ displayName: "No Email" }] }],
+        connections: [{ resourceName: "people/1", names: [{ displayName: "No Contact Info" }] }],
         nextPageToken: undefined,
       },
     });
     const count = await importFromGoogleContacts();
     expect(count).toBe(0);
+    expect(mocks.contactUpsert).not.toHaveBeenCalled();
+    expect(mocks.contactUpdate).not.toHaveBeenCalled();
+  });
+
+  it("imports a phone-only Google contact by looking up email in ReviewRequest history", async () => {
+    mocks.reviewRequestFindMany.mockResolvedValue([
+      { phone: "021 111 2222", email: "carol@example.com" },
+    ]);
+    mocks.connectionsList.mockResolvedValue({
+      data: {
+        connections: [
+          {
+            resourceName: "people/3",
+            names: [{ displayName: "Carol" }],
+            phoneNumbers: [{ value: "021 111 2222" }],
+          },
+        ],
+        nextPageToken: undefined,
+      },
+    });
+    const count = await importFromGoogleContacts();
+    expect(count).toBe(1);
+    expect(mocks.contactUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { email: "carol@example.com" },
+        create: expect.objectContaining({ googleContactId: "people/3", name: "Carol" }),
+        update: { googleContactId: "people/3" },
+      }),
+    );
+  });
+
+  it("links googleContactId by phone when no email is found anywhere", async () => {
+    mocks.contactFindMany.mockResolvedValue([{ id: "contact-9", phone: "+64211112222" }]);
+    mocks.connectionsList.mockResolvedValue({
+      data: {
+        connections: [
+          {
+            resourceName: "people/4",
+            names: [{ displayName: "Dave" }],
+            phoneNumbers: [{ value: "021 111 2222" }],
+          },
+        ],
+        nextPageToken: undefined,
+      },
+    });
+    const count = await importFromGoogleContacts();
+    expect(count).toBe(1);
+    expect(mocks.contactUpsert).not.toHaveBeenCalled();
+    expect(mocks.contactUpdate).toHaveBeenCalledWith({
+      where: { id: "contact-9" },
+      data: { googleContactId: "people/4" },
+    });
+  });
+
+  it("skips a phone-only Google contact when no ReviewRequest or existing contact matches the phone", async () => {
+    mocks.connectionsList.mockResolvedValue({
+      data: {
+        connections: [
+          {
+            resourceName: "people/5",
+            names: [{ displayName: "Eve" }],
+            phoneNumbers: [{ value: "021 999 8888" }],
+          },
+        ],
+        nextPageToken: undefined,
+      },
+    });
+    const count = await importFromGoogleContacts();
+    expect(count).toBe(0);
+    expect(mocks.contactUpsert).not.toHaveBeenCalled();
+    expect(mocks.contactUpdate).not.toHaveBeenCalled();
   });
 
   it("continues processing after a per-contact upsert error", async () => {
@@ -258,7 +338,7 @@ describe("upsertToGoogleContacts", () => {
     expect(mocks.createContact).toHaveBeenCalledWith(
       expect.objectContaining({
         requestBody: expect.objectContaining({
-          names: [{ displayName: "Alice" }],
+          names: [{ displayName: "Alice", givenName: "Alice", familyName: "" }],
           emailAddresses: [{ value: "alice@example.com" }],
         }),
       }),
@@ -282,8 +362,10 @@ describe("upsertToGoogleContacts", () => {
     );
   });
 
-  it("updates an existing contact when googleContactId is provided", async () => {
-    mocks.get.mockResolvedValue({ data: { etag: "etag-abc" } });
+  it("updates an existing contact when googleContactId is provided and it already has a name", async () => {
+    mocks.get.mockResolvedValue({
+      data: { etag: "etag-abc", names: [{ displayName: "Alice Existing" }] },
+    });
     mocks.updateContact.mockResolvedValue({ data: { resourceName: "people/existing-1" } });
 
     const result = await upsertToGoogleContacts({
@@ -295,10 +377,35 @@ describe("upsertToGoogleContacts", () => {
     expect(mocks.updateContact).toHaveBeenCalledWith(
       expect.objectContaining({
         resourceName: "people/existing-1",
+        updatePersonFields: "emailAddresses,phoneNumbers,addresses",
         requestBody: expect.objectContaining({ etag: "etag-abc" }),
       }),
     );
+    // names must NOT be sent — existing Google name is preserved
+    const call = mocks.updateContact.mock.calls[0][0] as { requestBody: Record<string, unknown> };
+    expect(call.requestBody).not.toHaveProperty("names");
     expect(mocks.searchContacts).not.toHaveBeenCalled();
+  });
+
+  it("sets the name when updating a contact that has no name in Google", async () => {
+    mocks.get.mockResolvedValue({ data: { etag: "etag-noname", names: [] } });
+    mocks.updateContact.mockResolvedValue({ data: { resourceName: "people/existing-2" } });
+
+    const result = await upsertToGoogleContacts({
+      name: "Alice",
+      email: "alice@example.com",
+      googleContactId: "people/existing-2",
+    });
+    expect(result).toBe("people/existing-2");
+    expect(mocks.updateContact).toHaveBeenCalledWith(
+      expect.objectContaining({
+        updatePersonFields: "names,emailAddresses,phoneNumbers,addresses",
+        requestBody: expect.objectContaining({
+          etag: "etag-noname",
+          names: [{ displayName: "Alice", givenName: "Alice", familyName: "" }],
+        }),
+      }),
+    );
   });
 
   it("falls back to search when fetching the existing resource fails", async () => {
@@ -313,7 +420,7 @@ describe("upsertToGoogleContacts", () => {
     expect(result).toBe("people/created-1");
   });
 
-  it("updates a contact found by search", async () => {
+  it("updates a contact found by search (has existing name — name not replaced)", async () => {
     mocks.searchContacts.mockResolvedValue({
       data: {
         results: [
@@ -326,7 +433,9 @@ describe("upsertToGoogleContacts", () => {
         ],
       },
     });
-    mocks.get.mockResolvedValue({ data: { etag: "etag-found" } });
+    mocks.get.mockResolvedValue({
+      data: { etag: "etag-found", names: [{ displayName: "Alice Full Name" }] },
+    });
     mocks.updateContact.mockResolvedValue({ data: { resourceName: "people/found-1" } });
 
     const result = await upsertToGoogleContacts({
@@ -334,7 +443,46 @@ describe("upsertToGoogleContacts", () => {
       email: "alice@example.com",
     });
     expect(result).toBe("people/found-1");
-    expect(mocks.updateContact).toHaveBeenCalled();
+    expect(mocks.updateContact).toHaveBeenCalledWith(
+      expect.objectContaining({
+        updatePersonFields: "emailAddresses,phoneNumbers,addresses",
+      }),
+    );
+    // names must NOT be sent — existing Google name is preserved
+    const call = mocks.updateContact.mock.calls[0][0] as { requestBody: Record<string, unknown> };
+    expect(call.requestBody).not.toHaveProperty("names");
+    expect(mocks.createContact).not.toHaveBeenCalled();
+  });
+
+  it("sets the name when updating a contact found by search that has no name", async () => {
+    mocks.searchContacts.mockResolvedValue({
+      data: {
+        results: [
+          {
+            person: {
+              resourceName: "people/found-2",
+              emailAddresses: [{ value: "alice@example.com" }],
+            },
+          },
+        ],
+      },
+    });
+    mocks.get.mockResolvedValue({ data: { etag: "etag-found-noname", names: [] } });
+    mocks.updateContact.mockResolvedValue({ data: { resourceName: "people/found-2" } });
+
+    const result = await upsertToGoogleContacts({
+      name: "Alice",
+      email: "alice@example.com",
+    });
+    expect(result).toBe("people/found-2");
+    expect(mocks.updateContact).toHaveBeenCalledWith(
+      expect.objectContaining({
+        updatePersonFields: "names,emailAddresses,phoneNumbers,addresses",
+        requestBody: expect.objectContaining({
+          names: [{ displayName: "Alice", givenName: "Alice", familyName: "" }],
+        }),
+      }),
+    );
     expect(mocks.createContact).not.toHaveBeenCalled();
   });
 

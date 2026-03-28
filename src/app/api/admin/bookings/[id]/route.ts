@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { deleteBookingEvent } from "@/features/calendar/lib/google-calendar";
+import { toE164NZ } from "@/shared/lib/normalize-phone";
 
 interface PatchPayload {
   name?: string;
@@ -47,7 +48,7 @@ export async function PATCH(
 
   if (body.name !== undefined) data.name = body.name.trim();
   if (body.email !== undefined) data.email = body.email.trim();
-  if (body.phone !== undefined) data.phone = body.phone.trim() || null;
+  if (body.phone !== undefined) data.phone = toE164NZ(body.phone) || null;
   if (body.notes !== undefined) data.notes = body.notes;
 
   if (body.address !== undefined && body.notes === undefined) {
@@ -92,7 +93,7 @@ export async function PATCH(
     try {
       await prisma.contact.updateMany({
         where: { email: booking.email },
-        data: { phone: body.phone.trim() || null },
+        data: { phone: toE164NZ(body.phone) || null },
       });
     } catch (err) {
       console.error("[admin/bookings] Failed to update contact phone:", err);
