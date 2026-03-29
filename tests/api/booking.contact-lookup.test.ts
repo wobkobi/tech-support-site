@@ -2,13 +2,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
 const mocks = vi.hoisted(() => ({
-  contactFindUnique: vi.fn(),
+  contactFindFirst: vi.fn(),
 }));
 
 vi.mock("@/shared/lib/prisma", () => ({
   prisma: {
     contact: {
-      findUnique: mocks.contactFindUnique,
+      findFirst: mocks.contactFindFirst,
     },
   },
 }));
@@ -45,7 +45,7 @@ describe("GET /api/booking/contact-lookup", () => {
   });
 
   it("returns 404 when contact is not found", async () => {
-    mocks.contactFindUnique.mockResolvedValue(null);
+    mocks.contactFindFirst.mockResolvedValue(null);
     const res = await GET(makeReq("unknown@example.com"));
     expect(res.status).toBe(404);
     const json = await res.json();
@@ -53,7 +53,7 @@ describe("GET /api/booking/contact-lookup", () => {
   });
 
   it("returns contact fields when found", async () => {
-    mocks.contactFindUnique.mockResolvedValue({
+    mocks.contactFindFirst.mockResolvedValue({
       name: "Alice",
       phone: "021 111 2222",
       address: "1 Main St",
@@ -68,9 +68,9 @@ describe("GET /api/booking/contact-lookup", () => {
   });
 
   it("normalises email to lowercase before lookup", async () => {
-    mocks.contactFindUnique.mockResolvedValue(null);
+    mocks.contactFindFirst.mockResolvedValue(null);
     await GET(makeReq("ALICE@Example.COM"));
-    expect(mocks.contactFindUnique).toHaveBeenCalledWith(
+    expect(mocks.contactFindFirst).toHaveBeenCalledWith(
       expect.objectContaining({ where: { email: "alice@example.com" } }),
     );
   });

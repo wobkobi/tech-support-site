@@ -59,4 +59,46 @@ describe("GET /api/booking/days", () => {
     expect(json.days).toEqual([]);
     expect(typeof json.timeZone).toBe("string");
   });
+
+  it("passes mapped calendar events to buildAvailableDays", async () => {
+    mocks.fetchAllCalendarEvents.mockResolvedValue([
+      { id: "evt-1", start: "2099-06-15T09:00:00Z", end: "2099-06-15T10:00:00Z" },
+    ]);
+    await GET();
+    const calendarArg = mocks.buildAvailableDays.mock.calls[0][1] as Array<{
+      id: string;
+      start: string;
+      end: string;
+    }>;
+    expect(calendarArg).toHaveLength(1);
+    expect(calendarArg[0]).toEqual({
+      id: "evt-1",
+      start: "2099-06-15T09:00:00Z",
+      end: "2099-06-15T10:00:00Z",
+    });
+  });
+
+  it("passes mapped database bookings to buildAvailableDays", async () => {
+    const startAt = new Date("2099-06-15T09:00:00Z");
+    const endAt = new Date("2099-06-15T10:00:00Z");
+    mocks.bookingFindMany.mockResolvedValue([
+      { id: "bk-1", startAt, endAt, bufferBeforeMin: 15, bufferAfterMin: 30 },
+    ]);
+    await GET();
+    const bookingsArg = mocks.buildAvailableDays.mock.calls[0][0] as Array<{
+      id: string;
+      startAt: Date;
+      endAt: Date;
+      bufferBeforeMin: number;
+      bufferAfterMin: number;
+    }>;
+    expect(bookingsArg).toHaveLength(1);
+    expect(bookingsArg[0]).toEqual({
+      id: "bk-1",
+      startAt,
+      endAt,
+      bufferBeforeMin: 15,
+      bufferAfterMin: 30,
+    });
+  });
 });

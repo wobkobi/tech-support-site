@@ -16,6 +16,7 @@ import { AdminTabs } from "@/features/admin/components/AdminTabs";
 import type { AdminBookingRow } from "@/features/booking/components/admin/BookingAdminList";
 import type { ContactRow } from "@/features/admin/components/ContactAdminList";
 import type { TravelBlockRow } from "@/features/admin/components/TravelBlockAdminList";
+import { autoMaintain } from "@/features/admin/lib/auto-maintain";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +42,9 @@ export default async function AdminPage({
     console.warn("[admin] Invalid token attempt", { tokenPresent: Boolean(token) });
     notFound();
   }
+
+  // Backfill missing contacts, link unlinked reviews, auto-fill fields, and collect conflicts.
+  const initialConflicts = await autoMaintain(prisma);
 
   const [reviews, sentBookings, sentRequests, allBookings, allContacts] = await Promise.all([
     prisma.review.findMany({
@@ -88,6 +92,7 @@ export default async function AdminPage({
         id: true,
         name: true,
         email: true,
+        phone: true,
         notes: true,
         startAt: true,
         endAt: true,
@@ -117,12 +122,24 @@ export default async function AdminPage({
   // Group reviews that have a contactId by that contactId for per-contact display.
   const reviewsByContactId = new Map<
     string,
-    Array<{ id: string; text: string; firstName: string | null; lastName: string | null }>
+    Array<{
+      id: string;
+      text: string;
+      firstName: string | null;
+      lastName: string | null;
+      customerRef: string | null;
+    }>
   >();
   for (const r of reviews) {
     if (r.contactId) {
       const existing = reviewsByContactId.get(r.contactId) ?? [];
-      existing.push({ id: r.id, text: r.text, firstName: r.firstName, lastName: r.lastName });
+      existing.push({
+        id: r.id,
+        text: r.text,
+        firstName: r.firstName,
+        lastName: r.lastName,
+        customerRef: r.customerRef ?? null,
+      });
       reviewsByContactId.set(r.contactId, existing);
     }
   }
@@ -227,6 +244,7 @@ export default async function AdminPage({
     id: b.id,
     name: b.name,
     email: b.email,
+    phone: b.phone ?? null,
     notes: b.notes ?? null,
     startAt: b.startAt.toISOString(),
     endAt: b.endAt.toISOString(),
@@ -282,8 +300,8 @@ export default async function AdminPage({
     sourceEventId: b.sourceEventId,
     calendarEmail: b.calendarEmail,
     summary: b.summary ?? null,
-    eventStartAt: b.eventStartAt?.toISOString() ?? null,
-    eventEndAt: b.eventEndAt?.toISOString() ?? null,
+    eventStartAt: b.eventStartAt.toISOString(),
+    eventEndAt: b.eventEndAt.toISOString(),
     rawTravelMinutes: b.rawTravelMinutes ?? null,
     roundedMinutes: b.roundedMinutes ?? null,
     rawTravelBackMinutes: b.rawTravelBackMinutes ?? null,
@@ -341,6 +359,7 @@ export default async function AdminPage({
             travelBlocks={travelBlockRows}
             token={token!}
             initialTab={tab}
+            initialConflicts={initialConflicts}
           />
         </div>
       </FrostedSection>

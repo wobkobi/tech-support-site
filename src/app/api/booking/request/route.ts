@@ -28,6 +28,7 @@ import {
 import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
 import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
+import { toE164NZ } from "@/shared/lib/normalize-phone";
 
 interface BookingRequestPayload {
   dateKey: string;
@@ -189,10 +190,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (meetingType === "in-person" && address) {
       bookingNotes += `Address: ${address.trim()}\n`;
     }
-    if (phone) {
-      bookingNotes += `Phone: ${phone.trim()}\n`;
-    }
-
     // Create calendar event
     let calendarEventId: string | null = null;
     try {
@@ -232,6 +229,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         data: {
           name: name.trim(),
           email: email.trim().toLowerCase(),
+          phone: phone ? toE164NZ(phone) || null : null,
           notes: bookingNotes,
           startAt,
           endAt,
@@ -249,20 +247,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
       // Upsert contact record - best effort, never fail the booking on write error
       try {
-        const contact = await prisma.contact.upsert({
-          where: { email: email.trim().toLowerCase() },
-          create: {
-            name: name.trim(),
-            email: email.trim().toLowerCase(),
-            phone: phone?.trim() || null,
-            address: address?.trim() || null,
-          },
-          update: {
-            name: name.trim(),
-            phone: phone?.trim() || null,
-            address: address?.trim() || null,
-          },
-        });
+        const contactEmail = email.trim().toLowerCase();
+        let existing = await prisma.contact.findFirst({ where: { email: contactEmail } });
+        if (!existing) {
+          existing = await prisma.contact.create({
+            data: {
+              name: name.trim(),
+              email: contactEmail,
+              phone: phone ? toE164NZ(phone) || null : null,
+              address: address?.trim() || null,
+            },
+          });
+        }
+        const contact = existing;
         // Best-effort sync to Google Contacts — never fail the booking if it errors.
         await syncContactToGoogle(contact.id);
       } catch (contactError) {

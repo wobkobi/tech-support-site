@@ -18,7 +18,6 @@ enum BookingStatus {
 enum ReviewStatus {
   pending
   approved
-  revoked
 }
 
 model Booking {
@@ -33,6 +32,9 @@ model Booking {
   startAt DateTime
   endAt   DateTime
 
+  // Client phone number.
+  phone String?
+
   // Per-booking buffer in minutes before and after the appointment.
   bufferBeforeMin Int @default(0)
   bufferAfterMin  Int @default(0)
@@ -46,8 +48,7 @@ model Booking {
   reviewToken String  @unique @default(uuid())
 
   // Double-booking prevention: set to startAt.toISOString() when active (held/confirmed),
-  // null when cancelled or expired. Sparse unique index only enforces uniqueness on
-  // non-null values, so multiple cancelled bookings can coexist safely.
+  // set to "released:<id>" when cancelled or expired so the slot is freed without null collisions.
   activeSlotKey String? @unique
 
   // Google Calendar event ID, used to delete the event on cancellation.
@@ -62,14 +63,14 @@ model Booking {
 
   // Expired hold cleanup cron: WHERE status="held" AND holdExpiresAt <= now
   @@index([status, holdExpiresAt])
-  // Cancellation flow: look up by Google Calendar event ID
-  @@index([calendarEventId])
   // Slot availability (slots, days, request, booking page): WHERE status IN [held,confirmed] AND endAt >= now
   @@index([status, endAt])
   // Review email cron and admin page: filter/sort on reviewSentAt
   @@index([reviewSentAt])
   // Review email cron: WHERE status="confirmed" AND reviewSentAt=null AND endAt<=threshold
   @@index([status, reviewSentAt, endAt])
+  // Contact/admin lookup by phone
+  @@index([phone])
 }
 
 model Review {
@@ -97,6 +98,8 @@ model Review {
 
   // Public and admin review listing: WHERE status="approved" ORDER BY createdAt DESC
   @@index([status, createdAt(sort: Desc)])
+  // Contacts tab: group reviews by contactId
+  @@index([contactId])
 }
 
 // Standalone review requests sent to past clients by email or SMS.
@@ -120,7 +123,7 @@ model ReviewRequest {
 model Contact {
   id              String   @id @default(auto()) @map("_id") @db.ObjectId
   name            String
-  email           String   @unique
+  email           String?
   phone           String?
   address         String?
   googleContactId String? // Google People API resource name (e.g. "people/c1234567890")
@@ -134,8 +137,8 @@ model TravelBlock {
   sourceEventId    String
   calendarEmail    String
   summary          String?   // Google Calendar event title (e.g. "Dentist", "Mario Movie")
-  eventStartAt     DateTime? // Source event start — used to detect time changes
-  eventEndAt       DateTime? // Source event end — used to detect time changes
+  eventStartAt     DateTime  // Source event start — used to detect time changes
+  eventEndAt       DateTime  // Source event end — used to detect time changes
   rawTravelMinutes     Int?    // Raw travel-to time from Distance Matrix API
   roundedMinutes       Int?    // Rounded travel-to value used for block window
   rawTravelBackMinutes Int?    // Raw return-trip travel time

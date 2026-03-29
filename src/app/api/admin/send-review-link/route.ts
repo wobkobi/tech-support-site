@@ -91,6 +91,31 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       },
     });
 
+    // Upsert a Contact record — best effort, never blocks.
+    if (mode === "email" && reviewRequest.email) {
+      try {
+        const exists = await prisma.contact.findFirst({ where: { email: reviewRequest.email } });
+        if (!exists) {
+          await prisma.contact.create({
+            data: { name: name.trim(), email: reviewRequest.email, phone: null },
+          });
+        }
+      } catch {
+        // best-effort
+      }
+    } else if (mode === "sms" && reviewRequest.phone) {
+      try {
+        const exists = await prisma.contact.findFirst({ where: { phone: reviewRequest.phone } });
+        if (!exists) {
+          await prisma.contact.create({
+            data: { name: name.trim(), email: null, phone: reviewRequest.phone },
+          });
+        }
+      } catch {
+        // best-effort
+      }
+    }
+
     const reviewUrl = `${siteUrl}/review?token=${reviewRequest.reviewToken}`;
 
     if (mode === "sms") {

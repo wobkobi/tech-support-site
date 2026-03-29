@@ -17,6 +17,7 @@ vi.mock("../../src/shared/lib/prisma", () => ({
       create: vi.fn(),
     },
     booking: { findFirst: vi.fn() },
+    contact: { upsert: vi.fn().mockResolvedValue({}) },
   },
 }));
 

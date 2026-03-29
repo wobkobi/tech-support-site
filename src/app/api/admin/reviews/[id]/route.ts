@@ -14,6 +14,8 @@ import { revalidateReviewPaths } from "@/features/reviews/lib/revalidate";
  * PATCH /api/admin/reviews/[id]
  * Approves or revokes a review, or updates the linked contactId.
  * - When body contains { action: "approve" | "revoke", token } → moderation flow (token in body).
+ *   On approve, automatically upserts a Contact record from the review's booking/review-request
+ *   and links review.contactId. This is best-effort; failure does not block the approval.
  * - When body contains { contactId: string | null } → contact-link flow (token via X-Admin-Secret header).
  * @param request - Incoming request.
  * @param params - Route segment params wrapper.
@@ -63,10 +65,69 @@ export async function PATCH(
   const { id } = await params;
 
   try {
+    // Fetch review before updating so we have source info for auto-link.
+    const review = await prisma.review.findUnique({
+      where: { id },
+      select: {
+        bookingId: true,
+        customerRef: true,
+        contactId: true,
+        firstName: true,
+        lastName: true,
+      },
+    });
+
     await prisma.review.update({
       where: { id },
       data: { status: action === "approve" ? "approved" : "pending" },
     });
+
+    // Auto-link review to a Contact on approve (best-effort, non-fatal).
+    if (action === "approve" && review && !review.contactId) {
+      try {
+        let email: string | null = null;
+        let contactName: string | null = null;
+        let contactPhone: string | null = null;
+
+        if (review.bookingId) {
+          const booking = await prisma.booking.findUnique({
+            where: { id: review.bookingId },
+            select: { email: true, name: true },
+          });
+          email = booking?.email ?? null;
+          contactName = booking?.name ?? null;
+        } else if (review.customerRef) {
+          const rr = await prisma.reviewRequest.findFirst({
+            where: { reviewToken: review.customerRef },
+            select: { email: true, name: true, phone: true },
+          });
+          email = rr?.email ?? null;
+          contactName = rr?.name ?? null;
+          contactPhone = rr?.phone ?? null;
+        }
+
+        if (email) {
+          const fallbackName =
+            [review.firstName, review.lastName].filter(Boolean).join(" ") || "Unknown";
+          let contact = await prisma.contact.findFirst({ where: { email } });
+          if (!contact) {
+            contact = await prisma.contact.create({
+              data: {
+                name: contactName ?? fallbackName,
+                email,
+                ...(contactPhone && { phone: contactPhone }),
+              },
+            });
+          }
+          await prisma.review.update({
+            where: { id },
+            data: { contactId: contact.id },
+          });
+        }
+      } catch (err) {
+        console.error(`[admin/reviews] Auto-link contact failed for review ${id}:`, err);
+      }
+    }
 
     // Trigger ISR revalidation so public pages update immediately
     revalidateReviewPaths();

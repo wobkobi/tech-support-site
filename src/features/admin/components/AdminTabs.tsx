@@ -24,6 +24,7 @@ import {
   TravelBlockAdminList,
   type TravelBlockRow,
 } from "@/features/admin/components/TravelBlockAdminList";
+import type { ConflictEntry } from "@/app/api/admin/contacts/enrich-from-reviews/route";
 
 const TABS = ["reviews", "calendar", "contacts", "travel"] as const;
 type Tab = (typeof TABS)[number];
@@ -38,6 +39,8 @@ interface AdminTabsProps {
   token: string;
   /** Initial tab from the URL ?tab= param. Validated internally; defaults to "reviews". */
   initialTab?: string;
+  /** Conflicts pre-computed at page load (ReviewRequest vs Contact). */
+  initialConflicts: ConflictEntry[];
 }
 
 /**
@@ -52,6 +55,7 @@ interface AdminTabsProps {
  * @param props.travelBlocks - Travel block rows.
  * @param props.token - Admin token for API calls.
  * @param props.initialTab - Initial tab to show, from the URL tab param.
+ * @param props.initialConflicts - Conflicts pre-computed at page load.
  * @returns Admin tabs element.
  */
 export function AdminTabs({
@@ -63,6 +67,7 @@ export function AdminTabs({
   travelBlocks,
   token,
   initialTab,
+  initialConflicts,
 }: AdminTabsProps): React.ReactElement {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>(() =>
@@ -72,8 +77,16 @@ export function AdminTabs({
   const [backfillResult, setBackfillResult] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
+  const [syncConfirmPending, setSyncConfirmPending] = useState(false);
   const [matching, setMatching] = useState(false);
   const [matchResult, setMatchResult] = useState<string | null>(null);
+  const [enriching, setEnriching] = useState(false);
+  const [enrichResult, setEnrichResult] = useState<string | null>(null);
+  const [conflicts, setConflicts] = useState<ConflictEntry[] | null>(
+    initialConflicts.length > 0 ? initialConflicts : null,
+  );
+  const [recalculating, setRecalculating] = useState(false);
+  const [recalculateResult, setRecalculateResult] = useState<string | null>(null);
 
   /**
    * Switches the active tab and updates the URL without adding a history entry.
@@ -94,7 +107,8 @@ export function AdminTabs({
       });
       const data = (await res.json()) as { ok: boolean; upsertedCount?: number; error?: string };
       if (data.ok) {
-        setBackfillResult(`Done — ${data.upsertedCount} contacts upserted. Reload to see updates.`);
+        setBackfillResult(`Done — ${data.upsertedCount} contacts upserted.`);
+        router.refresh();
       } else {
         setBackfillResult(`Error: ${data.error ?? "unknown"}`);
       }
@@ -103,9 +117,10 @@ export function AdminTabs({
     } finally {
       setBackfilling(false);
     }
-  }, [token]);
+  }, [token, router]);
 
   const runSync = useCallback(async () => {
+    setSyncConfirmPending(false);
     setSyncing(true);
     setSyncResult(null);
     try {
@@ -121,8 +136,9 @@ export function AdminTabs({
       };
       if (data.ok) {
         setSyncResult(
-          `Done — ${data.importedCount ?? 0} imported from Google, ${data.syncedCount ?? 0} pushed to Google. Reload to see updates.`,
+          `Done — ${data.importedCount ?? 0} imported from Google, ${data.syncedCount ?? 0} pushed to Google.`,
         );
+        router.refresh();
       } else {
         setSyncResult(`Error: ${data.error ?? "unknown"}`);
       }
@@ -131,7 +147,7 @@ export function AdminTabs({
     } finally {
       setSyncing(false);
     }
-  }, [token]);
+  }, [token, router]);
 
   const runMatchContacts = useCallback(async () => {
     setMatching(true);
@@ -143,7 +159,8 @@ export function AdminTabs({
       });
       const data = (await res.json()) as { ok: boolean; matchedCount?: number; error?: string };
       if (data.ok) {
-        setMatchResult(`Done — ${data.matchedCount ?? 0} reviews matched. Reload to see updates.`);
+        setMatchResult(`Done — ${data.matchedCount ?? 0} reviews matched.`);
+        router.refresh();
       } else {
         setMatchResult(`Error: ${data.error ?? "unknown"}`);
       }
@@ -152,7 +169,93 @@ export function AdminTabs({
     } finally {
       setMatching(false);
     }
+  }, [token, router]);
+
+  const runEnrich = useCallback(async () => {
+    setEnriching(true);
+    setEnrichResult(null);
+    setConflicts(null);
+    try {
+      const res = await fetch("/api/admin/contacts/enrich-from-reviews", {
+        method: "POST",
+        headers: { "X-Admin-Secret": token },
+      });
+      const data = (await res.json()) as {
+        ok: boolean;
+        enrichedCount?: number;
+        conflicts?: ConflictEntry[];
+        error?: string;
+      };
+      if (data.ok) {
+        const parts: string[] = [];
+        if ((data.enrichedCount ?? 0) > 0)
+          parts.push(`${data.enrichedCount} phone${data.enrichedCount === 1 ? "" : "s"} filled in`);
+        const conflictCount = data.conflicts?.length ?? 0;
+        if (conflictCount > 0)
+          parts.push(`${conflictCount} conflict${conflictCount === 1 ? "" : "s"} found`);
+        setEnrichResult(
+          parts.length > 0 ? parts.join(", ") + "." : "No missing data or conflicts found.",
+        );
+        setConflicts(data.conflicts ?? []);
+      } else {
+        setEnrichResult(`Error: ${data.error ?? "unknown"}`);
+      }
+    } catch {
+      setEnrichResult("Network error — try again.");
+    } finally {
+      setEnriching(false);
+    }
   }, [token]);
+
+  const resolveConflict = useCallback(
+    async (conflict: ConflictEntry, chosenName: string | null, chosenPhone: string | null) => {
+      const body: Record<string, string> = {
+        contactId: conflict.contactId,
+        sourceId: conflict.sourceId,
+        source: conflict.source,
+      };
+      if (chosenName !== null) body.name = chosenName;
+      if (chosenPhone !== null) body.phone = chosenPhone;
+      try {
+        await fetch("/api/admin/contacts/resolve-conflict", {
+          method: "POST",
+          headers: { "X-Admin-Secret": token, "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        router.refresh();
+      } catch {
+        // best-effort
+      }
+      setConflicts((prev) => prev?.filter((c) => c.sourceId !== conflict.sourceId) ?? null);
+    },
+    [token, router],
+  );
+
+  const skipConflict = useCallback((sourceId: string) => {
+    setConflicts((prev) => prev?.filter((c) => c.sourceId !== sourceId) ?? null);
+  }, []);
+
+  const runRecalculate = useCallback(async () => {
+    setRecalculating(true);
+    setRecalculateResult(null);
+    try {
+      const res = await fetch("/api/admin/travel/recalculate", {
+        method: "POST",
+        headers: { "X-Admin-Secret": token },
+      });
+      const data = (await res.json()) as { ok: boolean; cachedCount?: number; error?: string };
+      if (data.ok) {
+        setRecalculateResult(`Done — ${data.cachedCount ?? 0} events cached.`);
+        router.refresh();
+      } else {
+        setRecalculateResult(`Error: ${data.error ?? "unknown"}`);
+      }
+    } catch {
+      setRecalculateResult("Network error — try again.");
+    } finally {
+      setRecalculating(false);
+    }
+  }, [token, router]);
 
   const pendingCount = initialPending.length;
   const confirmedCount = bookings.filter((b) => b.status === "confirmed").length;
@@ -294,7 +397,12 @@ export function AdminTabs({
               pending={initialPending}
               approved={initialApproved}
               token={token}
-              contacts={contacts.map((c) => ({ id: c.id, name: c.name, email: c.email }))}
+              contacts={contacts.map((c) => ({
+                id: c.id,
+                name: c.name,
+                email: c.email,
+                reviewCount: c.reviews.length,
+              }))}
             />
           </section>
         </>
@@ -314,8 +422,7 @@ export function AdminTabs({
             <div>
               <h2 className="text-russian-violet mb-1 text-lg font-bold">Contacts</h2>
               <p className="text-rich-black/50 text-xs">
-                Customers who have booked. Updated automatically with their latest details on each
-                booking.
+                Customers built from bookings and review requests.
               </p>
             </div>
             <div className="flex flex-col items-end gap-2">
@@ -330,19 +437,62 @@ export function AdminTabs({
                       : "bg-russian-violet/10 text-russian-violet hover:bg-russian-violet/20",
                   )}
                 >
-                  {backfilling ? "Backfilling…" : "Backfill from bookings"}
+                  {backfilling ? "Backfilling…" : "Backfill contacts"}
                 </button>
+                {syncConfirmPending ? (
+                  <div className="border-seasalt-400/40 bg-seasalt flex flex-col gap-2 rounded-lg border p-3 text-xs">
+                    <p className="text-rich-black/70 font-medium">Confirm sync with Google?</p>
+                    <ul className="text-rich-black/50 list-inside list-disc space-y-0.5">
+                      <li>
+                        {contacts.filter((c) => !!c.googleContactId).length} synced contacts will
+                        have their email, phone and address pushed to Google
+                      </li>
+                      <li>
+                        {contacts.filter((c) => !c.googleContactId).length} unsynced contacts will
+                        be created in Google Contacts
+                      </li>
+                      <li>Google contacts not yet in your local DB will be imported</li>
+                    </ul>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => void runSync()}
+                        className="bg-russian-violet hover:bg-russian-violet/90 rounded px-2.5 py-1 text-xs font-semibold text-white transition-colors"
+                      >
+                        Confirm
+                      </button>
+                      <button
+                        onClick={() => setSyncConfirmPending(false)}
+                        className="bg-seasalt-400/40 text-rich-black/70 hover:bg-seasalt-400/60 rounded px-2.5 py-1 text-xs font-semibold transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setSyncConfirmPending(true)}
+                    disabled={syncing}
+                    className={cn(
+                      "rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
+                      syncing
+                        ? "bg-seasalt-400/40 text-rich-black/40 cursor-not-allowed"
+                        : "bg-russian-violet/10 text-russian-violet hover:bg-russian-violet/20",
+                    )}
+                  >
+                    {syncing ? "Syncing…" : "Sync with Google"}
+                  </button>
+                )}
                 <button
-                  onClick={runSync}
-                  disabled={syncing}
+                  onClick={runEnrich}
+                  disabled={enriching}
                   className={cn(
                     "rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
-                    syncing
+                    enriching
                       ? "bg-seasalt-400/40 text-rich-black/40 cursor-not-allowed"
                       : "bg-russian-violet/10 text-russian-violet hover:bg-russian-violet/20",
                   )}
                 >
-                  {syncing ? "Syncing…" : "Sync with Google"}
+                  {enriching ? "Checking…" : "Enrich from reviews"}
                 </button>
               </div>
               {backfillResult && (
@@ -351,20 +501,143 @@ export function AdminTabs({
               {syncResult && (
                 <p className="text-rich-black/50 max-w-xs text-right text-xs">{syncResult}</p>
               )}
+              {enrichResult && (
+                <p className="text-rich-black/50 max-w-xs text-right text-xs">{enrichResult}</p>
+              )}
             </div>
           </div>
           <ContactAdminList contacts={contacts} token={token} />
+
+          {conflicts !== null && conflicts.length > 0 && (
+            <div className="mt-6">
+              <h3 className="text-russian-violet mb-1 text-sm font-bold">
+                Conflicts ({conflicts.length})
+              </h3>
+              <p className="text-rich-black/50 mb-3 text-xs">
+                These records have data that differs from your contacts. Accept to update the
+                contact, or skip to leave it as-is.
+              </p>
+              <div className="flex flex-col gap-2">
+                {conflicts.map((conflict) => (
+                  <div
+                    key={conflict.sourceId}
+                    className="border-coquelicot-500/30 bg-coquelicot-500/5 rounded-lg border p-3"
+                  >
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                      <span className="text-rich-black text-sm font-medium">
+                        {conflict.contactEmail ?? conflict.contactPhone ?? "Unknown"}
+                      </span>
+                      <span className="bg-seasalt-400/60 text-rich-black/60 rounded px-1.5 py-0.5 text-xs font-medium">
+                        {conflict.source === "ReviewRequest"
+                          ? "Review request"
+                          : conflict.source === "Booking"
+                            ? "Booking"
+                            : "Review"}
+                      </span>
+                    </div>
+                    <div className="space-y-2">
+                      {conflict.conflictFields.includes("name") && (
+                        <div className="space-y-1">
+                          <p className="text-rich-black/50 text-xs font-medium uppercase tracking-wide">
+                            Name — pick one to apply to both sides
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              onClick={() =>
+                                void resolveConflict(conflict, conflict.contactName, null)
+                              }
+                              className="border-seasalt-400/60 text-rich-black hover:border-russian-violet hover:text-russian-violet rounded border px-2.5 py-1 text-xs font-medium transition-colors"
+                            >
+                              {conflict.contactName}
+                            </button>
+                            <button
+                              onClick={() =>
+                                void resolveConflict(conflict, conflict.sourceName, null)
+                              }
+                              className="border-seasalt-400/60 text-rich-black hover:border-russian-violet hover:text-russian-violet rounded border px-2.5 py-1 text-xs font-medium transition-colors"
+                            >
+                              {conflict.sourceName}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                      {conflict.conflictFields.includes("phone") && (
+                        <div className="space-y-1">
+                          <p className="text-rich-black/50 text-xs font-medium uppercase tracking-wide">
+                            Phone — pick one to apply to both sides
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              onClick={() =>
+                                void resolveConflict(conflict, null, conflict.contactPhone)
+                              }
+                              className="border-seasalt-400/60 text-rich-black hover:border-russian-violet hover:text-russian-violet rounded border px-2.5 py-1 text-xs font-medium transition-colors"
+                            >
+                              {conflict.contactPhone ?? "—"}
+                            </button>
+                            <button
+                              onClick={() =>
+                                void resolveConflict(conflict, null, conflict.sourcePhone)
+                              }
+                              className="border-seasalt-400/60 text-rich-black hover:border-russian-violet hover:text-russian-violet rounded border px-2.5 py-1 text-xs font-medium transition-colors"
+                            >
+                              {conflict.sourcePhone}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="mt-2 flex justify-end">
+                      <button
+                        onClick={() => skipConflict(conflict.sourceId)}
+                        className="text-rich-black/40 hover:text-rich-black/70 rounded px-2 py-1 text-xs font-semibold transition-colors"
+                      >
+                        Skip
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {conflicts !== null && conflicts.length === 0 && enrichResult && (
+            <p className="text-rich-black/40 mt-4 text-xs">No conflicts remaining.</p>
+          )}
         </section>
       )}
 
       {/* Travel view */}
       {tab === "travel" && (
         <section className={cn(CARD, "animate-fade-in")}>
-          <h2 className="text-russian-violet mb-1 text-lg font-bold">Travel blocks</h2>
-          <p className="text-rich-black/50 mb-4 text-xs">
-            Travel time blocks computed for calendar events with a location. Refreshed every 15
-            minutes by the cron job.
-          </p>
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-russian-violet mb-1 text-lg font-bold">Travel blocks</h2>
+              <p className="text-rich-black/50 text-xs">
+                Travel time blocks computed for calendar events with a location. Refreshed every 15
+                minutes by the cron job.
+              </p>
+            </div>
+            <div className="flex flex-col items-end gap-2">
+              <button
+                onClick={() => void runRecalculate()}
+                disabled={recalculating}
+                className={cn(
+                  "rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
+                  recalculating
+                    ? "bg-seasalt-400/40 text-rich-black/40 cursor-not-allowed"
+                    : "bg-russian-violet/10 text-russian-violet hover:bg-russian-violet/20",
+                )}
+              >
+                {recalculating ? "Recalculating…" : "Recalculate travel times"}
+              </button>
+              {recalculateResult && (
+                <p className="text-rich-black/50 max-w-xs text-right text-xs">
+                  {recalculateResult}
+                </p>
+              )}
+            </div>
+          </div>
           <TravelBlockAdminList blocks={travelBlocks} />
         </section>
       )}

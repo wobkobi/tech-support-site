@@ -4,7 +4,9 @@ import { NextRequest } from "next/server";
 const mocks = vi.hoisted(() => ({
   isAdminRequest: vi.fn(),
   bookingFindMany: vi.fn(),
-  contactUpsert: vi.fn(),
+  reviewRequestFindMany: vi.fn(),
+  contactFindFirst: vi.fn(),
+  contactCreate: vi.fn(),
 }));
 
 vi.mock("@/shared/lib/auth", () => ({
@@ -16,8 +18,12 @@ vi.mock("@/shared/lib/prisma", () => ({
     booking: {
       findMany: mocks.bookingFindMany,
     },
+    reviewRequest: {
+      findMany: mocks.reviewRequestFindMany,
+    },
     contact: {
-      upsert: mocks.contactUpsert,
+      findFirst: mocks.contactFindFirst,
+      create: mocks.contactCreate,
     },
   },
 }));
@@ -30,7 +36,10 @@ describe("POST /api/admin/contacts/backfill", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.isAdminRequest.mockReturnValue(true);
-    mocks.contactUpsert.mockResolvedValue({});
+    mocks.bookingFindMany.mockResolvedValue([]);
+    mocks.reviewRequestFindMany.mockResolvedValue([]);
+    mocks.contactFindFirst.mockResolvedValue(null);
+    mocks.contactCreate.mockResolvedValue({});
   });
 
   it("returns 401 when not admin", async () => {
@@ -39,7 +48,7 @@ describe("POST /api/admin/contacts/backfill", () => {
     expect(res.status).toBe(401);
   });
 
-  it("upserts one contact per unique email from bookings", async () => {
+  it("creates one contact per unique email from bookings", async () => {
     mocks.bookingFindMany.mockResolvedValue([
       {
         name: "Alice",
@@ -59,7 +68,7 @@ describe("POST /api/admin/contacts/backfill", () => {
     const json = await res.json();
     expect(json.ok).toBe(true);
     expect(json.upsertedCount).toBe(2);
-    expect(mocks.contactUpsert).toHaveBeenCalledTimes(2);
+    expect(mocks.contactCreate).toHaveBeenCalledTimes(2);
   });
 
   it("deduplicates by email, keeping the most recent booking", async () => {
@@ -74,13 +83,15 @@ describe("POST /api/admin/contacts/backfill", () => {
 
     await POST(FAKE_REQ);
 
-    expect(mocks.contactUpsert).toHaveBeenCalledTimes(1);
-    expect(mocks.contactUpsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { email: "alice@example.com" },
-        create: expect.objectContaining({ name: "Alice New", address: "New St", phone: "021 999" }),
+    expect(mocks.contactCreate).toHaveBeenCalledTimes(1);
+    expect(mocks.contactCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        name: "Alice New",
+        email: "alice@example.com",
+        address: "New St",
+        phone: "+6421999",
       }),
-    );
+    });
   });
 
   it("handles bookings with no phone or address in notes", async () => {
@@ -94,11 +105,9 @@ describe("POST /api/admin/contacts/backfill", () => {
 
     await POST(FAKE_REQ);
 
-    expect(mocks.contactUpsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        create: expect.objectContaining({ phone: null, address: null }),
-      }),
-    );
+    expect(mocks.contactCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({ phone: null, address: null }),
+    });
   });
 
   it("handles empty bookings list", async () => {
@@ -107,6 +116,16 @@ describe("POST /api/admin/contacts/backfill", () => {
     const json = await res.json();
     expect(json.ok).toBe(true);
     expect(json.upsertedCount).toBe(0);
-    expect(mocks.contactUpsert).not.toHaveBeenCalled();
+    expect(mocks.contactCreate).not.toHaveBeenCalled();
+  });
+
+  it("handles bookings with null notes gracefully", async () => {
+    mocks.bookingFindMany.mockResolvedValue([
+      { name: "Dana", email: "dana@example.com", notes: null },
+    ]);
+    await POST(FAKE_REQ);
+    expect(mocks.contactCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({ phone: null, address: null }),
+    });
   });
 });

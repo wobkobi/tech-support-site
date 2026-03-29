@@ -55,6 +55,28 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       "",
     );
 
+    /**
+     * Upserts a Contact for a given email — best effort, never blocks the response.
+     * @param contactEmail - Normalised email address.
+     * @param contactName - Contact name from the ReviewRequest.
+     */
+    async function upsertContact(
+      contactEmail: string | null | undefined,
+      contactName: string,
+    ): Promise<void> {
+      if (!contactEmail) return;
+      try {
+        const exists = await prisma.contact.findFirst({ where: { email: contactEmail } });
+        if (!exists) {
+          await prisma.contact.create({
+            data: { name: contactName, email: contactEmail, phone: normalizedPhone || null },
+          });
+        }
+      } catch {
+        // best-effort
+      }
+    }
+
     if (customerRef) {
       // Legacy review with existing token - create or update ReviewRequest with that token
       const existing = await prisma.reviewRequest.findUnique({
@@ -70,6 +92,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             phone: normalizedPhone || null,
           },
         });
+        await upsertContact(email?.trim().toLowerCase(), name.trim());
         return NextResponse.json({ ok: true, id: existing.id });
       }
 
@@ -84,6 +107,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         select: { id: true, reviewToken: true },
       });
 
+      await upsertContact(email?.trim().toLowerCase(), name.trim());
       return NextResponse.json({
         ok: true,
         id: reviewRequest.id,
@@ -109,6 +133,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       data: { customerRef: reviewRequest.reviewToken },
     });
 
+    await upsertContact(email?.trim().toLowerCase(), name.trim());
     return NextResponse.json({
       ok: true,
       id: reviewRequest.id,

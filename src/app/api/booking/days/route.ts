@@ -63,7 +63,9 @@ async function fetchCalendarEventsSafe(
 export async function GET(): Promise<NextResponse<AvailableDaysResponse>> {
   try {
     const now = new Date();
-    const maxDate = new Date(now.getTime() + BOOKING_CONFIG.maxAdvanceDays * 24 * 60 * 60 * 1000);
+    const maxDate = new Date(
+      now.getTime() + (BOOKING_CONFIG.maxAdvanceDays + 1) * 24 * 60 * 60 * 1000,
+    );
 
     // Get existing bookings from database
     const existingBookings = await prisma.booking.findMany({

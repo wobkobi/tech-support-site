@@ -8,10 +8,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
-import { normalizePhone, isValidPhone } from "@/shared/lib/normalize-phone";
+import { toE164NZ, normalizePhone, isValidPhone } from "@/shared/lib/normalize-phone";
 
 interface ContactPatchBody {
   name?: string;
+  email?: string;
   phone?: string;
   address?: string;
 }
@@ -40,13 +41,29 @@ export async function PATCH(
   if (body.name !== undefined && !body.name.trim()) {
     return NextResponse.json({ error: "Name is required." }, { status: 400 });
   }
+  if (body.email !== undefined) {
+    const trimmedEmail = body.email.trim().toLowerCase();
+    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      return NextResponse.json({ error: "Please enter a valid email address." }, { status: 400 });
+    }
+    if (trimmedEmail) {
+      const dupe = await prisma.contact.findFirst({
+        where: { email: trimmedEmail, id: { not: id } },
+        select: { id: true },
+      });
+      if (dupe) {
+        return NextResponse.json({ error: "That email is already in use." }, { status: 409 });
+      }
+    }
+  }
   if (body.phone !== undefined && body.phone.trim() && !isValidPhone(normalizePhone(body.phone))) {
     return NextResponse.json({ error: "Please enter a valid phone number." }, { status: 400 });
   }
 
   const updateData: Record<string, string | null> = {};
   if (body.name !== undefined) updateData.name = body.name.trim();
-  if (body.phone !== undefined) updateData.phone = body.phone.trim() || null;
+  if (body.email !== undefined) updateData.email = body.email.trim().toLowerCase() || null;
+  if (body.phone !== undefined) updateData.phone = toE164NZ(body.phone) || null;
   if (body.address !== undefined) updateData.address = body.address.trim() || null;
 
   const contact = await prisma.contact.update({

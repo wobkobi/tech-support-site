@@ -92,6 +92,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     let verified = false;
     let bookingId = null;
     let customerRef = null;
+    let autoContactId: string | null = null;
 
     // Verify against a real booking
     if (body.bookingId && body.reviewToken) {
@@ -103,6 +104,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         verified = true;
         bookingId = booking.id;
         customerRef = booking.reviewToken;
+        // Auto-link to Contact by booking email — best effort, never fails the submission.
+        try {
+          const contact = await prisma.contact.findFirst({
+            where: { email: booking.email.toLowerCase() },
+            select: { id: true },
+          });
+          if (contact) autoContactId = contact.id;
+        } catch {
+          // best-effort
+        }
         await prisma.booking.update({
           where: { id: booking.id },
           data: { reviewSubmittedAt: new Date() },
@@ -119,6 +130,29 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       if (reviewRequest) {
         verified = true;
         customerRef = reviewRequest.reviewToken;
+        // Auto-link to Contact by ReviewRequest email (primary) or phone (fallback).
+        if (reviewRequest.email) {
+          try {
+            const contact = await prisma.contact.findFirst({
+              where: { email: reviewRequest.email.trim().toLowerCase() },
+              select: { id: true },
+            });
+            if (contact) autoContactId = contact.id;
+          } catch {
+            // best-effort
+          }
+        }
+        if (!autoContactId && reviewRequest.phone) {
+          try {
+            const contact = await prisma.contact.findFirst({
+              where: { phone: reviewRequest.phone },
+              select: { id: true },
+            });
+            if (contact) autoContactId = contact.id;
+          } catch {
+            // best-effort
+          }
+        }
         // Store any contact details the customer provided (only fill blanks, never overwrite)
         const contactEmail = body.contactEmail?.trim().toLowerCase() || null;
         const contactPhone = body.contactPhone ? normalizePhone(body.contactPhone) : null;
@@ -142,6 +176,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         verified,
         bookingId,
         customerRef,
+        contactId: autoContactId,
         status: "pending", // All reviews start as pending
       },
     });

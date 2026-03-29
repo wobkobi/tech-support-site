@@ -1,19 +1,20 @@
 // src/app/api/admin/reviews/match-contacts/route.ts
 /**
  * @file route.ts
- * @description Admin API to auto-match reviews to contacts by email.
+ * @description Admin API to auto-match reviews to contacts by email or phone.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
+import { toE164NZ, normalizePhone } from "@/shared/lib/normalize-phone";
 
 /**
  * POST /api/admin/reviews/match-contacts
  * For each review that has a bookingId but no contactId, loads the booking to
- * get the email and finds the matching Contact. Also falls back to customerRef
- * as an email if no bookingId is present. Updates review.contactId when a match
- * is found.
+ * get the email (primary) or phone (fallback) and finds the matching Contact.
+ * Also falls back to customerRef as an email if no bookingId is present.
+ * Updates review.contactId when a match is found.
  * Requires X-Admin-Secret header.
  * @param request - Incoming request.
  * @returns JSON with { ok: true, matchedCount } on success, or error.
@@ -24,7 +25,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    // Load all reviews that don't yet have a contactId.
     const unmatched = await prisma.review.findMany({
       where: { contactId: null },
       select: { id: true, bookingId: true, customerRef: true },
@@ -34,57 +34,78 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ ok: true, matchedCount: 0 });
     }
 
-    // Collect booking IDs we need to look up.
     const bookingIds = unmatched.map((r) => r.bookingId).filter((id): id is string => id !== null);
 
-    // Load all relevant bookings in one query.
     const bookings =
       bookingIds.length > 0
         ? await prisma.booking.findMany({
             where: { id: { in: bookingIds } },
-            select: { id: true, email: true },
+            select: { id: true, email: true, phone: true },
           })
         : [];
 
-    const bookingEmailMap = new Map(bookings.map((b) => [b.id, b.email]));
-
-    // Collect all emails we'll need to look up contacts for.
-    const emailSet = new Set<string>();
-    for (const review of unmatched) {
-      const email = review.bookingId
-        ? bookingEmailMap.get(review.bookingId)
-        : (review.customerRef ?? null);
-      if (email) emailSet.add(email.toLowerCase());
+    const bookingEmailById = new Map(bookings.map((b) => [b.id, b.email]));
+    const bookingPhoneById = new Map<string, string>();
+    for (const b of bookings) {
+      if (b.phone) {
+        const norm = normalizePhone(toE164NZ(b.phone) || b.phone);
+        if (norm) bookingPhoneById.set(b.id, norm);
+      }
     }
 
-    if (emailSet.size === 0) {
-      return NextResponse.json({ ok: true, matchedCount: 0 });
+    // Load ReviewRequests so customerRef (token) can be resolved to an email or phone.
+    const rrRows = await prisma.reviewRequest.findMany({
+      select: { reviewToken: true, email: true, phone: true },
+    });
+    const rrEmailByToken = new Map<string, string>();
+    const rrPhoneByToken = new Map<string, string>();
+    for (const rr of rrRows) {
+      if (rr.email) rrEmailByToken.set(rr.reviewToken, rr.email.toLowerCase());
+      if (rr.phone) {
+        const norm = normalizePhone(toE164NZ(rr.phone) || rr.phone);
+        if (norm) rrPhoneByToken.set(rr.reviewToken, norm);
+      }
     }
 
-    // Load all contacts matching those emails in one query.
     const contacts = await prisma.contact.findMany({
-      where: { email: { in: Array.from(emailSet) } },
-      select: { id: true, email: true },
+      select: { id: true, email: true, phone: true },
     });
 
-    const contactEmailMap = new Map(contacts.map((c) => [c.email.toLowerCase(), c.id]));
+    const contactIdByEmail = new Map(
+      contacts.filter((c) => c.email).map((c) => [c.email!.toLowerCase(), c.id]),
+    );
+    const contactIdByPhone = new Map<string, string>();
+    for (const c of contacts) {
+      if (c.phone) {
+        const norm = normalizePhone(c.phone);
+        if (norm && !contactIdByPhone.has(norm)) contactIdByPhone.set(norm, c.id);
+      }
+    }
 
-    // Update each review that can be matched.
     let matchedCount = 0;
     for (const review of unmatched) {
-      const rawEmail = review.bookingId
-        ? bookingEmailMap.get(review.bookingId)
-        : (review.customerRef ?? null);
+      let contactId: string | undefined;
 
-      if (!rawEmail) continue;
+      if (review.bookingId) {
+        const email = bookingEmailById.get(review.bookingId);
+        if (email) contactId = contactIdByEmail.get(email.toLowerCase());
+        if (!contactId) {
+          const phone = bookingPhoneById.get(review.bookingId);
+          if (phone) contactId = contactIdByPhone.get(phone);
+        }
+      } else if (review.customerRef) {
+        // customerRef is a reviewToken UUID — look it up via ReviewRequest
+        const email = rrEmailByToken.get(review.customerRef);
+        if (email) contactId = contactIdByEmail.get(email);
+        if (!contactId) {
+          const phone = rrPhoneByToken.get(review.customerRef);
+          if (phone) contactId = contactIdByPhone.get(phone);
+        }
+      }
 
-      const contactId = contactEmailMap.get(rawEmail.toLowerCase());
       if (!contactId) continue;
 
-      await prisma.review.update({
-        where: { id: review.id },
-        data: { contactId },
-      });
+      await prisma.review.update({ where: { id: review.id }, data: { contactId } });
       matchedCount++;
     }
 

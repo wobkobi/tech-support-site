@@ -20,7 +20,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: false }, { status: 400 });
   }
 
-  const contact = await prisma.contact.findUnique({
+  const contact = await prisma.contact.findFirst({
     where: { email },
     select: { name: true, phone: true, address: true },
   });

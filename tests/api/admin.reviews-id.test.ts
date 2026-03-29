@@ -4,8 +4,13 @@ import { NextRequest } from "next/server";
 const mocks = vi.hoisted(() => ({
   isValidAdminToken: vi.fn(),
   isAdminRequest: vi.fn(),
+  reviewFindUnique: vi.fn(),
   reviewUpdate: vi.fn(),
   reviewDelete: vi.fn(),
+  bookingFindUnique: vi.fn(),
+  reviewRequestFindFirst: vi.fn(),
+  contactFindFirst: vi.fn(),
+  contactCreate: vi.fn(),
   revalidateReviewPaths: vi.fn(),
 }));
 
@@ -17,9 +22,13 @@ vi.mock("@/shared/lib/auth", () => ({
 vi.mock("@/shared/lib/prisma", () => ({
   prisma: {
     review: {
+      findUnique: mocks.reviewFindUnique,
       update: mocks.reviewUpdate,
       delete: mocks.reviewDelete,
     },
+    booking: { findUnique: mocks.bookingFindUnique },
+    reviewRequest: { findFirst: mocks.reviewRequestFindFirst },
+    contact: { findFirst: mocks.contactFindFirst, create: mocks.contactCreate },
   },
 }));
 
@@ -56,11 +65,23 @@ function makeDeleteRequest(token: string): NextRequest {
 
 const PARAMS = { params: Promise.resolve({ id: "review-123" }) };
 
+/** Default review stub with no source info — auto-link does nothing. */
+const NO_SOURCE_REVIEW = {
+  bookingId: null,
+  customerRef: null,
+  contactId: null,
+  firstName: null,
+  lastName: null,
+};
+
 describe("PATCH /api/admin/reviews/[id]", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.reviewFindUnique.mockResolvedValue(NO_SOURCE_REVIEW);
     mocks.reviewUpdate.mockResolvedValue({});
     mocks.revalidateReviewPaths.mockReturnValue(undefined);
+    mocks.contactFindFirst.mockResolvedValue(null);
+    mocks.contactCreate.mockResolvedValue({ id: "contact-new" });
   });
 
   it("returns 401 when token is invalid", async () => {
@@ -111,6 +132,124 @@ describe("PATCH /api/admin/reviews/[id]", () => {
     const req = makePatchRequest({ action: "approve", token: "valid" });
     const res = await PATCH(req, PARAMS);
     expect(res.status).toBe(500);
+  });
+
+  it("auto-links review to a contact when the review has a bookingId", async () => {
+    mocks.isValidAdminToken.mockReturnValue(true);
+    mocks.reviewFindUnique.mockResolvedValue({
+      bookingId: "booking-abc",
+      customerRef: null,
+      contactId: null,
+      firstName: "Alice",
+      lastName: "Smith",
+    });
+    mocks.bookingFindUnique.mockResolvedValue({ email: "alice@example.com", name: "Alice Smith" });
+    mocks.contactCreate.mockResolvedValue({ id: "contact-1" });
+
+    const req = makePatchRequest({ action: "approve", token: "valid" });
+    await PATCH(req, PARAMS);
+
+    expect(mocks.bookingFindUnique).toHaveBeenCalledWith({
+      where: { id: "booking-abc" },
+      select: { email: true, name: true },
+    });
+    expect(mocks.contactCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({ name: "Alice Smith", email: "alice@example.com" }),
+    });
+    expect(mocks.reviewUpdate).toHaveBeenCalledWith({
+      where: { id: "review-123" },
+      data: { contactId: "contact-1" },
+    });
+  });
+
+  it("auto-links review to a contact when the review has a customerRef", async () => {
+    mocks.isValidAdminToken.mockReturnValue(true);
+    mocks.reviewFindUnique.mockResolvedValue({
+      bookingId: null,
+      customerRef: "token-xyz",
+      contactId: null,
+      firstName: "Bob",
+      lastName: null,
+    });
+    mocks.reviewRequestFindFirst.mockResolvedValue({
+      email: "bob@example.com",
+      name: "Bob Jones",
+      phone: "021 000 0000",
+    });
+    mocks.contactCreate.mockResolvedValue({ id: "contact-2" });
+
+    const req = makePatchRequest({ action: "approve", token: "valid" });
+    await PATCH(req, PARAMS);
+
+    expect(mocks.reviewRequestFindFirst).toHaveBeenCalledWith({
+      where: { reviewToken: "token-xyz" },
+      select: { email: true, name: true, phone: true },
+    });
+    expect(mocks.contactCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        name: "Bob Jones",
+        email: "bob@example.com",
+        phone: "021 000 0000",
+      }),
+    });
+  });
+
+  it("skips auto-link when review already has a contactId", async () => {
+    mocks.isValidAdminToken.mockReturnValue(true);
+    mocks.reviewFindUnique.mockResolvedValue({
+      bookingId: "booking-abc",
+      customerRef: null,
+      contactId: "existing-contact",
+      firstName: null,
+      lastName: null,
+    });
+
+    const req = makePatchRequest({ action: "approve", token: "valid" });
+    await PATCH(req, PARAMS);
+
+    expect(mocks.contactCreate).not.toHaveBeenCalled();
+  });
+
+  it("skips auto-link when no booking or review request is found", async () => {
+    mocks.isValidAdminToken.mockReturnValue(true);
+    mocks.reviewFindUnique.mockResolvedValue({
+      bookingId: "booking-abc",
+      customerRef: null,
+      contactId: null,
+      firstName: null,
+      lastName: null,
+    });
+    mocks.bookingFindUnique.mockResolvedValue(null);
+
+    const req = makePatchRequest({ action: "approve", token: "valid" });
+    const res = await PATCH(req, PARAMS);
+
+    expect(res.status).toBe(200);
+    expect(mocks.contactCreate).not.toHaveBeenCalled();
+  });
+
+  it("still approves review when auto-link contact upsert throws", async () => {
+    mocks.isValidAdminToken.mockReturnValue(true);
+    mocks.reviewFindUnique.mockResolvedValue({
+      bookingId: null,
+      customerRef: "token-xyz",
+      contactId: null,
+      firstName: null,
+      lastName: null,
+    });
+    mocks.reviewRequestFindFirst.mockResolvedValue({
+      email: "test@example.com",
+      name: "Test User",
+      phone: null,
+    });
+    mocks.contactCreate.mockRejectedValue(new Error("DB create failed"));
+
+    const req = makePatchRequest({ action: "approve", token: "valid" });
+    const res = await PATCH(req, PARAMS);
+
+    // Approval still succeeds despite auto-link failure
+    expect(res.status).toBe(200);
+    expect((await res.json()).ok).toBe(true);
   });
 });
 

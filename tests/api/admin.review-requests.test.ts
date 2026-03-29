@@ -30,6 +30,9 @@ vi.mock("@/shared/lib/prisma", () => ({
     review: {
       update: mocks.reviewUpdate,
     },
+    contact: {
+      upsert: vi.fn().mockResolvedValue({}),
+    },
   },
 }));
 

@@ -33,13 +33,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const ids = expired.map((b) => b.id);
 
     if (ids.length > 0) {
-      await prisma.booking.updateMany({
-        where: { id: { in: ids } },
-        data: {
-          status: "cancelled",
-          activeSlotKey: null,
-        },
-      });
+      await Promise.all(
+        ids.map((id) =>
+          prisma.booking.update({
+            where: { id },
+            data: { status: "cancelled", activeSlotKey: `released:${id}` },
+          }),
+        ),
+      );
     }
 
     return NextResponse.json({

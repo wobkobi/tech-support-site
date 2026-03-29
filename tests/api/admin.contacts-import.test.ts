@@ -59,4 +59,11 @@ describe("POST /api/admin/contacts/import", () => {
     expect(json.ok).toBe(false);
     expect(json.error).toMatch(/API failure/);
   });
+
+  it("returns 'Unknown error' when a non-Error is thrown", async () => {
+    mocks.importFromGoogleContacts.mockRejectedValue("raw string error");
+    const res = await POST(FAKE_REQ);
+    expect(res.status).toBe(500);
+    expect((await res.json()).error).toBe("Unknown error");
+  });
 });

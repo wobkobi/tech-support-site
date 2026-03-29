@@ -13,8 +13,8 @@ export interface TravelBlockRow {
   sourceEventId: string;
   calendarEmail: string;
   summary: string | null;
-  eventStartAt: string | null;
-  eventEndAt: string | null;
+  eventStartAt: string;
+  eventEndAt: string;
   rawTravelMinutes: number | null;
   roundedMinutes: number | null;
   rawTravelBackMinutes: number | null;
@@ -55,8 +55,7 @@ function formatExpiry(expiresAt: string | null): string {
  * @param end - ISO end string or null.
  * @returns Formatted time range string.
  */
-function formatEventTime(start: string | null, end: string | null): string {
-  if (!start || !end) return "\u2013";
+function formatEventTime(start: string, end: string): string {
   const fmt = new Intl.DateTimeFormat("en-NZ", {
     timeZone: "Pacific/Auckland",
     weekday: "short",
