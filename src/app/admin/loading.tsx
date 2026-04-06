@@ -34,7 +34,7 @@ export default function AdminLoading(): React.ReactElement {
 
       {/* Content skeleton */}
       <div className={cn("ml-56 flex-1 bg-slate-50")}>
-        <div className={cn("mx-auto max-w-5xl px-6 py-8")}>
+        <div className={cn("mx-auto max-w-7xl px-6 py-8")}>
           <Bone className={cn("mb-6 h-8 w-36")} />
 
           {/* Stat cards */}

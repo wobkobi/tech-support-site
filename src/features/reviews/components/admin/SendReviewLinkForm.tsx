@@ -66,13 +66,19 @@ export function SendReviewLinkForm({
   /** Rendered HTML preview returned from the preview API (email mode only). */
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
 
-  /** Resets all transient state when toggling the panel or switching mode. */
+  /** Resets transient result state (errors, previews, success banners). Does NOT clear form fields. */
   function resetState(): void {
     setSuccess(false);
     setError(null);
     setSmsText(null);
     setExistingUrl(null);
     setPreviewHtml(null);
+  }
+
+  /** Clears all form fields after a successful send. */
+  function clearFields(): void {
+    setName("");
+    setEmail("");
     setPhoneInput("");
   }
 
@@ -127,8 +133,7 @@ export function SendReviewLinkForm({
         setExistingUrl(data.reviewUrl);
       } else {
         setSuccess(true);
-        setName("");
-        setEmail("");
+        clearFields();
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
@@ -169,8 +174,7 @@ export function SendReviewLinkForm({
         setSmsText(
           `Hi ${firstName}, it's Harrison from To The Point Tech. Thanks for letting me help you out! I'm updating my website and a quick review would be greatly appreciated - it really helps: ${data.reviewUrl}`,
         );
-        setName("");
-        setPhoneInput("");
+        clearFields();
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
@@ -200,26 +204,28 @@ export function SendReviewLinkForm({
   function applyContact(id: string): void {
     const c = contactSuggestions.find((s) => s.id === id);
     if (!c) return;
-    setName(c.name);
-    if (mode === "email") {
-      setEmail(c.email ?? "");
-    } else {
-      setPhoneInput(c.phone ? formatNZPhone(c.phone) : "");
-    }
     resetState();
+    setName(c.name);
+    setEmail(c.email ?? "");
+    setPhoneInput(c.phone ? formatNZPhone(c.phone) : "");
   }
 
   return (
     <div>
-      <button
-        onClick={() => {
-          setOpen((v) => !v);
-          resetState();
-        }}
-        className={cn("text-russian-violet w-full text-left text-sm font-semibold hover:underline")}
-      >
-        {open ? "▲ Cancel" : "+ Send review link to past client"}
-      </button>
+      {!defaultOpen && (
+        <button
+          onClick={() => {
+            setOpen((v) => !v);
+            resetState();
+            clearFields();
+          }}
+          className={cn(
+            "text-russian-violet w-full text-left text-sm font-semibold hover:underline",
+          )}
+        >
+          {open ? "Hide form" : "+ Send review link to past client"}
+        </button>
+      )}
 
       {open && (
         <div className={cn("mt-4 flex flex-col gap-3")}>
@@ -239,25 +245,13 @@ export function SendReviewLinkForm({
                 )}
               />
               <select
-                defaultValue=""
+                value=""
                 onChange={(e) => {
                   applyContact(e.target.value);
                   setContactSearch("");
                 }}
-                size={Math.min(
-                  6,
-                  contactSuggestions.filter((c) => {
-                    const q = contactSearch.toLowerCase();
-                    return (
-                      !q ||
-                      c.name.toLowerCase().includes(q) ||
-                      c.email?.toLowerCase().includes(q) ||
-                      c.phone?.includes(q)
-                    );
-                  }).length + 1,
-                )}
                 className={cn(
-                  "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-300 bg-white px-1 py-1 text-sm text-slate-700 focus:outline-none focus:ring-1",
+                  "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-1",
                 )}
               >
                 <option value="">— select to pre-fill —</option>

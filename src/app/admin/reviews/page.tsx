@@ -4,6 +4,7 @@ import type React from "react";
 import { notFound } from "next/navigation";
 import { prisma } from "@/shared/lib/prisma";
 import { isValidAdminToken } from "@/shared/lib/auth";
+import { toE164NZ } from "@/shared/lib/normalize-phone";
 import { cn } from "@/shared/lib/cn";
 import { AdminSidebar } from "@/features/admin/components/AdminSidebar";
 import { ReviewApprovalList } from "@/features/reviews/components/admin/ReviewApprovalList";
@@ -79,7 +80,7 @@ export default async function AdminReviewsPage({
     }),
     prisma.contact.findMany({
       orderBy: { createdAt: "desc" },
-      select: { id: true, name: true, email: true },
+      select: { id: true, name: true, email: true, phone: true },
     }),
   ]);
 
@@ -108,6 +109,22 @@ export default async function AdminReviewsPage({
     email: c.email,
     reviewCount: reviewCountByContact.get(c.id) ?? 0,
   }));
+
+  // Contacts that have never received a review link (same logic as dashboard)
+  const sentEmails = new Set<string>([
+    ...sentRequests.flatMap((r) => (r.email ? [r.email.toLowerCase()] : [])),
+    ...sentBookings.flatMap((b) => (b.email ? [b.email.toLowerCase()] : [])),
+  ]);
+  const sentPhones = new Set<string>(
+    sentRequests.flatMap((r) => (r.phone ? [toE164NZ(r.phone)] : [])),
+  );
+  const contactSuggestions = allContacts
+    .filter((c) => {
+      if (c.email && sentEmails.has(c.email.toLowerCase())) return false;
+      if (c.phone && sentPhones.has(toE164NZ(c.phone))) return false;
+      return true;
+    })
+    .map((c) => ({ id: c.id, name: c.name, email: c.email, phone: c.phone }));
 
   // Build link history (same logic as the former monolithic page)
   const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz").replace(
@@ -238,7 +255,7 @@ export default async function AdminReviewsPage({
                 <h2 className={cn("text-russian-violet mb-4 text-sm font-semibold")}>
                   Send a review link
                 </h2>
-                <SendReviewLinkForm token={t} />
+                <SendReviewLinkForm token={t} contactSuggestions={contactSuggestions} />
               </div>
 
               {linkHistory.length > 0 && (
