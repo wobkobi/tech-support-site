@@ -22,7 +22,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    await prisma.travelBlock.deleteMany({});
+    // Zero out raw minutes on all existing blocks so refreshCalendarCache treats them as stale
+    // and makes fresh API calls. Transport modes are preserved so they are used during recalculation.
+    await prisma.travelBlock.updateMany({
+      data: {
+        rawTravelMinutes: null,
+        roundedMinutes: null,
+        rawTravelBackMinutes: null,
+        roundedBackMinutes: null,
+      },
+    });
     const result = await refreshCalendarCache();
     return NextResponse.json({ ok: true, cachedCount: result.cachedCount });
   } catch (error) {

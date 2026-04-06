@@ -227,6 +227,82 @@ describe("fetchAllCalendarEvents", () => {
     await expect(fetchAllCalendarEvents(START, END)).rejects.toThrow(/all.*calendars/i);
   });
 
+  it("skips cancelled events", async () => {
+    mockList.mockResolvedValue({
+      data: {
+        items: [
+          {
+            id: "cancelled-event",
+            status: "cancelled",
+            start: { dateTime: "2099-06-15T10:00:00Z" },
+            end: { dateTime: "2099-06-15T11:00:00Z" },
+            summary: "Cancelled Meeting",
+          },
+          {
+            id: "confirmed-event",
+            status: "confirmed",
+            start: { dateTime: "2099-06-15T12:00:00Z" },
+            end: { dateTime: "2099-06-15T13:00:00Z" },
+            summary: "Confirmed Meeting",
+          },
+        ],
+      },
+    });
+    const events = await fetchAllCalendarEvents(START, END);
+    // 3 calendars × 1 confirmed event each = 3 (cancelled ones are filtered out)
+    expect(events.every((e) => e.id === "confirmed-event")).toBe(true);
+    expect(events.some((e) => e.id === "cancelled-event")).toBe(false);
+  });
+
+  it("skips events declined by the self attendee", async () => {
+    mockList.mockResolvedValue({
+      data: {
+        items: [
+          {
+            id: "declined-event",
+            status: "confirmed",
+            start: { dateTime: "2099-06-15T10:00:00Z" },
+            end: { dateTime: "2099-06-15T11:00:00Z" },
+            summary: "Declined Meeting",
+            attendees: [{ self: true, responseStatus: "declined" }],
+          },
+          {
+            id: "accepted-event",
+            status: "confirmed",
+            start: { dateTime: "2099-06-15T12:00:00Z" },
+            end: { dateTime: "2099-06-15T13:00:00Z" },
+            summary: "Accepted Meeting",
+            attendees: [{ self: true, responseStatus: "accepted" }],
+          },
+        ],
+      },
+    });
+    const events = await fetchAllCalendarEvents(START, END);
+    expect(events.every((e) => e.id === "accepted-event")).toBe(true);
+    expect(events.some((e) => e.id === "declined-event")).toBe(false);
+  });
+
+  it("includes tentative events", async () => {
+    mockList
+      .mockResolvedValueOnce({
+        data: {
+          items: [
+            {
+              id: "tentative-event",
+              status: "tentative",
+              start: { dateTime: "2099-06-15T10:00:00Z" },
+              end: { dateTime: "2099-06-15T11:00:00Z" },
+              summary: "Tentative Meeting",
+            },
+          ],
+        },
+      })
+      .mockResolvedValue({ data: { items: [] } });
+    const events = await fetchAllCalendarEvents(START, END);
+    expect(events).toHaveLength(1);
+    expect(events[0].id).toBe("tentative-event");
+  });
+
   it("falls back to ['primary'] when no calendar env vars are set", async () => {
     delete process.env.BOOKING_CALENDAR_ID;
     delete process.env.WORK_CALENDAR_ID;

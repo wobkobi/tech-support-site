@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { findSmartOrigin } from "../../src/features/calendar/lib/calendar-cache";
+import type { CalendarEvent } from "../../src/features/calendar/lib/google-calendar";
 
 const mocks = vi.hoisted(() => ({
   fetchAllCalendarEvents: vi.fn(),
@@ -42,6 +44,94 @@ import { refreshCalendarCache } from "../../src/features/calendar/lib/calendar-c
 
 const BOOKING_CAL = "booking@example.com";
 const WORK_CAL = "work@example.com";
+
+const makeEvent = (
+  id: string,
+  startIso: string,
+  endIso: string,
+  extra: Partial<CalendarEvent> = {},
+): CalendarEvent => ({
+  id,
+  start: startIso,
+  end: endIso,
+  calendarEmail: "cal@example.com",
+  ...extra,
+});
+
+describe("findSmartOrigin", () => {
+  const HOME = "1 Home St, Auckland";
+
+  it("returns homeAddress when no other events exist", () => {
+    const target = makeEvent("e1", "2026-06-01T10:00:00Z", "2026-06-01T11:00:00Z", {
+      location: "Dentist",
+    });
+    expect(findSmartOrigin([target], target, HOME)).toBe(HOME);
+  });
+
+  it("returns the closest preceding event location within 4 hours", () => {
+    const preceding = makeEvent("e0", "2026-06-01T07:00:00Z", "2026-06-01T08:00:00Z", {
+      location: "99 Prior Ave",
+    });
+    const target = makeEvent("e1", "2026-06-01T10:00:00Z", "2026-06-01T11:00:00Z", {
+      location: "Dentist",
+    });
+    expect(findSmartOrigin([preceding, target], target, HOME)).toBe("99 Prior Ave");
+  });
+
+  it("falls back to home when preceding event ends more than 4 hours before target", () => {
+    const preceding = makeEvent("e0", "2026-06-01T03:00:00Z", "2026-06-01T04:00:00Z", {
+      location: "99 Far Away",
+    });
+    const target = makeEvent("e1", "2026-06-01T10:00:00Z", "2026-06-01T11:00:00Z", {
+      location: "Dentist",
+    });
+    // gap = 6 hours > 4 hours
+    expect(findSmartOrigin([preceding, target], target, HOME)).toBe(HOME);
+  });
+
+  it("picks the closest preceding event when multiple candidates exist", () => {
+    const farPreceding = makeEvent("e0", "2026-06-01T06:00:00Z", "2026-06-01T07:00:00Z", {
+      location: "Far Place",
+    });
+    const closePreceding = makeEvent("e1", "2026-06-01T08:30:00Z", "2026-06-01T09:00:00Z", {
+      location: "Close Place",
+    });
+    const target = makeEvent("e2", "2026-06-01T10:00:00Z", "2026-06-01T11:00:00Z", {
+      location: "Dentist",
+    });
+    expect(findSmartOrigin([farPreceding, closePreceding, target], target, HOME)).toBe(
+      "Close Place",
+    );
+  });
+
+  it("skips events that end after target starts", () => {
+    const overlapping = makeEvent("e0", "2026-06-01T09:00:00Z", "2026-06-01T11:00:00Z", {
+      location: "Overlapping",
+    });
+    const target = makeEvent("e1", "2026-06-01T10:00:00Z", "2026-06-01T11:00:00Z", {
+      location: "Dentist",
+    });
+    expect(findSmartOrigin([overlapping, target], target, HOME)).toBe(HOME);
+  });
+
+  it("uses event summary as fallback when no location field is set", () => {
+    const preceding = makeEvent("e0", "2026-06-01T08:00:00Z", "2026-06-01T09:00:00Z", {
+      summary: "Hoyts Ormiston",
+    });
+    const target = makeEvent("e1", "2026-06-01T10:00:00Z", "2026-06-01T11:00:00Z", {
+      location: "Dentist",
+    });
+    expect(findSmartOrigin([preceding, target], target, HOME)).toBe("Hoyts Ormiston");
+  });
+
+  it("ignores events without a location or summary", () => {
+    const noLoc = makeEvent("e0", "2026-06-01T08:00:00Z", "2026-06-01T09:00:00Z");
+    const target = makeEvent("e1", "2026-06-01T10:00:00Z", "2026-06-01T11:00:00Z", {
+      location: "Dentist",
+    });
+    expect(findSmartOrigin([noLoc, target], target, HOME)).toBe(HOME);
+  });
+});
 
 describe("refreshCalendarCache", () => {
   const originalEnv = process.env;
@@ -161,13 +251,14 @@ describe("refreshCalendarCache", () => {
       "1 Home St, Auckland",
       "456 Dentist Ave",
       new Date(futureStart),
-      { useArrivalTime: true },
+      { useArrivalTime: true, mode: "transit" },
     );
     expect(mocks.calculateTravelMinutes).toHaveBeenNthCalledWith(
       2,
       "456 Dentist Ave",
       "1 Home St, Auckland",
       new Date(futureEnd),
+      { mode: "transit" },
     );
 
     // Cache entries written with synthetic IDs — no Google Calendar writes
@@ -226,6 +317,7 @@ describe("refreshCalendarCache", () => {
       "789 Client Rd",
       "1 Home St, Auckland",
       expectedDeparture,
+      { mode: "transit" },
     );
   });
 
@@ -246,6 +338,9 @@ describe("refreshCalendarCache", () => {
         roundedBackMinutes: 30, // Math.ceil(18/15)*15 = 30
         beforeEventId: "travel-before:evt-work",
         afterEventId: "travel-after:evt-work",
+        transportMode: null,
+        customOrigin: null,
+        detectedOrigin: "1 Home St, Auckland",
       },
     ]);
     mocks.fetchAllCalendarEvents.mockResolvedValue([
@@ -306,6 +401,9 @@ describe("refreshCalendarCache", () => {
         roundedBackMinutes: null,
         beforeEventId: "travel-before:evt-work",
         afterEventId: null,
+        transportMode: null,
+        customOrigin: null,
+        detectedOrigin: "1 Home St, Auckland",
       },
     ]);
     mocks.fetchAllCalendarEvents.mockResolvedValue([
@@ -329,6 +427,7 @@ describe("refreshCalendarCache", () => {
       "456 Dentist Ave",
       "1 Home St, Auckland",
       new Date(futureEnd),
+      { mode: "transit" },
     );
     // travel-after cache entry should now be created
     expect(mocks.calendarEventCacheUpsert).toHaveBeenCalledWith(
@@ -341,6 +440,132 @@ describe("refreshCalendarCache", () => {
         },
       }),
     );
+  });
+
+  it("uses preceding event location as origin when a nearby event ends within 4 hours", async () => {
+    const precedingEnd = new Date(Date.now() + 1 * 60 * 60 * 1000).toISOString(); // 1h from now
+    const futureStart = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(); // 2h from now
+    const futureEnd = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString();
+
+    mocks.fetchAllCalendarEvents.mockResolvedValue([
+      {
+        id: "evt-preceding",
+        start: new Date(Date.now() + 0.5 * 60 * 60 * 1000).toISOString(),
+        end: precedingEnd,
+        calendarEmail: WORK_CAL,
+        location: "99 Prior Ave",
+        summary: "Prior Meeting",
+      },
+      {
+        id: "evt-target",
+        start: futureStart,
+        end: futureEnd,
+        calendarEmail: WORK_CAL,
+        location: "456 Dentist Ave",
+        summary: "Dentist",
+      },
+    ]);
+    mocks.calendarEventCacheDeleteMany.mockResolvedValue({ count: 0 });
+    mocks.calculateTravelMinutes.mockResolvedValue(10);
+
+    await refreshCalendarCache();
+
+    // travel-to for evt-target should depart from the preceding event's location
+    const travelToCalls = mocks.calculateTravelMinutes.mock.calls.filter(
+      (c: unknown[]) => c[1] === "456 Dentist Ave",
+    );
+    expect(travelToCalls.length).toBeGreaterThan(0);
+    expect(travelToCalls[0][0]).toBe("99 Prior Ave");
+  });
+
+  it("falls back to home when no preceding event is within 4 hours", async () => {
+    const farPastEnd = new Date(Date.now() + 1 * 60 * 60 * 1000).toISOString(); // 1h from now
+    // Target starts 6 hours after preceding event ends — outside the 4-hour window
+    const futureStart = new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString();
+    const futureEnd = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString();
+
+    mocks.fetchAllCalendarEvents.mockResolvedValue([
+      {
+        id: "evt-old",
+        start: new Date(Date.now() + 0.5 * 60 * 60 * 1000).toISOString(),
+        end: farPastEnd,
+        calendarEmail: WORK_CAL,
+        location: "99 Old Place",
+        summary: "Old Meeting",
+      },
+      {
+        id: "evt-target",
+        start: futureStart,
+        end: futureEnd,
+        calendarEmail: WORK_CAL,
+        location: "456 Dentist Ave",
+        summary: "Dentist",
+      },
+    ]);
+    mocks.calendarEventCacheDeleteMany.mockResolvedValue({ count: 0 });
+    mocks.calculateTravelMinutes.mockResolvedValue(20);
+
+    await refreshCalendarCache();
+
+    const travelToCalls = mocks.calculateTravelMinutes.mock.calls.filter(
+      (c: unknown[]) => c[1] === "456 Dentist Ave",
+    );
+    expect(travelToCalls.length).toBeGreaterThan(0);
+    expect(travelToCalls[0][0]).toBe("1 Home St, Auckland");
+  });
+
+  it("uses customOrigin when set, ignoring auto-detection", async () => {
+    const precedingEnd = new Date(Date.now() + 1 * 60 * 60 * 1000).toISOString();
+    const futureStart = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+    const futureEnd = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString();
+
+    mocks.travelBlockFindMany.mockResolvedValue([
+      {
+        id: "tb1",
+        sourceEventId: "evt-target",
+        calendarEmail: WORK_CAL,
+        summary: "Dentist",
+        eventStartAt: new Date(futureStart),
+        eventEndAt: new Date(futureEnd),
+        rawTravelMinutes: null,
+        roundedMinutes: null,
+        rawTravelBackMinutes: null,
+        roundedBackMinutes: null,
+        beforeEventId: null,
+        afterEventId: null,
+        transportMode: null,
+        customOrigin: "42 Custom St",
+        detectedOrigin: "99 Prior Ave",
+      },
+    ]);
+    mocks.fetchAllCalendarEvents.mockResolvedValue([
+      {
+        id: "evt-preceding",
+        start: new Date(Date.now() + 0.5 * 60 * 60 * 1000).toISOString(),
+        end: precedingEnd,
+        calendarEmail: WORK_CAL,
+        location: "99 Prior Ave",
+        summary: "Prior Meeting",
+      },
+      {
+        id: "evt-target",
+        start: futureStart,
+        end: futureEnd,
+        calendarEmail: WORK_CAL,
+        location: "456 Dentist Ave",
+        summary: "Dentist",
+      },
+    ]);
+    mocks.calendarEventCacheDeleteMany.mockResolvedValue({ count: 0 });
+    mocks.calculateTravelMinutes.mockResolvedValue(15);
+
+    await refreshCalendarCache();
+
+    const travelToCalls = mocks.calculateTravelMinutes.mock.calls.filter(
+      (c: unknown[]) => c[1] === "456 Dentist Ave",
+    );
+    expect(travelToCalls.length).toBeGreaterThan(0);
+    expect(travelToCalls[0][0]).toBe("42 Custom St");
   });
 
   it("deletes stale travel blocks when source event no longer exists", async () => {

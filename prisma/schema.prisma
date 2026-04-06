@@ -145,6 +145,9 @@ model TravelBlock {
   roundedBackMinutes   Int?    // Rounded return-trip value used for block window
   beforeEventId        String? // Synthetic CalendarEventCache ID blocking travel-to
   afterEventId         String? // Synthetic CalendarEventCache ID blocking travel-back
+  transportMode        String? // "transit" | "driving" | "walking" | "bicycling" — null treated as "transit"
+  customOrigin         String? // Manual override for travel-to origin address
+  detectedOrigin       String? // Auto-detected origin from preceding event or home address
   createdAt        DateTime  @default(now())
 
   @@unique([sourceEventId, calendarEmail])

@@ -85,7 +85,7 @@ const CARD = cn(
  * @returns Home page element
  */
 export default async function Home(): Promise<React.ReactElement> {
-  const rows = await getApprovedReviews();
+  const rows = await getApprovedReviews().catch(() => []);
 
   const items: ReviewItem[] = rows.map((r) => ({
     text: r.text.trim().replace(/\s+/g, " "),
