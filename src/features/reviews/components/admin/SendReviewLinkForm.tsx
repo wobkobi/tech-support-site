@@ -6,11 +6,24 @@
  */
 
 import { useState } from "react";
-import { SOFT_CARD } from "@/shared/components/PageLayout";
 import { cn } from "@/shared/lib/cn";
 import { CopyLinkButton } from "./CopyLinkButton";
 import { toE164NZ, formatNZPhone, isValidPhone } from "@/shared/lib/normalize-phone";
 import type React from "react";
+
+/**
+ * A contact entry used to pre-fill the review link form.
+ */
+export interface ContactSuggestion {
+  /** Contact database ID */
+  id: string;
+  /** Display name */
+  name: string;
+  /** Email address, or null */
+  email: string | null;
+  /** Phone number, or null */
+  phone: string | null;
+}
 
 /**
  * Props for SendReviewLinkForm component.
@@ -18,6 +31,10 @@ import type React from "react";
 interface SendReviewLinkFormProps {
   /** Admin token for API calls */
   token: string;
+  /** Contacts that have never received a review link, shown in a pre-fill dropdown */
+  contactSuggestions?: ContactSuggestion[];
+  /** Start the form expanded without needing to click the toggle */
+  defaultOpen?: boolean;
 }
 
 /**
@@ -25,11 +42,18 @@ interface SendReviewLinkFormProps {
  * Email mode shows a rendered preview before sending.
  * @param props - Component props.
  * @param props.token - Admin token for API calls.
+ * @param props.contactSuggestions - Contacts that have never received a review link, shown in a pre-fill dropdown.
+ * @param props.defaultOpen - Start the form expanded. Defaults to false.
  * @returns Send review link form element.
  */
-export function SendReviewLinkForm({ token }: SendReviewLinkFormProps): React.ReactElement {
-  const [open, setOpen] = useState(false);
+export function SendReviewLinkForm({
+  token,
+  contactSuggestions = [],
+  defaultOpen = false,
+}: SendReviewLinkFormProps): React.ReactElement {
+  const [open, setOpen] = useState(defaultOpen);
   const [mode, setMode] = useState<"email" | "sms">("email");
+  const [contactSearch, setContactSearch] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phoneInput, setPhoneInput] = useState("");
@@ -169,8 +193,24 @@ export function SendReviewLinkForm({ token }: SendReviewLinkFormProps): React.Re
   const phoneE164 = toE164NZ(phoneInput);
   const phoneValid = isValidPhone(phoneE164);
 
+  /**
+   * Pre-fills the form fields from a selected contact suggestion.
+   * @param id - The contact id to look up, or empty string to clear.
+   */
+  function applyContact(id: string): void {
+    const c = contactSuggestions.find((s) => s.id === id);
+    if (!c) return;
+    setName(c.name);
+    if (mode === "email") {
+      setEmail(c.email ?? "");
+    } else {
+      setPhoneInput(c.phone ? formatNZPhone(c.phone) : "");
+    }
+    resetState();
+  }
+
   return (
-    <div className={cn(SOFT_CARD)}>
+    <div>
       <button
         onClick={() => {
           setOpen((v) => !v);
@@ -183,6 +223,64 @@ export function SendReviewLinkForm({ token }: SendReviewLinkFormProps): React.Re
 
       {open && (
         <div className={cn("mt-4 flex flex-col gap-3")}>
+          {/* Contact picker — only shown when there are suggestions */}
+          {contactSuggestions.length > 0 && (
+            <div className={cn("flex flex-col gap-1")}>
+              <label className={cn("text-xs font-medium text-slate-500")}>
+                Pick an existing contact
+              </label>
+              <input
+                type="search"
+                placeholder="Search contacts…"
+                value={contactSearch}
+                onChange={(e) => setContactSearch(e.target.value)}
+                className={cn(
+                  "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-1",
+                )}
+              />
+              <select
+                defaultValue=""
+                onChange={(e) => {
+                  applyContact(e.target.value);
+                  setContactSearch("");
+                }}
+                size={Math.min(
+                  6,
+                  contactSuggestions.filter((c) => {
+                    const q = contactSearch.toLowerCase();
+                    return (
+                      !q ||
+                      c.name.toLowerCase().includes(q) ||
+                      c.email?.toLowerCase().includes(q) ||
+                      c.phone?.includes(q)
+                    );
+                  }).length + 1,
+                )}
+                className={cn(
+                  "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-300 bg-white px-1 py-1 text-sm text-slate-700 focus:outline-none focus:ring-1",
+                )}
+              >
+                <option value="">— select to pre-fill —</option>
+                {contactSuggestions
+                  .filter((c) => {
+                    const q = contactSearch.toLowerCase();
+                    return (
+                      !q ||
+                      c.name.toLowerCase().includes(q) ||
+                      c.email?.toLowerCase().includes(q) ||
+                      c.phone?.includes(q)
+                    );
+                  })
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                      {c.email ? ` · ${c.email}` : c.phone ? ` · ${c.phone}` : ""}
+                    </option>
+                  ))}
+              </select>
+            </div>
+          )}
+
           {/* Mode toggle */}
           <div className={cn("flex gap-2")}>
             {(["email", "sms"] as const).map((m) => (
@@ -197,7 +295,7 @@ export function SendReviewLinkForm({ token }: SendReviewLinkFormProps): React.Re
                   "rounded-lg border px-4 py-1.5 text-xs font-semibold transition-colors",
                   mode === m
                     ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
-                    : "border-seasalt-400/60 bg-seasalt text-rich-black/60 hover:border-russian-violet/40",
+                    : "border-slate-200 bg-white text-slate-500 hover:border-slate-300",
                 )}
               >
                 {m === "email" ? "📧 Email" : "💬 SMS"}
@@ -208,7 +306,7 @@ export function SendReviewLinkForm({ token }: SendReviewLinkFormProps): React.Re
           {/* Email mode: form → preview → confirm send */}
           {mode === "email" && !previewHtml && (
             <form onSubmit={handlePreview} className={cn("flex flex-col gap-3")}>
-              <div className={cn("flex items-start gap-3")}>
+              <div className={cn("flex flex-col gap-2")}>
                 <input
                   type="text"
                   autoComplete="off"
@@ -217,7 +315,7 @@ export function SendReviewLinkForm({ token }: SendReviewLinkFormProps): React.Re
                   placeholder="Full name"
                   required
                   className={cn(
-                    "border-seasalt-400/60 bg-seasalt-800 text-rich-black flex-1 rounded-lg border p-3 text-sm focus:outline-none",
+                    "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-1",
                   )}
                 />
                 <input
@@ -228,7 +326,7 @@ export function SendReviewLinkForm({ token }: SendReviewLinkFormProps): React.Re
                   placeholder="Email address"
                   required
                   className={cn(
-                    "border-seasalt-400/60 bg-seasalt-800 text-rich-black flex-1 rounded-lg border p-3 text-sm focus:outline-none",
+                    "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-1",
                   )}
                 />
               </div>
@@ -251,13 +349,13 @@ export function SendReviewLinkForm({ token }: SendReviewLinkFormProps): React.Re
           {/* Email preview */}
           {mode === "email" && previewHtml && (
             <div className={cn("flex flex-col gap-3")}>
-              <p className={cn("text-rich-black/50 text-xs font-semibold uppercase tracking-wide")}>
+              <p className={cn("text-xs font-semibold uppercase tracking-wide text-slate-500")}>
                 Preview — sending to {email}
               </p>
               <iframe
                 srcDoc={previewHtml}
                 title="Email preview"
-                className={cn("border-seasalt-400/40 w-full rounded-lg border")}
+                className={cn("w-full rounded-lg border border-slate-200")}
                 style={{ height: "480px" }}
                 sandbox="allow-same-origin"
               />
@@ -280,7 +378,7 @@ export function SendReviewLinkForm({ token }: SendReviewLinkFormProps): React.Re
                     setError(null);
                   }}
                   className={cn(
-                    "border-seasalt-400/60 text-rich-black/60 hover:border-russian-violet/40 rounded-lg border px-5 py-2 text-sm font-semibold transition-colors",
+                    "rounded-lg border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-600 transition-colors hover:border-slate-400",
                   )}
                 >
                   ← Back
@@ -292,7 +390,7 @@ export function SendReviewLinkForm({ token }: SendReviewLinkFormProps): React.Re
           {/* SMS mode */}
           {mode === "sms" && (
             <form onSubmit={handleSmsSubmit} className={cn("flex flex-col gap-3")}>
-              <div className={cn("flex items-start gap-3")}>
+              <div className={cn("flex flex-col gap-2")}>
                 <input
                   type="text"
                   autoComplete="off"
@@ -301,7 +399,7 @@ export function SendReviewLinkForm({ token }: SendReviewLinkFormProps): React.Re
                   placeholder="Full name"
                   required
                   className={cn(
-                    "border-seasalt-400/60 bg-seasalt-800 text-rich-black flex-1 rounded-lg border p-3 text-sm focus:outline-none",
+                    "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-1",
                   )}
                 />
                 <input
@@ -312,7 +410,7 @@ export function SendReviewLinkForm({ token }: SendReviewLinkFormProps): React.Re
                   onBlur={(e) => setPhoneInput(formatNZPhone(e.target.value))}
                   placeholder="021 123 1234"
                   className={cn(
-                    "border-seasalt-400/60 bg-seasalt-800 text-rich-black flex-1 rounded-lg border p-3 text-sm focus:outline-none",
+                    "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-1",
                     phoneInput && !phoneValid ? "border-coquelicot-500/60" : "",
                   )}
                 />
@@ -321,7 +419,7 @@ export function SendReviewLinkForm({ token }: SendReviewLinkFormProps): React.Re
                 <p
                   className={cn(
                     "-mt-1 text-xs",
-                    phoneValid ? "text-rich-black/40" : "text-coquelicot-400",
+                    phoneValid ? "text-slate-400" : "text-coquelicot-400",
                   )}
                 >
                   {phoneValid ? `Stored as: ${phoneE164}` : "Invalid phone number"}
@@ -342,7 +440,7 @@ export function SendReviewLinkForm({ token }: SendReviewLinkFormProps): React.Re
 
           {/* Existing link - already sent to this client before */}
           {existingUrl && (
-            <div className={cn("border-seasalt-400/60 bg-seasalt rounded-lg border p-3")}>
+            <div className={cn("rounded-lg border border-slate-200 bg-slate-50 p-3")}>
               <p
                 className={cn(
                   "text-coquelicot-500 mb-2 text-xs font-semibold uppercase tracking-wide",
@@ -350,22 +448,20 @@ export function SendReviewLinkForm({ token }: SendReviewLinkFormProps): React.Re
               >
                 Already sent - here is their existing link
               </p>
-              <p className={cn("text-rich-black/60 mb-3 break-all text-xs")}>{existingUrl}</p>
+              <p className={cn("mb-3 break-all text-xs text-slate-500")}>{existingUrl}</p>
               <CopyLinkButton url={existingUrl} />
             </div>
           )}
 
           {/* SMS copy box */}
           {smsText && (
-            <div className={cn("border-seasalt-400/60 bg-seasalt rounded-lg border p-3")}>
+            <div className={cn("rounded-lg border border-slate-200 bg-slate-50 p-3")}>
               <p
-                className={cn(
-                  "text-rich-black/60 mb-2 text-xs font-semibold uppercase tracking-wide",
-                )}
+                className={cn("mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500")}
               >
                 Copy and send from your phone
               </p>
-              <p className={cn("text-rich-black mb-3 text-sm leading-relaxed")}>{smsText}</p>
+              <p className={cn("mb-3 text-sm leading-relaxed text-slate-700")}>{smsText}</p>
               <button
                 type="button"
                 onClick={handleCopy}

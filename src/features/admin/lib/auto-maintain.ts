@@ -27,11 +27,13 @@ export async function autoMaintain(prisma: PrismaClient): Promise<ConflictEntry[
 /**
  * Creates a Contact for every unique email found in Booking or ReviewRequest records
  * that does not already have a corresponding Contact.
- * Existing contacts are never overwritten — admin edits are the source of truth.
+ * Also merges phone-only contacts into their email-based counterpart when both share
+ * the same phone number. Existing contacts are never overwritten otherwise —
+ * admin edits are the source of truth.
  * @param prisma - Prisma client instance.
  */
 async function backfillContacts(prisma: PrismaClient): Promise<void> {
-  const [bookings, reviewRequests, existing] = await Promise.all([
+  const [bookings, reviewRequests, allContacts] = await Promise.all([
     prisma.booking.findMany({
       orderBy: { createdAt: "asc" },
       select: { name: true, email: true, phone: true, notes: true },
@@ -40,8 +42,42 @@ async function backfillContacts(prisma: PrismaClient): Promise<void> {
       orderBy: { createdAt: "asc" },
       select: { name: true, email: true, phone: true },
     }),
-    prisma.contact.findMany({ select: { email: true, phone: true } }),
+    prisma.contact.findMany({ select: { id: true, email: true, phone: true, name: true } }),
   ]);
+
+  // --- Step 1: Merge phone-only contacts into their email-based counterpart ---
+  // Build buckets keyed by normalised phone: { withEmail, phoneOnly[] }
+  const phoneBuckets = new Map<
+    string,
+    {
+      withEmail: (typeof allContacts)[number] | null;
+      phoneOnly: (typeof allContacts)[number][];
+    }
+  >();
+  for (const c of allContacts) {
+    if (!c.phone) continue;
+    const norm = normalizePhone(toE164NZ(c.phone) || c.phone);
+    if (!norm) continue;
+    if (!phoneBuckets.has(norm)) phoneBuckets.set(norm, { withEmail: null, phoneOnly: [] });
+    const bucket = phoneBuckets.get(norm)!;
+    if (c.email) bucket.withEmail ??= c;
+    else bucket.phoneOnly.push(c);
+  }
+
+  const deletedIds = new Set<string>();
+  for (const { withEmail, phoneOnly } of phoneBuckets.values()) {
+    if (!withEmail || phoneOnly.length === 0) continue;
+    for (const dup of phoneOnly) {
+      await prisma.review
+        .updateMany({ where: { contactId: dup.id }, data: { contactId: withEmail.id } })
+        .catch(() => null);
+      await prisma.contact.delete({ where: { id: dup.id } }).catch(() => null);
+      deletedIds.add(dup.id);
+    }
+  }
+
+  // Work with the post-merge contact list so the sets below are accurate
+  const existing = allContacts.filter((c) => !deletedIds.has(c.id));
 
   const existingEmails = new Set(
     existing.filter((c) => c.email).map((c) => c.email!.toLowerCase()),
@@ -49,6 +85,14 @@ async function backfillContacts(prisma: PrismaClient): Promise<void> {
   const existingPhones = new Set(
     existing.filter((c) => c.phone).map((c) => normalizePhone(toE164NZ(c.phone!) || c.phone!)),
   );
+  // Remaining phone-only contacts (post-merge) — used to merge-on-create below
+  const phoneOnlyByNorm = new Map<string, (typeof existing)[number]>();
+  for (const c of existing) {
+    if (!c.email && c.phone) {
+      const norm = normalizePhone(toE164NZ(c.phone) || c.phone);
+      if (norm) phoneOnlyByNorm.set(norm, c);
+    }
+  }
 
   const toCreateByEmail = new Map<
     string,
@@ -89,12 +133,28 @@ async function backfillContacts(prisma: PrismaClient): Promise<void> {
   if (toCreateByEmail.size === 0 && toCreateByPhone.size === 0) return;
 
   await Promise.all([
-    ...[...toCreateByEmail.values()].map((d) =>
-      prisma.contact
+    ...[...toCreateByEmail.values()].map(async (d) => {
+      // If a phone-only contact already has this phone, merge email into it rather than
+      // creating a duplicate contact.
+      if (d.phone) {
+        const norm = normalizePhone(toE164NZ(d.phone) || d.phone);
+        const phoneOnlyMatch = norm ? phoneOnlyByNorm.get(norm) : undefined;
+        if (phoneOnlyMatch) {
+          const updates: { email: string; name?: string; address?: string } = { email: d.email };
+          if (d.name.toLowerCase().startsWith(phoneOnlyMatch.name.toLowerCase() + " ")) {
+            updates.name = d.name;
+          }
+          if (d.address) updates.address = d.address;
+          return prisma.contact
+            .update({ where: { id: phoneOnlyMatch.id }, data: updates })
+            .catch(() => null);
+        }
+      }
+      return prisma.contact
         .findFirst({ where: { email: d.email } })
         .then((exists) => (exists ? null : prisma.contact.create({ data: d })))
-        .catch(() => null),
-    ),
+        .catch(() => null);
+    }),
     ...[...toCreateByPhone.values()].map((d) =>
       prisma.contact
         .findFirst({ where: { phone: d.phone } })

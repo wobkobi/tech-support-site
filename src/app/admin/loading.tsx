@@ -1,71 +1,56 @@
 // src/app/admin/loading.tsx
-/**
- * @file loading.tsx
- * @description Streaming skeleton for the admin page.
- * Shown immediately while the server fetches data (reviews, bookings, contacts, travel blocks).
- * This Suspense boundary lets the shell render in <100ms even though DB queries take ~3s.
- */
-
-import { PageShell, FrostedSection, CARD } from "@/shared/components/PageLayout";
+import type React from "react";
 import { cn } from "@/shared/lib/cn";
 
 /**
  * Animated skeleton bone used to fill skeleton placeholder areas.
- * @param props - Component props.
- * @param props.className - Additional CSS classes for sizing/positioning.
+ * @param root0 - Component props.
+ * @param root0.className - Additional CSS classes for sizing/positioning.
  * @returns Skeleton bone element.
  */
 function Bone({ className }: { className?: string }): React.ReactElement {
-  return <div className={cn("bg-seasalt-400/50 animate-pulse rounded-lg", className)} />;
+  return <div className={cn("animate-pulse rounded-lg bg-slate-200", className)} />;
 }
 
 /**
- * Admin page loading skeleton shown via React Suspense while DB queries run.
+ * Admin dashboard loading skeleton shown via React Suspense while DB queries run.
  * @returns Loading skeleton element.
  */
 export default function AdminLoading(): React.ReactElement {
   return (
-    <PageShell>
-      <FrostedSection>
-        <div className="flex flex-col gap-6 sm:gap-8">
-          {/* Header card skeleton */}
-          <section className={cn(CARD)}>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <Bone className="h-8 w-24" />
-              <div className="flex gap-2">
-                <Bone className="h-5 w-20 rounded-full" />
-                <Bone className="h-5 w-24 rounded-full" />
-              </div>
-            </div>
-          </section>
-
-          {/* Tabs + content skeleton */}
-          <section className={cn(CARD)}>
-            {/* Tab bar */}
-            <div className="border-seasalt-400/40 mb-6 flex gap-3 border-b pb-3">
-              <Bone className="h-8 w-16 rounded-lg" />
-              <Bone className="h-8 w-20 rounded-lg" />
-              <Bone className="h-8 w-24 rounded-lg" />
-              <Bone className="h-8 w-14 rounded-lg" />
-            </div>
-
-            {/* Row skeletons */}
-            <div className="space-y-3">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className={cn("border-seasalt-400/40 rounded-xl border p-4")}>
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0 flex-1 space-y-2">
-                      <Bone className="h-4 w-40" />
-                      <Bone className="h-3 w-56 opacity-60" />
-                    </div>
-                    <Bone className="h-7 w-20 shrink-0 rounded-lg" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
+    <div className={cn("flex min-h-screen")}>
+      {/* Sidebar skeleton */}
+      <aside className={cn("bg-russian-violet fixed inset-y-0 left-0 z-10 flex w-56 flex-col")}>
+        <div className={cn("border-b border-white/10 px-5 py-5")}>
+          <Bone className={cn("mb-1 h-3 w-12 bg-white/20")} />
+          <Bone className={cn("h-4 w-28 bg-white/20")} />
         </div>
-      </FrostedSection>
-    </PageShell>
+        <div className={cn("flex flex-col gap-1 px-3 py-4")}>
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Bone key={i} className={cn("h-9 w-full bg-white/10")} />
+          ))}
+        </div>
+      </aside>
+
+      {/* Content skeleton */}
+      <div className={cn("ml-56 flex-1 bg-slate-50")}>
+        <div className={cn("mx-auto max-w-5xl px-6 py-8")}>
+          <Bone className={cn("mb-6 h-8 w-36")} />
+
+          {/* Stat cards */}
+          <div className={cn("mb-8 grid grid-cols-2 gap-4 sm:grid-cols-3")}>
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div
+                key={i}
+                className={cn("rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}
+              >
+                <Bone className={cn("mb-2 h-8 w-10")} />
+                <Bone className={cn("h-3 w-28 opacity-60")} />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

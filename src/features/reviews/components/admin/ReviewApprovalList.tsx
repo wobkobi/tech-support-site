@@ -7,6 +7,7 @@
 
 import { useState } from "react";
 import type React from "react";
+import { cn } from "@/shared/lib/cn";
 import type { ReviewRow } from "./review-types";
 import { ReviewCard } from "./ReviewCard";
 import { SendReviewLinkForm } from "./SendReviewLinkForm";
@@ -37,6 +38,8 @@ interface ReviewApprovalListProps {
   token: string;
   /** Contacts available for linking to reviews */
   contacts: ContactPickerEntry[];
+  /** Whether to show the SendReviewLinkForm at the top. Defaults to true. */
+  showSendForm?: boolean;
 }
 
 /**
@@ -47,6 +50,7 @@ interface ReviewApprovalListProps {
  * @param props.approved - Already-approved reviews.
  * @param props.token - Admin token.
  * @param props.contacts - Contacts available for linking.
+ * @param props.showSendForm - Whether to show the SendReviewLinkForm at the top. Defaults to true.
  * @returns Review approval list element.
  */
 export function ReviewApprovalList({
@@ -54,11 +58,29 @@ export function ReviewApprovalList({
   approved: initialApproved,
   token,
   contacts,
+  showSendForm = true,
 }: ReviewApprovalListProps): React.ReactElement {
   const [pending, setPending] = useState<ReviewRow[]>(initialPending);
   const [approved, setApproved] = useState<ReviewRow[]>(initialApproved);
+  const [query, setQuery] = useState("");
   const [linkingId, setLinkingId] = useState<string | null>(null);
   const [linkSaving, setLinkSaving] = useState<string | null>(null);
+
+  /**
+   * Returns true if a review row matches the current search query.
+   * @param row - Review row to test.
+   * @returns Whether the row matches.
+   */
+  function matchesQuery(row: ReviewRow): boolean {
+    if (!query.trim()) return true;
+    const q = query.toLowerCase();
+    const name = [row.firstName, row.lastName].filter(Boolean).join(" ").toLowerCase();
+    return (
+      name.includes(q) ||
+      row.text.toLowerCase().includes(q) ||
+      (row.contactName?.toLowerCase().includes(q) ?? false)
+    );
+  }
 
   /**
    * Moves a review from pending to approved.
@@ -133,7 +155,7 @@ export function ReviewApprovalList({
   function renderContactLink(row: ReviewRow): React.ReactElement {
     if (linkingId === row.id) {
       return (
-        <div className="flex items-center gap-2">
+        <div className={cn("flex items-center gap-2")}>
           <select
             aria-label="Select contact"
             defaultValue=""
@@ -142,7 +164,9 @@ export function ReviewApprovalList({
               const val = e.target.value;
               void handleLinkContact(row.id, val || null);
             }}
-            className="border-seasalt-400/80 bg-seasalt text-rich-black focus:border-russian-violet focus:ring-russian-violet/30 rounded-md border px-2 py-1 text-xs focus:outline-none focus:ring-1"
+            className={cn(
+              "focus:border-russian-violet focus:ring-russian-violet/30 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 focus:outline-none focus:ring-1",
+            )}
           >
             <option value="">-- no contact --</option>
             {contacts
@@ -156,7 +180,7 @@ export function ReviewApprovalList({
           </select>
           <button
             onClick={() => setLinkingId(null)}
-            className="text-rich-black/40 hover:text-rich-black/60 text-xs"
+            className={cn("text-xs text-slate-400 hover:text-slate-600")}
           >
             Cancel
           </button>
@@ -168,7 +192,9 @@ export function ReviewApprovalList({
       return (
         <button
           onClick={() => setLinkingId(row.id)}
-          className="bg-moonstone-600/10 text-moonstone-600 hover:bg-moonstone-600/20 rounded-full px-2 py-0.5 text-xs font-medium transition-colors"
+          className={cn(
+            "bg-moonstone-600/10 text-moonstone-600 hover:bg-moonstone-600/20 rounded-full px-2 py-0.5 text-xs font-medium transition-colors",
+          )}
           title="Change linked contact"
         >
           {row.contactName}
@@ -179,72 +205,100 @@ export function ReviewApprovalList({
     return (
       <button
         onClick={() => setLinkingId(row.id)}
-        className="text-russian-violet/50 hover:text-russian-violet rounded px-1 py-0.5 text-xs transition-colors"
+        className={cn(
+          "text-russian-violet/50 hover:text-russian-violet rounded px-1 py-0.5 text-xs transition-colors",
+        )}
       >
         Link contact
       </button>
     );
   }
 
+  const visiblePending = pending.filter(matchesQuery);
+  const visibleApproved = approved.filter(matchesQuery);
+
   return (
-    <div className="flex flex-col gap-8">
+    <div className={cn("flex flex-col gap-8")}>
       {/* Send review link to past client */}
-      <SendReviewLinkForm token={token} />
+      {showSendForm && <SendReviewLinkForm token={token} />}
+
+      {/* Search */}
+      <input
+        type="search"
+        placeholder="Search name, review text…"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        className={cn(
+          "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-1",
+        )}
+      />
 
       {/* Pending */}
       <section>
-        <h2 className="text-russian-violet mb-3 text-lg font-bold">
+        <h2 className={cn("text-russian-violet mb-3 text-lg font-bold")}>
           Pending{" "}
-          {pending.length > 0 && (
-            <span className="bg-coquelicot-500/20 text-coquelicot-400 ml-1 rounded-full px-2 py-0.5 text-sm">
-              {pending.length}
+          {visiblePending.length > 0 && (
+            <span
+              className={cn(
+                "bg-coquelicot-500/20 text-coquelicot-400 ml-1 rounded-full px-2 py-0.5 text-sm",
+              )}
+            >
+              {visiblePending.length}
             </span>
           )}
         </h2>
-        {pending.length === 0 ? (
-          <p className="text-seasalt-300 text-sm">No reviews pending approval.</p>
+        {visiblePending.length === 0 ? (
+          <p className={cn("text-sm text-slate-400")}>
+            {query ? "No matching pending reviews." : "No reviews pending approval."}
+          </p>
         ) : (
-          <div className="flex flex-col gap-3">
-            {pending.map((row) => (
-              <div key={row.id} className="flex flex-col gap-1">
+          <div className={cn("flex flex-col gap-3")}>
+            {visiblePending.map((row) => (
+              <div key={row.id} className={cn("flex flex-col gap-1")}>
                 <ReviewCard
                   row={row}
                   token={token}
                   onApprove={() => handleApprove(row.id)}
                   onDelete={() => handleDelete(row.id)}
                 />
-                <div className="pl-1">{renderContactLink(row)}</div>
+                <div className={cn("pl-1")}>{renderContactLink(row)}</div>
               </div>
             ))}
           </div>
         )}
       </section>
 
-      <hr className="border-seasalt-400/30" />
+      <hr className={cn("border-slate-200")} />
 
       {/* Approved */}
       <section>
-        <h2 className="text-russian-violet mb-3 text-lg font-bold">
+        <h2 className={cn("text-russian-violet mb-3 text-lg font-bold")}>
           Approved{" "}
           {approved.length > 0 && (
-            <span className="bg-moonstone-600/20 text-moonstone-600 ml-1 rounded-full px-2 py-0.5 text-sm">
-              {approved.length}
+            <span
+              className={cn(
+                "bg-moonstone-600/20 text-moonstone-600 ml-1 rounded-full px-2 py-0.5 text-sm",
+              )}
+            >
+              {visibleApproved.length}
             </span>
           )}
         </h2>
-        {approved.length === 0 ? (
-          <p className="text-seasalt-300 text-sm">No approved reviews yet.</p>
+        {visibleApproved.length === 0 ? (
+          <p className={cn("text-sm text-slate-400")}>
+            {query ? "No matching approved reviews." : "No approved reviews yet."}
+          </p>
         ) : (
-          <div className="flex flex-col gap-3">
-            {approved.map((row) => (
-              <div key={row.id} className="flex flex-col gap-1">
+          <div className={cn("flex flex-col gap-3")}>
+            {visibleApproved.map((row) => (
+              <div key={row.id} className={cn("flex flex-col gap-1")}>
                 <ReviewCard
                   row={row}
                   token={token}
                   onRevoke={() => handleRevoke(row.id)}
                   onDelete={() => handleDelete(row.id)}
                 />
-                <div className="pl-1">{renderContactLink(row)}</div>
+                <div className={cn("pl-1")}>{renderContactLink(row)}</div>
               </div>
             ))}
           </div>

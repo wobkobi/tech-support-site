@@ -86,7 +86,7 @@ export function AddReviewForm({ token, onAdded }: AddReviewFormProps): React.Rea
             rows={4}
             required
             className={cn(
-              "border-seasalt-400/60 bg-seasalt-800 text-rich-black w-full resize-none rounded-lg border p-3 text-sm focus:outline-none",
+              "w-full resize-none rounded-lg border border-slate-300 bg-white p-3 text-sm text-slate-800 focus:outline-none",
             )}
           />
 
@@ -99,7 +99,7 @@ export function AddReviewForm({ token, onAdded }: AddReviewFormProps): React.Rea
                 onChange={(e) => setFirstName(e.target.value)}
                 placeholder="First name"
                 className={cn(
-                  "border-seasalt-400/60 bg-seasalt-800 text-rich-black flex-1 rounded-lg border p-3 text-sm focus:outline-none",
+                  "flex-1 rounded-lg border border-slate-300 bg-white p-3 text-sm text-slate-800 focus:outline-none",
                 )}
               />
               <input
@@ -109,7 +109,7 @@ export function AddReviewForm({ token, onAdded }: AddReviewFormProps): React.Rea
                 onChange={(e) => setLastName(e.target.value)}
                 placeholder="Last name (optional)"
                 className={cn(
-                  "border-seasalt-400/60 bg-seasalt-800 text-rich-black flex-1 rounded-lg border p-3 text-sm focus:outline-none",
+                  "flex-1 rounded-lg border border-slate-300 bg-white p-3 text-sm text-slate-800 focus:outline-none",
                 )}
               />
             </div>
