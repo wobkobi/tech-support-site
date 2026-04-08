@@ -27,20 +27,20 @@ export default function ReviewLoading(): React.ReactElement {
   return (
     <PageShell>
       <FrostedSection maxWidth="56rem">
-        <div className="flex flex-col gap-4 sm:gap-5">
+        <div className={cn("flex flex-col gap-4 sm:gap-5")}>
           {/* Heading card skeleton */}
           <section className={cn(CARD)}>
-            <Bone className="mb-3 h-9 w-72 sm:w-96" />
-            <Bone className="h-5 w-64 opacity-70 sm:w-80" />
+            <Bone className={cn("mb-3 h-9 w-72 sm:w-96")} />
+            <Bone className={cn("h-5 w-64 opacity-70 sm:w-80")} />
           </section>
 
           {/* Form card skeleton */}
           <section className={cn(CARD)}>
-            <div className="space-y-4">
-              <Bone className="h-10 w-full" />
-              <Bone className="h-10 w-full" />
-              <Bone className="h-28 w-full" />
-              <Bone className="h-10 w-32 rounded-xl" />
+            <div className={cn("space-y-4")}>
+              <Bone className={cn("h-10 w-full")} />
+              <Bone className={cn("h-10 w-full")} />
+              <Bone className={cn("h-28 w-full")} />
+              <Bone className={cn("h-10 w-32 rounded-xl")} />
             </div>
           </section>
         </div>

@@ -39,14 +39,14 @@ function ReviewText({ text }: { text: string }): React.ReactElement {
   const normalizedText = normalizeText(text);
 
   if (!isLongReview(normalizedText)) {
-    return <span className="wrap-break-word inline whitespace-normal">{normalizedText}</span>;
+    return <span className={cn("wrap-break-word inline whitespace-normal")}>{normalizedText}</span>;
   }
 
   const preview = normalizedText.slice(0, REVIEW_CHAR_LIMIT);
   const wordSafe = preview.replace(/\s+\S*$/, "");
   const base = (wordSafe.trim().length > 0 ? wordSafe : preview).trim();
 
-  return <span className="wrap-break-word inline whitespace-normal">{base + "…"}</span>;
+  return <span className={cn("wrap-break-word inline whitespace-normal")}>{base + "…"}</span>;
 }
 
 /**
@@ -68,7 +68,10 @@ function ReviewCard({
 }): React.ReactElement {
   return (
     <li className={cn("cursor-pointer", className)} style={style}>
-      <Link href="/reviews" className="flex h-full flex-col p-4 text-inherit no-underline sm:p-5">
+      <Link
+        href="/reviews"
+        className={cn("flex h-full flex-col p-4 text-inherit no-underline sm:p-5")}
+      >
         <p className={cn("line-clamp-4")}>
           <ReviewText text={r.text} />
         </p>

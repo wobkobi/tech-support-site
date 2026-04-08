@@ -8,6 +8,7 @@
 import { useState } from "react";
 import type React from "react";
 import { cn } from "@/shared/lib/cn";
+import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 
 export interface AdminBookingRow {
   id: string;
@@ -245,30 +246,40 @@ export function BookingAdminList({
   const FILTERS: StatusFilter[] = ["all", "confirmed", "held", "completed", "cancelled"];
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className={cn("flex flex-col gap-4")}>
       {/* Status filter */}
-      <div className="flex flex-wrap gap-2">
-        {FILTERS.map((f) => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={cn(
-              "rounded-full px-3 py-1 text-xs font-medium transition-colors",
-              filter === f
-                ? "bg-russian-violet text-white"
-                : "text-rich-black/60 hover:bg-russian-violet/10",
-            )}
-          >
-            {f === "all"
-              ? `All (${bookings.length})`
-              : `${f.charAt(0).toUpperCase()}${f.slice(1)} (${counts[f as keyof typeof counts]})`}
-          </button>
-        ))}
+      <div
+        className={cn(
+          "inline-flex flex-wrap rounded-lg border border-slate-200 bg-slate-100 p-0.5",
+        )}
+      >
+        {FILTERS.map((f) => {
+          const label = f === "all" ? "All" : f.charAt(0).toUpperCase() + f.slice(1);
+          const count = f === "all" ? bookings.length : counts[f as keyof typeof counts];
+          const isActive = filter === f;
+          return (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={cn(
+                "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                isActive
+                  ? "text-russian-violet bg-white shadow-sm"
+                  : "text-slate-500 hover:text-slate-700",
+              )}
+            >
+              {label}{" "}
+              <span className={cn(isActive ? "text-russian-violet/60" : "text-slate-400")}>
+                {count}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
-      {filtered.length === 0 && <p className="text-rich-black/40 text-sm">No bookings found.</p>}
+      {filtered.length === 0 && <p className={cn("text-sm text-slate-400")}>No bookings found.</p>}
 
-      <div className="flex flex-col gap-3">
+      <div className={cn("flex flex-col gap-3")}>
         {filtered.map((b) => {
           const isExpanded = expandedId === b.id;
           const edit = edits[b.id] ?? {
@@ -282,48 +293,30 @@ export function BookingAdminList({
           const isResending = resending === b.id;
 
           return (
-            <div key={b.id} className="border-seasalt-400/30 rounded-xl border bg-white/50 p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div
-                  className="flex min-w-0 cursor-pointer flex-col gap-1"
-                  onClick={() => {
-                    if (isExpanded) {
-                      setExpandedId(null);
-                    } else {
-                      openEdit(b);
-                    }
-                  }}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      if (isExpanded) {
-                        setExpandedId(null);
-                      } else {
-                        openEdit(b);
-                      }
-                    }
-                  }}
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-russian-violet font-semibold">{b.name}</span>
+            <div key={b.id} className={cn("rounded-xl border border-slate-200 bg-white p-4")}>
+              <div className={cn("flex items-start justify-between gap-3")}>
+                <div className={cn("flex min-w-0 flex-col gap-1")}>
+                  <div className={cn("flex min-w-0 flex-wrap items-center gap-2")}>
+                    <span className={cn("text-russian-violet min-w-0 truncate font-semibold")}>
+                      {b.name}
+                    </span>
                     <span
                       className={cn(
-                        "rounded-full px-2 py-0.5 text-xs font-medium",
+                        "shrink-0 rounded-full px-2 py-0.5 text-xs font-medium",
                         STATUS_COLORS[b.status],
                       )}
                     >
                       {b.status}
                     </span>
                   </div>
-                  <span className="text-rich-black/50 text-xs">{b.email}</span>
-                  {b.phone && <span className="text-rich-black/50 text-xs">{b.phone}</span>}
-                  <span className="text-rich-black/60 text-xs">
+                  <span className={cn("break-all text-xs text-slate-500")}>{b.email}</span>
+                  {b.phone && <span className={cn("text-xs text-slate-500")}>{b.phone}</span>}
+                  <span className={cn("text-xs text-slate-500")}>
                     {formatNZDateTime(b.startAt)} &ndash; {formatNZDateTime(b.endAt)}
                   </span>
                 </div>
 
-                <div className="flex shrink-0 gap-2">
+                <div className={cn("flex shrink-0 gap-2")}>
                   {b.name.toLowerCase().includes("test") && (
                     <button
                       onClick={() => {
@@ -334,24 +327,32 @@ export function BookingAdminList({
                         }
                       }}
                       disabled={isSaving}
-                      className="rounded-lg bg-red-500/20 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-500/30 disabled:opacity-50"
+                      className={cn(
+                        "rounded-lg bg-red-500/20 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-500/30 disabled:opacity-50",
+                      )}
                     >
                       Delete
                     </button>
                   )}
                   {b.status !== "cancelled" && (
                     <>
-                      <a
-                        href={`/booking/edit?token=${b.cancelToken}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="bg-russian-violet/10 text-russian-violet hover:bg-russian-violet/20 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors"
-                      >
-                        Reschedule
-                      </a>
+                      {new Date(b.startAt) > new Date() && (
+                        <a
+                          href={`/booking/edit?token=${b.cancelToken}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className={cn(
+                            "bg-russian-violet/10 text-russian-violet hover:bg-russian-violet/20 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+                          )}
+                        >
+                          Reschedule
+                        </a>
+                      )}
                       <button
                         onClick={() => (isExpanded ? setExpandedId(null) : openEdit(b))}
-                        className="bg-russian-violet/10 text-russian-violet hover:bg-russian-violet/20 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors"
+                        className={cn(
+                          "bg-russian-violet/10 text-russian-violet hover:bg-russian-violet/20 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+                        )}
                       >
                         {isExpanded ? "Close" : "Edit"}
                       </button>
@@ -361,33 +362,39 @@ export function BookingAdminList({
               </div>
 
               {isExpanded && (
-                <div className="border-seasalt-400/20 mt-4 flex flex-col gap-3 border-t pt-4">
-                  <p className="text-rich-black/40 text-xs">
+                <div className={cn("mt-4 flex flex-col gap-3 border-t border-slate-100 pt-4")}>
+                  <p className={cn("text-xs text-slate-400")}>
                     Booked on {formatNZDateTime(b.createdAt)}
                   </p>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="flex flex-col gap-1">
-                      <span className="text-rich-black/60 text-xs font-medium">Name</span>
+                  <div className={cn("grid gap-3 sm:grid-cols-2")}>
+                    <label className={cn("flex flex-col gap-1")}>
+                      <span className={cn("text-russian-violet text-xs font-semibold")}>Name</span>
                       <input
-                        className="border-seasalt-400/30 rounded-lg border bg-white/80 px-3 py-2 text-sm"
+                        className={cn(
+                          "focus:border-russian-violet focus:ring-russian-violet/30 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-1",
+                        )}
                         value={edit.name}
                         onChange={(e) => setField(b.id, "name", e.target.value)}
                       />
                     </label>
-                    <label className="flex flex-col gap-1">
-                      <span className="text-rich-black/60 text-xs font-medium">Email</span>
+                    <label className={cn("flex flex-col gap-1")}>
+                      <span className={cn("text-russian-violet text-xs font-semibold")}>Email</span>
                       <input
                         type="email"
-                        className="border-seasalt-400/30 rounded-lg border bg-white/80 px-3 py-2 text-sm"
+                        className={cn(
+                          "focus:border-russian-violet focus:ring-russian-violet/30 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-1",
+                        )}
                         value={edit.email}
                         onChange={(e) => setField(b.id, "email", e.target.value)}
                       />
                     </label>
-                    <label className="flex flex-col gap-1">
-                      <span className="text-rich-black/60 text-xs font-medium">Phone</span>
+                    <label className={cn("flex flex-col gap-1")}>
+                      <span className={cn("text-russian-violet text-xs font-semibold")}>Phone</span>
                       <input
                         type="tel"
-                        className="border-seasalt-400/30 rounded-lg border bg-white/80 px-3 py-2 text-sm"
+                        className={cn(
+                          "focus:border-russian-violet focus:ring-russian-violet/30 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-1",
+                        )}
                         value={edit.phone}
                         onChange={(e) => setField(b.id, "phone", e.target.value)}
                         placeholder="Phone number"
@@ -396,33 +403,39 @@ export function BookingAdminList({
                   </div>
 
                   {edit.address !== undefined && edit.address !== "" && (
-                    <label className="flex flex-col gap-1">
-                      <span className="text-rich-black/60 text-xs font-medium">Address</span>
-                      <input
-                        className="border-seasalt-400/30 rounded-lg border bg-white/80 px-3 py-2 text-sm"
+                    <div className={cn("flex flex-col gap-1")}>
+                      <span className={cn("text-russian-violet text-xs font-semibold")}>
+                        Address
+                      </span>
+                      <AddressAutocomplete
+                        id={`edit-address-${b.id}`}
                         value={edit.address}
-                        onChange={(e) => setField(b.id, "address", e.target.value)}
+                        onChange={(v: string) => setField(b.id, "address", v)}
                         placeholder="Full address for travel time calculations"
                       />
-                    </label>
+                    </div>
                   )}
 
-                  <label className="flex flex-col gap-1">
-                    <span className="text-rich-black/60 text-xs font-medium">Notes</span>
+                  <label className={cn("flex flex-col gap-1")}>
+                    <span className={cn("text-russian-violet text-xs font-semibold")}>Notes</span>
                     <textarea
-                      className="min-h-25 border-seasalt-400/30 rounded-lg border bg-white/80 px-3 py-2 text-sm"
+                      className={cn(
+                        "focus:border-russian-violet focus:ring-russian-violet/30 min-h-25 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-1",
+                      )}
                       value={edit.notes}
                       onChange={(e) => setField(b.id, "notes", e.target.value)}
                     />
                   </label>
 
-                  {errors[b.id] && <p className="text-xs text-red-500">{errors[b.id]}</p>}
+                  {errors[b.id] && <p className={cn("text-xs text-red-500")}>{errors[b.id]}</p>}
 
-                  <div className="flex flex-wrap gap-2">
+                  <div className={cn("flex flex-wrap gap-2")}>
                     <button
                       onClick={() => saveEdit(b)}
                       disabled={isSaving}
-                      className="bg-russian-violet hover:bg-russian-violet/90 rounded-lg px-4 py-2 text-xs font-medium text-white transition-colors disabled:opacity-50"
+                      className={cn(
+                        "bg-russian-violet hover:bg-russian-violet/90 rounded-lg px-4 py-2 text-xs font-medium text-white transition-colors disabled:opacity-50",
+                      )}
                     >
                       {isSaving ? "Saving\u2026" : "Save changes"}
                     </button>
@@ -431,7 +444,9 @@ export function BookingAdminList({
                       <button
                         onClick={() => changeStatus(b.id, "completed")}
                         disabled={isSaving}
-                        className="rounded-lg bg-green-500/20 px-4 py-2 text-xs font-medium text-green-700 transition-colors hover:bg-green-500/30 disabled:opacity-50"
+                        className={cn(
+                          "rounded-lg bg-green-500/20 px-4 py-2 text-xs font-medium text-green-700 transition-colors hover:bg-green-500/30 disabled:opacity-50",
+                        )}
                       >
                         Mark completed
                       </button>
@@ -444,7 +459,9 @@ export function BookingAdminList({
                         }
                       }}
                       disabled={isSaving}
-                      className="rounded-lg bg-red-500/20 px-4 py-2 text-xs font-medium text-red-600 transition-colors hover:bg-red-500/30 disabled:opacity-50"
+                      className={cn(
+                        "rounded-lg bg-red-500/20 px-4 py-2 text-xs font-medium text-red-600 transition-colors hover:bg-red-500/30 disabled:opacity-50",
+                      )}
                     >
                       Cancel booking
                     </button>
@@ -453,7 +470,9 @@ export function BookingAdminList({
                       <button
                         onClick={() => void resendReview(b.id)}
                         disabled={isSaving || isResending}
-                        className="bg-moonstone-600/15 text-moonstone-700 hover:bg-moonstone-600/25 rounded-lg px-4 py-2 text-xs font-medium transition-colors disabled:opacity-50"
+                        className={cn(
+                          "bg-moonstone-600/15 text-moonstone-700 hover:bg-moonstone-600/25 rounded-lg px-4 py-2 text-xs font-medium transition-colors disabled:opacity-50",
+                        )}
                       >
                         {isResending
                           ? "Sending\u2026"

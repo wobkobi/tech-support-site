@@ -56,6 +56,7 @@ export function ReviewLinkHistoryTable({
   token,
 }: ReviewLinkHistoryTableProps): React.ReactElement {
   const [entries, setEntries] = useState(initialEntries);
+  const [query, setQuery] = useState("");
   /**
    * Key used to track which row is being edited.
    * For manual entries: the ReviewRequest id.
@@ -230,49 +231,118 @@ export function ReviewLinkHistoryTable({
     });
   }
 
+  const visibleEntries = query.trim()
+    ? entries.filter((e) => {
+        const q = query.toLowerCase();
+        return (
+          e.name.toLowerCase().includes(q) ||
+          e.email?.toLowerCase().includes(q) ||
+          e.phone?.includes(q) ||
+          e.source.toLowerCase().includes(q)
+        );
+      })
+    : entries;
+
   if (entries.length === 0) {
-    return <p className={cn("text-seasalt-300 text-sm")}>No review links sent yet.</p>;
+    return <p className={cn("text-sm text-slate-400")}>No review links sent yet.</p>;
   }
 
   return (
-    <div className={cn("overflow-x-auto")}>
-      <table className={cn("w-full text-sm")}>
-        <thead>
-          <tr
-            className={cn(
-              "text-rich-black/50 border-seasalt-400/30 border-b text-left text-xs uppercase tracking-wide",
-            )}
-          >
-            <th className={cn("pb-2 pr-4 font-semibold")}>Name</th>
-            <th className={cn("pb-2 pr-4 font-semibold")}>Email / Phone</th>
-            <th className={cn("pb-2 pr-4 font-semibold")}>Sent</th>
-            <th className={cn("pb-2 pr-4 font-semibold")}>Via</th>
-            <th className={cn("pb-2 pr-4 font-semibold")}>Reviewed?</th>
-            <th className={cn("pb-2 pr-4 font-semibold")}>Link</th>
-            <th className={cn("pb-2 font-semibold")}></th>
-          </tr>
-        </thead>
-        <tbody>
-          {entries.map((entry) => {
+    <div className={cn("flex flex-col gap-3")}>
+      <input
+        type="search"
+        placeholder="Search name, email, phone…"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        className={cn(
+          "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-1",
+        )}
+      />
+      {visibleEntries.length === 0 ? (
+        <p className={cn("text-sm text-slate-400")}>No matching entries.</p>
+      ) : (
+        <div className={cn("max-h-128 flex flex-col gap-2 overflow-y-auto")}>
+          {visibleEntries.map((entry) => {
             const key = entryKey(entry);
             const isEditing = key !== null && editingKey === key;
             const canEdit = key !== null;
 
-            if (isEditing) {
-              const phoneValid = isValidPhone(toE164NZ(editPhoneInput));
+            const sourceBadge = (
+              <span
+                className={cn(
+                  "rounded-full px-2 py-0.5 text-[10px] font-medium",
+                  entry.source === "Auto"
+                    ? "bg-moonstone-600/15 text-moonstone-600"
+                    : entry.source === "Manual SMS"
+                      ? "bg-coquelicot-500/10 text-coquelicot-500"
+                      : entry.source === "Legacy"
+                        ? "bg-slate-100 text-slate-400"
+                        : "bg-russian-violet/10 text-russian-violet",
+                )}
+              >
+                {entry.source}
+              </span>
+            );
 
-              return (
-                <tr key={key} className={cn("border-seasalt-400/20 border-b last:border-0")}>
-                  <td colSpan={7} className={cn("py-3")}>
-                    <div className={cn("flex flex-col gap-2")}>
-                      <div className={cn("flex flex-wrap gap-2")}>
+            const contact = entry.email
+              ? entry.email
+              : entry.phone
+                ? formatNZPhone(entry.phone)
+                : null;
+
+            return (
+              <div
+                key={key ?? entry.reviewUrl}
+                className={cn("rounded-lg border border-slate-200 bg-white p-3")}
+              >
+                {/* Name row */}
+                <div className={cn("flex items-start justify-between gap-2")}>
+                  <div className={cn("min-w-0")}>
+                    <div className={cn("flex flex-wrap items-center gap-1.5")}>
+                      <span className={cn("truncate text-sm font-medium text-slate-800")}>
+                        {entry.name}
+                      </span>
+                      {sourceBadge}
+                    </div>
+                    <p className={cn("mt-0.5 text-xs text-slate-500")}>
+                      {contact ?? (
+                        <span className={cn("italic text-slate-400")}>
+                          {entry.source === "Legacy" ? "no contact info" : "SMS only"}
+                        </span>
+                      )}
+                      {" · "}
+                      {fmt(entry.sentAt)}
+                    </p>
+                  </div>
+                  {canEdit && !isEditing && (
+                    <button
+                      type="button"
+                      onClick={() => openEdit(entry)}
+                      className={cn(
+                        "hover:text-russian-violet shrink-0 text-slate-400 transition-colors",
+                      )}
+                      aria-label="Edit contact details"
+                    >
+                      ✎
+                    </button>
+                  )}
+                </div>
+
+                {/* Edit form */}
+                {isEditing &&
+                  (() => {
+                    const phoneValid = isValidPhone(toE164NZ(editPhoneInput));
+                    return (
+                      <div
+                        className={cn("mt-2 flex flex-col gap-2 border-t border-slate-100 pt-2")}
+                      >
                         <input
                           type="email"
                           value={editEmail}
                           onChange={(e) => setEditEmail(e.target.value)}
                           placeholder="Email (optional)"
                           className={cn(
-                            "border-seasalt-400/60 bg-seasalt-800 text-rich-black w-40 rounded-lg border px-3 py-1.5 text-sm focus:outline-none",
+                            "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-1",
                           )}
                         />
                         <input
@@ -282,164 +352,111 @@ export function ReviewLinkHistoryTable({
                           onBlur={(e) => setEditPhoneInput(formatNZPhone(e.target.value))}
                           placeholder="021 123 1234"
                           className={cn(
-                            "border-seasalt-400/60 bg-seasalt-800 text-rich-black w-40 rounded-lg border px-3 py-1.5 text-sm focus:outline-none",
+                            "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-1",
                             editPhoneInput && !phoneValid ? "border-coquelicot-500/60" : "",
                           )}
                         />
-                      </div>
-                      {editPhoneInput && (
-                        <p
-                          className={cn(
-                            "text-xs",
-                            phoneValid ? "text-rich-black/40" : "text-coquelicot-400",
-                          )}
-                        >
-                          {phoneValid
-                            ? `Stored as: ${toE164NZ(editPhoneInput)}`
-                            : "Invalid phone number"}
-                        </p>
-                      )}
-                      {saveError && (
-                        <p className={cn("text-coquelicot-400 text-xs")}>{saveError}</p>
-                      )}
-                      <div className={cn("flex gap-2")}>
-                        <button
-                          type="button"
-                          disabled={saving || (!!editPhoneInput && !phoneValid)}
-                          onClick={() => handleSave(entry)}
-                          className={cn(
-                            "bg-moonstone-600 hover:bg-moonstone-700 rounded-lg px-4 py-1.5 text-xs font-semibold text-white transition-colors disabled:opacity-50",
-                          )}
-                        >
-                          {saving ? "Saving..." : "Save"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={cancelEdit}
-                          className={cn(
-                            "border-seasalt-400/60 text-rich-black/60 hover:border-russian-violet/40 rounded-lg border px-4 py-1.5 text-xs font-semibold transition-colors",
-                          )}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-              );
-            }
-
-            return (
-              <tr
-                key={key ?? entry.reviewUrl}
-                className={cn("border-seasalt-400/20 border-b last:border-0")}
-              >
-                <td className={cn("text-rich-black py-2 pr-4 font-medium")}>
-                  <div className={cn("flex items-center gap-2")}>
-                    {entry.name}
-                    {canEdit && (
-                      <button
-                        type="button"
-                        onClick={() => openEdit(entry)}
-                        className={cn(
-                          "text-rich-black/30 hover:text-russian-violet text-xs transition-colors",
+                        {editPhoneInput && (
+                          <p
+                            className={cn(
+                              "text-xs",
+                              phoneValid ? "text-slate-400" : "text-coquelicot-400",
+                            )}
+                          >
+                            {phoneValid
+                              ? `Stored as: ${toE164NZ(editPhoneInput)}`
+                              : "Invalid phone number"}
+                          </p>
                         )}
-                        aria-label="Edit contact details"
-                      >
-                        ✎
-                      </button>
+                        {saveError && (
+                          <p className={cn("text-coquelicot-400 text-xs")}>{saveError}</p>
+                        )}
+                        <div className={cn("flex gap-2")}>
+                          <button
+                            type="button"
+                            disabled={saving || (!!editPhoneInput && !phoneValid)}
+                            onClick={() => handleSave(entry)}
+                            className={cn(
+                              "bg-moonstone-600 hover:bg-moonstone-700 rounded-lg px-3 py-1 text-xs font-semibold text-white transition-colors disabled:opacity-50",
+                            )}
+                          >
+                            {saving ? "Saving…" : "Save"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={cancelEdit}
+                            className={cn(
+                              "text-xs text-slate-500 transition-colors hover:text-slate-700",
+                            )}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                {/* Actions row */}
+                {!isEditing && (
+                  <div
+                    className={cn("mt-2 flex items-center gap-3 border-t border-slate-100 pt-2")}
+                  >
+                    {entry.reviewed ? (
+                      <span className={cn("text-moonstone-600 text-xs font-medium")}>
+                        Reviewed ✓
+                      </span>
+                    ) : (
+                      <span className={cn("text-xs text-slate-400")}>Not reviewed</span>
+                    )}
+                    <CopyLinkButton url={entry.reviewUrl} />
+                    {entry.id &&
+                      !entry.reviewed &&
+                      (confirmRevokeKey === key ? (
+                        <div className={cn("flex items-center gap-2")}>
+                          <button
+                            type="button"
+                            disabled={revoking}
+                            onClick={() => handleRevoke(entry)}
+                            className={cn(
+                              "text-coquelicot-500 hover:text-coquelicot-600 text-xs font-semibold transition-colors disabled:opacity-50",
+                            )}
+                          >
+                            {revoking ? "Revoking…" : "Confirm revoke"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setConfirmRevokeKey(null);
+                              setRevokeError(null);
+                            }}
+                            className={cn(
+                              "text-xs text-slate-400 transition-colors hover:text-slate-600",
+                            )}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setConfirmRevokeKey(key)}
+                          className={cn(
+                            "hover:text-coquelicot-500 ml-auto text-xs text-slate-400 transition-colors",
+                          )}
+                        >
+                          Revoke
+                        </button>
+                      ))}
+                    {revokeError && (
+                      <p className={cn("text-coquelicot-400 text-xs")}>{revokeError}</p>
                     )}
                   </div>
-                </td>
-                <td className={cn("text-rich-black/70 py-2 pr-4")}>
-                  {entry.email ? (
-                    <span>{entry.email}</span>
-                  ) : entry.phone ? (
-                    <span>{formatNZPhone(entry.phone)}</span>
-                  ) : (
-                    <span className={cn("text-rich-black/30 italic")}>
-                      {entry.source === "Legacy" ? "no contact info" : "SMS only"}
-                    </span>
-                  )}
-                </td>
-                <td className={cn("text-rich-black/70 whitespace-nowrap py-2 pr-4")}>
-                  {fmt(entry.sentAt)}
-                </td>
-                <td className={cn("py-2 pr-4")}>
-                  <span
-                    className={cn(
-                      "rounded-full px-2 py-0.5 text-xs font-medium",
-                      entry.source === "Auto"
-                        ? "bg-moonstone-600/15 text-moonstone-600"
-                        : entry.source === "Manual SMS"
-                          ? "bg-coquelicot-500/10 text-coquelicot-500"
-                          : entry.source === "Legacy"
-                            ? "bg-seasalt-400/20 text-rich-black/40"
-                            : "bg-russian-violet/10 text-russian-violet",
-                    )}
-                  >
-                    {entry.source}
-                  </span>
-                </td>
-                <td className={cn("py-2 pr-4")}>
-                  {entry.reviewed ? (
-                    <span className={cn("text-moonstone-600 text-xs font-semibold")}>Yes</span>
-                  ) : (
-                    <span className={cn("text-rich-black/40 text-xs")}>Not yet</span>
-                  )}
-                </td>
-                <td className={cn("py-2 pr-4")}>
-                  <CopyLinkButton url={entry.reviewUrl} />
-                </td>
-                <td className={cn("py-2")}>
-                  {entry.id && confirmRevokeKey === key ? (
-                    <div className={cn("flex flex-col gap-1")}>
-                      <div className={cn("flex items-center gap-2")}>
-                        <span className={cn("text-rich-black/60 text-xs")}>Revoke this link?</span>
-                        <button
-                          type="button"
-                          disabled={revoking}
-                          onClick={() => handleRevoke(entry)}
-                          className={cn(
-                            "text-coquelicot-500 hover:text-coquelicot-600 text-xs font-semibold transition-colors disabled:opacity-50",
-                          )}
-                        >
-                          {revoking ? "Revoking…" : "Yes, revoke"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setConfirmRevokeKey(null);
-                            setRevokeError(null);
-                          }}
-                          className={cn(
-                            "text-rich-black/40 hover:text-rich-black/60 text-xs transition-colors",
-                          )}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                      {revokeError && (
-                        <p className={cn("text-coquelicot-400 text-xs")}>{revokeError}</p>
-                      )}
-                    </div>
-                  ) : entry.id && !entry.reviewed ? (
-                    <button
-                      type="button"
-                      onClick={() => setConfirmRevokeKey(key)}
-                      className={cn(
-                        "text-rich-black/30 hover:text-coquelicot-500 text-xs transition-colors",
-                      )}
-                    >
-                      Revoke
-                    </button>
-                  ) : null}
-                </td>
-              </tr>
+                )}
+              </div>
             );
           })}
-        </tbody>
-      </table>
+        </div>
+      )}
     </div>
   );
 }

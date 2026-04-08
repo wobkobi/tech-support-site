@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 
 const mocks = vi.hoisted(() => ({
   isAdminRequest: vi.fn(),
-  travelBlockDeleteMany: vi.fn(),
+  travelBlockUpdateMany: vi.fn(),
   refreshCalendarCache: vi.fn(),
 }));
 
@@ -13,7 +13,7 @@ vi.mock("@/shared/lib/auth", () => ({
 
 vi.mock("@/shared/lib/prisma", () => ({
   prisma: {
-    travelBlock: { deleteMany: mocks.travelBlockDeleteMany },
+    travelBlock: { updateMany: mocks.travelBlockUpdateMany },
   },
 }));
 
@@ -35,7 +35,7 @@ describe("POST /api/admin/travel/recalculate", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.isAdminRequest.mockReturnValue(true);
-    mocks.travelBlockDeleteMany.mockResolvedValue({ count: 3 });
+    mocks.travelBlockUpdateMany.mockResolvedValue({ count: 3 });
     mocks.refreshCalendarCache.mockResolvedValue({ cachedCount: 5 });
   });
 
@@ -53,7 +53,14 @@ describe("POST /api/admin/travel/recalculate", () => {
     const json = await res.json();
     expect(json.ok).toBe(true);
     expect(json.cachedCount).toBe(5);
-    expect(mocks.travelBlockDeleteMany).toHaveBeenCalledWith({});
+    expect(mocks.travelBlockUpdateMany).toHaveBeenCalledWith({
+      data: {
+        rawTravelMinutes: null,
+        roundedMinutes: null,
+        rawTravelBackMinutes: null,
+        roundedBackMinutes: null,
+      },
+    });
     expect(mocks.refreshCalendarCache).toHaveBeenCalled();
   });
 
