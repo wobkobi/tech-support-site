@@ -23,6 +23,7 @@ import {
   fetchAllCalendarEvents,
 } from "@/features/calendar/lib/google-calendar";
 import { Prisma } from "@prisma/client";
+import { toE164NZ } from "@/shared/lib/normalize-phone";
 
 interface EditBookingPayload {
   cancelToken: string;
@@ -188,8 +189,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (meetingType === "in-person" && address) {
       bookingNotes += `Address: ${address.trim()}\n`;
     }
-    if (phone) {
-      bookingNotes += `Phone: ${phone.trim()}\n`;
+    const phoneE164 = phone ? toE164NZ(phone) || null : null;
+    if (phoneE164) {
+      bookingNotes += `Phone: ${phoneE164}\n`;
     }
 
     // Delete old calendar event
@@ -241,6 +243,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           calendarEventId,
           activeSlotKey: startAt.toISOString(),
           bufferAfterMin: BOOKING_CONFIG.bookingBufferAfterMin,
+          ...(phoneE164 !== undefined ? { phone: phoneE164 } : {}),
         },
       });
       console.log(`[booking/edit] Updated booking: ${booking.id}`);

@@ -11,11 +11,46 @@ import {
   type CalendarEvent,
 } from "@/features/calendar/lib/google-calendar";
 import { BOOKING_CONFIG } from "@/features/booking/lib/booking";
-import { calculateTravelMinutes } from "@/features/calendar/lib/travel-time";
+import { calculateTravelMinutes, type TransportMode } from "@/features/calendar/lib/travel-time";
 
 interface RefreshResult {
   cachedCount: number;
   deletedCount: number;
+}
+
+/**
+ * Finds the best origin address for the travel-to leg of a given event.
+ * Looks for a preceding event that ends within 4 hours of the target event's
+ * start time and has a resolvable location. Falls back to homeAddress.
+ * @param allEvents - All calendar events in the current window.
+ * @param targetEvent - The event being travelled to.
+ * @param homeAddress - Fallback home address.
+ * @returns The best origin address to use.
+ */
+export function findSmartOrigin(
+  allEvents: CalendarEvent[],
+  targetEvent: CalendarEvent,
+  homeAddress: string,
+): string {
+  const targetStart = new Date(targetEvent.start).getTime();
+  const fourHoursMs = 4 * 60 * 60 * 1000;
+
+  let bestOrigin: string | null = null;
+  let bestGap = Infinity;
+
+  for (const e of allEvents) {
+    if (e.id === targetEvent.id) continue;
+    const loc = e.location ?? e.summary;
+    if (!loc) continue;
+    const endMs = new Date(e.end).getTime();
+    const gap = targetStart - endMs;
+    if (gap >= 0 && gap < fourHoursMs && gap < bestGap) {
+      bestOrigin = loc;
+      bestGap = gap;
+    }
+  }
+
+  return bestOrigin ?? homeAddress;
 }
 
 /**
@@ -118,7 +153,25 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
   }
 
   // Load existing TravelBlock records
-  const existingBlocks = await prisma.travelBlock.findMany();
+  const existingBlocks = await prisma.travelBlock.findMany({
+    select: {
+      id: true,
+      sourceEventId: true,
+      calendarEmail: true,
+      summary: true,
+      eventStartAt: true,
+      eventEndAt: true,
+      rawTravelMinutes: true,
+      roundedMinutes: true,
+      rawTravelBackMinutes: true,
+      roundedBackMinutes: true,
+      beforeEventId: true,
+      afterEventId: true,
+      transportMode: true,
+      customOrigin: true,
+      detectedOrigin: true,
+    },
+  });
   const blockByKey = new Map(
     existingBlocks.map((b) => [`${b.sourceEventId}|${b.calendarEmail}`, b]),
   );
@@ -128,7 +181,7 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
     console.log(`[travel] Existing TravelBlocks in DB: ${existingBlocks.length}`);
   }
 
-  // Create blocks for new eligible events (or rebuild if times or rounding changed)
+  // Create blocks for new eligible events (or rebuild if times, rounding, or origin changed)
   for (const event of eligibleEvents) {
     const key = `${event.id}|${event.calendarEmail}`;
     const existing = blockByKey.get(key);
@@ -145,6 +198,11 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
       ? new Date(eventEnd.getTime() + 30 * 60 * 1000)
       : eventEnd;
 
+    // Detect the best origin: preceding event location within 4 hours, or home
+    const detectedOrigin = findSmartOrigin(rawEvents, event, homeAddress);
+    // customOrigin (user override) takes precedence over auto-detection
+    const effectiveOrigin = existing?.customOrigin ?? detectedOrigin;
+
     // Determine whether a rebuild is needed and whether we can reuse raw minutes
     let needsRebuild = true;
     let reuseRawToMinutes: number | null = null;
@@ -155,7 +213,13 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
         existing.eventStartAt.getTime() === eventStart.getTime() &&
         existing.eventEndAt.getTime() === eventEnd.getTime();
 
-      if (eventTimesMatch) {
+      // Origin changes trigger a rebuild (only when no custom override, since custom overrides
+      // are stable until explicitly changed via the admin API)
+      const existingEffectiveOrigin =
+        existing.customOrigin ?? existing.detectedOrigin ?? homeAddress;
+      const originChanged = effectiveOrigin !== existingEffectiveOrigin;
+
+      if (eventTimesMatch && !originChanged) {
         // null means the direction was never successfully calculated — treat as needing retry
         const toOk =
           existing.rawTravelMinutes !== null &&
@@ -178,7 +242,10 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
             );
         }
       } else {
-        if (isDev) console.log(`[travel] Rebuilding "${event.summary}" - event times changed`);
+        if (isDev)
+          console.log(
+            `[travel] Rebuilding "${event.summary}" - ${originChanged ? "origin changed" : "event times changed"}`,
+          );
       }
 
       if (needsRebuild) {
@@ -241,12 +308,15 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
         });
       }
 
-      // Back-fill summary if the stored value is missing or stale
+      // Keep summary and detectedOrigin up-to-date for display
       const currentSummary = event.summary ?? null;
-      if (existing.summary !== currentSummary) {
+      const updates: { summary?: string | null; detectedOrigin?: string | null } = {};
+      if (existing.summary !== currentSummary) updates.summary = currentSummary;
+      if (existing.detectedOrigin !== detectedOrigin) updates.detectedOrigin = detectedOrigin;
+      if (Object.keys(updates).length > 0) {
         await prisma.travelBlock.update({
           where: { id: existing.id },
-          data: { summary: currentSummary },
+          data: updates,
         });
       }
       continue;
@@ -255,32 +325,45 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
     // Effective destination: dedicated location field, or fall back to event title
     const eventLocation = (event.location ?? event.summary)!;
 
-    // Travel-to leg
+    // Per-block transport mode (default to transit if not set)
+    const travelMode = (existing?.transportMode ?? "transit") as TransportMode;
+
+    // Travel-to leg (from effectiveOrigin → event location)
     let rawTravelToMinutes: number | null = null;
     if (reuseRawToMinutes !== null) {
       rawTravelToMinutes = reuseRawToMinutes;
     } else {
-      if (isDev) console.log(`[travel] Calculating travel-to: ${homeAddress} → ${eventLocation}`);
-      rawTravelToMinutes = await calculateTravelMinutes(homeAddress, eventLocation, eventStart, {
-        useArrivalTime: true,
-      });
+      if (isDev)
+        console.log(
+          `[travel] Calculating travel-to: ${effectiveOrigin} → ${eventLocation} (${travelMode})`,
+        );
+      rawTravelToMinutes = await calculateTravelMinutes(
+        effectiveOrigin,
+        eventLocation,
+        eventStart,
+        {
+          useArrivalTime: true,
+          mode: travelMode,
+        },
+      );
       if (isDev)
         console.log(`[travel] Travel-to result: ${rawTravelToMinutes ?? "null (skipping)"} min`);
     }
 
-    // Travel-back leg
+    // Travel-back leg (always back to homeAddress)
     let rawTravelBackMinutes: number | null = null;
     if (reuseRawBackMinutes !== null) {
       rawTravelBackMinutes = reuseRawBackMinutes;
     } else {
       if (isDev)
         console.log(
-          `[travel] Calculating travel-back: ${eventLocation} → ${homeAddress} (depart ${departureForBack.toISOString()})`,
+          `[travel] Calculating travel-back: ${eventLocation} → ${homeAddress} (depart ${departureForBack.toISOString()}, ${travelMode})`,
         );
       rawTravelBackMinutes = await calculateTravelMinutes(
         eventLocation,
         homeAddress,
         departureForBack,
+        { mode: travelMode },
       );
       if (isDev)
         console.log(
@@ -378,6 +461,9 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
             rawTravelBackMinutes !== null ? Math.ceil(rawTravelBackMinutes / 15) * 15 : null,
           beforeEventId: storedBeforeId,
           afterEventId: storedAfterId,
+          transportMode: existing?.transportMode ?? null,
+          customOrigin: existing?.customOrigin ?? null,
+          detectedOrigin,
         },
       });
       console.log(`[refreshCalendarCache] Created travel blocks for event: ${event.id}`);

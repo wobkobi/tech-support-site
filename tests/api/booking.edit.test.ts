@@ -275,7 +275,7 @@ describe("POST /api/booking/edit", () => {
     const res = await POST(makeRequest({ ...VALID_BODY, phone: "021 123 4567" }));
     expect(res.status).toBe(200);
     const updateCall = mocks.bookingUpdate.mock.calls[0][0];
-    expect(updateCall.data.notes).toContain("Phone: 021 123 4567");
+    expect(updateCall.data.notes).toContain("Phone: +64211234567");
   });
 
   it("returns 500 when request.json() throws an unexpected error", async () => {

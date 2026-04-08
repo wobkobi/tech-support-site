@@ -45,11 +45,14 @@ function toReliableDeparture(departureTime: Date, now: Date): Date {
   return candidate;
 }
 
+/** Valid Google Distance Matrix travel modes. */
+export type TransportMode = "transit" | "driving" | "walking" | "bicycling";
+
 /**
- * Calculates public-transport travel time in minutes between two addresses.
- * When the departure/arrival time is more than {@link SCHEDULE_HORIZON_DAYS} days away,
- * the nearest upcoming date with the same day-of-week is used so that transit
- * schedule data is available.
+ * Calculates travel time in minutes between two addresses.
+ * When the departure/arrival time is more than {@link SCHEDULE_HORIZON_DAYS} days away
+ * and mode is transit, the nearest upcoming date with the same day-of-week is used so
+ * that transit schedule data is available.
  * Returns null if the API key is not configured, the route cannot be determined,
  * or any error occurs. Never throws.
  * @param origin - Starting address or coordinates.
@@ -57,13 +60,14 @@ function toReliableDeparture(departureTime: Date, now: Date): Date {
  * @param departureTime - Desired departure (or arrival) time for transit schedule lookup.
  * @param options - Optional flags.
  * @param options.useArrivalTime - When true, uses arrival_time instead of departure_time.
+ * @param options.mode - Travel mode (default: "transit").
  * @returns Travel time in minutes (ceiling), or null.
  */
 export async function calculateTravelMinutes(
   origin: string,
   destination: string,
   departureTime: Date,
-  options?: { useArrivalTime?: boolean },
+  options?: { useArrivalTime?: boolean; mode?: TransportMode },
 ): Promise<number | null> {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
   if (!apiKey) {
@@ -71,13 +75,18 @@ export async function calculateTravelMinutes(
     return null;
   }
 
-  const effectiveDeparture = toReliableDeparture(departureTime, new Date());
+  const mode: TransportMode = options?.mode ?? "transit";
+  // Only apply the schedule-horizon proxy for transit — driving/walking/cycling don't need it
+  const effectiveDeparture =
+    mode === "transit" ? toReliableDeparture(departureTime, new Date()) : departureTime;
 
   const url = new URL("https://maps.googleapis.com/maps/api/distancematrix/json");
   url.searchParams.set("origins", origin);
   url.searchParams.set("destinations", destination);
-  url.searchParams.set("mode", "transit");
-  const timeParam = options?.useArrivalTime ? "arrival_time" : "departure_time";
+  url.searchParams.set("mode", mode);
+  // arrival_time is only supported for transit mode
+  const timeParam =
+    options?.useArrivalTime && mode === "transit" ? "arrival_time" : "departure_time";
   url.searchParams.set(timeParam, Math.floor(effectiveDeparture.getTime() / 1000).toString());
   url.searchParams.set("key", apiKey);
 

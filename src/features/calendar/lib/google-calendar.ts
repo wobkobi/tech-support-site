@@ -189,6 +189,13 @@ export async function fetchAllCalendarEvents(
       const processedEvents: CalendarEvent[] = [];
 
       for (const event of events) {
+        // Skip cancelled events (organizer cancelled or event was deleted)
+        if (event.status === "cancelled") continue;
+
+        // Skip events the user has declined
+        const selfAttendee = event.attendees?.find((a) => a.self);
+        if (selfAttendee?.responseStatus === "declined") continue;
+
         if (event.start?.dateTime && event.end?.dateTime) {
           // Timed event - always block regardless of calendar
           processedEvents.push({

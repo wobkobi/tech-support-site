@@ -48,7 +48,7 @@ export async function importFromGoogleContacts(): Promise<number> {
     do {
       const response = await people.people.connections.list({
         resourceName: "people/me",
-        personFields: "names,emailAddresses,phoneNumbers,addresses",
+        personFields: "names,emailAddresses,phoneNumbers,addresses,organizations",
         pageSize: 100,
         ...(pageToken ? { pageToken } : {}),
       });
@@ -65,7 +65,10 @@ export async function importFromGoogleContacts(): Promise<number> {
         const phone = rawPhone ? toE164NZ(rawPhone) || rawPhone : null;
         const normPhone = rawPhone ? normalizePhone(toE164NZ(rawPhone) || rawPhone) : null;
         const name =
-          person.names?.[0]?.displayName?.trim() ?? person.names?.[0]?.givenName?.trim() ?? null;
+          person.names?.[0]?.displayName?.trim() ??
+          person.names?.[0]?.givenName?.trim() ??
+          person.organizations?.[0]?.name?.trim() ??
+          null;
         const address = person.addresses?.[0]?.formattedValue?.trim() ?? null;
 
         // Resolve email: direct from Google, or looked up via phone in ReviewRequest history.
@@ -95,12 +98,17 @@ export async function importFromGoogleContacts(): Promise<number> {
           try {
             const existing = await prisma.contact.findFirst({
               where: { phone },
-              select: { id: true },
+              select: { id: true, name: true },
             });
             if (existing) {
+              // Also update the name if it was set to the phone number as a placeholder.
+              const namePlaceholder = existing.name === phone || existing.name === normPhone;
               await prisma.contact.update({
                 where: { id: existing.id },
-                data: { googleContactId: resourceName },
+                data: {
+                  googleContactId: resourceName,
+                  ...(name && namePlaceholder ? { name } : {}),
+                },
               });
             } else {
               await prisma.contact.create({

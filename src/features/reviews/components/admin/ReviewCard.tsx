@@ -114,26 +114,30 @@ export function ReviewCard({
   return (
     <div className={cn(SOFT_CARD, "flex flex-col gap-3")}>
       {/* Header row */}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-russian-violet font-semibold">{formatReviewerName(row)}</span>
+      <div className={cn("flex flex-wrap items-center gap-2")}>
+        <span className={cn("text-russian-violet font-semibold")}>{formatReviewerName(row)}</span>
         {row.verified && (
-          <span className="bg-moonstone-600/20 text-moonstone-600 rounded-full px-2 py-0.5 text-xs font-medium">
+          <span
+            className={cn(
+              "bg-moonstone-600/20 text-moonstone-600 rounded-full px-2 py-0.5 text-xs font-medium",
+            )}
+          >
             Verified
           </span>
         )}
-        <span className="text-seasalt-300 ml-auto shrink-0 text-xs">
+        <span className={cn("ml-auto shrink-0 text-xs text-slate-400")}>
           {formatDate(row.createdAt)}
         </span>
       </div>
 
       {/* Review text */}
-      <p className="text-seasalt-100 leading-relaxed">{row.text}</p>
+      <p className={cn("leading-relaxed text-slate-700")}>{row.text}</p>
 
       {/* Error */}
-      {error && <p className="text-coquelicot-400 text-xs">{error}</p>}
+      {error && <p className={cn("text-coquelicot-400 text-xs")}>{error}</p>}
 
       {/* Actions */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className={cn("flex flex-wrap items-center gap-2")}>
         {`${row.firstName ?? ""} ${row.lastName ?? ""}`.toLowerCase().includes("test") && (
           <button
             onClick={() => {
@@ -142,7 +146,9 @@ export function ReviewCard({
               }
             }}
             disabled={loading !== null}
-            className="rounded-lg bg-red-500/20 px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-500/30 disabled:opacity-50"
+            className={cn(
+              "rounded-lg bg-red-500/20 px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-500/30 disabled:opacity-50",
+            )}
           >
             {loading === "delete" ? "Deleting…" : "Delete"}
           </button>
@@ -160,13 +166,13 @@ export function ReviewCard({
         )}
 
         {/* More actions menu (Revoke + Delete) */}
-        <div ref={menuRef} className="relative ml-auto">
+        <div ref={menuRef} className={cn("relative ml-auto")}>
           <button
             type="button"
             onClick={() => setMenuOpen((v) => !v)}
             disabled={loading !== null}
             className={cn(
-              "border-seasalt-400/60 hover:bg-seasalt-700 rounded-lg border px-3 py-1.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+              "rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50",
             )}
             aria-label="More actions"
           >
@@ -175,7 +181,7 @@ export function ReviewCard({
           {menuOpen && (
             <div
               className={cn(
-                "border-seasalt-400/30 bg-seasalt absolute right-0 z-10 mt-1 flex min-w-32 flex-col rounded-lg border shadow-lg",
+                "absolute right-0 z-10 mt-1 flex min-w-32 flex-col rounded-lg border border-slate-200 bg-white shadow-lg",
               )}
             >
               {onRevoke && (
@@ -187,7 +193,7 @@ export function ReviewCard({
                   }}
                   disabled={loading !== null}
                   className={cn(
-                    "text-rich-black hover:bg-seasalt-700 rounded-t-lg px-4 py-2 text-left text-sm font-medium transition-colors disabled:opacity-50",
+                    "rounded-t-lg px-4 py-2 text-left text-sm font-medium text-slate-800 transition-colors hover:bg-slate-100 disabled:opacity-50",
                   )}
                 >
                   {loading === "revoke" ? "Revoking…" : "Revoke"}
@@ -200,7 +206,7 @@ export function ReviewCard({
                     onRevoke ? "rounded-b-lg" : "rounded-lg",
                   )}
                 >
-                  <span className={cn("text-rich-black/60 text-xs")}>Delete permanently?</span>
+                  <span className={cn("text-xs text-slate-600")}>Delete permanently?</span>
                   <div className={cn("flex gap-3")}>
                     <button
                       type="button"
@@ -218,7 +224,7 @@ export function ReviewCard({
                     <button
                       type="button"
                       onClick={() => setConfirmDelete(false)}
-                      className={cn("text-rich-black/40 hover:text-rich-black/60 text-xs")}
+                      className={cn("text-xs text-slate-400 hover:text-slate-600")}
                     >
                       Cancel
                     </button>
