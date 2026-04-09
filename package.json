@@ -96,7 +96,8 @@
       "minimatch": "^10.2.1"
     },
     "basic-ftp": "5.2.1",
-    "vite": "^7.3.2"
+    "vite": "^7.3.2",
+    "typescript-eslint": "8.58.1"
   },
   "simple-git-hooks": {
     "pre-commit": "npm install && git add package-lock.json && npx lint-staged",
