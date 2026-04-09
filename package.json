@@ -1,6 +1,6 @@
 {
   "name": "tech-support-site",
-  "version": "1.15.1",
+  "version": "1.15.2",
   "private": true,
   "type": "module",
   "scripts": {
@@ -26,9 +26,9 @@
     "autoprefixer": "^10.4.27",
     "clsx": "^2.1.1",
     "googleapis": "^171.4.0",
-    "next": "^16.2.2",
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4",
+    "next": "^16.2.3",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
     "react-icons": "^5.6.0",
     "resend": "^6.10.0",
     "tailwind-merge": "^3.5.0"
@@ -37,7 +37,7 @@
     "canvas": "^3.2.3",
     "@eslint/eslintrc": "^3.3.5",
     "@eslint/js": "^9.0.0",
-    "@next/bundle-analyzer": "^16.2.2",
+    "@next/bundle-analyzer": "^16.2.3",
     "@prisma/client": "6.19.2",
     "@tailwindcss/postcss": "^4.2.2",
     "@testing-library/dom": "^10.4.1",
@@ -49,21 +49,21 @@
     "@types/node": "^25.5.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "@typescript-eslint/eslint-plugin": "8.58.0",
-    "@typescript-eslint/parser": "8.58.0",
-    "@vitest/coverage-v8": "^4.1.2",
+    "@typescript-eslint/eslint-plugin": "8.58.1",
+    "@typescript-eslint/parser": "8.58.1",
+    "@vitest/coverage-v8": "^4.1.4",
     "dotenv-cli": "^11.0.0",
     "eslint": "^9.0.0",
-    "eslint-config-next": "^16.2.2",
+    "eslint-config-next": "^16.2.3",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-jsdoc": "^62.9.0",
     "eslint-plugin-prettier": "^5.5.5",
     "eslint-plugin-react": "^7.37.5",
     "globals": "^17.4.0",
-    "jsdom": "^29.0.1",
+    "jsdom": "^29.0.2",
     "lint-staged": "^16.4.0",
     "pdf-lib": "^1.17.1",
-    "postcss": "^8.5.8",
+    "postcss": "^8.5.9",
     "prettier": "^3.8.1",
     "prettier-plugin-tailwindcss": "^0.7.2",
     "prisma": "^6.19.2",
@@ -74,7 +74,7 @@
     "tailwindcss": "^4.2.2",
     "tsx": "^4.21.0",
     "typescript": "latest",
-    "vitest": "^4.1.2"
+    "vitest": "^4.1.4"
   },
   "browserslist": [
     "chrome >= 93",
@@ -94,7 +94,10 @@
     },
     "glob": {
       "minimatch": "^10.2.1"
-    }
+    },
+    "basic-ftp": "5.2.1",
+    "vite": "^7.3.2",
+    "typescript-eslint": "8.58.1"
   },
   "simple-git-hooks": {
     "pre-commit": "npm install && git add package-lock.json && npx lint-staged",
