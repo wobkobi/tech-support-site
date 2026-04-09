@@ -43,7 +43,7 @@ export async function PATCH(
   }
   if (body.email !== undefined) {
     const trimmedEmail = body.email.trim().toLowerCase();
-    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+    if (trimmedEmail && !/^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/.test(trimmedEmail)) {
       return NextResponse.json({ error: "Please enter a valid email address." }, { status: 400 });
     }
     if (trimmedEmail) {
