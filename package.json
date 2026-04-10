@@ -64,7 +64,7 @@
     "lint-staged": "^16.4.0",
     "pdf-lib": "^1.17.1",
     "postcss": "^8.5.9",
-    "prettier": "^3.8.1",
+    "prettier": "^3.8.2",
     "prettier-plugin-tailwindcss": "^0.7.2",
     "prisma": "^6.19.2",
     "puppeteer": "^24.40.0",
