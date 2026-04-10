@@ -69,8 +69,8 @@ const faqItems: ReadonlyArray<FaqItem> = [
     answer: (
       <>
         <p>
-          I charge $50 per hour, but it depends on the complexity of the task. I'll give you a clear
-          estimate before starting so there are no surprises.
+          I charge $75 per hour. I'll give you a clear estimate before starting so there are no
+          surprises.
         </p>
         <p className={cn("text-rich-black/80 mt-2")}>
           See the{" "}
