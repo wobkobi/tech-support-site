@@ -47,7 +47,7 @@ export default function PricingPage(): React.ReactElement {
 
             <div className={cn("bg-seasalt-900/40 border-seasalt-400/60 rounded-lg border p-5")}>
               <p className={cn("text-russian-violet mb-2 text-3xl font-bold sm:text-4xl")}>
-                $50 per hour
+                $75 per hour
               </p>
               <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
                 Billed fairly for the time I work. On-site visits and most remote support - remote
