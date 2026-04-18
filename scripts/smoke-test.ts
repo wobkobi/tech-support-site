@@ -46,7 +46,7 @@ const PAGES: PageSpec[] = [
   {
     path: "/booking/cancel",
     name: "Booking Cancel (no token)",
-    // Client fires cancel API immediately — no-token 400 is expected
+    // Client fires cancel API immediately - no-token 400 is expected
     ignoreErrors: ["Missing cancel token", "Could not cancel"],
   },
   { path: "/booking/success", name: "Booking Success (no token)" },
@@ -65,7 +65,7 @@ const PAGES: PageSpec[] = [
 /** Warn (but don't fail) when TTFB exceeds this on a local production server. */
 const TTFB_WARN_MS = 1_500;
 
-/** Fail when TTFB exceeds this — something is clearly broken. */
+/** Fail when TTFB exceeds this - something is clearly broken. */
 const TTFB_FAIL_MS = 10_000;
 
 /**
@@ -104,7 +104,7 @@ function runBuild(): void {
 
 /**
  * Copies static assets and native modules into the standalone output directory.
- * Next.js standalone only bundles server JS — static files, public assets, and
+ * Next.js standalone only bundles server JS - static files, public assets, and
  * platform-specific native binaries (e.g. sharp) must be copied manually.
  */
 function copyStandaloneAssets(): void {
@@ -258,7 +258,7 @@ async function checkPage(browser: Browser, baseUrl: string, spec: PageSpec): Pro
  * @returns Formatted string.
  */
 function fmtMs(ms: number | null): string {
-  if (ms === null) return "  —  ";
+  if (ms === null) return "  -  ";
   const s = `${ms}ms`.padStart(7);
   return ms > TTFB_WARN_MS ? `${s} ⚠` : s;
 }
@@ -337,7 +337,7 @@ function printTable(results: PageResult[]): void {
       const result = await checkPage(browser, baseUrl, spec);
       results.push(result);
       const icon = result.status === "pass" ? "✓" : "✗";
-      process.stdout.write(`\r  ${icon} ${spec.path.padEnd(40)} ${result.ttfbMs ?? "—"}ms TTFB\n`);
+      process.stdout.write(`\r  ${icon} ${spec.path.padEnd(40)} ${result.ttfbMs ?? "-"}ms TTFB\n`);
     }
 
     printTable(results);
@@ -356,7 +356,7 @@ function printTable(results: PageResult[]): void {
   } finally {
     await browser?.close();
     if (server?.pid) {
-      // On Windows, SIGTERM doesn't propagate to child processes — use taskkill to
+      // On Windows, SIGTERM doesn't propagate to child processes - use taskkill to
       // kill the whole process tree so the Prisma DLL is released before npm can update it.
       try {
         execSync(`taskkill //F //T //PID ${server.pid}`, { stdio: "ignore" });

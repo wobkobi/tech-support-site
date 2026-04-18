@@ -94,7 +94,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           if (phone) contactId = contactIdByPhone.get(phone);
         }
       } else if (review.customerRef) {
-        // customerRef is a reviewToken UUID — look it up via ReviewRequest
+        // customerRef is a reviewToken UUID - look it up via ReviewRequest
         const email = rrEmailByToken.get(review.customerRef);
         if (email) contactId = contactIdByEmail.get(email);
         if (!contactId) {

@@ -101,7 +101,7 @@ async function authorise(
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
 console.log("\n=== Google OAuth Re-authorisation (dev + prod) ===");
-console.log("You will authorise twice — once for dev, once for prod.");
+console.log("You will authorise twice - once for dev, once for prod.");
 console.log("Make sure both redirect URIs are registered in Google Cloud Console.\n");
 
 (async () => {

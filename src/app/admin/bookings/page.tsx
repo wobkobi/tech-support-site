@@ -14,7 +14,7 @@ import {
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Calendar — Admin",
+  title: "Calendar - Admin",
   robots: { index: false, follow: false },
 };
 

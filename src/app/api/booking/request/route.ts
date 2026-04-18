@@ -260,7 +260,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           });
         }
         const contact = existing;
-        // Best-effort sync to Google Contacts — never fail the booking if it errors.
+        // Best-effort sync to Google Contacts - never fail the booking if it errors.
         await syncContactToGoogle(contact.id);
       } catch (contactError) {
         console.error("[booking/request] Failed to upsert contact:", contactError);

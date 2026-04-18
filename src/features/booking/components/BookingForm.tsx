@@ -114,7 +114,7 @@ export default function BookingForm({
         setContactHint(`Pre-filled from your previous booking: ${filled.join(", ")}.`);
       }
     } catch {
-      // Silently ignore — pre-fill is best-effort
+      // Silently ignore - pre-fill is best-effort
     }
   }
 
@@ -463,7 +463,7 @@ export default function BookingForm({
                   })}
                 </div>
 
-                {/* Sub-slot picker — shown once an hour is selected */}
+                {/* Sub-slot picker - shown once an hour is selected */}
                 {selectedTime &&
                   (() => {
                     const activeWindow = selectedDay.timeWindows.find(

@@ -56,7 +56,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
 
     /**
-     * Upserts a Contact for a given email — best effort, never blocks the response.
+     * Upserts a Contact for a given email - best effort, never blocks the response.
      * @param contactEmail - Normalised email address.
      * @param contactName - Contact name from the ReviewRequest.
      */

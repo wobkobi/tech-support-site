@@ -30,13 +30,13 @@ export function RecalculateButton({ token }: RecalculateButtonProps): React.Reac
       });
       const data = (await res.json()) as { ok: boolean; cachedCount?: number; error?: string };
       if (data.ok) {
-        setResult(`Done — ${data.cachedCount ?? 0} events cached.`);
+        setResult(`Done - ${data.cachedCount ?? 0} events cached.`);
         router.refresh();
       } else {
         setResult(`Error: ${data.error ?? "unknown"}`);
       }
     } catch {
-      setResult("Network error — try again.");
+      setResult("Network error - try again.");
     } finally {
       setRecalculating(false);
     }

@@ -139,7 +139,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (!contact || seenRev.has(contact.id)) continue;
     seenRev.add(contact.id);
 
-    // If the review has no last name, don't flag a name conflict — the reviewer's
+    // If the review has no last name, don't flag a name conflict - the reviewer's
     // choice of display name (first name only) is not a suggestion to drop the
     // contact's last name.
     if (!review.lastName) continue;

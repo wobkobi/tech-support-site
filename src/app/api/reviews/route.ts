@@ -104,7 +104,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         verified = true;
         bookingId = booking.id;
         customerRef = booking.reviewToken;
-        // Auto-link to Contact by booking email — best effort, never fails the submission.
+        // Auto-link to Contact by booking email - best effort, never fails the submission.
         try {
           const contact = await prisma.contact.findFirst({
             where: { email: booking.email.toLowerCase() },
