@@ -17,8 +17,8 @@
     "build:poster": "npx tsx scripts/export-poster-screenshot.ts",
     "build:all": "npm run build:icons && npm run build",
     "test": "vitest",
-    "smoke": "tsx scripts/smoke-test.ts",
-    "smoke:fast": "tsx scripts/smoke-test.ts --skip-build"
+    "smoke": "dotenv -e .env.local -- tsx scripts/smoke-test.ts",
+    "smoke:fast": "dotenv -e .env.local -- tsx scripts/smoke-test.ts --skip-build"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",
