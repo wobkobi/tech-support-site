@@ -668,7 +668,7 @@ export function ContactAdminList({
         </a>
       </div>
 
-      {/* New contacts — added in the last 7 days */}
+      {/* New contacts - added in the last 7 days */}
       {newContacts.length > 0 && (
         <div className={cn("flex flex-col gap-3")}>
           <h3
@@ -691,7 +691,7 @@ export function ContactAdminList({
         </div>
       )}
 
-      {/* Unsynced contacts — shown prominently */}
+      {/* Unsynced contacts - shown prominently */}
       {unsynced.length > 0 ? (
         <div className={cn("flex flex-col gap-3")}>
           <h3 className={cn("text-russian-violet text-xs font-semibold uppercase tracking-wide")}>
@@ -705,7 +705,7 @@ export function ContactAdminList({
         <p className={cn("text-sm text-slate-400")}>All contacts are synced to Google.</p>
       )}
 
-      {/* Synced contacts — collapsible */}
+      {/* Synced contacts - collapsible */}
       {synced.length > 0 && (
         <div className={cn("flex flex-col gap-3")}>
           <button

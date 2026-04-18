@@ -14,7 +14,7 @@ import { SendReviewLinkForm } from "@/features/reviews/components/admin/SendRevi
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Reviews — Admin",
+  title: "Reviews - Admin",
   robots: { index: false, follow: false },
 };
 

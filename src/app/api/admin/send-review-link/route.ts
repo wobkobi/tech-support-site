@@ -91,7 +91,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       },
     });
 
-    // Upsert a Contact record — best effort, never blocks.
+    // Upsert a Contact record - best effort, never blocks.
     if (mode === "email" && reviewRequest.email) {
       try {
         const exists = await prisma.contact.findFirst({ where: { email: reviewRequest.email } });

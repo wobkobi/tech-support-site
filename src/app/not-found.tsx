@@ -20,7 +20,7 @@ const MESSAGES = [
   "Page not found. It's probably hiding in the same place as your TV remote.",
   "This page crashed harder than a Windows update at the worst time.",
   "Last seen heading toward the recycle bin.",
-  "This page has gone the way of Internet Explorer — fondly remembered by no one.",
+  "This page has gone the way of Internet Explorer - fondly remembered by no one.",
   "Like Bluetooth headphones at 2%, this page has quietly given up.",
   "This URL is about as useful as a printer at 3am.",
   "This page has as many bars as your phone in the kitchen.",

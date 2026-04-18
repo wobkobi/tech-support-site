@@ -229,7 +229,7 @@ export function SendReviewLinkForm({
 
       {open && (
         <div className={cn("mt-4 flex flex-col gap-3")}>
-          {/* Contact picker — only shown when there are suggestions */}
+          {/* Contact picker - only shown when there are suggestions */}
           {contactSuggestions.length > 0 && (
             <div className={cn("flex flex-col gap-1")}>
               <label className={cn("text-xs font-medium text-slate-500")}>
@@ -254,7 +254,7 @@ export function SendReviewLinkForm({
                   "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-1",
                 )}
               >
-                <option value="">— select to pre-fill —</option>
+                <option value="">- select to pre-fill -</option>
                 {contactSuggestions
                   .filter((c) => {
                     const q = contactSearch.toLowerCase();
@@ -344,7 +344,7 @@ export function SendReviewLinkForm({
           {mode === "email" && previewHtml && (
             <div className={cn("flex flex-col gap-3")}>
               <p className={cn("text-xs font-semibold uppercase tracking-wide text-slate-500")}>
-                Preview — sending to {email}
+                Preview - sending to {email}
               </p>
               <iframe
                 srcDoc={previewHtml}
