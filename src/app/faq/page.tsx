@@ -69,7 +69,7 @@ const faqItems: ReadonlyArray<FaqItem> = [
     answer: (
       <>
         <p>
-          $50/h for most jobs. $75/h for complex or lengthy work — data recovery, hardware repairs,
+          $50/h for most jobs. $75/h for complex or lengthy work - data recovery, hardware repairs,
           or full PC migrations. I'll confirm the rate before starting.
         </p>
         <p className={cn("text-rich-black/80 mt-2")}>

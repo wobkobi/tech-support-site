@@ -242,7 +242,7 @@ export async function fetchAllCalendarEvents(
 
   if (errorCount === calendarIds.length) {
     throw new Error(
-      `Failed to fetch events from all ${calendarIds.length} calendars — check API credentials`,
+      `Failed to fetch events from all ${calendarIds.length} calendars - check API credentials`,
     );
   }
 

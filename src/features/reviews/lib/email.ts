@@ -6,7 +6,7 @@
 
 import { Resend } from "resend";
 
-// Lazy singleton — created on first use so module import never throws in test environments.
+// Lazy singleton - created on first use so module import never throws in test environments.
 let _resend: Resend | null = null;
 /**
  * Returns the shared Resend client, initialising it on first call.

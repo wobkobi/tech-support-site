@@ -1,7 +1,7 @@
 // src/app/booking/cancel/page.tsx
 /**
  * @file page.tsx
- * @description Booking cancel page. Statically rendered shell — token is read
+ * @description Booking cancel page. Statically rendered shell - token is read
  * client-side via useSearchParams, so this page has no server-side dependencies.
  */
 

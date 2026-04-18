@@ -196,7 +196,7 @@ describe("POST /api/admin/contacts/enrich-from-reviews", () => {
   it("uses only the most recent ReviewRequest per contact (first in desc order)", async () => {
     mocks.contactFindMany.mockResolvedValue([CONTACT]);
     mocks.reviewRequestFindMany.mockResolvedValue([
-      // Most recent first — this one should win
+      // Most recent first - this one should win
       { id: "rr-new", name: "Alice S.", email: "alice@example.com", phone: null },
       { id: "rr-old", name: "A. Smith", email: "alice@example.com", phone: null },
     ]);
@@ -250,7 +250,7 @@ describe("POST /api/admin/contacts/enrich-from-reviews", () => {
     mocks.contactFindMany.mockResolvedValue([CONTACT]);
     mocks.reviewRequestFindMany.mockResolvedValue([]);
     mocks.reviewFindMany.mockResolvedValue([
-      // Reviewer chose to display only their first name — don't suggest dropping "Smith"
+      // Reviewer chose to display only their first name - don't suggest dropping "Smith"
       { id: "rev-1", firstName: "Alice", lastName: null, customerRef: "alice@example.com" },
     ]);
     const res = await POST(makeRequest());

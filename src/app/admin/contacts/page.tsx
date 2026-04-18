@@ -12,7 +12,7 @@ import { autoMaintain } from "@/features/admin/lib/auto-maintain";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Contacts — Admin",
+  title: "Contacts - Admin",
   robots: { index: false, follow: false },
 };
 

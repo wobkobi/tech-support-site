@@ -3,9 +3,9 @@ import { autoMaintain } from "@/features/admin/lib/auto-maintain";
 import type { PrismaClient } from "@prisma/client";
 
 // autoMaintain(prisma) calls three internal phases sequentially:
-//   1. backfillContacts  — creates Contact records from Bookings/ReviewRequests
-//   2. matchReviewContacts — links unlinked Reviews to Contacts
-//   3. autoEnrich — fills missing fields and returns conflict entries
+//   1. backfillContacts  - creates Contact records from Bookings/ReviewRequests
+//   2. matchReviewContacts - links unlinked Reviews to Contacts
+//   3. autoEnrich - fills missing fields and returns conflict entries
 
 /**
  * Creates a minimal Prisma mock pre-seeded with test data for all three autoMaintain phases.

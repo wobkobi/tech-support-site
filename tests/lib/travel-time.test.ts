@@ -122,7 +122,7 @@ describe("calculateTravelMinutes", () => {
     });
 
     // now = Saturday 23:30 UTC; departure is a Sunday far in the future at 00:15 UTC.
-    // candidate = tomorrow (Sunday) at 00:15 UTC, which is only 45 min from now —
+    // candidate = tomorrow (Sunday) at 00:15 UTC, which is only 45 min from now -
     // within the 1 h safety margin → must be bumped an extra week.
     const fakeNow = new Date("2026-03-28T23:30:00Z"); // Saturday
     vi.setSystemTime(fakeNow);
@@ -156,7 +156,7 @@ describe("calculateTravelMinutes", () => {
     const fakeNow = new Date("2026-03-27T10:00:00Z"); // Friday UTC
     vi.setSystemTime(fakeNow);
 
-    // Event on Tuesday 2026-04-14 at 12:00 UTC — 18 days away, beyond 7-day horizon
+    // Event on Tuesday 2026-04-14 at 12:00 UTC - 18 days away, beyond 7-day horizon
     const farDeparture = new Date("2026-04-14T12:00:00Z"); // Tuesday UTC
     await calculateTravelMinutes("home", "dest", farDeparture);
 
