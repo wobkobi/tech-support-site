@@ -26,6 +26,8 @@ import BookingForm, {
 } from "@/features/booking/components/BookingForm";
 import { FrostedSection, PageShell, CARD } from "@/shared/components/PageLayout";
 
+export const dynamic = "force-dynamic";
+
 /**
  * Derive NZ dateKey (YYYY-MM-DD) from a UTC Date.
  * @param date - UTC date object.
