@@ -101,7 +101,7 @@
   },
   "simple-git-hooks": {
     "pre-commit": "npm install && git add package-lock.json && npx lint-staged",
-    "pre-push": "npm run smoke:fast"
+    "pre-push": "npm run test -- --run && npm run build && npm run smoke:fast"
   },
   "lint-staged": {
     "**/*.{js,jsx,ts,tsx}": [
