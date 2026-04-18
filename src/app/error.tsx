@@ -17,7 +17,7 @@ const MESSAGES = [
   "Something broke. Which is ironic, given that fixing broken things is literally my job.",
   "The website has done the digital equivalent of tripping over nothing.",
   "An error occurred. No, turning your screen off and on won't help. But it won't hurt either.",
-  "Something went wrong — and unlike your printer, it's not out of paper.",
+  "Something went wrong - and unlike your printer, it's not out of paper.",
   "Well, this is embarrassing. The website is having a moment.",
   "The code gremlins struck again. I'll sort them out.",
   "This error is more unexpected than a Windows update at 8am.",

@@ -81,7 +81,7 @@ export async function importFromGoogleContacts(): Promise<number> {
             if (existing) {
               await prisma.contact.update({
                 where: { id: existing.id },
-                // Local name/phone/address are the source of truth — only link the resource name.
+                // Local name/phone/address are the source of truth - only link the resource name.
                 data: { googleContactId: resourceName },
               });
             } else {
@@ -94,7 +94,7 @@ export async function importFromGoogleContacts(): Promise<number> {
             console.error(`[google-contacts] Failed to import contact ${email}:`, upsertError);
           }
         } else if (normPhone) {
-          // No email anywhere — create a phone-only contact or link to an existing one.
+          // No email anywhere - create a phone-only contact or link to an existing one.
           try {
             const existing = await prisma.contact.findFirst({
               where: { phone },
@@ -171,7 +171,7 @@ function splitName(fullName: string): { givenName: string; familyName: string } 
  * Creates or updates a contact in Google Contacts.
  * - If `googleContactId` is provided, updates the existing contact (fetching etag first).
  * - Otherwise searches by email; updates if found, creates if not.
- * Never throws — returns null on any error.
+ * Never throws - returns null on any error.
  * @param params - Contact data to sync.
  * @returns The Google People API resource name, or null on error.
  */
@@ -181,7 +181,7 @@ export async function upsertToGoogleContacts(params: UpsertContactParams): Promi
 
     const { givenName, familyName } = splitName(params.name);
 
-    // Full body used only when CREATING a new contact — includes the local name.
+    // Full body used only when CREATING a new contact - includes the local name.
     const createBody = {
       names: [{ displayName: params.name, givenName, familyName }],
       emailAddresses: [{ value: params.email }],
@@ -189,7 +189,7 @@ export async function upsertToGoogleContacts(params: UpsertContactParams): Promi
       ...(params.address ? { addresses: [{ formattedValue: params.address }] } : {}),
     };
 
-    // Base update fields — always sync email, phone, address.
+    // Base update fields - always sync email, phone, address.
     // `names` is added only when the existing Google contact has no name.
     const baseUpdateBody = {
       emailAddresses: [{ value: params.email }],
@@ -290,7 +290,7 @@ export async function upsertToGoogleContacts(params: UpsertContactParams): Promi
       console.error("[google-contacts] Search failed, will attempt create:", searchError);
     }
 
-    // Create a new contact — use the full body including name.
+    // Create a new contact - use the full body including name.
     const created = await people.people.createContact({
       requestBody: createBody,
     });
@@ -323,7 +323,7 @@ export async function syncAllContactsToGoogle(): Promise<number> {
 /**
  * Loads a contact from the local DB and syncs it to Google Contacts.
  * Updates `googleContactId` in the DB if it changed.
- * Never throws — all errors are logged and swallowed.
+ * Never throws - all errors are logged and swallowed.
  * @param contactId - The local DB contact ID to sync.
  * @returns Promise that resolves when the sync attempt is complete.
  */
@@ -337,7 +337,7 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
       return;
     }
     if (!contact.email) {
-      // Phone-only contacts have no email — they are imported FROM Google, not pushed to it.
+      // Phone-only contacts have no email - they are imported FROM Google, not pushed to it.
       return;
     }
 

@@ -245,7 +245,7 @@ export function TravelBlockAdminList({
                 {(b.rawTravelMinutes === null || b.rawTravelBackMinutes === null) &&
                   b.transportMode !== null && (
                     <p className={cn("mt-1 text-xs text-amber-500")}>
-                      Mode changed — recalculate to update travel times
+                      Mode changed - recalculate to update travel times
                     </p>
                   )}
               </div>
@@ -338,7 +338,7 @@ export function TravelBlockAdminList({
                 {(b.rawTravelMinutes === null || b.rawTravelBackMinutes === null) &&
                   b.customOrigin !== null && (
                     <p className={cn("mt-1 text-xs text-amber-500")}>
-                      Origin changed — recalculate to update travel times
+                      Origin changed - recalculate to update travel times
                     </p>
                   )}
               </div>

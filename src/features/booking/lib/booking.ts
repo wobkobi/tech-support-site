@@ -135,7 +135,7 @@ function isSlotFree(
 
   // Check calendar events.
   // Travel blocks (synthetic entries) already represent padding, so no additional
-  // buffer is applied to them — only real calendar events get the bufferMin gap.
+  // buffer is applied to them - only real calendar events get the bufferMin gap.
   for (const event of calendarEvents) {
     const isTravelBlock =
       event.id.startsWith("travel-before:") || event.id.startsWith("travel-after:");
