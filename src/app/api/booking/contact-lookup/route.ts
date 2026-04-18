@@ -10,7 +10,7 @@ import { prisma } from "@/shared/lib/prisma";
 /**
  * GET /api/booking/contact-lookup?email=<email>
  * Returns name, phone, and address for a known contact email.
- * Returns 404 (ok: false) if not found — never exposes other contact fields.
+ * Returns 404 (ok: false) if not found - never exposes other contact fields.
  * @param request - Incoming request.
  * @returns JSON with contact fields or not-found response.
  */

@@ -69,7 +69,7 @@ export default function AddressAutocomplete({
 
     const apiKey = process.env.GOOGLE_MAPS_API_KEY;
     if (!apiKey) {
-      console.warn("GOOGLE_MAPS_API_KEY not set — address autocomplete disabled.");
+      console.warn("GOOGLE_MAPS_API_KEY not set - address autocomplete disabled.");
       const timer = setTimeout(() => setApiKeyMissing(true), 0);
       return () => clearTimeout(timer);
     }
@@ -195,7 +195,7 @@ export default function AddressAutocomplete({
           <span className={cn("mt-0.5")}>⚠️</span>
           <span>
             Address autocomplete unavailable. Please type your full address manually. (Failed to
-            load Google Maps — check Application restrictions in Google Cloud Console)
+            load Google Maps - check Application restrictions in Google Cloud Console)
           </span>
         </p>
       )}

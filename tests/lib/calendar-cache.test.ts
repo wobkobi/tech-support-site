@@ -261,7 +261,7 @@ describe("refreshCalendarCache", () => {
       { mode: "transit" },
     );
 
-    // Cache entries written with synthetic IDs — no Google Calendar writes
+    // Cache entries written with synthetic IDs - no Google Calendar writes
     expect(mocks.calendarEventCacheUpsert).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
@@ -480,7 +480,7 @@ describe("refreshCalendarCache", () => {
 
   it("falls back to home when no preceding event is within 4 hours", async () => {
     const farPastEnd = new Date(Date.now() + 1 * 60 * 60 * 1000).toISOString(); // 1h from now
-    // Target starts 6 hours after preceding event ends — outside the 4-hour window
+    // Target starts 6 hours after preceding event ends - outside the 4-hour window
     const futureStart = new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString();
     const futureEnd = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString();
 

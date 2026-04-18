@@ -181,7 +181,7 @@ export default async function EditBookingPage({
   const nzHour = getNZHour(booking.startAt);
   const matchedSlot = TIME_OF_DAY_OPTIONS.find((t) => t.startHour === nzHour);
   const timeOfDay: TimeOfDay = (matchedSlot?.value ?? "10am") as TimeOfDay;
-  // Minutes are timezone-independent — preserve the sub-slot offset
+  // Minutes are timezone-independent - preserve the sub-slot offset
   const startMinute = (booking.startAt.getUTCMinutes() as StartMinute) ?? 0;
 
   const { userNotes, meetingType, address, phone } = parseBookingNotes(booking.notes);

@@ -27,7 +27,7 @@ function parseNotes(notes: string | null): { phone: string | null; address: stri
  * POST /api/admin/contacts/backfill
  * Scans all Bookings and ReviewRequests, and upserts a Contact for each unique email.
  * For each email, the most recent Booking or ReviewRequest is used as the source of truth.
- * Existing contacts are never overwritten — admin edits take precedence.
+ * Existing contacts are never overwritten - admin edits take precedence.
  * Requires X-Admin-Secret header.
  * @param request - Incoming request.
  * @returns JSON with upserted count.
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   >();
   const mergedByPhone = new Map<string, { name: string; email: null; phone: string }>();
 
-  // 1. Bookings (sorted ascending — most recent wins the Map)
+  // 1. Bookings (sorted ascending - most recent wins the Map)
   const bookings = await prisma.booking.findMany({
     orderBy: { createdAt: "asc" },
     select: { name: true, email: true, notes: true },
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     mergedByEmail.set(b.email.toLowerCase(), { name: b.name, email: b.email, phone, address });
   }
 
-  // 2. ReviewRequests — email-based and phone-only (sorted ascending — most recent wins)
+  // 2. ReviewRequests - email-based and phone-only (sorted ascending - most recent wins)
   const reviewRequests = await prisma.reviewRequest.findMany({
     orderBy: { createdAt: "asc" },
     select: { name: true, email: true, phone: true },

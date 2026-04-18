@@ -24,11 +24,11 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz";
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "To The Point Tech — Local IT & Computer Support Auckland",
+    default: "To The Point Tech - Local IT & Computer Support Auckland",
     template: "%s | To The Point Tech",
   },
   description:
-    "Local IT & computer support in Auckland. Same-day, evening & weekend appointments available. No jargon — clear fixes for computers, Wi-Fi, phones, printers, and more.",
+    "Local IT & computer support in Auckland. Same-day, evening & weekend appointments available. No jargon - clear fixes for computers, Wi-Fi, phones, printers, and more.",
   applicationName: "To The Point Tech",
   authors: [{ name: "Harrison Raynes" }],
   alternates: {
@@ -141,7 +141,7 @@ export default function RootLayout({
     url: siteUrl,
     image: `${siteUrl}/og-1200x630.jpg`,
     description:
-      "Local IT & computer support in Auckland. Same-day, evening & weekend appointments. No jargon — clear fixes for computers, Wi-Fi, phones, printers, and more.",
+      "Local IT & computer support in Auckland. Same-day, evening & weekend appointments. No jargon - clear fixes for computers, Wi-Fi, phones, printers, and more.",
     telephone: "+64-21-297-1237",
     email: "harrison@tothepoint.co.nz",
     founder: { "@type": "Person", name: "Harrison Raynes" },

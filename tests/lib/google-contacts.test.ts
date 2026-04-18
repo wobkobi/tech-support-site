@@ -148,7 +148,7 @@ describe("importFromGoogleContacts", () => {
       },
     });
     await importFromGoogleContacts();
-    // Must update only googleContactId — never name/phone/address
+    // Must update only googleContactId - never name/phone/address
     expect(mocks.contactUpdate).toHaveBeenCalledWith({
       where: { id: "existing-1" },
       data: { googleContactId: "people/1" },
@@ -390,7 +390,7 @@ describe("upsertToGoogleContacts", () => {
         requestBody: expect.objectContaining({ etag: "etag-abc" }),
       }),
     );
-    // names must NOT be sent — existing Google name is preserved
+    // names must NOT be sent - existing Google name is preserved
     const call = mocks.updateContact.mock.calls[0][0] as { requestBody: Record<string, unknown> };
     expect(call.requestBody).not.toHaveProperty("names");
     expect(mocks.searchContacts).not.toHaveBeenCalled();
@@ -429,7 +429,7 @@ describe("upsertToGoogleContacts", () => {
     expect(result).toBe("people/created-1");
   });
 
-  it("updates a contact found by search (has existing name — name not replaced)", async () => {
+  it("updates a contact found by search (has existing name - name not replaced)", async () => {
     mocks.searchContacts.mockResolvedValue({
       data: {
         results: [
@@ -457,7 +457,7 @@ describe("upsertToGoogleContacts", () => {
         updatePersonFields: "emailAddresses,phoneNumbers,addresses",
       }),
     );
-    // names must NOT be sent — existing Google name is preserved
+    // names must NOT be sent - existing Google name is preserved
     const call = mocks.updateContact.mock.calls[0][0] as { requestBody: Record<string, unknown> };
     expect(call.requestBody).not.toHaveProperty("names");
     expect(mocks.createContact).not.toHaveBeenCalled();

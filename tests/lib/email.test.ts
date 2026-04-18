@@ -7,7 +7,7 @@ const mockSend = vi.hoisted(() =>
 );
 
 // Mock Resend before importing email.ts so the lazy singleton picks up the mock.
-// Must use a regular function (not an arrow function) — arrow functions cannot be
+// Must use a regular function (not an arrow function) - arrow functions cannot be
 // used as constructors with `new`.
 vi.mock("resend", () => ({
   Resend: vi.fn().mockImplementation(function () {

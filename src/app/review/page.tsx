@@ -12,7 +12,7 @@ import { Button } from "@/shared/components/Button";
 import { cn } from "@/shared/lib/cn";
 import { prisma } from "@/shared/lib/prisma";
 
-// This page reads searchParams so it is always dynamic — revalidate has no effect.
+// This page reads searchParams so it is always dynamic - revalidate has no effect.
 export const dynamic = "force-dynamic";
 
 /**
@@ -56,7 +56,7 @@ export default async function ReviewPage({
         where: { reviewToken: token },
         select: { id: true, name: true, email: true, phone: true, reviewSubmittedAt: true },
       }),
-      // Fetch speculatively — only used if the token maps to an already-reviewed source
+      // Fetch speculatively - only used if the token maps to an already-reviewed source
       prisma.review.findFirst({
         where: { customerRef: token },
         select: { id: true, text: true, firstName: true, lastName: true, isAnonymous: true },
