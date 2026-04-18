@@ -15,7 +15,7 @@ interface ResolveBody {
   contactId: string;
   /** Source record ID to write back to. */
   sourceId: string;
-  /** Source type — determines which table to update. */
+  /** Source type - determines which table to update. */
   source: "ReviewRequest" | "Booking" | "Review";
   /** Fields and their chosen values. */
   name?: string;
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         await prisma.booking.update({ where: { id: sourceId }, data: bookingUpdate });
       }
     } else if (source === "Review") {
-      // Reviews store name as firstName/lastName — only name conflicts arise from Reviews.
+      // Reviews store name as firstName/lastName - only name conflicts arise from Reviews.
       if (name !== undefined) {
         const parts = name.trim().split(/\s+/);
         const firstName = parts.slice(0, -1).join(" ") || parts[0] || null;

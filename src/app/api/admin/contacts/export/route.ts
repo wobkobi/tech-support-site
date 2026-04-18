@@ -102,7 +102,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       csvCell(""), // Birthday
       csvCell(""), // Notes
       csvCell(""), // Photo
-      csvCell("* myContacts"), // Labels — places contact in the My Contacts group
+      csvCell("* myContacts"), // Labels - places contact in the My Contacts group
       csvCell(c.email ? "* " : ""), // E-mail 1 - Label (* = primary)
       csvCell(c.email), // E-mail 1 - Value
       csvCell(""), // Phone 1 - Label

@@ -188,7 +188,7 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
     const eventStart = new Date(event.start);
     const eventEnd = new Date(event.end);
 
-    // Synthetic cache IDs — never written to Google Calendar
+    // Synthetic cache IDs - never written to Google Calendar
     const beforeId = `travel-before:${event.id}`;
     const afterId = `travel-after:${event.id}`;
 
@@ -220,7 +220,7 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
       const originChanged = effectiveOrigin !== existingEffectiveOrigin;
 
       if (eventTimesMatch && !originChanged) {
-        // null means the direction was never successfully calculated — treat as needing retry
+        // null means the direction was never successfully calculated - treat as needing retry
         const toOk =
           existing.rawTravelMinutes !== null &&
           Math.ceil(existing.rawTravelMinutes / 15) * 15 === (existing.roundedMinutes ?? -1);
@@ -233,7 +233,7 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
           if (isDev) console.log(`[travel] Skipping "${event.summary}" - unchanged`);
           needsRebuild = false;
         } else {
-          // Rounding formula changed or a direction was never calculated — reuse what we have
+          // Rounding formula changed or a direction was never calculated - reuse what we have
           reuseRawToMinutes = existing.rawTravelMinutes;
           reuseRawBackMinutes = existing.rawTravelBackMinutes;
           if (isDev)

@@ -28,7 +28,7 @@ export async function autoMaintain(prisma: PrismaClient): Promise<ConflictEntry[
  * Creates a Contact for every unique email found in Booking or ReviewRequest records
  * that does not already have a corresponding Contact.
  * Also merges phone-only contacts into their email-based counterpart when both share
- * the same phone number. Existing contacts are never overwritten otherwise —
+ * the same phone number. Existing contacts are never overwritten otherwise -
  * admin edits are the source of truth.
  * @param prisma - Prisma client instance.
  */
@@ -85,7 +85,7 @@ async function backfillContacts(prisma: PrismaClient): Promise<void> {
   const existingPhones = new Set(
     existing.filter((c) => c.phone).map((c) => normalizePhone(toE164NZ(c.phone!) || c.phone!)),
   );
-  // Remaining phone-only contacts (post-merge) — used to merge-on-create below
+  // Remaining phone-only contacts (post-merge) - used to merge-on-create below
   const phoneOnlyByNorm = new Map<string, (typeof existing)[number]>();
   for (const c of existing) {
     if (!c.email && c.phone) {
@@ -100,7 +100,7 @@ async function backfillContacts(prisma: PrismaClient): Promise<void> {
   >();
   const toCreateByPhone = new Map<string, { name: string; email: null; phone: string }>();
 
-  // Bookings sorted asc — most recent overwrites earlier entries in the Map
+  // Bookings sorted asc - most recent overwrites earlier entries in the Map
   for (const b of bookings) {
     const email = b.email.toLowerCase();
     if (existingEmails.has(email)) continue;
@@ -108,7 +108,7 @@ async function backfillContacts(prisma: PrismaClient): Promise<void> {
     toCreateByEmail.set(email, { name: b.name, email, phone: b.phone ?? null, address });
   }
 
-  // ReviewRequests sorted asc — email-based update existing map, phone-only go in separate map
+  // ReviewRequests sorted asc - email-based update existing map, phone-only go in separate map
   for (const rr of reviewRequests) {
     if (rr.email) {
       const email = rr.email.toLowerCase();
@@ -315,7 +315,7 @@ async function autoEnrich(prisma: PrismaClient): Promise<ConflictEntry[]> {
   const nameUpdates = new Map<string, string>();
   const addressUpdates = new Map<string, string>();
 
-  // ReviewRequests — newest first per contact: fill phone, detect conflicts
+  // ReviewRequests - newest first per contact: fill phone, detect conflicts
   for (const rr of reviewRequests) {
     const contact = findContact(rr.email, rr.phone);
     if (!contact) continue;
@@ -347,7 +347,7 @@ async function autoEnrich(prisma: PrismaClient): Promise<ConflictEntry[]> {
       const proposedName = proposedNameRR;
       const contactNameLower = contact.name.toLowerCase();
       const proposedNameLower = proposedName.toLowerCase();
-      // Only flag a name conflict when the proposed name is genuinely different —
+      // Only flag a name conflict when the proposed name is genuinely different -
       // not when it is simply the contact's first name without the last name.
       if (
         proposedName &&
@@ -377,7 +377,7 @@ async function autoEnrich(prisma: PrismaClient): Promise<ConflictEntry[]> {
     }
   }
 
-  // Bookings — newest first per contact: fill phone + address, detect conflicts
+  // Bookings - newest first per contact: fill phone + address, detect conflicts
   for (const booking of bookings) {
     const contact = findContact(booking.email, booking.phone);
     if (!contact) continue;
@@ -415,7 +415,7 @@ async function autoEnrich(prisma: PrismaClient): Promise<ConflictEntry[]> {
       const proposedName = proposedNameBooking;
       const contactNameLower = contact.name.toLowerCase();
       const proposedNameLower = proposedName.toLowerCase();
-      // Only flag a name conflict when the proposed name is genuinely different —
+      // Only flag a name conflict when the proposed name is genuinely different -
       // not when it is simply the contact's first name without the last name.
       if (
         proposedName &&

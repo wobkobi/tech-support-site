@@ -52,14 +52,14 @@ export function ContactsAdminView({
       };
       if (data.ok) {
         setSyncResult(
-          `Done — ${data.importedCount ?? 0} imported from Google, ${data.syncedCount ?? 0} pushed to Google.`,
+          `Done - ${data.importedCount ?? 0} imported from Google, ${data.syncedCount ?? 0} pushed to Google.`,
         );
         router.refresh();
       } else {
         setSyncResult(`Error: ${data.error ?? "unknown"}`);
       }
     } catch {
-      setSyncResult("Network error — try again.");
+      setSyncResult("Network error - try again.");
     } finally {
       setSyncing(false);
     }
@@ -141,7 +141,7 @@ export function ContactsAdminView({
                             "text-xs font-medium uppercase tracking-wide text-slate-400",
                           )}
                         >
-                          Name — pick one
+                          Name - pick one
                         </p>
                         <div className={cn("flex flex-wrap gap-2")}>
                           <button
@@ -174,7 +174,7 @@ export function ContactsAdminView({
                             "text-xs font-medium uppercase tracking-wide text-slate-400",
                           )}
                         >
-                          Phone — pick one
+                          Phone - pick one
                         </p>
                         <div className={cn("flex flex-wrap gap-2")}>
                           <button
@@ -185,7 +185,7 @@ export function ContactsAdminView({
                               "hover:border-russian-violet hover:text-russian-violet rounded border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors",
                             )}
                           >
-                            {conflict.contactPhone ?? "—"}
+                            {conflict.contactPhone ?? "-"}
                           </button>
                           <button
                             onClick={() =>

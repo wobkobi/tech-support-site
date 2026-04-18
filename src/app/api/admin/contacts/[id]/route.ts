@@ -72,7 +72,7 @@ export async function PATCH(
     select: { id: true, name: true, email: true, phone: true, address: true },
   });
 
-  // Best-effort Google Contacts sync — never fail the request if it errors.
+  // Best-effort Google Contacts sync - never fail the request if it errors.
   try {
     await syncContactToGoogle(id);
   } catch (syncError) {
