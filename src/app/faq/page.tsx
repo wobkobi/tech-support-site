@@ -69,8 +69,8 @@ const faqItems: ReadonlyArray<FaqItem> = [
     answer: (
       <>
         <p>
-          I charge $75 per hour. I'll give you a clear estimate before starting so there are no
-          surprises.
+          $50/h for most jobs. $75/h for complex or lengthy work — data recovery, hardware repairs,
+          or full PC migrations. I'll confirm the rate before starting.
         </p>
         <p className={cn("text-rich-black/80 mt-2")}>
           See the{" "}

@@ -38,21 +38,29 @@ export default function PricingPage(): React.ReactElement {
           </section>
 
           <section
-            aria-label="Standard rates"
+            aria-label="Rates"
             className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}
           >
-            <h2 className={cn("text-russian-violet mb-3 text-xl font-bold sm:text-2xl")}>
-              Standard rate
-            </h2>
+            <h2 className={cn("text-russian-violet mb-3 text-xl font-bold sm:text-2xl")}>Rates</h2>
 
-            <div className={cn("bg-seasalt-900/40 border-seasalt-400/60 rounded-lg border p-5")}>
-              <p className={cn("text-russian-violet mb-2 text-3xl font-bold sm:text-4xl")}>
-                $75 per hour
-              </p>
-              <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
-                Billed fairly for the time I work. On-site visits and most remote support - remote
-                rates may vary.
-              </p>
+            <div className={cn("grid gap-4 sm:grid-cols-2")}>
+              <div className={cn("bg-seasalt-900/40 border-seasalt-400/60 rounded-lg border p-5")}>
+                <p className={cn("text-russian-violet mb-2 text-3xl font-bold sm:text-4xl")}>
+                  $50/h
+                </p>
+                <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
+                  Most jobs — troubleshooting, setup, software, tune-ups, Wi-Fi, backups, and more.
+                </p>
+              </div>
+
+              <div className={cn("bg-seasalt-900/40 border-seasalt-400/60 rounded-lg border p-5")}>
+                <p className={cn("text-russian-violet mb-2 text-3xl font-bold sm:text-4xl")}>
+                  $75/h
+                </p>
+                <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
+                  Complex or lengthy work — data recovery, hardware repairs, or full PC migrations.
+                </p>
+              </div>
             </div>
 
             <div className={cn("mt-5 space-y-3")}>
@@ -73,8 +81,8 @@ export default function PricingPage(): React.ReactElement {
               <p className={cn("text-rich-black/90 flex gap-3 text-sm sm:text-base")}>
                 <span className={cn("text-moonstone-600 mt-1 text-lg")}>✓</span>
                 <span>
-                  <strong>Bundle multiple issues into one visit</strong> to make the most of your
-                  time.
+                  <strong>Not sure which rate applies?</strong> Just ask — I'll confirm before
+                  starting.
                 </span>
               </p>
             </div>

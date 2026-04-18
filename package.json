@@ -1,6 +1,6 @@
 {
   "name": "tech-support-site",
-  "version": "1.15.3",
+  "version": "1.15.6",
   "private": true,
   "type": "module",
   "scripts": {
@@ -17,8 +17,8 @@
     "build:poster": "npx tsx scripts/export-poster-screenshot.ts",
     "build:all": "npm run build:icons && npm run build",
     "test": "vitest",
-    "smoke": "tsx scripts/smoke-test.ts",
-    "smoke:fast": "tsx scripts/smoke-test.ts --skip-build"
+    "smoke": "dotenv -e .env.local -- tsx scripts/smoke-test.ts",
+    "smoke:fast": "dotenv -e .env.local -- tsx scripts/smoke-test.ts --skip-build"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",
@@ -95,13 +95,13 @@
     "glob": {
       "minimatch": "^10.2.1"
     },
-    "basic-ftp": "5.2.1",
+    "basic-ftp": "5.3.0",
     "vite": "^7.3.2",
     "typescript-eslint": "8.58.1"
   },
   "simple-git-hooks": {
     "pre-commit": "npm install && git add package-lock.json && npx lint-staged",
-    "pre-push": "npm run smoke:fast"
+    "pre-push": "npm run test -- --run && npm run build && npm run smoke:fast"
   },
   "lint-staged": {
     "**/*.{js,jsx,ts,tsx}": [

@@ -18,10 +18,10 @@ import BookingForm from "@/features/booking/components/BookingForm";
 import { FrostedSection, PageShell, CARD, SOFT_CARD } from "@/shared/components/PageLayout";
 import { FaCalendarCheck, FaClock, FaEnvelopeOpenText, FaListCheck } from "react-icons/fa6";
 
-// ISR (Incremental Static Regeneration) with 5-minute revalidation window
-// Ensures calendar availability is never more than 5 minutes stale
-// (cron-job.org refreshes every 15 minutes, so 5-min ISR is a safe buffer)
-export const revalidate = 300; // 5 minutes (300 seconds)
+// Always render fresh - slot availability is time-sensitive and ISR can serve
+// stale pages indefinitely on low-traffic routes (Vercel only revalidates on
+// the next request *after* the window, not proactively).
+export const dynamic = "force-dynamic";
 
 /**
  * Get calendar events, preferring cache but falling back to live API

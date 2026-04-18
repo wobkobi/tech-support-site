@@ -373,6 +373,10 @@ export function validateBookingRequest(
   );
   const slotEnd = new Date(slotStart.getTime() + durationMinutes * 60 * 1000);
 
+  if (slotStart < now) {
+    return { valid: false, error: "This time slot is in the past" };
+  }
+
   if (!isSlotFree(slotStart, slotEnd, existingBookings, calendarEvents, config.bufferMin)) {
     return { valid: false, error: "This time slot is no longer available" };
   }
