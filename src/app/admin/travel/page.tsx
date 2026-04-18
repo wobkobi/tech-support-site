@@ -15,7 +15,7 @@ import { RecalculateButton } from "@/features/admin/components/RecalculateButton
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Travel — Admin",
+  title: "Travel - Admin",
   robots: { index: false, follow: false },
 };
 

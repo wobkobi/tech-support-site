@@ -49,7 +49,7 @@ export default function PricingPage(): React.ReactElement {
                   $50/h
                 </p>
                 <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
-                  Most jobs — troubleshooting, setup, software, tune-ups, Wi-Fi, backups, and more.
+                  Most jobs - troubleshooting, setup, software, tune-ups, Wi-Fi, backups, and more.
                 </p>
               </div>
 
@@ -58,7 +58,7 @@ export default function PricingPage(): React.ReactElement {
                   $75/h
                 </p>
                 <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
-                  Complex or lengthy work — data recovery, hardware repairs, or full PC migrations.
+                  Complex or lengthy work - data recovery, hardware repairs, or full PC migrations.
                 </p>
               </div>
             </div>
@@ -81,7 +81,7 @@ export default function PricingPage(): React.ReactElement {
               <p className={cn("text-rich-black/90 flex gap-3 text-sm sm:text-base")}>
                 <span className={cn("text-moonstone-600 mt-1 text-lg")}>✓</span>
                 <span>
-                  <strong>Not sure which rate applies?</strong> Just ask — I'll confirm before
+                  <strong>Not sure which rate applies?</strong> Just ask - I'll confirm before
                   starting.
                 </span>
               </p>

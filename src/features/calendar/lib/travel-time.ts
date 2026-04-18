@@ -76,7 +76,7 @@ export async function calculateTravelMinutes(
   }
 
   const mode: TransportMode = options?.mode ?? "transit";
-  // Only apply the schedule-horizon proxy for transit — driving/walking/cycling don't need it
+  // Only apply the schedule-horizon proxy for transit - driving/walking/cycling don't need it
   const effectiveDeparture =
     mode === "transit" ? toReliableDeparture(departureTime, new Date()) : departureTime;
 

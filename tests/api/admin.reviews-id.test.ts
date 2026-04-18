@@ -65,7 +65,7 @@ function makeDeleteRequest(token: string): NextRequest {
 
 const PARAMS = { params: Promise.resolve({ id: "review-123" }) };
 
-/** Default review stub with no source info — auto-link does nothing. */
+/** Default review stub with no source info - auto-link does nothing. */
 const NO_SOURCE_REVIEW = {
   bookingId: null,
   customerRef: null,
@@ -253,7 +253,7 @@ describe("PATCH /api/admin/reviews/[id]", () => {
   });
 });
 
-describe("PATCH /api/admin/reviews/[id] — contactId link flow", () => {
+describe("PATCH /api/admin/reviews/[id] - contactId link flow", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.isAdminRequest.mockReturnValue(true);

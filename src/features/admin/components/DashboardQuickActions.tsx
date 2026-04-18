@@ -22,7 +22,7 @@ export interface PastBookingRow {
   id: string;
   /** Customer name */
   name: string;
-  /** Customer email — null for phone-only bookings */
+  /** Customer email - null for phone-only bookings */
   email: string | null;
   /** Start time as ISO string */
   startAt: string;
@@ -159,7 +159,7 @@ export function DashboardQuickActions({
             )}
           </h2>
           <p className={cn("mt-0.5 text-xs text-slate-400")}>
-            Past confirmed bookings — mark complete and send review
+            Past confirmed bookings - mark complete and send review
           </p>
         </div>
 

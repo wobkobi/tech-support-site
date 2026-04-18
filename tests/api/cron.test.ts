@@ -51,7 +51,7 @@ describe("GET /api/cron/send-review-emails", () => {
 
   it("returns ok:true with zero sent when no bookings are due", async () => {
     mocks.isCronAuthorized.mockReturnValue(true);
-    // No bookings to email — early exit, dedup queries are never called
+    // No bookings to email - early exit, dedup queries are never called
     mocks.bookingFindMany.mockResolvedValueOnce([]);
 
     const res = await GET(FAKE_REQ);
