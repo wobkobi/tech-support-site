@@ -40,12 +40,12 @@ model Booking {
   bufferAfterMin  Int @default(0)
 
   // Booking lifecycle state and hold expiry.
-  status         BookingStatus @default(confirmed)
+  status        BookingStatus @default(confirmed)
   holdExpiresAt DateTime?
 
   // Secret tokens for cancel and review magic links.
-  cancelToken String  @unique
-  reviewToken String  @unique @default(uuid())
+  cancelToken String @unique
+  reviewToken String @unique @default(uuid())
 
   // Double-booking prevention: set to startAt.toISOString() when active (held/confirmed),
   // set to "released:<id>" when cancelled or expired so the slot is freed without null collisions.
@@ -106,8 +106,8 @@ model Review {
 model ReviewRequest {
   id                String    @id @default(auto()) @map("_id") @db.ObjectId
   name              String
-  email             String?   // Null for SMS-only records; used for deduplication
-  phone             String?   // Null for email-only records; used for deduplication
+  email             String? // Null for SMS-only records; used for deduplication
+  phone             String? // Null for email-only records; used for deduplication
   reviewToken       String    @unique @default(uuid())
   reviewSubmittedAt DateTime?
   createdAt         DateTime  @default(now())
@@ -133,22 +133,22 @@ model Contact {
 
 // Travel time blocks created for external calendar events with a location.
 model TravelBlock {
-  id               String    @id @default(auto()) @map("_id") @db.ObjectId
-  sourceEventId    String
-  calendarEmail    String
-  summary          String?   // Google Calendar event title (e.g. "Dentist", "Mario Movie")
-  eventStartAt     DateTime  // Source event start - used to detect time changes
-  eventEndAt       DateTime  // Source event end - used to detect time changes
-  rawTravelMinutes     Int?    // Raw travel-to time from Distance Matrix API
-  roundedMinutes       Int?    // Rounded travel-to value used for block window
-  rawTravelBackMinutes Int?    // Raw return-trip travel time
-  roundedBackMinutes   Int?    // Rounded return-trip value used for block window
+  id                   String   @id @default(auto()) @map("_id") @db.ObjectId
+  sourceEventId        String
+  calendarEmail        String
+  summary              String? // Google Calendar event title (e.g. "Dentist", "Mario Movie")
+  eventStartAt         DateTime // Source event start - used to detect time changes
+  eventEndAt           DateTime // Source event end - used to detect time changes
+  rawTravelMinutes     Int? // Raw travel-to time from Distance Matrix API
+  roundedMinutes       Int? // Rounded travel-to value used for block window
+  rawTravelBackMinutes Int? // Raw return-trip travel time
+  roundedBackMinutes   Int? // Rounded return-trip value used for block window
   beforeEventId        String? // Synthetic CalendarEventCache ID blocking travel-to
   afterEventId         String? // Synthetic CalendarEventCache ID blocking travel-back
   transportMode        String? // "transit" | "driving" | "walking" | "bicycling" - null treated as "transit"
   customOrigin         String? // Manual override for travel-to origin address
   detectedOrigin       String? // Auto-detected origin from preceding event or home address
-  createdAt        DateTime  @default(now())
+  createdAt            DateTime @default(now())
 
   @@unique([sourceEventId, calendarEmail])
 }
@@ -157,18 +157,98 @@ model TravelBlock {
 model CalendarEventCache {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 
-  eventId       String   // Google Calendar event ID
-  calendarEmail String   // Which calendar this event belongs to
-  startAt      DateTime // Event start (UTC)
-  endAt        DateTime // Event end (UTC)
+  eventId       String // Google Calendar event ID
+  calendarEmail String // Which calendar this event belongs to
+  startAt       DateTime // Event start (UTC)
+  endAt         DateTime // Event end (UTC)
 
   fetchedAt DateTime @default(now()) // When this entry was cached
-  expiresAt DateTime                 // When this entry should be refreshed
+  expiresAt DateTime // When this entry should be refreshed
 
-  // Cache cleanup cron: WHERE expiresAt < now
-  @@index([expiresAt])
   // Upsert by natural key
   @@unique([eventId, calendarEmail])
+  // Cache cleanup cron: WHERE expiresAt < now
+  @@index([expiresAt])
   // Booking page query: WHERE endAt >= now AND expiresAt > now
   @@index([endAt, expiresAt])
+}
+
+// --- Business module ---
+
+model RateConfig {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  label       String
+  ratePerHour Float?
+  flatRate    Float?
+  unit        String   @default("hour")
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+}
+
+type LineItem {
+  description String
+  qty         Float
+  unitPrice   Float
+  lineTotal   Float
+}
+
+model Invoice {
+  id          String        @id @default(auto()) @map("_id") @db.ObjectId
+  number      String        @unique
+  clientName  String
+  clientEmail String
+  issueDate   DateTime
+  dueDate     DateTime
+  lineItems   LineItem[]
+  gst         Boolean       @default(false)
+  subtotal    Float
+  gstAmount   Float
+  total       Float
+  status      InvoiceStatus @default(DRAFT)
+  notes       String?
+  contactId   String?       @db.ObjectId
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model IncomeEntry {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  date        DateTime
+  customer    String
+  description String
+  amount      Float
+  method      String
+  notes       String?
+  invoiceId   String?  @db.ObjectId
+  createdAt   DateTime @default(now())
+}
+
+model ExpenseEntry {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  date        DateTime
+  supplier    String
+  description String
+  category    String
+  amountIncl  Float
+  gstAmount   Float
+  amountExcl  Float
+  method      String
+  receipt     Boolean  @default(false)
+  notes       String?
+  createdAt   DateTime @default(now())
+}
+
+model TaskTemplate {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  description  String
+  defaultPrice Float
+  usageCount   Int      @default(1)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
