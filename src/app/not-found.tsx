@@ -52,7 +52,12 @@ export default function NotFound(): React.ReactElement {
               Well, this is awkward...
             </h1>
 
-            <p className={cn("text-rich-black mb-6 text-base sm:text-lg md:text-xl")}>{message}</p>
+            <p
+              suppressHydrationWarning
+              className={cn("text-rich-black mb-6 text-base sm:text-lg md:text-xl")}
+            >
+              {message}
+            </p>
 
             <div className={cn("flex flex-wrap items-center justify-center gap-3")}>
               <Button href="/" variant="primary">
