@@ -111,6 +111,7 @@ export function TravelBlockAdminList({
 }: TravelBlockAdminListProps): React.ReactElement {
   const [blocks, setBlocks] = useState<TravelBlockRow[]>(initial);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setBlocks(initial);
   }, [initial]);
   const [saving, setSaving] = useState<string | null>(null);

@@ -108,6 +108,7 @@ export function SubscriptionsView({ token }: { token: string }): React.ReactElem
   }, [token]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [load]);
 

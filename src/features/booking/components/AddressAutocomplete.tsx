@@ -128,6 +128,7 @@ export default function AddressAutocomplete({
 
     if (!window.google?.maps?.places?.Autocomplete) {
       console.error("[AddressAutocomplete] google.maps.places.Autocomplete not found");
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setScriptError(true);
       return;
     }
