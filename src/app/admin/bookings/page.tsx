@@ -1,11 +1,10 @@
 // src/app/admin/bookings/page.tsx
 import type { Metadata } from "next";
 import type React from "react";
-import { notFound } from "next/navigation";
 import { prisma } from "@/shared/lib/prisma";
-import { isValidAdminToken } from "@/shared/lib/auth";
+import { requireAdminToken } from "@/shared/lib/auth";
 import { cn } from "@/shared/lib/cn";
-import { AdminSidebar } from "@/features/admin/components/AdminSidebar";
+import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
 import {
   BookingAdminList,
   type AdminBookingRow,
@@ -30,13 +29,7 @@ export default async function AdminBookingsPage({
   searchParams: Promise<{ token?: string }>;
 }): Promise<React.ReactElement> {
   const { token } = await searchParams;
-
-  if (!isValidAdminToken(token ?? null)) {
-    console.warn("[admin/bookings] Invalid token attempt", { tokenPresent: Boolean(token) });
-    notFound();
-  }
-
-  const t = token!;
+  const t = requireAdminToken(token);
 
   const allBookings = await prisma.booking.findMany({
     orderBy: { startAt: "desc" },
@@ -90,30 +83,24 @@ export default async function AdminBookingsPage({
   ];
 
   return (
-    <div className={cn("flex min-h-screen")}>
-      <AdminSidebar token={t} current="bookings" />
-
-      <div className={cn("ml-56 flex-1 bg-slate-50")}>
-        <div className={cn("mx-auto max-w-7xl px-6 py-8")}>
-          <div className={cn("mb-6 flex flex-wrap items-center justify-between gap-4")}>
-            <h1 className={cn("text-russian-violet text-2xl font-extrabold")}>Calendar</h1>
-            <div className={cn("flex flex-wrap gap-2")}>
-              {statusStats.map((s) => (
-                <span
-                  key={s.label}
-                  className={cn("rounded-full px-3 py-1 text-xs font-semibold", s.className)}
-                >
-                  {s.value} {s.label}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          <div className={cn("rounded-xl border border-slate-200 bg-white p-6 shadow-sm")}>
-            <BookingAdminList bookings={bookingRows} token={t} />
-          </div>
+    <AdminPageLayout token={t} current="bookings">
+      <div className={cn("mb-6 flex flex-wrap items-center justify-between gap-4")}>
+        <h1 className={cn("text-russian-violet text-2xl font-extrabold")}>Calendar</h1>
+        <div className={cn("flex flex-wrap gap-2")}>
+          {statusStats.map((s) => (
+            <span
+              key={s.label}
+              className={cn("rounded-full px-3 py-1 text-xs font-semibold", s.className)}
+            >
+              {s.value} {s.label}
+            </span>
+          ))}
         </div>
       </div>
-    </div>
+
+      <div className={cn("rounded-xl border border-slate-200 bg-white p-6 shadow-sm")}>
+        <BookingAdminList bookings={bookingRows} token={t} />
+      </div>
+    </AdminPageLayout>
   );
 }

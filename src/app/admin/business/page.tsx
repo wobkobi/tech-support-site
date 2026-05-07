@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import type React from "react";
 import Link from "next/link";
-import { notFound } from "next/navigation";
-import { isValidAdminToken } from "@/shared/lib/auth";
-import { AdminSidebar } from "@/features/admin/components/AdminSidebar";
+import { requireAdminToken } from "@/shared/lib/auth";
+import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
 import { cn } from "@/shared/lib/cn";
 import { prisma } from "@/shared/lib/prisma";
 import { formatNZD } from "@/features/business/lib/business";
+import { SheetImportButton } from "@/features/business/components/SheetImportButton";
 
 export const dynamic = "force-dynamic";
 
@@ -27,8 +27,7 @@ export default async function BusinessPage({
   searchParams: Promise<{ token?: string }>;
 }): Promise<React.ReactElement> {
   const { token } = await searchParams;
-  if (!isValidAdminToken(token ?? null)) notFound();
-  const t = token!;
+  const t = requireAdminToken(token);
 
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -112,42 +111,39 @@ export default async function BusinessPage({
   ];
 
   return (
-    <div className={cn("flex min-h-screen")}>
-      <AdminSidebar token={t} current="business" />
-      <div className={cn("ml-56 flex-1 bg-slate-50")}>
-        <div className={cn("px-6 py-8")}>
-          <h1 className={cn("text-russian-violet mb-6 text-2xl font-extrabold")}>Business</h1>
+    <AdminPageLayout token={t} current="business">
+      <h1 className={cn("text-russian-violet mb-6 text-2xl font-extrabold")}>Business</h1>
 
-          <div className={cn("mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4")}>
-            {cards.map((c) => (
-              <Link
-                key={c.label}
-                href={c.href}
-                className={cn(
-                  "rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm transition-shadow hover:shadow-md",
-                )}
-              >
-                <p className={cn("text-xl font-extrabold", c.color)}>{c.value}</p>
-                <p className={cn("mt-0.5 text-xs text-slate-500")}>{c.label}</p>
-              </Link>
-            ))}
-          </div>
-
-          <div className={cn("flex flex-wrap gap-3")}>
-            {links.map((l) => (
-              <Link
-                key={l.label}
-                href={l.href}
-                className={cn(
-                  "bg-russian-violet rounded-lg px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90",
-                )}
-              >
-                {l.label}
-              </Link>
-            ))}
-          </div>
-        </div>
+      <div className={cn("mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4")}>
+        {cards.map((c) => (
+          <Link
+            key={c.label}
+            href={c.href}
+            className={cn(
+              "rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm transition-shadow hover:shadow-md",
+            )}
+          >
+            <p className={cn("text-xl font-extrabold", c.color)}>{c.value}</p>
+            <p className={cn("mt-0.5 text-xs text-slate-500")}>{c.label}</p>
+          </Link>
+        ))}
       </div>
-    </div>
+
+      <div className={cn("flex flex-wrap gap-3")}>
+        {links.map((l) => (
+          <Link
+            key={l.label}
+            href={l.href}
+            className={cn(
+              "bg-russian-violet rounded-lg px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90",
+            )}
+          >
+            {l.label}
+          </Link>
+        ))}
+      </div>
+
+      <SheetImportButton token={t} />
+    </AdminPageLayout>
   );
 }

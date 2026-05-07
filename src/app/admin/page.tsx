@@ -2,10 +2,9 @@
 import type { Metadata } from "next";
 import type React from "react";
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import { prisma } from "@/shared/lib/prisma";
-import { isValidAdminToken } from "@/shared/lib/auth";
-import { AdminSidebar } from "@/features/admin/components/AdminSidebar";
+import { requireAdminToken } from "@/shared/lib/auth";
+import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
 import { DashboardQuickActions } from "@/features/admin/components/DashboardQuickActions";
 import { toE164NZ } from "@/shared/lib/normalize-phone";
 import { cn } from "@/shared/lib/cn";
@@ -39,7 +38,7 @@ function formatNZDateTime(iso: string): string {
  * @param iso - ISO 8601 date string.
  * @returns Formatted date string in NZ locale.
  */
-function formatNZDate(iso: string): string {
+function formatNZDateDisplay(iso: string): string {
   return new Intl.DateTimeFormat("en-NZ", {
     timeZone: "Pacific/Auckland",
     day: "numeric",
@@ -60,13 +59,8 @@ export default async function AdminPage({
   searchParams: Promise<{ token?: string }>;
 }): Promise<React.ReactElement> {
   const { token } = await searchParams;
+  const t = requireAdminToken(token);
 
-  if (!isValidAdminToken(token ?? null)) {
-    console.warn("[admin] Invalid token attempt", { tokenPresent: Boolean(token) });
-    notFound();
-  }
-
-  const t = token!;
   const now = new Date();
 
   const [
@@ -127,7 +121,6 @@ export default async function AdminPage({
       orderBy: { name: "asc" },
       select: { id: true, name: true, email: true, phone: true },
     }),
-    // Bookings that already had a review email sent (via the booking flow, not ReviewRequest)
     prisma.booking.findMany({
       where: { reviewSentAt: { not: null } },
       select: { email: true, phone: true },
@@ -188,191 +181,163 @@ export default async function AdminPage({
   ];
 
   return (
-    <div className={cn("flex min-h-screen")}>
-      <AdminSidebar token={t} current="dashboard" />
+    <AdminPageLayout token={t} current="dashboard">
+      <h1 className={cn("text-russian-violet mb-6 text-2xl font-extrabold")}>Dashboard</h1>
 
-      <div className={cn("ml-56 flex-1 bg-slate-50")}>
-        <div className={cn("mx-auto max-w-7xl px-6 py-8")}>
-          <h1 className={cn("text-russian-violet mb-6 text-2xl font-extrabold")}>Dashboard</h1>
+      <DashboardQuickActions
+        token={t}
+        pastConfirmedBookings={pastConfirmedBookings.map((b) => ({
+          id: b.id,
+          name: b.name,
+          email: b.email,
+          startAt: b.startAt.toISOString(),
+          reviewSentAt: b.reviewSentAt ? b.reviewSentAt.toISOString() : null,
+        }))}
+        contactSuggestions={contactsWithoutReviewLinks}
+      />
 
-          {/* Quick actions */}
-          <DashboardQuickActions
-            token={t}
-            pastConfirmedBookings={pastConfirmedBookings.map((b) => ({
-              id: b.id,
-              name: b.name,
-              email: b.email,
-              startAt: b.startAt.toISOString(),
-              reviewSentAt: b.reviewSentAt ? b.reviewSentAt.toISOString() : null,
-            }))}
-            contactSuggestions={contactsWithoutReviewLinks}
-          />
-
-          {/* Stat row */}
-          <div className={cn("mb-8 grid grid-cols-3 gap-3 sm:grid-cols-6")}>
-            {stats.map((s) => (
-              <Link
-                key={s.label}
-                href={s.href}
-                className={cn(
-                  "group rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm transition-shadow hover:shadow-md",
-                )}
-              >
-                <p
-                  className={cn(
-                    "text-2xl font-extrabold",
-                    s.urgent ? "text-coquelicot-400" : "text-russian-violet",
-                  )}
-                >
-                  {s.value}
-                </p>
-                <p className={cn("mt-0.5 text-xs text-slate-500")}>{s.label}</p>
-              </Link>
-            ))}
-          </div>
-
-          <div className={cn("grid grid-cols-1 gap-6 lg:grid-cols-2")}>
-            {/* Upcoming bookings */}
-            <div className={cn("rounded-xl border border-slate-200 bg-white shadow-sm")}>
-              <div
-                className={cn(
-                  "flex items-center justify-between border-b border-slate-100 px-5 py-4",
-                )}
-              >
-                <h2 className={cn("text-sm font-semibold text-slate-700")}>Upcoming bookings</h2>
-                <Link
-                  href={`/admin/bookings?token=${encodeURIComponent(t)}`}
-                  className={cn("hover:text-russian-violet text-xs text-slate-400")}
-                >
-                  View all →
-                </Link>
-              </div>
-              {upcomingBookings.length === 0 ? (
-                <p className={cn("px-5 py-6 text-sm text-slate-400")}>
-                  No upcoming confirmed bookings.
-                </p>
-              ) : (
-                <ul className={cn("divide-y divide-slate-100")}>
-                  {upcomingBookings.map((b) => (
-                    <li
-                      key={b.id}
-                      className={cn("flex items-start justify-between gap-3 px-5 py-3")}
-                    >
-                      <div className={cn("min-w-0")}>
-                        <p className={cn("truncate text-sm font-medium text-slate-700")}>
-                          {b.name}
-                        </p>
-                        <p className={cn("truncate text-xs text-slate-400")}>
-                          {b.email}
-                          {b.phone ? ` · ${b.phone}` : ""}
-                        </p>
-                      </div>
-                      <p className={cn("shrink-0 text-right text-xs text-slate-500")}>
-                        {formatNZDateTime(b.startAt.toISOString())}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
+      <div className={cn("mb-8 grid grid-cols-3 gap-3 sm:grid-cols-6")}>
+        {stats.map((s) => (
+          <Link
+            key={s.label}
+            href={s.href}
+            className={cn(
+              "group rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm transition-shadow hover:shadow-md",
+            )}
+          >
+            <p
+              className={cn(
+                "text-2xl font-extrabold",
+                s.urgent ? "text-coquelicot-400" : "text-russian-violet",
               )}
-            </div>
-
-            {/* Pending reviews */}
-            <div className={cn("rounded-xl border border-slate-200 bg-white shadow-sm")}>
-              <div
-                className={cn(
-                  "flex items-center justify-between border-b border-slate-100 px-5 py-4",
-                )}
-              >
-                <h2 className={cn("text-sm font-semibold text-slate-700")}>
-                  Pending reviews
-                  {pendingReviews.length > 0 && (
-                    <span
-                      className={cn(
-                        "bg-coquelicot-500/15 text-coquelicot-400 ml-2 rounded-full px-2 py-0.5 text-xs font-semibold",
-                      )}
-                    >
-                      {pendingCount}
-                    </span>
-                  )}
-                </h2>
-                <Link
-                  href={`/admin/reviews?token=${encodeURIComponent(t)}`}
-                  className={cn("hover:text-russian-violet text-xs text-slate-400")}
-                >
-                  Review all →
-                </Link>
-              </div>
-              {pendingReviews.length === 0 ? (
-                <p className={cn("px-5 py-6 text-sm text-slate-400")}>
-                  No reviews pending approval.
-                </p>
-              ) : (
-                <ul className={cn("divide-y divide-slate-100")}>
-                  {pendingReviews.map((r) => {
-                    const name = r.isAnonymous
-                      ? "Anonymous"
-                      : [r.firstName, r.lastName].filter(Boolean).join(" ") || "Unknown";
-                    return (
-                      <li key={r.id} className={cn("px-5 py-3")}>
-                        <div className={cn("mb-1 flex items-center justify-between gap-3")}>
-                          <p className={cn("text-xs font-medium text-slate-600")}>{name}</p>
-                          <p className={cn("shrink-0 text-xs text-slate-400")}>
-                            {formatNZDate(r.createdAt.toISOString())}
-                          </p>
-                        </div>
-                        <p className={cn("line-clamp-2 text-xs text-slate-500")}>{r.text}</p>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </div>
-
-            {/* Recent contacts */}
-            <div
-              className={cn("rounded-xl border border-slate-200 bg-white shadow-sm lg:col-span-2")}
             >
-              <div
-                className={cn(
-                  "flex items-center justify-between border-b border-slate-100 px-5 py-4",
-                )}
-              >
-                <h2 className={cn("text-sm font-semibold text-slate-700")}>Recent contacts</h2>
-                <Link
-                  href={`/admin/contacts?token=${encodeURIComponent(t)}`}
-                  className={cn("hover:text-russian-violet text-xs text-slate-400")}
-                >
-                  View all →
-                </Link>
-              </div>
-              {recentContacts.length === 0 ? (
-                <p className={cn("px-5 py-6 text-sm text-slate-400")}>No contacts yet.</p>
-              ) : (
-                <ul className={cn("divide-y divide-slate-100")}>
-                  {recentContacts.map((c) => (
-                    <li
-                      key={c.id}
-                      className={cn("flex items-center justify-between gap-4 px-5 py-3")}
-                    >
-                      <div className={cn("min-w-0 flex-1")}>
-                        <p className={cn("truncate text-sm font-medium text-slate-700")}>
-                          {c.name}
-                        </p>
-                        <p className={cn("truncate text-xs text-slate-400")}>
-                          {[c.email, c.phone].filter(Boolean).join(" · ") || "No contact info"}
-                        </p>
-                      </div>
-                      <p className={cn("shrink-0 text-xs text-slate-400")}>
-                        {formatNZDate(c.createdAt.toISOString())}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+              {s.value}
+            </p>
+            <p className={cn("mt-0.5 text-xs text-slate-500")}>{s.label}</p>
+          </Link>
+        ))}
+      </div>
+
+      <div className={cn("grid grid-cols-1 gap-6 lg:grid-cols-2")}>
+        {/* Upcoming bookings */}
+        <div className={cn("rounded-xl border border-slate-200 bg-white shadow-sm")}>
+          <div
+            className={cn("flex items-center justify-between border-b border-slate-100 px-5 py-4")}
+          >
+            <h2 className={cn("text-sm font-semibold text-slate-700")}>Upcoming bookings</h2>
+            <Link
+              href={`/admin/bookings?token=${encodeURIComponent(t)}`}
+              className={cn("hover:text-russian-violet text-xs text-slate-400")}
+            >
+              View all →
+            </Link>
           </div>
+          {upcomingBookings.length === 0 ? (
+            <p className={cn("px-5 py-6 text-sm text-slate-400")}>
+              No upcoming confirmed bookings.
+            </p>
+          ) : (
+            <ul className={cn("divide-y divide-slate-100")}>
+              {upcomingBookings.map((b) => (
+                <li key={b.id} className={cn("flex items-start justify-between gap-3 px-5 py-3")}>
+                  <div className={cn("min-w-0")}>
+                    <p className={cn("truncate text-sm font-medium text-slate-700")}>{b.name}</p>
+                    <p className={cn("truncate text-xs text-slate-400")}>
+                      {b.email}
+                      {b.phone ? ` · ${b.phone}` : ""}
+                    </p>
+                  </div>
+                  <p className={cn("shrink-0 text-right text-xs text-slate-500")}>
+                    {formatNZDateTime(b.startAt.toISOString())}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {/* Pending reviews */}
+        <div className={cn("rounded-xl border border-slate-200 bg-white shadow-sm")}>
+          <div
+            className={cn("flex items-center justify-between border-b border-slate-100 px-5 py-4")}
+          >
+            <h2 className={cn("text-sm font-semibold text-slate-700")}>
+              Pending reviews
+              {pendingReviews.length > 0 && (
+                <span
+                  className={cn(
+                    "bg-coquelicot-500/15 text-coquelicot-400 ml-2 rounded-full px-2 py-0.5 text-xs font-semibold",
+                  )}
+                >
+                  {pendingCount}
+                </span>
+              )}
+            </h2>
+            <Link
+              href={`/admin/reviews?token=${encodeURIComponent(t)}`}
+              className={cn("hover:text-russian-violet text-xs text-slate-400")}
+            >
+              Review all →
+            </Link>
+          </div>
+          {pendingReviews.length === 0 ? (
+            <p className={cn("px-5 py-6 text-sm text-slate-400")}>No reviews pending approval.</p>
+          ) : (
+            <ul className={cn("divide-y divide-slate-100")}>
+              {pendingReviews.map((r) => {
+                const name = r.isAnonymous
+                  ? "Anonymous"
+                  : [r.firstName, r.lastName].filter(Boolean).join(" ") || "Unknown";
+                return (
+                  <li key={r.id} className={cn("px-5 py-3")}>
+                    <div className={cn("mb-1 flex items-center justify-between gap-3")}>
+                      <p className={cn("text-xs font-medium text-slate-600")}>{name}</p>
+                      <p className={cn("shrink-0 text-xs text-slate-400")}>
+                        {formatNZDateDisplay(r.createdAt.toISOString())}
+                      </p>
+                    </div>
+                    <p className={cn("line-clamp-2 text-xs text-slate-500")}>{r.text}</p>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+
+        {/* Recent contacts */}
+        <div className={cn("rounded-xl border border-slate-200 bg-white shadow-sm lg:col-span-2")}>
+          <div
+            className={cn("flex items-center justify-between border-b border-slate-100 px-5 py-4")}
+          >
+            <h2 className={cn("text-sm font-semibold text-slate-700")}>Recent contacts</h2>
+            <Link
+              href={`/admin/contacts?token=${encodeURIComponent(t)}`}
+              className={cn("hover:text-russian-violet text-xs text-slate-400")}
+            >
+              View all →
+            </Link>
+          </div>
+          {recentContacts.length === 0 ? (
+            <p className={cn("px-5 py-6 text-sm text-slate-400")}>No contacts yet.</p>
+          ) : (
+            <ul className={cn("divide-y divide-slate-100")}>
+              {recentContacts.map((c) => (
+                <li key={c.id} className={cn("flex items-center justify-between gap-4 px-5 py-3")}>
+                  <div className={cn("min-w-0 flex-1")}>
+                    <p className={cn("truncate text-sm font-medium text-slate-700")}>{c.name}</p>
+                    <p className={cn("truncate text-xs text-slate-400")}>
+                      {[c.email, c.phone].filter(Boolean).join(" · ") || "No contact info"}
+                    </p>
+                  </div>
+                  <p className={cn("shrink-0 text-xs text-slate-400")}>
+                    {formatNZDateDisplay(c.createdAt.toISOString())}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
-    </div>
+    </AdminPageLayout>
   );
 }

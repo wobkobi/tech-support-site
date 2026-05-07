@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import type React from "react";
-import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { isValidAdminToken } from "@/shared/lib/auth";
-import { AdminSidebar } from "@/features/admin/components/AdminSidebar";
+import { requireAdminToken } from "@/shared/lib/auth";
+import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
 import { InvoiceBuilderView } from "@/features/business/components/InvoiceBuilderView";
 import { cn } from "@/shared/lib/cn";
 
@@ -26,22 +25,16 @@ export default async function NewInvoicePage({
   searchParams: Promise<{ token?: string }>;
 }): Promise<React.ReactElement> {
   const { token } = await searchParams;
-  if (!isValidAdminToken(token ?? null)) notFound();
-  const t = token!;
+  const t = requireAdminToken(token);
 
   return (
-    <div className={cn("flex min-h-screen")}>
-      <AdminSidebar token={t} current="business-invoices" />
-      <div className={cn("ml-56 flex-1 bg-slate-50")}>
-        <div className={cn("px-6 py-8")}>
-          <h1 className={cn("text-russian-violet mb-6 text-2xl font-extrabold print:hidden")}>
-            New invoice
-          </h1>
-          <Suspense>
-            <InvoiceBuilderView token={t} />
-          </Suspense>
-        </div>
-      </div>
-    </div>
+    <AdminPageLayout token={t} current="business-invoices">
+      <h1 className={cn("text-russian-violet mb-6 text-2xl font-extrabold print:hidden")}>
+        New invoice
+      </h1>
+      <Suspense>
+        <InvoiceBuilderView token={t} />
+      </Suspense>
+    </AdminPageLayout>
   );
 }

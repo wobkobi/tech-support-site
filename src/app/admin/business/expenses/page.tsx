@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import type React from "react";
-import { notFound } from "next/navigation";
-import { isValidAdminToken } from "@/shared/lib/auth";
-import { AdminSidebar } from "@/features/admin/components/AdminSidebar";
+import { requireAdminToken } from "@/shared/lib/auth";
+import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
 import { ExpensesView } from "@/features/business/components/ExpensesView";
+import { SubscriptionsView } from "@/features/business/components/SubscriptionsView";
 import { cn } from "@/shared/lib/cn";
 
 export const dynamic = "force-dynamic";
@@ -25,18 +25,15 @@ export default async function ExpensesPage({
   searchParams: Promise<{ token?: string }>;
 }): Promise<React.ReactElement> {
   const { token } = await searchParams;
-  if (!isValidAdminToken(token ?? null)) notFound();
-  const t = token!;
+  const t = requireAdminToken(token);
 
   return (
-    <div className={cn("flex min-h-screen")}>
-      <AdminSidebar token={t} current="business-expenses" />
-      <div className={cn("ml-56 flex-1 bg-slate-50")}>
-        <div className={cn("px-6 py-8")}>
-          <h1 className={cn("text-russian-violet mb-6 text-2xl font-extrabold")}>Expenses</h1>
-          <ExpensesView token={t} />
-        </div>
+    <AdminPageLayout token={t} current="business-expenses">
+      <h1 className={cn("text-russian-violet mb-6 text-2xl font-extrabold")}>Expenses</h1>
+      <ExpensesView token={t} />
+      <div className="mt-10">
+        <SubscriptionsView token={t} />
       </div>
-    </div>
+    </AdminPageLayout>
   );
 }

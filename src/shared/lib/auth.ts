@@ -6,6 +6,7 @@
 
 import { timingSafeEqual } from "crypto";
 import { NextRequest } from "next/server";
+import { notFound } from "next/navigation";
 
 /**
  * Validates a token against ADMIN_SECRET using constant-time comparison.
@@ -20,6 +21,16 @@ export function isValidAdminToken(token: string | null | undefined): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * Validates the admin token from page searchParams, calling notFound() if invalid.
+ * @param token - Token string from URL search params (may be undefined)
+ * @returns The validated token string
+ */
+export function requireAdminToken(token: string | undefined): string {
+  if (!isValidAdminToken(token ?? null)) notFound();
+  return token!;
 }
 
 /**
