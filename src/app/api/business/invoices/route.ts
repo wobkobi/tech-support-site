@@ -95,8 +95,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // Write back to sheet if we got a count from it
   if (sheetNextCount !== null) {
     try {
-      const origin = new URL(request.url).origin;
-      await fetch(`${origin}/api/business/sheets/invoice-counter`, {
+      const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL;
+      if (!appBaseUrl) {
+        throw new Error("NEXT_PUBLIC_APP_URL is not configured");
+      }
+      const counterUrl = new URL("/api/business/sheets/invoice-counter", appBaseUrl);
+      if (!["http:", "https:"].includes(counterUrl.protocol)) {
+        throw new Error("Invalid NEXT_PUBLIC_APP_URL protocol");
+      }
+
+      await fetch(counterUrl.toString(), {
         method: "POST",
         headers: {
           "content-type": "application/json",
