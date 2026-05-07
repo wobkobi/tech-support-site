@@ -119,7 +119,7 @@ export default async function AdminPage({
     }),
     prisma.contact.findMany({
       orderBy: { name: "asc" },
-      select: { id: true, name: true, email: true, phone: true },
+      select: { id: true, name: true, email: true, phone: true, address: true },
     }),
     prisma.booking.findMany({
       where: { reviewSentAt: { not: null } },
