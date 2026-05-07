@@ -170,6 +170,7 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
       transportMode: true,
       customOrigin: true,
       detectedOrigin: true,
+      destination: true,
     },
   });
   const blockByKey = new Map(
@@ -308,11 +309,17 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
         });
       }
 
-      // Keep summary and detectedOrigin up-to-date for display
+      // Keep summary, detectedOrigin, and destination up-to-date for display
       const currentSummary = event.summary ?? null;
-      const updates: { summary?: string | null; detectedOrigin?: string | null } = {};
+      const currentDestination = event.location ?? event.summary ?? null;
+      const updates: {
+        summary?: string | null;
+        detectedOrigin?: string | null;
+        destination?: string | null;
+      } = {};
       if (existing.summary !== currentSummary) updates.summary = currentSummary;
       if (existing.detectedOrigin !== detectedOrigin) updates.detectedOrigin = detectedOrigin;
+      if (existing.destination !== currentDestination) updates.destination = currentDestination;
       if (Object.keys(updates).length > 0) {
         await prisma.travelBlock.update({
           where: { id: existing.id },
@@ -464,6 +471,7 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
           transportMode: existing?.transportMode ?? null,
           customOrigin: existing?.customOrigin ?? null,
           detectedOrigin,
+          destination: eventLocation,
         },
       });
       console.log(`[refreshCalendarCache] Created travel blocks for event: ${event.id}`);
