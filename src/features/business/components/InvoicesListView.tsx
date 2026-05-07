@@ -24,6 +24,8 @@ export function InvoicesListView({ token }: { token: string }): React.ReactEleme
   const router = useRouter();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [syncToast, setSyncToast] = useState<string | null>(null);
   const headers = { "X-Admin-Secret": token };
 
   useEffect(() => {
@@ -50,17 +52,95 @@ export function InvoicesListView({ token }: { token: string }): React.ReactEleme
     if (d.ok) setInvoices((prev) => prev.map((i) => (i.id === id ? { ...i, status } : i)));
   }
 
+  /** Imports new invoices from Google Drive PDFs and refreshes the list. */
+  async function handleImportDrive(): Promise<void> {
+    setSyncing(true);
+    setSyncToast(null);
+    try {
+      const res = await fetch("/api/business/invoices/import-drive", {
+        method: "POST",
+        headers,
+      });
+      const d = await res.json();
+      if (d.ok) {
+        setSyncToast(
+          `Imported ${d.created} invoice${d.created !== 1 ? "s" : ""} from Drive.${d.errors ? ` ${d.errors} errors.` : ""}`,
+        );
+        const r2 = await fetch("/api/business/invoices", { headers });
+        const d2 = await r2.json();
+        if (d2.ok) setInvoices(d2.invoices);
+      } else {
+        setSyncToast("Import failed.");
+      }
+    } catch {
+      setSyncToast("Import failed.");
+    }
+    setSyncing(false);
+    setTimeout(() => setSyncToast(null), 5000);
+  }
+
+  /** Syncs Drive PDF links onto existing invoice records. */
+  async function handleSyncDrive(): Promise<void> {
+    setSyncing(true);
+    setSyncToast(null);
+    try {
+      const res = await fetch("/api/business/invoices/sync-drive", {
+        method: "POST",
+        headers,
+      });
+      const d = await res.json();
+      if (d.ok) {
+        setSyncToast(`Synced ${d.matched} invoice${d.matched !== 1 ? "s" : ""} from Drive.`);
+        // Reload invoices to pick up newly populated driveWebUrl values
+        const r2 = await fetch("/api/business/invoices", { headers });
+        const d2 = await r2.json();
+        if (d2.ok) setInvoices(d2.invoices);
+      } else {
+        setSyncToast("Drive sync failed.");
+      }
+    } catch {
+      setSyncToast("Drive sync failed.");
+    }
+    setSyncing(false);
+    setTimeout(() => setSyncToast(null), 4000);
+  }
+
   return (
     <div>
-      <div className={cn("mb-4 flex justify-end")}>
-        <Link
-          href={`/admin/business/invoices/new?token=${encodeURIComponent(token)}`}
-          className={cn(
-            "bg-russian-violet rounded-lg px-4 py-2 text-sm font-medium text-white hover:opacity-90",
+      <div className={cn("mb-4 flex items-center justify-between gap-3")}>
+        <div className={cn("flex gap-2")}>
+          {syncToast && (
+            <span className={cn("self-center text-xs text-slate-500")}>{syncToast}</span>
           )}
-        >
-          New invoice
-        </Link>
+        </div>
+        <div className={cn("flex gap-2")}>
+          <button
+            onClick={() => void handleImportDrive()}
+            disabled={syncing}
+            className={cn(
+              "rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50",
+            )}
+          >
+            {syncing ? "Working..." : "Import from Drive"}
+          </button>
+          <button
+            onClick={() => void handleSyncDrive()}
+            disabled={syncing}
+            className={cn(
+              "rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50",
+            )}
+          >
+            {syncing ? "Syncing..." : "Sync Drive"}
+          </button>
+          <Link
+            href={`/admin/business/invoices/new?token=${encodeURIComponent(token)}`}
+            className={cn(
+              "bg-russian-violet rounded-lg px-4 py-2 text-sm font-medium text-white hover:opacity-90",
+            )}
+          >
+            New invoice
+          </Link>
+        </div>
       </div>
 
       <div className={cn("overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm")}>
@@ -72,7 +152,7 @@ export function InvoicesListView({ token }: { token: string }): React.ReactEleme
           <table className={cn("w-full text-sm")}>
             <thead className={cn("border-b border-slate-100 bg-slate-50")}>
               <tr>
-                {["Number", "Client", "Date", "Total", "Status", ""].map((h) => (
+                {["Number", "Client", "Date", "Total", "Status", "PDF", ""].map((h) => (
                   <th
                     key={h}
                     className={cn("px-4 py-3 text-left text-xs font-semibold text-slate-500")}
@@ -116,6 +196,20 @@ export function InvoicesListView({ token }: { token: string }): React.ReactEleme
                       <option value="SENT">Sent</option>
                       <option value="PAID">Paid</option>
                     </select>
+                  </td>
+                  <td className={cn("px-4 py-3")} onClick={(e) => e.stopPropagation()}>
+                    {inv.driveWebUrl ? (
+                      <a
+                        href={inv.driveWebUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className={cn("text-xs text-blue-500 hover:text-blue-700")}
+                      >
+                        PDF ↗
+                      </a>
+                    ) : (
+                      <span className={cn("text-xs text-slate-300")}>-</span>
+                    )}
                   </td>
                   <td className={cn("px-4 py-3")}>
                     <Link

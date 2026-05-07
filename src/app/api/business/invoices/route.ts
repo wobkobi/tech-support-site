@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { calcInvoiceTotals, nextInvoiceNumber } from "@/features/business/lib/business";
+import { generateInvoicePdf, extractYearCode } from "@/features/business/lib/invoice-pdf";
+import { uploadInvoicePdf } from "@/features/business/lib/google-drive";
 
 /**
  * Fetches the next invoice number from Google Sheets, falling back to MongoDB on failure.
@@ -30,7 +32,7 @@ async function getNextInvoiceNumber(request: NextRequest): Promise<{
     const last = await prisma.invoice.findFirst({ orderBy: { number: "desc" } });
     const now = new Date();
     const fy = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
-    const yearCode = String(fy).slice(2) + String(fy + 1).slice(2);
+    const yearCode = String(fy) + String(fy + 1).slice(2);
     return {
       number: nextInvoiceNumber(last?.number ?? null, yearCode),
       sheetNextCount: null,
@@ -49,7 +51,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const invoices = await prisma.invoice.findMany({ orderBy: { createdAt: "desc" } });
+  const invoices = await prisma.invoice.findMany({ orderBy: { issueDate: "desc" } });
   return NextResponse.json({ ok: true, invoices });
 }
 
@@ -106,6 +108,27 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       // Non-fatal - invoice is already saved
     }
   }
+
+  // Fire-and-forget: generate PDF and upload to Drive, then store the Drive URL
+  void (async () => {
+    try {
+      const pdfBuffer = await generateInvoicePdf({
+        ...invoice,
+        issueDate: invoice.issueDate.toISOString(),
+        dueDate: invoice.dueDate.toISOString(),
+        createdAt: invoice.createdAt.toISOString(),
+        updatedAt: invoice.updatedAt.toISOString(),
+      });
+      const yearCode = extractYearCode(invoice.number);
+      const { fileId, webUrl } = await uploadInvoicePdf(pdfBuffer, invoice.number, yearCode);
+      await prisma.invoice.update({
+        where: { id: invoice.id },
+        data: { driveFileId: fileId, driveWebUrl: webUrl },
+      });
+    } catch (err) {
+      console.error("[invoices] Drive PDF upload failed:", err);
+    }
+  })();
 
   return NextResponse.json({ ok: true, invoice, sheetSyncWarning }, { status: 201 });
 }

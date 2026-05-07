@@ -32,6 +32,8 @@ export interface Invoice {
   status: InvoiceStatus;
   notes: string | null;
   contactId: string | null;
+  driveFileId: string | null;
+  driveWebUrl: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -103,6 +105,7 @@ export interface JobCalculation {
   hourlyRate: RateConfig | null;
   tasks: TaskLine[];
   parts: PartLine[];
+  travelCost: number | null;
   notes: string;
   gst: boolean;
   clientName: string;
@@ -111,6 +114,13 @@ export interface JobCalculation {
 
 export interface ParseJobRequest {
   input: string;
+  answers?: Record<string, string>;
+}
+
+export interface ParseJobQuestion {
+  id: string;
+  question: string;
+  hint?: string;
 }
 
 export interface ParseJobResponse {
@@ -123,6 +133,10 @@ export interface ParseJobResponse {
   notes: string;
   confidence: "high" | "medium" | "low";
   warnings: string[];
+  destination: string | null;
+  statedDistanceKm: number | null;
+  noTravelCharge: boolean;
+  travel?: TravelInfo;
 }
 
 export interface ParsedTaskLine {
@@ -146,10 +160,39 @@ export interface TaskTemplate {
   updatedAt: string;
 }
 
+export interface Subscription {
+  id: string;
+  description: string;
+  supplier: string;
+  category: string;
+  amountIncl: number;
+  gstRate: number;
+  method: string;
+  frequency: "weekly" | "fortnightly" | "monthly" | "quarterly" | "annually";
+  nextDue: string;
+  isActive: boolean;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface SheetCounterResponse {
   lastNumber: number;
   nextNumber: number;
   yearCode: string;
   nextFormatted: string;
   prefix: string;
+}
+export interface ParsedTaskLine {
+  rateConfigId: string | null;
+  description: string;
+  qty: number; // hours for work, km for travel
+  unitPrice: number;
+}
+
+// Add this new interface
+export interface TravelInfo {
+  distanceKm: number;
+  durationMins: number;
+  destination?: string;
 }

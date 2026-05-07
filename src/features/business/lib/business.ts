@@ -23,6 +23,36 @@ export function formatNZDate(date: Date | string): string {
 }
 
 /**
+ * Returns today's date as a YYYY-MM-DD string (local machine time).
+ * @returns ISO date string for today
+ */
+export function todayISO(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/**
+ * Extracts GST from a GST-inclusive amount.
+ * @param amountIncl - Amount including GST
+ * @param gstRate - GST rate as a decimal (e.g. 0.15)
+ * @returns GST component, rounded to 2 decimal places
+ */
+export function calcGstFromInclusive(amountIncl: number, gstRate: number): number {
+  return Math.round(((amountIncl * gstRate) / (1 + gstRate)) * 100) / 100;
+}
+
+/**
+ * Formats a Date as DD/MM/YYYY using UTC date parts (safe for server-side use).
+ * @param date - The date to format
+ * @returns Formatted date string
+ */
+export function formatUTCDDMMYYYY(date: Date): string {
+  const d = String(date.getUTCDate()).padStart(2, "0");
+  const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const y = date.getUTCFullYear();
+  return `${d}/${m}/${y}`;
+}
+
+/**
  * Calculates invoice totals including optional GST.
  * @param lineItems - Array of line items with qty and unit price
  * @param gst - Whether to apply 15% GST
@@ -128,6 +158,15 @@ export function jobToLineItems(job: JobCalculation): LineItem[] {
     });
   }
 
+  if (job.travelCost) {
+    items.push({
+      description: "Travel",
+      qty: 1,
+      unitPrice: job.travelCost,
+      lineTotal: job.travelCost,
+    });
+  }
+
   return items;
 }
 
@@ -140,6 +179,7 @@ export function calcJobTotal(job: JobCalculation): {
   timeCharge: number;
   tasksTotal: number;
   partsTotal: number;
+  travelTotal: number;
   subtotal: number;
   gstAmount: number;
   total: number;
@@ -150,9 +190,47 @@ export function calcJobTotal(job: JobCalculation): {
   const timeCharge = Math.round(hours * rate * 100) / 100;
   const tasksTotal = job.tasks.reduce((s, t) => s + t.qty * t.unitPrice, 0);
   const partsTotal = job.parts.reduce((s, p) => s + p.cost, 0);
-  const subtotal = Math.round((timeCharge + tasksTotal + partsTotal) * 100) / 100;
+  const travelTotal = job.travelCost ?? 0;
+  const subtotal = Math.round((timeCharge + tasksTotal + partsTotal + travelTotal) * 100) / 100;
   const gstAmount = job.gst ? Math.round(subtotal * 0.15 * 100) / 100 : 0;
-  return { timeCharge, tasksTotal, partsTotal, subtotal, gstAmount, total: subtotal + gstAmount };
+  return {
+    timeCharge,
+    tasksTotal,
+    partsTotal,
+    travelTotal,
+    subtotal,
+    gstAmount,
+    total: subtotal + gstAmount,
+  };
+}
+
+/**
+ * Advances a subscription's next due date by its frequency.
+ * Uses UTC date methods to avoid DST issues.
+ * @param current - Current nextDue date
+ * @param frequency - Billing frequency
+ * @returns New nextDue date
+ */
+export function advanceNextDue(current: Date, frequency: string): Date {
+  const d = new Date(current);
+  switch (frequency) {
+    case "weekly":
+      d.setUTCDate(d.getUTCDate() + 7);
+      break;
+    case "fortnightly":
+      d.setUTCDate(d.getUTCDate() + 14);
+      break;
+    case "monthly":
+      d.setUTCMonth(d.getUTCMonth() + 1);
+      break;
+    case "quarterly":
+      d.setUTCMonth(d.getUTCMonth() + 3);
+      break;
+    case "annually":
+      d.setUTCFullYear(d.getUTCFullYear() + 1);
+      break;
+  }
+  return d;
 }
 
 /**

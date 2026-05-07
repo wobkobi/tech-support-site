@@ -148,6 +148,7 @@ model TravelBlock {
   transportMode        String? // "transit" | "driving" | "walking" | "bicycling" - null treated as "transit"
   customOrigin         String? // Manual override for travel-to origin address
   detectedOrigin       String? // Auto-detected origin from preceding event or home address
+  destination          String? // Destination address (event.location ?? event.summary)
   createdAt            DateTime @default(now())
 
   @@unique([sourceEventId, calendarEmail])
@@ -213,6 +214,8 @@ model Invoice {
   status      InvoiceStatus @default(DRAFT)
   notes       String?
   contactId   String?       @db.ObjectId
+  driveFileId String?
+  driveWebUrl String?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 }
@@ -251,4 +254,22 @@ model TaskTemplate {
   usageCount   Int      @default(1)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+}
+
+model Subscription {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  description String
+  supplier    String
+  category    String   @default("Subscriptions")
+  amountIncl  Float
+  gstRate     Float    @default(0.15)
+  method      String   @default("Business Account")
+  frequency   String
+  nextDue     DateTime
+  isActive    Boolean  @default(true)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive, nextDue])
 }

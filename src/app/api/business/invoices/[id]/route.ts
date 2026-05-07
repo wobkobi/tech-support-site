@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
+import { calcInvoiceTotals } from "@/features/business/lib/business";
 
 /**
  * GET /api/business/invoices/[id] - Returns a single invoice by ID.
@@ -24,8 +25,9 @@ export async function GET(
 }
 
 /**
- * PATCH /api/business/invoices/[id] - Updates an invoice status (DRAFT, SENT, or PAID).
- * @param request - Incoming Next.js request with status in body
+ * PATCH /api/business/invoices/[id] - Updates an invoice.
+ * Accepts a status-only patch or a full invoice update.
+ * @param request - Incoming Next.js request
  * @param root0 - Route context
  * @param root0.params - Route params containing the invoice ID
  * @returns JSON with the updated invoice
@@ -40,12 +42,32 @@ export async function PATCH(
 
   const { id } = await params;
   const body = await request.json();
-  const { status } = body;
 
+  // Full update
+  if (body.clientName !== undefined || body.lineItems !== undefined) {
+    const { clientName, clientEmail, issueDate, dueDate, lineItems, gst, notes, status } = body;
+    const { subtotal, gstAmount, total } = calcInvoiceTotals(lineItems ?? [], gst ?? false);
+    const invoice = await prisma.invoice.update({
+      where: { id },
+      data: {
+        ...(clientName !== undefined && { clientName }),
+        ...(clientEmail !== undefined && { clientEmail }),
+        ...(issueDate !== undefined && { issueDate: new Date(issueDate) }),
+        ...(dueDate !== undefined && { dueDate: new Date(dueDate) }),
+        ...(lineItems !== undefined && { lineItems, subtotal, gstAmount, total }),
+        ...(gst !== undefined && { gst }),
+        ...(notes !== undefined && { notes: notes || null }),
+        ...(status !== undefined && { status }),
+      },
+    });
+    return NextResponse.json({ ok: true, invoice });
+  }
+
+  // Status-only patch
+  const { status } = body;
   if (!["DRAFT", "SENT", "PAID"].includes(status)) {
     return NextResponse.json({ error: "Invalid status" }, { status: 400 });
   }
-
   const invoice = await prisma.invoice.update({ where: { id }, data: { status } });
   return NextResponse.json({ ok: true, invoice });
 }
