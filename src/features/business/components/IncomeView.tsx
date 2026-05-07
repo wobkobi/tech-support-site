@@ -3,18 +3,9 @@
 import { useState, useEffect } from "react";
 import type React from "react";
 import { cn } from "@/shared/lib/cn";
-import { formatNZD } from "@/features/business/lib/business";
+import { formatNZD, todayISO } from "@/features/business/lib/business";
+import { INCOME_METHODS } from "@/features/business/lib/constants";
 import type { IncomeEntry } from "@/features/business/types/business";
-
-const METHODS = ["Business Account", "Personal then Reimburse", "Cash"];
-
-/**
- * Returns today's date as a YYYY-MM-DD string.
- * @returns ISO date string for today
- */
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 /**
  * Client component for recording and displaying income entries.
@@ -26,7 +17,7 @@ export function IncomeView({ token }: { token: string }): React.ReactElement {
   const [entries, setEntries] = useState<IncomeEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({
-    date: today(),
+    date: todayISO(),
     customer: "",
     description: "",
     amount: "",
@@ -67,7 +58,7 @@ export function IncomeView({ token }: { token: string }): React.ReactElement {
     if (d.ok) {
       setEntries((prev) => [d.entry, ...prev]);
       setForm({
-        date: today(),
+        date: todayISO(),
         customer: "",
         description: "",
         amount: "",
@@ -181,7 +172,7 @@ export function IncomeView({ token }: { token: string }): React.ReactElement {
                 "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
               )}
             >
-              {METHODS.map((m) => (
+              {INCOME_METHODS.map((m) => (
                 <option key={m}>{m}</option>
               ))}
             </select>

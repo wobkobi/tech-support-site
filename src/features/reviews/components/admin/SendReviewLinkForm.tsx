@@ -5,7 +5,7 @@
  * @description Form for sending a review link to a past client via email or SMS.
  */
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { cn } from "@/shared/lib/cn";
 import { CopyLinkButton } from "./CopyLinkButton";
 import { toE164NZ, formatNZPhone, isValidPhone } from "@/shared/lib/normalize-phone";
@@ -23,6 +23,8 @@ export interface ContactSuggestion {
   email: string | null;
   /** Phone number, or null */
   phone: string | null;
+  /** Street address, or null */
+  address: string | null;
 }
 
 /**
@@ -54,6 +56,8 @@ export function SendReviewLinkForm({
   const [open, setOpen] = useState(defaultOpen);
   const [mode, setMode] = useState<"email" | "sms">("email");
   const [contactSearch, setContactSearch] = useState("");
+  const [listOpen, setListOpen] = useState(false);
+  const pickerRef = useRef<HTMLDivElement>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phoneInput, setPhoneInput] = useState("");
@@ -231,47 +235,84 @@ export function SendReviewLinkForm({
         <div className={cn("mt-4 flex flex-col gap-3")}>
           {/* Contact picker - only shown when there are suggestions */}
           {contactSuggestions.length > 0 && (
-            <div className={cn("flex flex-col gap-1")}>
+            <div
+              ref={pickerRef}
+              className={cn("relative flex flex-col gap-1")}
+              onBlur={(e) => {
+                if (!pickerRef.current?.contains(e.relatedTarget as Node)) setListOpen(false);
+              }}
+            >
               <label className={cn("text-xs font-medium text-slate-500")}>
                 Pick an existing contact
               </label>
               <input
                 type="search"
-                placeholder="Search contacts…"
+                placeholder="Search by name, address or email…"
                 value={contactSearch}
-                onChange={(e) => setContactSearch(e.target.value)}
-                className={cn(
-                  "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-1",
-                )}
-              />
-              <select
-                value=""
+                onFocus={() => setListOpen(true)}
                 onChange={(e) => {
-                  applyContact(e.target.value);
-                  setContactSearch("");
+                  setContactSearch(e.target.value);
+                  setListOpen(true);
                 }}
                 className={cn(
                   "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-1",
                 )}
-              >
-                <option value="">- select to pre-fill -</option>
-                {contactSuggestions
-                  .filter((c) => {
+              />
+              {listOpen && (
+                <div
+                  className={cn(
+                    "absolute top-full z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg",
+                  )}
+                >
+                  {contactSuggestions
+                    .filter((c) => {
+                      const q = contactSearch.toLowerCase();
+                      return (
+                        !q ||
+                        c.name.toLowerCase().includes(q) ||
+                        c.email?.toLowerCase().includes(q) ||
+                        c.address?.toLowerCase().includes(q) ||
+                        c.phone?.includes(q)
+                      );
+                    })
+                    .map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        tabIndex={0}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          applyContact(c.id);
+                          setContactSearch("");
+                          setListOpen(false);
+                        }}
+                        className={cn(
+                          "flex w-full flex-col gap-0.5 px-3 py-2.5 text-left hover:bg-slate-50",
+                        )}
+                      >
+                        <span className={cn("text-sm font-medium text-slate-800")}>{c.name}</span>
+                        {c.address && (
+                          <span className={cn("text-xs text-slate-500")}>{c.address}</span>
+                        )}
+                        <span className={cn("text-xs text-slate-400")}>
+                          {[c.email, c.phone].filter(Boolean).join(" · ") || "No contact info"}
+                        </span>
+                      </button>
+                    ))}
+                  {contactSuggestions.filter((c) => {
                     const q = contactSearch.toLowerCase();
                     return (
                       !q ||
                       c.name.toLowerCase().includes(q) ||
                       c.email?.toLowerCase().includes(q) ||
+                      c.address?.toLowerCase().includes(q) ||
                       c.phone?.includes(q)
                     );
-                  })
-                  .map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                      {c.email ? ` · ${c.email}` : c.phone ? ` · ${c.phone}` : ""}
-                    </option>
-                  ))}
-              </select>
+                  }).length === 0 && (
+                    <p className={cn("px-3 py-2.5 text-xs text-slate-400")}>No contacts found</p>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

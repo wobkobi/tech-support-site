@@ -3,33 +3,9 @@
 import { useState, useEffect } from "react";
 import type React from "react";
 import { cn } from "@/shared/lib/cn";
-import { formatNZD } from "@/features/business/lib/business";
+import { formatNZD, todayISO, calcGstFromInclusive } from "@/features/business/lib/business";
+import { EXPENSE_CATEGORIES, PAYMENT_METHODS } from "@/features/business/lib/constants";
 import type { ExpenseEntry } from "@/features/business/types/business";
-
-const METHODS = ["Business Account", "Personal then Reimburse", "Cash", "Credit Card"];
-const CATEGORIES = [
-  "Fuel",
-  "Tools",
-  "Software",
-  "Marketing",
-  "Phone/Internet",
-  "Travel",
-  "Subscriptions",
-  "Bank fees",
-  "Repairs",
-  "Office supplies",
-  "Insurance",
-  "Accounting",
-  "Other",
-];
-
-/**
- * Returns today's date as a YYYY-MM-DD string.
- * @returns ISO date string for today
- */
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 /**
  * Client component for recording and displaying expense entries.
@@ -41,7 +17,7 @@ export function ExpensesView({ token }: { token: string }): React.ReactElement {
   const [entries, setEntries] = useState<ExpenseEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({
-    date: today(),
+    date: todayISO(),
     supplier: "",
     description: "",
     category: "Other",
@@ -70,7 +46,7 @@ export function ExpensesView({ token }: { token: string }): React.ReactElement {
 
   const inclNum = parseFloat(form.amountIncl) || 0;
   const rate = parseFloat(form.gstRate) || 0;
-  const previewGst = Math.round(((inclNum * rate) / (1 + rate)) * 100) / 100;
+  const previewGst = calcGstFromInclusive(inclNum, rate);
 
   /**
    * Submits the add-expense form and prepends the new entry to the list.
@@ -89,7 +65,7 @@ export function ExpensesView({ token }: { token: string }): React.ReactElement {
     if (d.ok) {
       setEntries((prev) => [d.entry, ...prev]);
       setForm({
-        date: today(),
+        date: todayISO(),
         supplier: "",
         description: "",
         category: "Other",
@@ -192,7 +168,7 @@ export function ExpensesView({ token }: { token: string }): React.ReactElement {
                 "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
               )}
             >
-              {CATEGORIES.map((c) => (
+              {EXPENSE_CATEGORIES.map((c) => (
                 <option key={c}>{c}</option>
               ))}
             </select>
@@ -242,7 +218,7 @@ export function ExpensesView({ token }: { token: string }): React.ReactElement {
                 "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
               )}
             >
-              {METHODS.map((m) => (
+              {PAYMENT_METHODS.map((m) => (
                 <option key={m}>{m}</option>
               ))}
             </select>

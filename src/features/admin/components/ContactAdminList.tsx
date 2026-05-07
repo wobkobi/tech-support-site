@@ -9,7 +9,7 @@
  */
 
 import type React from "react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/shared/lib/cn";
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import { formatReviewerName } from "@/features/reviews/lib/formatting";
@@ -389,6 +389,9 @@ export function ContactAdminList({
   token: string;
 }): React.ReactElement {
   const [contacts, setContacts] = useState<ContactRow[]>(initialContacts);
+  useEffect(() => {
+    setContacts(initialContacts);
+  }, [initialContacts]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editEmail, setEditEmail] = useState("");
