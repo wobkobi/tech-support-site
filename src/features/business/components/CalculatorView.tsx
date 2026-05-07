@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import type React from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/shared/lib/cn";
@@ -21,6 +21,7 @@ import type {
   PartLine,
   JobCalculation,
   ParseJobResponse,
+  ParseJobQuestion,
   GoogleContact,
   TaskTemplate,
 } from "@/features/business/types/business";
@@ -84,8 +85,8 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
 
   const [rates, setRates] = useState<RateConfig[]>([]);
   const [taskTemplates, setTaskTemplates] = useState<TaskTemplate[]>([]);
-  const [startTime, setStartTime] = useState(nowTime());
-  const [endTime, setEndTime] = useState(addHour(nowTime()));
+  const [startTime, setStartTime] = useState<string>("");
+  const [endTime, setEndTime] = useState<string>("");
   const [durationOverride, setDurationOverride] = useState<number | null>(null);
   const [hourlyRateId, setHourlyRateId] = useState<string | null>(null);
   const [tasks, setTasks] = useState<TaskLine[]>([]);
@@ -101,6 +102,18 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
   const [parseResult, setParseResult] = useState<ParseJobResponse | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
   const [hasParsed, setHasParsed] = useState(false);
+  const [clarifyQuestions, setClarifyQuestions] = useState<ParseJobQuestion[]>([]);
+  const [clarifyAnswers, setClarifyAnswers] = useState<Record<string, string>>({});
+
+  const [jobAddress, setJobAddress] = useState("");
+  const [travelInfo, setTravelInfo] = useState<{
+    distanceKm: number;
+    durationMins: number;
+    cost: number;
+  } | null>(null);
+  const [lookingUpTravel, setLookingUpTravel] = useState(false);
+  const [travelOnInvoice, setTravelOnInvoice] = useState(false);
+  const addressInputRef = useRef<HTMLInputElement>(null);
 
   const [showContactPicker, setShowContactPicker] = useState(false);
   const [savingIncome, setSavingIncome] = useState(false);
@@ -115,7 +128,57 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
     isDefault: false,
   });
   const [editingRateId, setEditingRateId] = useState<string | null>(null);
+
   useEffect(() => {
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+    if (!apiKey || !addressInputRef.current) return;
+
+    /** Attaches a Google Places Autocomplete widget to the address input. */
+    function attachAutocomplete(): void {
+      if (!addressInputRef.current) return;
+      const ac = new google.maps.places.Autocomplete(addressInputRef.current, {
+        componentRestrictions: { country: "nz" },
+        fields: ["formatted_address", "address_components"],
+        types: ["geocode"],
+      });
+      ac.addListener("place_changed", () => {
+        const place = ac.getPlace();
+        const suburb =
+          place.address_components?.find(
+            (c) => c.types.includes("locality") || c.types.includes("sublocality_level_1"),
+          )?.long_name ??
+          place.formatted_address ??
+          "";
+        if (suburb) {
+          setJobAddress(suburb);
+          setTravelInfo(null);
+        }
+      });
+    }
+
+    if (typeof google !== "undefined" && google.maps?.places) {
+      attachAutocomplete();
+      return;
+    }
+
+    const existing = document.querySelector<HTMLScriptElement>(
+      'script[src*="maps.googleapis.com"]',
+    );
+    if (existing) {
+      existing.addEventListener("load", attachAutocomplete);
+      return () => existing.removeEventListener("load", attachAutocomplete);
+    }
+
+    const script = document.createElement("script");
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+    script.async = true;
+    script.addEventListener("load", attachAutocomplete);
+    document.head.appendChild(script);
+    return () => script.removeEventListener("load", attachAutocomplete);
+  }, []);
+
+  useEffect(() => {
+    const now = nowTime();
     Promise.all([
       fetch("/api/business/rates", { headers }).then((r) => r.json()),
       fetch("/api/business/task-templates", { headers }).then((r) => r.json()),
@@ -124,6 +187,8 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
         { ok: boolean; rates: RateConfig[] },
         { ok: boolean; templates: TaskTemplate[] },
       ]) => {
+        setStartTime(now);
+        setEndTime(addHour(now));
         if (ratesData.ok) {
           setRates(ratesData.rates);
           const def = ratesData.rates.find((r) => r.isDefault);
@@ -146,6 +211,7 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
     hourlyRate,
     tasks,
     parts,
+    travelCost: travelOnInvoice && travelInfo ? travelInfo.cost : null,
     notes,
     gst,
     clientName,
@@ -163,7 +229,9 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
     if (result.startTime && result.endTime) {
       setStartTime(result.startTime);
       setEndTime(result.endTime);
-      setDurationOverride(null);
+      // Use durationMins as override when the AI provided it explicitly - handles multi-session
+      // work where billed time is less than wall-clock diff due to gaps between sessions.
+      setDurationOverride(result.durationMins ?? null);
     } else if (result.startTime) {
       setStartTime(result.startTime);
       setEndTime(nowTime());
@@ -179,40 +247,58 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
       setDurationOverride(null);
     }
     setHourlyRateId(result.hourlyRateId);
-    setTasks(
-      result.tasks.map((t) => ({
-        rateConfigId: t.rateConfigId,
-        description: t.description,
-        qty: t.qty,
-        unitPrice: t.unitPrice,
-        lineTotal: Math.round(t.qty * t.unitPrice * 100) / 100,
-      })),
-    );
-    setParts(result.parts.map((p) => ({ description: p.description, cost: p.cost })));
+    const parsedTasks: TaskLine[] = result.tasks.map((t) => ({
+      rateConfigId: t.rateConfigId,
+      description: t.description,
+      qty: t.qty,
+      unitPrice: t.unitPrice,
+      lineTotal: Math.round(t.qty * t.unitPrice * 100) / 100,
+    }));
+    const parsedParts = result.parts.map((p) => ({ description: p.description, cost: p.cost }));
+    if (result.destination) setJobAddress(result.destination);
+    if (result.travel && result.travel.distanceKm > 0) {
+      const travelRate = rateList.find((r) => r.unit === "km" && r.flatRate !== null);
+      const ratePerKm = travelRate?.flatRate ?? 1.2;
+      const cost = Math.round(result.travel.distanceKm * ratePerKm * 100) / 100;
+      setTravelInfo({
+        distanceKm: result.travel.distanceKm,
+        durationMins: result.travel.durationMins,
+        cost,
+      });
+      setTravelOnInvoice(true);
+    }
+    setTasks(parsedTasks);
+    setParts(parsedParts);
     if (result.notes) setNotes(result.notes);
-    void rateList;
   }, []);
 
   /**
    * Submits the free-text AI input to the parse-job API and applies the result to the calculator
-   * state, or sets an error message if parsing fails.
+   * state. If the AI needs clarification it returns questions instead of a result.
+   * @param answers - Optional answers to previous clarifying questions to include in the request.
    */
-  async function handleParse(): Promise<void> {
+  async function handleParse(answers?: Record<string, string>): Promise<void> {
     if (!aiInput.trim()) return;
     setParsing(true);
     setParseError(null);
     setParseResult(null);
+    setClarifyQuestions([]);
     try {
+      const body: Record<string, unknown> = { input: aiInput };
+      if (answers && Object.keys(answers).length > 0) body.answers = answers;
       const res = await fetch("/api/business/parse-job", {
         method: "POST",
         headers: { ...headers, "content-type": "application/json" },
-        body: JSON.stringify({ input: aiInput }),
+        body: JSON.stringify(body),
       });
       const d = await res.json();
-      if (d.ok) {
+      if (d.ok && d.clarify) {
+        setClarifyQuestions(d.clarify as ParseJobQuestion[]);
+      } else if (d.ok && d.result) {
         setParseResult(d.result);
         applyParseResult(d.result, rates);
         setHasParsed(true);
+        setClarifyAnswers({});
       } else {
         setParseError("Couldn't parse that - try being more specific, or build manually below.");
       }
@@ -325,8 +411,45 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
       setAiInput("");
       setParseResult(null);
       setHasParsed(false);
+      setClarifyQuestions([]);
+      setClarifyAnswers({});
     }
     setSavingIncome(false);
+  }
+
+  /** Calls the travel-time API with the current job address and updates travelInfo state. */
+  async function handleTravelLookup(): Promise<void> {
+    if (!jobAddress.trim()) return;
+    setLookingUpTravel(true);
+    setTravelInfo(null);
+    setTravelOnInvoice(false);
+    try {
+      const res = await fetch("/api/pricing/travel-time", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ destination: jobAddress }),
+      });
+      const d = (await res.json()) as { distanceKm?: number; durationMins?: number };
+      if (d.distanceKm && d.distanceKm > 0) {
+        const travelRate = rates.find((r) => r.unit === "km" && r.flatRate !== null);
+        const ratePerKm = travelRate?.flatRate ?? 1.2;
+        const roundTripKm = Math.round(d.distanceKm * 2 * 10) / 10;
+        setTravelInfo({
+          distanceKm: roundTripKm,
+          durationMins: (d.durationMins ?? 0) * 2,
+          cost: Math.round(roundTripKm * ratePerKm * 100) / 100,
+        });
+      }
+    } catch {
+      // silently ignore - travel is optional
+    }
+    setLookingUpTravel(false);
+  }
+
+  /** Marks the travel charge as included in the invoice total. */
+  function addTravelToInvoice(): void {
+    if (!travelInfo) return;
+    setTravelOnInvoice(true);
   }
 
   // Rate management
@@ -559,8 +682,14 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
             </h2>
             <textarea
               value={aiInput}
-              onChange={(e) => setAiInput(e.target.value)}
-              rows={3}
+              onChange={(e) => {
+                setAiInput(e.target.value);
+                if (clarifyQuestions.length > 0) {
+                  setClarifyQuestions([]);
+                  setClarifyAnswers({});
+                }
+              }}
+              rows={6}
               placeholder="e.g. Was at Dave's for 2 hours, removed some malware, set up his new router, had to drive out to Papakura"
               className={cn(
                 "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
@@ -569,7 +698,8 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
             {parseError && <p className={cn("mt-1 text-xs text-red-600")}>{parseError}</p>}
             <div className={cn("mt-3 flex gap-2")}>
               <button
-                onClick={handleParse}
+                onClick={() => void handleParse()}
+                suppressHydrationWarning
                 disabled={parsing || !aiInput.trim()}
                 className={cn(
                   "bg-russian-violet rounded-lg px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50",
@@ -588,6 +718,55 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
                   warnings={parseResult.warnings}
                   onDismiss={() => setParseResult(null)}
                 />
+              </div>
+            )}
+            {clarifyQuestions.length > 0 && (
+              <div className={cn("mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4")}>
+                <p className={cn("mb-3 text-xs font-medium text-amber-800")}>
+                  A few quick questions to fill in the gaps:
+                </p>
+                <div className={cn("space-y-3")}>
+                  {clarifyQuestions.map((q) => (
+                    <div key={q.id}>
+                      <label className={cn("mb-1 block text-xs font-medium text-slate-700")}>
+                        {q.question}
+                      </label>
+                      <input
+                        type="text"
+                        placeholder={q.hint}
+                        value={clarifyAnswers[q.id] ?? ""}
+                        onChange={(e) =>
+                          setClarifyAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))
+                        }
+                        className={cn(
+                          "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs focus:outline-none focus:ring-2",
+                        )}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <div className={cn("mt-3 flex gap-2")}>
+                  <button
+                    onClick={() => void handleParse(clarifyAnswers)}
+                    disabled={parsing}
+                    className={cn(
+                      "bg-russian-violet rounded-lg px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50",
+                    )}
+                  >
+                    {parsing ? "Parsing..." : "Submit answers"}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setClarifyQuestions([]);
+                      setClarifyAnswers({});
+                    }}
+                    className={cn(
+                      "rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50",
+                    )}
+                  >
+                    Skip
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -644,6 +823,11 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
                 />
                 <p className={cn("mt-1 text-xs text-slate-400")}>
                   {minsToHoursLabel(durationMins)}
+                  {billableMins(durationMins) !== durationMins && (
+                    <span className={cn("ml-1 text-slate-300")}>
+                      → {minsToHoursLabel(billableMins(durationMins))} billed
+                    </span>
+                  )}
                 </p>
               </div>
               <div>
@@ -666,6 +850,75 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
                 </select>
               </div>
             </div>
+          </div>
+
+          {/* Travel */}
+          <div className={cn("rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}>
+            <h2 className={cn("text-russian-violet mb-3 text-sm font-semibold")}>Travel</h2>
+            <div className={cn("flex gap-2")}>
+              <input
+                ref={addressInputRef}
+                type="text"
+                placeholder="Client address or suburb"
+                value={jobAddress}
+                onChange={(e) => {
+                  setJobAddress(e.target.value);
+                  setTravelInfo(null);
+                  setTravelOnInvoice(false);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void handleTravelLookup();
+                  }
+                }}
+                className={cn(
+                  "focus:ring-russian-violet/30 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
+                )}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  void handleTravelLookup();
+                }}
+                suppressHydrationWarning
+                disabled={lookingUpTravel || !jobAddress.trim()}
+                className={cn(
+                  "rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50",
+                )}
+              >
+                {lookingUpTravel ? "..." : "Look up"}
+              </button>
+            </div>
+            {travelInfo && (
+              <div
+                className={cn(
+                  "mt-2 flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600",
+                )}
+              >
+                <span>
+                  {travelInfo.distanceKm} km
+                  {travelInfo.durationMins > 0
+                    ? ` - approx ${travelInfo.durationMins} min drive`
+                    : ""}{" "}
+                  -{" "}
+                  <span className="font-medium text-slate-800">${travelInfo.cost.toFixed(2)}</span>
+                </span>
+                {travelOnInvoice ? (
+                  <span className={cn("ml-3 text-xs font-medium text-green-600")}>Added</span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={addTravelToInvoice}
+                    className={cn(
+                      "ml-3 rounded bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-700 hover:bg-slate-300",
+                    )}
+                  >
+                    Add to invoice
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Tasks */}
@@ -888,6 +1141,12 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
                   <span>{formatNZD(totals.partsTotal)}</span>
                 </div>
               )}
+              {totals.travelTotal > 0 && (
+                <div className={cn("flex justify-between text-slate-600")}>
+                  <span>Travel</span>
+                  <span>{formatNZD(totals.travelTotal)}</span>
+                </div>
+              )}
               <div
                 className={cn(
                   "flex justify-between border-t border-slate-100 pt-2 font-medium text-slate-700",
@@ -973,6 +1232,7 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
             </button>
             <button
               onClick={handleSaveIncome}
+              suppressHydrationWarning
               disabled={savingIncome || totals.subtotal === 0}
               className={cn(
                 "w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50",
@@ -992,6 +1252,10 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
                 setParseResult(null);
                 setHasParsed(false);
                 setGst(false);
+                setJobAddress("");
+                setTravelInfo(null);
+                setClarifyQuestions([]);
+                setClarifyAnswers({});
               }}
               className={cn(
                 "w-full rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-500 hover:bg-slate-50",

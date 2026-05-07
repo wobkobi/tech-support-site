@@ -4,7 +4,12 @@ import { useState, useEffect, useCallback } from "react";
 import type React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/shared/lib/cn";
-import { calcInvoiceTotals, formatNZD, formatNZDate } from "@/features/business/lib/business";
+import {
+  calcInvoiceTotals,
+  formatNZD,
+  formatNZDate,
+  todayISO,
+} from "@/features/business/lib/business";
 import { ContactPickerModal } from "@/features/business/components/ContactPickerModal";
 import type { LineItem, GoogleContact } from "@/features/business/types/business";
 
@@ -15,14 +20,6 @@ const BUSINESS_DETAILS = {
   phone: "0212971237",
   bank: "12-3077-0191830-00",
 };
-
-/**
- * Returns today's date as an ISO 8601 date string (YYYY-MM-DD).
- * @returns Today's date string
- */
-function todayStr(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 /**
  * Returns a date string (YYYY-MM-DD) for the date that is n days from today.
@@ -78,7 +75,7 @@ export function InvoiceBuilderView({ token }: { token: string }): React.ReactEle
     } catch {}
     return {
       number: "",
-      issueDate: todayStr(),
+      issueDate: todayISO(),
       dueDate: inDays(7),
       clientName,
       clientEmail,
