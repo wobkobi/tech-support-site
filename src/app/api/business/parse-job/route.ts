@@ -58,8 +58,6 @@ function calcSessionMins(input: string): number | null {
   return found ? total : null;
 }
 
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
 /**
  * Computes Jaccard similarity between two strings using word-token sets.
  * @param a - First string.
@@ -129,6 +127,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (input.length > 1000) {
     return NextResponse.json({ error: "input must be 1000 characters or fewer" }, { status: 400 });
   }
+
+  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
   try {
     const [rates, templates] = await Promise.all([
