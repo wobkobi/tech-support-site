@@ -1,26 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { google } from "googleapis";
-import { getOAuth2Client } from "@/features/calendar/lib/google-calendar";
 import { isAdminRequest } from "@/shared/lib/auth";
-
-/**
- * Creates an authenticated Google Sheets API client.
- * @returns Sheets v4 API client instance
- */
-function getSheetsClient(): ReturnType<typeof google.sheets> {
-  const auth = getOAuth2Client();
-  return google.sheets({ version: "v4", auth });
-}
-
-/**
- * Reads the Google Sheet ID from environment variables.
- * @returns GOOGLE_SHEET_ID value
- */
-function getSheetId(): string {
-  const id = process.env.GOOGLE_SHEET_ID;
-  if (!id) throw new Error("GOOGLE_SHEET_ID is not set");
-  return id;
-}
+import { getSheetsClient, getSheetId } from "@/features/business/lib/google-sheets";
 
 /**
  * GET /api/business/sheets/invoice-counter - Reads the next invoice number from the Google Sheet.
