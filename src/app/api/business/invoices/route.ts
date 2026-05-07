@@ -4,31 +4,21 @@ import { isAdminRequest } from "@/shared/lib/auth";
 import { calcInvoiceTotals, nextInvoiceNumber } from "@/features/business/lib/business";
 import { generateInvoicePdf, extractYearCode } from "@/features/business/lib/invoice-pdf";
 import { uploadInvoicePdf } from "@/features/business/lib/google-drive";
+import { getInvoiceCounter, setInvoiceCounter } from "@/features/business/lib/google-sheets";
 
 /**
  * Fetches the next invoice number from Google Sheets, falling back to MongoDB on failure.
- * @param request - Current incoming request (used to extract origin and auth header)
  * @returns Next invoice number string, sheet count for write-back, and sync warning flag
  */
-async function getNextInvoiceNumber(request: NextRequest): Promise<{
+async function getNextInvoiceNumber(): Promise<{
   number: string;
   sheetNextCount: number | null;
   sheetSyncWarning: boolean;
 }> {
   try {
-    const origin = new URL(request.url).origin;
-    const res = await fetch(`${origin}/api/business/sheets/invoice-counter`, {
-      headers: { "x-admin-secret": request.headers.get("x-admin-secret") ?? "" },
-    });
-    if (!res.ok) throw new Error("Sheet fetch failed");
-    const data = await res.json();
-    return {
-      number: data.nextFormatted,
-      sheetNextCount: data.nextNumber,
-      sheetSyncWarning: false,
-    };
+    const data = await getInvoiceCounter();
+    return { number: data.nextFormatted, sheetNextCount: data.nextNumber, sheetSyncWarning: false };
   } catch {
-    // Fallback: derive number from MongoDB
     const last = await prisma.invoice.findFirst({ orderBy: { number: "desc" } });
     const now = new Date();
     const fy = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
@@ -72,7 +62,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
-  const { number, sheetNextCount, sheetSyncWarning } = await getNextInvoiceNumber(request);
+  const { number, sheetNextCount, sheetSyncWarning } = await getNextInvoiceNumber();
   const { subtotal, gstAmount, total } = calcInvoiceTotals(lineItems, gst ?? false);
 
   const invoice = await prisma.invoice.create({
@@ -95,23 +85,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // Write back to sheet if we got a count from it
   if (sheetNextCount !== null) {
     try {
-      const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL;
-      if (!appBaseUrl) {
-        throw new Error("NEXT_PUBLIC_APP_URL is not configured");
-      }
-      const counterUrl = new URL("/api/business/sheets/invoice-counter", appBaseUrl);
-      if (!["http:", "https:"].includes(counterUrl.protocol)) {
-        throw new Error("Invalid NEXT_PUBLIC_APP_URL protocol");
-      }
-
-      await fetch(counterUrl.toString(), {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-admin-secret": request.headers.get("x-admin-secret") ?? "",
-        },
-        body: JSON.stringify({ newCount: sheetNextCount }),
-      });
+      await setInvoiceCounter(sheetNextCount);
     } catch {
       // Non-fatal - invoice is already saved
     }
