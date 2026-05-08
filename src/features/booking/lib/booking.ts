@@ -383,3 +383,55 @@ export function validateBookingRequest(
 
   return { valid: true };
 }
+
+/**
+ * Shape of the booking-form fields we validate at the API edge. Each field is
+ * optional because the payload comes from JSON.parse of a request body.
+ */
+export interface BookingPayloadFields {
+  name?: string;
+  email?: string;
+  notes?: string;
+  dateKey?: string;
+  timeOfDay?: string;
+  duration?: string;
+  meetingType?: string;
+  address?: string;
+}
+
+/**
+ * Validates the user-supplied fields on a booking POST/edit payload. Returns
+ * the same `{ valid, error }` shape as `validateBookingRequest` so call sites
+ * can treat both checks uniformly.
+ * @param payload - Request body fields.
+ * @param opts - Validation options.
+ * @param opts.requireEmail - Whether the email field must be present (true for new bookings, false for edits where the email is fixed on the existing record).
+ * @returns Validation result.
+ */
+export function validateBookingPayloadFields(
+  payload: BookingPayloadFields,
+  opts: { requireEmail: boolean },
+): { valid: true } | { valid: false; error: string } {
+  if (!payload.name?.trim()) {
+    return { valid: false, error: "Name is required." };
+  }
+  if (opts.requireEmail && (!payload.email?.trim() || !payload.email.includes("@"))) {
+    return { valid: false, error: "Valid email is required." };
+  }
+  if (!payload.notes?.trim()) {
+    return { valid: false, error: "Please describe what you need help with." };
+  }
+  if (!payload.dateKey || !payload.timeOfDay) {
+    return { valid: false, error: "Please select a day and time." };
+  }
+  if (!payload.duration) {
+    return { valid: false, error: "Please select job duration." };
+  }
+  if (!payload.meetingType) {
+    return { valid: false, error: "Please select in-person or remote." };
+  }
+  if (payload.meetingType === "in-person" && !payload.address?.trim()) {
+    return { valid: false, error: "Address is required for in-person appointments." };
+  }
+  return { valid: true };
+}

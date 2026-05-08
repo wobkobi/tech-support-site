@@ -12,14 +12,7 @@ import {
 } from "@/features/business/lib/business";
 import { ContactPickerModal } from "@/features/business/components/ContactPickerModal";
 import type { LineItem, GoogleContact } from "@/features/business/types/business";
-
-const BUSINESS_DETAILS = {
-  name: "Harrison Raynes",
-  company: "To The Point",
-  email: "harrison@tothepoint.co.nz",
-  phone: "0212971237",
-  bank: "12-3077-0191830-00",
-};
+import { BUSINESS, BUSINESS_BANK_ACCOUNT } from "@/shared/lib/business-identity";
 
 /**
  * Returns a date string (YYYY-MM-DD) for the date that is n days from today.
@@ -405,10 +398,10 @@ export function InvoiceBuilderView({ token }: { token: string }): React.ReactEle
         >
           <div className={cn("mb-6 flex items-start justify-between")}>
             <div>
-              <p className={cn("text-lg font-bold text-slate-800")}>{BUSINESS_DETAILS.company}</p>
-              <p className={cn("text-sm text-slate-500")}>{BUSINESS_DETAILS.name}</p>
-              <p className={cn("text-sm text-slate-500")}>{BUSINESS_DETAILS.email}</p>
-              <p className={cn("text-sm text-slate-500")}>{BUSINESS_DETAILS.phone}</p>
+              <p className={cn("text-lg font-bold text-slate-800")}>{BUSINESS.company}</p>
+              <p className={cn("text-sm text-slate-500")}>{BUSINESS.name}</p>
+              <p className={cn("text-sm text-slate-500")}>{BUSINESS.email}</p>
+              <p className={cn("text-sm text-slate-500")}>{BUSINESS.phone}</p>
             </div>
             <div className={cn("text-right")}>
               <p className={cn("text-russian-violet text-xl font-extrabold")}>INVOICE</p>
@@ -491,7 +484,7 @@ export function InvoiceBuilderView({ token }: { token: string }): React.ReactEle
 
           <div className={cn("mt-6 border-t border-slate-100 pt-4 text-xs text-slate-500")}>
             <p className={cn("mb-1 font-semibold text-slate-600")}>Bank transfer</p>
-            <p>Bank: {BUSINESS_DETAILS.bank}</p>
+            <p>Bank: {BUSINESS_BANK_ACCOUNT}</p>
             <p>Reference: {form.number || "Invoice number"}</p>
             {form.notes && <p className={cn("mt-3 italic")}>{form.notes}</p>}
           </div>

@@ -3,6 +3,7 @@ import sharp from "sharp";
 import fs from "fs/promises";
 import path from "path";
 import type { Invoice } from "@/features/business/types/business";
+import { BUSINESS_BANK_ACCOUNT } from "@/shared/lib/business-identity";
 
 const BRAND = rgb(12 / 255, 10 / 255, 62 / 255); // russian-violet #0c0a3e
 const DARK = rgb(0.15, 0.15, 0.15);
@@ -15,10 +16,6 @@ const MARGIN = 42;
 const PAGE_W = 595.28;
 const PAGE_H = 841.89;
 const CONTENT_W = PAGE_W - MARGIN * 2;
-
-const BUSINESS = {
-  bank: "12-3077-0191830-00",
-};
 
 /**
  * Formats a number as a NZD dollar string.
@@ -301,7 +298,13 @@ export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
   y -= 14;
   page.drawText("Bank transfer", { x: MARGIN, y, size: 8, font: bold, color: DARK });
   y -= 12;
-  page.drawText(`Account: ${BUSINESS.bank}`, { x: MARGIN, y, size: 8, font, color: MID });
+  page.drawText(`Account: ${BUSINESS_BANK_ACCOUNT}`, {
+    x: MARGIN,
+    y,
+    size: 8,
+    font,
+    color: MID,
+  });
   y -= 11;
   page.drawText(`Reference: ${invoice.number}`, { x: MARGIN, y, size: 8, font, color: MID });
 

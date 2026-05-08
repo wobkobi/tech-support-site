@@ -5,6 +5,7 @@
  */
 
 import { Resend } from "resend";
+import { BUSINESS } from "@/shared/lib/business-identity";
 
 /**
  * Escapes HTML special characters so user-supplied values can be safely
@@ -19,6 +20,27 @@ function escapeHtml(value: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+/**
+ * Renders the standard email signature block (logo, name, role, phone, email,
+ * site link, location). Trusted static content; no escaping needed.
+ * @param siteUrl - Canonical site URL for the logo link and footer.
+ * @returns HTML string for the signature.
+ */
+function buildEmailSignature(siteUrl: string): string {
+  return `
+    <div style="margin:32px 0 0;padding-top:24px;border-top:1px solid #e8e8e8">
+      <a href="${siteUrl}" style="display:inline-block;margin-bottom:12px">
+        <img src="${siteUrl}/assets/email-signature-400x135.png" alt="${BUSINESS.company} Tech" width="200" style="display:block;border:0;height:auto" />
+      </a>
+      <p style="margin:0 0 2px;font-size:14px;font-weight:600;color:#0c0a3e">${BUSINESS.name}</p>
+      <p style="margin:0 0 10px;font-size:13px;color:#666">Owner &amp; Technician</p>
+      <p style="margin:0 0 4px;font-size:13px;color:#555">📞 <a href="${BUSINESS.phoneTel}" style="color:#555;text-decoration:none">${BUSINESS.phone}</a></p>
+      <p style="margin:0 0 4px;font-size:13px;color:#555">✉️ <a href="mailto:${BUSINESS.email}" style="color:#43bccd;text-decoration:none">${BUSINESS.email}</a></p>
+      <p style="margin:0 0 4px;font-size:13px;color:#555">🌐 <a href="${siteUrl}" style="color:#43bccd;text-decoration:none">${siteUrl.replace(/^https?:\/\//, "")}</a></p>
+      <p style="margin:0;font-size:12px;color:#999">${BUSINESS.location}</p>
+    </div>`;
 }
 
 // Lazy singleton - created on first use so module import never throws in test environments.
@@ -248,18 +270,7 @@ export async function sendCustomerBookingConfirmation(
     </p>
 
     <a href="${cancelUrl}" style="display:inline-block;background:#e8e8e8;color:#333;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600">Cancel appointment</a>
-
-    <div style="margin:32px 0 0;padding-top:24px;border-top:1px solid #e8e8e8">
-      <a href="${siteUrl}" style="display:inline-block;margin-bottom:12px">
-        <img src="${siteUrl}/assets/email-signature-400x135.png" alt="To The Point Tech" width="200" style="display:block;border:0;height:auto" />
-      </a>
-      <p style="margin:0 0 2px;font-size:14px;font-weight:600;color:#0c0a3e">Harrison Raynes</p>
-      <p style="margin:0 0 10px;font-size:13px;color:#666">Owner &amp; Technician</p>
-      <p style="margin:0 0 4px;font-size:13px;color:#555">📞 <a href="tel:+64212971237" style="color:#555;text-decoration:none">021 297 1237</a></p>
-      <p style="margin:0 0 4px;font-size:13px;color:#555">✉️ <a href="mailto:harrison@tothepoint.co.nz" style="color:#43bccd;text-decoration:none">harrison@tothepoint.co.nz</a></p>
-      <p style="margin:0 0 4px;font-size:13px;color:#555">🌐 <a href="${siteUrl}" style="color:#43bccd;text-decoration:none">tothepoint.co.nz</a></p>
-      <p style="margin:0;font-size:12px;color:#999">Auckland, New Zealand</p>
-    </div>
+${buildEmailSignature(siteUrl)}
   </div>
 </body>
 </html>`;
@@ -325,19 +336,8 @@ export async function sendCustomerReviewRequest(booking: ReviewRequestData): Pro
     <p style="margin:0 0 24px;color:#444;line-height:1.6">It only takes a minute - and honest feedback is always welcome.</p>
     <a href="${reviewUrl}" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:15px">Share your experience →</a>
 
-    <p style="margin:28px 0 20px;color:#444;font-size:14px;line-height:1.6">Thanks again for choosing To The Point Tech. If you ever need a hand with anything else, don't hesitate to get in touch.</p>
-
-    <div style="padding-top:20px;border-top:1px solid #e8e8e8">
-      <a href="${siteUrl}" style="display:inline-block;margin-bottom:12px">
-        <img src="${siteUrl}/assets/email-signature-400x135.png" alt="To The Point Tech" width="200" style="display:block;border:0;height:auto" />
-      </a>
-      <p style="margin:0 0 2px;font-size:14px;font-weight:600;color:#0c0a3e">Harrison Raynes</p>
-      <p style="margin:0 0 10px;font-size:13px;color:#666">Owner &amp; Technician</p>
-      <p style="margin:0 0 4px;font-size:13px;color:#555">📞 <a href="tel:+64212971237" style="color:#555;text-decoration:none">021 297 1237</a></p>
-      <p style="margin:0 0 4px;font-size:13px;color:#555">✉️ <a href="mailto:harrison@tothepoint.co.nz" style="color:#43bccd;text-decoration:none">harrison@tothepoint.co.nz</a></p>
-      <p style="margin:0 0 4px;font-size:13px;color:#555">🌐 <a href="https://tothepoint.co.nz" style="color:#43bccd;text-decoration:none">tothepoint.co.nz</a></p>
-      <p style="margin:0;font-size:12px;color:#999">Auckland, New Zealand</p>
-    </div>
+    <p style="margin:28px 0 20px;color:#444;font-size:14px;line-height:1.6">Thanks again for choosing ${BUSINESS.company} Tech. If you ever need a hand with anything else, don't hesitate to get in touch.</p>
+${buildEmailSignature(siteUrl)}
   </div>
 </body>
 </html>`;
@@ -374,24 +374,13 @@ export function buildPastClientReviewEmailHtml(firstName: string, reviewUrl: str
 <body style="font-family:system-ui,sans-serif;background:#f6f7f8;margin:0;padding:24px">
   <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
     <h2 style="margin:0 0 12px;color:#0c0a3e;font-size:20px">Hi ${safeFirstName},</h2>
-    <p style="margin:0 0 12px;color:#444;line-height:1.6">It's Harrison from To The Point Tech - thanks again for letting me help you out!</p>
+    <p style="margin:0 0 12px;color:#444;line-height:1.6">It's ${BUSINESS.name.split(" ")[0]} from ${BUSINESS.company} Tech - thanks again for letting me help you out!</p>
     <p style="margin:0 0 12px;color:#444;line-height:1.6">I'm in the process of updating my website and building up my reviews section. If you have a spare moment, a quick review would mean a lot - it really helps other people in the area find reliable local tech support.</p>
     <p style="margin:0 0 24px;color:#444;line-height:1.6">No pressure at all, but if you're happy to, I'd really appreciate it.</p>
     <a href="${reviewUrl}" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:15px">Leave a review →</a>
 
     <p style="margin:28px 0 20px;color:#444;font-size:14px;line-height:1.6">If you ever need a hand with anything else, don't hesitate to get in touch.</p>
-
-    <div style="padding-top:20px;border-top:1px solid #e8e8e8">
-      <a href="${siteUrl}" style="display:inline-block;margin-bottom:12px">
-        <img src="${siteUrl}/assets/email-signature-400x135.png" alt="To The Point Tech" width="200" style="display:block;border:0;height:auto" />
-      </a>
-      <p style="margin:0 0 2px;font-size:14px;font-weight:600;color:#0c0a3e">Harrison Raynes</p>
-      <p style="margin:0 0 10px;font-size:13px;color:#666">Owner &amp; Technician</p>
-      <p style="margin:0 0 4px;font-size:13px;color:#555">📞 <a href="tel:+64212971237" style="color:#555;text-decoration:none">021 297 1237</a></p>
-      <p style="margin:0 0 4px;font-size:13px;color:#555">✉️ <a href="mailto:harrison@tothepoint.co.nz" style="color:#43bccd;text-decoration:none">harrison@tothepoint.co.nz</a></p>
-      <p style="margin:0 0 4px;font-size:13px;color:#555">🌐 <a href="https://tothepoint.co.nz" style="color:#43bccd;text-decoration:none">tothepoint.co.nz</a></p>
-      <p style="margin:0;font-size:12px;color:#999">Auckland, New Zealand</p>
-    </div>
+${buildEmailSignature(siteUrl)}
   </div>
 </body>
 </html>`;

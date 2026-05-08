@@ -6,6 +6,7 @@ import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
 import { prisma } from "@/shared/lib/prisma";
 import { formatNZD, formatNZDate } from "@/features/business/lib/business";
 import { cn } from "@/shared/lib/cn";
+import { BUSINESS, BUSINESS_BANK_ACCOUNT } from "@/shared/lib/business-identity";
 import { InvoiceActions } from "./InvoiceActions";
 
 export const dynamic = "force-dynamic";
@@ -13,14 +14,6 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Invoice - Business",
   robots: { index: false, follow: false },
-};
-
-const BUSINESS_DETAILS = {
-  name: "Harrison Raynes",
-  company: "To The Point",
-  email: "harrison@tothepoint.co.nz",
-  phone: "0212971237",
-  bank: "12-3077-0191830-00",
 };
 
 /**
@@ -63,10 +56,10 @@ export default async function InvoiceViewPage({
       >
         <div className={cn("mb-8 flex items-start justify-between")}>
           <div>
-            <p className={cn("text-lg font-bold text-slate-800")}>{BUSINESS_DETAILS.company}</p>
-            <p className={cn("text-sm text-slate-500")}>{BUSINESS_DETAILS.name}</p>
-            <p className={cn("text-sm text-slate-500")}>{BUSINESS_DETAILS.email}</p>
-            <p className={cn("text-sm text-slate-500")}>{BUSINESS_DETAILS.phone}</p>
+            <p className={cn("text-lg font-bold text-slate-800")}>{BUSINESS.company}</p>
+            <p className={cn("text-sm text-slate-500")}>{BUSINESS.name}</p>
+            <p className={cn("text-sm text-slate-500")}>{BUSINESS.email}</p>
+            <p className={cn("text-sm text-slate-500")}>{BUSINESS.phone}</p>
           </div>
           <div className={cn("text-right")}>
             <p className={cn("text-russian-violet text-2xl font-extrabold")}>INVOICE</p>
@@ -154,7 +147,7 @@ export default async function InvoiceViewPage({
 
         <div className={cn("border-t border-slate-100 pt-4 text-xs text-slate-500")}>
           <p className={cn("mb-1 font-semibold text-slate-600")}>Bank transfer</p>
-          <p>Bank: {BUSINESS_DETAILS.bank}</p>
+          <p>Bank: {BUSINESS_BANK_ACCOUNT}</p>
           <p>Reference: {invoice.number}</p>
           {invoice.notes && <p className={cn("mt-3 italic")}>{invoice.notes}</p>}
         </div>
