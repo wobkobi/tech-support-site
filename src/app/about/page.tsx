@@ -33,9 +33,9 @@ export default function AboutPage(): React.ReactElement {
             </h1>
 
             <p className={cn("text-rich-black mb-4 text-sm sm:text-base")}>
-              I'm Harrison, a computer science graduate based in Point Chevalier. I started To The
-              Point Tech because I saw how many people struggle with everyday technology problems
-              but don't have anyone reliable to call.
+              I'm Harrison Raynes, a computer science graduate based in Point Chevalier. I started
+              To The Point Tech because I saw how many people struggle with everyday technology
+              problems but don't have anyone reliable to call.
             </p>
 
             <p className={cn("text-rich-black/80 text-sm sm:text-base")}>

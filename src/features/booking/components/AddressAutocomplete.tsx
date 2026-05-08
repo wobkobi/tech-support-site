@@ -52,7 +52,7 @@ export default function AddressAutocomplete({
 }: AddressAutocompleteProps): React.ReactElement {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [isReady, setIsReady] = useState(false);
   const [scriptError, setScriptError] = useState(false);
   const [apiKeyMissing, setApiKeyMissing] = useState(false);
 
@@ -62,39 +62,42 @@ export default function AddressAutocomplete({
   useEffect(() => {
     if (typeof window === "undefined" || !isVisible) return;
 
-    if (window.google?.maps?.places) {
-      const timer = setTimeout(() => setIsLoaded(true), 0);
-      return () => clearTimeout(timer);
+    if (window.google?.maps?.places?.Autocomplete) {
+      const t = setTimeout(() => setIsReady(true), 0);
+      return () => clearTimeout(t);
     }
 
     const apiKey = process.env.GOOGLE_MAPS_API_KEY;
     if (!apiKey) {
       console.warn("GOOGLE_MAPS_API_KEY not set - address autocomplete disabled.");
-      const timer = setTimeout(() => setApiKeyMissing(true), 0);
-      return () => clearTimeout(timer);
+      const t = setTimeout(() => setApiKeyMissing(true), 0);
+      return () => clearTimeout(t);
     }
 
     const existingScript = document.querySelector(`script[src*="maps.googleapis.com/maps/api/js"]`);
     if (existingScript) {
       /**
-       * Marks the component as loaded when the already-present script fires its load event.
-       * @returns void
+       * Marks the component as ready when the already-present script fires its load event.
        */
-      const handler = (): void => setIsLoaded(true);
+      const handler = (): void => {
+        setIsReady(true);
+      };
       existingScript.addEventListener("load", handler);
       return () => existingScript.removeEventListener("load", handler);
     }
 
     const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+    // loading=async prevents the Maps bootstrap from blocking the main thread
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&loading=async`;
     script.async = true;
     script.defer = true;
 
     /**
-     * Marks the component as loaded once the Maps script finishes loading.
-     * @returns void
+     * Marks the component as ready once the Maps script finishes loading.
      */
-    const handleLoad = (): void => setIsLoaded(true);
+    const handleLoad = (): void => {
+      setIsReady(true);
+    };
 
     /**
      * Logs a detailed error and marks the component as failed.
@@ -122,48 +125,41 @@ export default function AddressAutocomplete({
     };
   }, [isVisible]);
 
-  // Initialise Autocomplete once the Maps API is ready
+  // Mount Autocomplete on the input once Maps is ready
   useEffect(() => {
-    if (!isLoaded || !inputRef.current) return;
+    if (!isReady || !inputRef.current) return;
 
     if (!window.google?.maps?.places?.Autocomplete) {
-      console.error("[AddressAutocomplete] google.maps.places.Autocomplete not found");
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setScriptError(true);
-      return;
+      const t = setTimeout(() => setScriptError(true), 0);
+      return () => clearTimeout(t);
     }
 
     const autocomplete = new google.maps.places.Autocomplete(inputRef.current, {
       componentRestrictions: { country: "nz" },
-      types: ["address"],
       fields: ["formatted_address"],
+      types: ["geocode"],
     });
 
-    /**
-     * Called when the user selects a prediction from the suggestion list.
-     */
-    const handlePlaceChanged = (): void => {
+    const listener = autocomplete.addListener("place_changed", () => {
       const place = autocomplete.getPlace();
       const addr = place.formatted_address ?? "";
       if (addr) {
         onChange(addr);
         onPlaceSelected?.(place);
       }
-    };
-
-    const listener = autocomplete.addListener("place_changed", handlePlaceChanged);
+    });
 
     return () => {
       google.maps.event.removeListener(listener);
     };
     // onChange/onPlaceSelected intentionally omitted: autocomplete is uncontrolled after mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoaded]);
+  }, [isReady]);
 
   const showWarning = apiKeyMissing || scriptError;
 
   return (
-    <div ref={wrapperRef} className={cn("flex w-full flex-col gap-1")}>
+    <div ref={wrapperRef} className="flex w-full flex-col gap-1">
       <input
         ref={inputRef}
         type="text"
@@ -180,10 +176,9 @@ export default function AddressAutocomplete({
         )}
       />
 
-      {/* Warning messages */}
       {apiKeyMissing && (
-        <p className={cn("flex items-start gap-1 text-xs text-yellow-700")}>
-          <span className={cn("mt-0.5")}>⚠️</span>
+        <p className="flex items-start gap-1 text-xs text-yellow-700">
+          <span className="mt-0.5">⚠️</span>
           <span>
             Address autocomplete unavailable. Please type your full address manually. (API key not
             configured)
@@ -192,18 +187,13 @@ export default function AddressAutocomplete({
       )}
 
       {scriptError && (
-        <p className={cn("flex items-start gap-1 text-xs text-yellow-700")}>
-          <span className={cn("mt-0.5")}>⚠️</span>
+        <p className="flex items-start gap-1 text-xs text-yellow-700">
+          <span className="mt-0.5">⚠️</span>
           <span>
             Address autocomplete unavailable. Please type your full address manually. (Failed to
-            load Google Maps - check Application restrictions in Google Cloud Console)
+            load Google Maps)
           </span>
         </p>
-      )}
-
-      {/* Loading indicator */}
-      {!showWarning && !isLoaded && (
-        <p className={cn("text-rich-black/60 text-xs")}>Loading address autocomplete...</p>
       )}
     </div>
   );

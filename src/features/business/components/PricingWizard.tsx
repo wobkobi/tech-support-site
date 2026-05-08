@@ -3,93 +3,51 @@
 import type React from "react";
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { calcPriceRange } from "@/features/business/lib/pricing";
-import type {
-  PublicRate,
-  SelectedService,
-  PriceRange,
-  Urgency,
-  DurationGuess,
-} from "@/features/business/types/pricing";
+import type { PublicRate, PriceRange } from "@/features/business/types/pricing";
+import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import { cn } from "@/shared/lib/cn";
 
 const SOFT_CARD = cn(
   "border-seasalt-400/80 bg-seasalt-900/60 rounded-xl border p-3 text-sm sm:p-4 sm:text-base",
 );
 
-type Step = "services" | "suburb" | "urgency" | "duration" | "results";
-
-const STEPS_WITH_DURATION: Step[] = ["services", "suburb", "urgency", "duration", "results"];
-const STEPS_NO_DURATION: Step[] = ["services", "suburb", "urgency", "results"];
-
-const URGENCY_OPTIONS: { value: Urgency; label: string; desc: string }[] = [
-  { value: "flexible", label: "Flexible", desc: "Whenever works best" },
-  { value: "this-week", label: "This week", desc: "Within a few days" },
-  { value: "asap", label: "ASAP", desc: "Today or tomorrow - after-hours rates may apply" },
-];
-
-const DURATION_OPTIONS: { value: DurationGuess; label: string; desc: string }[] = [
-  { value: "quick", label: "Quick job", desc: "Under 45 minutes" },
-  { value: "hour", label: "About an hour", desc: "45-90 minutes" },
-  { value: "few-hours", label: "A few hours", desc: "More than 90 minutes" },
-  { value: "unsure", label: "Not sure", desc: "I'll use a broad estimate" },
-];
+type Step = "issue" | "address" | "results";
 
 /**
- * Formats a number as a rounded NZD currency string.
+ * Formats a dollar amount as a rounded NZD string.
  * @param amount - Amount in dollars
- * @returns Formatted string (e.g. "$85")
+ * @returns Formatted string e.g. "$85"
  */
 function formatNZD(amount: number): string {
   return `$${amount.toFixed(0)}`;
 }
 
 /**
- * Returns true if a public rate represents a call-out fee.
- * @param rate - Public rate to test
- * @returns Whether the rate is a call-out fee
+ * Formats minutes as a human-readable duration string.
+ * @param mins - Duration in minutes
+ * @returns Formatted string e.g. "About 2 hours"
  */
-function isCallOut(rate: PublicRate): boolean {
-  return rate.label.toLowerCase().includes("call") && rate.flatRate !== null;
+function formatDuration(mins: number): string {
+  if (mins < 60) return `About ${mins} minutes`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  const hourStr = `${h} hour${h === 1 ? "" : "s"}`;
+  return m === 0 ? `About ${hourStr}` : `About ${hourStr} ${m} min`;
 }
 
 /**
- * Returns true if a public rate is a per-kilometre travel rate.
- * @param rate - Public rate to test
- * @returns Whether the rate is charged per km
- */
-function isTravelPerKm(rate: PublicRate): boolean {
-  return rate.unit === "km";
-}
-
-/**
- * Converts a public rate into the SelectedService shape used by calcPriceRange.
- * @param rate - Public rate from the API
- * @returns Selected service object
- */
-function rateToService(rate: PublicRate): SelectedService {
-  return {
-    label: rate.label,
-    type: rate.ratePerHour !== null ? "hourly" : "flat",
-    flatRate: rate.flatRate,
-    ratePerHour: rate.ratePerHour,
-  };
-}
-
-/**
- * Multi-step pricing wizard that fetches live rates and calculates an estimate range.
- * @returns Pricing wizard element
+ * Multi-step wizard that gathers a job description, location, and meeting type,
+ * uses the AI duration estimator to predict job length, and shows a price range.
+ * @returns The rendered wizard.
  */
 export function PricingWizard(): React.ReactElement {
   const [rates, setRates] = useState<PublicRate[]>([]);
   const [loading, setLoading] = useState(true);
-
-  const [step, setStep] = useState<Step>("services");
-  const [selectedServices, setSelectedServices] = useState<SelectedService[]>([]);
-  const [suburb, setSuburb] = useState("");
-  const [travelMins, setTravelMins] = useState(0);
-  const [urgency, setUrgency] = useState<Urgency | null>(null);
-  const [duration, setDuration] = useState<DurationGuess>(null);
+  const [step, setStep] = useState<Step>("issue");
+  const [issueDescription, setIssueDescription] = useState("");
+  const [address, setAddress] = useState("");
+  const [aiExplanation, setAiExplanation] = useState("");
+  const [aiEstimatedMins, setAiEstimatedMins] = useState(0);
   const [result, setResult] = useState<PriceRange | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
 
@@ -103,115 +61,137 @@ export function PricingWizard(): React.ReactElement {
       .catch(() => setLoading(false));
   }, []);
 
-  const selectableRates = rates.filter(
-    (r) => !isCallOut(r) && !isTravelPerKm(r) && !(r.ratePerHour !== null && !r.isDefault),
-  );
-  const afterHoursRate =
-    rates.find((r) => r.label.toLowerCase().includes("after") && r.ratePerHour !== null)
-      ?.ratePerHour ?? null;
+  /** Calls both APIs in parallel then computes a ±20% price range from the AI's time estimate. */
+  async function getEstimate(): Promise<void> {
+    setIsCalculating(true);
 
-  const hasHourly = selectedServices.some((s) => s.type === "hourly");
-  const steps = hasHourly ? STEPS_WITH_DURATION : STEPS_NO_DURATION;
-  const stepIndex = steps.indexOf(step);
-  const totalSteps = steps.length - 1;
+    // Strip trailing ", New Zealand" — travel-time API appends it automatically
+    const dest = address
+      .trim()
+      .replace(/,?\s*New Zealand$/i, "")
+      .trim();
 
-  /**
-   * Toggles a rate's selection in the services step.
-   * @param rate - Public rate to toggle
-   */
-  function toggleService(rate: PublicRate): void {
-    const service = rateToService(rate);
-    setSelectedServices((prev) => {
-      const exists = prev.some((s) => s.label === service.label);
-      return exists ? prev.filter((s) => s.label !== service.label) : [...prev, service];
-    });
-  }
+    const [travelRes, estimateRes] = await Promise.allSettled([
+      dest
+        ? fetch("/api/pricing/travel-time", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ destination: dest }),
+          }).then((r) => r.json() as Promise<{ durationMins?: number }>)
+        : Promise.resolve({ durationMins: 0 }),
+      fetch("/api/pricing/estimate-duration", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: issueDescription }),
+      }).then(
+        (r) =>
+          r.json() as Promise<{
+            ok: boolean;
+            result?: {
+              estimatedMins: number;
+              category: "standard" | "complex";
+              explanation: string;
+            };
+          }>,
+      ),
+    ]);
 
-  /**
-   * Advances to the next wizard step, fetching drive time when leaving the suburb step.
-   */
-  async function nextStep(): Promise<void> {
-    let mins = travelMins;
+    const travelMins = travelRes.status === "fulfilled" ? (travelRes.value.durationMins ?? 0) : 0;
 
-    if (step === "suburb" && suburb.trim()) {
-      setIsCalculating(true);
-      try {
-        const res = await fetch("/api/pricing/travel-time", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ destination: suburb.trim() }),
-        });
-        const data = (await res.json()) as { durationMins?: number };
-        mins = data.durationMins ?? 0;
-        setTravelMins(mins);
-      } catch {
-        mins = 0;
+    let estimatedMins = 60;
+    let ratePerHour = 65;
+    let explanation = "";
+
+    if (estimateRes.status === "fulfilled" && estimateRes.value.ok && estimateRes.value.result) {
+      const ai = estimateRes.value.result;
+      estimatedMins = ai.estimatedMins;
+      explanation = ai.explanation;
+
+      const hourlyRates = rates
+        .filter(
+          (r) =>
+            r.ratePerHour !== null && r.unit !== "km" && !r.label.toLowerCase().includes("call"),
+        )
+        .map((r) => r.ratePerHour!);
+
+      if (hourlyRates.length > 0) {
+        ratePerHour =
+          ai.category === "complex" ? Math.max(...hourlyRates) : Math.min(...hourlyRates);
       }
-      setIsCalculating(false);
     }
 
-    const currentIdx = steps.indexOf(step);
-    const next = steps[currentIdx + 1];
-    if (next === "results") {
-      const range = calcPriceRange(
-        selectedServices,
-        urgency ?? "flexible",
-        duration ?? "unsure",
-        mins,
-        afterHoursRate,
-      );
-      setResult(range);
-    }
-    if (next) setStep(next);
+    setAiExplanation(explanation);
+    setAiEstimatedMins(estimatedMins);
+
+    // Compute ±20% range directly from estimated minutes
+    const jobCost = (estimatedMins / 60) * ratePerHour;
+    const travelCost = (travelMins / 60) * ratePerHour;
+    const jobLow = Math.floor((jobCost * 0.8) / 10) * 10;
+    const jobHigh = Math.max(Math.ceil((jobCost * 1.2) / 10) * 10, jobLow + 30);
+    const travelRounded = Math.round(travelCost / 10) * 10;
+
+    const range: PriceRange = {
+      low: jobLow + travelRounded,
+      high: jobHigh + travelRounded,
+      breakdown: [
+        { label: "Tech support", low: jobLow, high: jobHigh, note: null },
+        ...(travelRounded > 0
+          ? [{ label: "Drive time", low: travelRounded, high: travelRounded, note: null }]
+          : []),
+      ],
+      includesTravel: travelRounded > 0,
+      includesAfterHours: false,
+    };
+
+    setResult(range);
+    setIsCalculating(false);
+    setStep("results");
   }
 
-  /**
-   * Returns to the previous wizard step.
-   */
+  /** Advances to the next step, or triggers estimate calculation on the address step. */
+  async function nextStep(): Promise<void> {
+    if (step === "address") {
+      await getEstimate();
+      return;
+    }
+    setStep("address");
+  }
+
+  /** Returns to the previous step. */
   function prevStep(): void {
-    const currentIdx = steps.indexOf(step);
-    const prev = steps[currentIdx - 1];
-    if (prev) setStep(prev);
+    if (step === "address") setStep("issue");
   }
 
-  /**
-   * Resets all wizard state back to the first step.
-   */
+  /** Resets all wizard state back to the first step. */
   function reset(): void {
-    setStep("services");
-    setSelectedServices([]);
-    setSuburb("");
-    setTravelMins(0);
-    setUrgency(null);
-    setDuration(null);
+    setStep("issue");
+    setIssueDescription("");
+    setAddress("");
+    setAiExplanation("");
+    setAiEstimatedMins(0);
     setResult(null);
   }
 
   /**
-   * Returns whether the current step has a valid selection to advance.
-   * @returns True if the user can proceed to the next step
+   * Returns whether the current step has enough input to advance.
+   * @returns True if the user can proceed
    */
   function canAdvance(): boolean {
-    if (step === "services") return selectedServices.length > 0;
-    if (step === "suburb") return true;
-    if (step === "urgency") return urgency !== null;
-    if (step === "duration") return duration !== null;
+    if (step === "issue") return issueDescription.trim().length > 0;
     return true;
   }
 
-  const displayStepCount = stepIndex < totalSteps ? stepIndex + 1 : totalSteps;
+  const stepIndex = step === "issue" ? 0 : 1;
 
   if (loading) {
     return <div className="py-8 text-center text-sm text-slate-400">Loading calculator...</div>;
   }
 
-  if (selectableRates.length === 0) return <></>;
-
   return (
     <div>
       {step !== "results" && (
         <div className="mb-6 flex items-center gap-2">
-          {Array.from({ length: totalSteps }, (_, i) => (
+          {[0, 1].map((i) => (
             <div
               key={i}
               className={cn(
@@ -224,158 +204,63 @@ export function PricingWizard(): React.ReactElement {
               )}
             />
           ))}
-          <span className="ml-2 whitespace-nowrap text-xs text-slate-400">
-            {displayStepCount} / {totalSteps}
-          </span>
+          <span className="ml-2 whitespace-nowrap text-xs text-slate-400">{stepIndex + 1} / 2</span>
         </div>
       )}
 
-      {step === "services" && (
+      {step === "issue" && (
         <div>
-          <h3 className={cn("text-russian-violet mb-1 text-lg font-bold")}>
-            What do you need help with?
-          </h3>
-          <p className="mb-4 text-sm text-slate-500">Select all that apply</p>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {selectableRates.map((rate) => {
-              const selected = selectedServices.some((s) => s.label === rate.label);
-              return (
-                <button
-                  key={rate.label}
-                  onClick={() => toggleService(rate)}
-                  className={cn(
-                    "rounded-xl border p-4 text-left transition-all",
-                    selected
-                      ? "border-russian-violet bg-russian-violet/5 ring-russian-violet ring-1"
-                      : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50",
-                  )}
-                >
-                  <p
-                    className={cn(
-                      "font-medium",
-                      selected ? "text-russian-violet" : "text-slate-700",
-                    )}
-                  >
-                    {rate.label}
-                  </p>
-                  <p className="mt-0.5 text-xs text-slate-500">
-                    {rate.ratePerHour !== null
-                      ? `${formatNZD(rate.ratePerHour)}/hr`
-                      : rate.flatRate !== null
-                        ? `From ${formatNZD(rate.flatRate)}`
-                        : ""}
-                  </p>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {step === "suburb" && (
-        <div>
-          <h3 className={cn("text-russian-violet mb-1 text-lg font-bold")}>
-            Where are you located?
-          </h3>
+          <h3 className="text-coquelicot mb-1 text-lg font-bold">What do you need help with?</h3>
           <p className="mb-4 text-sm text-slate-500">
-            Enter your suburb to factor in drive time, or leave blank to skip.
+            Describe the issue or job - the more detail, the better the estimate.
           </p>
-          <input
-            type="text"
-            value={suburb}
-            onChange={(e) => setSuburb(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") void nextStep();
-            }}
-            placeholder="e.g. Papanui, Halswell, Rolleston..."
+          <textarea
+            rows={4}
+            value={issueDescription}
+            onChange={(e) => setIssueDescription(e.target.value)}
+            placeholder="e.g. My laptop is running really slow and I think it has a virus. Also want to set up my new phone."
             className={cn(
-              "w-full rounded-xl border px-4 py-3 text-sm text-slate-700 outline-none transition-all",
-              "border-seasalt-400/80 bg-white",
-              "focus:border-russian-violet focus:ring-russian-violet focus:ring-1",
+              "w-full resize-none rounded-xl border px-4 py-3 text-sm text-slate-700 outline-none transition-all",
+              "border-coquelicot/40 bg-white",
+              "focus:border-coquelicot focus:ring-coquelicot/30 focus:ring-2",
             )}
           />
         </div>
       )}
 
-      {step === "urgency" && (
+      {step === "address" && (
         <div>
-          <h3 className={cn("text-russian-violet mb-1 text-lg font-bold")}>When do you need it?</h3>
-          <p className="mb-4 text-sm text-slate-500">Urgent jobs may attract after-hours rates</p>
-          <div className="flex flex-col gap-3">
-            {URGENCY_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => setUrgency(opt.value)}
-                className={cn(
-                  "rounded-xl border p-4 text-left transition-all",
-                  urgency === opt.value
-                    ? "border-russian-violet bg-russian-violet/5 ring-russian-violet ring-1"
-                    : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50",
-                )}
-              >
-                <p
-                  className={cn(
-                    "font-medium",
-                    urgency === opt.value ? "text-russian-violet" : "text-slate-700",
-                  )}
-                >
-                  {opt.label}
-                </p>
-                <p className="mt-0.5 text-xs text-slate-500">{opt.desc}</p>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {step === "duration" && (
-        <div>
-          <h3 className={cn("text-russian-violet mb-1 text-lg font-bold")}>
-            How long do you think it might take?
-          </h3>
+          <h3 className="text-russian-violet mb-1 text-lg font-bold">Where are you located?</h3>
           <p className="mb-4 text-sm text-slate-500">
-            A rough guess is fine - I'll confirm before starting
+            Enter your address to include drive time, or skip for an estimate without travel.
           </p>
-          <div className="flex flex-col gap-3">
-            {DURATION_OPTIONS.map((opt) => (
-              <button
-                key={opt.value ?? "unsure"}
-                onClick={() => setDuration(opt.value)}
-                className={cn(
-                  "rounded-xl border p-4 text-left transition-all",
-                  duration === opt.value
-                    ? "border-russian-violet bg-russian-violet/5 ring-russian-violet ring-1"
-                    : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50",
-                )}
-              >
-                <p
-                  className={cn(
-                    "font-medium",
-                    duration === opt.value ? "text-russian-violet" : "text-slate-700",
-                  )}
-                >
-                  {opt.label}
-                </p>
-                <p className="mt-0.5 text-xs text-slate-500">{opt.desc}</p>
-              </button>
-            ))}
-          </div>
+          <AddressAutocomplete
+            value={address}
+            onChange={setAddress}
+            placeholder="Start typing your address..."
+          />
         </div>
       )}
 
       {step === "results" && result && (
         <div>
-          <div className="border-russian-violet/20 bg-russian-violet/5 mb-6 rounded-2xl border p-6 text-center">
-            <p className="mb-1 text-sm font-medium text-slate-500">Estimated cost range</p>
-            <p className="text-russian-violet text-4xl font-extrabold">
-              {formatNZD(result.low)} - {formatNZD(result.high)}
+          <div className="border-russian-violet/20 bg-russian-violet/5 mb-4 rounded-2xl border p-6 text-center">
+            {aiEstimatedMins > 0 && (
+              <p className="text-rich-black mb-3 text-2xl font-bold sm:text-3xl">
+                {formatDuration(aiEstimatedMins)}
+              </p>
+            )}
+            <p className="mb-1 text-sm font-medium text-slate-500">Estimated cost</p>
+            <p className="text-russian-violet text-4xl font-extrabold sm:text-5xl">
+              {formatNZD(result.low)} – {formatNZD(result.high)}
             </p>
-            <p className="mt-1 text-xs text-slate-400">
+            <p className="mt-2 text-xs text-slate-400">
               {result.includesTravel && "Includes drive time. "}
-              {result.includesAfterHours && "After-hours rate applied. "}
-              All prices in NZD.
+              All prices in NZD. No GST.
             </p>
           </div>
+
+          {aiExplanation && <p className="mb-4 text-sm text-slate-500">{aiExplanation}</p>}
 
           {result.breakdown.length > 0 && (
             <div className={cn(SOFT_CARD, "mb-4")}>
@@ -385,12 +270,7 @@ export function PricingWizard(): React.ReactElement {
               <div className="divide-y divide-slate-100">
                 {result.breakdown.map((line, i) => (
                   <div key={i} className="flex items-baseline justify-between py-1.5">
-                    <span className="text-slate-700">
-                      {line.label}
-                      {line.note && (
-                        <span className="ml-1 text-xs text-amber-600">({line.note})</span>
-                      )}
-                    </span>
+                    <span className="text-slate-700">{line.label}</span>
                     <span className="ml-4 whitespace-nowrap font-medium text-slate-700">
                       {line.low === line.high
                         ? formatNZD(line.low)
@@ -432,7 +312,7 @@ export function PricingWizard(): React.ReactElement {
 
       {step !== "results" && (
         <div className="mt-6 flex gap-3">
-          {stepIndex > 0 && (
+          {step === "address" && (
             <button
               onClick={prevStep}
               className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
@@ -450,11 +330,7 @@ export function PricingWizard(): React.ReactElement {
                 : "cursor-not-allowed bg-slate-300",
             )}
           >
-            {isCalculating
-              ? "Calculating..."
-              : steps[stepIndex + 1] === "results"
-                ? "Get estimate"
-                : "Next"}
+            {isCalculating ? "Estimating..." : step === "address" ? "Get a rough estimate" : "Next"}
           </button>
         </div>
       )}

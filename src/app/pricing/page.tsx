@@ -64,6 +64,16 @@ export default function PricingPage(): React.ReactElement {
               </div>
             </div>
 
+            <a
+              href="#estimate-heading"
+              className={cn(
+                "mt-5 inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white",
+                "bg-russian-violet hover:bg-russian-violet/90 transition-colors",
+              )}
+            >
+              Get a rough estimate ↓
+            </a>
+
             <div className={cn("mt-5 space-y-3")}>
               <p className={cn("text-rich-black/90 flex gap-3 text-sm sm:text-base")}>
                 <span className={cn("text-moonstone-600 mt-1 text-lg")}>✓</span>
