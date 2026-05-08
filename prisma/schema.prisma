@@ -229,7 +229,15 @@ model IncomeEntry {
   method      String
   notes       String?
   invoiceId   String?  @db.ObjectId
+  // Stable identifier shared with the corresponding row in the per-FY Google Sheet
+  // (Cashbook tab, hidden column Z). Set when the entry is first written to a sheet
+  // or backfilled by the import. Used for upsert-by-id sync in both directions.
+  // Not @unique because MongoDB's unique index rejects multiple null values during
+  // backfill; collisions are vanishingly unlikely with crypto.randomUUID().
+  sheetRowKey String?
   createdAt   DateTime @default(now())
+
+  @@index([sheetRowKey])
 }
 
 model ExpenseEntry {
@@ -244,7 +252,21 @@ model ExpenseEntry {
   method      String
   receipt     Boolean  @default(false)
   notes       String?
+  // Stable identifier shared with the corresponding row in the per-FY Google Sheet
+  // (Expenses tab, hidden column Z). See IncomeEntry.sheetRowKey for details.
+  sheetRowKey String?
   createdAt   DateTime @default(now())
+
+  @@index([sheetRowKey])
+}
+
+// Singleton-ish key/value store for small pieces of cross-app config that
+// previously lived in the Google Sheet SETTINGS tab (e.g. the invoice counter).
+model Setting {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
 }
 
 model TaskTemplate {

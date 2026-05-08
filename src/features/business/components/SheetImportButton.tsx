@@ -4,6 +4,16 @@ import { useState } from "react";
 import type React from "react";
 import { cn } from "@/shared/lib/cn";
 
+interface PerSheetCounts {
+  fileId: string;
+  name: string;
+  incomeImported: number;
+  incomeSkipped: number;
+  expensesImported: number;
+  expensesSkipped: number;
+  errors: string[];
+}
+
 interface ImportResult {
   ok: boolean;
   incomeImported: number;
@@ -11,6 +21,8 @@ interface ImportResult {
   expensesImported: number;
   expensesSkipped: number;
   errors: string[];
+  perSheet?: PerSheetCounts[];
+  source?: "folder" | "single";
 }
 
 /**
@@ -77,13 +89,27 @@ export function SheetImportButton({ token }: { token: string }): React.ReactElem
             "mb-3 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800",
           )}
         >
-          <p className="font-medium">Import complete</p>
+          <p className="font-medium">
+            Import complete
+            {done.source === "folder" && done.perSheet && ` - ${done.perSheet.length} sheet(s)`}
+          </p>
           <p>
             Income: {done.incomeImported} imported, {done.incomeSkipped} skipped
           </p>
           <p>
             Expenses: {done.expensesImported} imported, {done.expensesSkipped} skipped
           </p>
+          {done.perSheet && done.perSheet.length > 0 && (
+            <ul className={cn("mt-2 list-inside list-disc text-xs text-green-900/80")}>
+              {done.perSheet.map((s) => (
+                <li key={s.fileId}>
+                  <span className="font-medium">{s.name}</span>: {s.incomeImported} income,{" "}
+                  {s.expensesImported} expenses
+                  {s.errors.length > 0 && ` (${s.errors.length} errors)`}
+                </li>
+              ))}
+            </ul>
+          )}
           {done.errors.length > 0 && (
             <p className="mt-1 text-amber-700">{done.errors.length} row errors - check console</p>
           )}
@@ -96,7 +122,12 @@ export function SheetImportButton({ token }: { token: string }): React.ReactElem
             "mb-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700",
           )}
         >
-          <p className="mb-1 font-medium">Preview (no changes made yet)</p>
+          <p className="mb-1 font-medium">
+            Preview (no changes made yet)
+            {preview.source === "folder" &&
+              preview.perSheet &&
+              ` - ${preview.perSheet.length} sheet(s) found`}
+          </p>
           <p>
             Income: {preview.incomeImported} to import, {preview.incomeSkipped} already exist or
             invalid
@@ -105,6 +136,16 @@ export function SheetImportButton({ token }: { token: string }): React.ReactElem
             Expenses: {preview.expensesImported} to import, {preview.expensesSkipped} already exist
             or invalid
           </p>
+          {preview.perSheet && preview.perSheet.length > 0 && (
+            <ul className={cn("mt-2 list-inside list-disc text-xs text-slate-600")}>
+              {preview.perSheet.map((s) => (
+                <li key={s.fileId}>
+                  <span className="font-medium">{s.name}</span>: {s.incomeImported} income,{" "}
+                  {s.expensesImported} expenses to import
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
 

@@ -1,5 +1,6 @@
 import { prisma } from "@/shared/lib/prisma";
 import { getSheetsClient, getSheetId } from "@/features/business/lib/google-sheets";
+import { listSpreadsheetsInFolder } from "@/features/business/lib/google-drive";
 import { calcGstFromInclusive } from "@/features/business/lib/business";
 
 /**
@@ -47,8 +48,11 @@ function parseGstRate(raw: string): number {
   return isNaN(n) ? 0.15 : n > 1 ? n / 100 : n;
 }
 
-export interface ImportResult {
-  ok: boolean;
+export interface PerSheetCounts {
+  /** Drive file ID of the spreadsheet that was imported. */
+  fileId: string;
+  /** Display name of the spreadsheet. */
+  name: string;
   incomeImported: number;
   incomeSkipped: number;
   expensesImported: number;
@@ -56,15 +60,39 @@ export interface ImportResult {
   errors: string[];
 }
 
-/**
- * Reads Cashbook and Expenses tabs and imports or previews rows.
- * @param dryRun - When true, counts rows without writing to the database.
- * @returns Import result with counts and any row-level errors.
- */
-export async function runSheetsImport(dryRun: boolean): Promise<ImportResult> {
-  const sheets = getSheetsClient();
-  const spreadsheetId = getSheetId();
+export interface ImportResult {
+  ok: boolean;
+  /** Aggregated counts across every spreadsheet processed. */
+  incomeImported: number;
+  incomeSkipped: number;
+  expensesImported: number;
+  expensesSkipped: number;
+  errors: string[];
+  /** Per-spreadsheet breakdown when scanning a Drive folder. */
+  perSheet?: PerSheetCounts[];
+  /** Source mode used: "folder" when scanning, "single" when falling back to GOOGLE_SHEET_ID. */
+  source?: "folder" | "single";
+}
 
+/**
+ * Reads the Cashbook and Expenses tabs of a single spreadsheet and imports
+ * (or previews) rows. Dedup is by date + amount + description so re-running
+ * is a no-op. Errors on individual rows are captured and do not abort the run.
+ * @param spreadsheetId - The Google Sheet ID to read.
+ * @param dryRun - When true, counts rows without writing to the database.
+ * @returns Counts and any row-level errors.
+ */
+async function importFromSheet(
+  spreadsheetId: string,
+  dryRun: boolean,
+): Promise<{
+  incomeImported: number;
+  incomeSkipped: number;
+  expensesImported: number;
+  expensesSkipped: number;
+  errors: string[];
+}> {
+  const sheets = getSheetsClient();
   const res = await sheets.spreadsheets.values.batchGet({
     spreadsheetId,
     ranges: ["Cashbook!A:H", "Expenses!A:K"],
@@ -176,5 +204,58 @@ export async function runSheetsImport(dryRun: boolean): Promise<ImportResult> {
     }
   }
 
-  return { ok: true, incomeImported, incomeSkipped, expensesImported, expensesSkipped, errors };
+  return { incomeImported, incomeSkipped, expensesImported, expensesSkipped, errors };
+}
+
+/**
+ * Imports Cashbook and Expenses rows. When `GOOGLE_BUSINESS_SHEETS_FOLDER_ID`
+ * is set, scans that Drive folder and imports every spreadsheet inside; this
+ * is the path you want for one-sheet-per-financial-year. Otherwise falls back
+ * to importing from `GOOGLE_SHEET_ID` only.
+ * @param dryRun - When true, counts rows without writing to the database.
+ * @returns Aggregate counts plus a per-spreadsheet breakdown.
+ */
+export async function runSheetsImport(dryRun: boolean): Promise<ImportResult> {
+  const folderId = process.env.GOOGLE_BUSINESS_SHEETS_FOLDER_ID?.trim();
+
+  if (folderId) {
+    const sheetsToImport = await listSpreadsheetsInFolder(folderId);
+    const aggregate: Omit<ImportResult, "ok" | "perSheet" | "source"> = {
+      incomeImported: 0,
+      incomeSkipped: 0,
+      expensesImported: 0,
+      expensesSkipped: 0,
+      errors: [],
+    };
+    const perSheet: PerSheetCounts[] = [];
+
+    for (const sheet of sheetsToImport) {
+      try {
+        const counts = await importFromSheet(sheet.fileId, dryRun);
+        aggregate.incomeImported += counts.incomeImported;
+        aggregate.incomeSkipped += counts.incomeSkipped;
+        aggregate.expensesImported += counts.expensesImported;
+        aggregate.expensesSkipped += counts.expensesSkipped;
+        aggregate.errors.push(...counts.errors.map((e) => `[${sheet.name}] ${e}`));
+        perSheet.push({ fileId: sheet.fileId, name: sheet.name, ...counts });
+      } catch (err) {
+        const message = `[${sheet.name}] ${String(err)}`;
+        aggregate.errors.push(message);
+        perSheet.push({
+          fileId: sheet.fileId,
+          name: sheet.name,
+          incomeImported: 0,
+          incomeSkipped: 0,
+          expensesImported: 0,
+          expensesSkipped: 0,
+          errors: [message],
+        });
+      }
+    }
+
+    return { ok: true, source: "folder", perSheet, ...aggregate };
+  }
+
+  const counts = await importFromSheet(getSheetId(), dryRun);
+  return { ok: true, source: "single", ...counts };
 }
