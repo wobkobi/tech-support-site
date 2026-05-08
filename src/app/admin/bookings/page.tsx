@@ -31,8 +31,11 @@ export default async function AdminBookingsPage({
   const { token } = await searchParams;
   const t = requireAdminToken(token);
 
+  // Soft cap to prevent unbounded scans as the booking history grows.
+  // Swap for cursor pagination if more than the most recent 1000 bookings ever needs to be visible.
   const allBookings = await prisma.booking.findMany({
     orderBy: { startAt: "desc" },
+    take: 1000,
     select: {
       id: true,
       name: true,

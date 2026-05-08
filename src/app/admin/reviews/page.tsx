@@ -31,9 +31,13 @@ export default async function AdminReviewsPage({
   const { token } = await searchParams;
   const t = requireAdminToken(token);
 
+  // Soft caps to prevent unbounded scans as data grows. The page joins these
+  // sets to build a unified link history; if the most recent 1000 ever stops
+  // being enough, swap in cursor pagination per section.
   const [reviews, sentBookings, sentRequests, allContacts] = await Promise.all([
     prisma.review.findMany({
       orderBy: { createdAt: "desc" },
+      take: 1000,
       select: {
         id: true,
         text: true,
@@ -50,6 +54,7 @@ export default async function AdminReviewsPage({
     prisma.booking.findMany({
       where: { reviewSentAt: { not: null } },
       orderBy: { reviewSentAt: "desc" },
+      take: 1000,
       select: {
         id: true,
         name: true,
@@ -61,6 +66,7 @@ export default async function AdminReviewsPage({
     }),
     prisma.reviewRequest.findMany({
       orderBy: { createdAt: "desc" },
+      take: 1000,
       select: {
         id: true,
         name: true,
@@ -73,6 +79,7 @@ export default async function AdminReviewsPage({
     }),
     prisma.contact.findMany({
       orderBy: { createdAt: "desc" },
+      take: 1000,
       select: { id: true, name: true, email: true, phone: true, address: true },
     }),
   ]);
