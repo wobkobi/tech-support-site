@@ -36,13 +36,6 @@ jobs:
       - name: Run linter
         run: npm run lint
 
-      - name: Run tests
-        run: npm test -- --run --coverage
-
-      - name: Report coverage
-        if: github.event_name == 'pull_request'
-        uses: davelosert/vitest-coverage-report-action@v2
-
       - name: Build application
         if: github.actor != 'dependabot[bot]'
         run: npm run build

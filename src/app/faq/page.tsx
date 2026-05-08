@@ -69,7 +69,7 @@ const faqItems: ReadonlyArray<FaqItem> = [
     answer: (
       <>
         <p>
-          $50/h for most jobs. $75/h for complex or lengthy work - data recovery, hardware repairs,
+          $65/h for most jobs. $85/h for complex or lengthy work - data recovery, hardware repairs,
           or full PC migrations. I'll confirm the rate before starting.
         </p>
         <p className={cn("text-rich-black/80 mt-2")}>
@@ -142,7 +142,7 @@ const faqItems: ReadonlyArray<FaqItem> = [
 export default function FaqPage(): React.ReactElement {
   return (
     <PageShell>
-      <FrostedSection maxWidth="56rem">
+      <FrostedSection>
         <div className={cn("flex flex-col gap-6 sm:gap-8")}>
           <section aria-labelledby="faq-heading" className={cn(CARD, "animate-fade-in")}>
             <h1
@@ -166,30 +166,36 @@ export default function FaqPage(): React.ReactElement {
             aria-label="FAQ list"
             className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}
           >
-            <div className={cn("space-y-4")}>
-              {faqItems.map((item) => (
-                <details key={item.question} className={cn(SOFT_CARD, "group")}>
-                  <summary
-                    className={cn(
-                      "text-rich-black flex cursor-pointer select-text items-center justify-between gap-3 text-sm font-semibold sm:text-base",
-                      "list-none [&::-webkit-details-marker]:hidden",
-                    )}
-                  >
-                    <span>{item.question}</span>
-                    <span
-                      className={cn(
-                        "text-moonstone-600 shrink-0 text-lg transition-transform duration-200 group-open:rotate-180",
-                      )}
-                      aria-hidden
-                    >
-                      ▾
-                    </span>
-                  </summary>
-                  <div className={cn("text-rich-black/90 mt-3 text-sm sm:text-base")}>
-                    {item.answer}
+            <div className={cn("flex flex-col gap-4 sm:flex-row sm:items-start")}>
+              {[faqItems.filter((_, i) => i % 2 === 0), faqItems.filter((_, i) => i % 2 !== 0)].map(
+                (col, colIdx) => (
+                  <div key={colIdx} className={cn("flex flex-1 flex-col gap-4")}>
+                    {col.map((item) => (
+                      <details key={item.question} className={cn(SOFT_CARD, "group")}>
+                        <summary
+                          className={cn(
+                            "text-rich-black flex cursor-pointer select-text items-center justify-between gap-3 text-sm font-semibold sm:text-base",
+                            "list-none [&::-webkit-details-marker]:hidden",
+                          )}
+                        >
+                          <span>{item.question}</span>
+                          <span
+                            className={cn(
+                              "text-moonstone-600 shrink-0 text-lg transition-transform duration-200 group-open:rotate-180",
+                            )}
+                            aria-hidden
+                          >
+                            ▾
+                          </span>
+                        </summary>
+                        <div className={cn("text-rich-black/90 mt-3 text-sm sm:text-base")}>
+                          {item.answer}
+                        </div>
+                      </details>
+                    ))}
                   </div>
-                </details>
-              ))}
+                ),
+              )}
             </div>
           </section>
 

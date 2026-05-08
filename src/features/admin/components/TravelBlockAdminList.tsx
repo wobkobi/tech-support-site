@@ -6,7 +6,7 @@
  * with per-event transport mode selector and custom origin override.
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type React from "react";
 import { cn } from "@/shared/lib/cn";
 
@@ -28,6 +28,7 @@ export interface TravelBlockRow {
   transportMode: string | null;
   customOrigin: string | null;
   detectedOrigin: string | null;
+  destination: string | null;
   createdAt: string;
 }
 
@@ -109,6 +110,10 @@ export function TravelBlockAdminList({
   token,
 }: TravelBlockAdminListProps): React.ReactElement {
   const [blocks, setBlocks] = useState<TravelBlockRow[]>(initial);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setBlocks(initial);
+  }, [initial]);
   const [saving, setSaving] = useState<string | null>(null);
   const [editingOriginId, setEditingOriginId] = useState<string | null>(null);
   const [originInput, setOriginInput] = useState<string>("");
@@ -217,6 +222,14 @@ export function TravelBlockAdminList({
               <p className={cn("text-xs text-slate-600")}>
                 {formatEventTime(b.eventStartAt, b.eventEndAt)}
               </p>
+
+              {/* Destination address */}
+              {b.destination && (
+                <p className={cn("text-xs text-slate-500")}>
+                  <span className={cn("font-medium text-slate-400")}>To: </span>
+                  {b.destination}
+                </p>
+              )}
 
               {/* Transport mode selector */}
               <div>

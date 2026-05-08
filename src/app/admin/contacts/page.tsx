@@ -1,11 +1,10 @@
 // src/app/admin/contacts/page.tsx
 import type { Metadata } from "next";
 import type React from "react";
-import { notFound } from "next/navigation";
 import { prisma } from "@/shared/lib/prisma";
-import { isValidAdminToken } from "@/shared/lib/auth";
+import { requireAdminToken } from "@/shared/lib/auth";
 import { cn } from "@/shared/lib/cn";
-import { AdminSidebar } from "@/features/admin/components/AdminSidebar";
+import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
 import { ContactsAdminView } from "@/features/admin/components/ContactsAdminView";
 import { autoMaintain } from "@/features/admin/lib/auto-maintain";
 
@@ -28,15 +27,8 @@ export default async function AdminContactsPage({
   searchParams: Promise<{ token?: string }>;
 }): Promise<React.ReactElement> {
   const { token } = await searchParams;
+  const t = requireAdminToken(token);
 
-  if (!isValidAdminToken(token ?? null)) {
-    console.warn("[admin/contacts] Invalid token attempt", { tokenPresent: Boolean(token) });
-    notFound();
-  }
-
-  const t = token!;
-
-  // Run maintenance: backfill contacts, link reviews, enrich fields, collect conflicts.
   const initialConflicts = await autoMaintain(prisma);
 
   const [allContacts, reviews] = await Promise.all([
@@ -101,21 +93,14 @@ export default async function AdminContactsPage({
   }));
 
   return (
-    <div className={cn("flex min-h-screen")}>
-      <AdminSidebar token={t} current="contacts" />
-
-      <div className={cn("ml-56 flex-1 bg-slate-50")}>
-        <div className={cn("mx-auto max-w-7xl px-6 py-8")}>
-          <h1 className={cn("text-russian-violet mb-6 text-2xl font-extrabold")}>
-            Contacts
-            <span className={cn("ml-3 text-lg font-semibold text-slate-400")}>
-              {allContacts.length}
-            </span>
-          </h1>
-
-          <ContactsAdminView initialConflicts={initialConflicts} contacts={contactRows} token={t} />
-        </div>
-      </div>
-    </div>
+    <AdminPageLayout token={t} current="contacts">
+      <h1 className={cn("text-russian-violet mb-6 text-2xl font-extrabold")}>
+        Contacts
+        <span className={cn("ml-3 text-lg font-semibold text-slate-400")}>
+          {allContacts.length}
+        </span>
+      </h1>
+      <ContactsAdminView initialConflicts={initialConflicts} contacts={contactRows} token={t} />
+    </AdminPageLayout>
   );
 }

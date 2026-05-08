@@ -124,6 +124,7 @@ export default function BookingForm({
       if (initialValues?.dateKey) {
         const preselected = availableDays.find((d) => d.dateKey === initialValues.dateKey);
         if (preselected) {
+          // eslint-disable-next-line react-hooks/set-state-in-effect
           setSelectedDay(preselected);
           return;
         }

@@ -69,7 +69,8 @@ function ReviewCard({
   return (
     <li className={cn("cursor-pointer", className)} style={style}>
       <Link
-        href="/reviews"
+        href={`/reviews#review-${r.id}`}
+        scroll={false}
         className={cn("flex h-full flex-col p-4 text-inherit no-underline sm:p-5")}
       >
         <p className={cn("line-clamp-4")}>
@@ -84,6 +85,7 @@ function ReviewCard({
 }
 
 export interface ReviewItem {
+  id: string;
   text: string;
   name: string;
 }

@@ -1,12 +1,11 @@
 // src/app/admin/reviews/page.tsx
 import type { Metadata } from "next";
 import type React from "react";
-import { notFound } from "next/navigation";
 import { prisma } from "@/shared/lib/prisma";
-import { isValidAdminToken } from "@/shared/lib/auth";
+import { requireAdminToken } from "@/shared/lib/auth";
 import { toE164NZ } from "@/shared/lib/normalize-phone";
 import { cn } from "@/shared/lib/cn";
-import { AdminSidebar } from "@/features/admin/components/AdminSidebar";
+import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
 import { ReviewApprovalList } from "@/features/reviews/components/admin/ReviewApprovalList";
 import { ReviewLinkHistoryTable } from "@/features/reviews/components/admin/ReviewLinkHistoryTable";
 import { SendReviewLinkForm } from "@/features/reviews/components/admin/SendReviewLinkForm";
@@ -30,13 +29,7 @@ export default async function AdminReviewsPage({
   searchParams: Promise<{ token?: string }>;
 }): Promise<React.ReactElement> {
   const { token } = await searchParams;
-
-  if (!isValidAdminToken(token ?? null)) {
-    console.warn("[admin/reviews] Invalid token attempt", { tokenPresent: Boolean(token) });
-    notFound();
-  }
-
-  const t = token!;
+  const t = requireAdminToken(token);
 
   const [reviews, sentBookings, sentRequests, allContacts] = await Promise.all([
     prisma.review.findMany({
@@ -80,13 +73,12 @@ export default async function AdminReviewsPage({
     }),
     prisma.contact.findMany({
       orderBy: { createdAt: "desc" },
-      select: { id: true, name: true, email: true, phone: true },
+      select: { id: true, name: true, email: true, phone: true, address: true },
     }),
   ]);
 
   const contactMap = new Map(allContacts.map((c) => [c.id, c.name]));
 
-  // Count reviews per contact for the picker
   const reviewCountByContact = new Map<string, number>();
   for (const r of reviews) {
     if (r.contactId) {
@@ -110,7 +102,6 @@ export default async function AdminReviewsPage({
     reviewCount: reviewCountByContact.get(c.id) ?? 0,
   }));
 
-  // Contacts that have never received a review link (same logic as dashboard)
   const sentEmails = new Set<string>([
     ...sentRequests.flatMap((r) => (r.email ? [r.email.toLowerCase()] : [])),
     ...sentBookings.flatMap((b) => (b.email ? [b.email.toLowerCase()] : [])),
@@ -124,9 +115,8 @@ export default async function AdminReviewsPage({
       if (c.phone && sentPhones.has(toE164NZ(c.phone))) return false;
       return true;
     })
-    .map((c) => ({ id: c.id, name: c.name, email: c.email, phone: c.phone }));
+    .map((c) => ({ id: c.id, name: c.name, email: c.email, phone: c.phone, address: c.address }));
 
-  // Build link history (same logic as the former monolithic page)
   const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz").replace(
     /\/$/,
     "",
@@ -214,62 +204,52 @@ export default async function AdminReviewsPage({
   ].sort((a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime());
 
   return (
-    <div className={cn("flex min-h-screen")}>
-      <AdminSidebar token={t} current="reviews" />
-
-      <div className={cn("ml-56 flex-1 bg-slate-50")}>
-        <div className={cn("mx-auto max-w-7xl px-6 py-8")}>
-          <h1 className={cn("text-russian-violet mb-6 text-2xl font-extrabold")}>
-            Reviews
-            {pending.length > 0 && (
-              <span
-                className={cn(
-                  "bg-coquelicot-500/20 text-coquelicot-400 ml-3 rounded-full px-2.5 py-0.5 text-sm font-semibold",
-                )}
-              >
-                {pending.length} pending
-              </span>
+    <AdminPageLayout token={t} current="reviews">
+      <h1 className={cn("text-russian-violet mb-6 text-2xl font-extrabold")}>
+        Reviews
+        {pending.length > 0 && (
+          <span
+            className={cn(
+              "bg-coquelicot-500/20 text-coquelicot-400 ml-3 rounded-full px-2.5 py-0.5 text-sm font-semibold",
             )}
-            <span className={cn("ml-3 text-lg font-semibold text-slate-400")}>
-              {approved.length} approved
-            </span>
-          </h1>
+          >
+            {pending.length} pending
+          </span>
+        )}
+        <span className={cn("ml-3 text-lg font-semibold text-slate-400")}>
+          {approved.length} approved
+        </span>
+      </h1>
 
-          <div className={cn("grid grid-cols-1 gap-6 lg:grid-cols-3")}>
-            {/* Main column: review list */}
-            <div className={cn("flex flex-col gap-6 lg:col-span-2")}>
-              <div className={cn("rounded-xl border border-slate-200 bg-white p-6 shadow-sm")}>
-                <ReviewApprovalList
-                  pending={pending}
-                  approved={approved}
-                  token={t}
-                  contacts={contacts}
-                  showSendForm={false}
-                />
-              </div>
-            </div>
-
-            {/* Side column: send form + link history */}
-            <div className={cn("flex flex-col gap-6")}>
-              <div className={cn("rounded-xl border border-slate-200 bg-white p-6 shadow-sm")}>
-                <h2 className={cn("text-russian-violet mb-4 text-sm font-semibold")}>
-                  Send a review link
-                </h2>
-                <SendReviewLinkForm token={t} contactSuggestions={contactSuggestions} />
-              </div>
-
-              {linkHistory.length > 0 && (
-                <div className={cn("rounded-xl border border-slate-200 bg-white p-6 shadow-sm")}>
-                  <h2 className={cn("text-russian-violet mb-4 text-sm font-semibold")}>
-                    Link history
-                  </h2>
-                  <ReviewLinkHistoryTable entries={linkHistory} token={t} />
-                </div>
-              )}
-            </div>
+      <div className={cn("grid grid-cols-1 gap-6 lg:grid-cols-3")}>
+        <div className={cn("flex flex-col gap-6 lg:col-span-2")}>
+          <div className={cn("rounded-xl border border-slate-200 bg-white p-6 shadow-sm")}>
+            <ReviewApprovalList
+              pending={pending}
+              approved={approved}
+              token={t}
+              contacts={contacts}
+              showSendForm={false}
+            />
           </div>
         </div>
+
+        <div className={cn("flex flex-col gap-6")}>
+          <div className={cn("rounded-xl border border-slate-200 bg-white p-6 shadow-sm")}>
+            <h2 className={cn("text-russian-violet mb-4 text-sm font-semibold")}>
+              Send a review link
+            </h2>
+            <SendReviewLinkForm token={t} contactSuggestions={contactSuggestions} />
+          </div>
+
+          {linkHistory.length > 0 && (
+            <div className={cn("rounded-xl border border-slate-200 bg-white p-6 shadow-sm")}>
+              <h2 className={cn("text-russian-violet mb-4 text-sm font-semibold")}>Link history</h2>
+              <ReviewLinkHistoryTable entries={linkHistory} token={t} />
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </AdminPageLayout>
   );
 }

@@ -8,6 +8,7 @@ import type React from "react";
 import Link from "next/link";
 import { FrostedSection, PageShell, CARD, SOFT_CARD } from "@/shared/components/PageLayout";
 import { cn } from "@/shared/lib/cn";
+import { PricingWizard } from "@/features/business/components/PricingWizard";
 
 const linkStyle = cn(
   "text-coquelicot-500 hover:text-coquelicot-600 underline-offset-4 hover:underline",
@@ -46,7 +47,7 @@ export default function PricingPage(): React.ReactElement {
             <div className={cn("grid gap-4 sm:grid-cols-2")}>
               <div className={cn("bg-seasalt-900/40 border-seasalt-400/60 rounded-lg border p-5")}>
                 <p className={cn("text-russian-violet mb-2 text-3xl font-bold sm:text-4xl")}>
-                  $50/h
+                  $65/h
                 </p>
                 <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
                   Most jobs - troubleshooting, setup, software, tune-ups, Wi-Fi, backups, and more.
@@ -55,13 +56,23 @@ export default function PricingPage(): React.ReactElement {
 
               <div className={cn("bg-seasalt-900/40 border-seasalt-400/60 rounded-lg border p-5")}>
                 <p className={cn("text-russian-violet mb-2 text-3xl font-bold sm:text-4xl")}>
-                  $75/h
+                  $85/h
                 </p>
                 <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
                   Complex or lengthy work - data recovery, hardware repairs, or full PC migrations.
                 </p>
               </div>
             </div>
+
+            <a
+              href="#estimate-heading"
+              className={cn(
+                "mt-5 inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white",
+                "bg-russian-violet hover:bg-russian-violet/90 transition-colors",
+              )}
+            >
+              Get a rough estimate ↓
+            </a>
 
             <div className={cn("mt-5 space-y-3")}>
               <p className={cn("text-rich-black/90 flex gap-3 text-sm sm:text-base")}>
@@ -202,6 +213,22 @@ export default function PricingPage(): React.ReactElement {
               </Link>{" "}
               if you're ready to go.
             </p>
+          </section>
+
+          <section
+            aria-labelledby="estimate-heading"
+            className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-500")}
+          >
+            <h2
+              id="estimate-heading"
+              className={cn("text-russian-violet mb-1 text-xl font-bold sm:text-2xl")}
+            >
+              Get a rough estimate
+            </h2>
+            <p className={cn("text-rich-black/70 mb-5 text-sm sm:text-base")}>
+              Answer a few quick questions to get a price range. No commitment required.
+            </p>
+            <PricingWizard />
           </section>
         </div>
       </FrostedSection>
