@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { VALID_FREQUENCIES } from "@/features/business/lib/constants";
+import { parseAmount, parseRate } from "@/features/business/lib/validation";
 
 /**
  * GET /api/business/subscriptions - Returns all subscriptions ordered by nextDue ascending.
@@ -48,13 +49,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Invalid frequency" }, { status: 400 });
   }
 
+  const safeAmount = parseAmount(amountIncl);
+  if (safeAmount === null) {
+    return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
+  }
+  const safeRate = gstRate === undefined ? 0.15 : parseRate(gstRate);
+  if (safeRate === null) {
+    return NextResponse.json({ error: "Invalid GST rate" }, { status: 400 });
+  }
+
   const subscription = await prisma.subscription.create({
     data: {
       description,
       supplier,
       category: category ?? "Subscriptions",
-      amountIncl: Number(amountIncl),
-      gstRate: gstRate !== undefined ? Number(gstRate) : 0.15,
+      amountIncl: safeAmount,
+      gstRate: safeRate,
       method: method ?? "Business Account",
       frequency,
       nextDue: new Date(nextDue),

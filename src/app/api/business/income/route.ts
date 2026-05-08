@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
+import { parseAmount } from "@/features/business/lib/validation";
 
 /**
  * GET /api/business/income - Returns all income entries ordered by date descending.
@@ -33,12 +34,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
+  const safeAmount = parseAmount(amount);
+  if (safeAmount === null) {
+    return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
+  }
+
   const entry = await prisma.incomeEntry.create({
     data: {
       date: new Date(date),
       customer,
       description,
-      amount: Number(amount),
+      amount: safeAmount,
       method,
       notes: notes ?? null,
       invoiceId: invoiceId ?? null,

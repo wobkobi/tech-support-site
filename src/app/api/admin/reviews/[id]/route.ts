@@ -7,16 +7,17 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
-import { isValidAdminToken, isAdminRequest } from "@/shared/lib/auth";
+import { isAdminRequest } from "@/shared/lib/auth";
 import { revalidateReviewPaths } from "@/features/reviews/lib/revalidate";
 
 /**
  * PATCH /api/admin/reviews/[id]
  * Approves or revokes a review, or updates the linked contactId.
- * - When body contains { action: "approve" | "revoke", token } → moderation flow (token in body).
+ * Authenticated via X-Admin-Secret header.
+ * - When body contains { action: "approve" | "revoke" } → moderation flow.
  *   On approve, automatically upserts a Contact record from the review's booking/review-request
  *   and links review.contactId. This is best-effort; failure does not block the approval.
- * - When body contains { contactId: string | null } → contact-link flow (token via X-Admin-Secret header).
+ * - When body contains { contactId: string | null } → contact-link flow.
  * @param request - Incoming request.
  * @param params - Route segment params wrapper.
  * @param params.params - Promise resolving to the route segment containing the review ID.
@@ -26,18 +27,17 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
+  if (!isAdminRequest(request)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const body = (await request.json()) as {
     action?: string;
-    token?: string;
     contactId?: string | null;
   };
 
-  // Contact-link flow: authenticated via X-Admin-Secret header.
+  // Contact-link flow.
   if ("contactId" in body) {
-    if (!isAdminRequest(request)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { id } = await params;
 
     try {
@@ -50,11 +50,6 @@ export async function PATCH(
       console.error(`[admin/reviews] PATCH contactId error for ${id}:`, error);
       return NextResponse.json({ error: "Failed to update review" }, { status: 500 });
     }
-  }
-
-  // Moderation flow: authenticated via token in request body.
-  if (!isValidAdminToken(body.token)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const { action } = body;
@@ -141,8 +136,8 @@ export async function PATCH(
 
 /**
  * DELETE /api/admin/reviews/[id]
- * Permanently deletes a review.
- * @param request - Incoming request with ?token= query param.
+ * Permanently deletes a review. Authenticated via X-Admin-Secret header.
+ * @param request - Incoming request.
  * @param params - Route segment params wrapper.
  * @param params.params - Promise resolving to the route segment containing the review ID.
  * @returns JSON response.
@@ -151,9 +146,7 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
-  const token = request.nextUrl.searchParams.get("token");
-
-  if (!isValidAdminToken(token)) {
+  if (!isAdminRequest(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

@@ -91,7 +91,10 @@ export async function importFromGoogleContacts(): Promise<number> {
             }
             count++;
           } catch (upsertError) {
-            console.error(`[google-contacts] Failed to import contact ${email}:`, upsertError);
+            console.error(
+              `[google-contacts] Failed to import contact (resource ${resourceName}):`,
+              upsertError,
+            );
           }
         } else if (normPhone) {
           // No email anywhere - create a phone-only contact or link to an existing one.

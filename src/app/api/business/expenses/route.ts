@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
+import { parseAmount, parseRate } from "@/features/business/lib/validation";
 
 /**
  * GET /api/business/expenses - Returns all expense entries ordered by date descending.
@@ -34,8 +35,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
-  const rate = Number(gstRate ?? 0.15);
-  const inclNum = Number(amountIncl);
+  const inclNum = parseAmount(amountIncl);
+  if (inclNum === null) {
+    return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
+  }
+
+  const rate = gstRate === undefined ? 0.15 : parseRate(gstRate);
+  if (rate === null) {
+    return NextResponse.json({ error: "Invalid GST rate" }, { status: 400 });
+  }
+
   const gstAmount = Math.round(((inclNum * rate) / (1 + rate)) * 100) / 100;
   const amountExcl = Math.round((inclNum - gstAmount) * 100) / 100;
 

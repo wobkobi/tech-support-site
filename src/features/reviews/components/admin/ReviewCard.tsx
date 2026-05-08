@@ -78,8 +78,8 @@ export function ReviewCard({
     try {
       const res = await fetch(`/api/admin/reviews/${row.id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, token }),
+        headers: { "Content-Type": "application/json", "X-Admin-Secret": token },
+        body: JSON.stringify({ action }),
       });
       if (!res.ok) throw new Error("Request failed");
       if (action === "approve") onApprove?.();
@@ -99,8 +99,9 @@ export function ReviewCard({
     setLoading("delete");
     setError(null);
     try {
-      const res = await fetch(`/api/admin/reviews/${row.id}?token=${encodeURIComponent(token)}`, {
+      const res = await fetch(`/api/admin/reviews/${row.id}`, {
         method: "DELETE",
+        headers: { "X-Admin-Secret": token },
       });
       if (!res.ok) throw new Error("Request failed");
       onDelete();

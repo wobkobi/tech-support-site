@@ -6,12 +6,13 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
-import { isValidAdminToken } from "@/shared/lib/auth";
+import { isAdminRequest } from "@/shared/lib/auth";
 import { toE164NZ, isValidPhone } from "@/shared/lib/normalize-phone";
 
 /**
  * PATCH /api/admin/review-requests/[id]
  * Updates name, email, and/or phone on an existing ReviewRequest.
+ * Authenticated via X-Admin-Secret header.
  * @param request - The incoming request.
  * @param params - Route params containing the ReviewRequest id.
  * @param params.params - Promise resolving to an object with the id param.
@@ -21,19 +22,18 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
+  if (!isAdminRequest(request)) {
+    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const { id } = await params;
     const body = (await request.json()) as {
-      token?: string;
       name?: string;
       email?: string;
       phone?: string;
     };
-    const { token, name, email, phone } = body;
-
-    if (!isValidAdminToken(token ?? null)) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-    }
+    const { name, email, phone } = body;
 
     if (!name?.trim()) {
       return NextResponse.json({ ok: false, error: "Name is required." }, { status: 400 });
@@ -63,7 +63,8 @@ export async function PATCH(
 /**
  * DELETE /api/admin/review-requests/[id]
  * Revokes a review link by deleting the ReviewRequest record so the token is no longer valid.
- * @param request - The incoming request with ?token= query param.
+ * Authenticated via X-Admin-Secret header.
+ * @param request - The incoming request.
  * @param params - Route params containing the ReviewRequest id.
  * @param params.params - The dynamic route params promise.
  * @returns JSON response indicating success or failure.
@@ -72,9 +73,7 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
-  const adminToken = request.nextUrl.searchParams.get("token");
-
-  if (!isValidAdminToken(adminToken)) {
+  if (!isAdminRequest(request)) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 

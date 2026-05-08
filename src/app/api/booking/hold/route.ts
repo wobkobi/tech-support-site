@@ -13,6 +13,7 @@ import { createBookingEvent } from "@/features/calendar/lib/google-calendar";
 import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
 import { toE164NZ } from "@/shared/lib/normalize-phone";
+import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 
 // Hold expiration time in minutes
 const HOLD_EXPIRATION_MINUTES = 15;
@@ -60,6 +61,9 @@ interface CreateBookingResponse {
  * @returns JSON response indicating success or failure.
  */
 export async function POST(request: NextRequest): Promise<NextResponse<CreateBookingResponse>> {
+  const limited = rateLimitOrReject(request, "booking-hold", 10, 60_000);
+  if (limited) return limited as NextResponse<CreateBookingResponse>;
+
   try {
     // Parse and validate request body
     const body = (await request.json()) as CreateBookingRequest;

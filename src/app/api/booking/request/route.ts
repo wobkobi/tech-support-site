@@ -29,6 +29,7 @@ import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
 import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
 import { toE164NZ } from "@/shared/lib/normalize-phone";
+import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 
 interface BookingRequestPayload {
   dateKey: string;
@@ -50,6 +51,9 @@ interface BookingRequestPayload {
  * @returns JSON response with booking ID or error message
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  const limited = rateLimitOrReject(request, "booking-request", 5, 60_000);
+  if (limited) return limited;
+
   try {
     const body = (await request.json()) as BookingRequestPayload;
     const {

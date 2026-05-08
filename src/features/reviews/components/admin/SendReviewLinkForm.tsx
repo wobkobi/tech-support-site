@@ -98,8 +98,8 @@ export function SendReviewLinkForm({
     try {
       const res = await fetch("/api/admin/preview-review-email", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, name }),
+        headers: { "Content-Type": "application/json", "X-Admin-Secret": token },
+        body: JSON.stringify({ name }),
       });
       const data = (await res.json()) as { ok?: boolean; html?: string; error?: string };
       if (!res.ok) throw new Error(data.error ?? "Request failed");
@@ -121,8 +121,8 @@ export function SendReviewLinkForm({
     try {
       const res = await fetch("/api/admin/send-review-link", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, name, email, mode: "email" }),
+        headers: { "Content-Type": "application/json", "X-Admin-Secret": token },
+        body: JSON.stringify({ name, email, mode: "email" }),
       });
       const data = (await res.json()) as {
         ok?: boolean;
@@ -160,8 +160,8 @@ export function SendReviewLinkForm({
     try {
       const res = await fetch("/api/admin/send-review-link", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, name, phone: phoneInput, mode: "sms" }),
+        headers: { "Content-Type": "application/json", "X-Admin-Secret": token },
+        body: JSON.stringify({ name, phone: phoneInput, mode: "sms" }),
       });
       const data = (await res.json()) as {
         ok?: boolean;

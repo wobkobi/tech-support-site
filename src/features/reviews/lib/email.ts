@@ -6,6 +6,21 @@
 
 import { Resend } from "resend";
 
+/**
+ * Escapes HTML special characters so user-supplied values can be safely
+ * interpolated into HTML email bodies without breaking layout or injecting markup.
+ * @param value - The string to escape.
+ * @returns The escaped string.
+ */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 // Lazy singleton - created on first use so module import never throws in test environments.
 let _resend: Resend | null = null;
 /**
@@ -57,6 +72,8 @@ export async function sendOwnerReviewNotification(review: ReviewNotificationData
 
   const badge = review.verified ? "✅ Verified (auto-approved)" : "⏳ Pending approval";
   const adminUrl = `${siteUrl}/admin/reviews`;
+  const safeDisplayName = escapeHtml(displayName);
+  const safeReviewText = escapeHtml(review.text).replace(/\n/g, "<br>");
 
   const html = `
 <!DOCTYPE html>
@@ -68,8 +85,8 @@ export async function sendOwnerReviewNotification(review: ReviewNotificationData
     <p style="margin:0 0 20px;color:#555;font-size:14px">${badge}</p>
 
     <div style="background:#f6f7f8;border-radius:8px;padding:16px;margin-bottom:20px">
-      <p style="margin:0 0 8px;font-size:14px;color:#888"><strong style="color:#0c0a3e">${displayName}</strong></p>
-      <p style="margin:0;color:#222;line-height:1.6;font-size:15px">${review.text.replace(/\n/g, "<br>")}</p>
+      <p style="margin:0 0 8px;font-size:14px;color:#888"><strong style="color:#0c0a3e">${safeDisplayName}</strong></p>
+      <p style="margin:0;color:#222;line-height:1.6;font-size:15px">${safeReviewText}</p>
     </div>
 
     ${
@@ -150,7 +167,10 @@ export async function sendOwnerBookingNotification(
   }
 
   const start = formatNZDateTime(booking.startAt);
-  const notesHtml = booking.notes.replace(/\n/g, "<br>");
+  const notesHtml = escapeHtml(booking.notes).replace(/\n/g, "<br>");
+  const safeName = escapeHtml(booking.name);
+  const safeEmail = escapeHtml(booking.email);
+  const safeMailto = encodeURIComponent(booking.email);
 
   const html = `
 <!DOCTYPE html>
@@ -163,8 +183,8 @@ export async function sendOwnerBookingNotification(
 
     <div style="background:#f6f7f8;border-radius:8px;padding:16px;margin-bottom:20px">
       <p style="margin:0 0 4px;font-size:14px;color:#888">Customer</p>
-      <p style="margin:0 0 12px;font-size:15px;color:#0c0a3e;font-weight:600">${booking.name}</p>
-      <p style="margin:0 0 12px;font-size:14px;color:#444"><a href="mailto:${booking.email}" style="color:#43bccd">${booking.email}</a></p>
+      <p style="margin:0 0 12px;font-size:15px;color:#0c0a3e;font-weight:600">${safeName}</p>
+      <p style="margin:0 0 12px;font-size:14px;color:#444"><a href="mailto:${safeMailto}" style="color:#43bccd">${safeEmail}</a></p>
       <p style="margin:0;font-size:14px;color:#444;line-height:1.6">${notesHtml}</p>
     </div>
   </div>
@@ -202,9 +222,10 @@ export async function sendCustomerBookingConfirmation(
   }
 
   const firstName = booking.name.split(" ")[0];
+  const safeFirstName = escapeHtml(firstName);
   const start = formatNZDateTime(booking.startAt);
-  const cancelUrl = `${siteUrl}/booking/cancel?token=${booking.cancelToken}`;
-  const notesHtml = booking.notes.replace(/\n/g, "<br>");
+  const cancelUrl = `${siteUrl}/booking/cancel?token=${encodeURIComponent(booking.cancelToken)}`;
+  const notesHtml = escapeHtml(booking.notes).replace(/\n/g, "<br>");
 
   const html = `
 <!DOCTYPE html>
@@ -212,7 +233,7 @@ export async function sendCustomerBookingConfirmation(
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="font-family:system-ui,sans-serif;background:#f6f7f8;margin:0;padding:24px">
   <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
-    <h2 style="margin:0 0 12px;color:#0c0a3e;font-size:20px">Booking confirmed, ${firstName}!</h2>
+    <h2 style="margin:0 0 12px;color:#0c0a3e;font-size:20px">Booking confirmed, ${safeFirstName}!</h2>
     <p style="margin:0 0 20px;color:#444;line-height:1.6">Thanks for choosing To The Point Tech - I'm looking forward to helping you out.</p>
 
     <p style="margin:0 0 8px;color:#888;font-size:13px;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Your appointment</p>
@@ -252,7 +273,7 @@ export async function sendCustomerBookingConfirmation(
       html,
     });
   } catch (error) {
-    console.error(`[email] Failed to send booking confirmation to ${booking.email}:`, error);
+    console.error(`[email] Failed to send booking confirmation for booking ${booking.id}:`, error);
   }
 }
 
@@ -288,8 +309,9 @@ export async function sendCustomerReviewRequest(booking: ReviewRequestData): Pro
     return;
   }
 
-  const reviewUrl = `${siteUrl}/review?token=${booking.reviewToken}`;
+  const reviewUrl = `${siteUrl}/review?token=${encodeURIComponent(booking.reviewToken)}`;
   const firstName = booking.name.split(" ")[0];
+  const safeFirstName = escapeHtml(firstName);
 
   const html = `
 <!DOCTYPE html>
@@ -297,7 +319,7 @@ export async function sendCustomerReviewRequest(booking: ReviewRequestData): Pro
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="font-family:system-ui,sans-serif;background:#f6f7f8;margin:0;padding:24px">
   <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
-    <h2 style="margin:0 0 12px;color:#0c0a3e;font-size:20px">Hi ${firstName}, how did everything go?</h2>
+    <h2 style="margin:0 0 12px;color:#0c0a3e;font-size:20px">Hi ${safeFirstName}, how did everything go?</h2>
     <p style="margin:0 0 12px;color:#444;line-height:1.6">It was great meeting you - I hope I managed to get everything sorted and left you feeling a bit less frustrated with technology!</p>
     <p style="margin:0 0 12px;color:#444;line-height:1.6">If you have a spare moment, I'd love to hear how your experience was. A quick review makes a real difference for a small local business like mine, and helps other people in the area find reliable tech support when they need it.</p>
     <p style="margin:0 0 24px;color:#444;line-height:1.6">It only takes a minute - and honest feedback is always welcome.</p>
@@ -329,7 +351,7 @@ export async function sendCustomerReviewRequest(booking: ReviewRequestData): Pro
       html,
     });
   } catch (error) {
-    console.error("[email] Failed to send review request to %s:", booking.email, error);
+    console.error(`[email] Failed to send review request for booking ${booking.id}:`, error);
   }
 }
 
@@ -344,13 +366,14 @@ export function buildPastClientReviewEmailHtml(firstName: string, reviewUrl: str
     /\/$/,
     "",
   );
+  const safeFirstName = escapeHtml(firstName);
   return `
 <!DOCTYPE html>
 <html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="font-family:system-ui,sans-serif;background:#f6f7f8;margin:0;padding:24px">
   <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
-    <h2 style="margin:0 0 12px;color:#0c0a3e;font-size:20px">Hi ${firstName},</h2>
+    <h2 style="margin:0 0 12px;color:#0c0a3e;font-size:20px">Hi ${safeFirstName},</h2>
     <p style="margin:0 0 12px;color:#444;line-height:1.6">It's Harrison from To The Point Tech - thanks again for letting me help you out!</p>
     <p style="margin:0 0 12px;color:#444;line-height:1.6">I'm in the process of updating my website and building up my reviews section. If you have a spare moment, a quick review would mean a lot - it really helps other people in the area find reliable local tech support.</p>
     <p style="margin:0 0 24px;color:#444;line-height:1.6">No pressure at all, but if you're happy to, I'd really appreciate it.</p>
@@ -393,7 +416,7 @@ export async function sendPastClientReviewRequest(booking: ReviewRequestData): P
     return;
   }
 
-  const reviewUrl = `${siteUrl}/review?token=${booking.reviewToken}`;
+  const reviewUrl = `${siteUrl}/review?token=${encodeURIComponent(booking.reviewToken)}`;
   const firstName = booking.name.split(" ")[0];
   const html = buildPastClientReviewEmailHtml(firstName, reviewUrl);
 
@@ -406,6 +429,9 @@ export async function sendPastClientReviewRequest(booking: ReviewRequestData): P
       html,
     });
   } catch (error) {
-    console.error("[email] Failed to send past client review request to %s:", booking.email, error);
+    console.error(
+      `[email] Failed to send past client review request for request ${booking.id}:`,
+      error,
+    );
   }
 }

@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
-import { isValidAdminToken } from "@/shared/lib/auth";
+import { isAdminRequest } from "@/shared/lib/auth";
 
 /**
  * Escapes a value for CSV: wraps in double quotes and escapes inner quotes.
@@ -33,15 +33,15 @@ function splitName(fullName: string): { first: string; last: string } {
 }
 
 /**
- * GET /api/admin/contacts/export?token=<ADMIN_SECRET>
+ * GET /api/admin/contacts/export
  * Returns all contacts as a CSV file compatible with Google Contacts import.
  * Column layout mirrors the format Google Contacts produces when exporting.
+ * Authenticated via X-Admin-Secret header.
  * @param request - Incoming request.
  * @returns CSV file response.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  const token = request.nextUrl.searchParams.get("token");
-  if (!isValidAdminToken(token)) {
+  if (!isAdminRequest(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

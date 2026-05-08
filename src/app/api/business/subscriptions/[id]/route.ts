@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { VALID_FREQUENCIES } from "@/features/business/lib/constants";
+import { parseAmount, parseRate } from "@/features/business/lib/validation";
 
 /**
  * PATCH /api/business/subscriptions/[id] - Updates a subscription's fields.
@@ -37,14 +38,32 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid frequency" }, { status: 400 });
   }
 
+  let safeAmount: number | undefined;
+  if (amountIncl !== undefined) {
+    const parsed = parseAmount(amountIncl);
+    if (parsed === null) {
+      return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
+    }
+    safeAmount = parsed;
+  }
+
+  let safeRate: number | undefined;
+  if (gstRate !== undefined) {
+    const parsed = parseRate(gstRate);
+    if (parsed === null) {
+      return NextResponse.json({ error: "Invalid GST rate" }, { status: 400 });
+    }
+    safeRate = parsed;
+  }
+
   const subscription = await prisma.subscription.update({
     where: { id },
     data: {
       ...(description !== undefined && { description }),
       ...(supplier !== undefined && { supplier }),
       ...(category !== undefined && { category }),
-      ...(amountIncl !== undefined && { amountIncl: Number(amountIncl) }),
-      ...(gstRate !== undefined && { gstRate: Number(gstRate) }),
+      ...(safeAmount !== undefined && { amountIncl: safeAmount }),
+      ...(safeRate !== undefined && { gstRate: safeRate }),
       ...(method !== undefined && { method }),
       ...(frequency !== undefined && { frequency }),
       ...(nextDue !== undefined && { nextDue: new Date(nextDue) }),
