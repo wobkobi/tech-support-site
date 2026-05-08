@@ -25,6 +25,13 @@ export const BUSINESS = {
   location: "Auckland, New Zealand",
 } as const;
 
+/**
+ * Date the business started operating. Used to label the first NZ financial
+ * year as "(partial)" on the business dashboard, since the business didn't
+ * cover the full 1 April - 31 March span that year.
+ */
+export const BUSINESS_START_DATE = new Date("2025-10-01T00:00:00Z");
+
 export const BUSINESS_BANK_ACCOUNT =
   process.env.NEXT_PUBLIC_BUSINESS_BANK_ACCOUNT ??
   "[BANK ACCOUNT NOT SET - configure NEXT_PUBLIC_BUSINESS_BANK_ACCOUNT]";

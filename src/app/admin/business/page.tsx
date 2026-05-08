@@ -6,6 +6,7 @@ import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
 import { cn } from "@/shared/lib/cn";
 import { prisma } from "@/shared/lib/prisma";
 import { formatNZD } from "@/features/business/lib/business";
+import { aggregateByFinancialYear } from "@/features/business/lib/financial-year";
 import { SheetImportButton } from "@/features/business/components/SheetImportButton";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +15,31 @@ export const metadata: Metadata = {
   title: "Business - Admin",
   robots: { index: false, follow: false },
 };
+
+/**
+ * Small stat cell used inside each financial-year card.
+ * @param props - Component props.
+ * @param props.label - Caption shown below the value.
+ * @param props.value - Pre-formatted value string.
+ * @param props.color - Tailwind text colour class.
+ * @returns A stat cell.
+ */
+function FyStat({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: string;
+  color: string;
+}): React.ReactElement {
+  return (
+    <div>
+      <p className={cn("text-base font-extrabold", color)}>{value}</p>
+      <p className={cn("mt-0.5 text-[11px] text-slate-500")}>{label}</p>
+    </div>
+  );
+}
 
 /**
  * Business dashboard showing income, expense, and invoice summary stats.
@@ -51,6 +77,8 @@ export default async function BusinessPage({
   const monthExpenses = expenseEntries
     .filter((e) => e.date >= monthStart && e.date < monthEnd)
     .reduce((s, e) => s + e.amountExcl, 0);
+
+  const fyTotals = aggregateByFinancialYear(incomeEntries, expenseEntries, now);
 
   const cards = [
     {
@@ -128,6 +156,60 @@ export default async function BusinessPage({
           </Link>
         ))}
       </div>
+
+      <section className={cn("mb-8")}>
+        <h2 className={cn("text-russian-violet mb-3 text-lg font-bold")}>By financial year</h2>
+        <div className={cn("flex flex-col gap-3")}>
+          {fyTotals.map((row) => (
+            <div
+              key={row.fy.label}
+              className={cn(
+                "rounded-xl border bg-white p-4 shadow-sm",
+                row.fy.current ? "border-russian-violet/40" : "border-slate-200",
+              )}
+            >
+              <div className={cn("mb-3 flex flex-wrap items-baseline gap-2")}>
+                <p className={cn("text-russian-violet text-base font-bold")}>{row.fy.label}</p>
+                {row.fy.current && (
+                  <span
+                    className={cn(
+                      "bg-moonstone-600/15 text-moonstone-600 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                    )}
+                  >
+                    Current
+                  </span>
+                )}
+                <p className={cn("ml-auto text-xs text-slate-400")}>
+                  {row.incomeCount} income · {row.expenseCount} expense
+                </p>
+              </div>
+              <div className={cn("grid grid-cols-2 gap-3 sm:grid-cols-5")}>
+                <FyStat label="Income" value={formatNZD(row.income)} color="text-green-600" />
+                <FyStat
+                  label="Expenses (excl. GST)"
+                  value={formatNZD(row.expensesExcl)}
+                  color="text-slate-700"
+                />
+                <FyStat
+                  label="Profit"
+                  value={formatNZD(row.profit)}
+                  color={row.profit >= 0 ? "text-green-600" : "text-red-600"}
+                />
+                <FyStat
+                  label="GST claimable"
+                  value={formatNZD(row.gstClaimable)}
+                  color="text-moonstone-600"
+                />
+                <FyStat
+                  label="Tax reserve (20%)"
+                  value={formatNZD(row.taxReserve)}
+                  color="text-amber-600"
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <div className={cn("flex flex-wrap gap-3")}>
         {links.map((l) => (
