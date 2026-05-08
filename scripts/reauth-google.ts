@@ -28,6 +28,8 @@ const PROD_REDIRECT = "https://www.tothepoint.co.nz/api/google/oauth/callback";
 const SCOPES = [
   "https://www.googleapis.com/auth/calendar",
   "https://www.googleapis.com/auth/contacts",
+  "https://www.googleapis.com/auth/spreadsheets",
+  "https://www.googleapis.com/auth/drive",
 ];
 
 /**

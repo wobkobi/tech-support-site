@@ -1,11 +1,10 @@
 // src/app/admin/travel/page.tsx
 import type { Metadata } from "next";
 import type React from "react";
-import { notFound } from "next/navigation";
 import { prisma } from "@/shared/lib/prisma";
-import { isValidAdminToken } from "@/shared/lib/auth";
+import { requireAdminToken } from "@/shared/lib/auth";
 import { cn } from "@/shared/lib/cn";
-import { AdminSidebar } from "@/features/admin/components/AdminSidebar";
+import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
 import {
   TravelBlockAdminList,
   type TravelBlockRow,
@@ -31,16 +30,10 @@ export default async function AdminTravelPage({
   searchParams: Promise<{ token?: string }>;
 }): Promise<React.ReactElement> {
   const { token } = await searchParams;
-
-  if (!isValidAdminToken(token ?? null)) {
-    console.warn("[admin/travel] Invalid token attempt", { tokenPresent: Boolean(token) });
-    notFound();
-  }
-
-  const t = token!;
+  const t = requireAdminToken(token);
 
   const travelBlocks = await prisma.travelBlock.findMany({
-    orderBy: { createdAt: "desc" },
+    orderBy: { eventStartAt: "asc" },
     select: {
       id: true,
       sourceEventId: true,
@@ -57,6 +50,7 @@ export default async function AdminTravelPage({
       transportMode: true,
       customOrigin: true,
       detectedOrigin: true,
+      destination: true,
       createdAt: true,
     },
   });
@@ -91,6 +85,7 @@ export default async function AdminTravelPage({
     transportMode: b.transportMode ?? null,
     customOrigin: b.customOrigin ?? null,
     detectedOrigin: b.detectedOrigin ?? null,
+    destination: b.destination ?? null,
     beforeExpiresAt: b.beforeEventId
       ? (travelCacheMap.get(b.beforeEventId)?.toISOString() ?? null)
       : null,
@@ -100,7 +95,6 @@ export default async function AdminTravelPage({
     createdAt: b.createdAt.toISOString(),
   }));
 
-  // Friendly display names for calendar IDs
   const calendarLabels: Record<string, string> = {};
   if (process.env.BOOKING_CALENDAR_ID) calendarLabels[process.env.BOOKING_CALENDAR_ID] = "Bookings";
   if (process.env.WORK_CALENDAR_ID) calendarLabels[process.env.WORK_CALENDAR_ID] = "Work";
@@ -108,29 +102,19 @@ export default async function AdminTravelPage({
     calendarLabels[process.env.PERSONAL_CALENDAR_ID] = "Personal";
 
   return (
-    <div className={cn("flex min-h-screen")}>
-      <AdminSidebar token={t} current="travel" />
+    <AdminPageLayout token={t} current="travel">
+      <h1 className={cn("text-russian-violet mb-6 text-2xl font-extrabold")}>Travel blocks</h1>
 
-      <div className={cn("ml-56 flex-1 bg-slate-50")}>
-        <div className={cn("mx-auto max-w-7xl px-6 py-8")}>
-          <h1 className={cn("text-russian-violet mb-6 text-2xl font-extrabold")}>Travel blocks</h1>
-
-          <div className={cn("rounded-xl border border-slate-200 bg-white p-6 shadow-sm")}>
-            <div className={cn("mb-5 flex flex-wrap items-center justify-between gap-4")}>
-              <p className={cn("text-sm text-slate-500")}>
-                Travel time blocks computed for calendar events with a location. Refreshed every 15
-                minutes by the cron job.
-              </p>
-              <RecalculateButton token={t} />
-            </div>
-            <TravelBlockAdminList
-              blocks={travelBlockRows}
-              calendarLabels={calendarLabels}
-              token={t}
-            />
-          </div>
+      <div className={cn("rounded-xl border border-slate-200 bg-white p-6 shadow-sm")}>
+        <div className={cn("mb-5 flex flex-wrap items-center justify-between gap-4")}>
+          <p className={cn("text-sm text-slate-500")}>
+            Travel time blocks computed for calendar events with a location. Refreshed every 15
+            minutes by the cron job.
+          </p>
+          <RecalculateButton token={t} />
         </div>
+        <TravelBlockAdminList blocks={travelBlockRows} calendarLabels={calendarLabels} token={t} />
       </div>
-    </div>
+    </AdminPageLayout>
   );
 }

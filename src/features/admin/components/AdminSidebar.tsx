@@ -2,9 +2,30 @@
 import type React from "react";
 import Link from "next/link";
 import { cn } from "@/shared/lib/cn";
-import { FaGaugeHigh, FaStar, FaAddressBook, FaCalendarDays, FaRoute } from "react-icons/fa6";
+import {
+  FaGaugeHigh,
+  FaStar,
+  FaAddressBook,
+  FaCalendarDays,
+  FaRoute,
+  FaBriefcase,
+  FaArrowTrendUp,
+  FaReceipt,
+  FaFileInvoiceDollar,
+  FaCalculator,
+} from "react-icons/fa6";
 
-export type AdminPage = "dashboard" | "reviews" | "contacts" | "bookings" | "travel";
+export type AdminPage =
+  | "dashboard"
+  | "reviews"
+  | "contacts"
+  | "bookings"
+  | "travel"
+  | "business"
+  | "business-income"
+  | "business-expenses"
+  | "business-invoices"
+  | "business-calculator";
 
 interface NavItem {
   page: AdminPage;
@@ -46,6 +67,39 @@ const NAV_ITEMS: NavItem[] = [
   },
 ];
 
+const BUSINESS_NAV_ITEMS: NavItem[] = [
+  {
+    page: "business",
+    label: "Overview",
+    icon: <FaBriefcase className={cn("shrink-0")} />,
+    path: "/admin/business",
+  },
+  {
+    page: "business-income",
+    label: "Income",
+    icon: <FaArrowTrendUp className={cn("shrink-0")} />,
+    path: "/admin/business/income",
+  },
+  {
+    page: "business-expenses",
+    label: "Expenses",
+    icon: <FaReceipt className={cn("shrink-0")} />,
+    path: "/admin/business/expenses",
+  },
+  {
+    page: "business-invoices",
+    label: "Invoices",
+    icon: <FaFileInvoiceDollar className={cn("shrink-0")} />,
+    path: "/admin/business/invoices",
+  },
+  {
+    page: "business-calculator",
+    label: "Calculator",
+    icon: <FaCalculator className={cn("shrink-0")} />,
+    path: "/admin/business/calculator",
+  },
+];
+
 interface AdminSidebarProps {
   token: string;
   current: AdminPage;
@@ -68,8 +122,31 @@ export function AdminSidebar({ token, current }: AdminSidebarProps): React.React
       </div>
 
       {/* Nav */}
-      <nav className={cn("flex flex-1 flex-col gap-1 px-3 py-4")}>
+      <nav className={cn("flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-4")}>
         {NAV_ITEMS.map(({ page, label, icon, path }) => (
+          <Link
+            key={page}
+            href={`${path}?token=${encodeURIComponent(token)}`}
+            className={cn(
+              "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+              current === page
+                ? "bg-white/15 text-white"
+                : "text-white/60 hover:bg-white/10 hover:text-white/90",
+            )}
+          >
+            {icon}
+            {label}
+          </Link>
+        ))}
+
+        <p
+          className={cn(
+            "mb-1 mt-4 px-3 text-xs font-semibold uppercase tracking-widest text-white/30",
+          )}
+        >
+          Business
+        </p>
+        {BUSINESS_NAV_ITEMS.map(({ page, label, icon, path }) => (
           <Link
             key={page}
             href={`${path}?token=${encodeURIComponent(token)}`}

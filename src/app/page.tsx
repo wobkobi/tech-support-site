@@ -48,7 +48,7 @@ const getApprovedReviews = unstable_cache(
   async () =>
     prisma.review.findMany({
       orderBy: { createdAt: "desc" },
-      select: { text: true, firstName: true, lastName: true, isAnonymous: true },
+      select: { id: true, text: true, firstName: true, lastName: true, isAnonymous: true },
       where: { status: "approved" },
       take: 20,
     }),
@@ -88,6 +88,7 @@ export default async function Home(): Promise<React.ReactElement> {
   const rows = await getApprovedReviews().catch(() => []);
 
   const items: ReviewItem[] = rows.map((r) => ({
+    id: r.id,
     text: r.text.trim().replace(/\s+/g, " "),
     name: formatReviewerName({
       firstName: r.firstName?.trim() || null,

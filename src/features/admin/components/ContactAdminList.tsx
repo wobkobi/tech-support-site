@@ -9,7 +9,7 @@
  */
 
 import type React from "react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/shared/lib/cn";
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import { formatReviewerName } from "@/features/reviews/lib/formatting";
@@ -372,6 +372,8 @@ function ContactCard({
   );
 }
 
+const PAGE_LOAD_TIME = Date.now();
+
 /**
  * Editable list of contacts captured from booking submissions.
  * Unsynced contacts (no Google Contact link) are shown prominently at the top.
@@ -389,6 +391,10 @@ export function ContactAdminList({
   token: string;
 }): React.ReactElement {
   const [contacts, setContacts] = useState<ContactRow[]>(initialContacts);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setContacts(initialContacts);
+  }, [initialContacts]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editEmail, setEditEmail] = useState("");
@@ -421,7 +427,7 @@ export function ContactAdminList({
    * @returns Whether the contact is considered new.
    */
   function isNew(c: ContactRow): boolean {
-    return Date.now() - new Date(c.createdAt).getTime() < NEW_CONTACT_MS;
+    return PAGE_LOAD_TIME - new Date(c.createdAt).getTime() < NEW_CONTACT_MS;
   }
 
   const q = query.toLowerCase().trim();

@@ -10,6 +10,7 @@ import { FrostedSection, PageShell, CARD } from "@/shared/components/PageLayout"
 import { cn } from "@/shared/lib/cn";
 import { prisma } from "@/shared/lib/prisma";
 import { formatReviewerName } from "@/features/reviews/lib/formatting";
+import { ReviewScrollHandler } from "@/features/reviews/components/ReviewScrollHandler";
 
 // Rely on on-demand revalidation (triggered by admin approve/delete/submit).
 // Long fallback avoids waking a cold DB on a fixed timer.
@@ -46,7 +47,8 @@ export default async function ReviewsPage(): Promise<React.ReactElement> {
 
   return (
     <PageShell>
-      <FrostedSection maxWidth="56rem">
+      <ReviewScrollHandler />
+      <FrostedSection>
         <div className={cn("flex flex-col gap-6 sm:gap-8")}>
           <section aria-labelledby="reviews-heading" className={cn(CARD, "animate-fade-in")}>
             <h1
@@ -81,6 +83,7 @@ export default async function ReviewsPage(): Promise<React.ReactElement> {
                 {normalizedRows.map((r) => (
                   <li
                     key={r.id}
+                    id={`review-${r.id}`}
                     className={cn(
                       "bg-seasalt-800/80 border-seasalt-400/60 flex flex-col rounded-lg border-2 p-4 sm:p-5",
                     )}

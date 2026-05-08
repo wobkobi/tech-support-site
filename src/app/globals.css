@@ -190,7 +190,7 @@ textarea {
 }
 
 .animate-marquee {
-  animation: marquee 80s linear infinite;
+  animation: marquee 120s linear infinite;
   will-change: transform;
 }
 
@@ -361,6 +361,25 @@ gmp-place-autocomplete {
   --gmp-color-on-surface-variant: rgba(0, 21, 20, 0.5);
   --gmp-color-primary: #0c0a3e;
   --gmp-color-outline: rgba(0, 21, 20, 0.2);
+}
+
+gmp-place-autocomplete::part(input) {
+  width: 100%;
+  border: 1px solid rgba(191, 198, 205, 0.8);
+  background-color: #f6f7f8;
+  color: #001514;
+  border-radius: 0.375rem;
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  line-height: 1.5rem;
+  font-family: var(--font-sans);
+  outline: none;
+  box-sizing: border-box;
+}
+
+gmp-place-autocomplete::part(input):focus {
+  border-color: #0c0a3e;
+  box-shadow: 0 0 0 1px rgba(12, 10, 62, 0.3);
 }
 
 /* ============================================
