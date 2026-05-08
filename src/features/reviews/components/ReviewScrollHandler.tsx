@@ -38,14 +38,15 @@ export function ReviewScrollHandler(): null {
       window.scrollTo({ top: 0, behavior: "instant" });
 
       // Brief beat so the user sees "we're at the top", then glide to target
+      const target: HTMLElement = el;
       setTimeout(() => {
-        el.scrollIntoView({ block: "center", inline: "nearest", behavior: "smooth" });
+        target.scrollIntoView({ block: "center", inline: "nearest", behavior: "smooth" });
 
         /**
          * Plays the halo flash on the targeted card.
          */
         function playHalo(): void {
-          el.animate(
+          target.animate(
             [
               { boxShadow: `0 0 0 0 rgba(${COQ}, 0)` },
               { boxShadow: `0 0 28px 6px rgba(${COQ}, 0.7)`, offset: 0.25 },
