@@ -1,33 +1,30 @@
 // src/app/booking/layout.tsx
 /**
  * @file layout.tsx
- * @description Booking page layout with Google Maps Places API.
+ * @description Booking route segment layout. Google Maps is no longer loaded
+ *   here - AddressAutocomplete injects the script lazily when the address input
+ *   becomes visible (and only for in-person bookings). The preconnect hint
+ *   warms the TLS handshake so the lazy injection feels instant when it fires.
  */
 
 import type React from "react";
-import Script from "next/script";
 
 /**
- * Booking layout that loads Google Maps Places API
- * @param props - Layout props
- * @param props.children - Child components
- * @returns Layout wrapper with Google Maps script
+ * Booking layout wrapper with a preconnect to Google Maps origins.
+ * @param props - Layout props.
+ * @param props.children - Child content.
+ * @returns Layout element.
  */
 export default function BookingLayout({
   children,
 }: {
   children: React.ReactNode;
 }): React.ReactElement {
-  const googleMapsApiKey = process.env.GOOGLE_MAPS_API_KEY;
-
   return (
     <>
-      {googleMapsApiKey && (
-        <Script
-          src={`https://maps.googleapis.com/maps/api/js?key=${googleMapsApiKey}&libraries=places&loading=async`}
-          strategy="afterInteractive"
-        />
-      )}
+      <link rel="preconnect" href="https://maps.googleapis.com" crossOrigin="anonymous" />
+      <link rel="preconnect" href="https://maps.gstatic.com" crossOrigin="anonymous" />
+      <link rel="dns-prefetch" href="https://maps.googleapis.com" />
       {children}
     </>
   );

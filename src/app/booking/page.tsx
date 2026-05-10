@@ -2,10 +2,15 @@
 /**
  * @file page.tsx
  * @description Booking page with duration-aware slot availability.
+ *   The static shell (heading, sidebar, skeleton) renders immediately while
+ *   the slot data is streamed in via a Suspense boundary, so TTFB stays
+ *   constant even when the calendar cache is cold and we have to hit the
+ *   live Google Calendar API.
  */
 
 import type { Metadata } from "next";
 import type React from "react";
+import { Suspense } from "react";
 import { cn } from "@/shared/lib/cn";
 import {
   BOOKING_CONFIG,
@@ -83,8 +88,9 @@ async function getCalendarEvents(
       `[booking/page] Fetched ${liveEvents.length} live calendar events (cache was empty)`,
     );
 
-    // Populate cache in background so the next request is fast
-    const cacheExpiry = new Date(now.getTime() + 15 * 60 * 1000);
+    // Populate cache in background so the next request is fast.
+    // Matches the cron writer's 30-min TTL (cron runs every 15 min).
+    const cacheExpiry = new Date(now.getTime() + 30 * 60 * 1000);
     void Promise.all(
       liveEvents.map((e) =>
         prisma.calendarEventCache.upsert({
@@ -159,13 +165,103 @@ const STEP_ICON = cn(
   "border-moonstone-500/40 bg-moonstone-600/20 grid size-9 shrink-0 place-items-center rounded-lg border",
 );
 
+const SKELETON_BLOCK = cn("bg-seasalt-900/40 rounded-lg");
+
+/**
+ * Async island that fetches slot data and renders the booking form. Held
+ * inside a Suspense boundary so the rest of the page can flush instantly.
+ * @returns Booking form populated with available days.
+ */
+async function BookingFormIsland(): Promise<React.ReactElement> {
+  const availableDays = await getAvailableDays();
+  return <BookingForm availableDays={availableDays} />;
+}
+
+/**
+ * Skeleton shown while BookingFormIsland streams in. Matches the rough
+ * visual height of the real form to avoid layout shift on hydration.
+ * @returns Skeleton placeholder element.
+ */
+function BookingFormSkeleton(): React.ReactElement {
+  return (
+    <div
+      className={cn("flex animate-pulse flex-col gap-8")}
+      role="status"
+      aria-live="polite"
+      aria-label="Loading booking form"
+    >
+      {/* Schedule header */}
+      <div className={cn("flex flex-col gap-6")}>
+        <div className={cn(SKELETON_BLOCK, "h-7 w-32")} />
+
+        {/* Duration */}
+        <div className={cn("flex flex-col gap-2")}>
+          <div className={cn(SKELETON_BLOCK, "h-5 w-48")} />
+          <div className={cn("grid gap-3 sm:grid-cols-2")}>
+            <div className={cn(SKELETON_BLOCK, "h-20")} />
+            <div className={cn(SKELETON_BLOCK, "h-20")} />
+          </div>
+        </div>
+
+        {/* Days */}
+        <div className={cn("flex flex-col gap-2")}>
+          <div className={cn(SKELETON_BLOCK, "h-5 w-32")} />
+          <div className={cn(SKELETON_BLOCK, "h-4 w-20")} />
+          <div className={cn("grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-2")}>
+            {Array.from({ length: 10 }).map((_, i) => (
+              <div key={i} className={cn(SKELETON_BLOCK, "h-12")} />
+            ))}
+          </div>
+        </div>
+
+        {/* Times */}
+        <div className={cn("flex flex-col gap-2")}>
+          <div className={cn(SKELETON_BLOCK, "h-5 w-40")} />
+          <div className={cn("grid grid-cols-[repeat(auto-fill,minmax(5rem,1fr))] gap-2")}>
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className={cn(SKELETON_BLOCK, "h-11")} />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <hr className={cn("border-seasalt-400/80")} />
+
+      {/* Your details */}
+      <div className={cn("flex flex-col gap-6")}>
+        <div className={cn(SKELETON_BLOCK, "h-7 w-36")} />
+        <div className={cn("grid gap-4 sm:grid-cols-2")}>
+          <div className={cn(SKELETON_BLOCK, "h-12")} />
+          <div className={cn(SKELETON_BLOCK, "h-12")} />
+        </div>
+        <div className={cn(SKELETON_BLOCK, "h-12 sm:max-w-sm")} />
+        <div className={cn("grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-2")}>
+          <div className={cn(SKELETON_BLOCK, "h-11")} />
+          <div className={cn(SKELETON_BLOCK, "h-11")} />
+        </div>
+      </div>
+
+      <hr className={cn("border-seasalt-400/80")} />
+
+      {/* Notes */}
+      <div className={cn("flex flex-col gap-2")}>
+        <div className={cn(SKELETON_BLOCK, "h-5 w-56")} />
+        <div className={cn(SKELETON_BLOCK, "h-28")} />
+      </div>
+
+      {/* Submit */}
+      <div className={cn(SKELETON_BLOCK, "h-12 w-44")} />
+
+      <span className={cn("sr-only")}>Loading available appointment times...</span>
+    </div>
+  );
+}
+
 /**
  * Booking page component
  * @returns React element for booking page
  */
-export default async function BookingPage(): Promise<React.ReactElement> {
-  const availableDays = await getAvailableDays();
-
+export default function BookingPage(): React.ReactElement {
   return (
     <PageShell>
       <BreadcrumbJsonLd
@@ -195,14 +291,16 @@ export default async function BookingPage(): Promise<React.ReactElement> {
 
           {/* Two-column: Form + Sidebar */}
           <div className={cn("grid gap-6 sm:gap-8 lg:grid-cols-[1fr_20rem]")}>
-            {/* Form Card */}
+            {/* Form Card - data island streams in inside the Suspense boundary */}
             <section
               className={cn(
                 CARD,
                 "animate-slide-up animate-fill-both animate-delay-100 order-2 lg:order-1",
               )}
             >
-              <BookingForm availableDays={availableDays} />
+              <Suspense fallback={<BookingFormSkeleton />}>
+                <BookingFormIsland />
+              </Suspense>
             </section>
 
             {/* Sidebar */}

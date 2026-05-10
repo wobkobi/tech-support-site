@@ -7,7 +7,6 @@
  */
 
 import type React from "react";
-import Script from "next/script";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz";
 
@@ -41,7 +40,7 @@ export function BreadcrumbJsonLd({
   };
 
   return (
-    <Script
+    <script
       id={`ld-breadcrumb-${crumbs[crumbs.length - 1]?.path ?? "root"}`}
       type="application/ld+json"
       dangerouslySetInnerHTML={{ __html: JSON.stringify(json) }}

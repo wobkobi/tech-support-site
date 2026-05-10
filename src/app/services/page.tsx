@@ -6,7 +6,6 @@
 
 import type { Metadata } from "next";
 import type React from "react";
-import Script from "next/script";
 import { FrostedSection, PageShell, CARD } from "@/shared/components/PageLayout";
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
 import { Button } from "@/shared/components/Button";
@@ -158,7 +157,7 @@ export default function ServicesPage(): React.ReactElement {
 
   return (
     <PageShell>
-      <Script
+      <script
         id="ld-services"
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(servicesJsonLd) }}

@@ -8,7 +8,6 @@ import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata, Viewport } from "next";
 import { Exo } from "next/font/google";
-import Script from "next/script";
 import "./globals.css";
 import { NavBar } from "@/shared/components/NavBar";
 
@@ -393,13 +392,13 @@ export default function RootLayout({
         {/* Performance */}
         {/* Vercel performance and analytics integrations */}
         <SpeedInsights />
-        {/* JSON-LD for richer SERP features */}
-        <Script
+        {/* JSON-LD for richer SERP features (plain inline scripts - no client-side overhead) */}
+        <script
           id="ld-business"
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(localBusinessJsonLd) }}
         />
-        <Script
+        <script
           id="ld-website"
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}

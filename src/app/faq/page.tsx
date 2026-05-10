@@ -7,7 +7,6 @@
 import type { Metadata } from "next";
 import type React from "react";
 import Link from "next/link";
-import Script from "next/script";
 import { FrostedSection, PageShell, CARD, SOFT_CARD } from "@/shared/components/PageLayout";
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
 import { cn } from "@/shared/lib/cn";
@@ -204,7 +203,7 @@ export default function FaqPage(): React.ReactElement {
 
   return (
     <PageShell>
-      <Script
+      <script
         id="ld-faq"
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}

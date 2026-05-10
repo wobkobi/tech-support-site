@@ -80,8 +80,12 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
     },
   });
 
-  // Upsert fresh events into cache
-  const cacheExpiry = new Date(now.getTime() + 15 * 60 * 1000); // Cache expires in 15 minutes
+  // Upsert fresh events into cache.
+  // 30-min TTL gives a 15-min cushion over the 15-min cron cadence so a single
+  // missed/late cron run doesn't push the booking page onto its slow live-API
+  // fallback. Data freshness is unaffected - the cron rewrites each entry on
+  // every run.
+  const cacheExpiry = new Date(now.getTime() + 30 * 60 * 1000);
   const upsertPromises = rawEvents.map((event) =>
     prisma.calendarEventCache.upsert({
       where: {
