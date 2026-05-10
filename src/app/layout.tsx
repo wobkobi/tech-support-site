@@ -24,13 +24,38 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz";
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "To The Point Tech - Local IT & Computer Support Auckland",
+    default: "To The Point Tech - Computer & IT Support in Auckland",
     template: "%s | To The Point Tech",
   },
   description:
-    "Local IT & computer support in Auckland. Same-day, evening & weekend appointments available. No jargon - clear fixes for computers, Wi-Fi, phones, printers, and more.",
+    "Friendly computer and IT support across Auckland. On-site and remote help with PCs, Macs, Wi-Fi, phones, printers and more. Same-day, evening and weekend appointments. No jargon, no upselling, transparent pricing.",
+  keywords: [
+    "computer repair Auckland",
+    "IT support Auckland",
+    "tech support Auckland",
+    "Wi-Fi setup Auckland",
+    "laptop repair Auckland",
+    "Mac support Auckland",
+    "PC support Auckland",
+    "small business IT support Auckland",
+    "remote tech support NZ",
+    "home computer help Auckland",
+    "printer setup Auckland",
+    "smart TV setup Auckland",
+    "data recovery Auckland",
+    "virus removal Auckland",
+    "Auckland computer help",
+    "Auckland IT help",
+    "tech support near me Auckland",
+    "computer technician Auckland",
+    "on-site IT support Auckland",
+    "mobile tech support Auckland",
+  ],
   applicationName: "To The Point Tech",
   authors: [{ name: "Harrison Raynes" }],
+  creator: "Harrison Raynes",
+  publisher: "To The Point Tech",
+  category: "Technology",
   alternates: {
     canonical: "/",
     languages: { "en-NZ": "/" },
@@ -40,16 +65,16 @@ export const metadata: Metadata = {
     locale: "en_NZ",
     siteName: "To The Point Tech",
     url: "/",
-    title: "To The Point Tech",
+    title: "To The Point Tech - Computer & IT Support in Auckland",
     description:
-      "Local tech support in Point Chevalier. Clear explanations, no jargon, and solutions that actually work.",
+      "Friendly computer and IT support across Auckland. On-site and remote help, transparent pricing, no jargon.",
     images: [{ url: "/og-1200x630.jpg", width: 1200, height: 630, alt: "To The Point Tech" }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "To The Point Tech",
+    title: "To The Point Tech - Computer & IT Support in Auckland",
     description:
-      "Local tech support in Point Chevalier. Clear explanations, no jargon, and solutions that actually work.",
+      "Friendly computer and IT support across Auckland. On-site and remote help, transparent pricing, no jargon.",
     images: ["/og-1200x630.jpg"],
   },
   robots: {
@@ -134,14 +159,63 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>): React.ReactElement {
-  const orgJsonLd = {
+  const servedSuburbs = [
+    "Auckland Central",
+    "Auckland CBD",
+    "Ponsonby",
+    "Herne Bay",
+    "Grey Lynn",
+    "Westmere",
+    "Point Chevalier",
+    "Western Springs",
+    "Mount Albert",
+    "Kingsland",
+    "Sandringham",
+    "Mount Eden",
+    "Epsom",
+    "Newmarket",
+    "Parnell",
+    "Remuera",
+    "Mission Bay",
+    "Saint Heliers",
+    "Glen Innes",
+    "Onehunga",
+    "Royal Oak",
+    "Hillsborough",
+    "Three Kings",
+    "Mount Roskill",
+    "Avondale",
+    "New Lynn",
+    "Henderson",
+    "Te Atatu",
+    "Massey",
+    "Glen Eden",
+    "Titirangi",
+    "Devonport",
+    "Takapuna",
+    "Milford",
+    "Northcote",
+    "Birkenhead",
+    "Albany",
+    "Manukau",
+    "Botany",
+    "Howick",
+    "Pakuranga",
+  ];
+
+  const localBusinessJsonLd = {
     "@context": "https://schema.org",
-    "@type": "ProfessionalService",
+    "@type": ["LocalBusiness", "ProfessionalService"],
+    "@id": `${siteUrl}#business`,
     name: "To The Point Tech",
+    legalName: "To The Point Tech",
+    alternateName: ["To The Point Tech Auckland", "To The Point IT Support"],
     url: siteUrl,
     image: `${siteUrl}/og-1200x630.jpg`,
+    logo: `${siteUrl}/source/logo-full.svg`,
     description:
-      "Local IT & computer support in Auckland. Same-day, evening & weekend appointments. No jargon - clear fixes for computers, Wi-Fi, phones, printers, and more.",
+      "Friendly computer and IT support across Auckland. On-site and remote help with PCs, Macs, Wi-Fi, phones, printers, smart TVs, and small-business IT. Same-day, evening and weekend appointments.",
+    slogan: "Clear explanations, no jargon, solutions that actually work.",
     telephone: "+64-21-297-1237",
     email: "harrison@tothepoint.co.nz",
     founder: { "@type": "Person", name: "Harrison Raynes" },
@@ -149,37 +223,161 @@ export default function RootLayout({
       "@type": "PostalAddress",
       addressLocality: "Point Chevalier",
       addressRegion: "Auckland",
+      postalCode: "1022",
       addressCountry: "NZ",
     },
-    areaServed: {
+    geo: {
+      "@type": "GeoCoordinates",
+      latitude: -36.8717,
+      longitude: 174.7185,
+    },
+    areaServed: [
+      {
+        "@type": "GeoCircle",
+        geoMidpoint: { "@type": "GeoCoordinates", latitude: -36.8485, longitude: 174.7633 },
+        geoRadius: "25000",
+      },
+      ...servedSuburbs.map((name) => ({
+        "@type": "City",
+        name,
+        containedInPlace: { "@type": "AdministrativeArea", name: "Auckland" },
+      })),
+    ],
+    serviceArea: {
       "@type": "GeoCircle",
       geoMidpoint: { "@type": "GeoCoordinates", latitude: -36.8717, longitude: 174.7185 },
       geoRadius: "15000",
     },
-    contactPoint: {
-      "@type": "ContactPoint",
-      telephone: "+64-21-297-1237",
-      email: "harrison@tothepoint.co.nz",
-      contactType: "customer support",
-      availableLanguage: "English",
-    },
-    priceRange: "$$",
+    openingHoursSpecification: [
+      {
+        "@type": "OpeningHoursSpecification",
+        dayOfWeek: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+        opens: "08:00",
+        closes: "20:00",
+      },
+      {
+        "@type": "OpeningHoursSpecification",
+        dayOfWeek: ["Saturday", "Sunday"],
+        opens: "09:00",
+        closes: "18:00",
+      },
+    ],
+    contactPoint: [
+      {
+        "@type": "ContactPoint",
+        telephone: "+64-21-297-1237",
+        email: "harrison@tothepoint.co.nz",
+        contactType: "customer support",
+        areaServed: "NZ",
+        availableLanguage: ["English"],
+      },
+    ],
+    priceRange: "NZ$65 - NZ$85 per hour",
+    paymentAccepted: ["Cash", "Bank Transfer"],
+    currenciesAccepted: "NZD",
+    knowsAbout: [
+      "Computer Repair",
+      "Laptop Repair",
+      "Wi-Fi Setup",
+      "Network Troubleshooting",
+      "Virus and Malware Removal",
+      "Data Recovery",
+      "Data Transfer",
+      "Cloud Backup",
+      "Smart Home Setup",
+      "Smart TV Setup",
+      "Printer Setup",
+      "Email Configuration",
+      "Account Recovery",
+      "Windows Support",
+      "macOS Support",
+      "iOS Support",
+      "Android Support",
+      "Small Business IT",
+      "Remote Tech Support",
+    ],
     hasOfferCatalog: {
       "@type": "OfferCatalog",
       name: "Tech Support Services",
       itemListElement: [
-        "Computer & Laptop Repair",
-        "Wi-Fi & Network Setup",
-        "Phone & Tablet Help",
-        "Virus & Malware Removal",
-        "Data Recovery & Transfer",
-        "Cloud & Photo Backup",
-        "Smart TV & Home Setup",
-        "Email & Account Setup",
-        "Printer Setup",
-        "Remote Support",
-      ].map((name) => ({ "@type": "Offer", itemOffered: { "@type": "Service", name } })),
+        {
+          name: "Computer & Laptop Repair",
+          description:
+            "Diagnosis and repair for slow PCs and laptops, software issues, hardware faults and tune-ups.",
+        },
+        {
+          name: "Wi-Fi & Network Setup",
+          description:
+            "Reliable Wi-Fi, mesh installs, dead-spot fixes, router configuration and speed troubleshooting.",
+        },
+        {
+          name: "Phone & Tablet Help",
+          description:
+            "iPhone, iPad and Android setup, account sync, app help, and migrating to a new device.",
+        },
+        {
+          name: "Virus & Malware Removal",
+          description:
+            "Scam pop-up cleanup, malware removal, and security hardening so your devices stay safe.",
+        },
+        {
+          name: "Data Recovery & Transfer",
+          description:
+            "Recovering files from failing drives, migrating data between devices, and restoring backups.",
+        },
+        {
+          name: "Cloud & Photo Backup",
+          description:
+            "OneDrive, iCloud and Google Photos setup with automatic backup of important files and photos.",
+        },
+        {
+          name: "Smart TV & Home Setup",
+          description:
+            "Smart TVs, streaming apps, AirPlay/Chromecast, smart lights, cameras and voice assistants.",
+        },
+        {
+          name: "Email & Account Setup",
+          description:
+            "Email configuration, password recovery, account sync across devices, and spam filtering.",
+        },
+        {
+          name: "Printer Setup",
+          description:
+            "Printer install, network printing, driver troubleshooting and scan-to-email setup.",
+        },
+        {
+          name: "Remote Support",
+          description:
+            "Quick remote help for software issues, account problems and follow-up support.",
+        },
+      ].map((s) => ({
+        "@type": "Offer",
+        itemOffered: {
+          "@type": "Service",
+          name: s.name,
+          description: s.description,
+          areaServed: "Auckland, NZ",
+        },
+        priceCurrency: "NZD",
+        priceSpecification: {
+          "@type": "UnitPriceSpecification",
+          price: 65,
+          priceCurrency: "NZD",
+          unitCode: "HUR",
+        },
+      })),
     },
+    sameAs: ["https://www.google.com/search?q=To+The+Point+Tech+Auckland"],
+  };
+
+  const websiteJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "@id": `${siteUrl}#website`,
+    url: siteUrl,
+    name: "To The Point Tech",
+    publisher: { "@id": `${siteUrl}#business` },
+    inLanguage: "en-NZ",
   };
 
   return (
@@ -197,9 +395,14 @@ export default function RootLayout({
         <SpeedInsights />
         {/* JSON-LD for richer SERP features */}
         <Script
-          id="ld-org"
+          id="ld-business"
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }}
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(localBusinessJsonLd) }}
+        />
+        <Script
+          id="ld-website"
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
         />
       </body>
     </html>

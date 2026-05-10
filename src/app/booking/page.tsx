@@ -4,6 +4,7 @@
  * @description Booking page with duration-aware slot availability.
  */
 
+import type { Metadata } from "next";
 import type React from "react";
 import { cn } from "@/shared/lib/cn";
 import {
@@ -16,7 +17,27 @@ import { prisma } from "@/shared/lib/prisma";
 import { fetchAllCalendarEvents } from "@/features/calendar/lib/google-calendar";
 import BookingForm from "@/features/booking/components/BookingForm";
 import { FrostedSection, PageShell, CARD, SOFT_CARD } from "@/shared/components/PageLayout";
+import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
 import { FaCalendarCheck, FaClock, FaEnvelopeOpenText, FaListCheck } from "react-icons/fa6";
+
+export const metadata: Metadata = {
+  title: "Book a Tech Support Appointment in Auckland",
+  description:
+    "Book an on-site or remote tech support appointment in Auckland. Same-day, evening and weekend slots available. Pick a 1- or 2-hour slot and get an instant calendar invite.",
+  keywords: [
+    "book tech support Auckland",
+    "computer repair appointment Auckland",
+    "IT support booking Auckland",
+    "same day tech support Auckland",
+    "weekend computer help Auckland",
+  ],
+  alternates: { canonical: "/booking" },
+  openGraph: {
+    title: "Book an Appointment - To The Point Tech",
+    description: "Same-day, evening and weekend tech support appointments across Auckland.",
+    url: "/booking",
+  },
+};
 
 // Always render fresh - slot availability is time-sensitive and ISR can serve
 // stale pages indefinitely on low-traffic routes (Vercel only revalidates on
@@ -147,6 +168,12 @@ export default async function BookingPage(): Promise<React.ReactElement> {
 
   return (
     <PageShell>
+      <BreadcrumbJsonLd
+        crumbs={[
+          { name: "Home", path: "/" },
+          { name: "Book", path: "/booking" },
+        ]}
+      />
       <FrostedSection maxWidth="90rem">
         <div className={cn("flex flex-col gap-6 sm:gap-8")}>
           {/* Header */}

@@ -4,10 +4,38 @@
  * @description Services page with wider layout and better organization.
  */
 
+import type { Metadata } from "next";
 import type React from "react";
+import Script from "next/script";
 import { FrostedSection, PageShell, CARD } from "@/shared/components/PageLayout";
+import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
 import { Button } from "@/shared/components/Button";
 import { cn } from "@/shared/lib/cn";
+
+export const metadata: Metadata = {
+  title: "Tech Support Services - Computers, Wi-Fi, Phones & More",
+  description:
+    "On-site and remote tech support across Auckland: computer and laptop repair, Wi-Fi setup, virus removal, data recovery, smart TVs, printers, email, cloud backup and small business IT.",
+  keywords: [
+    "computer repair Auckland",
+    "laptop repair Auckland",
+    "Wi-Fi setup Auckland",
+    "virus removal Auckland",
+    "data recovery Auckland",
+    "printer setup Auckland",
+    "smart TV setup Auckland",
+    "small business IT support Auckland",
+    "Mac support Auckland",
+    "Windows support Auckland",
+  ],
+  alternates: { canonical: "/services" },
+  openGraph: {
+    title: "Tech Support Services - To The Point Tech",
+    description:
+      "Computer repair, Wi-Fi setup, data recovery, smart home, printers, email and more across Auckland's Inner West.",
+    url: "/services",
+  },
+};
 import {
   FaCloud,
   FaHouse,
@@ -92,13 +120,55 @@ const serviceAreas: ReadonlyArray<ServiceArea> = [
   },
 ];
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz";
+
 /**
  * Services page component
  * @returns Services page element
  */
 export default function ServicesPage(): React.ReactElement {
+  const servicesJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name: "To The Point Tech - Services",
+    itemListElement: serviceAreas.map((area, idx) => ({
+      "@type": "ListItem",
+      position: idx + 1,
+      item: {
+        "@type": "Service",
+        name: area.label,
+        serviceType: area.label,
+        description: `${area.label} in Auckland: ${area.examples.join(", ")}.`,
+        areaServed: { "@type": "AdministrativeArea", name: "Auckland, New Zealand" },
+        provider: { "@id": `${siteUrl}#business` },
+        offers: {
+          "@type": "Offer",
+          priceCurrency: "NZD",
+          priceSpecification: {
+            "@type": "UnitPriceSpecification",
+            price: 65,
+            priceCurrency: "NZD",
+            unitCode: "HUR",
+          },
+          availability: "https://schema.org/InStock",
+        },
+      },
+    })),
+  };
+
   return (
     <PageShell>
+      <Script
+        id="ld-services"
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(servicesJsonLd) }}
+      />
+      <BreadcrumbJsonLd
+        crumbs={[
+          { name: "Home", path: "/" },
+          { name: "Services", path: "/services" },
+        ]}
+      />
       <FrostedSection maxWidth="90rem">
         <div className={cn("flex flex-col gap-6 sm:gap-8")}>
           <section aria-labelledby="services-heading" className={cn(CARD, "animate-fade-in")}>

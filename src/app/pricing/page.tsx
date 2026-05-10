@@ -4,11 +4,33 @@
  * @description Pricing page: transparent pricing structure for tech support services.
  */
 
+import type { Metadata } from "next";
 import type React from "react";
 import Link from "next/link";
 import { FrostedSection, PageShell, CARD, SOFT_CARD } from "@/shared/components/PageLayout";
+import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
 import { cn } from "@/shared/lib/cn";
 import { PricingWizard } from "@/features/business/components/PricingWizard";
+
+export const metadata: Metadata = {
+  title: "Pricing - $65/h Tech Support in Auckland",
+  description:
+    "Transparent tech support pricing in Auckland. $65/h for most jobs, $85/h for complex work. Free quick calls and emails. No hidden fees, no upselling. On-site and remote rates the same.",
+  keywords: [
+    "tech support pricing Auckland",
+    "computer repair cost Auckland",
+    "IT support hourly rate Auckland",
+    "affordable tech support Auckland",
+    "transparent IT pricing NZ",
+  ],
+  alternates: { canonical: "/pricing" },
+  openGraph: {
+    title: "Pricing - To The Point Tech",
+    description:
+      "Simple, transparent rates: $65/h for most jobs, $85/h for complex work. Free initial calls.",
+    url: "/pricing",
+  },
+};
 
 const linkStyle = cn(
   "text-coquelicot-500 hover:text-coquelicot-600 underline-offset-4 hover:underline",
@@ -21,6 +43,12 @@ const linkStyle = cn(
 export default function PricingPage(): React.ReactElement {
   return (
     <PageShell>
+      <BreadcrumbJsonLd
+        crumbs={[
+          { name: "Home", path: "/" },
+          { name: "Pricing", path: "/pricing" },
+        ]}
+      />
       <FrostedSection>
         <div className={cn("flex flex-col gap-6 sm:gap-8")}>
           <section aria-labelledby="pricing-heading" className={cn(CARD, "animate-fade-in")}>

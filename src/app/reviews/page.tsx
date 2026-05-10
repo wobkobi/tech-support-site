@@ -4,13 +4,33 @@
  * @description Public reviews page showing all approved client reviews.
  */
 
+import type { Metadata } from "next";
 import type React from "react";
 import Link from "next/link";
 import { FrostedSection, PageShell, CARD } from "@/shared/components/PageLayout";
+import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
 import { cn } from "@/shared/lib/cn";
 import { prisma } from "@/shared/lib/prisma";
 import { formatReviewerName } from "@/features/reviews/lib/formatting";
 import { ReviewScrollHandler } from "@/features/reviews/components/ReviewScrollHandler";
+
+export const metadata: Metadata = {
+  title: "Reviews - What Auckland Clients Say About To The Point Tech",
+  description:
+    "Real reviews from Auckland clients who have used To The Point Tech for computer repair, Wi-Fi setup, virus removal, smart home, and small-business IT support.",
+  keywords: [
+    "tech support reviews Auckland",
+    "computer repair reviews Auckland",
+    "IT support testimonials",
+    "To The Point Tech reviews",
+  ],
+  alternates: { canonical: "/reviews" },
+  openGraph: {
+    title: "Reviews - To The Point Tech",
+    description: "Feedback from clients across Auckland.",
+    url: "/reviews",
+  },
+};
 
 // Rely on on-demand revalidation (triggered by admin approve/delete/submit).
 // Long fallback avoids waking a cold DB on a fixed timer.
@@ -48,6 +68,12 @@ export default async function ReviewsPage(): Promise<React.ReactElement> {
   return (
     <PageShell>
       <ReviewScrollHandler />
+      <BreadcrumbJsonLd
+        crumbs={[
+          { name: "Home", path: "/" },
+          { name: "Reviews", path: "/reviews" },
+        ]}
+      />
       <FrostedSection>
         <div className={cn("flex flex-col gap-6 sm:gap-8")}>
           <section aria-labelledby="reviews-heading" className={cn(CARD, "animate-fade-in")}>
