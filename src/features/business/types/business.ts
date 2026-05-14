@@ -1,8 +1,12 @@
 export interface RateConfig {
   id: string;
   label: string;
+  /** Set on base hourly rates (e.g. Standard $65/hr). Null on modifiers and flat rates. */
   ratePerHour: number | null;
+  /** Set on flat rates (e.g. Travel $1.20/km). Null on hourly bases and modifiers. */
   flatRate: number | null;
+  /** Set on modifier rates (signed $/hr delta, e.g. -10 for At home). Null on bases and flat rates. */
+  hourlyDelta: number | null;
   unit: string;
   isDefault: boolean;
   createdAt: string;
@@ -86,7 +90,12 @@ export interface GoogleContact {
 }
 
 export interface TaskLine {
+  /** For flat-rate tasks (e.g. Travel) - points to the linked flat RateConfig. Null on hourly tasks. */
   rateConfigId: string | null;
+  /** For hourly tasks - points to the base RateConfig (with ratePerHour set). Null on flat tasks. */
+  baseRateId?: string | null;
+  /** For hourly tasks - applied modifier RateConfig IDs (each with hourlyDelta set). Effective $/hr = base + sum(deltas). */
+  modifierIds?: string[];
   description: string;
   qty: number;
   unitPrice: number;
@@ -141,6 +150,10 @@ export interface ParseJobResponse {
 
 export interface ParsedTaskLine {
   rateConfigId: string | null;
+  /** Resolved base rate ID (set by the server from baseRateLabel emitted by the AI). */
+  baseRateId?: string | null;
+  /** Resolved modifier rate IDs (set by the server from modifierLabels emitted by the AI). */
+  modifierIds?: string[];
   description: string;
   qty: number;
   unitPrice: number;
@@ -183,14 +196,7 @@ export interface SheetCounterResponse {
   nextFormatted: string;
   prefix: string;
 }
-export interface ParsedTaskLine {
-  rateConfigId: string | null;
-  description: string;
-  qty: number; // hours for work, km for travel
-  unitPrice: number;
-}
 
-// Add this new interface
 export interface TravelInfo {
   distanceKm: number;
   durationMins: number;

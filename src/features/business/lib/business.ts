@@ -1,4 +1,5 @@
 import type { JobCalculation, LineItem, RateConfig } from "@/features/business/types/business";
+import { formatDateSlash } from "@/shared/lib/date-format";
 
 /**
  * Formats a number as NZD currency string.
@@ -10,16 +11,12 @@ export function formatNZD(amount: number): string {
 }
 
 /**
- * Formats a Date or ISO string as NZ short date (DD/MM/YYYY).
- * @param date - Date object or ISO string
- * @returns Formatted date string (e.g. "01/05/2026")
+ * NZ slash date "DD/MM/YYYY" (local). Wrapper kept for existing imports.
+ * @param date - Date or ISO string.
+ * @returns Formatted string.
  */
 export function formatNZDate(date: Date | string): string {
-  const d = typeof date === "string" ? new Date(date) : date;
-  const day = String(d.getDate()).padStart(2, "0");
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const year = d.getFullYear();
-  return `${day}/${month}/${year}`;
+  return formatDateSlash(date);
 }
 
 /**
@@ -41,15 +38,12 @@ export function calcGstFromInclusive(amountIncl: number, gstRate: number): numbe
 }
 
 /**
- * Formats a Date as DD/MM/YYYY using UTC date parts (safe for server-side use).
- * @param date - The date to format
- * @returns Formatted date string
+ * UTC slash date "DD/MM/YYYY" - safe for server-side sheet writes.
+ * @param date - Date to format.
+ * @returns Formatted string.
  */
 export function formatUTCDDMMYYYY(date: Date): string {
-  const d = String(date.getUTCDate()).padStart(2, "0");
-  const m = String(date.getUTCMonth() + 1).padStart(2, "0");
-  const y = date.getUTCFullYear();
-  return `${d}/${m}/${y}`;
+  return formatDateSlash(date, { utc: true });
 }
 
 /**
@@ -120,6 +114,30 @@ export function matchRateById(rates: RateConfig[], id: string | null): RateConfi
 }
 
 /**
+ * Computes the effective hourly rate for a task by adding modifier deltas to
+ * a base rate. E.g. Standard ($65) + At home (-$10) + Student (-$20) = $35.
+ * @param rates - All rate configurations (used to look up by ID).
+ * @param baseRateId - Base rate ID (must point to a rate with ratePerHour set).
+ * @param modifierIds - Modifier rate IDs (each must point to a rate with hourlyDelta set).
+ * @returns Effective $/hr, or 0 when the base rate isn't found / lacks ratePerHour.
+ */
+export function effectiveHourlyRate(
+  rates: RateConfig[],
+  baseRateId: string | null | undefined,
+  modifierIds: string[] | null | undefined,
+): number {
+  if (!baseRateId) return 0;
+  const base = rates.find((r) => r.id === baseRateId);
+  if (!base || base.ratePerHour === null) return 0;
+  const ids = modifierIds ?? [];
+  const sumDelta = ids.reduce((s, id) => {
+    const mod = rates.find((r) => r.id === id);
+    return s + (mod?.hourlyDelta ?? 0);
+  }, 0);
+  return Math.round((base.ratePerHour + sumDelta) * 100) / 100;
+}
+
+/**
  * Converts a job calculation into a flat array of invoice line items.
  * @param job - Job calculation with time, tasks, and parts
  * @returns Array of line items ready for an invoice
@@ -172,8 +190,8 @@ export function jobToLineItems(job: JobCalculation): LineItem[] {
 
 /**
  * Calculates the complete cost breakdown for a job.
- * @param job - Job calculation with time, tasks, and parts
- * @returns Cost breakdown with time charge, tasks, parts, subtotal, GST, and total
+ * @param job - Job calculation with time, tasks, and parts.
+ * @returns Cost breakdown including subtotals and totals.
  */
 export function calcJobTotal(job: JobCalculation): {
   timeCharge: number;
@@ -200,7 +218,7 @@ export function calcJobTotal(job: JobCalculation): {
     travelTotal,
     subtotal,
     gstAmount,
-    total: subtotal + gstAmount,
+    total: Math.round((subtotal + gstAmount) * 100) / 100,
   };
 }
 

@@ -176,11 +176,20 @@ model CalendarEventCache {
 
 // --- Business module ---
 
+// A RateConfig row is exactly one of three kinds, distinguished by which
+// numeric field is set:
+//   - Base hourly rate: ratePerHour set (e.g. Standard $65/hr).
+//   - Modifier: hourlyDelta set (signed $/hr added to the base when applied,
+//     e.g. -10 for At home, +20 for Complex). Stacked freely per task.
+//   - Flat rate: flatRate set (e.g. Travel $1.20/km).
+// The effective unit price for an hourly task is base.ratePerHour + sum of
+// applied modifier deltas.
 model RateConfig {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
   label       String
   ratePerHour Float?
   flatRate    Float?
+  hourlyDelta Float?
   unit        String   @default("hour")
   isDefault   Boolean  @default(false)
   createdAt   DateTime @default(now())

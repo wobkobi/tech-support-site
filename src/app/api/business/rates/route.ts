@@ -2,46 +2,56 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
 
+// Seed shape: one base hourly rate (Standard), a handful of modifier rates that
+// shift the effective $/hr (Complex +$20, At home -$10, Student -$20, Remote
+// -$10), and the Travel flat rate. Replaces the previous mess of fixed rates
+// like "Complex at home" / "Complex work" / "At home" - those are now derived.
 const DEFAULTS = [
   {
     label: "Standard",
     ratePerHour: 65,
     flatRate: null,
+    hourlyDelta: null,
     unit: "hour",
     isDefault: true,
   },
   {
-    label: "Complex work",
-    ratePerHour: 85,
+    label: "Complex",
+    ratePerHour: null,
     flatRate: null,
-    unit: "hour",
-    isDefault: false,
-  },
-  {
-    label: "Remote support",
-    ratePerHour: 60,
-    flatRate: null,
-    unit: "hour",
+    hourlyDelta: 20,
+    unit: "modifier",
     isDefault: false,
   },
   {
     label: "At home",
-    ratePerHour: 55,
+    ratePerHour: null,
     flatRate: null,
-    unit: "hour",
+    hourlyDelta: -10,
+    unit: "modifier",
     isDefault: false,
   },
   {
-    label: "Complex at home",
-    ratePerHour: 75,
+    label: "Student",
+    ratePerHour: null,
     flatRate: null,
-    unit: "hour",
+    hourlyDelta: -20,
+    unit: "modifier",
+    isDefault: false,
+  },
+  {
+    label: "Remote",
+    ratePerHour: null,
+    flatRate: null,
+    hourlyDelta: -10,
+    unit: "modifier",
     isDefault: false,
   },
   {
     label: "Travel",
     ratePerHour: null,
     flatRate: 1.2,
+    hourlyDelta: null,
     unit: "km",
     isDefault: false,
   },
@@ -83,7 +93,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   const body = await request.json();
-  const { label, ratePerHour, flatRate, unit, isDefault } = body;
+  const { label, ratePerHour, flatRate, hourlyDelta, unit, isDefault } = body;
 
   if (!label || typeof label !== "string") {
     return NextResponse.json({ error: "label is required" }, { status: 400 });
@@ -98,10 +108,28 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       label,
       ratePerHour: ratePerHour ?? null,
       flatRate: flatRate ?? null,
+      hourlyDelta: hourlyDelta ?? null,
       unit: unit ?? "hour",
       isDefault: isDefault ?? false,
     },
   });
 
   return NextResponse.json({ ok: true, rate }, { status: 201 });
+}
+
+/**
+ * DELETE /api/business/rates - Wipes every rate row and reseeds the defaults
+ * (Standard base + modifier set + Travel flat rate). Used by the "Reset rates"
+ * button in the Calculator's Manage rates panel after the rate-model rework.
+ * @param request - Incoming Next.js request
+ * @returns JSON with the freshly-seeded rates array
+ */
+export async function DELETE(request: NextRequest): Promise<NextResponse> {
+  if (!isAdminRequest(request)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  await prisma.rateConfig.deleteMany({});
+  await prisma.rateConfig.createMany({ data: DEFAULTS });
+  const rates = await prisma.rateConfig.findMany({ orderBy: { label: "asc" } });
+  return NextResponse.json({ ok: true, rates });
 }

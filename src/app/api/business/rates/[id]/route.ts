@@ -19,7 +19,7 @@ export async function PATCH(
 
   const { id } = await params;
   const body = await request.json();
-  const { label, ratePerHour, flatRate, unit, isDefault } = body;
+  const { label, ratePerHour, flatRate, hourlyDelta, unit, isDefault } = body;
 
   if (isDefault) {
     await prisma.rateConfig.updateMany({ data: { isDefault: false } });
@@ -32,6 +32,7 @@ export async function PATCH(
         ...(label !== undefined && { label }),
         ...(ratePerHour !== undefined && { ratePerHour }),
         ...(flatRate !== undefined && { flatRate }),
+        ...(hourlyDelta !== undefined && { hourlyDelta }),
         ...(unit !== undefined && { unit }),
         ...(isDefault !== undefined && { isDefault }),
       },
