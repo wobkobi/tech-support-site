@@ -13,6 +13,7 @@ import {
   SendReviewLinkForm,
   type ContactSuggestion,
 } from "@/features/reviews/components/admin/SendReviewLinkForm";
+import { formatDateShort } from "@/shared/lib/date-format";
 
 /**
  * A past confirmed booking that is ready to be completed.
@@ -40,20 +41,6 @@ interface DashboardQuickActionsProps {
   pastConfirmedBookings: PastBookingRow[];
   /** Contacts that have never received a review link */
   contactSuggestions: ContactSuggestion[];
-}
-
-/**
- * Formats an ISO date string as a short NZ local date.
- * @param iso - ISO 8601 date string.
- * @returns Formatted date string.
- */
-function fmt(iso: string): string {
-  return new Intl.DateTimeFormat("en-NZ", {
-    timeZone: "Pacific/Auckland",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(new Date(iso));
 }
 
 /**
@@ -178,7 +165,7 @@ export function DashboardQuickActions({
                   <div className={cn("min-w-0")}>
                     <p className={cn("truncate text-sm font-medium text-slate-700")}>{b.name}</p>
                     <p className={cn("text-xs text-slate-400")}>
-                      {fmt(b.startAt)}
+                      {formatDateShort(b.startAt)}
                       {b.email ? ` · ${b.email}` : " · no email"}
                     </p>
                     {err && <p className={cn("text-coquelicot-400 text-xs")}>{err}</p>}

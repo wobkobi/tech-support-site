@@ -29,6 +29,10 @@ export function getSheetId(): string {
 
 /**
  * Reads the current invoice counter state from the Google Sheet SETTINGS tab.
+ * Cell layout (current template):
+ *   - B8: Invoice Prefix (e.g. "TTP")
+ *   - B11: Financial Year (e.g. "2026-27")
+ *   - B19: Invoice counter (last issued number; blank = 0)
  * @returns Invoice counter data including next formatted number
  */
 export async function getInvoiceCounter(): Promise<InvoiceCounterData> {
@@ -36,7 +40,7 @@ export async function getInvoiceCounter(): Promise<InvoiceCounterData> {
   const spreadsheetId = getSheetId();
   const res = await sheets.spreadsheets.values.batchGet({
     spreadsheetId,
-    ranges: ["SETTINGS!B8", "SETTINGS!B11", "SETTINGS!B17"],
+    ranges: ["SETTINGS!B8", "SETTINGS!B11", "SETTINGS!B19"],
   });
   const ranges = res.data.valueRanges ?? [];
   const prefix = (ranges[0]?.values?.[0]?.[0] as string | undefined) ?? "TTP";
@@ -50,7 +54,7 @@ export async function getInvoiceCounter(): Promise<InvoiceCounterData> {
 }
 
 /**
- * Writes a new invoice count back to the Google Sheet SETTINGS tab.
+ * Writes a new invoice count back to the Google Sheet SETTINGS tab at B19.
  * @param newCount - The new invoice count to persist
  */
 export async function setInvoiceCounter(newCount: number): Promise<void> {
@@ -58,7 +62,7 @@ export async function setInvoiceCounter(newCount: number): Promise<void> {
   const spreadsheetId = getSheetId();
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: "SETTINGS!B17",
+    range: "SETTINGS!B19",
     valueInputOption: "RAW",
     requestBody: { values: [[newCount]] },
   });

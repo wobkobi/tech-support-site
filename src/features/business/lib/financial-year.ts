@@ -105,13 +105,16 @@ export function aggregateByFinancialYear(
     const totalIncome = fyIncome.reduce((s, e) => s + e.amount, 0);
     const totalExpensesExcl = fyExpenses.reduce((s, e) => s + e.amountExcl, 0);
     const totalGstClaimable = fyExpenses.reduce((s, e) => s + e.gstAmount, 0);
+    const profit = totalIncome - totalExpensesExcl;
     return {
       fy,
       income: totalIncome,
       expensesExcl: totalExpensesExcl,
       gstClaimable: totalGstClaimable,
-      profit: Math.round((totalIncome - totalExpensesExcl) * 100) / 100,
-      taxReserve: Math.round(totalIncome * 0.2 * 100) / 100,
+      profit: Math.round(profit * 100) / 100,
+      // 20% income-tax provision is on PROFIT, not raw income (matches the NZ
+      // sole-trader Tax Planner sheet). Negative profit yields zero reserve.
+      taxReserve: Math.round(Math.max(0, profit * 0.2) * 100) / 100,
       incomeCount: fyIncome.length,
       expenseCount: fyExpenses.length,
     };

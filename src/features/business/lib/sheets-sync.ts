@@ -1,18 +1,14 @@
 // src/features/business/lib/sheets-sync.ts
 /**
  * @file sheets-sync.ts
- * @description Site → Google Sheet write-back helpers. Each cashbook/expense
- * entry created via the site appends a row to the per-FY spreadsheet (resolved
- * by walking `Business/<FY-name>/...` in Drive). A hidden `Sync ID` column at
- * column Z carries a stable UUID so future edit/delete sync can find rows
- * regardless of reorders or content changes.
- *
- * Failures are non-fatal: callers should log but never block on sheet writes.
+ * @description Site → Google Sheet write-back. Hidden Sync ID at column Z
+ * carries a UUID so edits/deletes can find rows. Failures are non-fatal.
  */
 
 import { randomUUID } from "crypto";
 import { getSheetsClient } from "@/features/business/lib/google-sheets";
 import { getDriveClient } from "@/features/business/lib/google-drive";
+import { formatDateSlash } from "@/shared/lib/date-format";
 import { getFinancialYear } from "@/features/business/lib/financial-year";
 
 /** Cache: FY key (e.g. "2025-26") → spreadsheet file ID. */
@@ -26,12 +22,9 @@ const SYNC_ID_COLUMN_INDEX = 25;
 const SYNC_ID_COLUMN_LETTER = "Z";
 
 /**
- * Resolves the spreadsheet file ID for the financial year that contains `date`.
- * Walks the configured `GOOGLE_BUSINESS_SHEETS_FOLDER_ID` looking for a
- * subfolder named like the FY (e.g. `2025-26`) and returns the first
- * spreadsheet inside it. Results are cached per-process.
+ * Resolves the FY spreadsheet ID for `date`; cached per-process.
  * @param date - Entry date used to compute the FY.
- * @returns Spreadsheet file ID, or null if no matching folder/sheet was found.
+ * @returns Spreadsheet file ID, or null if not found.
  */
 export async function getFySheetIdForDate(date: Date): Promise<string | null> {
   const folderId = process.env.GOOGLE_BUSINESS_SHEETS_FOLDER_ID?.trim();
@@ -45,7 +38,7 @@ export async function getFySheetIdForDate(date: Date): Promise<string | null> {
   if (cached) return cached;
 
   const drive = getDriveClient();
-  const escapedKey = fyKey.replace(/'/g, "\\'");
+  const escapedKey = fyKey.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
 
   const folderRes = await drive.files.list({
     q: `'${folderId}' in parents and name='${escapedKey}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
@@ -68,8 +61,7 @@ export async function getFySheetIdForDate(date: Date): Promise<string | null> {
 }
 
 /**
- * Looks up the numeric sheet ID (gid) of a tab by name. Required because the
- * batchUpdate API addresses sheets by gid, not by name.
+ * Looks up the numeric sheet ID (gid) of a tab by name; needed for batchUpdate.
  * @param spreadsheetId - The spreadsheet file ID.
  * @param tabName - Human-readable tab name (e.g. "Cashbook").
  * @returns The numeric sheetId, or null if the tab is missing.
@@ -85,10 +77,7 @@ async function getTabSheetId(spreadsheetId: string, tabName: string): Promise<nu
 }
 
 /**
- * Idempotently prepares the Sync ID column on a tab: writes the "Sync ID"
- * header at Z1 (if missing), hides the column, and adds a warning-only
- * protected range so the column can't be edited accidentally via the UI.
- * Cached per-process so repeat calls are free after the first.
+ * Idempotently writes the Z1 "Sync ID" header, hides the column, and protects it.
  * @param spreadsheetId - The spreadsheet file ID.
  * @param tabName - Tab to prepare (e.g. "Cashbook" or "Expenses").
  */
@@ -98,20 +87,18 @@ export async function ensureSyncIdSetup(spreadsheetId: string, tabName: string):
 
   const sheets = getSheetsClient();
 
-  // Read Z1 to see whether setup has already been done in a previous run.
+  // Z1 set means a previous run did the setup.
   const headerRes = await sheets.spreadsheets.values.get({
     spreadsheetId,
     range: `${tabName}!${SYNC_ID_COLUMN_LETTER}1`,
   });
   const existingHeader = headerRes.data.values?.[0]?.[0];
   if (existingHeader === "Sync ID") {
-    // Already set up; trust the previous run for hidden+protected state.
     if (!cached) setupCache.set(spreadsheetId, new Set([tabName]));
     else cached.add(tabName);
     return;
   }
 
-  // First-time setup for this tab: write header, hide column, add protection.
   const tabSheetId = await getTabSheetId(spreadsheetId, tabName);
   if (tabSheetId === null) {
     throw new Error(`Tab "${tabName}" not found in spreadsheet ${spreadsheetId}`);
@@ -162,12 +149,11 @@ export async function ensureSyncIdSetup(spreadsheetId: string, tabName: string):
 }
 
 /**
- * Appends a row to a tab with a fresh Sync ID at column Z.
- * Pads `cells` to 25 columns so column Z always lands at index 25.
+ * Appends a row with a fresh Sync ID at column Z; pads to 25 columns.
  * @param spreadsheetId - Spreadsheet file ID.
  * @param tabName - Tab to append to (e.g. "Cashbook").
- * @param cells - Values for columns A..Y (0..24). Shorter arrays are right-padded with empty strings.
- * @returns The Sync ID written into column Z, suitable for storing on the DB entry.
+ * @param cells - Values for columns A..Y; right-padded with empty strings.
+ * @returns The Sync ID written into column Z.
  */
 export async function appendRowWithSyncId(
   spreadsheetId: string,
@@ -193,13 +179,10 @@ export async function appendRowWithSyncId(
 }
 
 /**
- * Formats a Date as DD/MM/YYYY (NZ display format) for sheet output.
+ * Sheet-bound DD/MM/YYYY string (UTC date parts).
  * @param d - Date to format.
- * @returns Date string like "30/03/2026".
+ * @returns Formatted string.
  */
 export function formatDateForSheet(d: Date): string {
-  const day = String(d.getUTCDate()).padStart(2, "0");
-  const month = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const year = d.getUTCFullYear();
-  return `${day}/${month}/${year}`;
+  return formatDateSlash(d, { utc: true });
 }
