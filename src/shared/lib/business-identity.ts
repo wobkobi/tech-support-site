@@ -1,13 +1,8 @@
 // src/shared/lib/business-identity.ts
 /**
  * @file business-identity.ts
- * @description Static business identity used across email signatures, invoices,
- * and contact surfaces. Safe to import from both server and client code.
- *
- * The bank account is read from NEXT_PUBLIC_BUSINESS_BANK_ACCOUNT so the literal
- * value is never committed to source. Set this in `.env.local` for development
- * and in Vercel project settings for production. If unset the placeholder makes
- * the gap obvious in any rendered invoice.
+ * @description Business identity used across emails, invoices, contact surfaces.
+ * Bank account read from `NEXT_PUBLIC_BUSINESS_BANK_ACCOUNT` so the literal stays out of git.
  */
 
 export const BUSINESS = {
@@ -23,7 +18,15 @@ export const BUSINESS = {
   phoneTel: "tel:+64212971237",
   /** Locality used in signature blocks. */
   location: "Auckland, New Zealand",
+  /** Public website URL (no scheme) shown on invoice footer. */
+  website: "tothepoint.co.nz",
 } as const;
+
+/** NZ payment-terms window (days from issue) shown on invoice footer. */
+export const BUSINESS_PAYMENT_TERMS_DAYS = 7;
+
+/** GST# (env). When unset the invoice PDF skips the "Tax invoice" + GST block. */
+export const BUSINESS_GST_NUMBER = process.env.NEXT_PUBLIC_BUSINESS_GST_NUMBER ?? "";
 
 /**
  * Date the business started operating. Used to label the first NZ financial
