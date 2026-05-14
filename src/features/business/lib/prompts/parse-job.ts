@@ -14,8 +14,12 @@ export function buildParseJobPrompt(
 ): string {
   const templateSection =
     templates.length > 0
-      ? `\nPreviously used service descriptions — you MUST reuse these exact strings when the task type matches, even loosely. Do not paraphrase, shorten, or invent a new description if a template covers the same service. When in doubt, use the template verbatim.\nExamples of correct reuse: if a template says "Cloud storage migration and data transfer" and the job mentions moving files between cloud services, use the template exactly.\n${JSON.stringify(
-          templates.map((t) => ({ description: t.description, typicalPrice: t.defaultPrice })),
+      ? `\nPreviously used (device, action) combinations — when the same combination appears in this job, REUSE the exact tag values shown here so the dashboard taxonomy doesn't drift. Each template is one device + one action; never combine them.\n${JSON.stringify(
+          templates.map((t) => ({
+            device: t.device ?? null,
+            action: t.action ?? null,
+            typicalPrice: t.defaultPrice,
+          })),
           null,
           2,
         )}\n`
@@ -31,9 +35,37 @@ ${JSON.stringify(rates, null, 2)}
 
 Rules:
 - Return ONLY valid JSON. No prose, no markdown fences, no explanation.
-- Write ALL descriptions in professional billing language suitable for a client-facing invoice. Do NOT name specific apps, brands, devices, or client-specific details — always use the generic category instead (e.g. tablet, laptop, desktop computer, smartphone, social media account, email account, cloud storage, streaming account, office software, operating system).
-  Good: "Social media account security and recovery", "Tablet diagnosis and configuration", "Laptop troubleshooting, cleanup, and setup", "Cloud storage migration and data transfer"
-  Bad: "Instagram security and archive retrieval", "iPad quick fix", "MacBook cleanup", "moved files from Dropbox to iCloud",
+
+STRUCTURE — every task object represents ONE device + ONE action (+ optional details):
+- Each task object MUST have a 'device' string and an 'action' string, plus an optional 'details' string. The server composes the invoice line-item description as "<device> <action lowercased>" or "<device> <action lowercased> - <details>" when details is present. DO NOT include a 'description' field in your output — the server derives it.
+- ONE action per task. NEVER use the word "and" to combine multiple actions in a single task. If the job mentions "set up phone AND configure email AND transfer photos", that is THREE separate task objects — never one.
+- ONE device per task. If the same action applies to two devices, that's two tasks (e.g. "set up new phone and laptop" → task A device "Phone" action "Setup", task B device "Laptop" action "Setup").
+- Use generic device names — never brand names. "iPhone" → "Phone", "MacBook" → "Laptop", "iPad" → "Tablet", "Gmail" → "Email account", "Instagram" → "Social media account", "Dropbox" / "iCloud" → "Cloud storage".
+- Use SPECIFIC action names when context calls for it — single concept per action, but encode meaningful detail in the verb-phrase rather than defaulting to a bare generic. Prefer "Corruption repair", "Windows repair", "Battery replacement", "Account recovery", "Password reset" over plain "Repair" / "Recovery" when the job description tells you what was actually fixed/recovered. Stay short (1-3 words) and never use "and".
+
+DEVICE vocabulary (suggested, but extensible — invent a similarly short generic noun if none match):
+- "Phone", "Laptop", "Desktop / PC", "Tablet", "Printer", "Network", "Server", "Email account", "Social media account", "Streaming account", "Cloud storage", "Banking", "Other".
+
+ACTION vocabulary (starting points — extend with more specific phrases as needed):
+- Bare verbs: "Setup", "Configuration", "Repair", "Troubleshooting", "Cleanup", "Recovery", "Transfer", "Migration", "Security", "Training", "Maintenance", "Diagnosis".
+- Specific verb-phrases (preferred when the job tells you what was done): "Corruption repair", "Windows repair", "OS reinstall", "Battery replacement", "Screen replacement", "Password reset", "Account recovery", "Data transfer", "Photo transfer", "Driver update", "Virus removal".
+
+DETAILS (optional qualifier — use sparingly):
+- Each task may include a "details" string with a short free-text qualifier (≤ 4 words) when the device + action alone STILL wouldn't carry enough context. The server appends it to the composed description as "<Device> <action lowercased> - <details>".
+- Use details for incidental context that isn't worth its own action tag: the affected component, the symptom, the trigger, a count (e.g. "corrupted", "caused USB issues", "from old laptop", "5 photos", "BSOD on boot").
+- OMIT details (set to null or leave it out) when the device + action already say everything — no filler like "successful" / "done" / "complete".
+
+REUSE — if a previous template (see list above) has the exact (device, action) combination, copy those tag values verbatim. Don't switch "Phone" → "Smartphone" or "Setup" → "Configuration" mid-stream. Details are NOT templated — choose them per-job.
+
+EXAMPLES — multi-task splitting + specific actions + details:
+- Input: "set up new phone and transfer photos to laptop, also reset the email password"
+  Tasks: [{device: "Phone", action: "Setup"}, {device: "Phone", action: "Photo transfer", details: "to laptop"}, {device: "Email account", action: "Password reset"}]
+- Input: "iPhone setup and iCloud configuration, then laptop config for that"
+  Tasks: [{device: "Phone", action: "Setup"}, {device: "Cloud storage", action: "Configuration"}, {device: "Laptop", action: "Configuration", details: "iCloud sync"}]
+- Input: "fixed and repaired corrupted USB drives and fixed Windows since it was causing it"
+  Tasks: [{device: "USB drive", action: "Corruption repair"}, {device: "Desktop / PC", action: "Windows repair", details: "caused USB issues"}]
+- Input: "fixed virus on laptop"
+  Tasks: [{device: "Laptop", action: "Virus removal"}]
 
 BILLING — follow these steps in order:
 1. Determine durationMins (from pre-computed annotation if present, otherwise from the description).
@@ -44,28 +76,43 @@ BILLING — follow these steps in order:
    Example: 1.75h across 4 tasks → 0.5 + 0.5 + 0.5 + 0.25 = 1.75h. NOT 0.75 + 0.75 + 0.75 + 0.5.
    Example: 3h across 2 tasks → 1.5 + 1.5 = 3h.
 5. VERIFY: sum all task qtys. If the sum ≠ rounded total hours, stop and redistribute until it matches.
-- qty is ALWAYS decimal hours. unitPrice is ALWAYS the $/hr rate. qty=1 means exactly 1 hour — never "1 occurrence".
+- qty is ALWAYS decimal hours (the server multiplies by the effective $/hr it computes from baseRateLabel + modifierLabels). qty=1 means exactly 1 hour — never "1 occurrence".
 
 SESSION TIMES:
 - durationMins: If the input includes "[Pre-computed session total: N min — use this as durationMins without recalculating]", use N exactly. Otherwise sum all worked segment durations (not wall-clock start-to-end span).
 - startTime / endTime: Single session → exact HH:MM 24-hour strings. Multi-session → first start and last end. Open-ended session (e.g. "8:10 -") → use current NZ time above as end. No times mentioned → both null.
 - Always set hourlyRateId to null.
 
-LOCATION AND RATE SELECTION:
-Infer location from context clues. If signals conflict, do NOT silently pick one — add a warning describing the conflict and state which you assumed.
+RATES — base + stacked modifiers (effective $/hr = base + sum of modifier deltas):
+For each hourly task, set:
+- "baseRateLabel": always "Standard" (the base hourly rate)
+- "modifierLabels": array of modifier labels to apply per the triggers below. Empty array [] if no modifiers.
+The SERVER computes unitPrice from these labels - DO NOT compute it yourself, just pick labels.
 
-- On-site at client's location: mentions client's address, suburb, driving to a place, "at [name]'s", "on-site" → use "Standard" (default) or "Complex work" for complex tasks.
-- At Harrison's home, working alone on client's device (no screen-share): "working at home", "from home", "at home" with no mention of remote desktop or the client being on-screen → use "At home".
-- Remote support with client on-screen: "remote", "TeamViewer", "AnyDesk", "screen share", "remote access", "remote desktop", client watching/guiding → use "Remote support".
-- "Complex work" ($85/hr) - for complex tasks done on-site at the client's location: data recovery, hardware repair, full system migration, motherboard-level diagnosis.
-- "Complex at home" ($75/hr) - same complex task types as above, but done from Harrison's home. Use this instead of "Complex work" when the job is at home.
-  Example: "Windows reinstall + data recovery, working at home" → Windows reinstall at "At home" ($55/hr), data recovery at "Complex at home" ($75/hr).
-- Mixed jobs: split tasks with the appropriate rate per segment. Different tasks in the same job can and should have different rates when the task types differ.
+Modifier triggers:
+- "At home" (-$10): work done at Harrison's home, alone, no screen-share. Triggers: "working at home", "from home", "at home" with no remote-desktop mention.
+- "Remote" (-$10): client on-screen via screen share. Triggers: "remote", "TeamViewer", "AnyDesk", "screen share", "remote access", "remote desktop", client watching/guiding.
+- "Complex" (+$20): genuinely complex task. Triggers: data recovery, hardware repair, full system migration, motherboard-level diagnosis, BIOS work, OS reinstall paired with recovery.
+- "Student" (-$20): job is for a student. Triggers: "student", "school", "uni", "university", "college", "high school", "year 11/12/13", "studying X". Stacks with location modifiers, but NOT with Complex - if a student job is also genuinely complex, pick "Complex" instead of "Student" (work-difficulty signal wins).
+
+Stacking examples:
+- On-site, regular client → modifierLabels: []
+- On-site, complex work → modifierLabels: ["Complex"]
+- At home, regular work → modifierLabels: ["At home"]
+- At home, complex (e.g. data recovery at home) → modifierLabels: ["At home", "Complex"]
+- Remote support, regular → modifierLabels: ["Remote"]
+- Helping a uni student set up his laptop on-site → modifierLabels: ["Student"]
+- Helping a uni student at home → modifierLabels: ["At home", "Student"]
+- Remote support for a high-school student → modifierLabels: ["Remote", "Student"]
+
+Mixed jobs: different tasks in the same job CAN and SHOULD have different modifier sets if their context differs. Example: at-home job with both Windows reinstall (At home only) and data recovery (At home + Complex) → task A modifierLabels ["At home"], task B modifierLabels ["At home", "Complex"].
+
+If location/rate signals conflict, do NOT silently pick - add a warning describing the conflict and state which you assumed.
 
 Conflict examples that must produce a warning:
-- "working at home" + mentions driving to a client address → flag: "Conflicting: 'at home' but also mentions driving to client. Assumed on-site."
-- "remote support" + a street address → flag: "Conflicting: remote support mentioned but a client address is present. Assumed remote."
-- "at home" + no remote-desktop mention but device belongs to client → flag: "Assumed 'At home' rate — verify if this was remote support."
+- "working at home" + mentions driving to a client address → flag: "Conflicting: 'at home' but also mentions driving to client. Assumed on-site (no At home modifier)."
+- "remote support" + a street address → flag: "Conflicting: remote support mentioned but a client address is present. Assumed Remote modifier applied."
+- "at home" + no remote-desktop mention but device belongs to client → flag: "Assumed At home modifier - verify if this was actually remote support."
 
 TASK SPLITTING:
 - Only create tasks for services explicitly mentioned in the description. Do NOT invent tasks that are not described.
@@ -83,6 +130,8 @@ TASK SPLITTING:
 
 OTHER RULES:
 - tasks[].rateConfigId should always be null for work tasks.
+- tasks[].baseRateLabel should always be "Standard". tasks[].modifierLabels picked per the modifier rules above (empty array if none).
+- DO NOT emit a unitPrice field on tasks - the server computes it from baseRateLabel + modifierLabels.
 - Only include parts if the user explicitly mentions a physical component they supplied. Do not invent parts.
 - notes: A single professional sentence suitable for the invoice footer. Use empty string if nothing meaningful to add.
 - confidence: "high" if all session times are clearly stated. "medium" if some times were estimated. "low" if mostly guessed.
@@ -120,9 +169,12 @@ Return this exact JSON shape (when not asking for clarification):
   "tasks": [
     {
       "rateConfigId": null,
-      "description": string,
-      "qty": number,
-      "unitPrice": number
+      "baseRateLabel": "Standard",
+      "modifierLabels": string[],
+      "device": string,
+      "action": string,
+      "details": string | null,
+      "qty": number
     }
   ],
   "parts": [

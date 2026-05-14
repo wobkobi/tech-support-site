@@ -103,6 +103,27 @@ export function minsToHoursLabel(mins: number): string {
 }
 
 /**
+ * Composes the line-item description from device + action + optional details.
+ * Mirrors the operator-facing preview in the Calculator and the persisted
+ * description on TaskTemplate, so AI-generated and operator-entered tasks all
+ * read identically on the invoice.
+ * @param device - Device tag (e.g. "Phone").
+ * @param action - Action tag (e.g. "Setup").
+ * @param details - Optional free-text qualifier appended after " - ".
+ * @returns Composed string "Device action" / "Device action - details", or empty when device or action is missing.
+ */
+export function composeDescription(
+  device: string | null | undefined,
+  action: string | null | undefined,
+  details?: string | null,
+): string {
+  if (!device || !action) return "";
+  const base = `${device} ${action.toLowerCase()}`;
+  const trimmed = details?.trim();
+  return trimmed ? `${base} - ${trimmed}` : base;
+}
+
+/**
  * Finds a rate config by ID, falling back to the default rate.
  * @param rates - Array of rate configurations
  * @param id - Rate config ID to search for, or null for default

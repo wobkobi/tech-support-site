@@ -163,6 +163,12 @@ export interface ParsedTaskLine {
   description: string;
   qty: number;
   unitPrice: number;
+  /** Free-text device tag from the AI (e.g. "Laptop", "Phone", "Email account"). */
+  device?: string | null;
+  /** Free-text action tag from the AI (e.g. "Setup", "Repair", "Recovery"). */
+  action?: string | null;
+  /** Optional free-text qualifier from the AI when device + action alone aren't specific enough. */
+  details?: string | null;
 }
 
 export interface ParsedPartLine {
