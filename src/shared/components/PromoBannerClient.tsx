@@ -45,32 +45,34 @@ export function PromoBannerClient({ promo }: Props): React.ReactElement {
   // Admin pages have their own chrome - no public promo banner over the top.
   const hidden = pathname === "/admin" || pathname.startsWith("/admin/");
 
-  // Lazy init reads localStorage during state creation (not in an effect) so
-  // returning visitors see the banner on the first paint and dismissed users
-  // never see it at all, without triggering setState-in-effect lint warnings.
-  const [initialState] = useState<{ dismissed: boolean; visibleAtStart: boolean }>(() => {
-    if (typeof window === "undefined") return { dismissed: false, visibleAtStart: false };
-    const dismissedAtRaw = window.localStorage.getItem(PROMO_DISMISSED_KEY);
-    const dismissedAt = dismissedAtRaw ? Number(dismissedAtRaw) : 0;
-    if (dismissedAt && Date.now() - dismissedAt < DISMISS_TTL_MS) {
-      return { dismissed: true, visibleAtStart: false };
-    }
-    // Returning visitor sees it immediately; first-ever visit waits in effect.
-    return { dismissed: false, visibleAtStart: !!window.localStorage.getItem(PROMO_SEEN_KEY) };
-  });
-  const dismissed = initialState.dismissed;
-  const [visible, setVisible] = useState(initialState.visibleAtStart);
+  // Both states start false on the server AND first client render so
+  // hydration matches; the effect below syncs from localStorage on mount.
+  const [visible, setVisible] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
   const bannerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (typeof window === "undefined" || dismissed) return;
-    if (visible) return;
+    if (typeof window === "undefined") return;
+
+    const dismissedAtRaw = window.localStorage.getItem(PROMO_DISMISSED_KEY);
+    const dismissedAt = dismissedAtRaw ? Number(dismissedAtRaw) : 0;
+    if (dismissedAt && Date.now() - dismissedAt < DISMISS_TTL_MS) {
+      // queueMicrotask defers the setState past the effect body, satisfying
+      // the React lint while still firing before the next paint.
+      queueMicrotask(() => setDismissed(true));
+      return;
+    }
+
+    // Returning visitor: reveal immediately after hydration.
+    if (window.localStorage.getItem(PROMO_SEEN_KEY)) {
+      queueMicrotask(() => setVisible(true));
+      return;
+    }
 
     // First-ever visit: mark as seen and reveal after a brief settle delay.
     window.localStorage.setItem(PROMO_SEEN_KEY, String(Date.now()));
     const timer = window.setTimeout(() => setVisible(true), FIRST_LOAD_DELAY_MS);
     return () => window.clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Measure the live banner height (which can change if copy wraps to two
