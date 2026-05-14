@@ -1,9 +1,15 @@
-import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import { PDFDocument, rgb, StandardFonts, degrees } from "pdf-lib";
 import sharp from "sharp";
 import fs from "fs/promises";
 import path from "path";
 import type { Invoice } from "@/features/business/types/business";
-import { BUSINESS_BANK_ACCOUNT } from "@/shared/lib/business-identity";
+import {
+  BUSINESS,
+  BUSINESS_BANK_ACCOUNT,
+  BUSINESS_GST_NUMBER,
+  BUSINESS_PAYMENT_TERMS_DAYS,
+} from "@/shared/lib/business-identity";
+import { formatDateShort } from "@/shared/lib/date-format";
 
 const BRAND = rgb(12 / 255, 10 / 255, 62 / 255); // russian-violet #0c0a3e
 const DARK = rgb(0.15, 0.15, 0.15);
@@ -11,6 +17,8 @@ const MID = rgb(0.45, 0.45, 0.45);
 const LIGHT = rgb(0.75, 0.75, 0.75);
 const ROW_ALT = rgb(0.97, 0.97, 0.97);
 const WHITE = rgb(1, 1, 1);
+const PAID_COLOR = rgb(0.1, 0.55, 0.25);
+const OVERDUE_COLOR = rgb(0.78, 0.16, 0.16);
 
 const MARGIN = 42;
 const PAGE_W = 595.28;
@@ -24,19 +32,6 @@ const CONTENT_W = PAGE_W - MARGIN * 2;
  */
 function fmt(n: number): string {
   return `$${n.toFixed(2)}`;
-}
-
-/**
- * Formats an ISO date string as a short NZ locale date.
- * @param iso - ISO 8601 date string
- * @returns Formatted date string like "01 Jan 2026"
- */
-function fmtDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-NZ", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
 }
 
 /**
@@ -65,24 +60,45 @@ export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
     .toBuffer();
   const logoImg = await pdfDoc.embedPng(logoBuffer);
 
-  // --- Header image (full content width, no top margin) ---
-  const hScale = CONTENT_W / headerImg.width;
+  // --- Status watermark (PAID green / OVERDUE red), drawn first so it's underneath ---
+  const dueDate = new Date(invoice.dueDate);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const isOverdue = invoice.status === "SENT" && dueDate < today;
+  const watermarkText = invoice.status === "PAID" ? "PAID" : isOverdue ? "OVERDUE" : null;
+  if (watermarkText) {
+    const wmColor = invoice.status === "PAID" ? PAID_COLOR : OVERDUE_COLOR;
+    const wmSize = 140;
+    const wmWidth = bold.widthOfTextAtSize(watermarkText, wmSize);
+    page.drawText(watermarkText, {
+      x: PAGE_W / 2 - (wmWidth / 2) * 0.87, // adjust for rotation pivot
+      y: PAGE_H / 2 - 80,
+      size: wmSize,
+      font: bold,
+      color: wmColor,
+      opacity: 0.12,
+      rotate: degrees(-25),
+    });
+  }
+
+  // --- Header band (left-aligned letterhead, ~65% of content width) ---
+  // Matches InvoiceBuilderView's w-2/3 preview.
+  const HEADER_WIDTH_RATIO = 0.65;
+  const hW = CONTENT_W * HEADER_WIDTH_RATIO;
+  const hScale = hW / headerImg.width;
   const hH = headerImg.height * hScale;
-  page.drawImage(headerImg, { x: MARGIN, y: PAGE_H - hH, width: CONTENT_W, height: hH });
+  page.drawImage(headerImg, { x: MARGIN, y: PAGE_H - hH, width: hW, height: hH });
 
   let y = PAGE_H - hH - 18;
 
   // --- Invoice number + status block (right-aligned) ---
   const statusColor =
-    invoice.status === "PAID"
-      ? rgb(0.1, 0.55, 0.25)
-      : invoice.status === "SENT"
-        ? rgb(0.1, 0.35, 0.75)
-        : MID;
+    invoice.status === "PAID" ? PAID_COLOR : invoice.status === "SENT" ? rgb(0.1, 0.35, 0.75) : MID;
 
   const rightX = MARGIN + CONTENT_W;
 
-  const invTitle = "INVOICE";
+  // NZ IRD requires "Tax invoice" wording when GST-registered. GST# env presence = registered.
+  const invTitle = BUSINESS_GST_NUMBER ? "TAX INVOICE" : "INVOICE";
   page.drawText(invTitle, {
     x: rightX - bold.widthOfTextAtSize(invTitle, 18),
     y,
@@ -108,6 +124,19 @@ export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
     font: bold,
     color: statusColor,
   });
+
+  // GST# below the status pill for IRD validation.
+  if (BUSINESS_GST_NUMBER) {
+    y -= 13;
+    const gstLine = `GST# ${BUSINESS_GST_NUMBER}`;
+    page.drawText(gstLine, {
+      x: rightX - font.widthOfTextAtSize(gstLine, 8.5),
+      y,
+      size: 8.5,
+      font,
+      color: MID,
+    });
+  }
 
   // --- Bill to + dates block (2 cols) ---
   const infoY = PAGE_H - hH - 18;
@@ -155,8 +184,8 @@ export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
       color: DARK,
     });
   };
-  dateLabel("Issued:", fmtDate(invoice.issueDate), 0);
-  dateLabel("Due:", fmtDate(invoice.dueDate), -13);
+  dateLabel("Issued:", formatDateShort(invoice.issueDate), 0);
+  dateLabel("Due:", formatDateShort(invoice.dueDate), -13);
 
   y = infoY - 40;
 
@@ -298,6 +327,14 @@ export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
   y -= 14;
   page.drawText("Bank transfer", { x: MARGIN, y, size: 8, font: bold, color: DARK });
   y -= 12;
+  page.drawText(`Payee: ${BUSINESS.name}`, {
+    x: MARGIN,
+    y,
+    size: 8,
+    font,
+    color: MID,
+  });
+  y -= 11;
   page.drawText(`Account: ${BUSINESS_BANK_ACCOUNT}`, {
     x: MARGIN,
     y,
@@ -307,6 +344,17 @@ export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
   });
   y -= 11;
   page.drawText(`Reference: ${invoice.number}`, { x: MARGIN, y, size: 8, font, color: MID });
+  y -= 11;
+  page.drawText(
+    `Due within ${BUSINESS_PAYMENT_TERMS_DAYS} days of issue (by ${formatDateShort(invoice.dueDate)}).`,
+    {
+      x: MARGIN,
+      y,
+      size: 8,
+      font,
+      color: MID,
+    },
+  );
 
   // --- Notes ---
   if (invoice.notes) {
@@ -314,11 +362,36 @@ export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
     page.drawText(invoice.notes, { x: MARGIN, y, size: 8, font, color: MID, maxWidth: CONTENT_W });
   }
 
-  // --- Footer logo (bottom-left) ---
+  // --- Footer: logo (left) + contact strip (right) ---
   const logoScale = 70 / logoImg.width;
   const logoW = logoImg.width * logoScale;
   const logoH = logoImg.height * logoScale;
   page.drawImage(logoImg, { x: MARGIN, y: MARGIN, width: logoW, height: logoH });
+
+  // Right-aligned contact strip - company + phone/email/website.
+  const footerY = MARGIN + logoH;
+  page.drawText(BUSINESS.company, {
+    x: rightX - bold.widthOfTextAtSize(BUSINESS.company, 9),
+    y: footerY - 9,
+    size: 9,
+    font: bold,
+    color: BRAND,
+  });
+  const contactLine = `${BUSINESS.phone}  ·  ${BUSINESS.email}  ·  ${BUSINESS.website}`;
+  page.drawText(contactLine, {
+    x: rightX - font.widthOfTextAtSize(contactLine, 7.5),
+    y: footerY - 22,
+    size: 7.5,
+    font,
+    color: MID,
+  });
+  page.drawText("Thanks for your business.", {
+    x: rightX - font.widthOfTextAtSize("Thanks for your business.", 7.5),
+    y: footerY - 33,
+    size: 7.5,
+    font,
+    color: LIGHT,
+  });
 
   const bytes = await pdfDoc.save();
   return Buffer.from(bytes);
