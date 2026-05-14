@@ -10,6 +10,7 @@ import type { Metadata, Viewport } from "next";
 import { Exo } from "next/font/google";
 import "./globals.css";
 import { NavBar } from "@/shared/components/NavBar";
+import { PromoBanner } from "@/shared/components/PromoBanner";
 
 const exo = Exo({
   subsets: ["latin"],
@@ -382,17 +383,12 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${exo.variable} font-sans`}>
       <body suppressHydrationWarning>
-        {/* Primary app content */}
+        <PromoBanner />
         <NavBar />
         {children}
 
-        {/* Analytics */}
         <Analytics />
-
-        {/* Performance */}
-        {/* Vercel performance and analytics integrations */}
         <SpeedInsights />
-        {/* JSON-LD for richer SERP features (plain inline scripts - no client-side overhead) */}
         <script
           id="ld-business"
           type="application/ld+json"

@@ -33,6 +33,10 @@ export interface Invoice {
   subtotal: number;
   gstAmount: number;
   total: number;
+  /** Snapshot of the promo (if any) that was active when this invoice was created. */
+  promoTitle?: string | null;
+  /** Dollar discount applied to the labor subtotal at creation time. */
+  promoDiscount?: number | null;
   status: InvoiceStatus;
   notes: string | null;
   contactId: string | null;

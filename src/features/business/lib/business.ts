@@ -47,18 +47,29 @@ export function formatUTCDDMMYYYY(date: Date): string {
 }
 
 /**
- * Calculates invoice totals including optional GST.
+ * Calculates invoice totals including optional GST and an optional promo
+ * discount. The discount is subtracted from the gross subtotal before GST,
+ * matching the Calculator's Summary panel and IRD's "discount = price
+ * reduction" treatment.
  * @param lineItems - Array of line items with qty and unit price
  * @param gst - Whether to apply 15% GST
- * @returns Subtotal, GST amount, and total
+ * @param promoDiscount - Optional dollar discount (e.g. from a promo snapshot)
+ * @returns Subtotal (gross), GST amount, and total (post-discount, post-GST)
  */
 export function calcInvoiceTotals(
   lineItems: { qty: number; unitPrice: number }[],
   gst: boolean,
+  promoDiscount = 0,
 ): { subtotal: number; gstAmount: number; total: number } {
-  const subtotal = lineItems.reduce((sum, item) => sum + item.qty * item.unitPrice, 0);
-  const gstAmount = gst ? Math.round(subtotal * 0.15 * 100) / 100 : 0;
-  return { subtotal, gstAmount, total: subtotal + gstAmount };
+  const subtotal =
+    Math.round(lineItems.reduce((sum, item) => sum + item.qty * item.unitPrice, 0) * 100) / 100;
+  const taxableAmount = Math.max(0, Math.round((subtotal - promoDiscount) * 100) / 100);
+  const gstAmount = gst ? Math.round(taxableAmount * 0.15 * 100) / 100 : 0;
+  return {
+    subtotal,
+    gstAmount,
+    total: Math.round((taxableAmount + gstAmount) * 100) / 100,
+  };
 }
 
 /**
@@ -209,17 +220,71 @@ export function jobToLineItems(job: JobCalculation): LineItem[] {
   return items;
 }
 
+/** Active-promo shape consumed by `calcJobTotal`. Kept loose so business.ts doesn't depend on the wider promos module. */
+export interface JobPromo {
+  flatHourlyRate: number | null;
+  percentDiscount: number | null;
+}
+
 /**
- * Calculates the complete cost breakdown for a job.
- * @param job - Job calculation with time, tasks, and parts.
- * @returns Cost breakdown including subtotals and totals.
+ * Promo discount on a job's labor only (time charge + hourly tasks).
+ * @param job - Job calculation.
+ * @param promo - Active promo or null.
+ * @returns Discount in dollars.
  */
-export function calcJobTotal(job: JobCalculation): {
+export function computeJobPromoDiscount(job: JobCalculation, promo: JobPromo | null): number {
+  if (!promo) return 0;
+
+  // A task is hourly if either: it has a baseRateId set (new rate model),
+  // OR no flat rateConfigId. The double check survives stale AI output that
+  // forgets to clear rateConfigId.
+  const hourlyTasks = job.tasks.filter((t) => t.baseRateId != null || t.rateConfigId == null);
+  const hourlyTasksTotal = hourlyTasks.reduce((s, t) => s + t.qty * t.unitPrice, 0);
+  const hourlyTasksHours = hourlyTasks.reduce((s, t) => s + t.qty, 0);
+
+  const billed = billableMins(job.durationMins);
+  const timeHours = billed / 60;
+  const timeCharge = Math.round(timeHours * (job.hourlyRate?.ratePerHour ?? 0) * 100) / 100;
+
+  const laborSubtotal = timeCharge + hourlyTasksTotal;
+  if (laborSubtotal <= 0) return 0;
+
+  if (promo.flatHourlyRate !== null) {
+    // Only count hours that actually contributed to laborSubtotal. When the
+    // top-level rate is null, timeHours is "phantom" duration with no charge
+    // behind it - including it inflates promoTotal and zeros the discount.
+    const billedTimeHours = timeCharge > 0 ? timeHours : 0;
+    const totalHours = billedTimeHours + hourlyTasksHours;
+    const promoTotal = totalHours * promo.flatHourlyRate;
+    const discount = laborSubtotal - promoTotal;
+    return discount > 0 ? Math.round(discount * 100) / 100 : 0;
+  }
+  if (promo.percentDiscount !== null) {
+    const pct = Math.max(0, Math.min(1, promo.percentDiscount));
+    return Math.round(laborSubtotal * pct * 100) / 100;
+  }
+  return 0;
+}
+
+/**
+ * Calculates the complete cost breakdown for a job. When `promo` is supplied
+ * (and the job has labor), a `promoDiscount` is computed via
+ * `computeJobPromoDiscount` and subtracted from the subtotal before GST.
+ * Travel + parts are never discounted.
+ * @param job - Job calculation with time, tasks, and parts.
+ * @param promo - Optional active promo to apply.
+ * @returns Cost breakdown including promoDiscount.
+ */
+export function calcJobTotal(
+  job: JobCalculation,
+  promo: JobPromo | null = null,
+): {
   timeCharge: number;
   tasksTotal: number;
   partsTotal: number;
   travelTotal: number;
   subtotal: number;
+  promoDiscount: number;
   gstAmount: number;
   total: number;
 } {
@@ -230,16 +295,21 @@ export function calcJobTotal(job: JobCalculation): {
   const tasksTotal = job.tasks.reduce((s, t) => s + t.qty * t.unitPrice, 0);
   const partsTotal = job.parts.reduce((s, p) => s + p.cost, 0);
   const travelTotal = job.travelCost ?? 0;
+  // Subtotal = gross (pre-promo); promo shown as its own line in the Summary.
   const subtotal = Math.round((timeCharge + tasksTotal + partsTotal + travelTotal) * 100) / 100;
-  const gstAmount = job.gst ? Math.round(subtotal * 0.15 * 100) / 100 : 0;
+  const promoDiscount = computeJobPromoDiscount(job, promo);
+  // GST applies to the discounted amount per NZ IRD treatment.
+  const taxableAmount = Math.round((subtotal - promoDiscount) * 100) / 100;
+  const gstAmount = job.gst ? Math.round(taxableAmount * 0.15 * 100) / 100 : 0;
   return {
     timeCharge,
     tasksTotal,
     partsTotal,
     travelTotal,
     subtotal,
+    promoDiscount,
     gstAmount,
-    total: Math.round((subtotal + gstAmount) * 100) / 100,
+    total: Math.round((taxableAmount + gstAmount) * 100) / 100,
   };
 }
 

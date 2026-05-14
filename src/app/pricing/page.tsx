@@ -11,36 +11,56 @@ import { FrostedSection, PageShell, CARD, SOFT_CARD } from "@/shared/components/
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
 import { cn } from "@/shared/lib/cn";
 import { PricingWizard } from "@/features/business/components/PricingWizard";
+import {
+  applyPromoToHourlyRate,
+  getActivePromo,
+  summariseForBanner,
+} from "@/features/business/lib/promos";
+import { formatDateShort } from "@/shared/lib/date-format";
 
-export const metadata: Metadata = {
-  title: "Pricing - $65/h Tech Support in Auckland",
-  description:
-    "Transparent tech support pricing in Auckland. $65/h for most jobs, $85/h for complex work. Free quick calls and emails. No hidden fees, no upselling. On-site and remote rates the same.",
-  keywords: [
-    "tech support pricing Auckland",
-    "computer repair cost Auckland",
-    "IT support hourly rate Auckland",
-    "affordable tech support Auckland",
-    "transparent IT pricing NZ",
-  ],
-  alternates: { canonical: "/pricing" },
-  openGraph: {
-    title: "Pricing - To The Point Tech",
-    description:
-      "Simple, transparent rates: $65/h for most jobs, $85/h for complex work. Free initial calls.",
-    url: "/pricing",
-  },
-};
+// Promo state changes metadata text; cached lookup keeps this cheap.
+export const dynamic = "force-dynamic";
+
+/**
+ * Builds page metadata; reflects the active promo in title/description.
+ * @returns Metadata object.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const promo = await getActivePromo();
+  const rateBlurb = promo
+    ? `Limited offer: ${summariseForBanner(promo)}.`
+    : "$65/h for most jobs, $85/h for complex work.";
+  return {
+    title: promo
+      ? `Pricing - ${summariseForBanner(promo)} | To The Point Tech`
+      : "Pricing - $65/h Tech Support in Auckland",
+    description: `Transparent tech support pricing in Auckland. ${rateBlurb} No hidden fees, no upselling. On-site and remote rates the same.`,
+    keywords: [
+      "tech support pricing Auckland",
+      "computer repair cost Auckland",
+      "IT support hourly rate Auckland",
+      "affordable tech support Auckland",
+      "transparent IT pricing NZ",
+    ],
+    alternates: { canonical: "/pricing" },
+    openGraph: {
+      title: "Pricing - To The Point Tech",
+      description: `Simple, transparent rates. ${rateBlurb}`,
+      url: "/pricing",
+    },
+  };
+}
 
 const linkStyle = cn(
   "text-coquelicot-500 hover:text-coquelicot-600 underline-offset-4 hover:underline",
 );
 
 /**
- * Pricing page component.
+ * Pricing page; branches rate cards on the active promo server-side.
  * @returns Pricing page element.
  */
-export default function PricingPage(): React.ReactElement {
+export default async function PricingPage(): Promise<React.ReactElement> {
+  const promo = await getActivePromo();
   return (
     <PageShell>
       <BreadcrumbJsonLd
@@ -72,25 +92,82 @@ export default function PricingPage(): React.ReactElement {
           >
             <h2 className={cn("text-russian-violet mb-3 text-xl font-bold sm:text-2xl")}>Rates</h2>
 
-            <div className={cn("grid gap-4 sm:grid-cols-2")}>
-              <div className={cn("bg-seasalt-900/40 border-seasalt-400/60 rounded-lg border p-5")}>
-                <p className={cn("text-russian-violet mb-2 text-3xl font-bold sm:text-4xl")}>
-                  $65/h
-                </p>
-                <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
-                  Most jobs - troubleshooting, setup, software, tune-ups, Wi-Fi, backups, and more.
-                </p>
-              </div>
+            {promo ? (
+              <>
+                <div className={cn("grid gap-4 sm:grid-cols-2")}>
+                  <div className={cn("border-mustard-400 bg-mustard-900 rounded-lg border p-5")}>
+                    <p className={cn("text-rich-black/60 mb-1 text-lg line-through sm:text-xl")}>
+                      $65/h
+                    </p>
+                    <p className={cn("text-russian-violet mb-2 text-3xl font-bold sm:text-4xl")}>
+                      ${applyPromoToHourlyRate(65, promo).toFixed(0)}/h
+                    </p>
+                    <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
+                      Most jobs - troubleshooting, setup, software, tune-ups, Wi-Fi, backups, and
+                      more.
+                    </p>
+                  </div>
 
-              <div className={cn("bg-seasalt-900/40 border-seasalt-400/60 rounded-lg border p-5")}>
-                <p className={cn("text-russian-violet mb-2 text-3xl font-bold sm:text-4xl")}>
-                  $85/h
+                  <div className={cn("border-mustard-400 bg-mustard-900 rounded-lg border p-5")}>
+                    <p className={cn("text-rich-black/60 mb-1 text-lg line-through sm:text-xl")}>
+                      $85/h
+                    </p>
+                    <p className={cn("text-russian-violet mb-2 text-3xl font-bold sm:text-4xl")}>
+                      ${applyPromoToHourlyRate(85, promo).toFixed(0)}/h
+                    </p>
+                    <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
+                      Complex or lengthy work - data recovery, hardware repairs, or full PC
+                      migrations.
+                    </p>
+                  </div>
+                </div>
+
+                <div
+                  className={cn(
+                    "bg-mustard-500 text-russian-violet-500 mt-4 rounded-lg px-4 py-3 text-center",
+                  )}
+                >
+                  <p className={cn("text-sm font-bold sm:text-base")}>
+                    ⚡ Limited offer: {promo.title}
+                    {promo.description ? ` - ${promo.description}` : ""}
+                  </p>
+                  <p className={cn("text-russian-violet-500/80 mt-1 text-xs sm:text-sm")}>
+                    Until {formatDateShort(promo.endAt)}.
+                  </p>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className={cn("grid gap-4 sm:grid-cols-2")}>
+                  <div
+                    className={cn("bg-seasalt-900/40 border-seasalt-400/60 rounded-lg border p-5")}
+                  >
+                    <p className={cn("text-russian-violet mb-2 text-3xl font-bold sm:text-4xl")}>
+                      $65/h
+                    </p>
+                    <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
+                      Most jobs - troubleshooting, setup, software, tune-ups, Wi-Fi, backups, and
+                      more.
+                    </p>
+                  </div>
+
+                  <div
+                    className={cn("bg-seasalt-900/40 border-seasalt-400/60 rounded-lg border p-5")}
+                  >
+                    <p className={cn("text-russian-violet mb-2 text-3xl font-bold sm:text-4xl")}>
+                      $85/h
+                    </p>
+                    <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
+                      Complex or lengthy work - data recovery, hardware repairs, or full PC
+                      migrations.
+                    </p>
+                  </div>
+                </div>
+                <p className={cn("text-rich-black/70 mt-3 text-xs sm:text-sm")}>
+                  Discounts available - just ask. Students and at-home jobs get a small reduction.
                 </p>
-                <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
-                  Complex or lengthy work - data recovery, hardware repairs, or full PC migrations.
-                </p>
-              </div>
-            </div>
+              </>
+            )}
 
             <a
               href="#estimate-heading"

@@ -220,6 +220,9 @@ model Invoice {
   subtotal    Float
   gstAmount   Float
   total       Float
+  // Promo snapshot at creation time (kept stable if the source promo changes).
+  promoTitle    String?
+  promoDiscount Float?
   status      InvoiceStatus @default(DRAFT)
   notes       String?
   contactId   String?       @db.ObjectId
@@ -296,6 +299,31 @@ model TaskTemplate {
   // Calculator filters by device/action, so index both for fast lookups.
   @@index([device])
   @@index([action])
+}
+
+// Customer-facing promotional discount that applies during a date window.
+// At any time, at most one Promo is "currently active" (isActive AND startAt
+// <= now < endAt); when multiple overlap the most recently created wins.
+//
+// Exactly one of `flatHourlyRate` / `percentDiscount` must be set:
+//   - flatHourlyRate: replaces the labor $/hr while active (e.g. 50 = $50/hr).
+//   - percentDiscount: 0..1, multiplied against the labor subtotal.
+// The active promo is applied to labor only (tasks + top-level Time charge);
+// parts and Travel are never discounted.
+model Promo {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  title           String
+  description     String?
+  startAt         DateTime
+  endAt           DateTime
+  flatHourlyRate  Float?
+  percentDiscount Float?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // getActivePromo() filters by these three; covers most lookups.
+  @@index([isActive, startAt, endAt])
 }
 
 model Subscription {

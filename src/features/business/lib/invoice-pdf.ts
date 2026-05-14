@@ -305,6 +305,11 @@ export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
   };
 
   drawTotalRow("Subtotal", fmt(invoice.subtotal));
+  // Promo discount line (snapshot fields keep historical totals stable).
+  if (invoice.promoDiscount && invoice.promoDiscount > 0) {
+    const label = invoice.promoTitle ? `Promo: ${invoice.promoTitle}` : "Promo discount";
+    drawTotalRow(label, `-${fmt(invoice.promoDiscount)}`);
+  }
   if (invoice.gst) drawTotalRow("GST (15%)", fmt(invoice.gstAmount));
   page.drawLine({
     start: { x: totalsLabelX, y: y + 6 },
