@@ -100,6 +100,12 @@ export interface TaskLine {
   qty: number;
   unitPrice: number;
   lineTotal: number;
+  /** Device tag picked by the operator or returned by the AI. */
+  device?: string | null;
+  /** Action tag picked by the operator or returned by the AI. */
+  action?: string | null;
+  /** Optional free-text qualifier appended to the composed description (e.g. "corrupted", "Windows OS"). */
+  details?: string | null;
 }
 
 export interface PartLine {
@@ -169,6 +175,8 @@ export interface TaskTemplate {
   description: string;
   defaultPrice: number;
   usageCount: number;
+  device?: string | null;
+  action?: string | null;
   createdAt: string;
   updatedAt: string;
 }

@@ -283,8 +283,19 @@ model TaskTemplate {
   description  String
   defaultPrice Float
   usageCount   Int      @default(1)
+  // Free-text device the task targets (e.g. "Laptop", "Phone", "Email account").
+  // Open vocabulary - any string the operator types or the AI emits is accepted.
+  device       String?
+  // Free-text action describing what was done (e.g. "Setup", "Repair", "Recovery").
+  // Same open vocabulary as device. Combined with device to compose the
+  // line-item description: "<device> <action lowercased>".
+  action       String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  // Calculator filters by device/action, so index both for fast lookups.
+  @@index([device])
+  @@index([action])
 }
 
 model Subscription {
