@@ -21,6 +21,8 @@ interface NavItem {
 }
 
 const HIDDEN_PATHS: ReadonlyArray<string> = ["/poster"];
+/** Path prefixes that hide the public nav entirely (e.g. admin has its own sidebar). */
+const HIDDEN_PREFIXES: ReadonlyArray<string> = ["/admin"];
 const NAV_ITEMS: ReadonlyArray<NavItem> = [
   { label: "Services", href: "/services", activePrefix: "/services" },
   { label: "Pricing", href: "/pricing", activePrefix: "/pricing" },
@@ -357,6 +359,9 @@ export function NavBar(): React.ReactElement | null {
   if (HIDDEN_PATHS.includes(pathname)) {
     return null;
   }
+  if (HIDDEN_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))) {
+    return null;
+  }
 
   const bookingActive = isActivePrefix(pathname, "/booking");
   const contactActive = isActivePrefix(pathname, "/contact");
@@ -377,12 +382,15 @@ export function NavBar(): React.ReactElement | null {
 
   return (
     <>
-      <div aria-hidden="true" className={cn("h-24 sm:h-28")} />
+      {/* Spacer for fixed nav - grows via --promo-h when banner is shown. */}
+      <div aria-hidden="true" className={cn("app-nav-spacer")} />
 
       <header
         ref={headerRef}
         className={cn(
-          "duration-400 fixed inset-x-0 top-3 z-50 mx-auto w-full px-4 transition-[transform,opacity] ease-in-out will-change-transform sm:top-4",
+          "fixed inset-x-0 z-50 mx-auto w-full px-4 will-change-transform",
+          // `.app-nav-header` (globals.css) - top driven by --promo-h.
+          "app-nav-header",
           "max-w-[min(100vw-2rem,90rem)]",
           isHidden && !isHoveringTop && "pointer-events-none opacity-0",
         )}
@@ -515,7 +523,9 @@ export function NavBar(): React.ReactElement | null {
 
       <nav
         className={cn(
-          "border-seasalt-400/40 bg-seasalt-800/95 sm:top-30 top-27 overscroll-behavior-contain fixed right-4 z-40 max-h-[calc(100dvh-8rem)] max-w-[min(calc(100vw-2rem),18rem)] overflow-y-auto rounded-2xl border shadow-2xl backdrop-blur-xl transition-transform duration-300 lg:hidden",
+          "border-seasalt-400/40 bg-seasalt-800/95 overscroll-behavior-contain fixed right-4 z-40 max-h-[calc(100dvh-8rem)] max-w-[min(calc(100vw-2rem),18rem)] overflow-y-auto rounded-2xl border shadow-2xl backdrop-blur-xl lg:hidden",
+          // `.app-mobile-drawer` (globals.css) owns top + translate transition.
+          "app-mobile-drawer",
           mobileMenuOpen ? "translate-x-0" : "translate-x-full",
         )}
         id="mobile-nav"
