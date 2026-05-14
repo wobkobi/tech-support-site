@@ -10,6 +10,7 @@ import type React from "react";
 import { cn } from "@/shared/lib/cn";
 import { CopyLinkButton } from "./CopyLinkButton";
 import { toE164NZ, formatNZPhone, isValidPhone } from "@/shared/lib/normalize-phone";
+import { formatDateShort } from "@/shared/lib/date-format";
 
 /**
  * A single row in the review link history table.
@@ -215,19 +216,6 @@ export function ReviewLinkHistoryTable({
     }
   }
 
-  /**
-   * Formats an ISO date string as a short localised string.
-   * @param iso - ISO date string.
-   * @returns Formatted date string.
-   */
-  function fmt(iso: string): string {
-    return new Date(iso).toLocaleDateString("en-NZ", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  }
-
   const visibleEntries = query.trim()
     ? entries.filter((e) => {
         const q = query.toLowerCase();
@@ -308,7 +296,7 @@ export function ReviewLinkHistoryTable({
                         </span>
                       )}
                       {" · "}
-                      {fmt(entry.sentAt)}
+                      {formatDateShort(entry.sentAt)}
                     </p>
                   </div>
                   {canEdit && !isEditing && (

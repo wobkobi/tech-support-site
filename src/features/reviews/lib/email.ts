@@ -6,6 +6,7 @@
 
 import { Resend } from "resend";
 import { BUSINESS } from "@/shared/lib/business-identity";
+import { formatDateTimeLong } from "@/shared/lib/date-format";
 
 /**
  * Escapes HTML special characters so user-supplied values can be safely
@@ -154,24 +155,6 @@ export interface BookingNotificationData {
 }
 
 /**
- * Formats a UTC date as a human-readable NZ local time string.
- * @param date - UTC date to format.
- * @returns Formatted date/time string in NZ time.
- */
-function formatNZDateTime(date: Date): string {
-  return date.toLocaleString("en-NZ", {
-    timeZone: "Pacific/Auckland",
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
-}
-
-/**
  * Sends the site owner a notification email when a new booking is submitted.
  * Failures are caught and logged - never throws.
  * @param booking - The new booking details.
@@ -188,7 +171,7 @@ export async function sendOwnerBookingNotification(
     return;
   }
 
-  const start = formatNZDateTime(booking.startAt);
+  const start = formatDateTimeLong(booking.startAt);
   const notesHtml = escapeHtml(booking.notes).replace(/\n/g, "<br>");
   const safeName = escapeHtml(booking.name);
   const safeEmail = escapeHtml(booking.email);
@@ -245,7 +228,7 @@ export async function sendCustomerBookingConfirmation(
 
   const firstName = booking.name.split(" ")[0];
   const safeFirstName = escapeHtml(firstName);
-  const start = formatNZDateTime(booking.startAt);
+  const start = formatDateTimeLong(booking.startAt);
   const cancelUrl = `${siteUrl}/booking/cancel?token=${encodeURIComponent(booking.cancelToken)}`;
   const notesHtml = escapeHtml(booking.notes).replace(/\n/g, "<br>");
 

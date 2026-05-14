@@ -8,7 +8,8 @@
 import { useState, useRef, useEffect } from "react";
 import { SOFT_CARD } from "@/shared/components/PageLayout";
 import { cn } from "@/shared/lib/cn";
-import { type ReviewRow, formatDate } from "./review-types";
+import { type ReviewRow } from "./review-types";
+import { formatDateShort } from "@/shared/lib/date-format";
 import { formatReviewerName } from "@/features/reviews/lib/formatting";
 import type React from "react";
 
@@ -127,7 +128,7 @@ export function ReviewCard({
           </span>
         )}
         <span className={cn("ml-auto shrink-0 text-xs text-slate-400")}>
-          {formatDate(row.createdAt)}
+          {formatDateShort(row.createdAt)}
         </span>
       </div>
 
