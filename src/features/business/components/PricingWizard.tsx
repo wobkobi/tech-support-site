@@ -20,11 +20,11 @@ type Step = "issue" | "address" | "results";
 
 /**
  * Whole-dollar NZD string (no cents) for the pricing range UI.
- * @param amount - Amount in dollars
- * @returns Formatted string e.g. "$85"
+ * @param amount - Amount in dollars (positive or negative).
+ * @returns Formatted string e.g. "$85" or "-$85".
  */
 function formatPriceRound(amount: number): string {
-  return `$${amount.toFixed(0)}`;
+  return `${amount < 0 ? "-" : ""}$${Math.abs(amount).toFixed(0)}`;
 }
 
 /**

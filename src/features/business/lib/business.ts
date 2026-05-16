@@ -2,12 +2,16 @@ import type { JobCalculation, LineItem, RateConfig } from "@/features/business/t
 import { formatDateSlash } from "@/shared/lib/date-format";
 
 /**
- * Formats a number as NZD currency string.
- * @param amount - Amount in dollars
- * @returns Formatted currency string (e.g. "$1,234.56")
+ * Formats a number as NZD currency string with the sign before the dollar.
+ * @param amount - Amount in dollars (positive or negative).
+ * @returns Formatted currency string (e.g. "$1,234.56" or "-$1,234.56").
  */
 export function formatNZD(amount: number): string {
-  return "$" + amount.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const sign = amount < 0 ? "-" : "";
+  const body = Math.abs(amount)
+    .toFixed(2)
+    .replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return `${sign}$${body}`;
 }
 
 /**

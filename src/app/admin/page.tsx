@@ -200,7 +200,7 @@ export default async function AdminPage({
       kind: "invoice" as const,
       timestamp: inv.createdAt,
       title: `Invoice ${inv.number}: ${inv.clientName}`,
-      detail: `${inv.status} - $${inv.total.toFixed(2)}`,
+      detail: `${inv.status} - ${inv.total < 0 ? "-" : ""}$${Math.abs(inv.total).toFixed(2)}`,
     })),
   ]
     .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
