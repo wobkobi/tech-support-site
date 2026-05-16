@@ -393,7 +393,6 @@ export default async function BusinessPage({
         income={scopedIncomeTotal}
         expensesExcl={scopedExpensesTotal}
         gstClaimable={scopedGstTotal}
-        actuals={paymentTotals}
         rates={rates}
       />
 
