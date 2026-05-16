@@ -21,6 +21,7 @@ import { TaxonomyManageModal } from "@/features/business/components/TaxonomyMana
 import { Combobox } from "@/features/business/components/Combobox";
 import { TotalsPanel } from "@/features/business/components/calculator/TotalsPanel";
 import { PartsSection } from "@/features/business/components/calculator/PartsSection";
+import { TravelSection } from "@/features/business/components/calculator/TravelSection";
 import { loadPlacesLibrary } from "@/shared/lib/google-maps-loader";
 import { summariseForBanner, type ActivePromo } from "@/features/business/lib/promos";
 import type {
@@ -1149,73 +1150,18 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
           </div>
 
           {/* Travel */}
-          <div className={cn("rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}>
-            <h2 className={cn("text-russian-violet mb-3 text-sm font-semibold")}>Travel</h2>
-            <div className={cn("flex gap-2")}>
-              <input
-                ref={addressInputRef}
-                type="text"
-                placeholder="Client address or suburb"
-                value={jobAddress}
-                onChange={(e) => {
-                  setJobAddress(e.target.value);
-                  setTravelInfo(null);
-                  setTravelOnInvoice(false);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    void handleTravelLookup();
-                  }
-                }}
-                className={cn(
-                  "focus:ring-russian-violet/30 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
-                )}
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  void handleTravelLookup();
-                }}
-                suppressHydrationWarning
-                disabled={lookingUpTravel || !jobAddress.trim()}
-                className={cn(
-                  "rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50",
-                )}
-              >
-                {lookingUpTravel ? "..." : "Look up"}
-              </button>
-            </div>
-            {travelInfo && (
-              <div
-                className={cn(
-                  "mt-2 flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600",
-                )}
-              >
-                <span>
-                  {travelInfo.distanceKm} km
-                  {travelInfo.durationMins > 0
-                    ? ` - approx ${travelInfo.durationMins} min drive`
-                    : ""}{" "}
-                  -{" "}
-                  <span className="font-medium text-slate-800">${travelInfo.cost.toFixed(2)}</span>
-                </span>
-                {travelOnInvoice ? (
-                  <span className={cn("ml-3 text-xs font-medium text-green-600")}>Added</span>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={addTravelToInvoice}
-                    className={cn(
-                      "ml-3 rounded bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-700 hover:bg-slate-300",
-                    )}
-                  >
-                    Add to invoice
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
+          <TravelSection
+            addressInputRef={addressInputRef}
+            jobAddress={jobAddress}
+            onJobAddressChange={setJobAddress}
+            travelInfo={travelInfo}
+            onTravelInfoChange={setTravelInfo}
+            lookingUpTravel={lookingUpTravel}
+            travelOnInvoice={travelOnInvoice}
+            onTravelOnInvoiceChange={setTravelOnInvoice}
+            onLookup={() => void handleTravelLookup()}
+            onAddToInvoice={addTravelToInvoice}
+          />
 
           {/* Tasks */}
           <div
