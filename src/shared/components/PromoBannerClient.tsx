@@ -7,6 +7,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type React from "react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { FaBolt, FaXmark } from "react-icons/fa6";
 import { cn } from "@/shared/lib/cn";
@@ -118,7 +119,9 @@ export function PromoBannerClient({ promo }: Props): React.ReactElement {
       ref={bannerRef}
       className={cn(
         "z-60 fixed inset-x-0 top-0",
-        "bg-mustard-500 text-russian-violet-500 border-mustard-400 border-b",
+        // Matches the mustard strap on /pricing so both promo surfaces look the same.
+        "bg-mustard-500 text-russian-violet-500",
+
         // Right padding leaves room for the absolute-positioned dismiss button.
         "px-4 py-2.5 pr-12 text-center text-base font-semibold sm:px-12 sm:text-lg",
         "transition-transform duration-500 ease-out",
@@ -126,11 +129,17 @@ export function PromoBannerClient({ promo }: Props): React.ReactElement {
       )}
       role="status"
     >
-      <FaBolt
-        className={cn("text-russian-violet-500 mr-2 inline-block h-4 w-4 sm:h-5 sm:w-5")}
-        aria-hidden="true"
-      />
-      <span className={cn("font-bold")}>Limited offer:</span> {summariseForBanner(promo)}
+      <Link
+        href="/pricing"
+        aria-label="See pricing details for the current offer"
+        className={cn("block hover:underline focus:outline-none focus-visible:underline")}
+      >
+        <FaBolt
+          className={cn("text-russian-violet-500 mr-2 inline-block h-4 w-4 sm:h-5 sm:w-5")}
+          aria-hidden="true"
+        />
+        <span className={cn("font-bold")}>Limited offer:</span> {summariseForBanner(promo)}
+      </Link>
       <button
         type="button"
         onClick={handleDismiss}
