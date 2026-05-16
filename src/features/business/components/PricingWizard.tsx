@@ -143,7 +143,10 @@ export function PricingWizard(): React.ReactElement {
     setAiEstimatedMins(estimatedMins);
 
     /**
-     * Builds a ±20% price range from the AI's minute estimate at a given rate.
+     * Builds a ±15% price range from the AI's minute estimate, rounded to the
+     * nearest $5 with a $15 minimum spread. Tighter than the previous ±20%/$10
+     * defaults so short jobs (e.g. a 45 min Wi-Fi fix at $65/h) report a
+     * believable $40-60 range instead of a 100%-wide $30-60 bucket.
      * Called twice when a promo is active so we can show original + promo'd.
      * @param rate - Effective $/hr for this branch.
      * @returns Low/high range plus the per-call travel surcharge.
@@ -151,17 +154,24 @@ export function PricingWizard(): React.ReactElement {
     const buildRange = (rate: number): { low: number; high: number; travel: number } => {
       const jobCost = (estimatedMins / 60) * rate;
       const travelCost = (travelMins / 60) * rate;
-      const jobLow = Math.floor((jobCost * 0.8) / 10) * 10;
-      const jobHigh = Math.max(Math.ceil((jobCost * 1.2) / 10) * 10, jobLow + 30);
-      const travel = Math.round(travelCost / 10) * 10;
+      const jobLow = Math.floor((jobCost * 0.85) / 5) * 5;
+      const jobHigh = Math.max(Math.ceil((jobCost * 1.15) / 5) * 5, jobLow + 15);
+      const travel = Math.round(travelCost / 5) * 5;
       return { low: jobLow + travel, high: jobHigh + travel, travel };
     };
     const promoRange = buildRange(promoRate);
-    const original = promoApplied ? buildRange(fullRate) : null;
-    const jobLow = Math.floor(((estimatedMins / 60) * promoRate * 0.8) / 10) * 10;
+    // Cosmetic safety net: only surface the crossed-out original when the
+    // rounded range actually differs - if both branches happen to round to
+    // the same bucket, identical struck/un-struck prices read as a glitch.
+    const rawOriginal = promoApplied ? buildRange(fullRate) : null;
+    const original =
+      rawOriginal && (rawOriginal.low !== promoRange.low || rawOriginal.high !== promoRange.high)
+        ? rawOriginal
+        : null;
+    const jobLow = Math.floor(((estimatedMins / 60) * promoRate * 0.85) / 5) * 5;
     const jobHigh = Math.max(
-      Math.ceil(((estimatedMins / 60) * promoRate * 1.2) / 10) * 10,
-      jobLow + 30,
+      Math.ceil(((estimatedMins / 60) * promoRate * 1.15) / 5) * 5,
+      jobLow + 15,
     );
 
     const range: PriceRange = {
