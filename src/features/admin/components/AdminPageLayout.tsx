@@ -29,10 +29,13 @@ export function AdminPageLayout({
       <AdminSidebar token={token} current={current} />
       {/* Sidebar is fixed-position; reserve its width on lg+ only. Below lg the
           sidebar slides in as an overlay drawer so content gets the full width. */}
-      <div className={cn("flex-1 bg-slate-50 lg:ml-56")}>
+      <div className={cn("flex-1 bg-slate-50 lg:ml-56 print:ml-0 print:bg-white")}>
         {/* Top padding bumped on mobile so the page heading clears the
-            hamburger button (h-11 + 12px top inset = ~56px). */}
-        <div className={cn(contentClassName ?? "px-4 pb-8 pt-16 sm:px-6 sm:pt-8 lg:pt-8")}>
+            hamburger button (h-11 + 12px top inset = ~56px). Print drops
+            padding so the invoice fills the page edge-to-edge. */}
+        <div
+          className={cn(contentClassName ?? "px-4 pb-8 pt-16 sm:px-6 sm:pt-8 lg:pt-8", "print:p-0")}
+        >
           {children}
         </div>
       </div>

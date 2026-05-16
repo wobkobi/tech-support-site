@@ -166,7 +166,7 @@ export function AdminSidebar({ token, current }: AdminSidebarProps): React.React
         aria-label="Open menu"
         aria-expanded={open}
         className={cn(
-          "bg-russian-violet fixed left-3 top-3 z-30 inline-flex h-11 w-11 items-center justify-center rounded-lg text-white shadow-lg lg:hidden",
+          "bg-russian-violet fixed left-3 top-3 z-30 inline-flex h-11 w-11 items-center justify-center rounded-lg text-white shadow-lg lg:hidden print:hidden",
         )}
       >
         <FaBars className={cn("text-base")} />
@@ -177,14 +177,14 @@ export function AdminSidebar({ token, current }: AdminSidebarProps): React.React
         onClick={() => setOpen(false)}
         aria-hidden
         className={cn(
-          "fixed inset-0 z-30 bg-black/40 transition-opacity lg:hidden",
+          "fixed inset-0 z-30 bg-black/40 transition-opacity lg:hidden print:hidden",
           open ? "opacity-100" : "pointer-events-none opacity-0",
         )}
       />
 
       <aside
         className={cn(
-          "bg-russian-violet fixed inset-y-0 left-0 z-40 flex w-56 flex-col lg:translate-x-0",
+          "bg-russian-violet fixed inset-y-0 left-0 z-40 flex w-56 flex-col lg:translate-x-0 print:hidden",
           // `.app-admin-drawer` (globals.css) owns the translate transition.
           "app-admin-drawer",
           open ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
