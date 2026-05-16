@@ -5,12 +5,9 @@ import type React from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/shared/lib/cn";
 import {
-  formatNZD,
   calcJobTotal,
   jobToLineItems,
   buildIncomeDescription,
-  minsToHoursLabel,
-  billableMins,
   matchRateById,
   effectiveHourlyRate,
   composeDescription,
@@ -24,6 +21,7 @@ import { TravelSection } from "@/features/business/components/calculator/TravelS
 import { ClientPickerSection } from "@/features/business/components/calculator/ClientPickerSection";
 import { TasksSection } from "@/features/business/components/calculator/TasksSection";
 import { RateConfigPanel } from "@/features/business/components/calculator/RateConfigPanel";
+import { JobDetailsSection } from "@/features/business/components/calculator/JobDetailsSection";
 import { loadPlacesLibrary } from "@/shared/lib/google-maps-loader";
 import { summariseForBanner, type ActivePromo } from "@/features/business/lib/promos";
 import type {
@@ -934,85 +932,18 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
           </div>
 
           {/* Time */}
-          <div
-            className={cn("space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}
-          >
-            <h2 className={cn("text-russian-violet text-sm font-semibold")}>Time</h2>
-            <div className={cn("grid grid-cols-2 gap-3")}>
-              <div>
-                <label className={cn("mb-1 block text-xs font-medium text-slate-500")}>Start</label>
-                <input
-                  type="time"
-                  value={startTime}
-                  onChange={(e) => {
-                    setStartTime(e.target.value);
-                    setDurationOverride(null);
-                  }}
-                  className={cn(
-                    "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
-                  )}
-                />
-              </div>
-              <div>
-                <label className={cn("mb-1 block text-xs font-medium text-slate-500")}>End</label>
-                <input
-                  type="time"
-                  value={endTime}
-                  onChange={(e) => {
-                    setEndTime(e.target.value);
-                    setDurationOverride(null);
-                  }}
-                  className={cn(
-                    "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
-                  )}
-                />
-              </div>
-            </div>
-            <div className={cn("grid grid-cols-2 gap-3")}>
-              <div>
-                <label className={cn("mb-1 block text-xs font-medium text-slate-500")}>
-                  Duration (override)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="5"
-                  value={durationOverride ?? durationMins}
-                  onChange={(e) => setDurationOverride(parseInt(e.target.value) || 0)}
-                  className={cn(
-                    "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
-                  )}
-                />
-                <p className={cn("mt-1 text-xs text-slate-400")}>
-                  {minsToHoursLabel(durationMins)}
-                  {billableMins(durationMins) !== durationMins && (
-                    <span className={cn("ml-1 text-slate-300")}>
-                      → {minsToHoursLabel(billableMins(durationMins))} billed
-                    </span>
-                  )}
-                </p>
-              </div>
-              <div>
-                <label className={cn("mb-1 block text-xs font-medium text-slate-500")}>
-                  Hourly rate
-                </label>
-                <select
-                  value={hourlyRateId ?? ""}
-                  onChange={(e) => setHourlyRateId(e.target.value || null)}
-                  className={cn(
-                    "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
-                  )}
-                >
-                  <option value="">None</option>
-                  {baseRates.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.label} ({formatNZD(r.ratePerHour ?? 0)}/hr)
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
+          <JobDetailsSection
+            startTime={startTime}
+            onStartTimeChange={setStartTime}
+            endTime={endTime}
+            onEndTimeChange={setEndTime}
+            durationOverride={durationOverride}
+            onDurationOverrideChange={setDurationOverride}
+            durationMins={durationMins}
+            hourlyRateId={hourlyRateId}
+            onHourlyRateIdChange={setHourlyRateId}
+            baseRates={baseRates}
+          />
 
           {/* Travel */}
           <TravelSection
