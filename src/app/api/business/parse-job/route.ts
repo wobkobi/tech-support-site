@@ -274,7 +274,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       typeof parsed.durationMins === "number" &&
       parsed.durationMins > 0
     ) {
-      const targetHours = Math.round((parsed.durationMins / 60) * 4) / 4;
+      // Round UP to match the calculator's billable rule (ceil to next 15-min slot).
+      // Same policy as the prompt's BILLING step 2 - so the safety net + AI agree on the target.
+      const targetHours = Math.ceil((parsed.durationMins / 60) * 4) / 4;
       const sumQty = parsed.tasks.reduce((s, t) => s + (t.qty || 0), 0);
       const diff = Math.round((targetHours - sumQty) * 100) / 100;
       if (Math.abs(diff) >= 0.25) {

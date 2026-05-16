@@ -52,6 +52,9 @@ export function TaxonomyManageModal({ token, onClose, onChanged }: Props): React
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  // Two-step confirm baked into the row instead of native window.confirm(),
+  // because Firefox's "stop showing this dialog" option permanently suppresses it.
+  const [pendingClear, setPendingClear] = useState<string | null>(null);
 
   /**
    * Fetches the current taxonomy from the API and returns it.
@@ -118,19 +121,14 @@ export function TaxonomyManageModal({ token, onClose, onChanged }: Props): React
   }, [onClose]);
 
   /**
-   * Clears a tag from every task tagged with it.
+   * Clears a tag from every task tagged with it. Caller must have confirmed
+   * via the inline two-step (no window.confirm — Firefox suppresses it).
    * @param kind - Whether to clear a device or an action.
    * @param name - The tag value to clear.
    */
   async function clearTag(kind: "devices" | "actions", name: string): Promise<void> {
-    if (
-      !confirm(
-        `Clear "${name}" from all task templates? Tasks stay; the tag is removed and they'll be retagged the next time the AI parses a similar job.`,
-      )
-    ) {
-      return;
-    }
     setBusy(`${kind}:${name}`);
+    setPendingClear(null);
     setError(null);
     try {
       const res = await fetch(`/api/business/task-templates/${kind}/${encodeURIComponent(name)}`, {
@@ -198,14 +196,20 @@ export function TaxonomyManageModal({ token, onClose, onChanged }: Props): React
                 title="Devices"
                 tags={devices}
                 busyKey={busy}
-                onClear={(name) => void clearTag("devices", name)}
+                pendingKey={pendingClear}
+                onRequestClear={(name) => setPendingClear(`devices:${name}`)}
+                onConfirmClear={(name) => void clearTag("devices", name)}
+                onCancelClear={() => setPendingClear(null)}
                 kind="devices"
               />
               <TagSection
                 title="Actions"
                 tags={actions}
                 busyKey={busy}
-                onClear={(name) => void clearTag("actions", name)}
+                pendingKey={pendingClear}
+                onRequestClear={(name) => setPendingClear(`actions:${name}`)}
+                onConfirmClear={(name) => void clearTag("actions", name)}
+                onCancelClear={() => setPendingClear(null)}
                 kind="actions"
               />
             </>
@@ -217,27 +221,38 @@ export function TaxonomyManageModal({ token, onClose, onChanged }: Props): React
 }
 
 /**
- * Small list section for one of the taxonomy axes.
+ * Small list section for one of the taxonomy axes. Each row uses a two-step
+ * inline confirmation rather than window.confirm() (Firefox suppresses native
+ * confirm dialogs once the user opts out for the origin).
  * @param props - Component props.
  * @param props.title - Section heading (e.g. "Devices").
  * @param props.tags - Tag values to render.
  * @param props.busyKey - Currently-busy `kind:name` key to disable the matching button.
- * @param props.kind - Whether this section renders devices or categories (used in the busy key).
- * @param props.onClear - Click handler for the clear button.
+ * @param props.pendingKey - Currently-staged `kind:name` row awaiting confirm.
+ * @param props.kind - Whether this section renders devices or categories.
+ * @param props.onRequestClear - First click: stage the row for confirmation.
+ * @param props.onConfirmClear - Second click: actually fire the delete.
+ * @param props.onCancelClear - Cancel the pending confirmation.
  * @returns Tag list section.
  */
 function TagSection({
   title,
   tags,
   busyKey,
+  pendingKey,
   kind,
-  onClear,
+  onRequestClear,
+  onConfirmClear,
+  onCancelClear,
 }: {
   title: string;
   tags: string[];
   busyKey: string | null;
+  pendingKey: string | null;
   kind: "devices" | "actions";
-  onClear: (name: string) => void;
+  onRequestClear: (name: string) => void;
+  onConfirmClear: (name: string) => void;
+  onCancelClear: () => void;
 }): React.ReactElement {
   return (
     <section>
@@ -249,25 +264,52 @@ function TagSection({
       ) : (
         <ul className={cn("flex flex-col gap-1")}>
           {tags.map((tag) => {
-            const isBusy = busyKey === `${kind}:${tag}`;
+            const rowKey = `${kind}:${tag}`;
+            const isBusy = busyKey === rowKey;
+            const isPending = pendingKey === rowKey;
             return (
               <li
                 key={tag}
                 className={cn(
-                  "flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2",
+                  "flex items-center justify-between gap-3 rounded-lg border px-3 py-2",
+                  isPending ? "border-red-300 bg-red-50" : "border-slate-200",
                 )}
               >
                 <span className={cn("truncate text-sm text-slate-700")}>{tag}</span>
-                <button
-                  type="button"
-                  disabled={isBusy}
-                  onClick={() => onClear(tag)}
-                  className={cn(
-                    "shrink-0 rounded text-xs font-semibold text-red-500 hover:text-red-700 disabled:opacity-50",
-                  )}
-                >
-                  {isBusy ? "Clearing..." : "Clear"}
-                </button>
+                {isPending ? (
+                  <div className={cn("flex shrink-0 items-center gap-2")}>
+                    <span className={cn("text-xs text-red-700")}>Clear this tag?</span>
+                    <button
+                      type="button"
+                      onClick={() => onConfirmClear(tag)}
+                      className={cn(
+                        "rounded bg-red-600 px-2 py-1 text-xs font-semibold text-white hover:bg-red-700",
+                      )}
+                    >
+                      Yes, clear
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onCancelClear}
+                      className={cn(
+                        "rounded text-xs font-semibold text-slate-500 hover:text-slate-700",
+                      )}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={isBusy}
+                    onClick={() => onRequestClear(tag)}
+                    className={cn(
+                      "shrink-0 rounded text-xs font-semibold text-red-500 hover:text-red-700 disabled:opacity-50",
+                    )}
+                  >
+                    {isBusy ? "Clearing..." : "Clear"}
+                  </button>
+                )}
               </li>
             );
           })}

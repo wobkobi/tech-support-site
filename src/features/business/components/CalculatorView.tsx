@@ -131,6 +131,12 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
   const [gst, setGst] = useState(false);
   const [clientName, setClientName] = useState("");
   const [clientEmail, setClientEmail] = useState("");
+  // Address-to state mirrors the InvoiceBuilder's segmented control so the
+  // operator picks Name/Company/Custom once and the choice rides through to
+  // the invoice without re-picking.
+  const [pickedContactName, setPickedContactName] = useState<string | null>(null);
+  const [pickedContactCompany, setPickedContactCompany] = useState<string | null>(null);
+  const [addressMode, setAddressModeState] = useState<"name" | "company" | "custom">("custom");
 
   const [aiInput, setAiInput] = useState("");
   const [parsing, setParsing] = useState(false);
@@ -437,6 +443,25 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
   }
 
   /**
+   * Switches address-to mode and updates clientName accordingly. Custom mode
+   * keeps whatever clientName already has so the operator can keep editing.
+   * @param mode - Target mode.
+   */
+  function setAddressMode(mode: "name" | "company" | "custom"): void {
+    if (mode === "name" && pickedContactName) {
+      setAddressModeState("name");
+      setClientName(pickedContactName);
+      return;
+    }
+    if (mode === "company" && pickedContactCompany) {
+      setAddressModeState("company");
+      setClientName(pickedContactCompany);
+      return;
+    }
+    setAddressModeState("custom");
+  }
+
+  /**
    * Saves task templates then navigates to the new-invoice page with the job pre-populated.
    */
   async function handleCreateInvoice(): Promise<void> {
@@ -449,6 +474,12 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
       gst: String(gst),
       notes,
     });
+    // Carry the picked-contact + address-mode across so the InvoiceBuilder
+    // restores the same Name/Company/Custom toggle state the operator chose
+    // here, no re-picking.
+    if (pickedContactName) q.set("pickedContactName", pickedContactName);
+    if (pickedContactCompany) q.set("pickedContactCompany", pickedContactCompany);
+    if (pickedContactName) q.set("addressMode", addressMode);
     // Pass promo snapshot to InvoiceBuilder; skipPromo=1 carries the opt-out.
     if (activePromo && !skipPromo && totals.promoDiscount > 0) {
       q.set("promoTitle", activePromo.title);
@@ -734,8 +765,12 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
         <ContactPickerModal
           token={token}
           onSelect={(c: GoogleContact) => {
+            const company = c.company?.trim() || null;
             setClientName(c.name);
             setClientEmail(c.email);
+            setPickedContactName(c.name);
+            setPickedContactCompany(company);
+            setAddressModeState("name");
           }}
           onClose={() => setShowContactPicker(false)}
         />
@@ -828,7 +863,7 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
                     {r.ratePerHour !== null
                       ? `$${r.ratePerHour}/hr`
                       : r.hourlyDelta !== null
-                        ? `${r.hourlyDelta > 0 ? "+" : ""}$${r.hourlyDelta}/hr`
+                        ? `${r.hourlyDelta < 0 ? "-" : "+"}$${Math.abs(r.hourlyDelta)}/hr`
                         : r.flatRate !== null
                           ? `$${r.flatRate}`
                           : "-"}
@@ -1369,7 +1404,8 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
                         </select>
                         {modifierRates.map((m) => {
                           const active = task.modifierIds?.includes(m.id) ?? false;
-                          const sign = m.hourlyDelta !== null && m.hourlyDelta > 0 ? "+" : "";
+                          const delta = m.hourlyDelta ?? 0;
+                          const sign = delta < 0 ? "-" : "+";
                           return (
                             <button
                               key={m.id}
@@ -1383,7 +1419,7 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
                                   : "border-slate-200 bg-white text-slate-500 hover:border-slate-300",
                               )}
                             >
-                              {m.label} {sign}${m.hourlyDelta}
+                              {m.label} {sign}${Math.abs(delta)}
                             </button>
                           );
                         })}
@@ -1584,13 +1620,44 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
                 Pick from contacts
               </button>
             </div>
+            {pickedContactName && (
+              <div className={cn("flex flex-wrap items-center gap-2")}>
+                <span className={cn("text-xs font-medium text-slate-600")}>Address to:</span>
+                {(["name", "company", "custom"] as const).map((mode) => {
+                  const disabled = mode === "company" && !pickedContactCompany;
+                  const active = addressMode === mode;
+                  const label =
+                    mode === "name" ? "Name" : mode === "company" ? "Company" : "Custom";
+                  return (
+                    <button
+                      key={mode}
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => setAddressMode(mode)}
+                      title={disabled ? "Picked contact has no company" : undefined}
+                      className={cn(
+                        "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                        active
+                          ? "border-russian-violet/40 bg-russian-violet/10 text-russian-violet"
+                          : "border-slate-200 bg-white text-slate-600 hover:border-slate-300",
+                        disabled && "cursor-not-allowed opacity-40 hover:border-slate-200",
+                      )}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             <input
               type="text"
               placeholder="Name"
               value={clientName}
+              readOnly={addressMode !== "custom"}
               onChange={(e) => setClientName(e.target.value)}
               className={cn(
                 "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
+                addressMode !== "custom" && "bg-slate-50 text-slate-700",
               )}
             />
             <input
