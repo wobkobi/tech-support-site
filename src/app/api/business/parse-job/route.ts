@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
-import { buildParseJobPrompt } from "@/features/business/lib/prompts/parse-job";
+import {
+  buildParseJobPrompt,
+  buildParseJobContext,
+} from "@/features/business/lib/prompts/parse-job";
 import { effectiveHourlyRate, composeDescription } from "@/features/business/lib/business";
 import type {
   ParseJobResponse,
@@ -146,13 +149,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       hour12: false,
     }).format(new Date());
 
-    const systemPrompt = buildParseJobPrompt(rateDtos, templateDtos, currentTime);
+    // System prompt is static (cacheable) - all per-call data is appended to
+    // the user message via buildParseJobContext.
+    const systemPrompt = buildParseJobPrompt();
+    const context = buildParseJobContext(rateDtos, templateDtos, currentTime);
 
     const precomputed = calcSessionMins(input);
     let userContent =
       precomputed !== null
-        ? `${input.trim()}\n\n[Pre-computed session total: ${precomputed} min — use this as durationMins without recalculating]`
-        : input.trim();
+        ? `${context}${input.trim()}\n\n[Pre-computed session total: ${precomputed} min — use this as durationMins without recalculating]`
+        : `${context}${input.trim()}`;
     if (answers && Object.keys(answers).length > 0) {
       const clarifications = Object.entries(answers)
         .map(([k, v]) => `${k}=${v}`)
