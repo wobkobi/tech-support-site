@@ -80,8 +80,12 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
     },
   });
 
-  // Upsert fresh events into cache
-  const cacheExpiry = new Date(now.getTime() + 15 * 60 * 1000); // Cache expires in 15 minutes
+  // Upsert fresh events into cache.
+  // 30-min TTL gives a 15-min cushion over the 15-min cron cadence so a single
+  // missed/late cron run doesn't push the booking page onto its slow live-API
+  // fallback. Data freshness is unaffected - the cron rewrites each entry on
+  // every run.
+  const cacheExpiry = new Date(now.getTime() + 30 * 60 * 1000);
   const upsertPromises = rawEvents.map((event) =>
     prisma.calendarEventCache.upsert({
       where: {
@@ -335,47 +339,36 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
     // Per-block transport mode (default to transit if not set)
     const travelMode = (existing?.transportMode ?? "transit") as TransportMode;
 
-    // Travel-to leg (from effectiveOrigin → event location)
-    let rawTravelToMinutes: number | null = null;
-    if (reuseRawToMinutes !== null) {
-      rawTravelToMinutes = reuseRawToMinutes;
-    } else {
-      if (isDev)
-        console.log(
-          `[travel] Calculating travel-to: ${effectiveOrigin} → ${eventLocation} (${travelMode})`,
-        );
-      rawTravelToMinutes = await calculateTravelMinutes(
-        effectiveOrigin,
-        eventLocation,
-        eventStart,
-        {
-          useArrivalTime: true,
-          mode: travelMode,
-        },
+    // Travel-to and travel-back are independent Distance Matrix calls; run them
+    // concurrently per event to roughly halve wall-clock time on the cron job.
+    if (isDev && reuseRawToMinutes === null) {
+      console.log(
+        `[travel] Calculating travel-to: ${effectiveOrigin} → ${eventLocation} (${travelMode})`,
       );
-      if (isDev)
-        console.log(`[travel] Travel-to result: ${rawTravelToMinutes ?? "null (skipping)"} min`);
+    }
+    if (isDev && reuseRawBackMinutes === null) {
+      console.log(
+        `[travel] Calculating travel-back: ${eventLocation} → ${homeAddress} (depart ${departureForBack.toISOString()}, ${travelMode})`,
+      );
     }
 
-    // Travel-back leg (always back to homeAddress)
-    let rawTravelBackMinutes: number | null = null;
-    if (reuseRawBackMinutes !== null) {
-      rawTravelBackMinutes = reuseRawBackMinutes;
-    } else {
-      if (isDev)
-        console.log(
-          `[travel] Calculating travel-back: ${eventLocation} → ${homeAddress} (depart ${departureForBack.toISOString()}, ${travelMode})`,
-        );
-      rawTravelBackMinutes = await calculateTravelMinutes(
-        eventLocation,
-        homeAddress,
-        departureForBack,
-        { mode: travelMode },
-      );
-      if (isDev)
-        console.log(
-          `[travel] Travel-back result: ${rawTravelBackMinutes ?? "null (skipping)"} min`,
-        );
+    const [rawTravelToMinutes, rawTravelBackMinutes] = await Promise.all([
+      reuseRawToMinutes !== null
+        ? Promise.resolve(reuseRawToMinutes)
+        : calculateTravelMinutes(effectiveOrigin, eventLocation, eventStart, {
+            useArrivalTime: true,
+            mode: travelMode,
+          }),
+      reuseRawBackMinutes !== null
+        ? Promise.resolve(reuseRawBackMinutes)
+        : calculateTravelMinutes(eventLocation, homeAddress, departureForBack, {
+            mode: travelMode,
+          }),
+    ]);
+
+    if (isDev) {
+      console.log(`[travel] Travel-to result: ${rawTravelToMinutes ?? "null (skipping)"} min`);
+      console.log(`[travel] Travel-back result: ${rawTravelBackMinutes ?? "null (skipping)"} min`);
     }
 
     // Skip entirely if both directions failed (try again next cron run)

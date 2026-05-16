@@ -129,7 +129,10 @@ export default function Reviews({ items = [] }: ReviewsProps): React.ReactElemen
 
         <div
           className={cn(
-            "relative -mx-4 w-[calc(100%+2rem)] overflow-hidden rounded-xl sm:-mx-8 sm:w-[calc(100%+4rem)]",
+            // Bleed all the way to the FrostedSection edge so the carousel sits flush against the page chrome.
+            "relative -mx-8 w-[calc(100%+4rem)] overflow-hidden rounded-xl",
+            "sm:-mx-12 sm:w-[calc(100%+6rem)]",
+            "md:-mx-16 md:w-[calc(100%+8rem)]",
           )}
         >
           <ul className={cn("marquee-track animate-marquee flex w-max gap-3")}>

@@ -7,29 +7,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { sendPastClientReviewRequest } from "@/features/reviews/lib/email";
-import { isValidAdminToken } from "@/shared/lib/auth";
+import { isAdminRequest } from "@/shared/lib/auth";
 import { toE164NZ, isValidPhone } from "@/shared/lib/normalize-phone";
 
 /**
  * POST /api/admin/send-review-link
  * Creates a minimal booking record and sends a review request email to a past client.
+ * Authenticated via X-Admin-Secret header.
  * @param request - The incoming request.
  * @returns JSON response indicating success or failure.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  if (!isAdminRequest(request)) {
+    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const body = (await request.json()) as {
-      token?: string;
       name?: string;
       email?: string;
       phone?: string;
       mode?: "email" | "sms";
     };
-    const { token, name, email, phone, mode = "email" } = body;
-
-    if (!isValidAdminToken(token ?? null)) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-    }
+    const { name, email, phone, mode = "email" } = body;
 
     if (!name?.trim()) {
       return NextResponse.json({ ok: false, error: "Name is required." }, { status: 400 });

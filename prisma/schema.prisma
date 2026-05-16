@@ -176,11 +176,20 @@ model CalendarEventCache {
 
 // --- Business module ---
 
+// A RateConfig row is exactly one of three kinds, distinguished by which
+// numeric field is set:
+//   - Base hourly rate: ratePerHour set (e.g. Standard $65/hr).
+//   - Modifier: hourlyDelta set (signed $/hr added to the base when applied,
+//     e.g. -10 for At home, +20 for Complex). Stacked freely per task.
+//   - Flat rate: flatRate set (e.g. Travel $1.20/km).
+// The effective unit price for an hourly task is base.ratePerHour + sum of
+// applied modifier deltas.
 model RateConfig {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
   label       String
   ratePerHour Float?
   flatRate    Float?
+  hourlyDelta Float?
   unit        String   @default("hour")
   isDefault   Boolean  @default(false)
   createdAt   DateTime @default(now())
@@ -211,6 +220,9 @@ model Invoice {
   subtotal    Float
   gstAmount   Float
   total       Float
+  // Promo snapshot at creation time (kept stable if the source promo changes).
+  promoTitle    String?
+  promoDiscount Float?
   status      InvoiceStatus @default(DRAFT)
   notes       String?
   contactId   String?       @db.ObjectId
@@ -229,7 +241,15 @@ model IncomeEntry {
   method      String
   notes       String?
   invoiceId   String?  @db.ObjectId
+  // Stable identifier shared with the corresponding row in the per-FY Google Sheet
+  // (Cashbook tab, hidden column Z). Set when the entry is first written to a sheet
+  // or backfilled by the import. Used for upsert-by-id sync in both directions.
+  // Not @unique because MongoDB's unique index rejects multiple null values during
+  // backfill; collisions are vanishingly unlikely with crypto.randomUUID().
+  sheetRowKey String?
   createdAt   DateTime @default(now())
+
+  @@index([sheetRowKey])
 }
 
 model ExpenseEntry {
@@ -244,7 +264,21 @@ model ExpenseEntry {
   method      String
   receipt     Boolean  @default(false)
   notes       String?
+  // Stable identifier shared with the corresponding row in the per-FY Google Sheet
+  // (Expenses tab, hidden column Z). See IncomeEntry.sheetRowKey for details.
+  sheetRowKey String?
   createdAt   DateTime @default(now())
+
+  @@index([sheetRowKey])
+}
+
+// Singleton-ish key/value store for small pieces of cross-app config that
+// previously lived in the Google Sheet SETTINGS tab (e.g. the invoice counter).
+model Setting {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
 }
 
 model TaskTemplate {
@@ -252,8 +286,44 @@ model TaskTemplate {
   description  String
   defaultPrice Float
   usageCount   Int      @default(1)
+  // Free-text device the task targets (e.g. "Laptop", "Phone", "Email account").
+  // Open vocabulary - any string the operator types or the AI emits is accepted.
+  device       String?
+  // Free-text action describing what was done (e.g. "Setup", "Repair", "Recovery").
+  // Same open vocabulary as device. Combined with device to compose the
+  // line-item description: "<device> <action lowercased>".
+  action       String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  // Calculator filters by device/action, so index both for fast lookups.
+  @@index([device])
+  @@index([action])
+}
+
+// Customer-facing promotional discount that applies during a date window.
+// At any time, at most one Promo is "currently active" (isActive AND startAt
+// <= now < endAt); when multiple overlap the most recently created wins.
+//
+// Exactly one of `flatHourlyRate` / `percentDiscount` must be set:
+//   - flatHourlyRate: replaces the labor $/hr while active (e.g. 50 = $50/hr).
+//   - percentDiscount: 0..1, multiplied against the labor subtotal.
+// The active promo is applied to labor only (tasks + top-level Time charge);
+// parts and Travel are never discounted.
+model Promo {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  title           String
+  description     String?
+  startAt         DateTime
+  endAt           DateTime
+  flatHourlyRate  Float?
+  percentDiscount Float?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // getActivePromo() filters by these three; covers most lookups.
+  @@index([isActive, startAt, endAt])
 }
 
 model Subscription {

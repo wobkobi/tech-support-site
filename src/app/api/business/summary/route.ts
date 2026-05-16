@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
+import { aggregateByFinancialYear } from "@/features/business/lib/financial-year";
 
 /**
- * GET /api/business/summary - Returns aggregated income, expense, profit, and tax reserve stats.
+ * GET /api/business/summary - Returns aggregated income, expense, profit, and tax reserve stats,
+ * plus per-NZ-financial-year breakdowns.
  * @param request - Incoming Next.js request
- * @returns JSON with summary object
+ * @returns JSON with summary object and financialYears array (most recent first)
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!isAdminRequest(request)) {
@@ -33,6 +35,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     .filter((e) => e.date >= monthStart && e.date < monthEnd)
     .reduce((s, e) => s + e.amountExcl, 0);
 
+  const fyTotals = aggregateByFinancialYear(incomeEntries, expenseEntries, now);
+
   return NextResponse.json({
     ok: true,
     summary: {
@@ -46,5 +50,19 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       incomeCount: incomeEntries.length,
       expenseCount: expenseEntries.length,
     },
+    financialYears: fyTotals.map((row) => ({
+      label: row.fy.label,
+      start: row.fy.start.toISOString(),
+      end: row.fy.end.toISOString(),
+      current: row.fy.current,
+      partial: row.fy.partial,
+      income: row.income,
+      expensesExcl: row.expensesExcl,
+      gstClaimable: row.gstClaimable,
+      profit: row.profit,
+      taxReserve: row.taxReserve,
+      incomeCount: row.incomeCount,
+      expenseCount: row.expenseCount,
+    })),
   });
 }

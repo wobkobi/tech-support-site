@@ -21,7 +21,13 @@ export function ReviewScrollHandler(): null {
     function flashTarget(attempt = 0): void {
       const rawHash = window.location.hash;
       const matches = rawHash.match(/review-[a-zA-Z0-9_-]+/g);
-      if (!matches || matches.length === 0) return;
+      // No hash target: undo any stale scroll-restoration and stay at the top.
+      // Without this, clicking "Reviews" in the navbar after previously
+      // targeting a review would scroll back to the old anchor.
+      if (!matches || matches.length === 0) {
+        window.scrollTo({ top: 0, behavior: "instant" });
+        return;
+      }
       const id = matches[matches.length - 1];
 
       if (matches.length > 1 || rawHash !== `#${id}`) {

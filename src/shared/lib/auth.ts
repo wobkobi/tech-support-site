@@ -43,19 +43,33 @@ export function isAdminRequest(req: NextRequest): boolean {
 }
 
 /**
+ * Validates a Bearer token from an Authorization header against CRON_SECRET
+ * using constant-time comparison.
+ * @param authHeader - Raw Authorization header value (e.g. "Bearer xyz") or null.
+ * @returns True if the token matches CRON_SECRET.
+ */
+function isValidCronBearer(authHeader: string | null): boolean {
+  const secret = process.env.CRON_SECRET;
+  if (!secret || !authHeader) return false;
+  const prefix = "Bearer ";
+  if (!authHeader.startsWith(prefix)) return false;
+  const token = authHeader.slice(prefix.length);
+  try {
+    const a = Buffer.from(token);
+    const b = Buffer.from(secret);
+    if (a.length !== b.length) return false;
+    return timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Validates cron authorization from Vercel Cron or secret token.
  * @param request - The incoming request to verify.
  * @returns True if authorized, false otherwise.
  */
 export function isCronAuthorized(request: NextRequest): boolean {
-  const authHeader = request.headers.get("authorization");
-  const cronSecret = process.env.CRON_SECRET;
-
-  // If no secret is configured, only allow from Vercel Cron
-  if (!cronSecret) {
-    return request.headers.has("x-vercel-cron");
-  }
-
-  // Check both Vercel Cron header and Bearer token
-  return request.headers.has("x-vercel-cron") || authHeader === `Bearer ${cronSecret}`;
+  if (request.headers.has("x-vercel-cron")) return true;
+  return isValidCronBearer(request.headers.get("authorization"));
 }

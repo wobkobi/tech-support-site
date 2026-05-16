@@ -8,7 +8,8 @@
 import { useState, useRef, useEffect } from "react";
 import { SOFT_CARD } from "@/shared/components/PageLayout";
 import { cn } from "@/shared/lib/cn";
-import { type ReviewRow, formatDate } from "./review-types";
+import { type ReviewRow } from "./review-types";
+import { formatDateShort } from "@/shared/lib/date-format";
 import { formatReviewerName } from "@/features/reviews/lib/formatting";
 import type React from "react";
 
@@ -78,8 +79,8 @@ export function ReviewCard({
     try {
       const res = await fetch(`/api/admin/reviews/${row.id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, token }),
+        headers: { "Content-Type": "application/json", "X-Admin-Secret": token },
+        body: JSON.stringify({ action }),
       });
       if (!res.ok) throw new Error("Request failed");
       if (action === "approve") onApprove?.();
@@ -99,8 +100,9 @@ export function ReviewCard({
     setLoading("delete");
     setError(null);
     try {
-      const res = await fetch(`/api/admin/reviews/${row.id}?token=${encodeURIComponent(token)}`, {
+      const res = await fetch(`/api/admin/reviews/${row.id}`, {
         method: "DELETE",
+        headers: { "X-Admin-Secret": token },
       });
       if (!res.ok) throw new Error("Request failed");
       onDelete();
@@ -126,7 +128,7 @@ export function ReviewCard({
           </span>
         )}
         <span className={cn("ml-auto shrink-0 text-xs text-slate-400")}>
-          {formatDate(row.createdAt)}
+          {formatDateShort(row.createdAt)}
         </span>
       </div>
 

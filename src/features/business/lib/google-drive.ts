@@ -9,7 +9,7 @@ const folderCache = new Map<string, string>();
  * Creates an authenticated Google Drive API v3 client.
  * @returns Drive v3 API client instance
  */
-function getDriveClient(): ReturnType<typeof google.drive> {
+export function getDriveClient(): ReturnType<typeof google.drive> {
   return google.drive({ version: "v3", auth: getOAuth2Client() });
 }
 
@@ -128,6 +128,53 @@ export async function searchAllInvoicePdfs(): Promise<
     fileId: f.id!,
     webUrl: f.webViewLink!,
   }));
+}
+
+/**
+ * Lists every Google Sheets spreadsheet inside a Drive folder, recursing into
+ * any subfolders so per-year subfolder structures (e.g. `Business/2025-26/...`)
+ * are walked end-to-end. Sheet display names are prefixed with the folder
+ * breadcrumb so they're identifiable in the per-sheet import breakdown.
+ * @param folderId - The Drive folder ID to scan.
+ * @returns Array of `{ name, fileId }` for every spreadsheet found, sorted by name.
+ */
+export async function listSpreadsheetsInFolder(
+  folderId: string,
+): Promise<{ name: string; fileId: string }[]> {
+  const drive = getDriveClient();
+  const results: { name: string; fileId: string }[] = [];
+
+  /**
+   * Recursive walker.
+   * @param currentFolderId - Folder being scanned.
+   * @param breadcrumbs - Folder names walked so far, for display.
+   */
+  async function walk(currentFolderId: string, breadcrumbs: string[]): Promise<void> {
+    let pageToken: string | undefined;
+    do {
+      const res = await drive.files.list({
+        q: `'${currentFolderId}' in parents and trashed=false and (mimeType='application/vnd.google-apps.spreadsheet' or mimeType='application/vnd.google-apps.folder')`,
+        fields: "nextPageToken, files(id,name,mimeType)",
+        pageSize: 100,
+        ...(pageToken ? { pageToken } : {}),
+      });
+      for (const f of res.data.files ?? []) {
+        if (!f.id || !f.name) continue;
+        if (f.mimeType === "application/vnd.google-apps.spreadsheet") {
+          const displayName =
+            breadcrumbs.length > 0 ? `${breadcrumbs.join(" / ")} / ${f.name}` : f.name;
+          results.push({ name: displayName, fileId: f.id });
+        } else if (f.mimeType === "application/vnd.google-apps.folder") {
+          await walk(f.id, [...breadcrumbs, f.name]);
+        }
+      }
+      pageToken = res.data.nextPageToken ?? undefined;
+    } while (pageToken);
+  }
+
+  await walk(folderId, []);
+  results.sort((a, b) => a.name.localeCompare(b.name, "en", { sensitivity: "base" }));
+  return results;
 }
 
 /**

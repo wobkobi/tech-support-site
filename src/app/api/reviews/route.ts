@@ -10,6 +10,7 @@ import { prisma as prismaClient } from "@/shared/lib/prisma";
 import { sendOwnerReviewNotification } from "@/features/reviews/lib/email";
 import { normalizePhone } from "@/shared/lib/normalize-phone";
 import { reviewTextError } from "@/features/reviews/lib/validation";
+import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 
 /**
  * Factory for reviews API handlers, allows dependency injection of Prisma client.
@@ -60,6 +61,9 @@ export const GET = createReviewsHandlers().GET;
  * @returns JSON response with ok flag and review id on success (201), or an error message on failure.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  const limited = rateLimitOrReject(request, "reviews-post", 5, 60_000);
+  if (limited) return limited;
+
   const prisma = prismaClient;
   try {
     const body = (await request.json()) as {

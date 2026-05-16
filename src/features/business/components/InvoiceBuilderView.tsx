@@ -2,24 +2,19 @@
 
 import { useState, useEffect, useCallback } from "react";
 import type React from "react";
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/shared/lib/cn";
-import {
-  calcInvoiceTotals,
-  formatNZD,
-  formatNZDate,
-  todayISO,
-} from "@/features/business/lib/business";
+import { calcInvoiceTotals, formatNZD, todayISO } from "@/features/business/lib/business";
+import { formatDateShort } from "@/shared/lib/date-format";
 import { ContactPickerModal } from "@/features/business/components/ContactPickerModal";
 import type { LineItem, GoogleContact } from "@/features/business/types/business";
-
-const BUSINESS_DETAILS = {
-  name: "Harrison Raynes",
-  company: "To The Point",
-  email: "harrison@tothepoint.co.nz",
-  phone: "0212971237",
-  bank: "12-3077-0191830-00",
-};
+import {
+  BUSINESS,
+  BUSINESS_BANK_ACCOUNT,
+  BUSINESS_GST_NUMBER,
+  BUSINESS_PAYMENT_TERMS_DAYS,
+} from "@/shared/lib/business-identity";
 
 /**
  * Returns a date string (YYYY-MM-DD) for the date that is n days from today.
@@ -40,8 +35,11 @@ interface FormState {
   clientEmail: string;
   lineItems: LineItem[];
   gst: boolean;
-  paymentTerms: string;
   notes: string;
+  /** Promo title shown on the invoice; null when no promo. */
+  promoTitle: string | null;
+  /** Promo discount in dollars, applied before GST. */
+  promoDiscount: number;
 }
 
 /**
@@ -69,6 +67,9 @@ export function InvoiceBuilderView({ token }: { token: string }): React.ReactEle
     const rawItems = params.get("lineItems");
     const gst = params.get("gst") === "true";
     const notes = params.get("notes") ?? "";
+    const promoTitle = params.get("promoTitle");
+    const promoDiscountRaw = params.get("promoDiscount");
+    const promoDiscount = promoDiscountRaw ? Number.parseFloat(promoDiscountRaw) : 0;
     let lineItems: LineItem[] = [emptyLine()];
     try {
       if (rawItems) lineItems = JSON.parse(rawItems) as LineItem[];
@@ -81,8 +82,9 @@ export function InvoiceBuilderView({ token }: { token: string }): React.ReactEle
       clientEmail,
       lineItems: clientName || clientEmail || rawItems ? lineItems : [emptyLine()],
       gst,
-      paymentTerms: "7 days",
       notes,
+      promoTitle: promoTitle && promoDiscount > 0 ? promoTitle : null,
+      promoDiscount: promoDiscount > 0 ? promoDiscount : 0,
     };
   });
   const [saving, setSaving] = useState(false);
@@ -118,7 +120,7 @@ export function InvoiceBuilderView({ token }: { token: string }): React.ReactEle
     });
   }, []);
 
-  const totals = calcInvoiceTotals(form.lineItems, form.gst);
+  const totals = calcInvoiceTotals(form.lineItems, form.gst, form.promoDiscount);
 
   /**
    * Submits the invoice form to the API and redirects to the new invoice detail page on success.
@@ -138,6 +140,8 @@ export function InvoiceBuilderView({ token }: { token: string }): React.ReactEle
         lineItems: form.lineItems,
         gst: form.gst,
         notes: form.notes || null,
+        promoTitle: form.promoTitle,
+        promoDiscount: form.promoDiscount > 0 ? form.promoDiscount : null,
       }),
     });
     const d = await res.json();
@@ -185,7 +189,9 @@ export function InvoiceBuilderView({ token }: { token: string }): React.ReactEle
         </div>
       )}
 
-      <div className={cn("grid gap-8 lg:grid-cols-2 print:block")}>
+      <div
+        className={cn("grid gap-8 lg:grid-cols-[minmax(360px,1fr)_minmax(0,1.3fr)] print:block")}
+      >
         {/* LEFT - Form */}
         <div className={cn("space-y-5 print:hidden")}>
           <div
@@ -227,19 +233,6 @@ export function InvoiceBuilderView({ token }: { token: string }): React.ReactEle
                   type="date"
                   value={form.dueDate}
                   onChange={(e) => setForm((p) => ({ ...p, dueDate: e.target.value }))}
-                  className={cn(
-                    "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
-                  )}
-                />
-              </div>
-              <div>
-                <label className={cn("mb-1 block text-xs font-medium text-slate-600")}>
-                  Payment terms
-                </label>
-                <input
-                  type="text"
-                  value={form.paymentTerms}
-                  onChange={(e) => setForm((p) => ({ ...p, paymentTerms: e.target.value }))}
                   className={cn(
                     "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
                   )}
@@ -397,103 +390,179 @@ export function InvoiceBuilderView({ token }: { token: string }): React.ReactEle
           </div>
         </div>
 
-        {/* RIGHT - Live preview */}
+        {/* RIGHT - Live preview (mirrors invoice-pdf.ts so the operator sees
+            the same layout they'll get when they download / email the PDF).
+            Locked to A4 portrait proportions on lg+ so the preview renders as
+            a recognisable sheet of paper rather than a squashed card. Long
+            line-item lists scroll inside the sheet. */}
         <div
           className={cn(
-            "rounded-xl border border-slate-200 bg-white p-6 shadow-sm print:rounded-none print:border-0 print:shadow-none",
+            "flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm",
+            "lg:aspect-210/297 lg:sticky lg:top-4 lg:overflow-y-auto",
+            "print:aspect-auto print:rounded-none print:border-0 print:shadow-none",
           )}
         >
-          <div className={cn("mb-6 flex items-start justify-between")}>
-            <div>
-              <p className={cn("text-lg font-bold text-slate-800")}>{BUSINESS_DETAILS.company}</p>
-              <p className={cn("text-sm text-slate-500")}>{BUSINESS_DETAILS.name}</p>
-              <p className={cn("text-sm text-slate-500")}>{BUSINESS_DETAILS.email}</p>
-              <p className={cn("text-sm text-slate-500")}>{BUSINESS_DETAILS.phone}</p>
-            </div>
-            <div className={cn("text-right")}>
-              <p className={cn("text-russian-violet text-xl font-extrabold")}>INVOICE</p>
-              <p className={cn("font-mono text-sm font-semibold text-slate-700")}>
-                {form.number || "TTP-XXXX-0000"}
-              </p>
-            </div>
+          {/* Branded header band, capped at ~65% of the content width to
+              match the PDF letterhead (HEADER_WIDTH_RATIO in invoice-pdf.ts).
+              Left-aligned so it reads as a header rather than a banner. */}
+          <div className={cn("shrink-0 px-10 pt-10")}>
+            <Image
+              src="/assets/document-header-800x270.png"
+              alt="To The Point"
+              width={800}
+              height={270}
+              className={cn("h-auto w-2/3")}
+              priority
+            />
           </div>
 
-          <div className={cn("mb-6 grid grid-cols-2 gap-4 text-sm")}>
-            <div>
-              <p className={cn("text-xs font-semibold uppercase tracking-wide text-slate-400")}>
-                Bill to
-              </p>
-              <p className={cn("font-medium text-slate-700")}>{form.clientName || "Client name"}</p>
-              <p className={cn("text-slate-500")}>{form.clientEmail || "client@email.com"}</p>
-            </div>
-            <div className={cn("text-right")}>
-              <p className={cn("text-xs text-slate-400")}>
-                Issued: {form.issueDate ? formatNZDate(form.issueDate) : "-"}
-              </p>
-              <p className={cn("text-xs text-slate-400")}>
-                Due: {form.dueDate ? formatNZDate(form.dueDate) : "-"}
-              </p>
-              <p className={cn("text-xs text-slate-400")}>Terms: {form.paymentTerms}</p>
-            </div>
-          </div>
-
-          <table className={cn("mb-4 w-full text-sm")}>
-            <thead>
-              <tr className={cn("border-b border-slate-200")}>
-                <th className={cn("pb-2 text-left text-xs font-semibold text-slate-400")}>
-                  Description
-                </th>
-                <th className={cn("pb-2 text-right text-xs font-semibold text-slate-400")}>Qty</th>
-                <th className={cn("pb-2 text-right text-xs font-semibold text-slate-400")}>
-                  Price
-                </th>
-                <th className={cn("pb-2 text-right text-xs font-semibold text-slate-400")}>
-                  Total
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {form.lineItems.map((item, idx) => (
-                <tr key={idx} className={cn("border-b border-slate-100")}>
-                  <td className={cn("py-2 text-slate-700")}>{item.description || "-"}</td>
-                  <td className={cn("py-2 text-right text-slate-500")}>{item.qty}</td>
-                  <td className={cn("py-2 text-right text-slate-500")}>
-                    {formatNZD(item.unitPrice)}
-                  </td>
-                  <td className={cn("py-2 text-right font-medium text-slate-700")}>
-                    {formatNZD(item.lineTotal)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          <div className={cn("max-w-50 ml-auto space-y-1 text-sm")}>
-            <div className={cn("flex justify-between")}>
-              <span className={cn("text-slate-500")}>Subtotal</span>
-              <span className={cn("font-medium text-slate-700")}>{formatNZD(totals.subtotal)}</span>
-            </div>
-            {form.gst && (
-              <div className={cn("flex justify-between")}>
-                <span className={cn("text-slate-500")}>GST (15%)</span>
-                <span className={cn("font-medium text-slate-700")}>
-                  {formatNZD(totals.gstAmount)}
-                </span>
+          {/* Body: flex column so the footer stays pinned to the bottom of the
+              A4 sheet even when line items don't fill the page. */}
+          <div className={cn("flex flex-1 flex-col px-10 pb-10 pt-4")}>
+            {/* Bill to (left) + INVOICE title / number / status / GST# (right) */}
+            <div className={cn("mb-6 grid grid-cols-2 gap-4")}>
+              <div>
+                <p
+                  className={cn(
+                    "mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-300",
+                  )}
+                >
+                  Bill to
+                </p>
+                <p className={cn("text-sm font-bold text-slate-700")}>
+                  {form.clientName || "Client name"}
+                </p>
+                <p className={cn("text-xs text-slate-500")}>
+                  {form.clientEmail || "client@email.com"}
+                </p>
+                <div className={cn("mt-3 flex gap-6 text-[11px] text-slate-500")}>
+                  <p>
+                    <span className={cn("text-slate-400")}>Issued:</span>{" "}
+                    <span className={cn("font-bold text-slate-700")}>
+                      {form.issueDate ? formatDateShort(form.issueDate) : "-"}
+                    </span>
+                  </p>
+                  <p>
+                    <span className={cn("text-slate-400")}>Due:</span>{" "}
+                    <span className={cn("font-bold text-slate-700")}>
+                      {form.dueDate ? formatDateShort(form.dueDate) : "-"}
+                    </span>
+                  </p>
+                </div>
               </div>
-            )}
-            <div className={cn("flex justify-between border-t border-slate-200 pt-1")}>
-              <span className={cn("font-semibold text-slate-800")}>Total</span>
-              <span className={cn("text-russian-violet font-extrabold")}>
-                {formatNZD(totals.total)}
-              </span>
+              <div className={cn("text-right")}>
+                <p className={cn("text-russian-violet text-2xl font-extrabold leading-none")}>
+                  {BUSINESS_GST_NUMBER ? "TAX INVOICE" : "INVOICE"}
+                </p>
+                <p className={cn("mt-2 font-mono text-sm text-slate-700")}>
+                  {form.number || "TTP-XXXX-0000"}
+                </p>
+                <p className={cn("mt-1 text-[11px] font-bold uppercase text-slate-400")}>DRAFT</p>
+                {BUSINESS_GST_NUMBER && (
+                  <p className={cn("mt-1 text-[11px] text-slate-500")}>
+                    GST# {BUSINESS_GST_NUMBER}
+                  </p>
+                )}
+              </div>
             </div>
-          </div>
 
-          <div className={cn("mt-6 border-t border-slate-100 pt-4 text-xs text-slate-500")}>
-            <p className={cn("mb-1 font-semibold text-slate-600")}>Bank transfer</p>
-            <p>Bank: {BUSINESS_DETAILS.bank}</p>
-            <p>Reference: {form.number || "Invoice number"}</p>
-            {form.notes && <p className={cn("mt-3 italic")}>{form.notes}</p>}
+            {/* Separator above table - matches the PDF's thin grey line. */}
+            <div className={cn("mb-0 h-px bg-slate-300")} />
+
+            {/* Branded table: russian-violet header + alternating row backgrounds. */}
+            <table className={cn("mb-0 w-full text-xs")}>
+              <thead>
+                <tr className={cn("bg-russian-violet text-white")}>
+                  <th className={cn("px-2 py-2 text-left font-bold")}>Description</th>
+                  <th className={cn("px-2 py-2 text-right font-bold")}>Qty</th>
+                  <th className={cn("px-2 py-2 text-right font-bold")}>Unit price</th>
+                  <th className={cn("px-2 py-2 text-right font-bold")}>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {form.lineItems.map((item, idx) => (
+                  <tr key={idx} className={cn(idx % 2 === 1 ? "bg-slate-50" : "bg-white")}>
+                    <td className={cn("px-2 py-2 text-slate-700")}>
+                      {item.description || (
+                        <span className={cn("italic text-slate-300")}>(line description)</span>
+                      )}
+                    </td>
+                    <td className={cn("px-2 py-2 text-right text-slate-700")}>{item.qty}</td>
+                    <td className={cn("px-2 py-2 text-right text-slate-700")}>
+                      {formatNZD(item.unitPrice)}
+                    </td>
+                    <td className={cn("px-2 py-2 text-right font-bold text-slate-700")}>
+                      {formatNZD(item.lineTotal)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            <div className={cn("mb-4 h-px bg-slate-300")} />
+
+            {/* Totals (right-aligned, matches PDF). */}
+            <div className={cn("mb-6 ml-auto w-1/2 space-y-1 text-xs")}>
+              <div className={cn("flex justify-between")}>
+                <span className={cn("text-slate-500")}>Subtotal</span>
+                <span className={cn("text-slate-700")}>{formatNZD(totals.subtotal)}</span>
+              </div>
+              {form.promoDiscount > 0 && (
+                <div className={cn("flex justify-between text-amber-700")}>
+                  <span>Promo{form.promoTitle ? `: ${form.promoTitle}` : ""}</span>
+                  <span>-{formatNZD(form.promoDiscount)}</span>
+                </div>
+              )}
+              {form.gst && (
+                <div className={cn("flex justify-between")}>
+                  <span className={cn("text-slate-500")}>GST (15%)</span>
+                  <span className={cn("text-slate-700")}>{formatNZD(totals.gstAmount)}</span>
+                </div>
+              )}
+              <div className={cn("h-px bg-slate-300")} />
+              <div
+                className={cn("text-russian-violet flex justify-between text-sm font-extrabold")}
+              >
+                <span>Total</span>
+                <span>{formatNZD(totals.total)}</span>
+              </div>
+            </div>
+
+            <div className={cn("mb-3 h-px bg-slate-300")} />
+
+            {/* Bank transfer section with payee, account, reference, payment terms. */}
+            <div className={cn("mb-4 space-y-1 text-[11px]")}>
+              <p className={cn("font-bold text-slate-700")}>Bank transfer</p>
+              <p className={cn("text-slate-500")}>Payee: {BUSINESS.name}</p>
+              <p className={cn("text-slate-500")}>Account: {BUSINESS_BANK_ACCOUNT}</p>
+              <p className={cn("text-slate-500")}>Reference: {form.number || "[invoice number]"}</p>
+              <p className={cn("text-slate-500")}>
+                Due within {BUSINESS_PAYMENT_TERMS_DAYS} days of issue
+                {form.dueDate ? ` (by ${formatDateShort(form.dueDate)}).` : "."}
+              </p>
+            </div>
+
+            {form.notes && <p className={cn("mb-6 text-[11px] text-slate-500")}>{form.notes}</p>}
+
+            {/* Footer: logo (left) + contact strip (right). mt-auto pushes
+                this to the bottom of the A4 sheet on lg+ where the parent has
+                a fixed aspect ratio. */}
+            <div className={cn("mt-auto flex items-end justify-between gap-4 pt-8")}>
+              <Image
+                src="/source/profile.svg"
+                alt="To The Point logo"
+                width={70}
+                height={70}
+                className={cn("h-12 w-auto")}
+              />
+              <div className={cn("text-right text-[11px]")}>
+                <p className={cn("text-russian-violet text-sm font-bold")}>{BUSINESS.company}</p>
+                <p className={cn("text-slate-500")}>
+                  {BUSINESS.phone} &middot; {BUSINESS.email} &middot; {BUSINESS.website}
+                </p>
+                <p className={cn("text-slate-300")}>Thanks for your business.</p>
+              </div>
+            </div>
           </div>
         </div>
       </div>

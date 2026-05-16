@@ -40,27 +40,52 @@ interface PageSpec {
 
 /* --------------------------------------------------------------- constants */
 
-const PAGES: PageSpec[] = [
-  { path: "/", name: "Home" },
-  { path: "/booking", name: "Booking" },
-  {
-    path: "/booking/cancel",
+/**
+ * Per-route overrides for auto-discovered pages. Keyed by the discovered URL
+ * path. Anything not listed uses the auto-generated name and no ignores.
+ */
+const PAGE_OVERRIDES: Record<string, { name?: string; ignoreErrors?: string[] }> = {
+  "/": { name: "Home" },
+  "/booking/cancel": {
     name: "Booking Cancel (no token)",
-    // Client fires cancel API immediately - no-token 400 is expected
+    // Client fires cancel API immediately - no-token 400 is expected.
     ignoreErrors: ["Missing cancel token", "Could not cancel"],
   },
-  { path: "/booking/success", name: "Booking Success (no token)" },
-  { path: "/reviews", name: "Reviews" },
-  {
-    path: "/review",
-    name: "Review (no token)",
+  "/booking/success": { name: "Booking Success (no token)" },
+  "/review": { name: "Review (no token)" },
+  "/poster": { name: "Poster (marketing print)" },
+  "/admin": { name: "Admin Dashboard" },
+  "/admin/business": { name: "Admin Business Overview" },
+  "/admin/business/invoices/new": {
+    name: "Admin New Invoice",
+    // Client immediately fetches invoice counter; sheet API may 4xx locally.
+    ignoreErrors: ["invoice-counter"],
   },
-  { path: "/services", name: "Services" },
-  { path: "/about", name: "About" },
-  { path: "/contact", name: "Contact" },
-  { path: "/faq", name: "FAQ" },
-  { path: "/pricing", name: "Pricing" },
-];
+  "/admin/business/calculator": {
+    name: "Admin Calculator",
+    // Maps API key restrictions can 4xx locally; legacy widget also logs a
+    // deprecation warning that's expected.
+    ignoreErrors: ["maps.googleapis.com", "google.maps.places.Autocomplete"],
+  },
+};
+
+/**
+ * Discovered URL paths to skip — internal-only surfaces, or routes that crash
+ * without sample data the test can't fabricate. Dynamic routes (`[id]`) and
+ * collisions are already filtered automatically; this is for everything else.
+ */
+const SKIP_PATHS: ReadonlySet<string> = new Set([]);
+
+/**
+ * Path prefixes considered admin (token gets appended at request time).
+ */
+const ADMIN_PREFIXES: ReadonlyArray<string> = ["/admin"];
+
+/** App router page files - first match wins per directory. */
+const PAGE_FILE_NAMES: ReadonlyArray<string> = ["page.tsx", "page.ts", "page.jsx", "page.js"];
+
+/** Root of the App Router tree. */
+const APP_DIR = path.join("src", "app");
 
 /** Warn (but don't fail) when TTFB exceeds this on a local production server. */
 const TTFB_WARN_MS = 1_500;
@@ -75,6 +100,83 @@ const TTFB_FAIL_MS = 10_000;
 const IGNORE_404_URLS = ["/_vercel/insights/", "/_vercel/speed-insights/"];
 
 /* ---------------------------------------------------------------- helpers */
+
+/**
+ * Walks the App Router tree and turns every `page.{tsx,ts,jsx,js}` into a route.
+ * - Route groups `(...)` are stripped from the URL.
+ * - Dynamic segments `[id]`, `[...slug]` are skipped (no sample data to test).
+ * - Paths in `SKIP_PATHS` are filtered out.
+ * - Names default to a Title-Cased version of the path; `PAGE_OVERRIDES`
+ *   supplies friendlier names + per-page ignoreErrors.
+ * @returns Discovered routes split into public and admin.
+ */
+function discoverPages(): { publicPages: PageSpec[]; adminPages: PageSpec[] } {
+  const publicPages: PageSpec[] = [];
+  const adminPages: PageSpec[] = [];
+  const seen = new Set<string>();
+
+  /**
+   * Recursive helper that records the route for any directory with a page file.
+   * @param dir - Absolute filesystem path being inspected.
+   * @param segments - URL segments accumulated from the App Router root.
+   */
+  const walk = (dir: string, segments: string[]): void => {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+
+    // If this directory has a page file, record the route.
+    const hasPage = entries.some((e) => e.isFile() && PAGE_FILE_NAMES.includes(e.name));
+    if (hasPage) {
+      // Strip route groups and skip dynamic segments.
+      const cleanSegments = segments.filter((s) => !s.startsWith("("));
+      const hasDynamic = cleanSegments.some((s) => s.includes("[") || s.includes("]"));
+      if (!hasDynamic) {
+        const route = "/" + cleanSegments.join("/");
+        const normalised = route === "/" ? "/" : route.replace(/\/$/, "");
+        if (!SKIP_PATHS.has(normalised) && !seen.has(normalised)) {
+          seen.add(normalised);
+          const override = PAGE_OVERRIDES[normalised] ?? {};
+          const spec: PageSpec = {
+            path: normalised,
+            name: override.name ?? routeToName(normalised),
+            ignoreErrors: override.ignoreErrors,
+          };
+          if (ADMIN_PREFIXES.some((p) => normalised === p || normalised.startsWith(`${p}/`))) {
+            adminPages.push(spec);
+          } else {
+            publicPages.push(spec);
+          }
+        }
+      }
+    }
+
+    // Recurse into subdirectories.
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      if (entry.name.startsWith("_")) continue; // Next.js private folders.
+      walk(path.join(dir, entry.name), [...segments, entry.name]);
+    }
+  };
+
+  walk(APP_DIR, []);
+
+  publicPages.sort((a, b) => a.path.localeCompare(b.path));
+  adminPages.sort((a, b) => a.path.localeCompare(b.path));
+  return { publicPages, adminPages };
+}
+
+/**
+ * Title-cases the final segment of a route for the default display name.
+ * @param route - Discovered URL path (e.g. "/admin/business/calculator").
+ * @returns Friendly name (e.g. "Admin Business Calculator", or "Home" for "/").
+ */
+function routeToName(route: string): string {
+  if (route === "/") return "Home";
+  return route
+    .replace(/^\//, "")
+    .split("/")
+    .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+    .join(" ");
+}
 
 /**
  * Parses `--flag` and `--flag=value` CLI arguments.
@@ -328,16 +430,43 @@ function printTable(results: PageResult[]): void {
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
     });
 
-    console.log(`Checking ${PAGES.length} pages…\n`);
+    // Auto-discover every page.tsx under src/app; route groups stripped,
+    // dynamic segments skipped, admin routes split out. New pages get tested
+    // automatically — no manual list to maintain.
+    const { publicPages, adminPages } = discoverPages();
+
+    // Admin pages are only included when ADMIN_SECRET is set; the token gets
+    // appended to each path. Without the secret every admin page would 404
+    // via requireAdminToken, so we skip them gracefully.
+    const adminToken = process.env.ADMIN_SECRET;
+    const adminPagesWithToken: PageSpec[] = adminToken
+      ? adminPages.map((spec) => ({
+          ...spec,
+          path: `${spec.path}?token=${encodeURIComponent(adminToken)}`,
+        }))
+      : [];
+    if (!adminToken && adminPages.length > 0) {
+      console.log(`  (ADMIN_SECRET not set - skipping ${adminPages.length} admin pages)\n`);
+    }
+
+    const allPages = [...publicPages, ...adminPagesWithToken];
+    console.log(`Checking ${allPages.length} pages…\n`);
 
     const results: PageResult[] = [];
 
-    for (const spec of PAGES) {
-      process.stdout.write(`  Loading ${spec.path}…`);
+    for (const spec of allPages) {
+      // Strip token query for the loading + result line - the admin paths
+      // include the secret, which is both noisy and a leak risk in CI logs.
+      const displayPath = spec.path.replace(/\?token=[^&]*/, "");
+      process.stdout.write(`  Loading ${displayPath}…`);
       const result = await checkPage(browser, baseUrl, spec);
       results.push(result);
       const icon = result.status === "pass" ? "✓" : "✗";
-      process.stdout.write(`\r  ${icon} ${spec.path.padEnd(40)} ${result.ttfbMs ?? "-"}ms TTFB\n`);
+      // \x1b[2K clears the entire line so the new (shorter) line doesn't leave
+      // fragments of the longer "Loading..." message behind.
+      process.stdout.write(
+        `\r\x1b[2K  ${icon} ${displayPath.padEnd(40)} ${result.ttfbMs ?? "-"}ms TTFB\n`,
+      );
     }
 
     printTable(results);

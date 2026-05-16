@@ -6,33 +6,33 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
-import { isValidAdminToken } from "@/shared/lib/auth";
+import { isAdminRequest } from "@/shared/lib/auth";
 import { toE164NZ, isValidPhone } from "@/shared/lib/normalize-phone";
 
 /**
  * POST /api/admin/review-requests
  * Creates a ReviewRequest for a legacy review (using its existing customerRef as reviewToken).
  * If a ReviewRequest with that token already exists, returns its id.
+ * Authenticated via X-Admin-Secret header.
  * @param request - The incoming request.
  * @returns JSON response with the ReviewRequest id, or an error.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  if (!isAdminRequest(request)) {
+    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const body = (await request.json()) as {
-      token?: string;
       customerRef?: string;
       reviewId?: string;
       name?: string;
       email?: string;
       phone?: string;
     };
-    const { token, reviewId, name, email, phone } = body;
+    const { reviewId, name, email, phone } = body;
     // Treat empty-string customerRef the same as absent (old MongoDB docs may have "" stored)
     const customerRef = body.customerRef || undefined;
-
-    if (!isValidAdminToken(token ?? null)) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-    }
 
     if (!name?.trim()) {
       return NextResponse.json({ ok: false, error: "Name is required." }, { status: 400 });

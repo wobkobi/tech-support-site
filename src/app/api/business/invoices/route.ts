@@ -56,14 +56,38 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   const body = await request.json();
-  const { clientName, clientEmail, issueDate, dueDate, lineItems, gst, notes, contactId } = body;
+  const {
+    clientName,
+    clientEmail,
+    issueDate,
+    dueDate,
+    lineItems,
+    gst,
+    notes,
+    contactId,
+    // Optional promo snapshot from the calculator (persisted for history).
+    promoTitle,
+    promoDiscount,
+  } = body as {
+    clientName?: string;
+    clientEmail?: string;
+    issueDate?: string;
+    dueDate?: string;
+    lineItems?: { qty: number; unitPrice: number; description: string; lineTotal: number }[];
+    gst?: boolean;
+    notes?: string | null;
+    contactId?: string | null;
+    promoTitle?: string | null;
+    promoDiscount?: number | null;
+  };
 
   if (!clientName || !clientEmail || !issueDate || !dueDate || !Array.isArray(lineItems)) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
   const { number, sheetNextCount, sheetSyncWarning } = await getNextInvoiceNumber();
-  const { subtotal, gstAmount, total } = calcInvoiceTotals(lineItems, gst ?? false);
+  const discount = typeof promoDiscount === "number" && promoDiscount > 0 ? promoDiscount : 0;
+  const { subtotal, gstAmount, total } = calcInvoiceTotals(lineItems, gst ?? false, discount);
 
   const invoice = await prisma.invoice.create({
     data: {
@@ -77,6 +101,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       subtotal,
       gstAmount,
       total,
+      promoTitle: discount > 0 && promoTitle ? promoTitle : null,
+      promoDiscount: discount > 0 ? discount : null,
       notes: notes ?? null,
       contactId: contactId ?? null,
     },

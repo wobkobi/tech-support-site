@@ -8,6 +8,8 @@ import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
 import { DashboardQuickActions } from "@/features/admin/components/DashboardQuickActions";
 import { toE164NZ } from "@/shared/lib/normalize-phone";
 import { cn } from "@/shared/lib/cn";
+import { formatDateShort, formatDateTimeShort } from "@/shared/lib/date-format";
+import { formatNZD } from "@/features/business/lib/business";
 
 export const dynamic = "force-dynamic";
 
@@ -15,37 +17,6 @@ export const metadata: Metadata = {
   title: "Admin",
   robots: { index: false, follow: false },
 };
-
-/**
- * Formats a UTC ISO string as a short NZ local date + time.
- * @param iso - ISO 8601 date string.
- * @returns Formatted date-time string in NZ locale.
- */
-function formatNZDateTime(iso: string): string {
-  return new Intl.DateTimeFormat("en-NZ", {
-    timeZone: "Pacific/Auckland",
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  }).format(new Date(iso));
-}
-
-/**
- * Formats a UTC ISO string as a short NZ local date.
- * @param iso - ISO 8601 date string.
- * @returns Formatted date string in NZ locale.
- */
-function formatNZDateDisplay(iso: string): string {
-  return new Intl.DateTimeFormat("en-NZ", {
-    timeZone: "Pacific/Auckland",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(new Date(iso));
-}
 
 /**
  * Admin dashboard page showing stat cards and live data panels.
@@ -62,6 +33,9 @@ export default async function AdminPage({
   const t = requireAdminToken(token);
 
   const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
   const [
     pendingCount,
@@ -77,6 +51,11 @@ export default async function AdminPage({
     allReviewRequests,
     allContacts,
     bookingsWithReviewSent,
+    todaysBookings,
+    monthIncome,
+    outstandingInvoices,
+    recentInvoices,
+    latestCacheEntry,
   ] = await Promise.all([
     prisma.review.count({ where: { status: "pending" } }),
     prisma.review.count({ where: { status: "approved" } }),
@@ -125,6 +104,48 @@ export default async function AdminPage({
       where: { reviewSentAt: { not: null } },
       select: { email: true, phone: true },
     }),
+    // Today's confirmed bookings - drives the "today snapshot" bar.
+    prisma.booking.findMany({
+      where: { status: "confirmed", startAt: { gte: todayStart, lt: todayEnd } },
+      orderBy: { startAt: "asc" },
+      select: { id: true, name: true, startAt: true, endAt: true },
+    }),
+    // This-month income (server-side sum).
+    prisma.incomeEntry.aggregate({
+      where: { date: { gte: monthStart } },
+      _sum: { amount: true },
+    }),
+    // Outstanding (DRAFT or SENT). Overdue flagged separately on the card.
+    prisma.invoice.findMany({
+      where: { status: { in: ["DRAFT", "SENT"] } },
+      orderBy: { dueDate: "asc" },
+      select: {
+        id: true,
+        number: true,
+        total: true,
+        dueDate: true,
+        status: true,
+        clientName: true,
+      },
+    }),
+    // Recent invoices (any status) - feeds the activity timeline.
+    prisma.invoice.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 8,
+      select: {
+        id: true,
+        number: true,
+        clientName: true,
+        total: true,
+        status: true,
+        createdAt: true,
+      },
+    }),
+    // Newest cache row -> calendar freshness for system status.
+    prisma.calendarEventCache.findFirst({
+      orderBy: { fetchedAt: "desc" },
+      select: { fetchedAt: true },
+    }),
   ]);
 
   const sentEmails = new Set<string>([
@@ -141,7 +162,70 @@ export default async function AdminPage({
     return true;
   });
 
+  // --- Derived KPIs for the new dashboard sections ---
+  const monthRevenue = monthIncome._sum.amount ?? 0;
+  const outstandingTotal = outstandingInvoices.reduce((s, inv) => s + inv.total, 0);
+  const overdueInvoices = outstandingInvoices.filter(
+    (inv) => inv.status === "SENT" && inv.dueDate < now,
+  );
+
+  // --- Unified activity feed: merge recent events across tables and sort by time ---
+  type ActivityKind = "booking" | "review" | "contact" | "invoice";
+  interface ActivityEvent {
+    kind: ActivityKind;
+    timestamp: Date;
+    title: string;
+    detail: string;
+  }
+  const activity: ActivityEvent[] = [
+    ...upcomingBookings.map((b) => ({
+      kind: "booking" as const,
+      timestamp: b.startAt,
+      title: `Booking: ${b.name}`,
+      detail: `${formatDateTimeShort(b.startAt.toISOString())}`,
+    })),
+    ...pendingReviews.map((r) => ({
+      kind: "review" as const,
+      timestamp: r.createdAt,
+      title: `Review pending`,
+      detail: r.text.length > 60 ? r.text.slice(0, 60) + "..." : r.text,
+    })),
+    ...recentContacts.map((c) => ({
+      kind: "contact" as const,
+      timestamp: c.createdAt,
+      title: `New contact: ${c.name}`,
+      detail: c.email ?? c.phone ?? "no contact info",
+    })),
+    ...recentInvoices.map((inv) => ({
+      kind: "invoice" as const,
+      timestamp: inv.createdAt,
+      title: `Invoice ${inv.number}: ${inv.clientName}`,
+      detail: `${inv.status} - ${inv.total < 0 ? "-" : ""}$${Math.abs(inv.total).toFixed(2)}`,
+    })),
+  ]
+    .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+    .slice(0, 10);
+
+  // --- System status freshness ---
+  // Use the `now` captured at the top of this request to keep render pure.
+  const calendarLastRefreshMs = latestCacheEntry?.fetchedAt
+    ? now.getTime() - latestCacheEntry.fetchedAt.getTime()
+    : null;
+
   const stats = [
+    {
+      label: "Revenue this month",
+      value: formatNZD(monthRevenue),
+      href: `/admin/business?token=${encodeURIComponent(t)}`,
+      urgent: false,
+    },
+    {
+      label: "Outstanding",
+      value: formatNZD(outstandingTotal),
+      sub: `${outstandingInvoices.length} invoice${outstandingInvoices.length === 1 ? "" : "s"}${overdueInvoices.length > 0 ? `, ${overdueInvoices.length} overdue` : ""}`,
+      href: `/admin/business/invoices?token=${encodeURIComponent(t)}`,
+      urgent: overdueInvoices.length > 0,
+    },
     {
       label: "Pending reviews",
       value: pendingCount,
@@ -178,11 +262,47 @@ export default async function AdminPage({
       href: `/admin/contacts?token=${encodeURIComponent(t)}`,
       urgent: unsyncedCount > 0,
     },
-  ];
+  ] as { label: string; value: number | string; sub?: string; href: string; urgent: boolean }[];
 
   return (
     <AdminPageLayout token={t} current="dashboard">
       <h1 className={cn("text-russian-violet mb-6 text-2xl font-extrabold")}>Dashboard</h1>
+
+      {/* Today's snapshot - pinned at the top so the morning glance is instant. */}
+      <div
+        className={cn(
+          "border-russian-violet/20 from-russian-violet/5 bg-linear-to-r mb-6 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border to-white px-5 py-4",
+        )}
+      >
+        <p className={cn("text-russian-violet text-sm font-semibold")}>Today</p>
+        <p className={cn("text-sm text-slate-700")}>
+          <span className={cn("text-russian-violet font-bold")}>{todaysBookings.length}</span>{" "}
+          booking{todaysBookings.length === 1 ? "" : "s"}
+        </p>
+        <p className={cn("text-sm text-slate-700")}>
+          <span
+            className={cn(
+              "font-bold",
+              pendingCount > 0 ? "text-coquelicot-400" : "text-russian-violet",
+            )}
+          >
+            {pendingCount}
+          </span>{" "}
+          review{pendingCount === 1 ? "" : "s"} to approve
+        </p>
+        {overdueInvoices.length > 0 && (
+          <p className={cn("text-sm text-slate-700")}>
+            <span className={cn("text-coquelicot-400 font-bold")}>{overdueInvoices.length}</span>{" "}
+            overdue invoice{overdueInvoices.length === 1 ? "" : "s"}
+          </p>
+        )}
+        {heldCount > 0 && (
+          <p className={cn("text-sm text-slate-700")}>
+            <span className={cn("text-coquelicot-400 font-bold")}>{heldCount}</span> held booking
+            {heldCount === 1 ? "" : "s"} to action
+          </p>
+        )}
+      </div>
 
       <DashboardQuickActions
         token={t}
@@ -196,7 +316,7 @@ export default async function AdminPage({
         contactSuggestions={contactsWithoutReviewLinks}
       />
 
-      <div className={cn("mb-8 grid grid-cols-3 gap-3 sm:grid-cols-6")}>
+      <div className={cn("mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4")}>
         {stats.map((s) => (
           <Link
             key={s.label}
@@ -207,13 +327,15 @@ export default async function AdminPage({
           >
             <p
               className={cn(
-                "text-2xl font-extrabold",
+                "font-extrabold",
+                typeof s.value === "string" ? "text-xl" : "text-2xl",
                 s.urgent ? "text-coquelicot-400" : "text-russian-violet",
               )}
             >
               {s.value}
             </p>
             <p className={cn("mt-0.5 text-xs text-slate-500")}>{s.label}</p>
+            {s.sub && <p className={cn("mt-0.5 text-[10px] text-slate-400")}>{s.sub}</p>}
           </Link>
         ))}
       </div>
@@ -248,7 +370,7 @@ export default async function AdminPage({
                     </p>
                   </div>
                   <p className={cn("shrink-0 text-right text-xs text-slate-500")}>
-                    {formatNZDateTime(b.startAt.toISOString())}
+                    {formatDateTimeShort(b.startAt.toISOString())}
                   </p>
                 </li>
               ))}
@@ -293,7 +415,7 @@ export default async function AdminPage({
                     <div className={cn("mb-1 flex items-center justify-between gap-3")}>
                       <p className={cn("text-xs font-medium text-slate-600")}>{name}</p>
                       <p className={cn("shrink-0 text-xs text-slate-400")}>
-                        {formatNZDateDisplay(r.createdAt.toISOString())}
+                        {formatDateShort(r.createdAt.toISOString())}
                       </p>
                     </div>
                     <p className={cn("line-clamp-2 text-xs text-slate-500")}>{r.text}</p>
@@ -304,38 +426,101 @@ export default async function AdminPage({
           )}
         </div>
 
-        {/* Recent contacts */}
-        <div className={cn("rounded-xl border border-slate-200 bg-white shadow-sm lg:col-span-2")}>
+        {/* Recent activity - unified timeline of bookings, reviews, contacts, invoices. */}
+        <div className={cn("rounded-xl border border-slate-200 bg-white shadow-sm")}>
           <div
             className={cn("flex items-center justify-between border-b border-slate-100 px-5 py-4")}
           >
-            <h2 className={cn("text-sm font-semibold text-slate-700")}>Recent contacts</h2>
-            <Link
-              href={`/admin/contacts?token=${encodeURIComponent(t)}`}
-              className={cn("hover:text-russian-violet text-xs text-slate-400")}
-            >
-              View all →
-            </Link>
+            <h2 className={cn("text-sm font-semibold text-slate-700")}>Recent activity</h2>
           </div>
-          {recentContacts.length === 0 ? (
-            <p className={cn("px-5 py-6 text-sm text-slate-400")}>No contacts yet.</p>
+          {activity.length === 0 ? (
+            <p className={cn("px-5 py-6 text-sm text-slate-400")}>No activity yet.</p>
           ) : (
             <ul className={cn("divide-y divide-slate-100")}>
-              {recentContacts.map((c) => (
-                <li key={c.id} className={cn("flex items-center justify-between gap-4 px-5 py-3")}>
+              {activity.map((e, i) => (
+                <li
+                  key={`${e.kind}:${i}:${e.timestamp.getTime()}`}
+                  className={cn("flex items-start gap-3 px-5 py-3")}
+                >
+                  <span
+                    className={cn(
+                      "mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold",
+                      e.kind === "booking" && "bg-moonstone-600/15 text-moonstone-600",
+                      e.kind === "review" && "bg-yellow-500/15 text-yellow-600",
+                      e.kind === "contact" && "bg-slate-200 text-slate-600",
+                      e.kind === "invoice" && "bg-russian-violet/15 text-russian-violet",
+                    )}
+                    aria-hidden="true"
+                  >
+                    {e.kind === "booking"
+                      ? "B"
+                      : e.kind === "review"
+                        ? "R"
+                        : e.kind === "contact"
+                          ? "C"
+                          : "I"}
+                  </span>
                   <div className={cn("min-w-0 flex-1")}>
-                    <p className={cn("truncate text-sm font-medium text-slate-700")}>{c.name}</p>
-                    <p className={cn("truncate text-xs text-slate-400")}>
-                      {[c.email, c.phone].filter(Boolean).join(" · ") || "No contact info"}
-                    </p>
+                    <p className={cn("truncate text-sm font-medium text-slate-700")}>{e.title}</p>
+                    <p className={cn("truncate text-xs text-slate-400")}>{e.detail}</p>
                   </div>
                   <p className={cn("shrink-0 text-xs text-slate-400")}>
-                    {formatNZDateDisplay(c.createdAt.toISOString())}
+                    {formatDateShort(e.timestamp.toISOString())}
                   </p>
                 </li>
               ))}
             </ul>
           )}
+        </div>
+
+        {/* System status - quick view of how fresh the various sync sources are. */}
+        <div className={cn("rounded-xl border border-slate-200 bg-white shadow-sm")}>
+          <div
+            className={cn("flex items-center justify-between border-b border-slate-100 px-5 py-4")}
+          >
+            <h2 className={cn("text-sm font-semibold text-slate-700")}>System status</h2>
+            <Link
+              href={`/admin/settings?token=${encodeURIComponent(t)}`}
+              className={cn("hover:text-russian-violet text-xs text-slate-400")}
+            >
+              Settings →
+            </Link>
+          </div>
+          <ul className={cn("divide-y divide-slate-100 text-sm")}>
+            <li className={cn("flex items-center justify-between px-5 py-3")}>
+              <span className={cn("text-slate-600")}>Calendar cache</span>
+              <span
+                className={cn(
+                  "text-xs",
+                  calendarLastRefreshMs === null
+                    ? "text-coquelicot-400 font-medium"
+                    : calendarLastRefreshMs > 30 * 60 * 1000
+                      ? "text-yellow-600"
+                      : "text-slate-500",
+                )}
+              >
+                {calendarLastRefreshMs === null
+                  ? "never refreshed"
+                  : `refreshed ${Math.round(calendarLastRefreshMs / 60000)} min ago`}
+              </span>
+            </li>
+            <li className={cn("flex items-center justify-between px-5 py-3")}>
+              <span className={cn("text-slate-600")}>Latest invoice</span>
+              <span className={cn("text-xs text-slate-500")}>
+                {recentInvoices[0]
+                  ? `${recentInvoices[0].number} (${formatDateShort(recentInvoices[0].createdAt.toISOString())})`
+                  : "none yet"}
+              </span>
+            </li>
+            <li className={cn("flex items-center justify-between px-5 py-3")}>
+              <span className={cn("text-slate-600")}>Unsynced contacts</span>
+              <span
+                className={cn("text-xs", unsyncedCount > 0 ? "text-yellow-600" : "text-slate-500")}
+              >
+                {unsyncedCount === 0 ? "all synced" : `${unsyncedCount} pending`}
+              </span>
+            </li>
+          </ul>
         </div>
       </div>
     </AdminPageLayout>

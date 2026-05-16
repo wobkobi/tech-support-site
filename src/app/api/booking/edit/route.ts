@@ -10,6 +10,7 @@ import {
   BOOKING_CONFIG,
   DURATION_OPTIONS,
   validateBookingRequest,
+  validateBookingPayloadFields,
   TIME_OF_DAY_OPTIONS,
   type TimeOfDay,
   type StartMinute,
@@ -76,39 +77,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // Validate fields
-    if (!name?.trim()) {
-      return NextResponse.json({ ok: false, error: "Name is required." }, { status: 400 });
-    }
-    if (!notes?.trim()) {
-      return NextResponse.json(
-        { ok: false, error: "Please describe what you need help with." },
-        { status: 400 },
-      );
-    }
-    if (!dateKey || !timeOfDay) {
-      return NextResponse.json(
-        { ok: false, error: "Please select a day and time." },
-        { status: 400 },
-      );
-    }
-    if (!duration) {
-      return NextResponse.json(
-        { ok: false, error: "Please select job duration." },
-        { status: 400 },
-      );
-    }
-    if (!meetingType) {
-      return NextResponse.json(
-        { ok: false, error: "Please select in-person or remote." },
-        { status: 400 },
-      );
-    }
-    if (meetingType === "in-person" && !address?.trim()) {
-      return NextResponse.json(
-        { ok: false, error: "Address is required for in-person appointments." },
-        { status: 400 },
-      );
+    const payloadCheck = validateBookingPayloadFields(
+      { name, notes, dateKey, timeOfDay, duration, meetingType, address },
+      { requireEmail: false },
+    );
+    if (!payloadCheck.valid) {
+      return NextResponse.json({ ok: false, error: payloadCheck.error }, { status: 400 });
     }
 
     const now = new Date();

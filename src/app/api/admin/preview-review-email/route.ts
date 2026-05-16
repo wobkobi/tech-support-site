@@ -6,22 +6,23 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { buildPastClientReviewEmailHtml } from "@/features/reviews/lib/email";
-import { isValidAdminToken } from "@/shared/lib/auth";
+import { isAdminRequest } from "@/shared/lib/auth";
 
 /**
  * POST /api/admin/preview-review-email
  * Returns the rendered HTML for a past-client review request email so the admin can preview it.
+ * Authenticated via X-Admin-Secret header.
  * @param request - The incoming request.
  * @returns JSON response with `{ html }`.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  try {
-    const body = (await request.json()) as { token?: string; name?: string };
-    const { token, name } = body;
+  if (!isAdminRequest(request)) {
+    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
 
-    if (!isValidAdminToken(token ?? null)) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-    }
+  try {
+    const body = (await request.json()) as { name?: string };
+    const { name } = body;
 
     if (!name?.trim()) {
       return NextResponse.json({ ok: false, error: "Name is required." }, { status: 400 });

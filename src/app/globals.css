@@ -136,6 +136,79 @@ textarea {
   user-select: text;
 }
 
+/* Hide the up/down spinner buttons on number inputs site-wide. They use a
+   fixed step that's rarely useful (pennies for $/hr fields, +1 for hours)
+   and they make small inputs visually busy. Keyboard Up/Down still works
+   for incrementing where the step attribute is set. */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* ============================================
+   Promo-aware navbar offset
+   --------------------------------------------
+   The site-wide promo banner sets `--promo-h` on <html> when it's visible
+   (~36px). NavBar's spacer + fixed `top` read this so the nav slides down
+   smoothly when the banner appears and back up when it's dismissed.
+
+   Wrapped in `@layer utilities` so the rules sit in the same cascade layer
+   as Tailwind utilities and reliably win against any conflicting class on
+   the same element.
+   ============================================ */
+/* Outside @layer so the rules win against any Tailwind utility on the same
+   element. `!important` makes the cascade unambiguous and protects against
+   `tailwind-merge` accidentally stripping the class via the `cn()` helper. */
+div.app-nav-spacer {
+  height: calc(6rem + var(--promo-h, 0px)) !important;
+  transition: height 500ms ease-out !important;
+}
+@media (min-width: 640px) {
+  div.app-nav-spacer {
+    height: calc(7rem + var(--promo-h, 0px)) !important;
+  }
+}
+
+header.app-nav-header {
+  top: calc(0.75rem + var(--promo-h, 0px)) !important;
+  transition:
+    transform 400ms ease-in-out,
+    opacity 400ms ease-in-out,
+    top 500ms ease-out !important;
+}
+@media (min-width: 640px) {
+  header.app-nav-header {
+    top: calc(1rem + var(--promo-h, 0px)) !important;
+  }
+}
+
+/* Mobile slide-in drawer. Owns its own `top` (tracks --promo-h) and the
+   slide-in transition. Tailwind v4 compiles translate-x-* to the modern
+   CSS `translate` property, so the transition target must be `translate`
+   (not `transform`). Plain CSS here avoids tailwind-merge stripping the
+   arbitrary `transition-[translate]` utility. */
+nav.app-mobile-drawer {
+  top: calc(6.75rem + var(--promo-h, 0px)) !important;
+  transition:
+    translate 300ms ease-out,
+    top 500ms ease-out !important;
+}
+@media (min-width: 640px) {
+  nav.app-mobile-drawer {
+    top: calc(7.5rem + var(--promo-h, 0px)) !important;
+  }
+}
+
+/* Admin sidebar drawer - same Tailwind v4 caveat applies. */
+aside.app-admin-drawer {
+  transition: translate 200ms ease-out !important;
+}
+
 /* ============================================
    A11y: focus + selection highlights
    ============================================ */
@@ -342,6 +415,19 @@ select {
 
 html {
   scrollbar-gutter: auto;
+}
+
+/* ============================================
+   Large-screen typography scaling
+   --------------------------------------------
+   The site is designed at 16px root and looks "right" on 1080p (1920px wide).
+   On bigger viewports we want it to look the same proportionally - the
+   formula below pins 16px at 1920px and scales linearly to 26px at 3840px
+   (4K), with a floor at 16px for anything narrower. Everything Tailwind
+   sizes in rem (text, padding, gaps, max-widths) follows automatically.
+   ============================================ */
+html {
+  font-size: clamp(16px, calc(6px + 0.521vw), 26px);
 }
 /* ============================================
    Google Maps PlaceAutocompleteElement (new Places API)

@@ -108,7 +108,7 @@ export default async function Home(): Promise<React.ReactElement> {
             <div className={cn("mb-6 grid place-items-center")}>
               <Image
                 src="/source/logo-full.svg"
-                alt="To The Point Tech"
+                alt="To The Point Tech - computer and IT support in Auckland"
                 width={640}
                 height={146}
                 priority
@@ -118,13 +118,22 @@ export default async function Home(): Promise<React.ReactElement> {
               />
             </div>
 
+            <h1
+              id="hero-heading"
+              className={cn(
+                "text-russian-violet mx-auto mb-4 max-w-5xl text-2xl font-extrabold sm:text-3xl md:text-4xl",
+              )}
+            >
+              Computer & IT Support in Auckland
+            </h1>
+
             <p
               className={cn(
                 "text-rich-black mx-auto mb-8 max-w-7xl text-lg font-medium sm:text-xl md:text-2xl",
               )}
             >
-              Professional tech help in your local area. Clear explanations, no jargon, and
-              solutions that actually work.
+              Friendly tech help across Auckland. Clear explanations, no jargon, and solutions that
+              actually work.
             </p>
 
             <div className={cn("flex flex-wrap items-center justify-center gap-4")}>
@@ -268,7 +277,7 @@ export default async function Home(): Promise<React.ReactElement> {
                 About Me
               </h2>
               <p className={cn("text-rich-black mb-4 text-base sm:text-lg")}>
-                Hi, I'm Harrison, a computer science graduate from Point Chevalier. I started To The
+                Hi, I'm Harrison, a computer science graduate based in Auckland. I started To The
                 Point Tech to give locals a reliable, friendly person to call when technology acts
                 up.
               </p>

@@ -56,6 +56,18 @@ export async function importFromGoogleContacts(): Promise<number> {
       const connections = response.data.connections ?? [];
       pageToken = response.data.nextPageToken ?? undefined;
 
+      // Resolve each Google person to the fields we need, then batch DB lookups
+      // for the whole page so we issue 2 findManys instead of N findFirsts.
+      interface Resolved {
+        resourceName: string;
+        email: string | null;
+        phone: string | null;
+        normPhone: string | null;
+        name: string | null;
+        address: string | null;
+      }
+
+      const resolved: Resolved[] = [];
       for (const person of connections) {
         const resourceName = person.resourceName;
         if (!resourceName) continue;
@@ -70,61 +82,107 @@ export async function importFromGoogleContacts(): Promise<number> {
           person.organizations?.[0]?.name?.trim() ??
           null;
         const address = person.addresses?.[0]?.formattedValue?.trim() ?? null;
-
-        // Resolve email: direct from Google, or looked up via phone in ReviewRequest history.
         const email =
           emailEntry ?? (normPhone ? (reviewRequestsByPhone.get(normPhone) ?? null) : null);
 
-        if (email) {
+        resolved.push({ resourceName, email, phone, normPhone, name, address });
+      }
+
+      const emailsToCheck = Array.from(
+        new Set(resolved.filter((r) => r.email).map((r) => r.email!)),
+      );
+      const phonesToCheck = Array.from(
+        new Set(resolved.filter((r) => !r.email && r.phone).map((r) => r.phone!)),
+      );
+
+      const [emailMatches, phoneMatches] = await Promise.all([
+        emailsToCheck.length > 0
+          ? prisma.contact.findMany({
+              where: { email: { in: emailsToCheck } },
+              select: { id: true, email: true, name: true },
+            })
+          : Promise.resolve([] as { id: string; email: string | null; name: string }[]),
+        phonesToCheck.length > 0
+          ? prisma.contact.findMany({
+              where: { phone: { in: phonesToCheck } },
+              select: { id: true, phone: true, name: true },
+            })
+          : Promise.resolve([] as { id: string; phone: string | null; name: string }[]),
+      ]);
+
+      const contactByEmail = new Map<string, { id: string; name: string }>();
+      for (const c of emailMatches) {
+        if (c.email) contactByEmail.set(c.email, { id: c.id, name: c.name });
+      }
+      const contactByPhone = new Map<string, { id: string; name: string }>();
+      for (const c of phoneMatches) {
+        if (c.phone) contactByPhone.set(c.phone, { id: c.id, name: c.name });
+      }
+
+      // Writes stay sequential so a page that contains the same email/phone twice
+      // (rare but possible) doesn't race itself into duplicate records. Maps are
+      // updated after each create so subsequent iterations see the new row.
+      for (const r of resolved) {
+        if (r.email) {
           try {
-            const existing = await prisma.contact.findFirst({ where: { email } });
+            const existing = contactByEmail.get(r.email);
             if (existing) {
               await prisma.contact.update({
                 where: { id: existing.id },
                 // Local name/phone/address are the source of truth - only link the resource name.
-                data: { googleContactId: resourceName },
+                data: { googleContactId: r.resourceName },
               });
             } else {
-              await prisma.contact.create({
-                data: { name: name ?? email, email, phone, address, googleContactId: resourceName },
+              const created = await prisma.contact.create({
+                data: {
+                  name: r.name ?? r.email,
+                  email: r.email,
+                  phone: r.phone,
+                  address: r.address,
+                  googleContactId: r.resourceName,
+                },
+                select: { id: true, name: true },
               });
+              contactByEmail.set(r.email, { id: created.id, name: created.name });
             }
             count++;
           } catch (upsertError) {
-            console.error(`[google-contacts] Failed to import contact ${email}:`, upsertError);
+            console.error(
+              `[google-contacts] Failed to import contact (resource ${r.resourceName}):`,
+              upsertError,
+            );
           }
-        } else if (normPhone) {
+        } else if (r.normPhone && r.phone) {
           // No email anywhere - create a phone-only contact or link to an existing one.
           try {
-            const existing = await prisma.contact.findFirst({
-              where: { phone },
-              select: { id: true, name: true },
-            });
+            const existing = contactByPhone.get(r.phone);
             if (existing) {
               // Also update the name if it was set to the phone number as a placeholder.
-              const namePlaceholder = existing.name === phone || existing.name === normPhone;
+              const namePlaceholder = existing.name === r.phone || existing.name === r.normPhone;
               await prisma.contact.update({
                 where: { id: existing.id },
                 data: {
-                  googleContactId: resourceName,
-                  ...(name && namePlaceholder ? { name } : {}),
+                  googleContactId: r.resourceName,
+                  ...(r.name && namePlaceholder ? { name: r.name } : {}),
                 },
               });
             } else {
-              await prisma.contact.create({
+              const created = await prisma.contact.create({
                 data: {
-                  name: name ?? phone!,
+                  name: r.name ?? r.phone,
                   email: null,
-                  phone,
-                  address,
-                  googleContactId: resourceName,
+                  phone: r.phone,
+                  address: r.address,
+                  googleContactId: r.resourceName,
                 },
+                select: { id: true, name: true },
               });
+              contactByPhone.set(r.phone, { id: created.id, name: created.name });
             }
             count++;
           } catch (importError) {
             console.error(
-              `[google-contacts] Failed to import phone-only contact ${normPhone}:`,
+              `[google-contacts] Failed to import phone-only contact (resource ${r.resourceName}):`,
               importError,
             );
           }

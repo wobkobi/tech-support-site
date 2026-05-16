@@ -6,28 +6,28 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
-import { isValidAdminToken } from "@/shared/lib/auth";
+import { isAdminRequest } from "@/shared/lib/auth";
 import { reviewTextError } from "@/features/reviews/lib/validation";
 
 /**
  * POST /api/admin/reviews
  * Creates a new review, pre-approved. Used by admin to add past client reviews.
+ * Authenticated via X-Admin-Secret header.
  * @param request - Incoming request.
  * @returns JSON with the created review.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  if (!isAdminRequest(request)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const body = (await request.json()) as {
-      token?: string;
       text?: string;
       firstName?: string;
       lastName?: string;
       isAnonymous?: boolean;
     };
-
-    if (!isValidAdminToken(body.token ?? null)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
 
     const text = body.text?.trim() ?? "";
     const textErr = reviewTextError(text);

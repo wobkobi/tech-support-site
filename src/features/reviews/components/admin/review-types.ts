@@ -29,16 +29,3 @@ export interface ReviewRow {
   /** Denormalised contact display name for quick rendering, or null */
   contactName: string | null;
 }
-
-/**
- * Formats a date as a short localised string.
- * @param date - Date to format.
- * @returns Formatted date string.
- */
-export function formatDate(date: Date): string {
-  return new Date(date).toLocaleDateString("en-NZ", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}

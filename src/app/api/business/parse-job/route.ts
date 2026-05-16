@@ -3,35 +3,54 @@ import OpenAI from "openai";
 import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { buildParseJobPrompt } from "@/features/business/lib/prompts/parse-job";
-import type { ParseJobResponse, ParseJobQuestion } from "@/features/business/types/business";
+import { effectiveHourlyRate, composeDescription } from "@/features/business/lib/business";
+import type {
+  ParseJobResponse,
+  ParseJobQuestion,
+  RateConfig,
+} from "@/features/business/types/business";
 
 const TIME_RANGE_RE =
   /(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\s*[-–—]\s*(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/gi;
 
+type Meridiem = "am" | "pm" | null;
+
 /**
- * Parses a time string (e.g. "7pm", "7:10", "10:22am") into minutes since midnight.
- * @param s - Time string to parse
- * @returns Minutes since midnight, or null if unparseable
+ * Extracts the am/pm marker from a time fragment.
+ * @param s - Time fragment like "7", "9pm", "10:30am".
+ * @returns "am" / "pm" / null.
  */
-function parseTimeMins(s: string): number | null {
+function meridiemOf(s: string): Meridiem {
+  const t = s.toLowerCase();
+  if (/pm/.test(t)) return "pm";
+  if (/am/.test(t)) return "am";
+  return null;
+}
+
+/**
+ * Parses a time string into minutes since midnight.
+ * @param s - Time string (e.g. "7pm", "7:10", "10:22am").
+ * @param assume - Meridiem to apply when the string has none (e.g. trailing "pm" in "7-9pm").
+ * @returns Minutes since midnight, or null if unparseable.
+ */
+function parseTimeMins(s: string, assume: Meridiem = null): number | null {
   const t = s.trim().toLowerCase();
-  const pm = /pm/.test(t);
-  const am = /am/.test(t);
+  const meridiem: Meridiem = meridiemOf(t) ?? assume;
   const clean = t.replace(/[apm\s]/g, "");
   const [hStr, mStr = "0"] = clean.split(":");
   const h = parseInt(hStr, 10);
   const m = parseInt(mStr, 10);
   if (isNaN(h) || isNaN(m)) return null;
-  if (pm) return (h === 12 ? 12 : h + 12) * 60 + m;
-  if (am) return (h === 12 ? 0 : h) * 60 + m;
+  if (meridiem === "pm") return (h === 12 ? 12 : h + 12) * 60 + m;
+  if (meridiem === "am") return (h === 12 ? 0 : h) * 60 + m;
   return h * 60 + m;
 }
 
 /**
  * Sums all HH:MM–HH:MM segments on lines that start with a digit.
- * Handles noon crossings (12:30–1:00 = 30 min) and midnight crossings.
- * @param input - Raw job description text
- * @returns Total worked minutes, or null if no time ranges detected
+ * Handles noon/midnight crossings and trailing meridiems (e.g. "7-9pm" = 7pm-9pm).
+ * @param input - Raw job description text.
+ * @returns Total worked minutes, or null if no time ranges detected.
  */
 function calcSessionMins(input: string): number | null {
   let total = 0;
@@ -41,14 +60,18 @@ function calcSessionMins(input: string): number | null {
     TIME_RANGE_RE.lastIndex = 0;
     const m = TIME_RANGE_RE.exec(line);
     if (!m) continue;
-    const start = parseTimeMins(m[1]);
-    const end = parseTimeMins(m[2]);
+    // "7-9pm" -> both pm; "9-11am" -> both am. If only one side has a marker,
+    // the other side inherits it (covers the common shorthand).
+    const startMeridiem = meridiemOf(m[1]);
+    const endMeridiem = meridiemOf(m[2]);
+    const start = parseTimeMins(m[1], startMeridiem ?? endMeridiem);
+    const end = parseTimeMins(m[2], endMeridiem ?? startMeridiem);
     if (start === null || end === null) continue;
     let dur = end - start;
     if (dur <= 0) {
       // Prefer the smallest positive result that fits a reasonable session (≤ 16h).
-      // Adding 12h handles the common case of unmarked am/pm times crossing noon
-      // (e.g. "11:25-1:20" → 115 min, not 835 min). Fall back to 24h for overnight runs.
+      // +12h handles unmarked am/pm crossing noon (e.g. "11:25-1:20" → 115 min).
+      // +24h is the fallback for overnight runs.
       const withNoon = dur + 12 * 60;
       dur = withNoon > 0 && withNoon <= 16 * 60 ? withNoon : dur + 24 * 60;
     }
@@ -59,52 +82,25 @@ function calcSessionMins(input: string): number | null {
 }
 
 /**
- * Computes Jaccard similarity between two strings using word-token sets.
- * @param a - First string.
- * @param b - Second string.
- * @returns Similarity score between 0 and 1.
+ * Snaps AI device/action tags to the canonical template by exact match.
+ * @param device - Device tag from the AI.
+ * @param action - Action tag from the AI.
+ * @param templates - All saved templates.
+ * @returns Matching template or null.
  */
-function jaccardSimilarity(a: string, b: string): number {
-  /**
-   * Lowercases and splits a string into a set of word tokens.
-   * @param s - Input string to tokenize
-   * @returns Set of lowercase word tokens
-   */
-  const tokenize = (s: string): Set<string> =>
-    new Set(
-      s
-        .toLowerCase()
-        .replace(/[^a-z0-9\s]/g, "")
-        .split(/\s+/)
-        .filter(Boolean),
-    );
-  const setA = tokenize(a);
-  const setB = tokenize(b);
-  const intersection = [...setA].filter((t) => setB.has(t)).length;
-  const union = new Set([...setA, ...setB]).size;
-  return union === 0 ? 0 : intersection / union;
-}
-
-/**
- * Returns the best-matching template for a task description if similarity exceeds 0.7.
- * @param description - AI-generated task description.
- * @param templates - Available task templates from the database.
- * @returns Matching template or null if no close match found.
- */
-function bestTemplateMatch(
-  description: string,
-  templates: { description: string }[],
-): { description: string } | null {
-  let best: { description: string } | null = null;
-  let bestScore = 0;
-  for (const t of templates) {
-    const score = jaccardSimilarity(description, t.description);
-    if (score > bestScore) {
-      bestScore = score;
-      best = t;
-    }
-  }
-  return bestScore >= 0.7 ? best : null;
+function findTemplateByTags<T extends { device: string | null; action: string | null }>(
+  device: string | null | undefined,
+  action: string | null | undefined,
+  templates: T[],
+): T | null {
+  if (!device || !action) return null;
+  const dLower = device.toLowerCase();
+  const aLower = action.toLowerCase();
+  return (
+    templates.find(
+      (t) => (t.device ?? "").toLowerCase() === dLower && (t.action ?? "").toLowerCase() === aLower,
+    ) ?? null
+  );
 }
 
 /**
@@ -184,7 +180,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ ok: true, clarify: parsed.clarify });
     }
 
-    // Use stated round-trip distance if the AI extracted one (car travel only)
     if (!parsed.noTravelCharge && parsed.statedDistanceKm && parsed.statedDistanceKm > 0) {
       parsed.travel = {
         distanceKm: parsed.statedDistanceKm,
@@ -192,7 +187,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         destination: parsed.destination ?? undefined,
       };
     } else if (!parsed.noTravelCharge && parsed.destination) {
-      // No stated distance - look up one-way distance via API and double for round trip
+      // No stated distance - look up one-way and double for round trip.
       try {
         const base = process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
         const travelRes = await fetch(`${base}/api/pricing/travel-time`, {
@@ -218,13 +213,87 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     }
 
-    // Snap task descriptions to exact template text when the AI drifts slightly
-    if (templates.length > 0 && parsed.tasks?.length > 0) {
+    if (parsed.tasks?.length > 0) {
+      const ratesForLookup = rateDtos as unknown as RateConfig[];
+      /**
+       * Resolves a rate label (e.g. "Standard", "At home") to its RateConfig row.
+       * @param label - Case-insensitive rate label emitted by the AI.
+       * @returns Matching RateConfig or null.
+       */
+      const findRateByLabel = (label: string | null | undefined): RateConfig | null => {
+        if (!label) return null;
+        const target = label.trim().toLowerCase();
+        return ratesForLookup.find((r) => r.label.toLowerCase() === target) ?? null;
+      };
       parsed.tasks = parsed.tasks.map((task) => {
-        const snap = bestTemplateMatch(task.description, templates);
-        if (snap) return { ...task, description: snap.description };
-        return task;
+        const t = task as typeof task & {
+          action?: string | null;
+          device?: string | null;
+          details?: string | null;
+          baseRateLabel?: string | null;
+          modifierLabels?: string[];
+        };
+        const snap = findTemplateByTags(t.device, t.action, templates);
+        const device = snap?.device ?? t.device ?? null;
+        const action = snap?.action ?? t.action ?? null;
+        const details = t.details?.trim() ? t.details.trim() : null;
+
+        const baseRate =
+          findRateByLabel(t.baseRateLabel) ??
+          ratesForLookup.find((r) => r.ratePerHour !== null && r.isDefault) ??
+          ratesForLookup.find((r) => r.ratePerHour !== null) ??
+          null;
+        const modifierIds = (t.modifierLabels ?? [])
+          .map((label) => findRateByLabel(label))
+          .filter((r): r is RateConfig => r !== null && r.hourlyDelta !== null)
+          .map((r) => r.id);
+
+        const computed = effectiveHourlyRate(ratesForLookup, baseRate?.id ?? null, modifierIds);
+        const unitPrice = computed > 0 ? computed : (snap?.defaultPrice ?? task.unitPrice ?? 0);
+
+        return {
+          ...t,
+          // All AI-parsed tasks are hourly work per the prompt. Force null so
+          // downstream "is this hourly" checks always agree, regardless of
+          // what the AI emitted (omitted, null, stale ID).
+          rateConfigId: null,
+          device,
+          action,
+          details,
+          baseRateId: baseRate?.id ?? null,
+          modifierIds,
+          description: composeDescription(device, action, details) || task.description || "",
+          unitPrice,
+        };
       });
+    }
+
+    // Safety net: rebalance into the largest task if the sum drifts.
+    if (
+      parsed.tasks?.length > 0 &&
+      typeof parsed.durationMins === "number" &&
+      parsed.durationMins > 0
+    ) {
+      // Round UP to match the calculator's billable rule (ceil to next 15-min slot).
+      // Same policy as the prompt's BILLING step 2 - so the safety net + AI agree on the target.
+      const targetHours = Math.ceil((parsed.durationMins / 60) * 4) / 4;
+      const sumQty = parsed.tasks.reduce((s, t) => s + (t.qty || 0), 0);
+      const diff = Math.round((targetHours - sumQty) * 100) / 100;
+      if (Math.abs(diff) >= 0.25) {
+        const largestIdx = parsed.tasks.reduce(
+          (maxI, t, i, arr) => (t.qty > arr[maxI].qty ? i : maxI),
+          0,
+        );
+        const adjusted = Math.max(
+          0.25,
+          Math.round((parsed.tasks[largestIdx].qty + diff) * 100) / 100,
+        );
+        parsed.tasks[largestIdx] = { ...parsed.tasks[largestIdx], qty: adjusted };
+        parsed.warnings = [
+          ...(parsed.warnings ?? []),
+          `Rebalanced task quantities to match the ${targetHours}h total (added ${diff}h to "${parsed.tasks[largestIdx].description}").`,
+        ];
+      }
     }
 
     return NextResponse.json({ ok: true, result: parsed });

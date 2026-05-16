@@ -4,11 +4,31 @@
  * @description Contact page: how to get in touch.
  */
 
+import type { Metadata } from "next";
 import type React from "react";
 import { FrostedSection, PageShell, CARD } from "@/shared/components/PageLayout";
+import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
 import { Button } from "@/shared/components/Button";
 import { cn } from "@/shared/lib/cn";
 import { FaEnvelope, FaPhone, FaMapLocationDot } from "react-icons/fa6";
+
+export const metadata: Metadata = {
+  title: "Contact - Local Tech Support in Auckland",
+  description:
+    "Call 021 297 1237 or email harrison@tothepoint.co.nz for friendly tech support across Auckland. Same-day, evening and weekend appointments available.",
+  keywords: [
+    "contact tech support Auckland",
+    "computer help phone number Auckland",
+    "IT support near me Auckland",
+    "Auckland tech support contact",
+  ],
+  alternates: { canonical: "/contact" },
+  openGraph: {
+    title: "Contact - To The Point Tech",
+    description: "Reach out by phone or email for tech help across Auckland.",
+    url: "/contact",
+  },
+};
 
 /**
  * Contact page component.
@@ -17,6 +37,12 @@ import { FaEnvelope, FaPhone, FaMapLocationDot } from "react-icons/fa6";
 export default function ContactPage(): React.ReactElement {
   return (
     <PageShell>
+      <BreadcrumbJsonLd
+        crumbs={[
+          { name: "Home", path: "/" },
+          { name: "Contact", path: "/contact" },
+        ]}
+      />
       <FrostedSection>
         <div className={cn("flex flex-col gap-6 sm:gap-8")}>
           {/* Hero Section */}
@@ -87,8 +113,7 @@ export default function ContactPage(): React.ReactElement {
                   Service area
                 </h2>
                 <p className={cn("text-rich-black mb-3 text-sm sm:text-base")}>
-                  Based in Point Chevalier, serving nearby suburbs including Western Springs, Mount
-                  Albert, Grey Lynn, Westmere, Kingsland, and surrounding areas.
+                  On-site visits across Auckland.
                 </p>
                 <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
                   Remote support available for software and account issues. No travel needed.

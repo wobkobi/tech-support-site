@@ -10,6 +10,7 @@ import type React from "react";
 import { cn } from "@/shared/lib/cn";
 import { CopyLinkButton } from "./CopyLinkButton";
 import { toE164NZ, formatNZPhone, isValidPhone } from "@/shared/lib/normalize-phone";
+import { formatDateShort } from "@/shared/lib/date-format";
 
 /**
  * A single row in the review link history table.
@@ -112,10 +113,10 @@ export function ReviewLinkHistoryTable({
     setRevoking(true);
     setRevokeError(null);
     try {
-      const res = await fetch(
-        `/api/admin/review-requests/${entry.id}?token=${encodeURIComponent(token)}`,
-        { method: "DELETE" },
-      );
+      const res = await fetch(`/api/admin/review-requests/${entry.id}`, {
+        method: "DELETE",
+        headers: { "X-Admin-Secret": token },
+      });
       const data = (await res.json()) as { ok?: boolean; error?: string };
       if (!res.ok) throw new Error(data.error ?? "Request failed");
       setEntries((prev) => prev.filter((e) => e.id !== entry.id));
@@ -143,9 +144,8 @@ export function ReviewLinkHistoryTable({
         // PATCH existing ReviewRequest
         const res = await fetch(`/api/admin/review-requests/${entry.id}`, {
           method: "PATCH",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "X-Admin-Secret": token },
           body: JSON.stringify({
-            token,
             name: entry.name,
             email: editEmail,
             phone: editPhoneInput,
@@ -157,9 +157,8 @@ export function ReviewLinkHistoryTable({
         // POST to create (or update) a ReviewRequest for a legacy review with existing token
         const res = await fetch(`/api/admin/review-requests`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "X-Admin-Secret": token },
           body: JSON.stringify({
-            token,
             customerRef: entry.customerRef,
             name: entry.name,
             email: editEmail,
@@ -174,9 +173,8 @@ export function ReviewLinkHistoryTable({
         // The server generates a fresh token and back-links it to the Review record.
         const res = await fetch(`/api/admin/review-requests`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "X-Admin-Secret": token },
           body: JSON.stringify({
-            token,
             reviewId: entry.reviewId,
             name: entry.name,
             email: editEmail,
@@ -216,19 +214,6 @@ export function ReviewLinkHistoryTable({
     } finally {
       setSaving(false);
     }
-  }
-
-  /**
-   * Formats an ISO date string as a short localised string.
-   * @param iso - ISO date string.
-   * @returns Formatted date string.
-   */
-  function fmt(iso: string): string {
-    return new Date(iso).toLocaleDateString("en-NZ", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
   }
 
   const visibleEntries = query.trim()
@@ -311,7 +296,7 @@ export function ReviewLinkHistoryTable({
                         </span>
                       )}
                       {" · "}
-                      {fmt(entry.sentAt)}
+                      {formatDateShort(entry.sentAt)}
                     </p>
                   </div>
                   {canEdit && !isEditing && (

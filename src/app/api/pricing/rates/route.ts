@@ -8,13 +8,16 @@ import { prisma } from "@/shared/lib/prisma";
 export async function GET(): Promise<NextResponse> {
   const rates = await prisma.rateConfig.findMany({ orderBy: { label: "asc" } });
 
-  const publicRates = rates.map(({ label, ratePerHour, flatRate, unit, isDefault }) => ({
-    label,
-    ratePerHour,
-    flatRate,
-    unit,
-    isDefault,
-  }));
+  const publicRates = rates.map(
+    ({ label, ratePerHour, flatRate, hourlyDelta, unit, isDefault }) => ({
+      label,
+      ratePerHour,
+      flatRate,
+      hourlyDelta,
+      unit,
+      isDefault,
+    }),
+  );
 
   return NextResponse.json({ ok: true, rates: publicRates });
 }

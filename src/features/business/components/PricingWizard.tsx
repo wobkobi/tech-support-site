@@ -6,6 +6,11 @@ import Link from "next/link";
 import type { PublicRate, PriceRange } from "@/features/business/types/pricing";
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import { cn } from "@/shared/lib/cn";
+import {
+  applyPromoToHourlyRate,
+  summariseForBanner,
+  type ActivePromo,
+} from "@/features/business/lib/promos";
 
 const SOFT_CARD = cn(
   "border-seasalt-400/80 bg-seasalt-900/60 rounded-xl border p-3 text-sm sm:p-4 sm:text-base",
@@ -14,12 +19,12 @@ const SOFT_CARD = cn(
 type Step = "issue" | "address" | "results";
 
 /**
- * Formats a dollar amount as a rounded NZD string.
- * @param amount - Amount in dollars
- * @returns Formatted string e.g. "$85"
+ * Whole-dollar NZD string (no cents) for the pricing range UI.
+ * @param amount - Amount in dollars (positive or negative).
+ * @returns Formatted string e.g. "$85" or "-$85".
  */
-function formatNZD(amount: number): string {
-  return `$${amount.toFixed(0)}`;
+function formatPriceRound(amount: number): string {
+  return `${amount < 0 ? "-" : ""}$${Math.abs(amount).toFixed(0)}`;
 }
 
 /**
@@ -42,6 +47,7 @@ function formatDuration(mins: number): string {
  */
 export function PricingWizard(): React.ReactElement {
   const [rates, setRates] = useState<PublicRate[]>([]);
+  const [activePromo, setActivePromo] = useState<ActivePromo | null>(null);
   const [loading, setLoading] = useState(true);
   const [step, setStep] = useState<Step>("issue");
   const [issueDescription, setIssueDescription] = useState("");
@@ -52,13 +58,24 @@ export function PricingWizard(): React.ReactElement {
   const [isCalculating, setIsCalculating] = useState(false);
 
   useEffect(() => {
-    fetch("/api/pricing/rates")
-      .then((r) => r.json())
-      .then((data: { ok: boolean; rates: PublicRate[] }) => {
-        setRates(data.rates ?? []);
+    // Rates + active promo in parallel; promo may be null.
+    Promise.all([
+      fetch("/api/pricing/rates")
+        .then((r) => r.json())
+        .catch(() => ({ ok: false, rates: [] })),
+      fetch("/api/promos/active")
+        .then((r) => r.json())
+        .catch(() => ({ ok: false, promo: null })),
+    ]).then(
+      ([ratesRes, promoRes]: [
+        { ok: boolean; rates: PublicRate[] },
+        { ok: boolean; promo: ActivePromo | null },
+      ]) => {
+        setRates(ratesRes.rates ?? []);
+        setActivePromo(promoRes.promo ?? null);
         setLoading(false);
-      })
-      .catch(() => setLoading(false));
+      },
+    );
   }, []);
 
   /** Calls both APIs in parallel then computes a ±20% price range from the AI's time estimate. */
@@ -99,7 +116,7 @@ export function PricingWizard(): React.ReactElement {
     const travelMins = travelRes.status === "fulfilled" ? (travelRes.value.durationMins ?? 0) : 0;
 
     let estimatedMins = 60;
-    let ratePerHour = 65;
+    let fullRate = 65;
     let explanation = "";
 
     if (estimateRes.status === "fulfilled" && estimateRes.value.ok && estimateRes.value.result) {
@@ -107,40 +124,81 @@ export function PricingWizard(): React.ReactElement {
       estimatedMins = ai.estimatedMins;
       explanation = ai.explanation;
 
-      const hourlyRates = rates
-        .filter(
-          (r) =>
-            r.ratePerHour !== null && r.unit !== "km" && !r.label.toLowerCase().includes("call"),
-        )
-        .map((r) => r.ratePerHour!);
-
-      if (hourlyRates.length > 0) {
-        ratePerHour =
-          ai.category === "complex" ? Math.max(...hourlyRates) : Math.min(...hourlyRates);
-      }
+      // Standard base + Complex modifier delta when AI flags the job complex.
+      const baseStandard =
+        rates.find((r) => r.ratePerHour !== null && r.isDefault)?.ratePerHour ??
+        rates.find((r) => r.ratePerHour !== null)?.ratePerHour ??
+        65;
+      const complexModifier = rates.find((r) => r.label === "Complex" && r.hourlyDelta !== null);
+      const complexRate = complexModifier
+        ? baseStandard + (complexModifier.hourlyDelta ?? 0)
+        : baseStandard;
+      fullRate = ai.category === "complex" ? complexRate : baseStandard;
     }
+
+    const promoRate = applyPromoToHourlyRate(fullRate, activePromo);
+    const promoApplied = promoRate < fullRate;
 
     setAiExplanation(explanation);
     setAiEstimatedMins(estimatedMins);
 
-    // Compute ±20% range directly from estimated minutes
-    const jobCost = (estimatedMins / 60) * ratePerHour;
-    const travelCost = (travelMins / 60) * ratePerHour;
-    const jobLow = Math.floor((jobCost * 0.8) / 10) * 10;
-    const jobHigh = Math.max(Math.ceil((jobCost * 1.2) / 10) * 10, jobLow + 30);
-    const travelRounded = Math.round(travelCost / 10) * 10;
+    /**
+     * Builds a ±15% price range from the AI's minute estimate, rounded to the
+     * nearest $5 with a $15 minimum spread. Tighter than the previous ±20%/$10
+     * defaults so short jobs (e.g. a 45 min Wi-Fi fix at $65/h) report a
+     * believable $40-60 range instead of a 100%-wide $30-60 bucket.
+     * Called twice when a promo is active so we can show original + promo'd.
+     * @param rate - Effective $/hr for this branch.
+     * @returns Low/high range plus the per-call travel surcharge.
+     */
+    const buildRange = (rate: number): { low: number; high: number; travel: number } => {
+      const jobCost = (estimatedMins / 60) * rate;
+      const travelCost = (travelMins / 60) * rate;
+      const jobLow = Math.floor((jobCost * 0.85) / 5) * 5;
+      const jobHigh = Math.max(Math.ceil((jobCost * 1.15) / 5) * 5, jobLow + 15);
+      const travel = Math.round(travelCost / 5) * 5;
+      return { low: jobLow + travel, high: jobHigh + travel, travel };
+    };
+    const promoRange = buildRange(promoRate);
+    // Cosmetic safety net: only surface the crossed-out original when the
+    // rounded range actually differs - if both branches happen to round to
+    // the same bucket, identical struck/un-struck prices read as a glitch.
+    const rawOriginal = promoApplied ? buildRange(fullRate) : null;
+    const original =
+      rawOriginal && (rawOriginal.low !== promoRange.low || rawOriginal.high !== promoRange.high)
+        ? rawOriginal
+        : null;
+    const jobLow = Math.floor(((estimatedMins / 60) * promoRate * 0.85) / 5) * 5;
+    const jobHigh = Math.max(
+      Math.ceil(((estimatedMins / 60) * promoRate * 1.15) / 5) * 5,
+      jobLow + 15,
+    );
 
     const range: PriceRange = {
-      low: jobLow + travelRounded,
-      high: jobHigh + travelRounded,
+      low: promoRange.low,
+      high: promoRange.high,
       breakdown: [
         { label: "Tech support", low: jobLow, high: jobHigh, note: null },
-        ...(travelRounded > 0
-          ? [{ label: "Drive time", low: travelRounded, high: travelRounded, note: null }]
+        ...(promoRange.travel > 0
+          ? [
+              {
+                label: "Drive time",
+                low: promoRange.travel,
+                high: promoRange.travel,
+                note: null,
+              },
+            ]
           : []),
       ],
-      includesTravel: travelRounded > 0,
+      includesTravel: promoRange.travel > 0,
       includesAfterHours: false,
+      ...(original
+        ? {
+            originalLow: original.low,
+            originalHigh: original.high,
+            promoLabel: activePromo ? summariseForBanner(activePromo) : undefined,
+          }
+        : {}),
     };
 
     setResult(range);
@@ -251,9 +309,19 @@ export function PricingWizard(): React.ReactElement {
               </p>
             )}
             <p className="mb-1 text-sm font-medium text-slate-500">Estimated cost</p>
+            {result.originalLow !== undefined && result.originalHigh !== undefined && (
+              <p className="text-sm text-slate-400 line-through sm:text-base">
+                {formatPriceRound(result.originalLow)} – {formatPriceRound(result.originalHigh)}
+              </p>
+            )}
             <p className="text-russian-violet text-4xl font-extrabold sm:text-5xl">
-              {formatNZD(result.low)} – {formatNZD(result.high)}
+              {formatPriceRound(result.low)} – {formatPriceRound(result.high)}
             </p>
+            {result.promoLabel && (
+              <p className={cn("mt-2 text-xs font-semibold text-amber-700")}>
+                ⚡ {result.promoLabel}
+              </p>
+            )}
             <p className="mt-2 text-xs text-slate-400">
               {result.includesTravel && "Includes drive time. "}
               All prices in NZD. No GST.
@@ -273,8 +341,8 @@ export function PricingWizard(): React.ReactElement {
                     <span className="text-slate-700">{line.label}</span>
                     <span className="ml-4 whitespace-nowrap font-medium text-slate-700">
                       {line.low === line.high
-                        ? formatNZD(line.low)
-                        : `${formatNZD(line.low)} - ${formatNZD(line.high)}`}
+                        ? formatPriceRound(line.low)
+                        : `${formatPriceRound(line.low)} - ${formatPriceRound(line.high)}`}
                     </span>
                   </div>
                 ))}

@@ -14,6 +14,7 @@ import { cn } from "@/shared/lib/cn";
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import { formatReviewerName } from "@/features/reviews/lib/formatting";
 import { normalizePhone, isValidPhone } from "@/shared/lib/normalize-phone";
+import { formatDateShort } from "@/shared/lib/date-format";
 
 export interface ContactRow {
   id: string;
@@ -33,20 +34,6 @@ export interface ContactRow {
     /** Review token used to construct the /review?token= link, or null for old records. */
     customerRef: string | null;
   }>;
-}
-
-/**
- * Formats an ISO date string as a short NZ local date.
- * @param iso - ISO 8601 date string.
- * @returns Formatted date string.
- */
-function formatDate(iso: string): string {
-  return new Intl.DateTimeFormat("en-NZ", {
-    timeZone: "Pacific/Auckland",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(new Date(iso));
 }
 
 interface ContactCardProps {
@@ -138,7 +125,7 @@ function ContactCard({
           <span className={cn("text-russian-violet text-xs font-semibold uppercase tracking-wide")}>
             Editing
           </span>
-          <span className={cn("text-xs text-slate-400")}>{formatDate(c.createdAt)}</span>
+          <span className={cn("text-xs text-slate-400")}>{formatDateShort(c.createdAt)}</span>
         </div>
         <div className={cn("flex flex-col gap-1")}>
           <label
@@ -243,7 +230,7 @@ function ContactCard({
       <div className={cn("flex min-w-0 flex-wrap items-center justify-between gap-2")}>
         <span className={cn("text-russian-violet min-w-0 truncate font-semibold")}>{c.name}</span>
         <div className={cn("flex items-center gap-2")}>
-          <span className={cn("text-xs text-slate-400")}>{formatDate(c.createdAt)}</span>
+          <span className={cn("text-xs text-slate-400")}>{formatDateShort(c.createdAt)}</span>
           {!c.googleContactId &&
             (syncingId === c.id ? (
               <span className={cn("text-xs text-slate-400")}>Syncing…</span>
@@ -470,6 +457,33 @@ export function ContactAdminList({
   }
 
   /**
+   * Downloads the full contacts CSV via the admin API and triggers a browser save dialog.
+   * Uses fetch + blob so the admin secret can be sent as a header rather than in the URL.
+   */
+  async function exportContacts(): Promise<void> {
+    try {
+      const res = await fetch("/api/admin/contacts/export", {
+        headers: { "X-Admin-Secret": token },
+      });
+      if (!res.ok) {
+        console.error("[ContactAdminList] Export failed:", res.status);
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "contacts.csv";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("[ContactAdminList] Export error:", err);
+    }
+  }
+
+  /**
    * Syncs a contact to Google Contacts via the admin API.
    * On success, updates the local state to reflect synced status.
    * @param id - Contact ID to sync.
@@ -663,15 +677,15 @@ export function ContactAdminList({
             "focus:ring-russian-violet/30 min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-1",
           )}
         />
-        <a
-          href={`/api/admin/contacts/export?token=${encodeURIComponent(token)}`}
-          download="contacts.csv"
+        <button
+          type="button"
+          onClick={() => void exportContacts()}
           className={cn(
             "text-moonstone-600 hover:text-moonstone-700 shrink-0 text-xs font-medium underline underline-offset-2",
           )}
         >
           Export CSV
-        </a>
+        </button>
       </div>
 
       {/* New contacts - added in the last 7 days */}

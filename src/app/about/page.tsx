@@ -4,10 +4,32 @@
  * @description About page: background, approach, and who I help.
  */
 
+import type { Metadata } from "next";
 import type React from "react";
 import { FrostedSection, PageShell, CARD } from "@/shared/components/PageLayout";
+import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
 import { cn } from "@/shared/lib/cn";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  title: "About Harrison Raynes - Local Tech Support in Auckland",
+  description:
+    "Computer science graduate based in Auckland. I help households and small businesses across Auckland with friendly, jargon-free tech support.",
+  keywords: [
+    "tech support Auckland",
+    "local IT support Auckland",
+    "Harrison Raynes",
+    "small business IT Auckland",
+    "home computer help Auckland",
+  ],
+  alternates: { canonical: "/about" },
+  openGraph: {
+    title: "About - To The Point Tech",
+    description: "Local computer and IT support across Auckland.",
+    url: "/about",
+    type: "profile",
+  },
+};
 
 const linkStyle = cn(
   "text-coquelicot-500 hover:text-coquelicot-600 underline-offset-4 hover:underline",
@@ -20,6 +42,12 @@ const linkStyle = cn(
 export default function AboutPage(): React.ReactElement {
   return (
     <PageShell>
+      <BreadcrumbJsonLd
+        crumbs={[
+          { name: "Home", path: "/" },
+          { name: "About", path: "/about" },
+        ]}
+      />
       <FrostedSection>
         <div className={cn("flex flex-col gap-6 sm:gap-8")}>
           <section aria-labelledby="about-hero-heading" className={cn(CARD, "animate-fade-in")}>
@@ -33,9 +61,9 @@ export default function AboutPage(): React.ReactElement {
             </h1>
 
             <p className={cn("text-rich-black mb-4 text-sm sm:text-base")}>
-              I'm Harrison Raynes, a computer science graduate based in Point Chevalier. I started
-              To The Point Tech because I saw how many people struggle with everyday technology
-              problems but don't have anyone reliable to call.
+              I'm Harrison Raynes, a computer science graduate based in Auckland. I started To The
+              Point Tech because I saw how many people struggle with everyday technology problems
+              but don't have anyone reliable to call.
             </p>
 
             <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
@@ -105,8 +133,8 @@ export default function AboutPage(): React.ReactElement {
             </h2>
 
             <p className={cn("text-rich-black mb-4 text-sm sm:text-base")}>
-              I mainly work with households and small businesses around Point Chevalier who want
-              their tech to just work, without wading through jargon or sales pitches.
+              I mainly work with households and small businesses across Auckland who want their tech
+              to just work, without wading through jargon or sales pitches.
             </p>
 
             <ul className={cn("text-rich-black mb-4 space-y-2.5 text-sm sm:text-base")}>

@@ -9,6 +9,7 @@ import { useState } from "react";
 import type React from "react";
 import { cn } from "@/shared/lib/cn";
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
+import { formatDateTimeShort } from "@/shared/lib/date-format";
 
 export interface AdminBookingRow {
   id: string;
@@ -40,23 +41,6 @@ const STATUS_COLORS: Record<string, string> = {
   cancelled: "bg-red-500/20 text-red-500",
   completed: "bg-green-500/20 text-green-600",
 };
-
-/**
- * Formats an ISO date string as a short NZ local date/time.
- * @param iso - ISO 8601 date string.
- * @returns Formatted date/time string in Pacific/Auckland timezone.
- */
-function formatNZDateTime(iso: string): string {
-  return new Intl.DateTimeFormat("en-NZ", {
-    timeZone: "Pacific/Auckland",
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  }).format(new Date(iso));
-}
 
 /**
  * Admin booking list with filter, inline edit, status change, and cancel.
@@ -312,7 +296,7 @@ export function BookingAdminList({
                   <span className={cn("break-all text-xs text-slate-500")}>{b.email}</span>
                   {b.phone && <span className={cn("text-xs text-slate-500")}>{b.phone}</span>}
                   <span className={cn("text-xs text-slate-500")}>
-                    {formatNZDateTime(b.startAt)} &ndash; {formatNZDateTime(b.endAt)}
+                    {formatDateTimeShort(b.startAt)} &ndash; {formatDateTimeShort(b.endAt)}
                   </span>
                 </div>
 
@@ -364,7 +348,7 @@ export function BookingAdminList({
               {isExpanded && (
                 <div className={cn("mt-4 flex flex-col gap-3 border-t border-slate-100 pt-4")}>
                   <p className={cn("text-xs text-slate-400")}>
-                    Booked on {formatNZDateTime(b.createdAt)}
+                    Booked on {formatDateTimeShort(b.createdAt)}
                   </p>
                   <div className={cn("grid gap-3 sm:grid-cols-2")}>
                     <label className={cn("flex flex-col gap-1")}>

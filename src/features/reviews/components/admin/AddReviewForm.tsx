@@ -49,8 +49,8 @@ export function AddReviewForm({ token, onAdded }: AddReviewFormProps): React.Rea
     try {
       const res = await fetch("/api/admin/reviews", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, text, firstName, lastName, isAnonymous }),
+        headers: { "Content-Type": "application/json", "X-Admin-Secret": token },
+        body: JSON.stringify({ text, firstName, lastName, isAnonymous }),
       });
       const data = (await res.json()) as { ok?: boolean; review?: ReviewRow; error?: string };
       if (!res.ok) throw new Error(data.error ?? "Request failed");

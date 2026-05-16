@@ -12,9 +12,15 @@ import {
   minsToHoursLabel,
   billableMins,
   matchRateById,
+  effectiveHourlyRate,
+  composeDescription,
 } from "@/features/business/lib/business";
 import { ContactPickerModal } from "@/features/business/components/ContactPickerModal";
 import { ParseConfidenceBanner } from "@/features/business/components/ParseConfidenceBanner";
+import { TaxonomyManageModal } from "@/features/business/components/TaxonomyManageModal";
+import { Combobox } from "@/features/business/components/Combobox";
+import { loadPlacesLibrary } from "@/shared/lib/google-maps-loader";
+import { summariseForBanner, type ActivePromo } from "@/features/business/lib/promos";
 import type {
   RateConfig,
   TaskLine,
@@ -57,19 +63,47 @@ function timeDiffMins(start: string, end: string): number {
 }
 
 /**
- * Builds an empty task line seeded from the first non-default flat rate in the given rate list.
+ * Builds an empty hourly task line seeded with the default base rate (e.g.
+ * Standard $65/hr) and no modifiers. The operator picks the device + action
+ * after adding the row, and toggles modifier chips to adjust the effective
+ * rate. Flat-rate rows (Travel etc.) come from AI parse or address lookup.
  * @param rates - The list of available rate configurations.
- * @returns A default TaskLine pre-filled with the first matching flat rate, or zeroed values.
+ * @returns A default hourly TaskLine.
  */
 function emptyTask(rates: RateConfig[]): TaskLine {
-  const flat = rates.find((r) => r.flatRate !== null && !r.isDefault);
+  const defaultBase =
+    rates.find((r) => r.ratePerHour !== null && r.isDefault) ??
+    rates.find((r) => r.ratePerHour !== null) ??
+    null;
+  const price = defaultBase?.ratePerHour ?? 0;
   return {
-    rateConfigId: flat?.id ?? null,
-    description: flat?.label ?? "",
+    rateConfigId: null,
+    baseRateId: defaultBase?.id ?? null,
+    modifierIds: [],
+    description: "",
     qty: 1,
-    unitPrice: flat?.flatRate ?? 0,
-    lineTotal: flat?.flatRate ?? 0,
+    unitPrice: price,
+    lineTotal: price,
+    device: null,
+    action: null,
+    details: null,
   };
+}
+
+/**
+ * Builds a sorted, deduplicated suggestion list for one of the combobox axes
+ * (devices or actions) from the current task-template snapshot.
+ * @param templates - All saved templates.
+ * @param key - "device" or "action" - which field to extract.
+ * @returns Sorted unique tag values for that axis.
+ */
+function tagSuggestions(templates: TaskTemplate[], key: "device" | "action"): string[] {
+  const set = new Set<string>();
+  for (const t of templates) {
+    const v = t[key];
+    if (typeof v === "string" && v.trim().length > 0) set.add(v.trim());
+  }
+  return Array.from(set).sort((a, b) => a.localeCompare(b, "en", { sensitivity: "base" }));
 }
 
 /**
@@ -92,10 +126,17 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
   const [tasks, setTasks] = useState<TaskLine[]>([]);
   const [parts, setParts] = useState<PartLine[]>([]);
   const [showParts, setShowParts] = useState(false);
+  const [showTaxonomyModal, setShowTaxonomyModal] = useState(false);
   const [notes, setNotes] = useState("");
   const [gst, setGst] = useState(false);
   const [clientName, setClientName] = useState("");
   const [clientEmail, setClientEmail] = useState("");
+  // Address-to state mirrors the InvoiceBuilder's segmented control so the
+  // operator picks Name/Company/Custom once and the choice rides through to
+  // the invoice without re-picking.
+  const [pickedContactName, setPickedContactName] = useState<string | null>(null);
+  const [pickedContactCompany, setPickedContactCompany] = useState<string | null>(null);
+  const [addressMode, setAddressModeState] = useState<"name" | "company" | "custom">("custom");
 
   const [aiInput, setAiInput] = useState("");
   const [parsing, setParsing] = useState(false);
@@ -122,59 +163,57 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
   const [showRates, setShowRates] = useState(false);
   const [rateForm, setRateForm] = useState({
     label: "",
-    type: "flat" as "flat" | "hourly",
+    type: "hourly" as "flat" | "hourly" | "modifier",
     amount: "",
-    unit: "job",
+    unit: "hour",
     isDefault: false,
   });
   const [editingRateId, setEditingRateId] = useState<string | null>(null);
+  const [resettingRates, setResettingRates] = useState(false);
+
+  // Active promo + per-job skip flag (not persisted).
+  const [activePromo, setActivePromo] = useState<ActivePromo | null>(null);
+  const [skipPromo, setSkipPromo] = useState(false);
 
   useEffect(() => {
     const apiKey = process.env.GOOGLE_MAPS_API_KEY;
     if (!apiKey || !addressInputRef.current) return;
 
-    /** Attaches a Google Places Autocomplete widget to the address input. */
-    function attachAutocomplete(): void {
-      if (!addressInputRef.current) return;
-      const ac = new google.maps.places.Autocomplete(addressInputRef.current, {
-        componentRestrictions: { country: "nz" },
-        fields: ["formatted_address", "address_components"],
-        types: ["geocode"],
+    let cancelled = false;
+    let listener: google.maps.MapsEventListener | null = null;
+
+    loadPlacesLibrary(apiKey)
+      .then(() => {
+        if (cancelled || !addressInputRef.current) return;
+        const autocomplete = new google.maps.places.Autocomplete(addressInputRef.current, {
+          componentRestrictions: { country: "nz" },
+          fields: ["formatted_address", "address_components"],
+          types: ["geocode"],
+        });
+        listener = autocomplete.addListener("place_changed", () => {
+          const place = autocomplete.getPlace();
+          // Prefer suburb (locality) since travel-time looks it up; fall back
+          // to the formatted address.
+          const suburb =
+            place.address_components?.find(
+              (c) => c.types.includes("locality") || c.types.includes("sublocality_level_1"),
+            )?.long_name ??
+            place.formatted_address ??
+            "";
+          if (suburb) {
+            setJobAddress(suburb);
+            setTravelInfo(null);
+          }
+        });
+      })
+      .catch((err) => {
+        console.error("[calculator] Maps autocomplete failed to load:", err);
       });
-      ac.addListener("place_changed", () => {
-        const place = ac.getPlace();
-        const suburb =
-          place.address_components?.find(
-            (c) => c.types.includes("locality") || c.types.includes("sublocality_level_1"),
-          )?.long_name ??
-          place.formatted_address ??
-          "";
-        if (suburb) {
-          setJobAddress(suburb);
-          setTravelInfo(null);
-        }
-      });
-    }
 
-    if (typeof google !== "undefined" && google.maps?.places) {
-      attachAutocomplete();
-      return;
-    }
-
-    const existing = document.querySelector<HTMLScriptElement>(
-      'script[src*="maps.googleapis.com"]',
-    );
-    if (existing) {
-      existing.addEventListener("load", attachAutocomplete);
-      return () => existing.removeEventListener("load", attachAutocomplete);
-    }
-
-    const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
-    script.async = true;
-    script.addEventListener("load", attachAutocomplete);
-    document.head.appendChild(script);
-    return () => script.removeEventListener("load", attachAutocomplete);
+    return () => {
+      cancelled = true;
+      if (listener) google.maps.event.removeListener(listener);
+    };
   }, []);
 
   useEffect(() => {
@@ -182,10 +221,15 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
     Promise.all([
       fetch("/api/business/rates", { headers }).then((r) => r.json()),
       fetch("/api/business/task-templates", { headers }).then((r) => r.json()),
+      // Public; auto-applies any live promo to the Summary panel.
+      fetch("/api/promos/active")
+        .then((r) => r.json())
+        .catch(() => ({ ok: false, promo: null })),
     ]).then(
-      ([ratesData, templatesData]: [
+      ([ratesData, templatesData, promoData]: [
         { ok: boolean; rates: RateConfig[] },
         { ok: boolean; templates: TaskTemplate[] },
+        { ok: boolean; promo: ActivePromo | null },
       ]) => {
         setStartTime(now);
         setEndTime(addHour(now));
@@ -195,13 +239,21 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
           if (def) setHourlyRateId(def.id);
         }
         if (templatesData.ok) setTaskTemplates(templatesData.templates);
+        setActivePromo(promoData.promo ?? null);
       },
     );
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const durationMins = durationOverride ?? timeDiffMins(startTime, endTime);
   const hourlyRate = matchRateById(rates, hourlyRateId);
-  const hourlyRates = rates.filter((r) => r.ratePerHour !== null);
+  // Base hourly rates (e.g. Standard $65/hr) — used for the top-level Time
+  // selector and as the per-task base rate.
+  const baseRates = rates.filter((r) => r.ratePerHour !== null);
+  // Modifier rates (signed $/hr deltas like At home -$10, Complex +$20) —
+  // toggled per task to shift the effective rate.
+  const modifierRates = rates
+    .filter((r) => r.hourlyDelta !== null)
+    .sort((a, b) => a.label.localeCompare(b.label));
   const flatRates = rates.filter((r) => r.flatRate !== null);
 
   const job: JobCalculation = {
@@ -217,7 +269,7 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
     clientName,
     clientEmail,
   };
-  const totals = calcJobTotal(job);
+  const totals = calcJobTotal(job, !skipPromo ? activePromo : null);
 
   /**
    * Applies a parsed job response to the calculator state, setting duration, hourly rate, tasks,
@@ -247,13 +299,31 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
       setDurationOverride(null);
     }
     setHourlyRateId(result.hourlyRateId);
-    const parsedTasks: TaskLine[] = result.tasks.map((t) => ({
-      rateConfigId: t.rateConfigId,
-      description: t.description,
-      qty: t.qty,
-      unitPrice: t.unitPrice,
-      lineTotal: Math.round(t.qty * t.unitPrice * 100) / 100,
-    }));
+    const parsedTasks: TaskLine[] = result.tasks.map((t) => {
+      const device = t.device ?? null;
+      const action = t.action ?? null;
+      const details = t.details?.trim() ? t.details.trim() : null;
+      // Server already composes the description, but compose locally as a
+      // fallback so descriptions stay correct even if an older route shape
+      // sneaks through.
+      const description = composeDescription(device, action, details) || t.description || "";
+      // If baseRateId is set, this is an hourly task (new rate model) - force
+      // rateConfigId to null so the promo math classifies it correctly even
+      // if the AI emitted a stray ID.
+      const isHourly = t.baseRateId != null;
+      return {
+        rateConfigId: isHourly ? null : (t.rateConfigId ?? null),
+        baseRateId: t.baseRateId ?? null,
+        modifierIds: t.modifierIds ?? [],
+        description,
+        qty: t.qty,
+        unitPrice: t.unitPrice,
+        lineTotal: Math.round(t.qty * t.unitPrice * 100) / 100,
+        device,
+        action,
+        details,
+      };
+    });
     const parsedParts = result.parts.map((p) => ({ description: p.description, cost: p.cost }));
     if (result.destination) setJobAddress(result.destination);
     if (result.travel && result.travel.distanceKm > 0) {
@@ -340,13 +410,22 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
    * @param taskList - Tasks from the current job to persist as templates
    */
   async function saveTaskTemplates(taskList: TaskLine[]): Promise<void> {
-    const custom = taskList.filter((t) => t.rateConfigId === null && t.description.trim());
+    // Only save tasks that have BOTH device + action populated. Description-only
+    // rows (e.g. flat-rate travel lines) skip templating.
+    const custom = taskList.filter((t) => t.rateConfigId == null && t.device && t.action);
     await Promise.all(
       custom.map((t) =>
         fetch("/api/business/task-templates", {
           method: "POST",
           headers: { ...headers, "content-type": "application/json" },
-          body: JSON.stringify({ description: t.description.trim(), defaultPrice: t.unitPrice }),
+          body: JSON.stringify({
+            defaultPrice: t.unitPrice,
+            device: t.device,
+            action: t.action,
+            // Description fallback for the server's composeDescription() in case
+            // either tag accidentally drops out before persist.
+            description: t.description.trim(),
+          }),
         })
           .then((r) => r.json())
           .then((d: { ok: boolean; template: TaskTemplate }) => {
@@ -364,6 +443,25 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
   }
 
   /**
+   * Switches address-to mode and updates clientName accordingly. Custom mode
+   * keeps whatever clientName already has so the operator can keep editing.
+   * @param mode - Target mode.
+   */
+  function setAddressMode(mode: "name" | "company" | "custom"): void {
+    if (mode === "name" && pickedContactName) {
+      setAddressModeState("name");
+      setClientName(pickedContactName);
+      return;
+    }
+    if (mode === "company" && pickedContactCompany) {
+      setAddressModeState("company");
+      setClientName(pickedContactCompany);
+      return;
+    }
+    setAddressModeState("custom");
+  }
+
+  /**
    * Saves task templates then navigates to the new-invoice page with the job pre-populated.
    */
   async function handleCreateInvoice(): Promise<void> {
@@ -376,6 +474,18 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
       gst: String(gst),
       notes,
     });
+    // Carry the picked-contact + address-mode across so the InvoiceBuilder
+    // restores the same Name/Company/Custom toggle state the operator chose
+    // here, no re-picking.
+    if (pickedContactName) q.set("pickedContactName", pickedContactName);
+    if (pickedContactCompany) q.set("pickedContactCompany", pickedContactCompany);
+    if (pickedContactName) q.set("addressMode", addressMode);
+    // Pass promo snapshot to InvoiceBuilder; skipPromo=1 carries the opt-out.
+    if (activePromo && !skipPromo && totals.promoDiscount > 0) {
+      q.set("promoTitle", activePromo.title);
+      q.set("promoDiscount", String(totals.promoDiscount));
+    }
+    if (skipPromo) q.set("skipPromo", "1");
     router.push(`/admin/business/invoices/new?token=${encodeURIComponent(token)}&${q.toString()}`);
   }
 
@@ -458,11 +568,13 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
    * @param r - The rate configuration to edit.
    */
   function handleStartEdit(r: RateConfig): void {
+    const type: "hourly" | "modifier" | "flat" =
+      r.ratePerHour !== null ? "hourly" : r.hourlyDelta !== null ? "modifier" : "flat";
     setEditingRateId(r.id);
     setRateForm({
       label: r.label,
-      type: r.ratePerHour !== null ? "hourly" : "flat",
-      amount: String(r.ratePerHour ?? r.flatRate ?? ""),
+      type,
+      amount: String(r.ratePerHour ?? r.hourlyDelta ?? r.flatRate ?? ""),
       unit: r.unit,
       isDefault: r.isDefault,
     });
@@ -473,7 +585,98 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
    */
   function handleCancelEdit(): void {
     setEditingRateId(null);
-    setRateForm({ label: "", type: "flat", amount: "", unit: "job", isDefault: false });
+    setRateForm({ label: "", type: "hourly", amount: "", unit: "hour", isDefault: false });
+  }
+
+  /**
+   * Re-fetches the rates list from the API. Used after a reset and after
+   * a 404 on edit/delete (which means the row was wiped server-side and our
+   * local snapshot is stale).
+   */
+  async function refreshRates(): Promise<void> {
+    try {
+      const res = await fetch("/api/business/rates", { headers });
+      if (!res.ok) return;
+      const d = await res.json();
+      if (d.ok && Array.isArray(d.rates)) setRates(d.rates);
+    } catch (err) {
+      console.error("[calculator] refreshRates failed:", err);
+    }
+  }
+
+  /**
+   * Wipes every rate row and reseeds the defaults (Standard base + modifier set
+   * + Travel flat). Confirms first since this drops any custom rates. Also
+   * cancels any in-progress edit so the form doesn't hold a stale ID.
+   */
+  async function handleResetRates(): Promise<void> {
+    if (
+      !confirm(
+        "Wipe all rates and reseed the defaults (Standard, Complex, At home, Student, Remote, Travel)? Any custom rates you've added will be deleted.",
+      )
+    ) {
+      return;
+    }
+    handleCancelEdit();
+    setResettingRates(true);
+    try {
+      const res = await fetch("/api/business/rates", { method: "DELETE", headers });
+      if (!res.ok) {
+        console.error("[calculator] reset rates failed with status", res.status);
+        return;
+      }
+      const d = await res.json();
+      if (d.ok && Array.isArray(d.rates)) {
+        setRates(d.rates);
+        const def = d.rates.find((r: RateConfig) => r.isDefault);
+        if (def) setHourlyRateId(def.id);
+      }
+    } finally {
+      setResettingRates(false);
+    }
+  }
+
+  /**
+   * Toggles a modifier rate on a task and recomputes the unit price + line
+   * total from the resulting base + modifiers combo.
+   * @param idx - Task index.
+   * @param modifierId - Modifier rate ID being toggled on/off.
+   */
+  function toggleTaskModifier(idx: number, modifierId: string): void {
+    setTasks((prev) => {
+      const arr = [...prev];
+      const current = arr[idx].modifierIds ?? [];
+      const next = current.includes(modifierId)
+        ? current.filter((m) => m !== modifierId)
+        : [...current, modifierId];
+      const newPrice = effectiveHourlyRate(rates, arr[idx].baseRateId, next);
+      arr[idx] = {
+        ...arr[idx],
+        modifierIds: next,
+        unitPrice: newPrice,
+        lineTotal: Math.round(arr[idx].qty * newPrice * 100) / 100,
+      };
+      return arr;
+    });
+  }
+
+  /**
+   * Sets a task's base hourly rate and recomputes its unit price + line total.
+   * @param idx - Task index.
+   * @param baseId - New base rate ID, or null to clear.
+   */
+  function setTaskBase(idx: number, baseId: string | null): void {
+    setTasks((prev) => {
+      const arr = [...prev];
+      const newPrice = effectiveHourlyRate(rates, baseId, arr[idx].modifierIds);
+      arr[idx] = {
+        ...arr[idx],
+        baseRateId: baseId,
+        unitPrice: newPrice,
+        lineTotal: Math.round(arr[idx].qty * newPrice * 100) / 100,
+      };
+      return arr;
+    });
   }
 
   /**
@@ -482,12 +685,14 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
    */
   async function handleSubmitRate(e: React.SyntheticEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault();
+    const amount = parseFloat(rateForm.amount);
     const body = {
       label: rateForm.label,
-      ratePerHour: rateForm.type === "hourly" ? parseFloat(rateForm.amount) : null,
-      flatRate: rateForm.type === "flat" ? parseFloat(rateForm.amount) : null,
-      unit: rateForm.unit,
-      isDefault: rateForm.isDefault,
+      ratePerHour: rateForm.type === "hourly" ? amount : null,
+      flatRate: rateForm.type === "flat" ? amount : null,
+      hourlyDelta: rateForm.type === "modifier" ? amount : null,
+      unit: rateForm.type === "modifier" ? "modifier" : rateForm.unit,
+      isDefault: rateForm.type === "hourly" ? rateForm.isDefault : false,
     };
 
     if (editingRateId) {
@@ -496,6 +701,14 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
         headers: { ...headers, "content-type": "application/json" },
         body: JSON.stringify(body),
       });
+      // Bail safely on non-OK - 404 typically means the rate was wiped via
+      // Reset and our local snapshot is stale. Re-fetch and exit edit mode.
+      if (!res.ok) {
+        console.error("[calculator] PATCH rate failed with status", res.status);
+        handleCancelEdit();
+        await refreshRates();
+        return;
+      }
       const d = await res.json();
       if (d.ok) {
         setRates((prev) =>
@@ -511,6 +724,10 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
         headers: { ...headers, "content-type": "application/json" },
         body: JSON.stringify(body),
       });
+      if (!res.ok) {
+        console.error("[calculator] POST rate failed with status", res.status);
+        return;
+      }
       const d = await res.json();
       if (d.ok) {
         setRates((prev) =>
@@ -518,7 +735,7 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
             ? prev.map((r) => ({ ...r, isDefault: false })).concat(d.rate)
             : [...prev, d.rate],
         );
-        setRateForm({ label: "", type: "flat", amount: "", unit: "job", isDefault: false });
+        setRateForm({ label: "", type: "hourly", amount: "", unit: "hour", isDefault: false });
       }
     }
   }
@@ -531,7 +748,15 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
   async function handleDeleteRate(id: string): Promise<void> {
     if (!confirm("Delete this rate?")) return;
     const res = await fetch(`/api/business/rates/${id}`, { method: "DELETE", headers });
-    if ((await res.json()).ok) setRates((prev) => prev.filter((r) => r.id !== id));
+    if (!res.ok) {
+      // 404 = already deleted server-side. Refresh so the row disappears
+      // from the table and the user can move on.
+      console.error("[calculator] DELETE rate failed with status", res.status);
+      await refreshRates();
+      return;
+    }
+    const d = await res.json();
+    if (d.ok) setRates((prev) => prev.filter((r) => r.id !== id));
   }
 
   return (
@@ -540,11 +765,57 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
         <ContactPickerModal
           token={token}
           onSelect={(c: GoogleContact) => {
+            const company = c.company?.trim() || null;
             setClientName(c.name);
             setClientEmail(c.email);
+            setPickedContactName(c.name);
+            setPickedContactCompany(company);
+            setAddressModeState("name");
           }}
           onClose={() => setShowContactPicker(false)}
         />
+      )}
+
+      {showTaxonomyModal && (
+        <TaxonomyManageModal
+          token={token}
+          onClose={() => setShowTaxonomyModal(false)}
+          onChanged={() => {
+            // Re-fetch templates so the picker dropdown reflects cleared tags.
+            void fetch("/api/business/task-templates", { headers })
+              .then((r) => r.json())
+              .then((d: { ok: boolean; templates: TaskTemplate[] }) => {
+                if (d.ok) setTaskTemplates(d.templates);
+              });
+          }}
+        />
+      )}
+
+      {/* Promo chip with per-job skip toggle. */}
+      {activePromo && (
+        <div
+          className={cn(
+            "mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3",
+          )}
+        >
+          <div className={cn("flex items-center gap-2 text-sm text-amber-800")}>
+            <span aria-hidden="true">⚡</span>
+            <span className={cn("font-semibold")}>Promo: {activePromo.title}</span>
+            <span className={cn("text-xs text-amber-700")}>
+              ({summariseForBanner(activePromo)})
+            </span>
+            {skipPromo && <span className={cn("text-xs italic")}>- skipped for this job</span>}
+          </div>
+          <label className={cn("flex items-center gap-2 text-xs text-amber-800")}>
+            <input
+              type="checkbox"
+              checked={skipPromo}
+              onChange={(e) => setSkipPromo(e.target.checked)}
+              className={cn("h-3.5 w-3.5")}
+            />
+            Skip promo for this job
+          </label>
+        </div>
       )}
 
       <div className={cn("mb-4 flex justify-end")}>
@@ -561,7 +832,19 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
       {/* Rate settings panel */}
       {showRates && (
         <div className={cn("mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}>
-          <h2 className={cn("text-russian-violet mb-3 text-sm font-semibold")}>Rate config</h2>
+          <div className={cn("mb-3 flex items-center justify-between gap-2")}>
+            <h2 className={cn("text-russian-violet text-sm font-semibold")}>Rate config</h2>
+            <button
+              type="button"
+              onClick={() => void handleResetRates()}
+              disabled={resettingRates}
+              className={cn(
+                "rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50",
+              )}
+            >
+              {resettingRates ? "Resetting..." : "Reset to defaults"}
+            </button>
+          </div>
           <table className={cn("mb-4 w-full text-xs")}>
             <thead>
               <tr className={cn("border-b border-slate-100")}>
@@ -579,9 +862,11 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
                   <td className={cn("py-1.5 text-slate-500")}>
                     {r.ratePerHour !== null
                       ? `$${r.ratePerHour}/hr`
-                      : r.flatRate !== null
-                        ? `$${r.flatRate}`
-                        : "-"}
+                      : r.hourlyDelta !== null
+                        ? `${r.hourlyDelta < 0 ? "-" : "+"}$${Math.abs(r.hourlyDelta)}/hr`
+                        : r.flatRate !== null
+                          ? `$${r.flatRate}`
+                          : "-"}
                   </td>
                   <td className={cn("py-1.5 text-slate-400")}>{r.unit}</td>
                   <td className={cn("py-1.5")}>{r.isDefault ? "✓" : ""}</td>
@@ -603,7 +888,10 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
               ))}
             </tbody>
           </table>
-          <form onSubmit={handleSubmitRate} className={cn("grid items-end gap-2 sm:grid-cols-5")}>
+          <form
+            onSubmit={handleSubmitRate}
+            className={cn("grid grid-cols-1 items-end gap-2 sm:grid-cols-2 lg:grid-cols-5")}
+          >
             <input
               type="text"
               placeholder="Label"
@@ -611,31 +899,37 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
               value={rateForm.label}
               onChange={(e) => setRateForm((p) => ({ ...p, label: e.target.value }))}
               className={cn(
-                "focus:ring-russian-violet/30 rounded-lg border border-slate-200 px-2 py-1.5 text-xs focus:outline-none focus:ring-2",
+                "focus:ring-russian-violet/30 rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 sm:py-2 sm:text-xs",
               )}
             />
             <select
               value={rateForm.type}
               onChange={(e) =>
-                setRateForm((p) => ({ ...p, type: e.target.value as "flat" | "hourly" }))
+                setRateForm((p) => ({
+                  ...p,
+                  type: e.target.value as "flat" | "hourly" | "modifier",
+                }))
               }
               className={cn(
-                "focus:ring-russian-violet/30 rounded-lg border border-slate-200 px-2 py-1.5 text-xs focus:outline-none focus:ring-2",
+                "focus:ring-russian-violet/30 rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 sm:py-2 sm:text-xs",
               )}
             >
+              <option value="hourly">Hourly base</option>
+              <option value="modifier">Modifier (+/-)</option>
               <option value="flat">Flat</option>
-              <option value="hourly">Hourly</option>
             </select>
             <input
               type="number"
-              placeholder="Amount"
+              placeholder={rateForm.type === "modifier" ? "Delta (+/-)" : "Amount"}
               required
               step="0.01"
-              min="0"
+              // Modifier rates carry a signed delta added to the base $/hr
+              // (e.g. -10 for At home). Flat and hourly rates must be >= 0.
+              min={rateForm.type === "modifier" ? undefined : 0}
               value={rateForm.amount}
               onChange={(e) => setRateForm((p) => ({ ...p, amount: e.target.value }))}
               className={cn(
-                "focus:ring-russian-violet/30 rounded-lg border border-slate-200 px-2 py-1.5 text-xs focus:outline-none focus:ring-2",
+                "focus:ring-russian-violet/30 rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 sm:py-2 sm:text-xs",
               )}
             />
             <input
@@ -644,14 +938,14 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
               value={rateForm.unit}
               onChange={(e) => setRateForm((p) => ({ ...p, unit: e.target.value }))}
               className={cn(
-                "focus:ring-russian-violet/30 rounded-lg border border-slate-200 px-2 py-1.5 text-xs focus:outline-none focus:ring-2",
+                "focus:ring-russian-violet/30 rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 sm:py-2 sm:text-xs",
               )}
             />
             <div className={cn("flex gap-2")}>
               <button
                 type="submit"
                 className={cn(
-                  "bg-russian-violet rounded-lg px-3 py-1.5 text-xs font-medium text-white hover:opacity-90",
+                  "bg-russian-violet rounded-lg px-4 py-2.5 text-sm font-medium text-white hover:opacity-90 sm:py-2 sm:text-xs",
                 )}
               >
                 {editingRateId ? "Update" : "Add"}
@@ -661,7 +955,7 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
                   type="button"
                   onClick={handleCancelEdit}
                   className={cn(
-                    "rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50",
+                    "rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 sm:py-2 sm:text-xs",
                   )}
                 >
                   Cancel
@@ -842,7 +1136,7 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
                   )}
                 >
                   <option value="">None</option>
-                  {hourlyRates.map((r) => (
+                  {baseRates.map((r) => (
                     <option key={r.id} value={r.id}>
                       {r.label} ({formatNZD(r.ratePerHour ?? 0)}/hr)
                     </option>
@@ -923,111 +1217,232 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
 
           {/* Tasks */}
           <div
-            className={cn("space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}
+            className={cn(
+              "space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5",
+            )}
           >
-            <h2 className={cn("text-russian-violet text-sm font-semibold")}>Tasks</h2>
-            {tasks.map((task, idx) => (
-              <div
-                key={idx}
-                className={cn("grid grid-cols-[120px_auto_60px_80px_80px_24px] items-center gap-2")}
+            <div className={cn("flex items-center justify-between gap-2")}>
+              <h2 className={cn("text-russian-violet text-sm font-semibold")}>Tasks</h2>
+              <button
+                type="button"
+                onClick={() => setShowTaxonomyModal(true)}
+                className={cn("text-xs font-medium text-slate-500 underline hover:text-slate-700")}
               >
-                <select
-                  value={task.rateConfigId ? `rate:${task.rateConfigId}` : "custom"}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (val === "custom") {
-                      updateTask(idx, "rateConfigId", null);
-                    } else if (val.startsWith("template:")) {
-                      const tmpl = taskTemplates.find((t) => t.id === val.slice(9));
-                      if (tmpl) {
-                        setTasks((prev) => {
-                          const next = [...prev];
-                          next[idx] = {
-                            ...next[idx],
-                            rateConfigId: null,
-                            description: tmpl.description,
-                            unitPrice: tmpl.defaultPrice,
-                            lineTotal: tmpl.defaultPrice,
-                          };
-                          return next;
-                        });
-                      }
-                    } else {
-                      updateTask(idx, "rateConfigId", val.slice(5));
-                    }
-                  }}
+                Manage tags
+              </button>
+            </div>
+            {tasks.map((task, idx) => {
+              // Flat-rate rows (e.g. Travel) keep their old single-line look;
+              // task rows use the device + action combobox layout.
+              const isFlatRate = task.rateConfigId != null;
+              const composed = composeDescription(
+                task.device ?? null,
+                task.action ?? null,
+                task.details ?? null,
+              );
+
+              return (
+                <div
+                  key={idx}
                   className={cn(
-                    "focus:ring-russian-violet/30 rounded-lg border border-slate-200 px-2 py-1.5 text-xs focus:outline-none focus:ring-2",
+                    "rounded-lg border border-slate-200 bg-slate-50/60 p-3 sm:bg-white",
                   )}
                 >
-                  <option value="custom">Custom</option>
-                  {taskTemplates.length > 0 && (
-                    <optgroup label="Saved services">
-                      {taskTemplates.map((t) => (
-                        <option key={t.id} value={`template:${t.id}`}>
-                          {t.description}
-                        </option>
-                      ))}
-                    </optgroup>
+                  {isFlatRate ? (
+                    /* Flat-rate row (Travel etc.): rate dropdown + qty/price/total/delete inline. */
+                    <div className={cn("flex flex-col gap-2 sm:flex-row sm:items-center")}>
+                      <select
+                        value={`rate:${task.rateConfigId}`}
+                        onChange={(e) => updateTask(idx, "rateConfigId", e.target.value.slice(5))}
+                        className={cn(
+                          "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 sm:w-40 sm:py-2 sm:text-xs",
+                        )}
+                      >
+                        {flatRates.map((r) => (
+                          <option key={r.id} value={`rate:${r.id}`}>
+                            {r.label}
+                          </option>
+                        ))}
+                      </select>
+                      <p
+                        className={cn(
+                          "truncate text-sm text-slate-600 sm:flex-1 sm:text-xs sm:text-slate-500",
+                        )}
+                      >
+                        {task.description}
+                      </p>
+                      <TaskTotalsRow
+                        task={task}
+                        onQty={(v) => updateTask(idx, "qty", v)}
+                        onPrice={(v) => updateTask(idx, "unitPrice", v)}
+                        onDelete={() => setTasks((p) => p.filter((_, i) => i !== idx))}
+                      />
+                    </div>
+                  ) : (
+                    /* Task row: Device + Action comboboxes, optional details input, composed preview, qty/price/total/delete. */
+                    <div className={cn("flex flex-col gap-2")}>
+                      <div className={cn("grid grid-cols-1 gap-2 sm:grid-cols-3")}>
+                        <Combobox
+                          value={task.device ?? ""}
+                          onChange={(v) => {
+                            const next = v.trim() || null;
+                            setTasks((prev) => {
+                              const arr = [...prev];
+                              const updated = { ...arr[idx], device: next };
+                              const composedDesc = composeDescription(
+                                next,
+                                updated.action ?? null,
+                                updated.details ?? null,
+                              );
+                              if (composedDesc) updated.description = composedDesc;
+                              const tmpl =
+                                next && updated.action
+                                  ? taskTemplates.find(
+                                      (t) =>
+                                        (t.device ?? "").toLowerCase() === next.toLowerCase() &&
+                                        (t.action ?? "").toLowerCase() ===
+                                          (updated.action ?? "").toLowerCase(),
+                                    )
+                                  : null;
+                              if (tmpl) {
+                                updated.unitPrice = tmpl.defaultPrice;
+                                updated.lineTotal =
+                                  Math.round(updated.qty * tmpl.defaultPrice * 100) / 100;
+                              }
+                              arr[idx] = updated;
+                              return arr;
+                            });
+                          }}
+                          suggestions={tagSuggestions(taskTemplates, "device")}
+                          placeholder="Device"
+                          ariaLabel="Device"
+                        />
+                        <Combobox
+                          value={task.action ?? ""}
+                          onChange={(v) => {
+                            const next = v.trim() || null;
+                            setTasks((prev) => {
+                              const arr = [...prev];
+                              const updated = { ...arr[idx], action: next };
+                              const composedDesc = composeDescription(
+                                updated.device ?? null,
+                                next,
+                                updated.details ?? null,
+                              );
+                              if (composedDesc) updated.description = composedDesc;
+                              const tmpl =
+                                updated.device && next
+                                  ? taskTemplates.find(
+                                      (t) =>
+                                        (t.device ?? "").toLowerCase() ===
+                                          (updated.device ?? "").toLowerCase() &&
+                                        (t.action ?? "").toLowerCase() === next.toLowerCase(),
+                                    )
+                                  : null;
+                              if (tmpl) {
+                                updated.unitPrice = tmpl.defaultPrice;
+                                updated.lineTotal =
+                                  Math.round(updated.qty * tmpl.defaultPrice * 100) / 100;
+                              }
+                              arr[idx] = updated;
+                              return arr;
+                            });
+                          }}
+                          suggestions={tagSuggestions(taskTemplates, "action")}
+                          placeholder="Action"
+                          ariaLabel="Action"
+                        />
+                        <input
+                          type="text"
+                          value={task.details ?? ""}
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            setTasks((prev) => {
+                              const arr = [...prev];
+                              const updated = { ...arr[idx], details: raw === "" ? null : raw };
+                              const composedDesc = composeDescription(
+                                updated.device ?? null,
+                                updated.action ?? null,
+                                updated.details,
+                              );
+                              if (composedDesc) updated.description = composedDesc;
+                              arr[idx] = updated;
+                              return arr;
+                            });
+                          }}
+                          placeholder="Details (optional)"
+                          aria-label="Details"
+                          className={cn(
+                            "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 sm:py-2 sm:text-xs",
+                          )}
+                        />
+                      </div>
+                      <p
+                        className={cn(
+                          "truncate rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-700 sm:py-1.5 sm:text-xs",
+                          !composed && "italic text-slate-400",
+                        )}
+                        title={composed || "Pick device + action"}
+                      >
+                        {composed || "Pick device + action"}
+                      </p>
+                      <div className={cn("flex flex-wrap items-center gap-1.5")}>
+                        <select
+                          value={task.baseRateId ?? ""}
+                          onChange={(e) => setTaskBase(idx, e.target.value || null)}
+                          aria-label="Base rate"
+                          className={cn(
+                            "focus:ring-russian-violet/30 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs focus:outline-none focus:ring-2",
+                          )}
+                        >
+                          <option value="">No base</option>
+                          {baseRates.map((r) => (
+                            <option key={r.id} value={r.id}>
+                              {r.label} ({formatNZD(r.ratePerHour ?? 0)}/hr)
+                            </option>
+                          ))}
+                        </select>
+                        {modifierRates.map((m) => {
+                          const active = task.modifierIds?.includes(m.id) ?? false;
+                          const delta = m.hourlyDelta ?? 0;
+                          const sign = delta < 0 ? "-" : "+";
+                          return (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => toggleTaskModifier(idx, m.id)}
+                              aria-pressed={active}
+                              className={cn(
+                                "rounded-full border px-2 py-1 text-xs font-medium transition-colors",
+                                active
+                                  ? "border-russian-violet/40 bg-russian-violet/10 text-russian-violet"
+                                  : "border-slate-200 bg-white text-slate-500 hover:border-slate-300",
+                              )}
+                            >
+                              {m.label} {sign}${Math.abs(delta)}
+                            </button>
+                          );
+                        })}
+                        <span className={cn("ml-auto text-xs font-semibold text-slate-700")}>
+                          = {formatNZD(task.unitPrice)}/hr
+                        </span>
+                      </div>
+                      <TaskTotalsRow
+                        task={task}
+                        onQty={(v) => updateTask(idx, "qty", v)}
+                        onPrice={(v) => updateTask(idx, "unitPrice", v)}
+                        onDelete={() => setTasks((p) => p.filter((_, i) => i !== idx))}
+                      />
+                    </div>
                   )}
-                  {flatRates.length > 0 && (
-                    <optgroup label="Flat rates">
-                      {flatRates.map((r) => (
-                        <option key={r.id} value={`rate:${r.id}`}>
-                          {r.label}
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-                </select>
-                {task.rateConfigId === null ? (
-                  <input
-                    type="text"
-                    placeholder="Description"
-                    value={task.description}
-                    onChange={(e) => updateTask(idx, "description", e.target.value)}
-                    className={cn(
-                      "focus:ring-russian-violet/30 rounded-lg border border-slate-200 px-2 py-1.5 text-xs focus:outline-none focus:ring-2",
-                    )}
-                  />
-                ) : (
-                  <div className={cn("truncate text-xs text-slate-500")}>{task.description}</div>
-                )}
-                <input
-                  type="number"
-                  min="0.25"
-                  step="0.25"
-                  title="Hours"
-                  value={task.qty}
-                  onChange={(e) => updateTask(idx, "qty", parseFloat(e.target.value) || 0)}
-                  className={cn(
-                    "focus:ring-russian-violet/30 rounded-lg border border-slate-200 px-2 py-1.5 text-xs focus:outline-none focus:ring-2",
-                  )}
-                />
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={task.unitPrice}
-                  onChange={(e) => updateTask(idx, "unitPrice", parseFloat(e.target.value) || 0)}
-                  className={cn(
-                    "focus:ring-russian-violet/30 rounded-lg border border-slate-200 px-2 py-1.5 text-xs focus:outline-none focus:ring-2",
-                  )}
-                />
-                <p className={cn("text-right text-xs font-medium text-slate-700")}>
-                  {formatNZD(task.lineTotal)}
-                </p>
-                <button
-                  onClick={() => setTasks((p) => p.filter((_, i) => i !== idx))}
-                  className={cn("text-lg leading-none text-slate-300 hover:text-red-500")}
-                >
-                  ×
-                </button>
-              </div>
-            ))}
+                </div>
+              );
+            })}
             <button
               onClick={() => setTasks((p) => [...p, emptyTask(rates)])}
-              className={cn("hover:text-russian-violet text-xs text-slate-500 underline")}
+              className={cn(
+                "hover:text-russian-violet inline-flex h-11 items-center text-sm text-slate-500 underline sm:h-auto sm:text-xs",
+              )}
             >
               + Add task
             </button>
@@ -1049,7 +1464,10 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
                 {parts.map((part, idx) => (
                   <div
                     key={idx}
-                    className={cn("grid grid-cols-[1fr_80px_24px] items-center gap-2")}
+                    className={cn(
+                      "grid grid-cols-[minmax(0,1fr)_44px] items-center gap-2",
+                      "sm:grid-cols-[minmax(0,1fr)_88px_28px]",
+                    )}
                   >
                     <input
                       type="text"
@@ -1063,7 +1481,7 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
                         })
                       }
                       className={cn(
-                        "focus:ring-russian-violet/30 rounded-lg border border-slate-200 px-2 py-1.5 text-xs focus:outline-none focus:ring-2",
+                        "focus:ring-russian-violet/30 col-span-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 sm:col-span-1 sm:py-2 sm:text-xs",
                       )}
                     />
                     <input
@@ -1080,12 +1498,15 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
                         })
                       }
                       className={cn(
-                        "focus:ring-russian-violet/30 rounded-lg border border-slate-200 px-2 py-1.5 text-xs focus:outline-none focus:ring-2",
+                        "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 sm:py-2 sm:text-xs",
                       )}
                     />
                     <button
                       onClick={() => setParts((p) => p.filter((_, i) => i !== idx))}
-                      className={cn("text-lg leading-none text-slate-300 hover:text-red-500")}
+                      aria-label="Remove part"
+                      className={cn(
+                        "inline-flex h-11 w-11 items-center justify-center rounded-lg text-xl leading-none text-slate-400 hover:bg-red-50 hover:text-red-500 sm:h-auto sm:w-auto sm:rounded-none sm:text-lg sm:hover:bg-transparent",
+                      )}
                     >
                       ×
                     </button>
@@ -1093,7 +1514,9 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
                 ))}
                 <button
                   onClick={() => setParts((p) => [...p, { description: "", cost: 0 }])}
-                  className={cn("hover:text-russian-violet text-xs text-slate-500 underline")}
+                  className={cn(
+                    "hover:text-russian-violet inline-flex h-11 items-center text-sm text-slate-500 underline sm:h-auto sm:text-xs",
+                  )}
                 >
                   + Add part
                 </button>
@@ -1155,6 +1578,12 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
                 <span>Subtotal</span>
                 <span>{formatNZD(totals.subtotal)}</span>
               </div>
+              {totals.promoDiscount > 0 && activePromo && (
+                <div className={cn("flex justify-between text-amber-700")}>
+                  <span>Promo: {activePromo.title}</span>
+                  <span>-{formatNZD(totals.promoDiscount)}</span>
+                </div>
+              )}
               <div className={cn("flex items-center justify-between")}>
                 <label className={cn("flex cursor-pointer items-center gap-2 text-slate-600")}>
                   <input
@@ -1191,13 +1620,44 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
                 Pick from contacts
               </button>
             </div>
+            {pickedContactName && (
+              <div className={cn("flex flex-wrap items-center gap-2")}>
+                <span className={cn("text-xs font-medium text-slate-600")}>Address to:</span>
+                {(["name", "company", "custom"] as const).map((mode) => {
+                  const disabled = mode === "company" && !pickedContactCompany;
+                  const active = addressMode === mode;
+                  const label =
+                    mode === "name" ? "Name" : mode === "company" ? "Company" : "Custom";
+                  return (
+                    <button
+                      key={mode}
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => setAddressMode(mode)}
+                      title={disabled ? "Picked contact has no company" : undefined}
+                      className={cn(
+                        "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                        active
+                          ? "border-russian-violet/40 bg-russian-violet/10 text-russian-violet"
+                          : "border-slate-200 bg-white text-slate-600 hover:border-slate-300",
+                        disabled && "cursor-not-allowed opacity-40 hover:border-slate-200",
+                      )}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             <input
               type="text"
               placeholder="Name"
               value={clientName}
+              readOnly={addressMode !== "custom"}
               onChange={(e) => setClientName(e.target.value)}
               className={cn(
                 "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
+                addressMode !== "custom" && "bg-slate-50 text-slate-700",
               )}
             />
             <input
@@ -1267,5 +1727,95 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
         </div>
       </div>
     </>
+  );
+}
+
+/**
+ * Compact qty + unit-price + total + delete row shared by both flat-rate and
+ * device/action task rows. Stacks on mobile (qty/price/total in a 3-up grid
+ * with the delete button to the right) and collapses to an inline strip at
+ * sm+ so it sits next to the device/action picker.
+ * @param props - Component props.
+ * @param props.task - The task line to render controls for.
+ * @param props.onQty - Called when the operator edits the hours / qty input.
+ * @param props.onPrice - Called when the operator edits the $/unit input.
+ * @param props.onDelete - Called when the × button is pressed.
+ * @returns Totals strip element.
+ */
+function TaskTotalsRow({
+  task,
+  onQty,
+  onPrice,
+  onDelete,
+}: {
+  task: TaskLine;
+  onQty: (v: number) => void;
+  onPrice: (v: number) => void;
+  onDelete: () => void;
+}): React.ReactElement {
+  return (
+    <div
+      className={cn(
+        "grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_44px] items-center gap-2",
+        "sm:flex sm:flex-none sm:items-center sm:gap-2",
+      )}
+    >
+      <label className={cn("flex flex-col gap-0.5 sm:contents")}>
+        <span
+          className={cn("text-[10px] font-medium uppercase tracking-wide text-slate-400 sm:hidden")}
+        >
+          Hrs
+        </span>
+        <input
+          type="number"
+          min="0"
+          step="0.25"
+          inputMode="decimal"
+          value={task.qty}
+          onChange={(e) => onQty(parseFloat(e.target.value) || 0)}
+          aria-label="Quantity"
+          className={cn(
+            "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 bg-white px-2 py-2.5 text-right text-sm focus:outline-none focus:ring-2 sm:w-16 sm:py-2 sm:text-xs",
+          )}
+        />
+      </label>
+      <label className={cn("flex flex-col gap-0.5 sm:contents")}>
+        <span
+          className={cn("text-[10px] font-medium uppercase tracking-wide text-slate-400 sm:hidden")}
+        >
+          $/unit
+        </span>
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          inputMode="decimal"
+          value={task.unitPrice}
+          onChange={(e) => onPrice(parseFloat(e.target.value) || 0)}
+          aria-label="Unit price"
+          className={cn(
+            "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 bg-white px-2 py-2.5 text-right text-sm focus:outline-none focus:ring-2 sm:w-20 sm:py-2 sm:text-xs",
+          )}
+        />
+      </label>
+      <span
+        className={cn(
+          "self-end text-right text-sm font-semibold text-slate-700 sm:w-20 sm:text-xs",
+        )}
+        aria-label="Line total"
+      >
+        {formatNZD(task.lineTotal)}
+      </span>
+      <button
+        type="button"
+        onClick={onDelete}
+        aria-label="Remove task"
+        className={cn(
+          "inline-flex h-11 w-11 items-center justify-center rounded-lg text-xl leading-none text-slate-400 hover:bg-red-50 hover:text-red-500 sm:h-auto sm:w-auto sm:rounded-none sm:text-lg sm:hover:bg-transparent",
+        )}
+      >
+        ×
+      </button>
+    </div>
   );
 }
