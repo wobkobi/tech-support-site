@@ -46,14 +46,6 @@ export const DEFAULT_TAX_RATES: TaxRates = {
   gstOutOfInclusive: 3 / 23,
 };
 
-/**
- * Fallback ISO date for when the bank auto-transfers began firing. The real
- * source of truth lives in each FY workbook's SETTINGS tab under the label
- * "Auto-transfer start date" - this constant only gets used when that cell
- * is missing or unparseable, to keep the dashboard rendering sensibly.
- */
-export const RECURRING_TRANSFERS_STARTED_AT = "2025-11-19";
-
 /** Output of `computeTaxPlan` covering set-asides, savings targets, and GST. */
 export interface TaxPlan {
   income: number;

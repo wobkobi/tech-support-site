@@ -15,15 +15,6 @@ export function formatNZD(amount: number): string {
 }
 
 /**
- * NZ slash date "DD/MM/YYYY" (local). Wrapper kept for existing imports.
- * @param date - Date or ISO string.
- * @returns Formatted string.
- */
-export function formatNZDate(date: Date | string): string {
-  return formatDateSlash(date);
-}
-
-/**
  * Returns today's date as a YYYY-MM-DD string (local machine time).
  * @returns ISO date string for today
  */
