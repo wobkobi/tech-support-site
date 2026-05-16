@@ -270,7 +270,7 @@ export default function BookingPage(): React.ReactElement {
           { name: "Book", path: "/booking" },
         ]}
       />
-      <FrostedSection maxWidth="90rem">
+      <FrostedSection>
         <div className={cn("flex flex-col gap-6 sm:gap-8")}>
           {/* Header */}
           <section className={cn(CARD, "animate-fade-in")}>

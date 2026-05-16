@@ -391,7 +391,7 @@ export function NavBar(): React.ReactElement | null {
           "fixed inset-x-0 z-50 mx-auto w-full px-4 will-change-transform",
           // `.app-nav-header` (globals.css) - top driven by --promo-h.
           "app-nav-header",
-          "max-w-[min(100vw-2rem,90rem)]",
+          "max-w-[min(100vw-2rem,clamp(90rem,75vw,140rem))]",
           isHidden && !isHoveringTop && "pointer-events-none opacity-0",
         )}
         onMouseEnter={handleNavInteractionStart}
@@ -426,7 +426,8 @@ export function NavBar(): React.ReactElement | null {
               width={40}
               height={40}
               priority
-              className={cn("select-none")}
+              // Rem-sized so it scales with the root font-size on bigger screens.
+              className={cn("h-10 w-10 shrink-0 select-none")}
             />
             <span className={cn("text-russian-violet text-lg font-bold sm:text-xl")}>
               To The Point Tech

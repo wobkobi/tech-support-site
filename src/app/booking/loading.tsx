@@ -17,7 +17,7 @@ const SKELETON = cn("bg-seasalt-900/40 animate-pulse rounded-lg");
 export default function BookingLoading(): React.ReactElement {
   return (
     <PageShell>
-      <FrostedSection maxWidth="90rem">
+      <FrostedSection>
         <div className={cn("flex flex-col gap-6 sm:gap-8")}>
           {/* Header card */}
           <section className={cn(CARD)}>

@@ -168,7 +168,7 @@ export default function ServicesPage(): React.ReactElement {
           { name: "Services", path: "/services" },
         ]}
       />
-      <FrostedSection maxWidth="90rem">
+      <FrostedSection>
         <div className={cn("flex flex-col gap-6 sm:gap-8")}>
           <section aria-labelledby="services-heading" className={cn(CARD, "animate-fade-in")}>
             <h1

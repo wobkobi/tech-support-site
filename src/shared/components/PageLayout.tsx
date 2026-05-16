@@ -56,7 +56,7 @@ export function PageShell({ children }: PageShellProps): React.ReactElement {
 export interface FrostedSectionProps {
   /** Child elements to render */
   children: React.ReactNode;
-  /** Maximum width constraint (default: 90rem = 1440px) */
+  /** Maximum width constraint. Default scales with viewport: stays at 1440px on 1080p screens, grows to ~1920px on 1440p, caps at 2240px on 4K. */
   maxWidth?: string;
   /** Additional CSS classes */
   className?: string;
@@ -72,7 +72,7 @@ export interface FrostedSectionProps {
  */
 export function FrostedSection({
   children,
-  maxWidth = "90rem",
+  maxWidth = "clamp(90rem, 75vw, 140rem)",
   className,
 }: FrostedSectionProps): React.ReactElement {
   return (
