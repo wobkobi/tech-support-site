@@ -127,6 +127,11 @@ model Contact {
   phone           String?
   address         String?
   googleContactId String? // Google People API resource name (e.g. "people/c1234567890")
+  // Stable per-contact review URL token. Lazy-filled by ensureContactReviewToken
+  // so the same review link appears on every invoice the customer receives.
+  // Not @unique because MongoDB's unique index rejects multiple null values
+  // during backfill; UUID v4 collisions are vanishingly rare.
+  reviewToken     String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
