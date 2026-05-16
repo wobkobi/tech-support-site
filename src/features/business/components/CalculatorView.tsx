@@ -1558,6 +1558,15 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
                   <span>{formatNZD(totals.tasksTotal)}</span>
                 </div>
               )}
+              {/* Promo sits immediately under the labor lines so it's visually
+                  attached to what it discounts. Travel + parts are appended
+                  AFTER, at full price - never touched by the promo. */}
+              {totals.promoDiscount > 0 && activePromo && (
+                <div className={cn("flex justify-between text-amber-700")}>
+                  <span>Promo: {activePromo.title}</span>
+                  <span>-{formatNZD(totals.promoDiscount)}</span>
+                </div>
+              )}
               {totals.partsTotal > 0 && (
                 <div className={cn("flex justify-between text-slate-600")}>
                   <span>Parts</span>
@@ -1576,14 +1585,8 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
                 )}
               >
                 <span>Subtotal</span>
-                <span>{formatNZD(totals.subtotal)}</span>
+                <span>{formatNZD(totals.subtotal - totals.promoDiscount)}</span>
               </div>
-              {totals.promoDiscount > 0 && activePromo && (
-                <div className={cn("flex justify-between text-amber-700")}>
-                  <span>Promo: {activePromo.title}</span>
-                  <span>-{formatNZD(totals.promoDiscount)}</span>
-                </div>
-              )}
               <div className={cn("flex items-center justify-between")}>
                 <label className={cn("flex cursor-pointer items-center gap-2 text-slate-600")}>
                   <input
