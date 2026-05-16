@@ -350,6 +350,6 @@ export function buildIncomeDescription(job: JobCalculation): string {
   if (job.durationMins > 0) {
     parts.push(`${minsToHoursLabel(job.durationMins)} labour`);
   }
-  const today = formatNZDate(new Date());
+  const today = formatDateSlash(new Date());
   return `Job: ${parts.join(" + ")} - ${today}`;
 }
