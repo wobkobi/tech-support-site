@@ -35,6 +35,35 @@ export interface BookingFormInitialValues {
   notes: string;
 }
 
+/**
+ * Splits an NZ-style apartment-prefixed address ("12/160 Kepa Road Orakei")
+ * into its unit number and the street-and-rest. Returns unit="" when no unit
+ * prefix is detected. Matches 1-4 digits with an optional letter suffix
+ * (e.g. "12", "12A") followed by "/" and at least one more char.
+ * @param addr - Saved address string, possibly with a unit prefix.
+ * @returns Object with `unit` (may be empty) and `rest` (the street + suburb).
+ */
+function splitUnitFromAddress(addr: string): { unit: string; rest: string } {
+  const trimmed = addr.trim();
+  const m = trimmed.match(/^(\d{1,4}[A-Za-z]?)\/(.+)$/);
+  if (!m) return { unit: "", rest: trimmed };
+  return { unit: m[1], rest: m[2].trim() };
+}
+
+/**
+ * Combines a unit number and a street-and-rest back into the saved address
+ * string ("12/160 Kepa Road Orakei"). Returns just the rest when no unit is
+ * present, so non-apartment addresses are unchanged.
+ * @param unit - Apartment / unit number, may be empty.
+ * @param rest - Street address + suburb.
+ * @returns Combined address string suitable for persistence.
+ */
+function combineUnitAndAddress(unit: string, rest: string): string {
+  const u = unit.trim();
+  const r = rest.trim();
+  return u ? `${u}/${r}` : r;
+}
+
 export interface BookingFormProps {
   availableDays: BookableDay[];
   cancelToken?: string;
@@ -72,7 +101,13 @@ export default function BookingForm({
   const [meetingType, setMeetingType] = useState<"in-person" | "remote" | "">(
     initialValues?.meetingType ?? "",
   );
-  const [address, setAddress] = useState(initialValues?.address ?? "");
+  // Apartment / unit number is stored separately so Google Places autocomplete
+  // can predict the street part (predictions go cold for NZ "N/" prefixes).
+  // We re-combine on submit and split on pre-fill so saved addresses stay in
+  // the standard "12/160 Kepa Road Orakei" shape.
+  const initialSplit = splitUnitFromAddress(initialValues?.address ?? "");
+  const [unit, setUnit] = useState(initialSplit.unit);
+  const [address, setAddress] = useState(initialSplit.rest);
   const [notes, setNotes] = useState(initialValues?.notes ?? "");
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -106,8 +141,10 @@ export default function BookingForm({
         setPhone(data.phone);
         filled.push("phone");
       }
-      if (data.address && !address.trim()) {
-        setAddress(data.address);
+      if (data.address && !address.trim() && !unit.trim()) {
+        const split = splitUnitFromAddress(data.address);
+        setUnit(split.unit);
+        setAddress(split.rest);
         filled.push("address");
       }
       if (filled.length > 0) {
@@ -242,7 +279,7 @@ export default function BookingForm({
             name: name.trim(),
             phone: phone.trim() || undefined,
             meetingType,
-            address: meetingType === "in-person" ? address.trim() : undefined,
+            address: meetingType === "in-person" ? combineUnitAndAddress(unit, address) : undefined,
             notes: notes.trim(),
           }
         : {
@@ -254,7 +291,7 @@ export default function BookingForm({
             email: email.trim(),
             phone: phone.trim() || undefined,
             meetingType,
-            address: meetingType === "in-person" ? address.trim() : undefined,
+            address: meetingType === "in-person" ? combineUnitAndAddress(unit, address) : undefined,
             notes: notes.trim(),
           };
 
@@ -631,21 +668,50 @@ export default function BookingForm({
         >
           <div className={cn(meetingType === "in-person" ? "overflow-visible" : "overflow-hidden")}>
             <div className={cn("pb-0.5 pt-0.5")}>
-              <label
-                htmlFor="booking-address"
-                className={cn("text-rich-black mb-2 block text-base font-semibold")}
-              >
+              <div className={cn("text-rich-black mb-2 block text-base font-semibold")}>
                 Address <span className={cn("text-coquelicot-500")}>*</span>
-              </label>
+              </div>
               {/* Only mount when in-person so Google Maps script never loads for remote sessions */}
               {meetingType === "in-person" && (
-                <AddressAutocomplete
-                  id="booking-address"
-                  value={address}
-                  onChange={setAddress}
-                  placeholder="Start typing your address..."
-                  required
-                />
+                <div className={cn("flex flex-col gap-2 sm:flex-row")}>
+                  <div className={cn("flex flex-col gap-1 sm:w-32")}>
+                    <label
+                      htmlFor="booking-unit"
+                      className={cn("text-rich-black/70 text-xs font-medium")}
+                    >
+                      Apt / Unit (optional)
+                    </label>
+                    <input
+                      id="booking-unit"
+                      type="text"
+                      value={unit}
+                      onChange={(e) => setUnit(e.target.value)}
+                      placeholder="e.g. 12"
+                      inputMode="text"
+                      autoComplete="off"
+                      maxLength={8}
+                      className={cn(
+                        "border-seasalt-400/80 bg-seasalt text-rich-black w-full rounded-md border px-4 py-3 text-base",
+                        "focus:border-russian-violet focus:ring-russian-violet/30 focus:outline-none focus:ring-1",
+                      )}
+                    />
+                  </div>
+                  <div className={cn("flex flex-1 flex-col gap-1")}>
+                    <label
+                      htmlFor="booking-address"
+                      className={cn("text-rich-black/70 text-xs font-medium")}
+                    >
+                      Street address
+                    </label>
+                    <AddressAutocomplete
+                      id="booking-address"
+                      value={address}
+                      onChange={setAddress}
+                      placeholder="Start typing your street address..."
+                      required
+                    />
+                  </div>
+                </div>
               )}
             </div>
           </div>
