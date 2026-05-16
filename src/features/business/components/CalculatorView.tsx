@@ -20,6 +20,7 @@ import { ParseConfidenceBanner } from "@/features/business/components/ParseConfi
 import { TaxonomyManageModal } from "@/features/business/components/TaxonomyManageModal";
 import { Combobox } from "@/features/business/components/Combobox";
 import { TotalsPanel } from "@/features/business/components/calculator/TotalsPanel";
+import { PartsSection } from "@/features/business/components/calculator/PartsSection";
 import { loadPlacesLibrary } from "@/shared/lib/google-maps-loader";
 import { summariseForBanner, type ActivePromo } from "@/features/business/lib/promos";
 import type {
@@ -1450,80 +1451,12 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
           </div>
 
           {/* Parts */}
-          <div className={cn("rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}>
-            <button
-              onClick={() => setShowParts((p) => !p)}
-              className={cn(
-                "text-russian-violet flex w-full items-center justify-between text-left text-sm font-semibold",
-              )}
-            >
-              Parts / materials
-              <span className={cn("text-xs text-slate-400")}>{showParts ? "▲" : "▼"}</span>
-            </button>
-            {showParts && (
-              <div className={cn("mt-3 space-y-2")}>
-                {parts.map((part, idx) => (
-                  <div
-                    key={idx}
-                    className={cn(
-                      "grid grid-cols-[minmax(0,1fr)_44px] items-center gap-2",
-                      "sm:grid-cols-[minmax(0,1fr)_88px_28px]",
-                    )}
-                  >
-                    <input
-                      type="text"
-                      placeholder="Description"
-                      value={part.description}
-                      onChange={(e) =>
-                        setParts((p) => {
-                          const n = [...p];
-                          n[idx] = { ...n[idx], description: e.target.value };
-                          return n;
-                        })
-                      }
-                      className={cn(
-                        "focus:ring-russian-violet/30 col-span-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 sm:col-span-1 sm:py-2 sm:text-xs",
-                      )}
-                    />
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      placeholder="Cost"
-                      value={part.cost}
-                      onChange={(e) =>
-                        setParts((p) => {
-                          const n = [...p];
-                          n[idx] = { ...n[idx], cost: parseFloat(e.target.value) || 0 };
-                          return n;
-                        })
-                      }
-                      className={cn(
-                        "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 sm:py-2 sm:text-xs",
-                      )}
-                    />
-                    <button
-                      onClick={() => setParts((p) => p.filter((_, i) => i !== idx))}
-                      aria-label="Remove part"
-                      className={cn(
-                        "inline-flex h-11 w-11 items-center justify-center rounded-lg text-xl leading-none text-slate-400 hover:bg-red-50 hover:text-red-500 sm:h-auto sm:w-auto sm:rounded-none sm:text-lg sm:hover:bg-transparent",
-                      )}
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-                <button
-                  onClick={() => setParts((p) => [...p, { description: "", cost: 0 }])}
-                  className={cn(
-                    "hover:text-russian-violet inline-flex h-11 items-center text-sm text-slate-500 underline sm:h-auto sm:text-xs",
-                  )}
-                >
-                  + Add part
-                </button>
-              </div>
-            )}
-          </div>
+          <PartsSection
+            parts={parts}
+            onPartsChange={setParts}
+            show={showParts}
+            onToggle={() => setShowParts((p) => !p)}
+          />
 
           {/* Notes */}
           <div className={cn("rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}>
