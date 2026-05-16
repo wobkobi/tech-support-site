@@ -23,6 +23,7 @@ import { PartsSection } from "@/features/business/components/calculator/PartsSec
 import { TravelSection } from "@/features/business/components/calculator/TravelSection";
 import { ClientPickerSection } from "@/features/business/components/calculator/ClientPickerSection";
 import { TasksSection } from "@/features/business/components/calculator/TasksSection";
+import { RateConfigPanel } from "@/features/business/components/calculator/RateConfigPanel";
 import { loadPlacesLibrary } from "@/shared/lib/google-maps-loader";
 import { summariseForBanner, type ActivePromo } from "@/features/business/lib/promos";
 import type {
@@ -819,139 +820,18 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
 
       {/* Rate settings panel */}
       {showRates && (
-        <div className={cn("mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}>
-          <div className={cn("mb-3 flex items-center justify-between gap-2")}>
-            <h2 className={cn("text-russian-violet text-sm font-semibold")}>Rate config</h2>
-            <button
-              type="button"
-              onClick={() => void handleResetRates()}
-              disabled={resettingRates}
-              className={cn(
-                "rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50",
-              )}
-            >
-              {resettingRates ? "Resetting..." : "Reset to defaults"}
-            </button>
-          </div>
-          <table className={cn("mb-4 w-full text-xs")}>
-            <thead>
-              <tr className={cn("border-b border-slate-100")}>
-                {["Label", "Rate", "Unit", "Default", ""].map((h) => (
-                  <th key={h} className={cn("pb-2 text-left text-xs font-semibold text-slate-400")}>
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className={cn("divide-y divide-slate-50")}>
-              {rates.map((r) => (
-                <tr key={r.id} className={cn(editingRateId === r.id ? "bg-russian-violet/5" : "")}>
-                  <td className={cn("py-1.5 text-slate-700")}>{r.label}</td>
-                  <td className={cn("py-1.5 text-slate-500")}>
-                    {r.ratePerHour !== null
-                      ? `$${r.ratePerHour}/hr`
-                      : r.hourlyDelta !== null
-                        ? `${r.hourlyDelta < 0 ? "-" : "+"}$${Math.abs(r.hourlyDelta)}/hr`
-                        : r.flatRate !== null
-                          ? `$${r.flatRate}`
-                          : "-"}
-                  </td>
-                  <td className={cn("py-1.5 text-slate-400")}>{r.unit}</td>
-                  <td className={cn("py-1.5")}>{r.isDefault ? "✓" : ""}</td>
-                  <td className={cn("flex gap-2 py-1.5")}>
-                    <button
-                      onClick={() => handleStartEdit(r)}
-                      className={cn("text-slate-400 hover:text-slate-700")}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDeleteRate(r.id)}
-                      className={cn("text-red-400 hover:text-red-600")}
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <form
-            onSubmit={handleSubmitRate}
-            className={cn("grid grid-cols-1 items-end gap-2 sm:grid-cols-2 lg:grid-cols-5")}
-          >
-            <input
-              type="text"
-              placeholder="Label"
-              required
-              value={rateForm.label}
-              onChange={(e) => setRateForm((p) => ({ ...p, label: e.target.value }))}
-              className={cn(
-                "focus:ring-russian-violet/30 rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 sm:py-2 sm:text-xs",
-              )}
-            />
-            <select
-              value={rateForm.type}
-              onChange={(e) =>
-                setRateForm((p) => ({
-                  ...p,
-                  type: e.target.value as "flat" | "hourly" | "modifier",
-                }))
-              }
-              className={cn(
-                "focus:ring-russian-violet/30 rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 sm:py-2 sm:text-xs",
-              )}
-            >
-              <option value="hourly">Hourly base</option>
-              <option value="modifier">Modifier (+/-)</option>
-              <option value="flat">Flat</option>
-            </select>
-            <input
-              type="number"
-              placeholder={rateForm.type === "modifier" ? "Delta (+/-)" : "Amount"}
-              required
-              step="0.01"
-              // Modifier rates carry a signed delta added to the base $/hr
-              // (e.g. -10 for At home). Flat and hourly rates must be >= 0.
-              min={rateForm.type === "modifier" ? undefined : 0}
-              value={rateForm.amount}
-              onChange={(e) => setRateForm((p) => ({ ...p, amount: e.target.value }))}
-              className={cn(
-                "focus:ring-russian-violet/30 rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 sm:py-2 sm:text-xs",
-              )}
-            />
-            <input
-              type="text"
-              placeholder="Unit"
-              value={rateForm.unit}
-              onChange={(e) => setRateForm((p) => ({ ...p, unit: e.target.value }))}
-              className={cn(
-                "focus:ring-russian-violet/30 rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 sm:py-2 sm:text-xs",
-              )}
-            />
-            <div className={cn("flex gap-2")}>
-              <button
-                type="submit"
-                className={cn(
-                  "bg-russian-violet rounded-lg px-4 py-2.5 text-sm font-medium text-white hover:opacity-90 sm:py-2 sm:text-xs",
-                )}
-              >
-                {editingRateId ? "Update" : "Add"}
-              </button>
-              {editingRateId && (
-                <button
-                  type="button"
-                  onClick={handleCancelEdit}
-                  className={cn(
-                    "rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 sm:py-2 sm:text-xs",
-                  )}
-                >
-                  Cancel
-                </button>
-              )}
-            </div>
-          </form>
-        </div>
+        <RateConfigPanel
+          rates={rates}
+          form={rateForm}
+          onFormChange={setRateForm}
+          editingRateId={editingRateId}
+          resettingRates={resettingRates}
+          onSubmit={handleSubmitRate}
+          onStartEdit={handleStartEdit}
+          onCancelEdit={handleCancelEdit}
+          onDeleteRate={handleDeleteRate}
+          onResetRates={() => void handleResetRates()}
+        />
       )}
 
       <div className={cn("grid gap-6 lg:grid-cols-2")}>
