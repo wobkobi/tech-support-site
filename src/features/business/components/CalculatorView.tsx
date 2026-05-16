@@ -22,6 +22,7 @@ import { Combobox } from "@/features/business/components/Combobox";
 import { TotalsPanel } from "@/features/business/components/calculator/TotalsPanel";
 import { PartsSection } from "@/features/business/components/calculator/PartsSection";
 import { TravelSection } from "@/features/business/components/calculator/TravelSection";
+import { ClientPickerSection } from "@/features/business/components/calculator/ClientPickerSection";
 import { loadPlacesLibrary } from "@/shared/lib/google-maps-loader";
 import { summariseForBanner, type ActivePromo } from "@/features/business/lib/promos";
 import type {
@@ -1430,68 +1431,17 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
           />
 
           {/* Client */}
-          <div
-            className={cn("space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}
-          >
-            <div className={cn("flex items-center justify-between")}>
-              <h2 className={cn("text-russian-violet text-sm font-semibold")}>Client</h2>
-              <button
-                onClick={() => setShowContactPicker(true)}
-                className={cn("hover:text-russian-violet text-xs text-slate-500 underline")}
-              >
-                Pick from contacts
-              </button>
-            </div>
-            {pickedContactName && (
-              <div className={cn("flex flex-wrap items-center gap-2")}>
-                <span className={cn("text-xs font-medium text-slate-600")}>Address to:</span>
-                {(["name", "company", "custom"] as const).map((mode) => {
-                  const disabled = mode === "company" && !pickedContactCompany;
-                  const active = addressMode === mode;
-                  const label =
-                    mode === "name" ? "Name" : mode === "company" ? "Company" : "Custom";
-                  return (
-                    <button
-                      key={mode}
-                      type="button"
-                      disabled={disabled}
-                      onClick={() => setAddressMode(mode)}
-                      title={disabled ? "Picked contact has no company" : undefined}
-                      className={cn(
-                        "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-                        active
-                          ? "border-russian-violet/40 bg-russian-violet/10 text-russian-violet"
-                          : "border-slate-200 bg-white text-slate-600 hover:border-slate-300",
-                        disabled && "cursor-not-allowed opacity-40 hover:border-slate-200",
-                      )}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-            <input
-              type="text"
-              placeholder="Name"
-              value={clientName}
-              readOnly={addressMode !== "custom"}
-              onChange={(e) => setClientName(e.target.value)}
-              className={cn(
-                "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
-                addressMode !== "custom" && "bg-slate-50 text-slate-700",
-              )}
-            />
-            <input
-              type="email"
-              placeholder="Email"
-              value={clientEmail}
-              onChange={(e) => setClientEmail(e.target.value)}
-              className={cn(
-                "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
-              )}
-            />
-          </div>
+          <ClientPickerSection
+            clientName={clientName}
+            onClientNameChange={setClientName}
+            clientEmail={clientEmail}
+            onClientEmailChange={setClientEmail}
+            pickedContactName={pickedContactName}
+            pickedContactCompany={pickedContactCompany}
+            addressMode={addressMode}
+            onAddressModeChange={setAddressMode}
+            onPickContact={() => setShowContactPicker(true)}
+          />
 
           {/* Actions */}
           <div className={cn("space-y-2")}>
