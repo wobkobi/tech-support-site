@@ -13,7 +13,7 @@ import {
 } from "@/features/business/lib/promos";
 
 const SOFT_CARD = cn(
-  "border-seasalt-400/80 bg-seasalt-900/60 rounded-xl border p-3 text-sm sm:p-4 sm:text-base",
+  "border-seasalt-400/80 bg-seasalt-900/60 rounded-xl border p-3 text-base sm:p-4 sm:text-lg",
 );
 
 type Step = "issue" | "address" | "results";
@@ -350,7 +350,7 @@ export function PricingWizard(): React.ReactElement {
       {step === "issue" && (
         <div>
           <h3 className="text-coquelicot mb-1 text-lg font-bold">What do you need help with?</h3>
-          <p className="mb-4 text-sm text-slate-500">
+          <p className="mb-4 text-base text-slate-600">
             Describe the issue or job - the more detail, the better the estimate.
           </p>
           <textarea
@@ -359,7 +359,7 @@ export function PricingWizard(): React.ReactElement {
             onChange={(e) => setIssueDescription(e.target.value)}
             placeholder="e.g. My laptop is running really slow and I think it has a virus. Also want to set up my new phone."
             className={cn(
-              "w-full resize-none rounded-xl border px-4 py-3 text-sm text-slate-700 outline-none transition-all",
+              "w-full resize-none rounded-xl border px-4 py-3 text-base text-slate-700 outline-none transition-all",
               "border-coquelicot/40 bg-white",
               "focus:border-coquelicot focus:ring-coquelicot/30 focus:ring-2",
             )}
@@ -370,7 +370,7 @@ export function PricingWizard(): React.ReactElement {
       {step === "address" && (
         <div>
           <h3 className="text-russian-violet mb-1 text-lg font-bold">Where are you located?</h3>
-          <p className="mb-4 text-sm text-slate-500">
+          <p className="mb-4 text-base text-slate-600">
             Enter your address to include drive time, or skip for an estimate without travel.
           </p>
           <AddressAutocomplete
@@ -389,9 +389,9 @@ export function PricingWizard(): React.ReactElement {
                 {formatDuration(aiEstimatedMins)}
               </p>
             )}
-            <p className="mb-1 text-sm font-medium text-slate-500">Estimated cost</p>
+            <p className="mb-1 text-base font-medium text-slate-600">Estimated cost</p>
             {result.originalLow !== undefined && result.originalHigh !== undefined && (
-              <p className="text-sm text-slate-400 line-through sm:text-base">
+              <p className="text-base text-slate-500 line-through sm:text-lg">
                 {formatPriceRound(result.originalLow)} – {formatPriceRound(result.originalHigh)}
               </p>
             )}
@@ -399,29 +399,29 @@ export function PricingWizard(): React.ReactElement {
               {formatPriceRound(result.low)} – {formatPriceRound(result.high)}
             </p>
             {result.promoLabel && (
-              <p className={cn("mt-2 text-xs font-semibold text-amber-700")}>
+              <p className={cn("mt-2 text-sm font-semibold text-amber-700")}>
                 ⚡ {result.promoLabel}
               </p>
             )}
             <p
               className={cn(
-                "border-coquelicot/30 bg-coquelicot/5 text-coquelicot-500 mt-4 rounded-lg border px-3 py-2 text-sm font-bold",
+                "border-coquelicot/30 bg-coquelicot/5 text-coquelicot-500 mt-4 rounded-lg border px-3 py-2 text-base font-bold",
               )}
             >
               You&apos;re charged for the actual time worked at the agreed hourly rate. Jobs that
               turn out more involved than described will cost more than this estimate.
             </p>
-            <p className="mt-2 text-xs text-slate-400">
+            <p className="mt-2 text-sm text-slate-500">
               {result.includesTravel && "Includes drive time. "}
               All prices in NZD. No GST.
             </p>
           </div>
 
-          {aiExplanation && <p className="mb-4 text-sm text-slate-500">{aiExplanation}</p>}
+          {aiExplanation && <p className="mb-4 text-base text-slate-600">{aiExplanation}</p>}
 
           {result.breakdown.length > 0 && (
             <div className={cn(SOFT_CARD, "mb-4")}>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+              <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
                 Breakdown
               </p>
               <div className="divide-y divide-slate-100">
@@ -439,7 +439,7 @@ export function PricingWizard(): React.ReactElement {
             </div>
           )}
 
-          <p className="mb-5 text-xs text-slate-400">
+          <p className="mb-5 text-sm text-slate-600">
             This is a rough estimate only. The actual cost depends on the complexity of the job and
             will be confirmed before work begins. No GST is charged.
           </p>
@@ -447,19 +447,19 @@ export function PricingWizard(): React.ReactElement {
           <div className="flex flex-wrap gap-3">
             <Link
               href="/booking"
-              className="bg-russian-violet hover:bg-russian-violet/90 rounded-xl px-5 py-2.5 text-sm font-semibold text-white"
+              className="bg-russian-violet hover:bg-russian-violet/90 rounded-xl px-5 py-2.5 text-base font-semibold text-white"
             >
               Book now
             </Link>
             <Link
               href="/contact"
-              className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-base font-semibold text-slate-700 hover:bg-slate-50"
             >
               Ask a question
             </Link>
             <button
               onClick={reset}
-              className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-500 hover:bg-slate-50"
+              className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-base font-semibold text-slate-600 hover:bg-slate-50"
             >
               Start over
             </button>
@@ -472,7 +472,7 @@ export function PricingWizard(): React.ReactElement {
           {step === "address" && (
             <button
               onClick={prevStep}
-              className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-base font-semibold text-slate-700 hover:bg-slate-50"
             >
               Back
             </button>
@@ -481,7 +481,7 @@ export function PricingWizard(): React.ReactElement {
             onClick={() => void nextStep()}
             disabled={!canAdvance() || isCalculating}
             className={cn(
-              "rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-opacity",
+              "rounded-xl px-5 py-2.5 text-base font-semibold text-white transition-opacity",
               canAdvance() && !isCalculating
                 ? "bg-russian-violet hover:bg-russian-violet/90"
                 : "cursor-not-allowed bg-slate-300",

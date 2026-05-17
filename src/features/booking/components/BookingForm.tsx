@@ -693,7 +693,7 @@ export default function BookingForm({
                 "focus:border-russian-violet focus:ring-russian-violet/30 focus:outline-none focus:ring-1",
               )}
             />
-            {contactHint && <p className={cn("text-rich-black/50 text-xs")}>{contactHint}</p>}
+            {contactHint && <p className={cn("text-rich-black/70 text-sm")}>{contactHint}</p>}
           </div>
         </div>
 
@@ -779,7 +779,7 @@ export default function BookingForm({
                   <div className={cn("flex flex-col gap-1 sm:w-32")}>
                     <label
                       htmlFor="booking-unit"
-                      className={cn("text-rich-black/70 text-xs font-medium")}
+                      className={cn("text-rich-black/80 text-sm font-medium")}
                     >
                       Apt / Unit (optional)
                     </label>
@@ -806,7 +806,7 @@ export default function BookingForm({
                   <div className={cn("flex flex-1 flex-col gap-1")}>
                     <label
                       htmlFor="booking-address"
-                      className={cn("text-rich-black/70 text-xs font-medium")}
+                      className={cn("text-rich-black/80 text-sm font-medium")}
                     >
                       Street address
                     </label>
@@ -831,14 +831,14 @@ export default function BookingForm({
                       (addressVerified ? (
                         <p
                           className={cn(
-                            "text-xs font-medium text-green-700",
+                            "text-sm font-medium text-green-700",
                             "flex items-center gap-1",
                           )}
                         >
                           <span aria-hidden="true">✓</span> Address verified
                         </p>
                       ) : (
-                        <p className={cn("text-xs text-slate-500")}>
+                        <p className={cn("text-sm text-slate-600")}>
                           Pick a suggestion from the dropdown to verify your address.
                         </p>
                       ))}

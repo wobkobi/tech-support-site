@@ -131,7 +131,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                     ⚡ Limited offer: {promo.title}
                     {promo.description ? ` - ${promo.description}` : ""}
                   </p>
-                  <p className={cn("text-russian-violet-500/80 mt-1 text-xs sm:text-sm")}>
+                  <p className={cn("text-russian-violet-500 mt-1 text-sm sm:text-base")}>
                     Until {formatDateShort(promo.endAt)}.
                   </p>
                 </div>
@@ -163,7 +163,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                     </p>
                   </div>
                 </div>
-                <p className={cn("text-rich-black/70 mt-3 text-xs sm:text-sm")}>
+                <p className={cn("text-rich-black/80 mt-3 text-sm sm:text-base")}>
                   Discounts available - just ask. Students and at-home jobs get a small reduction.
                 </p>
               </>

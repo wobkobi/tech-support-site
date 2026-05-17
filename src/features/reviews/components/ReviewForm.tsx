@@ -408,12 +408,12 @@ export default function ReviewFormProtected({
               textCount > textMax
                 ? "text-coquelicot-500 text-sm font-bold"
                 : remaining <= 50
-                  ? "text-coquelicot-500 text-xs font-semibold"
+                  ? "text-coquelicot-500 text-sm font-semibold"
                   : remaining <= 150
-                    ? "text-coquelicot-500/60 text-xs font-medium"
+                    ? "text-coquelicot-500/80 text-sm font-medium"
                     : textCount > 0 && textCount < textMin
-                      ? "text-coquelicot-500/70 text-xs"
-                      : "text-rich-black/40 text-xs",
+                      ? "text-coquelicot-500/80 text-sm"
+                      : "text-rich-black/70 text-sm",
             )}
             aria-live="polite"
           >

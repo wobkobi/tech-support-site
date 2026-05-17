@@ -175,7 +175,7 @@ export default function AddressAutocomplete({
       />
 
       {apiKeyMissing && (
-        <p className={cn("flex items-start gap-1 text-xs text-yellow-700")}>
+        <p className={cn("flex items-start gap-1 text-sm text-yellow-800")}>
           <span className={cn("mt-0.5")}>⚠️</span>
           <span>
             Address autocomplete unavailable. Please type your full address manually. (API key not
@@ -185,7 +185,7 @@ export default function AddressAutocomplete({
       )}
 
       {scriptError && (
-        <p className={cn("flex items-start gap-1 text-xs text-yellow-700")}>
+        <p className={cn("flex items-start gap-1 text-sm text-yellow-800")}>
           <span className={cn("mt-0.5")}>⚠️</span>
           <span>
             Address autocomplete unavailable. Please type your full address manually. (Failed to

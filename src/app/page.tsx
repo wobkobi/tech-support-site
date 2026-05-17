@@ -390,7 +390,7 @@ export default async function Home(): Promise<React.ReactElement> {
           <a
             href="tel:+64212971237"
             className={cn(
-              "text-russian-violet hover:text-coquelicot-500 flex items-center gap-3 rounded-md px-4 py-2 text-base font-medium transition-colors sm:text-lg",
+              "text-russian-violet hover:text-coquelicot-500 flex items-center gap-3 rounded-md px-4 py-2 text-base font-bold transition-colors sm:text-lg",
             )}
           >
             <FaPhone className={cn("h-4 w-4 shrink-0 sm:h-6 sm:w-6")} aria-hidden />
@@ -402,7 +402,7 @@ export default async function Home(): Promise<React.ReactElement> {
           <a
             href="mailto:harrison@tothepoint.co.nz"
             className={cn(
-              "text-russian-violet hover:text-coquelicot-500 flex items-center gap-3 rounded-md px-4 py-2 text-base font-medium transition-colors sm:text-lg",
+              "text-russian-violet hover:text-coquelicot-500 flex items-center gap-3 rounded-md px-4 py-2 text-base font-bold transition-colors sm:text-lg",
             )}
           >
             <FaEnvelope className={cn("h-6 w-6 shrink-0 sm:h-7 sm:w-7")} aria-hidden />
