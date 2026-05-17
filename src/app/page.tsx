@@ -109,8 +109,8 @@ export default async function Home(): Promise<React.ReactElement> {
               <Image
                 src="/source/logo-full.svg"
                 alt="To The Point Tech - computer and IT support in Auckland"
-                width={640}
-                height={146}
+                width={2000}
+                height={674}
                 priority
                 fetchPriority="high"
                 draggable={false}

@@ -174,16 +174,23 @@ div.app-nav-spacer {
   }
 }
 
+/* Position offset uses `translate` (GPU-composited) instead of `top` so the
+   promo-banner-driven offset animation doesn't trigger layout/paint each
+   frame. The inline `transform: translateY(...)` set by NavBar.tsx for
+   hide-on-scroll composes independently with `translate` (separate CSS
+   properties), so both can coexist. `top: 0` keeps the fixed-position
+   anchor at the top of the viewport. */
 header.app-nav-header {
-  top: calc(0.75rem + var(--promo-h, 0px)) !important;
+  top: 0 !important;
+  translate: 0 calc(0.75rem + var(--promo-h, 0px)) !important;
   transition:
     transform 400ms ease-in-out,
     opacity 400ms ease-in-out,
-    top 500ms ease-out !important;
+    translate 500ms ease-out !important;
 }
 @media (min-width: 640px) {
   header.app-nav-header {
-    top: calc(1rem + var(--promo-h, 0px)) !important;
+    translate: 0 calc(1rem + var(--promo-h, 0px)) !important;
   }
 }
 
