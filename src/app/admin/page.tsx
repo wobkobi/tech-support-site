@@ -10,6 +10,7 @@ import { toE164NZ } from "@/shared/lib/normalize-phone";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort, formatDateTimeShort } from "@/shared/lib/date-format";
 import { formatNZD } from "@/features/business/lib/business";
+import { FaCaretRight } from "react-icons/fa6";
 
 export const dynamic = "force-dynamic";
 
@@ -349,9 +350,12 @@ export default async function AdminPage({
             <h2 className={cn("text-sm font-semibold text-slate-700")}>Upcoming bookings</h2>
             <Link
               href={`/admin/bookings?token=${encodeURIComponent(t)}`}
-              className={cn("hover:text-russian-violet text-xs text-slate-400")}
+              className={cn(
+                "hover:text-russian-violet inline-flex items-center gap-1 text-xs text-slate-400",
+              )}
             >
-              View all →
+              View all
+              <FaCaretRight className={cn("h-3 w-3")} aria-hidden />
             </Link>
           </div>
           {upcomingBookings.length === 0 ? (
@@ -397,9 +401,12 @@ export default async function AdminPage({
             </h2>
             <Link
               href={`/admin/reviews?token=${encodeURIComponent(t)}`}
-              className={cn("hover:text-russian-violet text-xs text-slate-400")}
+              className={cn(
+                "hover:text-russian-violet inline-flex items-center gap-1 text-xs text-slate-400",
+              )}
             >
-              Review all →
+              Review all
+              <FaCaretRight className={cn("h-3 w-3")} aria-hidden />
             </Link>
           </div>
           {pendingReviews.length === 0 ? (
@@ -481,9 +488,12 @@ export default async function AdminPage({
             <h2 className={cn("text-sm font-semibold text-slate-700")}>System status</h2>
             <Link
               href={`/admin/settings?token=${encodeURIComponent(t)}`}
-              className={cn("hover:text-russian-violet text-xs text-slate-400")}
+              className={cn(
+                "hover:text-russian-violet inline-flex items-center gap-1 text-xs text-slate-400",
+              )}
             >
-              Settings →
+              Settings
+              <FaCaretRight className={cn("h-3 w-3")} aria-hidden />
             </Link>
           </div>
           <ul className={cn("divide-y divide-slate-100 text-sm")}>

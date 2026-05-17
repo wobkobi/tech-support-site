@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from "react";
 import type React from "react";
+import { FaCaretUp, FaCaretDown } from "react-icons/fa6";
 import { cn } from "@/shared/lib/cn";
 import type { GoogleContact } from "@/features/business/types/business";
 
@@ -206,8 +207,12 @@ export function ContactPickerModal({
             <span>
               {filtered.length} of {contacts.length}
             </span>
-            <span className={cn("hidden sm:inline")}>
-              ↑↓ to navigate &middot; Enter to pick &middot; Esc to close
+            <span className={cn("hidden items-center gap-1 sm:inline-flex")}>
+              <span className={cn("inline-flex items-center")} aria-hidden>
+                <FaCaretUp className={cn("h-3 w-3")} />
+                <FaCaretDown className={cn("h-3 w-3")} />
+              </span>
+              to navigate &middot; Enter to pick &middot; Esc to close
             </span>
           </div>
         )}

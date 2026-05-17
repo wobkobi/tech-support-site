@@ -7,6 +7,7 @@
 
 import { useState } from "react";
 import type React from "react";
+import { FaCheck } from "react-icons/fa6";
 import { cn } from "@/shared/lib/cn";
 import { CopyLinkButton } from "./CopyLinkButton";
 import { toE164NZ, formatNZPhone, isValidPhone } from "@/shared/lib/normalize-phone";
@@ -387,8 +388,13 @@ export function ReviewLinkHistoryTable({
                     className={cn("mt-2 flex items-center gap-3 border-t border-slate-100 pt-2")}
                   >
                     {entry.reviewed ? (
-                      <span className={cn("text-moonstone-600 text-xs font-medium")}>
-                        Reviewed ✓
+                      <span
+                        className={cn(
+                          "text-moonstone-600 inline-flex items-center gap-1 text-xs font-medium",
+                        )}
+                      >
+                        Reviewed
+                        <FaCheck className={cn("h-3 w-3")} aria-hidden />
                       </span>
                     ) : (
                       <span className={cn("text-xs text-slate-400")}>Not reviewed</span>

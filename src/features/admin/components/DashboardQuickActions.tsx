@@ -8,6 +8,7 @@
 
 import { useState } from "react";
 import type React from "react";
+import { FaCheck } from "react-icons/fa6";
 import { cn } from "@/shared/lib/cn";
 import {
   SendReviewLinkForm,
@@ -171,8 +172,13 @@ export function DashboardQuickActions({
                     {err && <p className={cn("text-coquelicot-400 text-xs")}>{err}</p>}
                   </div>
                   {isDone ? (
-                    <span className={cn("text-moonstone-600 shrink-0 text-xs font-semibold")}>
-                      Done ✓
+                    <span
+                      className={cn(
+                        "text-moonstone-600 inline-flex shrink-0 items-center gap-1 text-xs font-semibold",
+                      )}
+                    >
+                      Done
+                      <FaCheck className={cn("h-3 w-3")} aria-hidden />
                     </span>
                   ) : (
                     <button

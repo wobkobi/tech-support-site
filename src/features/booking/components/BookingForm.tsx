@@ -8,6 +8,7 @@
 
 import type React from "react";
 import { useState, useEffect } from "react";
+import { FaCheck } from "react-icons/fa6";
 import { useRouter } from "next/navigation";
 import { Button } from "@/shared/components/Button";
 import { cn } from "@/shared/lib/cn";
@@ -835,7 +836,7 @@ export default function BookingForm({
                             "flex items-center gap-1",
                           )}
                         >
-                          <span aria-hidden="true">✓</span> Address verified
+                          <FaCheck className={cn("h-4 w-4")} aria-hidden /> Address verified
                         </p>
                       ) : (
                         <p className={cn("text-sm text-slate-600")}>

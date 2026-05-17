@@ -1,6 +1,8 @@
 "use client";
 
 import type React from "react";
+import { FaCheck, FaTriangleExclamation, FaXmark } from "react-icons/fa6";
+import type { IconType } from "react-icons";
 import { cn } from "@/shared/lib/cn";
 
 interface ParseConfidenceBannerProps {
@@ -9,23 +11,26 @@ interface ParseConfidenceBannerProps {
   onDismiss: () => void;
 }
 
-const CONFIG = {
+const CONFIG: Record<
+  "high" | "medium" | "low",
+  { bg: string; text: string; Icon: IconType; message: string }
+> = {
   high: {
     bg: "bg-green-50 border-green-200",
     text: "text-green-800",
-    icon: "✓",
+    Icon: FaCheck,
     message: "Looks good - review the details below",
   },
   medium: {
     bg: "bg-amber-50 border-amber-200",
     text: "text-amber-800",
-    icon: "⚠",
+    Icon: FaTriangleExclamation,
     message: "Review suggested - some items were estimated",
   },
   low: {
     bg: "bg-red-50 border-red-200",
     text: "text-red-800",
-    icon: "✕",
+    Icon: FaXmark,
     message: "Needs review - rates were mostly guessed",
   },
 };
@@ -43,13 +48,13 @@ export function ParseConfidenceBanner({
   warnings,
   onDismiss,
 }: ParseConfidenceBannerProps): React.ReactElement {
-  const { bg, text, icon, message } = CONFIG[confidence];
+  const { bg, text, Icon, message } = CONFIG[confidence];
 
   return (
     <div className={cn("rounded-lg border px-4 py-3", bg)}>
       <div className={cn("flex items-start justify-between gap-2")}>
         <div className={cn("flex items-start gap-2")}>
-          <span className={cn("mt-0.5 text-sm font-bold", text)}>{icon}</span>
+          <Icon className={cn("mt-0.5 h-4 w-4 shrink-0", text)} aria-hidden />
           <p className={cn("text-sm font-medium", text)}>{message}</p>
         </div>
         <button

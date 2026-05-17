@@ -17,6 +17,7 @@ import {
   summariseForBanner,
 } from "@/features/business/lib/promos";
 import { formatDateShort } from "@/shared/lib/date-format";
+import { FaCaretDown, FaCheck } from "react-icons/fa6";
 
 // Promo state changes metadata text; cached lookup keeps this cheap.
 export const dynamic = "force-dynamic";
@@ -176,26 +177,27 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                 "bg-russian-violet hover:bg-russian-violet/90 transition-colors",
               )}
             >
-              Get a rough estimate ↓
+              Get a rough estimate
+              <FaCaretDown className={cn("h-4 w-4")} aria-hidden />
             </a>
 
             <div className={cn("mt-5 space-y-3")}>
               <p className={cn("text-rich-black/90 flex gap-3 text-sm sm:text-base")}>
-                <span className={cn("text-moonstone-600 mt-1 text-lg")}>✓</span>
+                <FaCheck className={cn("text-moonstone-600 mt-1.5 h-4 w-4 shrink-0")} aria-hidden />
                 <span>
                   <strong>Quick calls and emails are free.</strong> If you have a simple question,
                   just reach out.
                 </span>
               </p>
               <p className={cn("text-rich-black/90 flex gap-3 text-sm sm:text-base")}>
-                <span className={cn("text-moonstone-600 mt-1 text-lg")}>✓</span>
+                <FaCheck className={cn("text-moonstone-600 mt-1.5 h-4 w-4 shrink-0")} aria-hidden />
                 <span>
                   <strong>Most jobs take 1 to 2 hours.</strong> I'll give you a time estimate before
                   we start.
                 </span>
               </p>
               <p className={cn("text-rich-black/90 flex gap-3 text-sm sm:text-base")}>
-                <span className={cn("text-moonstone-600 mt-1 text-lg")}>✓</span>
+                <FaCheck className={cn("text-moonstone-600 mt-1.5 h-4 w-4 shrink-0")} aria-hidden />
                 <span>
                   <strong>Not sure which rate applies?</strong> Just ask - I'll confirm before
                   starting.

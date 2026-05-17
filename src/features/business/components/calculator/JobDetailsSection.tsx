@@ -1,6 +1,7 @@
 "use client";
 
 import type React from "react";
+import { FaCaretRight } from "react-icons/fa6";
 import { cn } from "@/shared/lib/cn";
 import { formatNZD, minsToHoursLabel, billableMins } from "@/features/business/lib/business";
 import type { RateConfig } from "@/features/business/types/business";
@@ -101,8 +102,9 @@ export function JobDetailsSection({
           <p className={cn("mt-1 text-xs text-slate-400")}>
             {minsToHoursLabel(durationMins)}
             {billableMins(durationMins) !== durationMins && (
-              <span className={cn("ml-1 text-slate-300")}>
-                → {minsToHoursLabel(billableMins(durationMins))} billed
+              <span className={cn("ml-1 inline-flex items-center gap-1 text-slate-300")}>
+                <FaCaretRight className={cn("h-3 w-3")} aria-hidden />
+                {minsToHoursLabel(billableMins(durationMins))} billed
               </span>
             )}
           </p>

@@ -2,6 +2,7 @@
 
 import type React from "react";
 import { useState } from "react";
+import { FaCaretLeft } from "react-icons/fa6";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/shared/lib/cn";
@@ -208,10 +209,11 @@ export function InvoiceActions({
         <Link
           href={backHref}
           className={cn(
-            "rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50",
+            "inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50",
           )}
         >
-          ← Back
+          <FaCaretLeft className={cn("h-4 w-4")} aria-hidden />
+          Back
         </Link>
         <button
           onClick={() => void downloadPdf()}

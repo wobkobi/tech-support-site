@@ -16,6 +16,7 @@
 
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
+import { FaTriangleExclamation } from "react-icons/fa6";
 import useOnVisible from "@/shared/lib/useOnVisible";
 import { loadPlacesLibrary } from "@/shared/lib/google-maps-loader";
 import { cn } from "@/shared/lib/cn";
@@ -176,7 +177,7 @@ export default function AddressAutocomplete({
 
       {apiKeyMissing && (
         <p className={cn("flex items-start gap-1 text-sm text-yellow-800")}>
-          <span className={cn("mt-0.5")}>⚠️</span>
+          <FaTriangleExclamation className={cn("mt-0.5 h-4 w-4 shrink-0")} aria-hidden />
           <span>
             Address autocomplete unavailable. Please type your full address manually. (API key not
             configured)
@@ -186,7 +187,7 @@ export default function AddressAutocomplete({
 
       {scriptError && (
         <p className={cn("flex items-start gap-1 text-sm text-yellow-800")}>
-          <span className={cn("mt-0.5")}>⚠️</span>
+          <FaTriangleExclamation className={cn("mt-0.5 h-4 w-4 shrink-0")} aria-hidden />
           <span>
             Address autocomplete unavailable. Please type your full address manually. (Failed to
             load Google Maps)

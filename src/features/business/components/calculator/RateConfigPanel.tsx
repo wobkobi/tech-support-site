@@ -1,6 +1,7 @@
 "use client";
 
 import type React from "react";
+import { FaCheck } from "react-icons/fa6";
 import { cn } from "@/shared/lib/cn";
 import type { RateConfig } from "@/features/business/types/business";
 
@@ -96,7 +97,9 @@ export function RateConfigPanel({
                       : "-"}
               </td>
               <td className={cn("py-1.5 text-slate-400")}>{r.unit}</td>
-              <td className={cn("py-1.5")}>{r.isDefault ? "✓" : ""}</td>
+              <td className={cn("py-1.5")}>
+                {r.isDefault ? <FaCheck className={cn("h-3 w-3")} aria-hidden /> : null}
+              </td>
               <td className={cn("flex gap-2 py-1.5")}>
                 <button
                   onClick={() => onStartEdit(r)}

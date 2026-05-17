@@ -181,7 +181,7 @@ export function BusinessDashboardCards({
     title: incomePrefix,
     rows: incomeRows(income),
     total: { label: "Total", value: formatNZD(totalIncome) },
-    viewAll: { label: "View all income →", href: `/admin/business/income${tokenSuffix}` },
+    viewAll: { label: "View all income", href: `/admin/business/income${tokenSuffix}` },
   };
 
   /** All-expense (excl. GST) breakdown for the expenses card. */
@@ -189,7 +189,7 @@ export function BusinessDashboardCards({
     title: expensesPrefix,
     rows: expenseRows(expenses, "amountExcl"),
     total: { label: "Total", value: formatNZD(totalExpensesExcl) },
-    viewAll: { label: "View all expenses →", href: `/admin/business/expenses${tokenSuffix}` },
+    viewAll: { label: "View all expenses", href: `/admin/business/expenses${tokenSuffix}` },
   };
 
   /** Calculation walk-through for "Profit". */
@@ -219,7 +219,7 @@ export function BusinessDashboardCards({
     title: "This month income",
     rows: incomeRows(monthIncome),
     total: { label: "Total", value: formatNZD(sumIncome(monthIncome)) },
-    viewAll: { label: "View all income →", href: `/admin/business/income${tokenSuffix}` },
+    viewAll: { label: "View all income", href: `/admin/business/income${tokenSuffix}` },
   };
 
   /** This-month expense breakdown. */
@@ -227,7 +227,7 @@ export function BusinessDashboardCards({
     title: "This month expenses",
     rows: expenseRows(monthExpenses, "amountExcl"),
     total: { label: "Total", value: formatNZD(sumExpense(monthExpenses, "amountExcl")) },
-    viewAll: { label: "View all expenses →", href: `/admin/business/expenses${tokenSuffix}` },
+    viewAll: { label: "View all expenses", href: `/admin/business/expenses${tokenSuffix}` },
   };
 
   /** GST claimable breakdown - shows the GST amount per expense entry. */
@@ -235,7 +235,7 @@ export function BusinessDashboardCards({
     title: "GST claimable",
     rows: expenseRows(expenses, "gstAmount"),
     total: { label: "Total GST", value: formatNZD(totalGst) },
-    viewAll: { label: "View all expenses →", href: `/admin/business/expenses${tokenSuffix}` },
+    viewAll: { label: "View all expenses", href: `/admin/business/expenses${tokenSuffix}` },
   };
 
   /** Invoice list breakdown. */
@@ -251,7 +251,7 @@ export function BusinessDashboardCards({
         amount: inv.total,
       })),
     total: { label: "Count", value: String(invoices.length) },
-    viewAll: { label: "View all invoices →", href: `/admin/business/invoices${tokenSuffix}` },
+    viewAll: { label: "View all invoices", href: `/admin/business/invoices${tokenSuffix}` },
   };
 
   const cards: Array<{
