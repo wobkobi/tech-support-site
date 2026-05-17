@@ -14,6 +14,8 @@ import { cn } from "@/shared/lib/cn";
 import {
   DURATION_OPTIONS,
   SUB_SLOT_MINUTES,
+  BOOKING_FIELD_LIMITS,
+  EMAIL_REGEX,
   type BookableDay,
   type TimeOfDay,
   type StartMinute,
@@ -119,9 +121,16 @@ export default function BookingForm({
   // re-checked, not silently bypassed).
   const [addressOverrideAcked, setAddressOverrideAcked] = useState(false);
   const [notes, setNotes] = useState(initialValues?.notes ?? "");
+  // Honeypot: real users never see/fill this; bots typically auto-fill any
+  // input that looks like a contact field. A non-empty value tells the server
+  // to fake a success response without creating a booking.
+  const [website, setWebsite] = useState("");
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // True when the server returned 409 (someone booked the same slot first).
+  // Drives a more prominent error with a "Refresh available times" link.
+  const [slotStale, setSlotStale] = useState(false);
   const [contactHint, setContactHint] = useState<string | null>(null);
 
   /**
@@ -192,6 +201,8 @@ export default function BookingForm({
    */
   function handleDaySelect(day: BookableDay): void {
     setSelectedDay(day);
+    // Picking a different day clears the stale-slot warning if it was set.
+    setSlotStale(false);
     // Reset time if current selection + minute not available on new day
     if (selectedTime) {
       const window = day.timeWindows.find((w) => w.value === selectedTime);
@@ -258,9 +269,19 @@ export default function BookingForm({
       setError("Please enter your name.");
       return;
     }
-    if (!email.trim() || !email.includes("@")) {
+    if (!email.trim() || !EMAIL_REGEX.test(email.trim())) {
       setError("Please enter a valid email address.");
       return;
+    }
+    // Phone is optional, but if present must be valid. Re-run validation here
+    // in case the user typed without blurring (phoneError only sets on blur).
+    if (phone.trim()) {
+      const phoneOk = isValidPhone(normalizePhone(phone));
+      if (!phoneOk) {
+        setPhoneError("Please enter a valid phone number.");
+        setError("Please fix the phone number, or leave it blank.");
+        return;
+      }
     }
     if (!meetingType) {
       setError("Please select in-person or remote.");
@@ -272,6 +293,12 @@ export default function BookingForm({
     }
     if (!notes.trim()) {
       setError("Please describe what you need help with.");
+      return;
+    }
+    if (notes.trim().length < BOOKING_FIELD_LIMITS.notesMin) {
+      setError(
+        `Please describe the issue in at least ${BOOKING_FIELD_LIMITS.notesMin} characters so I have enough context.`,
+      );
       return;
     }
 
@@ -331,6 +358,7 @@ export default function BookingForm({
             meetingType,
             address: meetingType === "in-person" ? combineUnitAndAddress(unit, address) : undefined,
             notes: notes.trim(),
+            website,
           };
 
       const res = await fetch(endpoint, {
@@ -342,7 +370,15 @@ export default function BookingForm({
       const data = (await res.json()) as { ok?: boolean; error?: string; cancelToken?: string };
 
       if (!res.ok) {
-        setError(data.error || "Could not submit request.");
+        if (res.status === 409) {
+          // Someone else booked this slot between page load and submit. Show
+          // the dedicated stale-slot UI so the customer can refresh and pick
+          // another time rather than re-clicking submit into a dead slot.
+          setSlotStale(true);
+          setError(null);
+        } else {
+          setError(data.error || "Could not submit request.");
+        }
         setSubmitting(false);
         return;
       }
@@ -363,6 +399,31 @@ export default function BookingForm({
 
   return (
     <form onSubmit={handleSubmit} className={cn("flex flex-col gap-8")} autoComplete="off">
+      {/* Honeypot: visually hidden + off-screen + tab-skipped + aria-hidden.
+          Real users never see or focus this. Bots that auto-fill contact-
+          style inputs will fill it, and the server fakes a success response
+          without creating a booking. */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          left: "-9999px",
+          width: 1,
+          height: 1,
+          overflow: "hidden",
+        }}
+      >
+        <label htmlFor="booking-website">Website (leave blank)</label>
+        <input
+          id="booking-website"
+          name="website"
+          type="text"
+          tabIndex={-1}
+          autoComplete="off"
+          value={website}
+          onChange={(e) => setWebsite(e.target.value)}
+        />
+      </div>
       {/* ── Section 1: Scheduling ── */}
       <fieldset className={cn("flex flex-col gap-6")}>
         <legend className={cn("text-russian-violet mb-1 text-xl font-bold sm:text-2xl")}>
@@ -599,6 +660,7 @@ export default function BookingForm({
               id="booking-name"
               type="text"
               autoComplete="name"
+              maxLength={BOOKING_FIELD_LIMITS.name}
               value={name}
               onChange={(e) => setName(e.target.value)}
               className={cn(
@@ -619,6 +681,7 @@ export default function BookingForm({
               id="booking-email"
               type="email"
               autoComplete="email"
+              maxLength={BOOKING_FIELD_LIMITS.email}
               value={email}
               onChange={(e) => {
                 setEmail(e.target.value);
@@ -642,6 +705,7 @@ export default function BookingForm({
             id="booking-phone"
             type="tel"
             autoComplete="tel"
+            maxLength={BOOKING_FIELD_LIMITS.phone}
             value={phone}
             onChange={(e) => {
               setPhone(e.target.value);
@@ -749,6 +813,7 @@ export default function BookingForm({
                     <AddressAutocomplete
                       id="booking-address"
                       value={address}
+                      maxLength={BOOKING_FIELD_LIMITS.address}
                       onChange={(v) => {
                         setAddress(v);
                         // Any typing invalidates the prior pick. The onChange
@@ -803,6 +868,7 @@ export default function BookingForm({
             name="booking-notes-no-autofill"
             autoComplete="new-password"
             rows={4}
+            maxLength={BOOKING_FIELD_LIMITS.notes}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             className={cn(
@@ -815,6 +881,33 @@ export default function BookingForm({
       </fieldset>
 
       {/* Submit */}
+      {slotStale && (
+        <div
+          role="alert"
+          className={cn(
+            "border-coquelicot-500/40 bg-coquelicot-50 rounded-md border p-4",
+            "flex flex-col gap-2",
+          )}
+        >
+          <p className={cn("text-coquelicot-700 text-base font-medium")}>
+            That time slot was just taken by another customer.
+          </p>
+          <p className={cn("text-rich-black/70 text-sm")}>
+            Refresh the page to load the up-to-date availability, then pick another time.
+          </p>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              setSlotStale(false);
+              router.refresh();
+            }}
+          >
+            Refresh available times
+          </Button>
+        </div>
+      )}
       {error && (
         <p className={cn("text-coquelicot-600 text-base font-medium")} role="alert">
           {error}
@@ -836,11 +929,6 @@ export default function BookingForm({
               ? "Save changes"
               : "Submit request"}
         </Button>
-        {!isEditMode && (
-          <p className={cn("text-rich-black/60 text-base")}>
-            I'll confirm your exact appointment time by email.
-          </p>
-        )}
       </div>
     </form>
   );
