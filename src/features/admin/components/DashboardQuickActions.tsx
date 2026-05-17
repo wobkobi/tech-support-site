@@ -63,15 +63,15 @@ export function DashboardQuickActions({
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   /**
-   * Marks a booking completed and sends its review request email in one action.
+   * Marks a booking completed. The PATCH endpoint automatically sends the
+   * review request email if one has not already been sent (atomically guarded
+   * against the cron, so no double-send risk).
    * @param id - Booking ID to complete.
-   * @param hasEmail - Whether the booking has an email address for the review.
    */
-  async function completeAndSend(id: string, hasEmail: boolean): Promise<void> {
+  async function completeAndSend(id: string): Promise<void> {
     setCompleting(id);
     setErrors((prev) => ({ ...prev, [id]: "" }));
     try {
-      // 1. Mark completed
       const patchRes = await fetch(`/api/admin/bookings/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", "x-admin-secret": token },
@@ -80,18 +80,6 @@ export function DashboardQuickActions({
       if (!patchRes.ok) {
         const d = (await patchRes.json()) as { error?: string };
         throw new Error(d.error ?? "Failed to mark completed.");
-      }
-
-      // 2. Send review email if possible
-      if (hasEmail) {
-        const reviewRes = await fetch(`/api/admin/bookings/${id}/resend-review`, {
-          method: "POST",
-          headers: { "x-admin-secret": token },
-        });
-        if (!reviewRes.ok) {
-          const d = (await reviewRes.json()) as { error?: string };
-          throw new Error(d.error ?? "Marked complete but failed to send review.");
-        }
       }
 
       setDone((prev) => new Set(prev).add(id));
@@ -117,10 +105,9 @@ export function DashboardQuickActions({
   /**
    * Wraps completeAndSend to return void for use as an event handler.
    * @param id - Booking ID.
-   * @param hasEmail - Whether the booking has an email.
    */
-  function handleComplete(id: string, hasEmail: boolean): void {
-    void completeAndSend(id, hasEmail);
+  function handleComplete(id: string): void {
+    void completeAndSend(id);
   }
 
   return (
@@ -184,7 +171,7 @@ export function DashboardQuickActions({
                     <button
                       type="button"
                       disabled={isRunning}
-                      onClick={() => handleComplete(b.id, !!b.email)}
+                      onClick={() => handleComplete(b.id)}
                       className={cn(
                         "bg-russian-violet hover:bg-russian-violet/90 shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition-colors disabled:opacity-50",
                       )}
