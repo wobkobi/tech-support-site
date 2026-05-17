@@ -415,9 +415,11 @@ export const BOOKING_FIELD_LIMITS = {
 
 /**
  * Minimal email regex - rejects "a@", "@b", "a@b" (no TLD), whitespace-only
- * input. Catches the common typo cases without trying to be RFC-perfect.
+ * input. The domain is matched as one-or-more dot-separated dot-free segments
+ * so dots only appear at explicit boundaries - this eliminates the backtrack
+ * ambiguity that triggers the polynomial-ReDoS analyzer.
  */
-export const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export const EMAIL_REGEX = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/;
 
 /**
  * Validates the user-supplied fields on a booking POST/edit payload. Returns
