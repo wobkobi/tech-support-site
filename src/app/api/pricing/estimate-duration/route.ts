@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
+import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 
 interface EstimateResult {
   estimatedMins: number;
@@ -39,6 +40,9 @@ Return valid JSON only. No markdown, no text outside the JSON object.`;
  * @returns JSON with estimatedMins, category, and explanation
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  const limited = rateLimitOrReject(request, "estimate-duration", 5, 60_000);
+  if (limited) return limited;
+
   const body = await request.json().catch(() => null);
   const description = (body as { description?: unknown })?.description;
 

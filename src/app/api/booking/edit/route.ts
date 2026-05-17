@@ -25,6 +25,7 @@ import {
 } from "@/features/calendar/lib/google-calendar";
 import { Prisma } from "@prisma/client";
 import { toE164NZ } from "@/shared/lib/normalize-phone";
+import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 
 interface EditBookingPayload {
   cancelToken: string;
@@ -46,6 +47,9 @@ interface EditBookingPayload {
  * @returns JSON response with ok flag or error.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  const limited = rateLimitOrReject(request, "booking-edit", 5, 60_000);
+  if (limited) return limited;
+
   try {
     const body = (await request.json()) as EditBookingPayload;
     const {
