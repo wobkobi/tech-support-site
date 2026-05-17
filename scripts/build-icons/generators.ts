@@ -8,6 +8,7 @@ import sharp from "sharp";
 import fs from "node:fs/promises";
 import { createRequire } from "node:module";
 import { JSDOM } from "jsdom";
+import pngToIco from "png-to-ico";
 import {
   PALETTE,
   LOGO_MARK,
@@ -22,6 +23,10 @@ import {
 } from "./config.js";
 import { ensureDir, makeFrostedCard, makeCoquelicotSvg } from "./helpers.js";
 
+// Opaque background colours used by the favicon renderer.
+const BG_LIGHT = { r: 246, g: 247, b: 248, alpha: 1 } as const; // seasalt
+const BG_DARK = { r: 0, g: 21, b: 20, alpha: 1 } as const; // rich-black
+
 // Dynamic import for CommonJS module
 const QRCodeStylingModule = await import("qr-code-styling");
 const QRCodeStyling = QRCodeStylingModule.default;
@@ -33,78 +38,122 @@ const canvas = createRequire(import.meta.url)("canvas") as typeof import("canvas
 /* ---------- Favicon Generation ---------- */
 
 /**
- * Build all favicon variations including dark mode versions.
+ * Render a single favicon variant from an SVG logo buffer.
+ *
+ * - `opaque: false` → resize logo to fill the canvas (transparent passthrough).
+ * - `opaque: true` → composite logo onto a coloured background at `logoScale`.
+ * @param logoSvg - SVG source buffer (light or dark colour variant).
+ * @param size - Output square size in pixels.
+ * @param opaque - Whether to render on an opaque background.
+ * @param background - Background colour (used when `opaque` is true).
+ * @param logoScale - Logo size as fraction of canvas (used when `opaque`).
+ * @returns PNG buffer.
+ */
+async function renderFavicon(
+  logoSvg: Buffer,
+  size: number,
+  opaque: boolean,
+  background: sharp.Color,
+  logoScale: number,
+): Promise<Buffer> {
+  if (!opaque) {
+    return sharp(logoSvg).resize(size, size).png().toBuffer();
+  }
+  const logo = await sharp(logoSvg)
+    .resize(Math.round(size * logoScale), Math.round(size * logoScale))
+    .png()
+    .toBuffer();
+  return sharp({ create: { width: size, height: size, channels: 4, background } })
+    .composite([{ input: logo, gravity: "centre" }])
+    .png()
+    .toBuffer();
+}
+
+/**
+ * Build all favicon variations and the multi-resolution favicon.ico.
+ *
+ * Each spec produces a light PNG. Specs flagged `hasDarkVariant` also produce
+ * a `-dark.png`. Maskable specs use a smaller logo scale (80%) so the safe
+ * zone survives Android's circle/squircle/rounded-square crop.
  * @returns Promise that resolves when all favicons are generated.
  */
 export async function buildFavicons(): Promise<void> {
   console.log("🎨 Building favicons...");
   await ensureDir("public");
 
-  // Read the SVG
-  const svgBuffer = await fs.readFile(LOGO_MARK);
-  const coquelicotSvgBuffer = await makeCoquelicotSvg(svgBuffer);
+  const lightSvg = await fs.readFile(LOGO_MARK);
+  const darkSvg = await makeCoquelicotSvg(lightSvg);
 
-  // Create light version (original Russian Violet on transparent)
-  const light512 = await sharp(svgBuffer).resize(512, 512).png().toBuffer();
+  for (const { name, size, opaque, hasDarkVariant, maskable } of FAVICON_SPECS) {
+    // Maskable icons need a 10% safe zone on all sides (logo at 80% of canvas).
+    // Other opaque icons use 85% to match the existing visual padding.
+    const logoScale = maskable ? 0.8 : 0.85;
 
-  // Create coquelicot version for dark mode
-  const coquelicot512 = await sharp(coquelicotSvgBuffer).resize(512, 512).png().toBuffer();
+    const lightBuf = await renderFavicon(lightSvg, size, opaque, BG_LIGHT, logoScale);
+    await fs.writeFile(`public/${name}.png`, lightBuf);
 
-  for (const { name, size, opaque } of FAVICON_SPECS) {
-    if (opaque) {
-      // Light mode: Russian Violet logo on Seasalt background
-      const bg = sharp({
-        create: {
-          width: size,
-          height: size,
-          channels: 4,
-          background: { r: 246, g: 247, b: 248, alpha: 1 }, // seasalt
-        },
-      });
-
-      const logoResized = await sharp(svgBuffer)
-        .resize(Math.round(size * 0.85), Math.round(size * 0.85))
-        .png()
-        .toBuffer();
-
-      await bg
-        .composite([{ input: logoResized, gravity: "centre" }])
-        .png()
-        .toFile(`public/${name}.png`);
-
-      // Dark mode: Coquelicot logo on Rich Black background
-      const bgDark = sharp({
-        create: {
-          width: size,
-          height: size,
-          channels: 4,
-          background: { r: 0, g: 21, b: 20, alpha: 1 }, // rich-black
-        },
-      });
-
-      const logoResizedCoquelicot = await sharp(coquelicotSvgBuffer)
-        .resize(Math.round(size * 0.85), Math.round(size * 0.85))
-        .png()
-        .toBuffer();
-
-      await bgDark
-        .composite([{ input: logoResizedCoquelicot, gravity: "centre" }])
-        .png()
-        .toFile(`public/${name}-dark.png`);
-    } else {
-      // Transparent - Light mode: Russian Violet
-      await sharp(light512).resize(size, size).png().toFile(`public/${name}.png`);
-
-      // Transparent - Dark mode: Coquelicot
-      await sharp(coquelicot512).resize(size, size).png().toFile(`public/${name}-dark.png`);
+    if (hasDarkVariant) {
+      const darkBuf = await renderFavicon(darkSvg, size, opaque, BG_DARK, logoScale);
+      await fs.writeFile(`public/${name}-dark.png`, darkBuf);
     }
 
-    console.log(`  ✓ ${name} (${size}x${size})`);
+    console.log(`  ✓ ${name} (${size}x${size})${hasDarkVariant ? " + dark" : ""}`);
   }
 
-  // Generate ICO file (copy 32x32)
-  await fs.copyFile("public/favicon-32x32.png", "public/favicon.ico");
-  console.log("  ✓ favicon.ico");
+  // Multi-resolution favicon.ico (16 + 32 + 48) so the OS/browser picks the
+  // sharpest size for each context (tab, taskbar, bookmark bar, etc.). The
+  // previous implementation was a renamed 32x32 PNG that rendered blurry in
+  // small UI like Windows pinned-taskbar icons.
+  const ico16 = await sharp(lightSvg).resize(16, 16).png().toBuffer();
+  const ico32 = await sharp(lightSvg).resize(32, 32).png().toBuffer();
+  const ico48 = await sharp(lightSvg).resize(48, 48).png().toBuffer();
+  const icoBuffer = await pngToIco([ico16, ico32, ico48]);
+  await fs.writeFile("public/favicon.ico", icoBuffer);
+  console.log("  ✓ favicon.ico (16 + 32 + 48 multi-res)");
+}
+
+/* ---------- SVG Favicon ---------- */
+
+/**
+ * Build favicon.svg with embedded prefers-color-scheme styling.
+ *
+ * The injected CSS overrides the source SVG's inline `fill` attributes
+ * because in SVG, `fill="..."` is a presentation attribute and any matching
+ * CSS rule wins (no `!important` needed). Modern browsers prefer SVG
+ * favicons over PNGs and handle dark mode natively in a single file.
+ * @returns Promise that resolves when favicon.svg is written.
+ */
+export async function buildFaviconSvg(): Promise<void> {
+  console.log("🖼️  Building favicon.svg (with dark-mode CSS)...");
+  const svg = await fs.readFile(LOGO_MARK, "utf-8");
+
+  const styleBlock = `<style>
+    path, rect, circle, ellipse, line, polyline, polygon, text {
+      fill: ${PALETTE.russianViolet500};
+    }
+    @media (prefers-color-scheme: dark) {
+      path, rect, circle, ellipse, line, polyline, polygon, text {
+        fill: ${PALETTE.coquelicot500};
+      }
+    }
+  </style>`;
+
+  // Inject the style block right after the opening <svg ...> tag, then strip
+  // every inline `fill="#hex"` from child elements. Without the strip, the
+  // browser briefly renders the inline fills (russian-violet) before the CSS
+  // is applied - visible as a "blue flash" before the dark-mode swap kicks in.
+  // Once inline fills are gone, the CSS is the sole colour source and both
+  // light and dark modes render correctly on first paint.
+  const withStyle = svg.replace(/<svg([^>]*)>/, `<svg$1>${styleBlock}`);
+
+  if (withStyle === svg) {
+    throw new Error("favicon.svg generation: opening <svg> tag not found in source");
+  }
+
+  const styled = withStyle.replace(/\s+fill="#[0-9A-Fa-f]{3,8}"/g, "");
+
+  await fs.writeFile("public/favicon.svg", styled, "utf-8");
+  console.log("  ✓ favicon.svg");
 }
 
 /* ---------- Social Image Generation ---------- */
@@ -380,16 +429,20 @@ export async function buildQRCodes(): Promise<void> {
   }
 }
 
-/* ---------- Manifest Files ---------- */
+/* ---------- Manifest File ---------- */
 
 /**
- * Build web manifest and browserconfig files.
- * @returns Promise that resolves when manifest files are generated.
+ * Build the web manifest (site.webmanifest) for PWA / Add to Home Screen.
+ *
+ * Lists every transparent android-chrome size so the OS picks the sharpest
+ * fit per device, plus a dedicated maskable icon (separate file with safe-zone
+ * padding) so Android does not clip the logo edges when cropping to a
+ * circle/squircle.
+ * @returns Promise that resolves when the manifest is written.
  */
 export async function buildManifest(): Promise<void> {
-  console.log("📋 Building manifest files...");
+  console.log("📋 Building site.webmanifest...");
 
-  // Web manifest
   const webManifest = {
     name: "To The Point Tech",
     short_name: "ToThePoint",
@@ -399,18 +452,12 @@ export async function buildManifest(): Promise<void> {
     background_color: PALETTE.seasalt500,
     theme_color: PALETTE.russianViolet500,
     icons: [
+      { src: "/android-chrome-192x192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+      { src: "/android-chrome-256x256.png", sizes: "256x256", type: "image/png", purpose: "any" },
+      { src: "/android-chrome-384x384.png", sizes: "384x384", type: "image/png", purpose: "any" },
+      { src: "/android-chrome-512x512.png", sizes: "512x512", type: "image/png", purpose: "any" },
       {
-        src: "/android-chrome-192x192.png",
-        sizes: "192x192",
-        type: "image/png",
-      },
-      {
-        src: "/android-chrome-512x512.png",
-        sizes: "512x512",
-        type: "image/png",
-      },
-      {
-        src: "/android-chrome-512x512.png",
+        src: "/android-chrome-maskable-512x512.png",
         sizes: "512x512",
         type: "image/png",
         purpose: "maskable",
@@ -420,18 +467,4 @@ export async function buildManifest(): Promise<void> {
 
   await fs.writeFile("public/site.webmanifest", JSON.stringify(webManifest, null, 2));
   console.log("  ✓ site.webmanifest");
-
-  // browserconfig.xml for MS tiles
-  const browserConfig = `<?xml version="1.0" encoding="utf-8"?>
-<browserconfig>
-  <msapplication>
-    <tile>
-      <square150x150logo src="/mstile-150x150.png"/>
-      <TileColor>${PALETTE.russianViolet500}</TileColor>
-    </tile>
-  </msapplication>
-</browserconfig>`;
-
-  await fs.writeFile("public/browserconfig.xml", browserConfig);
-  console.log("  ✓ browserconfig.xml");
 }

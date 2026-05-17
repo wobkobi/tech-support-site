@@ -26,27 +26,42 @@ export const BACKDROP = "public/source/backdrop.jpg"; // Background image
 
 /**
  * Specification for a single favicon variant.
+ *
+ * Only browser-tab favicons (`favicon-16/32`) get a `-dark` variant: those are
+ * the only icons where `prefers-color-scheme` actually works (via the
+ * `media` attribute on `<link rel="icon">`). iOS does not honour `media` on
+ * `apple-touch-icon`, and the PWA manifest does not support media-query icons,
+ * so generating dark variants for those is dead weight.
  */
 export interface IconSpec {
   /** Output filename without extension. */
   name: string;
   /** Pixel dimensions (square). */
   size: number;
-  /** Whether to render on an opaque background. */
+  /** Whether to render on an opaque background (vs transparent). */
   opaque: boolean;
+  /** Generate a matching `-dark.png` for use with `prefers-color-scheme`. */
+  hasDarkVariant?: boolean;
+  /**
+   * Render as a maskable PWA icon: opaque background, logo scaled to 80% so
+   * the safe zone survives Android's circle/squircle/rounded-square crop.
+   */
+  maskable?: boolean;
 }
 
 export const FAVICON_SPECS: IconSpec[] = [
-  // Apple
+  // Apple touch icon - one size covers all modern iPhones
   { name: "apple-touch-icon", size: 180, opaque: true },
-  // Android/Chrome
+  // PWA / Android home-screen icons (any-purpose, transparent)
   { name: "android-chrome-192x192", size: 192, opaque: false },
+  { name: "android-chrome-256x256", size: 256, opaque: false },
+  { name: "android-chrome-384x384", size: 384, opaque: false },
   { name: "android-chrome-512x512", size: 512, opaque: false },
-  // Standard favicons
-  { name: "favicon-32x32", size: 32, opaque: false },
-  { name: "favicon-16x16", size: 16, opaque: false },
-  // MS Tile
-  { name: "mstile-150x150", size: 150, opaque: true },
+  // Dedicated maskable variant - 80% logo on opaque bg for Android crop
+  { name: "android-chrome-maskable-512x512", size: 512, opaque: true, maskable: true },
+  // Browser-tab favicons - the only icons where dark mode actually works
+  { name: "favicon-32x32", size: 32, opaque: false, hasDarkVariant: true },
+  { name: "favicon-16x16", size: 16, opaque: false, hasDarkVariant: true },
 ];
 
 /* ---------- Social Image Specs ---------- */

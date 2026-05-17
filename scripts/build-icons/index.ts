@@ -20,6 +20,7 @@ import {
 } from "./config.js";
 import {
   buildFavicons,
+  buildFaviconSvg,
   buildSocialImages,
   buildBackdropVariants,
   buildAdditionalAssets,
@@ -57,8 +58,11 @@ function printSummary(): void {
   console.log("\n📦 Generated assets summary:\n");
 
   console.log("Favicons (public/):");
-  FAVICON_SPECS.forEach((s) => console.log(`  • ${s.name}.png / ${s.name}-dark.png (coquelicot)`));
-  console.log("  • favicon.ico\n");
+  FAVICON_SPECS.forEach((s) =>
+    console.log(`  • ${s.name}.png${s.hasDarkVariant ? ` + ${s.name}-dark.png` : ""}`),
+  );
+  console.log("  • favicon.svg (with prefers-color-scheme CSS)");
+  console.log("  • favicon.ico (16 + 32 + 48 multi-res)\n");
 
   console.log("Social Images (public/):");
   SOCIAL_SPECS.forEach((s) => console.log(`  • ${s.name}.jpg (${s.width}x${s.height})`));
@@ -80,13 +84,14 @@ function printSummary(): void {
   QR_CODE_SPECS.forEach((s) => console.log(`  • ${s.name}.svg + ${s.name}.png (${s.displayName})`));
   console.log("");
 
-  console.log("Manifest Files (public/):");
+  console.log("Manifest (public/):");
   console.log("  • site.webmanifest");
-  console.log("  • browserconfig.xml");
   console.log("");
 
   console.log("✅ All assets generated successfully!");
-  console.log("💡 Note: Dark mode icons use coquelicot (#f34213) color");
+  console.log(
+    "💡 Dark-mode favicon-16/32 use coquelicot (#f34213). favicon.svg handles it via CSS.",
+  );
 }
 
 /* ---------- Main ---------- */
@@ -100,6 +105,7 @@ async function main(): Promise<void> {
 
   await preflight();
   await buildFavicons();
+  await buildFaviconSvg();
   await buildSocialImages();
   await buildBackdropVariants();
   await buildAdditionalAssets();

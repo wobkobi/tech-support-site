@@ -46,15 +46,11 @@ export function makeFrostedCard(w: number, h: number, logoScale: number): Buffer
 export async function makeCoquelicotSvg(svgBuffer: Buffer): Promise<Buffer> {
   let svgString = svgBuffer.toString("utf-8");
 
-  // Replace all variations of Russian Violet with Coquelicot
-  svgString = svgString
-    .replace(/#0B093B/gi, PALETTE.coquelicot500)
-    .replace(/#0B093C/gi, PALETTE.coquelicot500)
-    .replace(/#0C0A3B/gi, PALETTE.coquelicot500)
-    .replace(/#0B0939/gi, PALETTE.coquelicot500)
-    .replace(/#0B093A/gi, PALETTE.coquelicot500)
-    .replace(/#0A0939/gi, PALETTE.coquelicot500)
-    .replace(/#0A093A/gi, PALETTE.coquelicot500);
+  // Replace all near-#0C0A3E (russian-violet) hex codes the SVG exporter
+  // rounds to. Matches the deep-navy range (R: 0A-0C, G: 08-0A, B: 39-3F) so a
+  // future re-export with slightly different rounding (e.g. #0B093D)
+  // still gets swapped without needing another entry here.
+  svgString = svgString.replace(/#0[ABC]0[89A]3[9A-F]/gi, PALETTE.coquelicot500);
 
   return Buffer.from(svgString, "utf-8");
 }
