@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 
 interface DistanceMatrixElement {
   status: string;
@@ -17,6 +18,9 @@ interface DistanceMatrixResponse {
  * @returns JSON with durationMins and distanceKm, or durationMins: 0 on any failure
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  const limited = rateLimitOrReject(request, "travel-time", 5, 60_000);
+  if (limited) return limited;
+
   const origin = process.env.HOME_ADDRESS;
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
 

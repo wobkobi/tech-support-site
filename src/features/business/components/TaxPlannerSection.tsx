@@ -8,7 +8,6 @@ import {
   DEFAULT_TAX_RATES,
   type TaxRates,
 } from "@/features/business/lib/tax-planner";
-import type { TaxPaymentTotals } from "@/features/business/lib/tax-payments";
 
 interface Props {
   /** Display label for the FY being summarised, e.g. "FY 2026-27 (current)". */
@@ -20,11 +19,6 @@ interface Props {
   /** GST claimable on FY expenses. */
   gstClaimable: number;
   /**
-   * Actuals pulled from the per-FY workbook's TAX tab Payment log plus any
-   * derived recurring transfer totals. Null when nothing is available.
-   */
-  actuals: TaxPaymentTotals | null;
-  /**
    * Per-rate overrides for income tax / ACC / KiwiSaver, sourced from the
    * workbook's SETTINGS tab. Falls back to DEFAULT_TAX_RATES when the sheet
    * couldn't be read so the dashboard always renders something sensible.
@@ -35,9 +29,9 @@ interface Props {
 /**
  * Mirrors the user's "Tax Planner (NZ Sole Trader)" sheet on the dashboard:
  * income/expense/profit summary, profit-based set-asides (income tax, ACC,
- * KiwiSaver), weekly/monthly savings targets, and a GST roll-up. When the
- * Payment log on the TAX tab has rows, each set-aside also shows actual-vs-
- * target progress so the operator can see whether they're on pace.
+ * KiwiSaver), weekly/monthly savings targets, and a GST roll-up. Shows only
+ * the targets - the "paid" actuals from the Payment log are deliberately
+ * omitted so the panel reads as "what should be in your tax account".
  *
  * Defaults to the parent page's selected scope. Server component - no
  * interactivity.
@@ -46,7 +40,6 @@ interface Props {
  * @param props.income - Period income.
  * @param props.expensesExcl - Period expenses excluding GST.
  * @param props.gstClaimable - Period GST claimable.
- * @param props.actuals - Combined Payment log + recurring totals, or null.
  * @param props.rates - Per-rate overrides; falls back to DEFAULT_TAX_RATES.
  * @returns The rendered tax planner section.
  */
@@ -55,7 +48,6 @@ export function TaxPlannerSection({
   income,
   expensesExcl,
   gstClaimable,
-  actuals,
   rates = DEFAULT_TAX_RATES,
 }: Props): React.ReactElement {
   const plan = computeTaxPlan(income, expensesExcl, gstClaimable, rates);
@@ -66,10 +58,6 @@ export function TaxPlannerSection({
   // Tax account total: income tax + ACC, plus GST when registered.
   const gstToReserve = GST_REGISTERED ? Math.max(0, plan.gst.netToPay) : 0;
   const taxAccountTarget = plan.setAsides.incomeTax + plan.setAsides.acc + gstToReserve;
-  const taxAccountPaid =
-    actuals === null
-      ? undefined
-      : actuals.incomeTax + actuals.acc + (GST_REGISTERED ? actuals.gst : 0);
 
   return (
     <section className={cn("mb-8")}>
@@ -93,30 +81,12 @@ export function TaxPlannerSection({
           <PlannerRow
             label={`Income tax @ ${incomeTaxPct}`}
             value={formatNZD(plan.setAsides.incomeTax)}
-            paid={actuals?.incomeTax}
-            target={plan.setAsides.incomeTax}
           />
-          <PlannerRow
-            label={`ACC (est.) @ ${accPct}`}
-            value={formatNZD(plan.setAsides.acc)}
-            paid={actuals?.acc}
-            target={plan.setAsides.acc}
-          />
+          <PlannerRow label={`ACC (est.) @ ${accPct}`} value={formatNZD(plan.setAsides.acc)} />
           {GST_REGISTERED && (
-            <PlannerRow
-              label="GST to pay"
-              value={formatNZD(Math.max(0, plan.gst.netToPay))}
-              paid={actuals?.gst}
-              target={Math.max(0, plan.gst.netToPay)}
-            />
+            <PlannerRow label="GST to pay" value={formatNZD(Math.max(0, plan.gst.netToPay))} />
           )}
-          <PlannerRow
-            label="Tax account total"
-            value={formatNZD(taxAccountTarget)}
-            paid={taxAccountPaid}
-            target={taxAccountTarget}
-            emphasis
-          />
+          <PlannerRow label="Tax account total" value={formatNZD(taxAccountTarget)} emphasis />
           <div className={cn("mt-3 grid grid-cols-2 gap-2 border-t border-slate-100 pt-2")}>
             <SmallStat label="Weekly target" value={formatNZD(taxAccountTarget / 52)} />
             <SmallStat label="Monthly target" value={formatNZD(taxAccountTarget / 12)} />
@@ -138,8 +108,6 @@ export function TaxPlannerSection({
           <PlannerRow
             label={`KiwiSaver @ ${kiwiSaverPct}`}
             value={formatNZD(plan.setAsides.kiwiSaver)}
-            paid={actuals?.kiwiSaver}
-            target={plan.setAsides.kiwiSaver}
             emphasis
           />
           <div className={cn("mt-3 grid grid-cols-2 gap-2 border-t border-slate-100 pt-2")}>
@@ -172,8 +140,6 @@ export function TaxPlannerSection({
             <PlannerRow
               label={plan.gst.netToPay >= 0 ? "GST to pay" : "GST refund"}
               value={formatNZD(Math.abs(plan.gst.netToPay))}
-              paid={actuals?.gst}
-              target={Math.abs(plan.gst.netToPay)}
               emphasis
             />
             <p className={cn("mt-2 text-[11px] leading-snug text-slate-400")}>
@@ -187,16 +153,12 @@ export function TaxPlannerSection({
 }
 
 /**
- * One label/value row in a planner card. When `paid` and `target` are both
- * provided, a second muted line shows "Paid: $X (Y% of target)" so progress
- * is visible at a glance.
+ * One label/value row in a planner card.
  * @param props - Component props.
  * @param props.label - Left-side label.
  * @param props.value - Right-side pre-formatted value.
  * @param props.emphasis - Bold/larger styling for totals.
  * @param props.muted - Lighter styling for derivable rows.
- * @param props.paid - Actual amount paid against this target (from Payment log).
- * @param props.target - Numeric target for percentage progress; omitted if `paid` is missing.
  * @returns A single planner row.
  */
 function PlannerRow({
@@ -204,19 +166,12 @@ function PlannerRow({
   value,
   emphasis,
   muted,
-  paid,
-  target,
 }: {
   label: string;
   value: string;
   emphasis?: boolean;
   muted?: boolean;
-  paid?: number;
-  target?: number;
 }): React.ReactElement {
-  const showPaid = typeof paid === "number" && typeof target === "number";
-  const pct = showPaid && target! > 0 ? Math.round((paid! / target!) * 100) : null;
-
   return (
     <div
       className={cn(
@@ -239,19 +194,6 @@ function PlannerRow({
           {value}
         </span>
       </div>
-      {showPaid && (
-        <div className={cn("mt-0.5 flex items-baseline justify-between gap-3 text-[11px]")}>
-          <span className={cn("text-slate-400")}>Paid {pct !== null ? `(${pct}%)` : ""}</span>
-          <span
-            className={cn(
-              "font-mono",
-              pct !== null && pct >= 100 ? "text-green-600" : "text-slate-500",
-            )}
-          >
-            {formatNZD(paid!)}
-          </span>
-        </div>
-      )}
     </div>
   );
 }

@@ -5,7 +5,6 @@
  */
 
 import { prisma } from "@/shared/lib/prisma";
-import type { TaxPaymentTotals } from "@/features/business/lib/tax-payments";
 import type { TaxRates } from "@/features/business/lib/tax-planner";
 
 /** How long a cached snapshot is fresh (1h trades staleness for fewer API calls). */
@@ -14,14 +13,9 @@ export const TAX_CACHE_TTL_MS = 60 * 60 * 1000;
 /** Setting-table key prefix; one row per scope. */
 const KEY_PREFIX = "tax-cache:";
 
-/** Cached payload: payment totals + planner config. */
+/** Cached payload: planner config pulled from the SETTINGS tab. */
 export interface CachedTaxSnapshot {
-  paymentTotals: TaxPaymentTotals | null;
   rates: TaxRates;
-  /** Weekly tax-account + KiwiSaver transfer amounts. */
-  weeklyAmounts: { kiwiSaver: number; incomeTax: number };
-  /** Auto-transfer start as ISO (Date doesn't survive JSON). */
-  scheduleStartISO: string | null;
 }
 
 interface SerialisedSnapshot {

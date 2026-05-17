@@ -127,6 +127,11 @@ model Contact {
   phone           String?
   address         String?
   googleContactId String? // Google People API resource name (e.g. "people/c1234567890")
+  // Stable per-contact review URL token. Lazy-filled by ensureContactReviewToken
+  // so the same review link appears on every invoice the customer receives.
+  // Not @unique because MongoDB's unique index rejects multiple null values
+  // during backfill; UUID v4 collisions are vanishingly rare.
+  reviewToken     String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
@@ -324,6 +329,56 @@ model Promo {
 
   // getActivePromo() filters by these three; covers most lookups.
   @@index([isActive, startAt, endAt])
+}
+
+// Per-task split returned by the public price estimator AI (one entry per
+// distinct task in a multi-task description). `mins` is the task's STACKED
+// contribution to the combined visit, not its standalone benchmark.
+type EstimateTask {
+  label String
+  mins  Int
+}
+
+// Audit log for the public price estimator. Captures what the user typed,
+// how the AI interpreted it, and the exact range shown on screen so disputes
+// can be reviewed. Purged after 30 days by /api/cron/purge-price-estimates.
+model PriceEstimateLog {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  // Raw user input from the wizard step 1.
+  description String
+
+  // AI output captured verbatim.
+  aiEstimatedMins Int
+  aiCategory      String // "standard" | "complex"
+  aiExplanation   String
+  aiTasks         EstimateTask[]
+
+  // Address + drive time (step 2 is optional - skipped values stay null).
+  address    String?
+  travelMins Int?
+
+  // Final price range shown to the user, post-promo.
+  hourlyRate Float
+  priceLow   Int
+  priceHigh  Int
+
+  // Promo snapshot so old quotes remain reconstructable after promos change.
+  promoTitle String?
+  promoLabel String?
+
+  // NODE_ENV at the time of the request - "production" for real public
+  // traffic, "development" when I hit the wizard from `npm run dev`. The
+  // admin page hides non-production rows by default and exposes a toggle
+  // so I can audit my own test submissions when I need to.
+  environment String @default("production")
+
+  createdAt DateTime @default(now())
+
+  // Cron cleanup: WHERE createdAt < now - 30d
+  @@index([createdAt])
+  // Admin page default view: WHERE environment="production" ORDER BY createdAt DESC
+  @@index([environment, createdAt(sort: Desc)])
 }
 
 model Subscription {

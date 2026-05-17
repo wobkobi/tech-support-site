@@ -15,7 +15,8 @@
 import { useState } from "react";
 import type React from "react";
 import { cn } from "@/shared/lib/cn";
-import { formatNZD, formatNZDate } from "@/features/business/lib/business";
+import { formatNZD } from "@/features/business/lib/business";
+import { formatDateSlash } from "@/shared/lib/date-format";
 import {
   BreakdownModal,
   type BreakdownData,
@@ -78,7 +79,7 @@ function incomeRows(entries: IncomeRow[]): BreakdownRow[] {
     .slice()
     .sort((a, b) => b.date.localeCompare(a.date))
     .map((e) => ({
-      date: formatNZDate(e.date),
+      date: formatDateSlash(e.date),
       label: e.customer,
       sublabel: e.description,
       amount: e.amount,
@@ -96,7 +97,7 @@ function expenseRows(entries: ExpenseRow[], field: "amountExcl" | "gstAmount"): 
     .slice()
     .sort((a, b) => b.date.localeCompare(a.date))
     .map((e) => ({
-      date: formatNZDate(e.date),
+      date: formatDateSlash(e.date),
       label: e.supplier,
       sublabel: e.description,
       amount: field === "amountExcl" ? e.amountExcl : e.gstAmount,
@@ -244,7 +245,7 @@ export function BusinessDashboardCards({
       .slice()
       .sort((a, b) => b.issueDate.localeCompare(a.issueDate))
       .map((inv) => ({
-        date: formatNZDate(inv.issueDate),
+        date: formatDateSlash(inv.issueDate),
         label: inv.number,
         sublabel: `${inv.clientName} - ${inv.status}`,
         amount: inv.total,

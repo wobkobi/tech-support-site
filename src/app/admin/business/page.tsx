@@ -11,20 +11,8 @@ import { SheetImportButton } from "@/features/business/components/SheetImportBut
 import { TaxPlannerSection } from "@/features/business/components/TaxPlannerSection";
 import { getFySheetIdForDate } from "@/features/business/lib/sheets-sync";
 import { listSpreadsheetsInFolder } from "@/features/business/lib/google-drive";
-import {
-  readTaxPayments,
-  sumPaymentsByType,
-  computeRecurringTotals,
-  combineTotals,
-  type WeeklyTransferAmounts,
-} from "@/features/business/lib/tax-payments";
 import { readPlannerConfig } from "@/features/business/lib/tax-settings";
-import {
-  DEFAULT_TAX_RATES,
-  RECURRING_TRANSFERS_STARTED_AT,
-  computeTaxPlan,
-  type TaxRates,
-} from "@/features/business/lib/tax-planner";
+import { DEFAULT_TAX_RATES, type TaxRates } from "@/features/business/lib/tax-planner";
 import {
   readCachedTaxSnapshot,
   writeCachedTaxSnapshot,
@@ -216,94 +204,43 @@ export default async function BusinessPage({
   const scopedExpensesTotal = expenses.reduce((s, r) => s + r.amountExcl, 0);
   const scopedGstTotal = expenses.reduce((s, r) => s + r.gstAmount, 0);
 
-  // Pull actuals + planner config from the FY workbook(s). Cached per scope
+  // Pull the per-FY rates from the workbook's SETTINGS tab. Cached per scope
   // since the Drive/Sheets reads cost 3-5s on a miss.
-  let paymentTotals: ReturnType<typeof sumPaymentsByType> | null = null;
   let rates: TaxRates = DEFAULT_TAX_RATES;
-  let weeklyAmounts: WeeklyTransferAmounts = { kiwiSaver: 0, incomeTax: 0 };
-  let scheduleStart: Date | null = null;
 
   const cached = forceRefresh ? null : await readCachedTaxSnapshot(scope.key);
   if (cached) {
-    paymentTotals = cached.paymentTotals;
     rates = cached.rates;
-    weeklyAmounts = cached.weeklyAmounts;
-    scheduleStart = cached.scheduleStartISO ? new Date(cached.scheduleStartISO) : null;
   } else {
     try {
-      let logged: ReturnType<typeof sumPaymentsByType> | null = null;
       let configSpreadsheetId: string | null = null;
 
       if (scope.isAllTime) {
         const folderId = process.env.GOOGLE_BUSINESS_SHEETS_FOLDER_ID?.trim();
         if (folderId) {
           const allSheets = await listSpreadsheetsInFolder(folderId);
-          const allPaymentLists = await Promise.all(
-            allSheets.map((s) => readTaxPayments(s.fileId)),
-          );
-          logged = sumPaymentsByType(allPaymentLists.flat());
           // For All time, use the most recent workbook for rates.
           configSpreadsheetId = allSheets[allSheets.length - 1]?.fileId ?? null;
         }
       } else if (scope.startISO) {
-        const spreadsheetId = await getFySheetIdForDate(new Date(scope.startISO));
-        if (spreadsheetId) {
-          const payments = await readTaxPayments(spreadsheetId);
-          logged = sumPaymentsByType(payments);
-          configSpreadsheetId = spreadsheetId;
-        }
+        configSpreadsheetId = await getFySheetIdForDate(new Date(scope.startISO));
       }
 
       if (configSpreadsheetId) {
         const config = await readPlannerConfig(configSpreadsheetId);
         if (config) {
           rates = config.rates;
-          weeklyAmounts = { kiwiSaver: config.weeklyKiwiSaver, incomeTax: config.weeklyTax };
-          // SETTINGS wins; falls back to the code constant.
-          scheduleStart = config.transferStartDate ?? new Date(RECURRING_TRANSFERS_STARTED_AT);
         }
       }
 
-      // Targets to split the weekly tax transfer across income tax / ACC / GST.
-      const planForSplit = computeTaxPlan(
-        scopedIncomeTotal,
-        scopedExpensesTotal,
-        scopedGstTotal,
-        rates,
-      );
-      const taxBucketTargets = {
-        incomeTax: planForSplit.setAsides.incomeTax,
-        acc: planForSplit.setAsides.acc,
-        gst: 0, // GST has its own line in the plan; tax bucket only covers income tax + ACC for now.
-      };
-
-      // Recurring window: scope range, or "since schedule start" for All time.
-      const recurringStart = scope.startISO ? new Date(scope.startISO) : new Date(0);
-      const recurringEnd = scope.endISO ? new Date(scope.endISO) : new Date(now.getTime() + 1);
-      const recurring = computeRecurringTotals(
-        weeklyAmounts,
-        scheduleStart,
-        recurringStart,
-        recurringEnd,
-        now,
-        taxBucketTargets,
-      );
-
-      paymentTotals = logged ? combineTotals(logged, recurring) : recurring;
-
       // Persist the snapshot - failures non-fatal, just stays cold next time.
       try {
-        await writeCachedTaxSnapshot(scope.key, {
-          paymentTotals,
-          rates,
-          weeklyAmounts,
-          scheduleStartISO: scheduleStart ? scheduleStart.toISOString() : null,
-        });
+        await writeCachedTaxSnapshot(scope.key, { rates });
       } catch (cacheErr) {
         console.error("[business/page] tax-cache write failed (non-fatal):", cacheErr);
       }
     } catch (err) {
-      console.error("[business/page] Failed to read tax payments:", err);
+      console.error("[business/page] Failed to read planner config:", err);
     }
   }
 
@@ -393,7 +330,6 @@ export default async function BusinessPage({
         income={scopedIncomeTotal}
         expensesExcl={scopedExpensesTotal}
         gstClaimable={scopedGstTotal}
-        actuals={paymentTotals}
         rates={rates}
       />
 

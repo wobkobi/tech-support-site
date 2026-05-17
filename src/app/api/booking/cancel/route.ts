@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { deleteBookingEvent } from "@/features/calendar/lib/google-calendar";
+import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 
 interface CancelPayload {
   cancelToken: string;
@@ -19,6 +20,9 @@ interface CancelPayload {
  * @returns JSON response indicating success or failure.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  const limited = rateLimitOrReject(request, "booking-cancel", 5, 60_000);
+  if (limited) return limited;
+
   try {
     const body = (await request.json()) as CancelPayload;
     const { cancelToken } = body;

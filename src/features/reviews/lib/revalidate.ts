@@ -6,7 +6,8 @@ import { revalidatePath, revalidateTag } from "next/cache";
  * Call after any review status change (approve, revoke, delete).
  * revalidateTag("reviews") clears the unstable_cache entry on the home page
  * so ISR regeneration picks up the latest approved reviews immediately.
- * The second argument ({}) is a Next.js 16 CacheLifeConfig (all fields optional).
+ * The second argument ({}) is a Next.js 16 CacheLifeConfig - the fields are
+ * optional but the argument itself is required.
  */
 export function revalidateReviewPaths(): void {
   revalidateTag("reviews", {});

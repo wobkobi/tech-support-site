@@ -14,6 +14,8 @@ import { cn } from "@/shared/lib/cn";
 import {
   DURATION_OPTIONS,
   SUB_SLOT_MINUTES,
+  BOOKING_FIELD_LIMITS,
+  EMAIL_REGEX,
   type BookableDay,
   type TimeOfDay,
   type StartMinute,
@@ -33,6 +35,35 @@ export interface BookingFormInitialValues {
   meetingType: "in-person" | "remote" | "";
   address: string;
   notes: string;
+}
+
+/**
+ * Splits an NZ-style apartment-prefixed address ("12/160 Kepa Road Orakei")
+ * into its unit number and the street-and-rest. Returns unit="" when no unit
+ * prefix is detected. Matches 1-4 digits with an optional letter suffix
+ * (e.g. "12", "12A") followed by "/" and at least one more char.
+ * @param addr - Saved address string, possibly with a unit prefix.
+ * @returns Object with `unit` (may be empty) and `rest` (the street + suburb).
+ */
+function splitUnitFromAddress(addr: string): { unit: string; rest: string } {
+  const trimmed = addr.trim();
+  const m = trimmed.match(/^(\d{1,4}[A-Za-z]?)\/(.+)$/);
+  if (!m) return { unit: "", rest: trimmed };
+  return { unit: m[1], rest: m[2].trim() };
+}
+
+/**
+ * Combines a unit number and a street-and-rest back into the saved address
+ * string ("12/160 Kepa Road Orakei"). Returns just the rest when no unit is
+ * present, so non-apartment addresses are unchanged.
+ * @param unit - Apartment / unit number, may be empty.
+ * @param rest - Street address + suburb.
+ * @returns Combined address string suitable for persistence.
+ */
+function combineUnitAndAddress(unit: string, rest: string): string {
+  const u = unit.trim();
+  const r = rest.trim();
+  return u ? `${u}/${r}` : r;
 }
 
 export interface BookingFormProps {
@@ -72,11 +103,34 @@ export default function BookingForm({
   const [meetingType, setMeetingType] = useState<"in-person" | "remote" | "">(
     initialValues?.meetingType ?? "",
   );
-  const [address, setAddress] = useState(initialValues?.address ?? "");
+  // Apartment / unit number is stored separately so Google Places autocomplete
+  // can predict the street part (predictions go cold for NZ "N/" prefixes).
+  // We re-combine on submit and split on pre-fill so saved addresses stay in
+  // the standard "12/160 Kepa Road Orakei" shape.
+  const initialSplit = splitUnitFromAddress(initialValues?.address ?? "");
+  const [unit, setUnit] = useState(initialSplit.unit);
+  const [address, setAddress] = useState(initialSplit.rest);
+  // True after the customer picks an autocomplete suggestion; resets to false
+  // on any subsequent keystroke. In edit mode the saved address is treated as
+  // verified (it was accepted on its original submission). Drives the
+  // green-tick hint + the optional submit-time geocode fallback.
+  const [addressVerified, setAddressVerified] = useState(Boolean(initialValues?.address));
+  // Flipped true after the submit-time geocode check fails so the customer can
+  // click Submit a second time to proceed with their typed address as-is.
+  // Reset whenever the address changes (so a different mistyped address gets
+  // re-checked, not silently bypassed).
+  const [addressOverrideAcked, setAddressOverrideAcked] = useState(false);
   const [notes, setNotes] = useState(initialValues?.notes ?? "");
+  // Honeypot: real users never see/fill this; bots typically auto-fill any
+  // input that looks like a contact field. A non-empty value tells the server
+  // to fake a success response without creating a booking.
+  const [website, setWebsite] = useState("");
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // True when the server returned 409 (someone booked the same slot first).
+  // Drives a more prominent error with a "Refresh available times" link.
+  const [slotStale, setSlotStale] = useState(false);
   const [contactHint, setContactHint] = useState<string | null>(null);
 
   /**
@@ -106,8 +160,10 @@ export default function BookingForm({
         setPhone(data.phone);
         filled.push("phone");
       }
-      if (data.address && !address.trim()) {
-        setAddress(data.address);
+      if (data.address && !address.trim() && !unit.trim()) {
+        const split = splitUnitFromAddress(data.address);
+        setUnit(split.unit);
+        setAddress(split.rest);
         filled.push("address");
       }
       if (filled.length > 0) {
@@ -145,6 +201,8 @@ export default function BookingForm({
    */
   function handleDaySelect(day: BookableDay): void {
     setSelectedDay(day);
+    // Picking a different day clears the stale-slot warning if it was set.
+    setSlotStale(false);
     // Reset time if current selection + minute not available on new day
     if (selectedTime) {
       const window = day.timeWindows.find((w) => w.value === selectedTime);
@@ -211,9 +269,19 @@ export default function BookingForm({
       setError("Please enter your name.");
       return;
     }
-    if (!email.trim() || !email.includes("@")) {
+    if (!email.trim() || !EMAIL_REGEX.test(email.trim())) {
       setError("Please enter a valid email address.");
       return;
+    }
+    // Phone is optional, but if present must be valid. Re-run validation here
+    // in case the user typed without blurring (phoneError only sets on blur).
+    if (phone.trim()) {
+      const phoneOk = isValidPhone(normalizePhone(phone));
+      if (!phoneOk) {
+        setPhoneError("Please enter a valid phone number.");
+        setError("Please fix the phone number, or leave it blank.");
+        return;
+      }
     }
     if (!meetingType) {
       setError("Please select in-person or remote.");
@@ -227,8 +295,42 @@ export default function BookingForm({
       setError("Please describe what you need help with.");
       return;
     }
+    if (notes.trim().length < BOOKING_FIELD_LIMITS.notesMin) {
+      setError(
+        `Please describe the issue in at least ${BOOKING_FIELD_LIMITS.notesMin} characters so I have enough context.`,
+      );
+      return;
+    }
 
     setSubmitting(true);
+
+    // Soft geocode check for typed-but-not-picked addresses. First failure
+    // sets addressOverrideAcked so the customer can click Submit again to
+    // proceed. Network/API outages don't block submission - the booking
+    // still goes through and I can clarify if needed.
+    if (meetingType === "in-person" && !addressVerified && !addressOverrideAcked) {
+      try {
+        const verifyRes = await fetch("/api/pricing/travel-time", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ destination: combineUnitAndAddress(unit, address) }),
+        });
+        if (verifyRes.ok) {
+          const data = (await verifyRes.json()) as { distanceKm?: number };
+          if (!data.distanceKm) {
+            setError(
+              "We couldn't find that address on the map. Double-check the spelling, or click Submit again to use it as-is.",
+            );
+            setAddressOverrideAcked(true);
+            setSubmitting(false);
+            return;
+          }
+        }
+      } catch {
+        // Verification failed (network / API outage) - fall through and submit
+        // anyway. Don't block legit bookings on a Google API hiccup.
+      }
+    }
 
     try {
       const endpoint = isEditMode ? "/api/booking/edit" : "/api/booking/request";
@@ -242,7 +344,7 @@ export default function BookingForm({
             name: name.trim(),
             phone: phone.trim() || undefined,
             meetingType,
-            address: meetingType === "in-person" ? address.trim() : undefined,
+            address: meetingType === "in-person" ? combineUnitAndAddress(unit, address) : undefined,
             notes: notes.trim(),
           }
         : {
@@ -254,8 +356,9 @@ export default function BookingForm({
             email: email.trim(),
             phone: phone.trim() || undefined,
             meetingType,
-            address: meetingType === "in-person" ? address.trim() : undefined,
+            address: meetingType === "in-person" ? combineUnitAndAddress(unit, address) : undefined,
             notes: notes.trim(),
+            website,
           };
 
       const res = await fetch(endpoint, {
@@ -267,7 +370,15 @@ export default function BookingForm({
       const data = (await res.json()) as { ok?: boolean; error?: string; cancelToken?: string };
 
       if (!res.ok) {
-        setError(data.error || "Could not submit request.");
+        if (res.status === 409) {
+          // Someone else booked this slot between page load and submit. Show
+          // the dedicated stale-slot UI so the customer can refresh and pick
+          // another time rather than re-clicking submit into a dead slot.
+          setSlotStale(true);
+          setError(null);
+        } else {
+          setError(data.error || "Could not submit request.");
+        }
         setSubmitting(false);
         return;
       }
@@ -288,6 +399,31 @@ export default function BookingForm({
 
   return (
     <form onSubmit={handleSubmit} className={cn("flex flex-col gap-8")} autoComplete="off">
+      {/* Honeypot: visually hidden + off-screen + tab-skipped + aria-hidden.
+          Real users never see or focus this. Bots that auto-fill contact-
+          style inputs will fill it, and the server fakes a success response
+          without creating a booking. */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          left: "-9999px",
+          width: 1,
+          height: 1,
+          overflow: "hidden",
+        }}
+      >
+        <label htmlFor="booking-website">Website (leave blank)</label>
+        <input
+          id="booking-website"
+          name="website"
+          type="text"
+          tabIndex={-1}
+          autoComplete="off"
+          value={website}
+          onChange={(e) => setWebsite(e.target.value)}
+        />
+      </div>
       {/* ── Section 1: Scheduling ── */}
       <fieldset className={cn("flex flex-col gap-6")}>
         <legend className={cn("text-russian-violet mb-1 text-xl font-bold sm:text-2xl")}>
@@ -524,6 +660,7 @@ export default function BookingForm({
               id="booking-name"
               type="text"
               autoComplete="name"
+              maxLength={BOOKING_FIELD_LIMITS.name}
               value={name}
               onChange={(e) => setName(e.target.value)}
               className={cn(
@@ -544,6 +681,7 @@ export default function BookingForm({
               id="booking-email"
               type="email"
               autoComplete="email"
+              maxLength={BOOKING_FIELD_LIMITS.email}
               value={email}
               onChange={(e) => {
                 setEmail(e.target.value);
@@ -567,6 +705,7 @@ export default function BookingForm({
             id="booking-phone"
             type="tel"
             autoComplete="tel"
+            maxLength={BOOKING_FIELD_LIMITS.phone}
             value={phone}
             onChange={(e) => {
               setPhone(e.target.value);
@@ -631,21 +770,80 @@ export default function BookingForm({
         >
           <div className={cn(meetingType === "in-person" ? "overflow-visible" : "overflow-hidden")}>
             <div className={cn("pb-0.5 pt-0.5")}>
-              <label
-                htmlFor="booking-address"
-                className={cn("text-rich-black mb-2 block text-base font-semibold")}
-              >
+              <div className={cn("text-rich-black mb-2 block text-base font-semibold")}>
                 Address <span className={cn("text-coquelicot-500")}>*</span>
-              </label>
+              </div>
               {/* Only mount when in-person so Google Maps script never loads for remote sessions */}
               {meetingType === "in-person" && (
-                <AddressAutocomplete
-                  id="booking-address"
-                  value={address}
-                  onChange={setAddress}
-                  placeholder="Start typing your address..."
-                  required
-                />
+                <div className={cn("flex flex-col gap-2 sm:flex-row")}>
+                  <div className={cn("flex flex-col gap-1 sm:w-32")}>
+                    <label
+                      htmlFor="booking-unit"
+                      className={cn("text-rich-black/70 text-xs font-medium")}
+                    >
+                      Apt / Unit (optional)
+                    </label>
+                    <input
+                      id="booking-unit"
+                      type="text"
+                      value={unit}
+                      onChange={(e) => {
+                        setUnit(e.target.value);
+                        // Unit edits invalidate any prior submit-time geocode
+                        // override so the new combined address gets re-checked.
+                        setAddressOverrideAcked(false);
+                      }}
+                      placeholder="e.g. 12"
+                      inputMode="text"
+                      autoComplete="off"
+                      maxLength={8}
+                      className={cn(
+                        "border-seasalt-400/80 bg-seasalt text-rich-black w-full rounded-md border px-4 py-3 text-base",
+                        "focus:border-russian-violet focus:ring-russian-violet/30 focus:outline-none focus:ring-1",
+                      )}
+                    />
+                  </div>
+                  <div className={cn("flex flex-1 flex-col gap-1")}>
+                    <label
+                      htmlFor="booking-address"
+                      className={cn("text-rich-black/70 text-xs font-medium")}
+                    >
+                      Street address
+                    </label>
+                    <AddressAutocomplete
+                      id="booking-address"
+                      value={address}
+                      maxLength={BOOKING_FIELD_LIMITS.address}
+                      onChange={(v) => {
+                        setAddress(v);
+                        // Any typing invalidates the prior pick. The onChange
+                        // fires before onPlaceSelected on a pick, so React
+                        // batches both updates and the final state is
+                        // verified=true. Keystrokes leave it at false.
+                        setAddressVerified(false);
+                        setAddressOverrideAcked(false);
+                      }}
+                      onPlaceSelected={() => setAddressVerified(true)}
+                      placeholder="Start typing your street address..."
+                      required
+                    />
+                    {address.trim() &&
+                      (addressVerified ? (
+                        <p
+                          className={cn(
+                            "text-xs font-medium text-green-700",
+                            "flex items-center gap-1",
+                          )}
+                        >
+                          <span aria-hidden="true">✓</span> Address verified
+                        </p>
+                      ) : (
+                        <p className={cn("text-xs text-slate-500")}>
+                          Pick a suggestion from the dropdown to verify your address.
+                        </p>
+                      ))}
+                  </div>
+                </div>
               )}
             </div>
           </div>
@@ -670,6 +868,7 @@ export default function BookingForm({
             name="booking-notes-no-autofill"
             autoComplete="new-password"
             rows={4}
+            maxLength={BOOKING_FIELD_LIMITS.notes}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             className={cn(
@@ -682,6 +881,33 @@ export default function BookingForm({
       </fieldset>
 
       {/* Submit */}
+      {slotStale && (
+        <div
+          role="alert"
+          className={cn(
+            "border-coquelicot-500/40 bg-coquelicot-50 rounded-md border p-4",
+            "flex flex-col gap-2",
+          )}
+        >
+          <p className={cn("text-coquelicot-700 text-base font-medium")}>
+            That time slot was just taken by another customer.
+          </p>
+          <p className={cn("text-rich-black/70 text-sm")}>
+            Refresh the page to load the up-to-date availability, then pick another time.
+          </p>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              setSlotStale(false);
+              router.refresh();
+            }}
+          >
+            Refresh available times
+          </Button>
+        </div>
+      )}
       {error && (
         <p className={cn("text-coquelicot-600 text-base font-medium")} role="alert">
           {error}
@@ -703,11 +929,6 @@ export default function BookingForm({
               ? "Save changes"
               : "Submit request"}
         </Button>
-        {!isEditMode && (
-          <p className={cn("text-rich-black/60 text-base")}>
-            I'll confirm your exact appointment time by email.
-          </p>
-        )}
       </div>
     </form>
   );

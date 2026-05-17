@@ -34,6 +34,8 @@ export interface AddressAutocompleteProps {
   placeholder?: string;
   /** Whether the field is required */
   required?: boolean;
+  /** Optional max length cap on the input. */
+  maxLength?: number;
   /** Input ID for label association */
   id?: string;
 }
@@ -48,6 +50,7 @@ export interface AddressAutocompleteProps {
  * @param props.onPlaceSelected - Optional callback when a suggestion is selected.
  * @param props.placeholder - Input placeholder text.
  * @param props.required - Whether the field is required.
+ * @param props.maxLength - Optional max character length for the input.
  * @param props.id - Input ID for label association.
  * @returns Address autocomplete input element.
  */
@@ -57,6 +60,7 @@ export default function AddressAutocomplete({
   onPlaceSelected,
   placeholder = "Start typing your address...",
   required = false,
+  maxLength,
   id = "address-autocomplete",
 }: AddressAutocompleteProps): React.ReactElement {
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -79,13 +83,40 @@ export default function AddressAutocomplete({
       return;
     }
 
+    // Capture the node now so the cleanup uses the same DOM element this
+    // effect attached to, not whatever inputRef.current points at later.
+    const inputEl = inputRef.current;
+
     let cancelled = false;
     let listener: google.maps.MapsEventListener | null = null;
+    let pacContainer: HTMLElement | null = null;
+    let resizeObserver: ResizeObserver | null = null;
+
+    /**
+     * Keeps the Google-rendered `.pac-container` dropdown the same width as
+     * the input. Google sets the width inline once when the widget attaches
+     * and doesn't update it on input resize - so a layout shift (responsive
+     * breakpoint change, sibling field appearing, etc.) leaves the dropdown
+     * stuck at its old width. ResizeObserver pushes the current input width
+     * onto the container on every change.
+     */
+    const syncDropdownWidth = (): void => {
+      if (!pacContainer) {
+        // Google appends the container to <body>; grab the latest one. This
+        // assumes one open dropdown at a time, which is true since only one
+        // input can be focused.
+        const all = document.querySelectorAll<HTMLElement>(".pac-container");
+        pacContainer = all[all.length - 1] ?? null;
+      }
+      if (!pacContainer) return;
+      const rect = inputEl.getBoundingClientRect();
+      pacContainer.style.width = `${rect.width}px`;
+    };
 
     loadPlacesLibrary(apiKey)
       .then(() => {
-        if (cancelled || !inputRef.current) return;
-        const autocomplete = new google.maps.places.Autocomplete(inputRef.current, {
+        if (cancelled) return;
+        const autocomplete = new google.maps.places.Autocomplete(inputEl, {
           componentRestrictions: { country: "nz" },
           fields: ["formatted_address", "address_components"],
           types: ["geocode"],
@@ -98,6 +129,13 @@ export default function AddressAutocomplete({
             onPlaceSelected?.(place);
           }
         });
+        // Resync on every input resize (responsive layout, sibling fields
+        // appearing, font-loading reflows, etc.).
+        resizeObserver = new ResizeObserver(syncDropdownWidth);
+        resizeObserver.observe(inputEl);
+        // Also sync as the user types so the dropdown grows/shrinks with the
+        // input's content-driven layout changes.
+        inputEl.addEventListener("input", syncDropdownWidth);
       })
       .catch((err) => {
         console.error("[AddressAutocomplete] Failed to load Maps API:", err);
@@ -107,6 +145,8 @@ export default function AddressAutocomplete({
     return () => {
       cancelled = true;
       if (listener) google.maps.event.removeListener(listener);
+      if (resizeObserver) resizeObserver.disconnect();
+      inputEl.removeEventListener("input", syncDropdownWidth);
     };
     // onChange / onPlaceSelected intentionally omitted - the listener is bound
     // once when the widget mounts and re-binding would tear it down.
@@ -125,6 +165,7 @@ export default function AddressAutocomplete({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         required={required}
+        maxLength={maxLength}
         autoComplete="off"
         className={cn(
           "border-seasalt-400/80 bg-seasalt text-rich-black w-full rounded-md border px-4 py-3 text-base",
