@@ -108,6 +108,16 @@ export default function BookingForm({
   const initialSplit = splitUnitFromAddress(initialValues?.address ?? "");
   const [unit, setUnit] = useState(initialSplit.unit);
   const [address, setAddress] = useState(initialSplit.rest);
+  // True after the customer picks an autocomplete suggestion; resets to false
+  // on any subsequent keystroke. In edit mode the saved address is treated as
+  // verified (it was accepted on its original submission). Drives the
+  // green-tick hint + the optional submit-time geocode fallback.
+  const [addressVerified, setAddressVerified] = useState(Boolean(initialValues?.address));
+  // Flipped true after the submit-time geocode check fails so the customer can
+  // click Submit a second time to proceed with their typed address as-is.
+  // Reset whenever the address changes (so a different mistyped address gets
+  // re-checked, not silently bypassed).
+  const [addressOverrideAcked, setAddressOverrideAcked] = useState(false);
   const [notes, setNotes] = useState(initialValues?.notes ?? "");
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -266,6 +276,34 @@ export default function BookingForm({
     }
 
     setSubmitting(true);
+
+    // Soft geocode check for typed-but-not-picked addresses. First failure
+    // sets addressOverrideAcked so the customer can click Submit again to
+    // proceed. Network/API outages don't block submission - the booking
+    // still goes through and I can clarify if needed.
+    if (meetingType === "in-person" && !addressVerified && !addressOverrideAcked) {
+      try {
+        const verifyRes = await fetch("/api/pricing/travel-time", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ destination: combineUnitAndAddress(unit, address) }),
+        });
+        if (verifyRes.ok) {
+          const data = (await verifyRes.json()) as { distanceKm?: number };
+          if (!data.distanceKm) {
+            setError(
+              "We couldn't find that address on the map. Double-check the spelling, or click Submit again to use it as-is.",
+            );
+            setAddressOverrideAcked(true);
+            setSubmitting(false);
+            return;
+          }
+        }
+      } catch {
+        // Verification failed (network / API outage) - fall through and submit
+        // anyway. Don't block legit bookings on a Google API hiccup.
+      }
+    }
 
     try {
       const endpoint = isEditMode ? "/api/booking/edit" : "/api/booking/request";
@@ -685,7 +723,12 @@ export default function BookingForm({
                       id="booking-unit"
                       type="text"
                       value={unit}
-                      onChange={(e) => setUnit(e.target.value)}
+                      onChange={(e) => {
+                        setUnit(e.target.value);
+                        // Unit edits invalidate any prior submit-time geocode
+                        // override so the new combined address gets re-checked.
+                        setAddressOverrideAcked(false);
+                      }}
                       placeholder="e.g. 12"
                       inputMode="text"
                       autoComplete="off"
@@ -706,10 +749,34 @@ export default function BookingForm({
                     <AddressAutocomplete
                       id="booking-address"
                       value={address}
-                      onChange={setAddress}
+                      onChange={(v) => {
+                        setAddress(v);
+                        // Any typing invalidates the prior pick. The onChange
+                        // fires before onPlaceSelected on a pick, so React
+                        // batches both updates and the final state is
+                        // verified=true. Keystrokes leave it at false.
+                        setAddressVerified(false);
+                        setAddressOverrideAcked(false);
+                      }}
+                      onPlaceSelected={() => setAddressVerified(true)}
                       placeholder="Start typing your street address..."
                       required
                     />
+                    {address.trim() &&
+                      (addressVerified ? (
+                        <p
+                          className={cn(
+                            "text-xs font-medium text-green-700",
+                            "flex items-center gap-1",
+                          )}
+                        >
+                          <span aria-hidden="true">✓</span> Address verified
+                        </p>
+                      ) : (
+                        <p className={cn("text-xs text-slate-500")}>
+                          Pick a suggestion from the dropdown to verify your address.
+                        </p>
+                      ))}
                   </div>
                 </div>
               )}
