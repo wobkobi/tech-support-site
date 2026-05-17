@@ -94,6 +94,36 @@ body {
   overflow-x: clip;
 }
 
+/* ============================================
+   Responsive root font-size
+   ============================================
+   Scales every rem-based unit on the site - text, spacing, sizing - so
+   the layout breathes on larger displays without per-element media
+   queries. Tailwind v4's utilities are all rem-based, so changing the
+   root font-size shifts the whole design system in one place.
+
+   Breakpoints chosen for common monitor classes:
+   - <1536px:  default 16px (laptops, 1080p windowed, mobile)
+   - 1536px+:  17px (+6%) - 1440p, large laptop full-screen
+   - 1920px+:  18px (+12%) - 1080p full-width, small 4K
+   - 2560px+:  19px (+19%) - 27" 4K, 1440p ultrawide
+*/
+@media (min-width: 1536px) {
+  html {
+    font-size: 17px;
+  }
+}
+@media (min-width: 1920px) {
+  html {
+    font-size: 18px;
+  }
+}
+@media (min-width: 2560px) {
+  html {
+    font-size: 19px;
+  }
+}
+
 /* Force transparency to defeat dark-mode extensions painting body */
 html,
 body {
