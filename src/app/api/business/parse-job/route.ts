@@ -107,7 +107,7 @@ function findTemplateByTags<T extends { device: string | null; action: string | 
 }
 
 /**
- * POST /api/business/parse-job - Parses a plain-English job description using gpt-4o.
+ * POST /api/business/parse-job - Parses a plain-English job description using gpt-4.1.
  * Pre-computes session total from time ranges and attaches travel info from the AI-extracted destination.
  * @param request - Incoming Next.js request with input string in body
  * @returns JSON with structured ParseJobResponse or a 422 error
@@ -167,7 +167,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     const completion = await client.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-4.1",
       max_tokens: 1000,
       temperature: 0,
       response_format: { type: "json_object" },
