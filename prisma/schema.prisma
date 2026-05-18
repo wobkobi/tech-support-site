@@ -132,8 +132,27 @@ model Contact {
   // Not @unique because MongoDB's unique index rejects multiple null values
   // during backfill; UUID v4 collisions are vanishingly rare.
   reviewToken     String?
+  // Bidirectional sync state: site changed iff updatedAt > lastSyncedAt,
+  // Google changed iff current etag != lastGoogleEtag.
+  lastSyncedAt    DateTime?
+  lastGoogleEtag  String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+}
+
+// Sync conflicts admin resolves at /admin/contacts/conflicts.
+model ContactConflict {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  contactId   String    @db.ObjectId
+  field       String // "name" | "email" | "address"
+  siteValue   String?
+  googleValue String?
+  resolvedAt  DateTime?
+  resolution  String? // "site" | "google" | "custom" | "auto"
+  createdAt   DateTime  @default(now())
+
+  @@index([resolvedAt, createdAt(sort: Desc)])
+  @@index([contactId, field, resolvedAt])
 }
 
 // Travel time blocks created for external calendar events with a location.
@@ -233,14 +252,11 @@ model Invoice {
   contactId   String?       @db.ObjectId
   driveFileId String?
   driveWebUrl String?
-  // Timestamp of the last send-email run that included the review link in the
-  // invoice email. Powers the 30-day cooldown in getInvoiceReviewEligibility
-  // so the same customer doesn't get re-asked across consecutive invoices.
+  // Stamped when send-email included the review link; powers the 30-day cooldown.
   reviewLinkSentAt DateTime?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
-  // Invoice review cooldown lookup: WHERE clientEmail = ? AND reviewLinkSentAt >= cutoff
   @@index([clientEmail, reviewLinkSentAt])
 }
 

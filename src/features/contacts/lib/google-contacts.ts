@@ -1,13 +1,28 @@
 // src/features/contacts/lib/google-contacts.ts
 /**
  * @file google-contacts.ts
- * @description Google People API integration for syncing local contacts with Google Contacts.
+ * @description Google People API integration with bidirectional latest-wins
+ * sync. The site DB and Google Contacts both have authority, with conflict
+ * resolution:
+ *
+ * - Phones: always merged as a union. A second number from a new booking is
+ *   appended to Google's existing phones; nothing is ever overwritten.
+ * - Names, emails, addresses (single-value fields): latest-wins when only one
+ *   side changed since the last sync (using Contact.lastSyncedAt and the
+ *   stored Google etag in lastGoogleEtag to detect change). When BOTH sides
+ *   changed and values differ, a ContactConflict row is recorded and the
+ *   admin resolves it from /admin/contacts/conflicts. The site DB is not
+ *   updated until the admin picks a winner.
+ *
+ * On first contact (lastSyncedAt null), Google's values win for any field
+ * Google has populated, with site values used to fill remaining blanks.
  */
 
 import { google } from "googleapis";
 import { prisma } from "@/shared/lib/prisma";
 import { getOAuth2Client } from "@/features/calendar/lib/google-calendar";
 import { normalizePhone, toE164NZ } from "@/shared/lib/normalize-phone";
+import { recordContactConflict, clearContactConflict } from "./contact-conflicts";
 
 /**
  * Returns an authenticated Google People API client.
@@ -60,6 +75,7 @@ export async function importFromGoogleContacts(): Promise<number> {
       // for the whole page so we issue 2 findManys instead of N findFirsts.
       interface Resolved {
         resourceName: string;
+        etag: string | null;
         email: string | null;
         phone: string | null;
         normPhone: string | null;
@@ -84,8 +100,9 @@ export async function importFromGoogleContacts(): Promise<number> {
         const address = person.addresses?.[0]?.formattedValue?.trim() ?? null;
         const email =
           emailEntry ?? (normPhone ? (reviewRequestsByPhone.get(normPhone) ?? null) : null);
+        const etag = person.etag ?? null;
 
-        resolved.push({ resourceName, email, phone, normPhone, name, address });
+        resolved.push({ resourceName, etag, email, phone, normPhone, name, address });
       }
 
       const emailsToCheck = Array.from(
@@ -127,10 +144,23 @@ export async function importFromGoogleContacts(): Promise<number> {
           try {
             const existing = contactByEmail.get(r.email);
             if (existing) {
+              // First-sync pull: on import, Google's values flow into the
+              // site DB (Google wins for any field it has populated). The
+              // blank-safety rule means empty Google values never overwrite
+              // existing site data. Stamping lastSyncedAt + lastGoogleEtag
+              // here is critical: without it the next syncContactToGoogle
+              // would see the etag as "changed" and conflict every field.
+              const updates: Record<string, unknown> = {
+                googleContactId: r.resourceName,
+                lastSyncedAt: new Date(),
+                lastGoogleEtag: r.etag,
+              };
+              if (r.name && r.name !== existing.name) updates.name = r.name;
+              if (r.phone) updates.phone = r.phone;
+              if (r.address) updates.address = r.address;
               await prisma.contact.update({
                 where: { id: existing.id },
-                // Local name/phone/address are the source of truth - only link the resource name.
-                data: { googleContactId: r.resourceName },
+                data: updates,
               });
             } else {
               const created = await prisma.contact.create({
@@ -140,6 +170,8 @@ export async function importFromGoogleContacts(): Promise<number> {
                   phone: r.phone,
                   address: r.address,
                   googleContactId: r.resourceName,
+                  lastSyncedAt: new Date(),
+                  lastGoogleEtag: r.etag,
                 },
                 select: { id: true, name: true },
               });
@@ -157,14 +189,18 @@ export async function importFromGoogleContacts(): Promise<number> {
           try {
             const existing = contactByPhone.get(r.phone);
             if (existing) {
-              // Also update the name if it was set to the phone number as a placeholder.
+              // Same first-sync pull semantics as the email-matched branch.
               const namePlaceholder = existing.name === r.phone || existing.name === r.normPhone;
+              const updates: Record<string, unknown> = {
+                googleContactId: r.resourceName,
+                lastSyncedAt: new Date(),
+                lastGoogleEtag: r.etag,
+              };
+              if (r.name && (namePlaceholder || r.name !== existing.name)) updates.name = r.name;
+              if (r.address) updates.address = r.address;
               await prisma.contact.update({
                 where: { id: existing.id },
-                data: {
-                  googleContactId: r.resourceName,
-                  ...(r.name && namePlaceholder ? { name: r.name } : {}),
-                },
+                data: updates,
               });
             } else {
               const created = await prisma.contact.create({
@@ -174,6 +210,8 @@ export async function importFromGoogleContacts(): Promise<number> {
                   phone: r.phone,
                   address: r.address,
                   googleContactId: r.resourceName,
+                  lastSyncedAt: new Date(),
+                  lastGoogleEtag: r.etag,
                 },
                 select: { id: true, name: true },
               });
@@ -198,22 +236,6 @@ export async function importFromGoogleContacts(): Promise<number> {
 }
 
 /**
- * Parameters for upserting a contact to Google Contacts.
- */
-export interface UpsertContactParams {
-  /** Full display name. */
-  name: string;
-  /** Email address (used for deduplication). */
-  email: string;
-  /** Phone number, or null. */
-  phone?: string | null;
-  /** Street/postal address, or null. */
-  address?: string | null;
-  /** Existing Google People API resource name if known (e.g. "people/c1234567890"). */
-  googleContactId?: string | null;
-}
-
-/**
  * Splits a full display name into given (first) and family (last) name parts.
  * @param fullName - Full display name.
  * @returns Object with givenName and familyName strings.
@@ -223,140 +245,6 @@ function splitName(fullName: string): { givenName: string; familyName: string } 
   if (parts.length === 0) return { givenName: "", familyName: "" };
   if (parts.length === 1) return { givenName: parts[0], familyName: "" };
   return { givenName: parts.slice(0, -1).join(" "), familyName: parts[parts.length - 1] };
-}
-
-/**
- * Creates or updates a contact in Google Contacts.
- * - If `googleContactId` is provided, updates the existing contact (fetching etag first).
- * - Otherwise searches by email; updates if found, creates if not.
- * Never throws - returns null on any error.
- * @param params - Contact data to sync.
- * @returns The Google People API resource name, or null on error.
- */
-export async function upsertToGoogleContacts(params: UpsertContactParams): Promise<string | null> {
-  try {
-    const people = getPeopleClient();
-
-    const { givenName, familyName } = splitName(params.name);
-
-    // Full body used only when CREATING a new contact - includes the local name.
-    const createBody = {
-      names: [{ displayName: params.name, givenName, familyName }],
-      emailAddresses: [{ value: params.email }],
-      ...(params.phone ? { phoneNumbers: [{ value: params.phone }] } : {}),
-      ...(params.address ? { addresses: [{ formattedValue: params.address }] } : {}),
-    };
-
-    // Base update fields - always sync email, phone, address.
-    // `names` is added only when the existing Google contact has no name.
-    const baseUpdateBody = {
-      emailAddresses: [{ value: params.email }],
-      ...(params.phone ? { phoneNumbers: [{ value: params.phone }] } : {}),
-      ...(params.address ? { addresses: [{ formattedValue: params.address }] } : {}),
-    };
-
-    /**
-     * Builds the request body and personFields for an update, adding `names`
-     * only when the existing Google contact has no display name.
-     * @param existingNames - The `names` array from the fetched Google contact.
-     * @returns Body and personFields string to pass to updateContact.
-     */
-    function buildUpdate(
-      existingNames: Array<{ displayName?: string | null }> | null | undefined,
-    ): {
-      body: typeof baseUpdateBody & {
-        names?: Array<{ displayName: string; givenName: string; familyName: string }>;
-      };
-      fields: string;
-    } {
-      const hasName = existingNames?.some((n) => n.displayName?.trim());
-      if (!hasName && params.name) {
-        return {
-          body: { names: [{ displayName: params.name, givenName, familyName }], ...baseUpdateBody },
-          fields: "names,emailAddresses,phoneNumbers,addresses",
-        };
-      }
-      return { body: baseUpdateBody, fields: "emailAddresses,phoneNumbers,addresses" };
-    }
-
-    // If we already have a resource name, try to update in place.
-    if (params.googleContactId) {
-      try {
-        const existing = await people.people.get({
-          resourceName: params.googleContactId,
-          personFields: "names,emailAddresses,phoneNumbers,addresses",
-        });
-        const etag = existing.data.etag;
-        if (etag) {
-          const { body, fields } = buildUpdate(existing.data.names);
-          const updated = await people.people.updateContact({
-            resourceName: params.googleContactId,
-            updatePersonFields: fields,
-            requestBody: { etag, ...body },
-          });
-          return updated.data.resourceName ?? params.googleContactId;
-        }
-      } catch (updateError) {
-        // Fall through to search-and-create if the existing resource is gone.
-        console.error(
-          `[google-contacts] Failed to update ${params.googleContactId}, falling back to search:`,
-          updateError,
-        );
-      }
-    }
-
-    // Search for an existing contact by email.
-    try {
-      const searchResult = await people.people.searchContacts({
-        query: params.email,
-        readMask: "names,emailAddresses",
-        pageSize: 5,
-      });
-
-      const match = searchResult.data.results?.find((r) =>
-        r.person?.emailAddresses?.some(
-          (e) => e.value?.toLowerCase() === params.email.toLowerCase(),
-        ),
-      );
-
-      if (match?.person?.resourceName) {
-        const resourceName = match.person.resourceName;
-        try {
-          const existing = await people.people.get({
-            resourceName,
-            personFields: "names,emailAddresses,phoneNumbers,addresses",
-          });
-          const etag = existing.data.etag;
-          if (etag) {
-            const { body, fields } = buildUpdate(existing.data.names);
-            const updated = await people.people.updateContact({
-              resourceName,
-              updatePersonFields: fields,
-              requestBody: { etag, ...body },
-            });
-            return updated.data.resourceName ?? resourceName;
-          }
-        } catch (updateFoundError) {
-          console.error(
-            `[google-contacts] Failed to update found contact ${resourceName}:`,
-            updateFoundError,
-          );
-          return resourceName;
-        }
-      }
-    } catch (searchError) {
-      console.error("[google-contacts] Search failed, will attempt create:", searchError);
-    }
-
-    // Create a new contact - use the full body including name.
-    const created = await people.people.createContact({
-      requestBody: createBody,
-    });
-    return created.data.resourceName ?? null;
-  } catch (error) {
-    console.error("[google-contacts] upsertToGoogleContacts failed:", error);
-    return null;
-  }
 }
 
 /**
@@ -379,9 +267,78 @@ export async function syncAllContactsToGoogle(): Promise<number> {
 }
 
 /**
- * Loads a contact from the local DB and syncs it to Google Contacts.
- * Updates `googleContactId` in the DB if it changed.
- * Never throws - all errors are logged and swallowed.
+ * Compares site + Google values of a single-value field, considering which
+ * sides changed since the last sync, and returns the action the sync should
+ * take. See file header for the policy.
+ * @param siteValue - Current site value (possibly null).
+ * @param googleValue - Current Google value (possibly null).
+ * @param siteChanged - Whether the site row was updated since last sync.
+ * @param googleChanged - Whether Google's etag differs from the stored one.
+ * @returns "noop" if values match, "push" / "pull" for latest-wins,
+ *   "conflict" when both sides changed and values diverge.
+ */
+function compareSingleField(
+  siteValue: string | null,
+  googleValue: string | null,
+  siteChanged: boolean,
+  googleChanged: boolean,
+): "noop" | "push" | "pull" | "conflict" {
+  const a = siteValue?.trim() || null;
+  const b = googleValue?.trim() || null;
+  if (a === b) return "noop";
+  if (siteChanged && !googleChanged) return "push";
+  if (!siteChanged && googleChanged) return "pull";
+  if (siteChanged && googleChanged) return "conflict";
+  // Neither changed but values diverge (e.g. first sync ever, or external
+  // tampering). Prefer Google so the admin's manual edits aren't trampled.
+  if (b) return "pull";
+  if (a) return "push";
+  return "noop";
+}
+
+/**
+ * Returns the union of site + Google phone numbers, deduplicated by
+ * normalised E.164 form. The order is preserved: Google's existing phones
+ * first (so its primary stays primary), then any new ones the site added.
+ * @param sitePhone - Site's single phone field (may be null).
+ * @param googlePhones - All values from Google's phoneNumbers array.
+ * @returns Merged phone array suitable for pushing back to Google.
+ */
+function mergePhones(sitePhone: string | null, googlePhones: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const raw of googlePhones) {
+    const trimmed = raw?.trim();
+    if (!trimmed) continue;
+    const key = normalizePhone(toE164NZ(trimmed) || trimmed) ?? trimmed;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(trimmed);
+  }
+  if (sitePhone?.trim()) {
+    const trimmed = sitePhone.trim();
+    const key = normalizePhone(toE164NZ(trimmed) || trimmed) ?? trimmed;
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push(trimmed);
+    }
+  }
+  return result;
+}
+
+/**
+ * Bidirectional sync between a site Contact and its Google Contacts counterpart.
+ *
+ * Loads the contact, finds (or creates) the matching Google person, then:
+ * - merges phones as a union so booking-time phone variations are appended,
+ *   never lost,
+ * - for name / email / address, uses latest-wins when only one side changed
+ *   since the last sync (Contact.lastSyncedAt vs Google's etag); when both
+ *   sides changed and values diverge, records a ContactConflict for admin
+ *   approval and leaves the site value alone.
+ *
+ * Stamps Contact.lastSyncedAt + Contact.lastGoogleEtag on success so the next
+ * sync can detect change correctly. Never throws - all errors are logged.
  * @param contactId - The local DB contact ID to sync.
  * @returns Promise that resolves when the sync attempt is complete.
  */
@@ -399,19 +356,198 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
       return;
     }
 
-    const resourceName = await upsertToGoogleContacts({
-      name: contact.name,
-      email: contact.email,
-      phone: contact.phone,
-      address: contact.address,
-      googleContactId: contact.googleContactId,
-    });
+    const people = getPeopleClient();
 
-    if (resourceName && resourceName !== contact.googleContactId) {
-      await prisma.contact.update({
-        where: { id: contactId },
-        data: { googleContactId: resourceName },
+    // Locate the Google contact: prefer the stored resource name, fall back
+    // to email search. If neither finds one, create a fresh Google contact
+    // using site values - that's an unambiguous first sync.
+    let resourceName = contact.googleContactId;
+    let googlePerson: {
+      etag?: string | null;
+      names?: Array<{ displayName?: string | null }> | null;
+      emailAddresses?: Array<{ value?: string | null }> | null;
+      phoneNumbers?: Array<{ value?: string | null }> | null;
+      addresses?: Array<{ formattedValue?: string | null }> | null;
+    } | null = null;
+
+    if (resourceName) {
+      try {
+        const fetched = await people.people.get({
+          resourceName,
+          personFields: "names,emailAddresses,phoneNumbers,addresses",
+        });
+        googlePerson = fetched.data;
+      } catch (err) {
+        console.error(
+          `[google-contacts] Stored googleContactId ${resourceName} not fetchable, will search by email:`,
+          err,
+        );
+        resourceName = null;
+      }
+    }
+
+    if (!resourceName) {
+      // Search Google by email
+      try {
+        const searchResult = await people.people.searchContacts({
+          query: contact.email,
+          readMask: "names,emailAddresses,phoneNumbers,addresses",
+          pageSize: 5,
+        });
+        const match = searchResult.data.results?.find((r) =>
+          r.person?.emailAddresses?.some(
+            (e) => e.value?.toLowerCase() === contact.email!.toLowerCase(),
+          ),
+        );
+        if (match?.person?.resourceName) {
+          resourceName = match.person.resourceName;
+          googlePerson = match.person;
+        }
+      } catch (err) {
+        console.error("[google-contacts] Search by email failed:", err);
+      }
+    }
+
+    if (!resourceName || !googlePerson) {
+      // No Google contact found - create a new one with all site values.
+      try {
+        const { givenName, familyName } = splitName(contact.name);
+        const created = await people.people.createContact({
+          requestBody: {
+            names: [{ displayName: contact.name, givenName, familyName }],
+            emailAddresses: [{ value: contact.email }],
+            ...(contact.phone ? { phoneNumbers: [{ value: contact.phone }] } : {}),
+            ...(contact.address ? { addresses: [{ formattedValue: contact.address }] } : {}),
+          },
+        });
+        if (created.data.resourceName) {
+          await prisma.contact.update({
+            where: { id: contactId },
+            data: {
+              googleContactId: created.data.resourceName,
+              lastSyncedAt: new Date(),
+              lastGoogleEtag: created.data.etag ?? null,
+            },
+          });
+        }
+      } catch (err) {
+        console.error("[google-contacts] Failed to create new Google contact:", err);
+      }
+      return;
+    }
+
+    // Both sides exist - decide who changed since last sync, then act.
+    const currentEtag = googlePerson.etag ?? null;
+    const siteChanged =
+      !contact.lastSyncedAt || contact.updatedAt.getTime() > contact.lastSyncedAt.getTime();
+    const googleChanged = !contact.lastGoogleEtag || currentEtag !== contact.lastGoogleEtag;
+
+    const googleName = googlePerson.names?.[0]?.displayName?.trim() || null;
+    const googleEmail = googlePerson.emailAddresses?.[0]?.value?.trim() || null;
+    const googleAddress = googlePerson.addresses?.[0]?.formattedValue?.trim() || null;
+    const googlePhoneList = (googlePerson.phoneNumbers ?? [])
+      .map((p) => p.value?.trim())
+      .filter((v): v is string => !!v);
+
+    // Phones - always merge as union. No conflict semantics.
+    const mergedPhones = mergePhones(contact.phone, googlePhoneList);
+    const phonesChanged =
+      mergedPhones.length !== googlePhoneList.length ||
+      mergedPhones.some((p, i) => p !== googlePhoneList[i]);
+
+    // Single-value fields - latest-wins or conflict
+    const nameAction = compareSingleField(contact.name, googleName, siteChanged, googleChanged);
+    const emailAction = compareSingleField(contact.email, googleEmail, siteChanged, googleChanged);
+    const addressAction = compareSingleField(
+      contact.address,
+      googleAddress,
+      siteChanged,
+      googleChanged,
+    );
+
+    // Build the Google update body from the actions
+    const updateBody: Record<string, unknown> = {};
+    const updateFields: string[] = [];
+    if (phonesChanged && mergedPhones.length > 0) {
+      updateBody.phoneNumbers = mergedPhones.map((value) => ({ value }));
+      updateFields.push("phoneNumbers");
+    }
+    if (nameAction === "push" && contact.name) {
+      const { givenName, familyName } = splitName(contact.name);
+      updateBody.names = [{ displayName: contact.name, givenName, familyName }];
+      updateFields.push("names");
+    }
+    if (emailAction === "push" && contact.email) {
+      updateBody.emailAddresses = [{ value: contact.email }];
+      updateFields.push("emailAddresses");
+    }
+    if (addressAction === "push" && contact.address) {
+      updateBody.addresses = [{ formattedValue: contact.address }];
+      updateFields.push("addresses");
+    }
+
+    if (updateFields.length > 0 && currentEtag) {
+      try {
+        const updated = await people.people.updateContact({
+          resourceName,
+          updatePersonFields: updateFields.join(","),
+          requestBody: { etag: currentEtag, ...updateBody },
+        });
+        // Refresh etag from the response - it changed because we just wrote.
+        googlePerson.etag = updated.data.etag ?? currentEtag;
+      } catch (err) {
+        console.error(`[google-contacts] updateContact failed for ${resourceName}:`, err);
+      }
+    }
+
+    // Build the site update from pull actions + the merged phones
+    const siteUpdate: Record<string, unknown> = {
+      googleContactId: resourceName,
+      lastSyncedAt: new Date(),
+      lastGoogleEtag: googlePerson.etag ?? currentEtag,
+    };
+    if (nameAction === "pull" && googleName) siteUpdate.name = googleName;
+    if (emailAction === "pull" && googleEmail) siteUpdate.email = googleEmail;
+    if (addressAction === "pull" && googleAddress) siteUpdate.address = googleAddress;
+    // Keep the site's phone as the first phone in the merged list so the rest
+    // of the app (which only reads the single Contact.phone field) sees the
+    // primary number.
+    if (mergedPhones[0] && mergedPhones[0] !== contact.phone) {
+      siteUpdate.phone = mergedPhones[0];
+    }
+
+    await prisma.contact.update({ where: { id: contactId }, data: siteUpdate });
+
+    // Record / clear conflicts per single-value field
+    if (nameAction === "conflict") {
+      await recordContactConflict({
+        contactId,
+        field: "name",
+        siteValue: contact.name,
+        googleValue: googleName,
       });
+    } else {
+      await clearContactConflict(contactId, "name");
+    }
+    if (emailAction === "conflict") {
+      await recordContactConflict({
+        contactId,
+        field: "email",
+        siteValue: contact.email,
+        googleValue: googleEmail,
+      });
+    } else {
+      await clearContactConflict(contactId, "email");
+    }
+    if (addressAction === "conflict") {
+      await recordContactConflict({
+        contactId,
+        field: "address",
+        siteValue: contact.address,
+        googleValue: googleAddress,
+      });
+    } else {
+      await clearContactConflict(contactId, "address");
     }
   } catch (error) {
     console.error(`[google-contacts] syncContactToGoogle failed for ${contactId}:`, error);
