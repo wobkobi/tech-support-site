@@ -67,7 +67,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     page: "bookings",
-    label: "Calendar",
+    label: "Bookings",
     icon: <FaCalendarDays className={cn("shrink-0")} />,
     path: "/admin/bookings",
   },

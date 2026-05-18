@@ -13,15 +13,15 @@ import {
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Calendar - Admin",
+  title: "Bookings - Admin",
   robots: { index: false, follow: false },
 };
 
 /**
- * Admin calendar page listing all bookings with status filters.
+ * Admin bookings page listing all bookings with status filters.
  * @param root0 - Page props.
  * @param root0.searchParams - URL search parameters (contains token).
- * @returns Calendar page element.
+ * @returns Bookings page element.
  */
 export default async function AdminBookingsPage({
   searchParams,
@@ -88,7 +88,7 @@ export default async function AdminBookingsPage({
   return (
     <AdminPageLayout token={t} current="bookings">
       <div className={cn("mb-6 flex flex-wrap items-center justify-between gap-4")}>
-        <h1 className={cn("text-russian-violet text-2xl font-extrabold")}>Calendar</h1>
+        <h1 className={cn("text-russian-violet text-2xl font-extrabold")}>Bookings</h1>
         <div className={cn("flex flex-wrap gap-2")}>
           {statusStats.map((s) => (
             <span
