@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
+import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 
 /**
  * GET /api/booking/contact-lookup?email=<email>
@@ -15,6 +16,9 @@ import { prisma } from "@/shared/lib/prisma";
  * @returns JSON with contact fields or not-found response.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
+  const limited = rateLimitOrReject(request, "contact-lookup", 5, 60_000);
+  if (limited) return limited;
+
   const email = request.nextUrl.searchParams.get("email")?.trim().toLowerCase();
   if (!email || !email.includes("@")) {
     return NextResponse.json({ ok: false }, { status: 400 });

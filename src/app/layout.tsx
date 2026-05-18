@@ -89,8 +89,14 @@ export const metadata: Metadata = {
     },
   },
   icons: {
-    // Raster favicons with light/dark media
+    // Modern browsers prefer the SVG (handles dark mode internally via CSS).
+    // PNG variants with prefers-color-scheme media queries cover browsers
+    // without SVG-favicon support. favicon.ico is intentionally NOT listed as
+    // a `<link>`: Chrome would otherwise pick it over the SVG. Legacy browsers
+    // (and bots that probe `/favicon.ico` directly) still get it - the file
+    // exists at `/favicon.ico`, just without an explicit hint to use it.
     icon: [
+      { url: "/favicon.svg", type: "image/svg+xml", sizes: "any" },
       {
         url: "/favicon-32x32.png",
         sizes: "32x32",
@@ -115,23 +121,8 @@ export const metadata: Metadata = {
         type: "image/png",
         media: "(prefers-color-scheme: dark)",
       },
-      { url: "/favicon.ico" },
     ],
     apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
-    other: [
-      {
-        rel: "mask-icon",
-        url: "/safari-pinned-tab.svg",
-        color: "#0c0a3e",
-        media: "(prefers-color-scheme: light)",
-      },
-      {
-        rel: "mask-icon",
-        url: "/safari-pinned-tab.svg",
-        color: "#43bccd",
-        media: "(prefers-color-scheme: dark)",
-      },
-    ],
   },
   manifest: "/site.webmanifest",
 };
@@ -212,7 +203,7 @@ export default function RootLayout({
     alternateName: ["To The Point Tech Auckland", "To The Point IT Support"],
     url: siteUrl,
     image: `${siteUrl}/og-1200x630.jpg`,
-    logo: `${siteUrl}/source/logo-full.svg`,
+    logo: `${siteUrl}/assets/logo-mark-512.png`,
     description:
       "Friendly computer and IT support across Auckland. On-site and remote help with PCs, Macs, Wi-Fi, phones, printers, smart TVs, and small-business IT. Same-day, evening and weekend appointments.",
     slogan: "Clear explanations, no jargon, solutions that actually work.",

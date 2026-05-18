@@ -2,6 +2,44 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { calcInvoiceTotals } from "@/features/business/lib/business";
+import { extractYearCode, generateInvoicePdf } from "@/features/business/lib/invoice-pdf";
+import { uploadInvoicePdf } from "@/features/business/lib/google-drive";
+
+/**
+ * Re-uploads the invoice's PDF to Drive (replacing the existing file in place when
+ * `driveFileId` is set, otherwise creating a fresh one) and persists any new IDs
+ * on the invoice record. Failures are logged but never thrown — Drive is a
+ * non-critical archive sync.
+ * @param invoiceId - Invoice DB id (used for the post-upload patch).
+ */
+async function syncInvoicePdfToDrive(invoiceId: string): Promise<void> {
+  try {
+    const inv = await prisma.invoice.findUnique({ where: { id: invoiceId } });
+    if (!inv) return;
+    const pdfBytes = await generateInvoicePdf({
+      ...inv,
+      issueDate: inv.issueDate.toISOString(),
+      dueDate: inv.dueDate.toISOString(),
+      createdAt: inv.createdAt.toISOString(),
+      updatedAt: inv.updatedAt.toISOString(),
+    });
+    const yearCode = extractYearCode(inv.number);
+    const drive = await uploadInvoicePdf(
+      pdfBytes,
+      inv.number,
+      yearCode,
+      inv.driveFileId ?? undefined,
+    );
+    if (drive.fileId !== inv.driveFileId || drive.webUrl !== inv.driveWebUrl) {
+      await prisma.invoice.update({
+        where: { id: invoiceId },
+        data: { driveFileId: drive.fileId, driveWebUrl: drive.webUrl },
+      });
+    }
+  } catch (err) {
+    console.error(`[invoice-patch] Drive sync failed:`, err);
+  }
+}
 
 /**
  * GET /api/business/invoices/[id] - Returns a single invoice by ID.
@@ -60,6 +98,8 @@ export async function PATCH(
         ...(status !== undefined && { status }),
       },
     });
+    // Any field change should be reflected in the Drive archive copy.
+    await syncInvoicePdfToDrive(id);
     return NextResponse.json({ ok: true, invoice });
   }
 
@@ -69,6 +109,8 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid status" }, { status: 400 });
   }
   const invoice = await prisma.invoice.update({ where: { id }, data: { status } });
+  // Status changes (Mark as paid, etc.) should be reflected in the Drive archive copy.
+  await syncInvoicePdfToDrive(id);
   return NextResponse.json({ ok: true, invoice });
 }
 

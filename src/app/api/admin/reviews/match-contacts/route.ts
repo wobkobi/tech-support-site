@@ -25,8 +25,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   try {
+    // MongoDB gotcha: `contactId: null` only matches documents where the field
+    // exists and equals null. Reviews created before contactId was added to
+    // the schema have no contactId field at all, so they need the `isSet:
+    // false` branch to be matched and eligible for linking.
     const unmatched = await prisma.review.findMany({
-      where: { contactId: null },
+      where: { OR: [{ contactId: null }, { contactId: { isSet: false } }] },
       select: { id: true, bookingId: true, customerRef: true },
     });
 

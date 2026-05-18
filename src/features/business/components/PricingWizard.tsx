@@ -13,7 +13,7 @@ import {
 } from "@/features/business/lib/promos";
 
 const SOFT_CARD = cn(
-  "border-seasalt-400/80 bg-seasalt-900/60 rounded-xl border p-3 text-sm sm:p-4 sm:text-base",
+  "border-seasalt-400/80 bg-seasalt-900/60 rounded-xl border p-3 text-base sm:p-4 sm:text-lg",
 );
 
 type Step = "issue" | "address" | "results";
@@ -78,7 +78,7 @@ export function PricingWizard(): React.ReactElement {
     );
   }, []);
 
-  /** Calls both APIs in parallel then computes a ±20% price range from the AI's time estimate. */
+  /** Calls both APIs in parallel then computes a price range from the AI's time estimate. */
   async function getEstimate(): Promise<void> {
     setIsCalculating(true);
 
@@ -108,6 +108,7 @@ export function PricingWizard(): React.ReactElement {
               estimatedMins: number;
               category: "standard" | "complex";
               explanation: string;
+              tasks: { label: string; mins: number }[];
             };
           }>,
       ),
@@ -118,11 +119,15 @@ export function PricingWizard(): React.ReactElement {
     let estimatedMins = 60;
     let fullRate = 65;
     let explanation = "";
+    let category: "standard" | "complex" = "standard";
+    let tasks: { label: string; mins: number }[] = [];
 
     if (estimateRes.status === "fulfilled" && estimateRes.value.ok && estimateRes.value.result) {
       const ai = estimateRes.value.result;
       estimatedMins = ai.estimatedMins;
       explanation = ai.explanation;
+      category = ai.category;
+      tasks = Array.isArray(ai.tasks) ? ai.tasks : [];
 
       // Standard base + Complex modifier delta when AI flags the job complex.
       const baseStandard =
@@ -142,43 +147,96 @@ export function PricingWizard(): React.ReactElement {
     setAiExplanation(explanation);
     setAiEstimatedMins(estimatedMins);
 
+    // 30-min minimum visit floors short jobs so we never quote less than half
+    // an hour of billable time. The wider ±25% (vs the old ±15%) and bumped
+    // $20 minimum spread make the high end defensible against "but the site
+    // said $X" complaints. Applies to the visit total, not each task line.
+    const MIN_VISIT_MINS = 30;
+    const effectiveMins = Math.max(MIN_VISIT_MINS, estimatedMins);
+
     /**
-     * Builds a ±15% price range from the AI's minute estimate, rounded to the
-     * nearest $5 with a $15 minimum spread. Tighter than the previous ±20%/$10
-     * defaults so short jobs (e.g. a 45 min Wi-Fi fix at $65/h) report a
-     * believable $40-60 range instead of a 100%-wide $30-60 bucket.
-     * Called twice when a promo is active so we can show original + promo'd.
-     * @param rate - Effective $/hr for this branch.
-     * @returns Low/high range plus the per-call travel surcharge.
+     * Builds a ±25% price range for a given duration + rate, rounded to the
+     * nearest $5 with a $20 minimum spread. Used for the visit total AND each
+     * breakdown line; the caller chooses whether to apply the visit floor.
+     * @param mins - Minutes for this slice.
+     * @param rate - Effective $/hr.
+     * @returns Whole-dollar low/high range.
      */
-    const buildRange = (rate: number): { low: number; high: number; travel: number } => {
-      const jobCost = (estimatedMins / 60) * rate;
-      const travelCost = (travelMins / 60) * rate;
-      const jobLow = Math.floor((jobCost * 0.85) / 5) * 5;
-      const jobHigh = Math.max(Math.ceil((jobCost * 1.15) / 5) * 5, jobLow + 15);
-      const travel = Math.round(travelCost / 5) * 5;
-      return { low: jobLow + travel, high: jobHigh + travel, travel };
+    const rangeFor = (mins: number, rate: number): { low: number; high: number } => {
+      const cost = (mins / 60) * rate;
+      const low = Math.floor((cost * 0.75) / 5) * 5;
+      const high = Math.max(Math.ceil((cost * 1.25) / 5) * 5, low + 20);
+      return { low, high };
     };
-    const promoRange = buildRange(promoRate);
+
+    // Travel is never discounted by promos (matches the schema rule:
+    // promos apply to labor only - parts and Travel are full price).
+    // Computed once with fullRate and reused across both branches.
+    const travel = Math.round(((travelMins / 60) * fullRate) / 5) * 5;
+
+    /**
+     * Builds the visit total (with floor applied) plus the flat travel
+     * surcharge. Called once per labor rate branch so the post-promo and
+     * crossed-out original ranges stay consistent.
+     * @param rate - Effective $/hr for labor.
+     * @returns Visit low/high plus the (rate-invariant) drive-time charge.
+     */
+    const buildVisitRange = (rate: number): { low: number; high: number; travel: number } => {
+      const { low, high } = rangeFor(effectiveMins, rate);
+      return { low: low + travel, high: high + travel, travel };
+    };
+
+    const promoRange = buildVisitRange(promoRate);
     // Cosmetic safety net: only surface the crossed-out original when the
     // rounded range actually differs - if both branches happen to round to
     // the same bucket, identical struck/un-struck prices read as a glitch.
-    const rawOriginal = promoApplied ? buildRange(fullRate) : null;
+    const rawOriginal = promoApplied ? buildVisitRange(fullRate) : null;
     const original =
       rawOriginal && (rawOriginal.low !== promoRange.low || rawOriginal.high !== promoRange.high)
         ? rawOriginal
         : null;
-    const jobLow = Math.floor(((estimatedMins / 60) * promoRate * 0.85) / 5) * 5;
-    const jobHigh = Math.max(
-      Math.ceil(((estimatedMins / 60) * promoRate * 1.15) / 5) * 5,
-      jobLow + 15,
-    );
+
+    // Per-task breakdown: when the AI returned >1 task, allocate the VISIT
+    // job range proportionally to each task's share of the total mins.
+    // Going line-by-line with rangeFor would re-apply the $20 min spread per
+    // line and inflate the breakdown above the visit total, then drift
+    // correction would squish the largest line to a single price. The
+    // proportional split keeps each task's slice honest and guarantees the
+    // lines sum exactly to the visit total (rounding drift snaps to the
+    // largest line).
+    const taskLines = (() => {
+      const visitJob = rangeFor(effectiveMins, promoRate);
+      if (tasks.length <= 1) {
+        return [{ label: "Tech support", low: visitJob.low, high: visitJob.high, note: null }];
+      }
+      const totalTaskMins = tasks.reduce((s, t) => s + t.mins, 0) || 1;
+      const lines = tasks.map((t) => ({
+        label: t.label,
+        low: Math.round((t.mins * visitJob.low) / totalTaskMins / 5) * 5,
+        high: Math.round((t.mins * visitJob.high) / totalTaskMins / 5) * 5,
+        note: null as string | null,
+      }));
+      const lowDrift = visitJob.low - lines.reduce((s, l) => s + l.low, 0);
+      const highDrift = visitJob.high - lines.reduce((s, l) => s + l.high, 0);
+      if (lowDrift !== 0 || highDrift !== 0) {
+        const largestIdx = lines.reduce(
+          (maxI, l, i, arr) => (l.high > arr[maxI].high ? i : maxI),
+          0,
+        );
+        lines[largestIdx] = {
+          ...lines[largestIdx],
+          low: Math.max(0, lines[largestIdx].low + lowDrift),
+          high: Math.max(0, lines[largestIdx].high + highDrift),
+        };
+      }
+      return lines;
+    })();
 
     const range: PriceRange = {
       low: promoRange.low,
       high: promoRange.high,
       breakdown: [
-        { label: "Tech support", low: jobLow, high: jobHigh, note: null },
+        ...taskLines,
         ...(promoRange.travel > 0
           ? [
               {
@@ -204,6 +262,29 @@ export function PricingWizard(): React.ReactElement {
     setResult(range);
     setIsCalculating(false);
     setStep("results");
+
+    // Audit log: fire-and-forget so failures don't break the UX. Captures
+    // the raw text, AI interpretation, and the exact range we just showed.
+    void fetch("/api/pricing/log-estimate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        description: issueDescription,
+        aiEstimatedMins: estimatedMins,
+        aiCategory: category,
+        aiExplanation: explanation,
+        aiTasks: tasks,
+        address: dest || null,
+        travelMins,
+        hourlyRate: promoRate,
+        priceLow: promoRange.low,
+        priceHigh: promoRange.high,
+        promoTitle: activePromo?.title ?? null,
+        promoLabel: activePromo ? summariseForBanner(activePromo) : null,
+      }),
+    }).catch(() => {
+      // Logging is best-effort; ignore network/server errors.
+    });
   }
 
   /** Advances to the next step, or triggers estimate calculation on the address step. */
@@ -269,7 +350,7 @@ export function PricingWizard(): React.ReactElement {
       {step === "issue" && (
         <div>
           <h3 className="text-coquelicot mb-1 text-lg font-bold">What do you need help with?</h3>
-          <p className="mb-4 text-sm text-slate-500">
+          <p className="mb-4 text-base text-slate-600">
             Describe the issue or job - the more detail, the better the estimate.
           </p>
           <textarea
@@ -278,7 +359,7 @@ export function PricingWizard(): React.ReactElement {
             onChange={(e) => setIssueDescription(e.target.value)}
             placeholder="e.g. My laptop is running really slow and I think it has a virus. Also want to set up my new phone."
             className={cn(
-              "w-full resize-none rounded-xl border px-4 py-3 text-sm text-slate-700 outline-none transition-all",
+              "w-full resize-none rounded-xl border px-4 py-3 text-base text-slate-700 outline-none transition-all",
               "border-coquelicot/40 bg-white",
               "focus:border-coquelicot focus:ring-coquelicot/30 focus:ring-2",
             )}
@@ -289,7 +370,7 @@ export function PricingWizard(): React.ReactElement {
       {step === "address" && (
         <div>
           <h3 className="text-russian-violet mb-1 text-lg font-bold">Where are you located?</h3>
-          <p className="mb-4 text-sm text-slate-500">
+          <p className="mb-4 text-base text-slate-600">
             Enter your address to include drive time, or skip for an estimate without travel.
           </p>
           <AddressAutocomplete
@@ -308,9 +389,9 @@ export function PricingWizard(): React.ReactElement {
                 {formatDuration(aiEstimatedMins)}
               </p>
             )}
-            <p className="mb-1 text-sm font-medium text-slate-500">Estimated cost</p>
+            <p className="mb-1 text-base font-medium text-slate-600">Estimated cost</p>
             {result.originalLow !== undefined && result.originalHigh !== undefined && (
-              <p className="text-sm text-slate-400 line-through sm:text-base">
+              <p className="text-base text-slate-500 line-through sm:text-lg">
                 {formatPriceRound(result.originalLow)} – {formatPriceRound(result.originalHigh)}
               </p>
             )}
@@ -318,21 +399,29 @@ export function PricingWizard(): React.ReactElement {
               {formatPriceRound(result.low)} – {formatPriceRound(result.high)}
             </p>
             {result.promoLabel && (
-              <p className={cn("mt-2 text-xs font-semibold text-amber-700")}>
+              <p className={cn("mt-2 text-sm font-semibold text-amber-700")}>
                 ⚡ {result.promoLabel}
               </p>
             )}
-            <p className="mt-2 text-xs text-slate-400">
+            <p
+              className={cn(
+                "border-coquelicot/30 bg-coquelicot/5 text-coquelicot-500 mt-4 rounded-lg border px-3 py-2 text-base font-bold",
+              )}
+            >
+              You&apos;re charged for the actual time worked at the agreed hourly rate. Jobs that
+              turn out more involved than described will cost more than this estimate.
+            </p>
+            <p className="mt-2 text-sm text-slate-500">
               {result.includesTravel && "Includes drive time. "}
               All prices in NZD. No GST.
             </p>
           </div>
 
-          {aiExplanation && <p className="mb-4 text-sm text-slate-500">{aiExplanation}</p>}
+          {aiExplanation && <p className="mb-4 text-base text-slate-600">{aiExplanation}</p>}
 
           {result.breakdown.length > 0 && (
             <div className={cn(SOFT_CARD, "mb-4")}>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+              <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
                 Breakdown
               </p>
               <div className="divide-y divide-slate-100">
@@ -350,7 +439,7 @@ export function PricingWizard(): React.ReactElement {
             </div>
           )}
 
-          <p className="mb-5 text-xs text-slate-400">
+          <p className="mb-5 text-sm text-slate-600">
             This is a rough estimate only. The actual cost depends on the complexity of the job and
             will be confirmed before work begins. No GST is charged.
           </p>
@@ -358,19 +447,19 @@ export function PricingWizard(): React.ReactElement {
           <div className="flex flex-wrap gap-3">
             <Link
               href="/booking"
-              className="bg-russian-violet hover:bg-russian-violet/90 rounded-xl px-5 py-2.5 text-sm font-semibold text-white"
+              className="bg-russian-violet hover:bg-russian-violet/90 rounded-xl px-5 py-2.5 text-base font-semibold text-white"
             >
               Book now
             </Link>
             <Link
               href="/contact"
-              className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-base font-semibold text-slate-700 hover:bg-slate-50"
             >
               Ask a question
             </Link>
             <button
               onClick={reset}
-              className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-500 hover:bg-slate-50"
+              className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-base font-semibold text-slate-600 hover:bg-slate-50"
             >
               Start over
             </button>
@@ -383,7 +472,7 @@ export function PricingWizard(): React.ReactElement {
           {step === "address" && (
             <button
               onClick={prevStep}
-              className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-base font-semibold text-slate-700 hover:bg-slate-50"
             >
               Back
             </button>
@@ -392,7 +481,7 @@ export function PricingWizard(): React.ReactElement {
             onClick={() => void nextStep()}
             disabled={!canAdvance() || isCalculating}
             className={cn(
-              "rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-opacity",
+              "rounded-xl px-5 py-2.5 text-base font-semibold text-white transition-opacity",
               canAdvance() && !isCalculating
                 ? "bg-russian-violet hover:bg-russian-violet/90"
                 : "cursor-not-allowed bg-slate-300",

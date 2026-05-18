@@ -9,6 +9,7 @@ import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { deleteBookingEvent } from "@/features/calendar/lib/google-calendar";
 import { toE164NZ } from "@/shared/lib/normalize-phone";
+import { sendCustomerReviewRequest } from "@/features/reviews/lib/email";
 
 interface PatchPayload {
   name?: string;
@@ -78,6 +79,41 @@ export async function PATCH(
 
   await prisma.booking.update({ where: { id }, data });
 
+  // When transitioning to "completed", send the review request email if one
+  // has not already gone out. updateMany with the null-or-missing guard is
+  // atomic, so we can't race with the /api/cron/send-review-emails cron - if
+  // the cron already claimed the send, our updateMany returns count=0 and we
+  // skip. Same `isSet: false` clause as the cron to handle MongoDB documents
+  // where `reviewSentAt` was never written (pre-schema docs).
+  let reviewSent = false;
+  if (
+    body.status === "completed" &&
+    booking.status !== "completed" &&
+    booking.email &&
+    booking.reviewToken
+  ) {
+    const claim = await prisma.booking.updateMany({
+      where: {
+        id,
+        OR: [{ reviewSentAt: null }, { reviewSentAt: { isSet: false } }],
+      },
+      data: { reviewSentAt: new Date() },
+    });
+
+    if (claim.count > 0) {
+      // We won the race - sendCustomerReviewRequest never throws (catches its
+      // own errors and logs), so the PATCH response stays successful even if
+      // Resend has a hiccup. Trade-off: a single failed send won't auto-retry.
+      await sendCustomerReviewRequest({
+        id,
+        name: booking.name,
+        email: booking.email,
+        reviewToken: booking.reviewToken,
+      });
+      reviewSent = true;
+    }
+  }
+
   if (body.address !== undefined && booking.email) {
     try {
       await prisma.contact.updateMany({
@@ -100,7 +136,7 @@ export async function PATCH(
     }
   }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, reviewSent });
 }
 
 /**

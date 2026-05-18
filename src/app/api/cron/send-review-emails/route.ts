@@ -28,16 +28,21 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     // Find bookings that:
     // 1. Ended at least 30 minutes ago (appointment is definitely over)
-    // 2. Are confirmed
+    // 2. Are confirmed or completed
     // 3. Haven't had review email sent yet
-    // reviewSentAt prevents duplicates across runs
+    //
+    // MongoDB gotcha: documents written before reviewSentAt existed in the
+    // schema have no `reviewSentAt` field at all (not even null). Prisma's
+    // `reviewSentAt: null` filter only matches explicit nulls and skips
+    // those documents. Using `isSet: false` on its own would skip the
+    // opposite case (field present and null). The OR covers both.
     const bookingsToEmail = await prisma.booking.findMany({
       where: {
         endAt: {
           lte: thirtyMinutesAgo,
         },
         status: { in: ["confirmed", "completed"] },
-        reviewSentAt: null, // Haven't sent review email yet
+        OR: [{ reviewSentAt: null }, { reviewSentAt: { isSet: false } }],
       },
       select: {
         id: true,
@@ -46,6 +51,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         reviewToken: true,
       },
     });
+
+    console.log(
+      `[cron/send-review-emails] found ${bookingsToEmail.length} candidate booking(s)`,
+      bookingsToEmail.map((b) => ({ id: b.id, email: b.email })),
+    );
 
     if (bookingsToEmail.length === 0) {
       return NextResponse.json({
@@ -128,6 +138,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         results.errors.push(`Booking ${booking.id}: ${error}`);
       }
     }
+
+    console.log(
+      `[cron/send-review-emails] done: sent=${results.sent} suppressed=${results.suppressed} failed=${results.failed}`,
+    );
 
     return NextResponse.json({
       ok: true,

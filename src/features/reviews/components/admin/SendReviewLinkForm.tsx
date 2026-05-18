@@ -10,6 +10,7 @@ import { cn } from "@/shared/lib/cn";
 import { CopyLinkButton } from "./CopyLinkButton";
 import { toE164NZ, formatNZPhone, isValidPhone } from "@/shared/lib/normalize-phone";
 import type React from "react";
+import { FaCaretLeft } from "react-icons/fa6";
 
 /**
  * A contact entry used to pre-fill the review link form.
@@ -413,10 +414,11 @@ export function SendReviewLinkForm({
                     setError(null);
                   }}
                   className={cn(
-                    "rounded-lg border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-600 transition-colors hover:border-slate-400",
+                    "inline-flex items-center gap-1 rounded-lg border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-600 transition-colors hover:border-slate-400",
                   )}
                 >
-                  ← Back
+                  <FaCaretLeft className={cn("h-4 w-4")} aria-hidden />
+                  Back
                 </button>
               </div>
             </div>

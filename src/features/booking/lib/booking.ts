@@ -400,6 +400,28 @@ export interface BookingPayloadFields {
 }
 
 /**
+ * Per-field max-length caps shared between the client form and the server
+ * validator so both ends agree. Anything longer is rejected at the API edge
+ * before hitting the database.
+ */
+export const BOOKING_FIELD_LIMITS = {
+  name: 100,
+  email: 320, // RFC 5321 path-length max
+  phone: 32,
+  notes: 2000,
+  address: 250, // includes apartment prefix
+  notesMin: 10,
+} as const;
+
+/**
+ * Minimal email regex - rejects "a@", "@b", "a@b" (no TLD), whitespace-only
+ * input. The domain is matched as one-or-more dot-separated dot-free segments
+ * so dots only appear at explicit boundaries - this eliminates the backtrack
+ * ambiguity that triggers the polynomial-ReDoS analyzer.
+ */
+export const EMAIL_REGEX = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/;
+
+/**
  * Validates the user-supplied fields on a booking POST/edit payload. Returns
  * the same `{ valid, error }` shape as `validateBookingRequest` so call sites
  * can treat both checks uniformly.
@@ -415,11 +437,26 @@ export function validateBookingPayloadFields(
   if (!payload.name?.trim()) {
     return { valid: false, error: "Name is required." };
   }
-  if (opts.requireEmail && (!payload.email?.trim() || !payload.email.includes("@"))) {
+  if (payload.name && payload.name.length > BOOKING_FIELD_LIMITS.name) {
+    return { valid: false, error: "Name is too long." };
+  }
+  if (opts.requireEmail && (!payload.email?.trim() || !EMAIL_REGEX.test(payload.email.trim()))) {
     return { valid: false, error: "Valid email is required." };
+  }
+  if (payload.email && payload.email.length > BOOKING_FIELD_LIMITS.email) {
+    return { valid: false, error: "Email is too long." };
   }
   if (!payload.notes?.trim()) {
     return { valid: false, error: "Please describe what you need help with." };
+  }
+  if (payload.notes && payload.notes.trim().length < BOOKING_FIELD_LIMITS.notesMin) {
+    return {
+      valid: false,
+      error: `Please describe the issue in at least ${BOOKING_FIELD_LIMITS.notesMin} characters.`,
+    };
+  }
+  if (payload.notes && payload.notes.length > BOOKING_FIELD_LIMITS.notes) {
+    return { valid: false, error: "Description is too long." };
   }
   if (!payload.dateKey || !payload.timeOfDay) {
     return { valid: false, error: "Please select a day and time." };
@@ -432,6 +469,9 @@ export function validateBookingPayloadFields(
   }
   if (payload.meetingType === "in-person" && !payload.address?.trim()) {
     return { valid: false, error: "Address is required for in-person appointments." };
+  }
+  if (payload.address && payload.address.length > BOOKING_FIELD_LIMITS.address) {
+    return { valid: false, error: "Address is too long." };
   }
   return { valid: true };
 }

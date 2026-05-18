@@ -27,6 +27,8 @@ function inDays(n: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+type AddressMode = "name" | "company" | "custom";
+
 interface FormState {
   number: string;
   issueDate: string;
@@ -40,6 +42,12 @@ interface FormState {
   promoTitle: string | null;
   /** Promo discount in dollars, applied before GST. */
   promoDiscount: number;
+  /** Picked contact's name; lets the operator switch back to it after editing. */
+  pickedContactName: string | null;
+  /** Picked contact's company; null when the contact has no company. */
+  pickedContactCompany: string | null;
+  /** Drives whether clientName is sourced from name/company or freely typed. */
+  addressMode: AddressMode;
 }
 
 /**
@@ -51,17 +59,64 @@ function emptyLine(): LineItem {
 }
 
 /**
+ * Pre-populated invoice payload used when the builder runs in edit mode for a
+ * DRAFT invoice. Mirrors the Prisma row shape after Date columns are stringified
+ * to YYYY-MM-DD for the form inputs.
+ */
+export interface InvoiceBuilderEditPayload {
+  id: string;
+  number: string;
+  issueDate: string;
+  dueDate: string;
+  clientName: string;
+  clientEmail: string;
+  lineItems: LineItem[];
+  gst: boolean;
+  notes: string | null;
+  promoTitle: string | null;
+  promoDiscount: number | null;
+}
+
+/**
  * Invoice builder view with a live preview panel.
  * @param props - Component props
  * @param props.token - Admin auth token used for API requests
+ * @param props.editInvoice - When set, the builder runs in edit mode: form is
+ *   pre-populated from this payload, the next-invoice-number prefetch is
+ *   skipped, and Save PATCHes the existing row instead of creating a new one.
  * @returns Invoice builder element
  */
-export function InvoiceBuilderView({ token }: { token: string }): React.ReactElement {
+export function InvoiceBuilderView({
+  token,
+  editInvoice,
+}: {
+  token: string;
+  editInvoice?: InvoiceBuilderEditPayload;
+}): React.ReactElement {
   const router = useRouter();
   const params = useSearchParams();
   const headers = { "X-Admin-Secret": token };
+  const isEditing = Boolean(editInvoice);
 
   const [form, setForm] = useState<FormState>(() => {
+    // Edit mode: hydrate every field from the existing invoice; no URL params.
+    if (editInvoice) {
+      return {
+        number: editInvoice.number,
+        issueDate: editInvoice.issueDate,
+        dueDate: editInvoice.dueDate,
+        clientName: editInvoice.clientName,
+        clientEmail: editInvoice.clientEmail,
+        lineItems: editInvoice.lineItems.length ? editInvoice.lineItems : [emptyLine()],
+        gst: editInvoice.gst,
+        notes: editInvoice.notes ?? "",
+        promoTitle: editInvoice.promoTitle,
+        promoDiscount: editInvoice.promoDiscount ?? 0,
+        pickedContactName: null,
+        pickedContactCompany: null,
+        addressMode: "custom",
+      };
+    }
     const clientName = params.get("clientName") ?? "";
     const clientEmail = params.get("clientEmail") ?? "";
     const rawItems = params.get("lineItems");
@@ -70,6 +125,17 @@ export function InvoiceBuilderView({ token }: { token: string }): React.ReactEle
     const promoTitle = params.get("promoTitle");
     const promoDiscountRaw = params.get("promoDiscount");
     const promoDiscount = promoDiscountRaw ? Number.parseFloat(promoDiscountRaw) : 0;
+    // Picked contact + address-mode restored from the calculator hand-off so
+    // the operator doesn't have to re-pick on arrival.
+    const pickedContactName = params.get("pickedContactName");
+    const pickedContactCompany = params.get("pickedContactCompany");
+    const addressModeParam = params.get("addressMode") as AddressMode | null;
+    const addressMode: AddressMode =
+      addressModeParam === "name" || addressModeParam === "company" || addressModeParam === "custom"
+        ? addressModeParam
+        : pickedContactName
+          ? "name"
+          : "custom";
     let lineItems: LineItem[] = [emptyLine()];
     try {
       if (rawItems) lineItems = JSON.parse(rawItems) as LineItem[];
@@ -85,6 +151,9 @@ export function InvoiceBuilderView({ token }: { token: string }): React.ReactEle
       notes,
       promoTitle: promoTitle && promoDiscount > 0 ? promoTitle : null,
       promoDiscount: promoDiscount > 0 ? promoDiscount : 0,
+      pickedContactName: pickedContactName || null,
+      pickedContactCompany: pickedContactCompany || null,
+      addressMode,
     };
   });
   const [saving, setSaving] = useState(false);
@@ -92,15 +161,16 @@ export function InvoiceBuilderView({ token }: { token: string }): React.ReactEle
   const [sheetWarning, setSheetWarning] = useState(false);
   const [showContactPicker, setShowContactPicker] = useState(false);
 
-  // Prefetch next invoice number
+  // Prefetch next invoice number - skipped in edit mode (number already set).
   useEffect(() => {
+    if (isEditing) return;
     fetch("/api/business/sheets/invoice-counter", { headers })
       .then((r) => r.json())
       .then((d) => {
         if (d.ok) setForm((p) => ({ ...p, number: d.nextFormatted }));
       })
       .catch(() => {});
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isEditing]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /**
    * Updates a single field on a line item and recalculates its total when qty or unitPrice changes.
@@ -123,13 +193,17 @@ export function InvoiceBuilderView({ token }: { token: string }): React.ReactEle
   const totals = calcInvoiceTotals(form.lineItems, form.gst, form.promoDiscount);
 
   /**
-   * Submits the invoice form to the API and redirects to the new invoice detail page on success.
+   * Submits the form. In create mode POSTs to /api/business/invoices and
+   * navigates to the new detail page. In edit mode PATCHes the existing row
+   * and navigates back to its detail page (no new ID).
    */
   async function handleSave(): Promise<void> {
     setSaving(true);
     setError(null);
-    const res = await fetch("/api/business/invoices", {
-      method: "POST",
+    const url = editInvoice ? `/api/business/invoices/${editInvoice.id}` : "/api/business/invoices";
+    const method = editInvoice ? "PATCH" : "POST";
+    const res = await fetch(url, {
+      method,
       headers: { ...headers, "content-type": "application/json" },
       body: JSON.stringify({
         number: form.number,
@@ -147,7 +221,8 @@ export function InvoiceBuilderView({ token }: { token: string }): React.ReactEle
     const d = await res.json();
     if (d.ok) {
       if (d.sheetSyncWarning) setSheetWarning(true);
-      router.push(`/admin/business/invoices/${d.invoice.id}?token=${encodeURIComponent(token)}`);
+      const targetId = editInvoice ? editInvoice.id : d.invoice.id;
+      router.push(`/admin/business/invoices/${targetId}?token=${encodeURIComponent(token)}`);
     } else {
       setError(d.error ?? "Failed to save");
       setSaving(false);
@@ -155,18 +230,83 @@ export function InvoiceBuilderView({ token }: { token: string }): React.ReactEle
   }
 
   /**
-   * Triggers the browser print dialog so the invoice preview can be saved as a PDF.
+   * Downloads the actual customer-facing PDF (same renderer as Drive + email
+   * attachment) for the in-progress invoice. POSTs the form state to the
+   * preview-pdf route, receives the PDF as a blob, and triggers a download.
+   * Browser's window.print() screenshot of the HTML preview is bypassed.
    */
-  function handlePrint(): void {
-    window.print();
+  async function handlePrint(): Promise<void> {
+    setError(null);
+    try {
+      const res = await fetch("/api/business/invoices/preview-pdf", {
+        method: "POST",
+        headers: { ...headers, "content-type": "application/json" },
+        body: JSON.stringify({
+          number: form.number || "DRAFT",
+          clientName: form.clientName || "(no client)",
+          clientEmail: form.clientEmail,
+          issueDate: form.issueDate,
+          dueDate: form.dueDate,
+          lineItems: form.lineItems,
+          gst: form.gst,
+          subtotal: totals.subtotal,
+          gstAmount: totals.gstAmount,
+          total: totals.total,
+          promoTitle: form.promoTitle,
+          promoDiscount: form.promoDiscount > 0 ? form.promoDiscount : null,
+          notes: form.notes || null,
+        }),
+      });
+      if (!res.ok) {
+        const d = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(d.error ?? "Could not generate PDF");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Invoice ${form.number || "DRAFT"}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not generate PDF");
+    }
   }
 
   /**
-   * Applies the selected Google contact's name and email to the form.
+   * Applies the selected Google contact to the form. Defaults to address-by-name;
+   * the operator can switch to company or custom via the segmented control.
    * @param c - The contact chosen from the picker
    */
   function handleContactSelect(c: GoogleContact): void {
-    setForm((p) => ({ ...p, clientName: c.name, clientEmail: c.email }));
+    const company = c.company?.trim() || null;
+    setForm((p) => ({
+      ...p,
+      clientName: c.name,
+      clientEmail: c.email,
+      pickedContactName: c.name,
+      pickedContactCompany: company,
+      addressMode: "name",
+    }));
+  }
+
+  /**
+   * Switches the address mode and updates clientName accordingly. Custom mode
+   * keeps whatever clientName already has so the operator can keep editing.
+   * @param mode - Target mode.
+   */
+  function setAddressMode(mode: AddressMode): void {
+    setForm((p) => {
+      if (mode === "name" && p.pickedContactName) {
+        return { ...p, addressMode: mode, clientName: p.pickedContactName };
+      }
+      if (mode === "company" && p.pickedContactCompany) {
+        return { ...p, addressMode: mode, clientName: p.pickedContactCompany };
+      }
+      return { ...p, addressMode: "custom" };
+    });
   }
 
   return (
@@ -253,15 +393,46 @@ export function InvoiceBuilderView({ token }: { token: string }): React.ReactEle
                 Pick from contacts
               </button>
             </div>
+            {form.pickedContactName && (
+              <div className={cn("flex flex-wrap items-center gap-2")}>
+                <span className={cn("text-xs font-medium text-slate-600")}>Address to:</span>
+                {(["name", "company", "custom"] as const).map((mode) => {
+                  const disabled = mode === "company" && !form.pickedContactCompany;
+                  const active = form.addressMode === mode;
+                  const label =
+                    mode === "name" ? "Name" : mode === "company" ? "Company" : "Custom";
+                  return (
+                    <button
+                      key={mode}
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => setAddressMode(mode)}
+                      title={disabled ? "Picked contact has no company" : undefined}
+                      className={cn(
+                        "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                        active
+                          ? "border-russian-violet/40 bg-russian-violet/10 text-russian-violet"
+                          : "border-slate-200 bg-white text-slate-600 hover:border-slate-300",
+                        disabled && "cursor-not-allowed opacity-40 hover:border-slate-200",
+                      )}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             <div className={cn("grid gap-3 sm:grid-cols-2")}>
               <div>
                 <label className={cn("mb-1 block text-xs font-medium text-slate-600")}>Name</label>
                 <input
                   type="text"
                   value={form.clientName}
+                  readOnly={form.addressMode !== "custom"}
                   onChange={(e) => setForm((p) => ({ ...p, clientName: e.target.value }))}
                   className={cn(
                     "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
+                    form.addressMode !== "custom" && "bg-slate-50 text-slate-700",
                   )}
                 />
               </div>
@@ -380,12 +551,12 @@ export function InvoiceBuilderView({ token }: { token: string }): React.ReactEle
               {saving ? "Saving..." : "Save as draft"}
             </button>
             <button
-              onClick={handlePrint}
+              onClick={() => void handlePrint()}
               className={cn(
                 "rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50",
               )}
             >
-              Print / save PDF
+              Save PDF
             </button>
           </div>
         </div>
@@ -399,57 +570,26 @@ export function InvoiceBuilderView({ token }: { token: string }): React.ReactEle
           className={cn(
             "flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm",
             "lg:aspect-210/297 lg:sticky lg:top-4 lg:overflow-y-auto",
-            "print:aspect-auto print:rounded-none print:border-0 print:shadow-none",
+            // Print overrides: defeat the lg: sticky + scroll constraints so
+            // the browser captures the FULL invoice rather than just the
+            // currently-visible scroll position.
+            "print:static print:aspect-auto print:overflow-visible print:rounded-none print:border-0 print:shadow-none",
           )}
         >
-          {/* Branded header band, capped at ~65% of the content width to
-              match the PDF letterhead (HEADER_WIDTH_RATIO in invoice-pdf.ts).
-              Left-aligned so it reads as a header rather than a banner. */}
-          <div className={cn("shrink-0 px-10 pt-10")}>
-            <Image
-              src="/assets/document-header-800x270.png"
-              alt="To The Point"
-              width={800}
-              height={270}
-              className={cn("h-auto w-2/3")}
-              priority
-            />
-          </div>
-
-          {/* Body: flex column so the footer stays pinned to the bottom of the
-              A4 sheet even when line items don't fill the page. */}
-          <div className={cn("flex flex-1 flex-col px-10 pb-10 pt-4")}>
-            {/* Bill to (left) + INVOICE title / number / status / GST# (right) */}
-            <div className={cn("mb-6 grid grid-cols-2 gap-4")}>
-              <div>
-                <p
-                  className={cn(
-                    "mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-300",
-                  )}
-                >
-                  Bill to
-                </p>
-                <p className={cn("text-sm font-bold text-slate-700")}>
-                  {form.clientName || "Client name"}
-                </p>
-                <p className={cn("text-xs text-slate-500")}>
-                  {form.clientEmail || "client@email.com"}
-                </p>
-                <div className={cn("mt-3 flex gap-6 text-[11px] text-slate-500")}>
-                  <p>
-                    <span className={cn("text-slate-400")}>Issued:</span>{" "}
-                    <span className={cn("font-bold text-slate-700")}>
-                      {form.issueDate ? formatDateShort(form.issueDate) : "-"}
-                    </span>
-                  </p>
-                  <p>
-                    <span className={cn("text-slate-400")}>Due:</span>{" "}
-                    <span className={cn("font-bold text-slate-700")}>
-                      {form.dueDate ? formatDateShort(form.dueDate) : "-"}
-                    </span>
-                  </p>
-                </div>
-              </div>
+          {/* Body: chip-logo header (left) + invoice block (right), then
+              bill-to / table / totals / bank-transfer. flex column so the
+              bank block stays at the bottom of the A4 sheet on lg+. */}
+          <div className={cn("flex flex-1 flex-col px-10 pb-10 pt-10")}>
+            {/* Header row: chip + wordmark on the left, INVOICE block on the right. */}
+            <div className={cn("mb-8 flex items-start justify-between gap-4")}>
+              <Image
+                src="/source/logo-wordmark.svg"
+                alt="To The Point Tech"
+                width={2000}
+                height={674}
+                className={cn("h-20 w-auto")}
+                priority
+              />
               <div className={cn("text-right")}>
                 <p className={cn("text-russian-violet text-2xl font-extrabold leading-none")}>
                   {BUSINESS_GST_NUMBER ? "TAX INVOICE" : "INVOICE"}
@@ -466,32 +606,69 @@ export function InvoiceBuilderView({ token }: { token: string }): React.ReactEle
               </div>
             </div>
 
+            {/* Bill to (left) + dates (right) - mirrors PDF layout. */}
+            <div className={cn("mb-6 flex items-start justify-between gap-6")}>
+              <div>
+                <p
+                  className={cn(
+                    "mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400",
+                  )}
+                >
+                  Bill to
+                </p>
+                <p className={cn("text-sm font-bold text-slate-800")}>
+                  {form.clientName || "Client name"}
+                </p>
+                <p className={cn("text-xs text-slate-500")}>
+                  {form.clientEmail || "client@email.com"}
+                </p>
+              </div>
+              <div className={cn("space-y-1 text-[11px]")}>
+                <p className={cn("flex justify-between gap-4")}>
+                  <span className={cn("text-slate-500")}>Issued:</span>
+                  <span className={cn("font-bold text-slate-800")}>
+                    {form.issueDate ? formatDateShort(form.issueDate) : "-"}
+                  </span>
+                </p>
+                <p className={cn("flex justify-between gap-4")}>
+                  <span className={cn("text-slate-500")}>Due:</span>
+                  <span className={cn("font-bold text-slate-800")}>
+                    {form.dueDate ? formatDateShort(form.dueDate) : "-"}
+                  </span>
+                </p>
+              </div>
+            </div>
+
             {/* Separator above table - matches the PDF's thin grey line. */}
             <div className={cn("mb-0 h-px bg-slate-300")} />
 
-            {/* Branded table: russian-violet header + alternating row backgrounds. */}
+            {/* Clean table (matches PDF): bold dark headers on white with a brand-coloured
+                bottom border. Column widths in % match the PDF: Description 67%, Qty 9%,
+                Unit price 11%, Total 13%. */}
             <table className={cn("mb-0 w-full text-xs")}>
               <thead>
-                <tr className={cn("bg-russian-violet text-white")}>
-                  <th className={cn("px-2 py-2 text-left font-bold")}>Description</th>
-                  <th className={cn("px-2 py-2 text-right font-bold")}>Qty</th>
-                  <th className={cn("px-2 py-2 text-right font-bold")}>Unit price</th>
-                  <th className={cn("px-2 py-2 text-right font-bold")}>Total</th>
+                <tr className={cn("border-russian-violet border-b-2 text-slate-800")}>
+                  <th className={cn("w-[67%] px-2 py-2 text-left font-bold")}>Description</th>
+                  <th className={cn("w-[9%] px-2 py-2 text-center font-bold")}>Qty</th>
+                  <th className={cn("w-[11%] px-2 py-2 text-center font-bold")}>Price</th>
+                  <th className={cn("w-[13%] px-2 py-2 text-center font-bold")}>Total</th>
                 </tr>
               </thead>
               <tbody>
                 {form.lineItems.map((item, idx) => (
                   <tr key={idx} className={cn(idx % 2 === 1 ? "bg-slate-50" : "bg-white")}>
-                    <td className={cn("px-2 py-2 text-slate-700")}>
+                    <td className={cn("px-2 py-2 align-top text-slate-700")}>
                       {item.description || (
                         <span className={cn("italic text-slate-300")}>(line description)</span>
                       )}
                     </td>
-                    <td className={cn("px-2 py-2 text-right text-slate-700")}>{item.qty}</td>
-                    <td className={cn("px-2 py-2 text-right text-slate-700")}>
+                    <td className={cn("px-2 py-2 text-right align-top text-slate-700")}>
+                      {item.qty}
+                    </td>
+                    <td className={cn("px-2 py-2 text-right align-top text-slate-700")}>
                       {formatNZD(item.unitPrice)}
                     </td>
-                    <td className={cn("px-2 py-2 text-right font-bold text-slate-700")}>
+                    <td className={cn("px-2 py-2 text-right align-top font-bold text-slate-700")}>
                       {formatNZD(item.lineTotal)}
                     </td>
                   </tr>
@@ -502,40 +679,50 @@ export function InvoiceBuilderView({ token }: { token: string }): React.ReactEle
             <div className={cn("mb-4 h-px bg-slate-300")} />
 
             {/* Totals (right-aligned, matches PDF). */}
-            <div className={cn("mb-6 ml-auto w-1/2 space-y-1 text-xs")}>
-              <div className={cn("flex justify-between")}>
+            <div className={cn("mb-6 ml-auto w-3/5 space-y-1 text-xs")}>
+              <div className={cn("flex justify-between gap-3")}>
                 <span className={cn("text-slate-500")}>Subtotal</span>
-                <span className={cn("text-slate-700")}>{formatNZD(totals.subtotal)}</span>
+                <span className={cn("whitespace-nowrap text-slate-700")}>
+                  {formatNZD(totals.subtotal)}
+                </span>
               </div>
               {form.promoDiscount > 0 && (
-                <div className={cn("flex justify-between text-amber-700")}>
-                  <span>Promo{form.promoTitle ? `: ${form.promoTitle}` : ""}</span>
-                  <span>-{formatNZD(form.promoDiscount)}</span>
+                <div className={cn("flex justify-between gap-3 text-amber-700")}>
+                  <span>Promo (labor only){form.promoTitle ? `: ${form.promoTitle}` : ""}</span>
+                  <span className={cn("whitespace-nowrap")}>-{formatNZD(form.promoDiscount)}</span>
                 </div>
               )}
               {form.gst && (
-                <div className={cn("flex justify-between")}>
+                <div className={cn("flex justify-between gap-3")}>
                   <span className={cn("text-slate-500")}>GST (15%)</span>
-                  <span className={cn("text-slate-700")}>{formatNZD(totals.gstAmount)}</span>
+                  <span className={cn("whitespace-nowrap text-slate-700")}>
+                    {formatNZD(totals.gstAmount)}
+                  </span>
                 </div>
               )}
               <div className={cn("h-px bg-slate-300")} />
               <div
-                className={cn("text-russian-violet flex justify-between text-sm font-extrabold")}
+                className={cn(
+                  "text-russian-violet flex justify-between gap-3 text-sm font-extrabold",
+                )}
               >
                 <span>Total</span>
-                <span>{formatNZD(totals.total)}</span>
+                <span className={cn("whitespace-nowrap")}>{formatNZD(totals.total)}</span>
               </div>
             </div>
 
-            <div className={cn("mb-3 h-px bg-slate-300")} />
-
-            {/* Bank transfer section with payee, account, reference, payment terms. */}
-            <div className={cn("mb-4 space-y-1 text-[11px]")}>
-              <p className={cn("font-bold text-slate-700")}>Bank transfer</p>
+            {/* Bank transfer call-out: tinted box mirrors the PDF's visual emphasis. */}
+            <div
+              className={cn(
+                "mb-4 space-y-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-[11px]",
+              )}
+            >
+              <p className={cn("text-russian-violet text-xs font-bold")}>Bank transfer</p>
               <p className={cn("text-slate-500")}>Payee: {BUSINESS.name}</p>
-              <p className={cn("text-slate-500")}>Account: {BUSINESS_BANK_ACCOUNT}</p>
-              <p className={cn("text-slate-500")}>Reference: {form.number || "[invoice number]"}</p>
+              <p className={cn("font-semibold text-slate-700")}>Account: {BUSINESS_BANK_ACCOUNT}</p>
+              <p className={cn("font-semibold text-slate-700")}>
+                Reference: {form.number || "[invoice number]"}
+              </p>
               <p className={cn("text-slate-500")}>
                 Due within {BUSINESS_PAYMENT_TERMS_DAYS} days of issue
                 {form.dueDate ? ` (by ${formatDateShort(form.dueDate)}).` : "."}
@@ -544,24 +731,14 @@ export function InvoiceBuilderView({ token }: { token: string }): React.ReactEle
 
             {form.notes && <p className={cn("mb-6 text-[11px] text-slate-500")}>{form.notes}</p>}
 
-            {/* Footer: logo (left) + contact strip (right). mt-auto pushes
-                this to the bottom of the A4 sheet on lg+ where the parent has
-                a fixed aspect ratio. */}
-            <div className={cn("mt-auto flex items-end justify-between gap-4 pt-8")}>
-              <Image
-                src="/source/profile.svg"
-                alt="To The Point logo"
-                width={70}
-                height={70}
-                className={cn("h-12 w-auto")}
-              />
-              <div className={cn("text-right text-[11px]")}>
-                <p className={cn("text-russian-violet text-sm font-bold")}>{BUSINESS.company}</p>
-                <p className={cn("text-slate-500")}>
-                  {BUSINESS.phone} &middot; {BUSINESS.email} &middot; {BUSINESS.website}
-                </p>
-                <p className={cn("text-slate-300")}>Thanks for your business.</p>
-              </div>
+            {/* Sender contact footer (matches the page-bottom footer in the PDF). */}
+            <div
+              className={cn(
+                "mt-auto border-t border-slate-200 pt-3 text-center text-[10px] text-slate-500",
+              )}
+            >
+              {BUSINESS.email} &nbsp;·&nbsp; {BUSINESS.phone} &nbsp;·&nbsp; {BUSINESS.website}
+              &nbsp;·&nbsp; {BUSINESS.location}
             </div>
           </div>
         </div>

@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
+import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 
 /**
  * PATCH /api/reviews/[id] - Allows a customer to edit their review.
@@ -19,6 +20,9 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } },
 ): Promise<NextResponse> {
+  const limited = rateLimitOrReject(request, "review-edit", 5, 60_000);
+  if (limited) return limited;
+
   try {
     const { id } = params;
     const body = await request.json();

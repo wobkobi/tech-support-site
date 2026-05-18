@@ -5,8 +5,14 @@
  */
 
 import { Resend } from "resend";
-import { BUSINESS } from "@/shared/lib/business-identity";
-import { formatDateTimeLong } from "@/shared/lib/date-format";
+import {
+  BUSINESS,
+  BUSINESS_BANK_ACCOUNT,
+  BUSINESS_PAYMENT_TERMS_DAYS,
+} from "@/shared/lib/business-identity";
+import { formatDateTimeLong, formatDateShort } from "@/shared/lib/date-format";
+import { formatNZD } from "@/features/business/lib/business";
+import { DEFAULT_INVOICE_EMAIL_BODY } from "@/features/business/lib/invoice-email-defaults";
 
 /**
  * Escapes HTML special characters so user-supplied values can be safely
@@ -405,5 +411,152 @@ export async function sendPastClientReviewRequest(booking: ReviewRequestData): P
       `[email] Failed to send past client review request for request ${booking.id}:`,
       error,
     );
+  }
+}
+
+/**
+ * Subset of the Invoice row needed to render the email body.
+ * Kept as a structural type so callers can pass a Prisma row directly without coupling.
+ */
+export interface InvoiceEmailData {
+  number: string;
+  clientName: string;
+  clientEmail: string;
+  issueDate: Date;
+  dueDate: Date;
+  total: number;
+  driveWebUrl?: string | null;
+}
+
+/**
+ * Renders the invoice email subject + HTML body without sending. Used by the
+ * preview modal AND the send route so what the operator previews is exactly
+ * what the customer receives.
+ * @param args - Render inputs.
+ * @param args.invoice - Invoice row fields needed for the body.
+ * @param args.reviewUrl - Stable per-contact review URL, or null to omit the review line.
+ * @param args.greetingName - Optional operator-typed greeting target. Useful when
+ *   the invoice goes to a company but the email goes to a specific person (e.g.
+ *   "Vicky" while the invoice header reads "Mars Salt and Sweet Limited").
+ * @param args.customBody - Optional operator-typed message that replaces the
+ *   default intro paragraph. Multi-line allowed (rendered with `white-space:
+ *   pre-wrap` so line breaks are preserved). Falls back to
+ *   DEFAULT_INVOICE_EMAIL_BODY when omitted.
+ * @returns Subject + escaped HTML body.
+ */
+export function buildInvoiceEmail(args: {
+  invoice: InvoiceEmailData;
+  reviewUrl: string | null;
+  greetingName?: string;
+  customBody?: string;
+}): { subject: string; html: string } {
+  const { invoice, reviewUrl, greetingName, customBody } = args;
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz";
+  const bodyText = (customBody ?? DEFAULT_INVOICE_EMAIL_BODY).trim();
+  // pre-wrap preserves line breaks the operator typed; escape first so the
+  // body can never inject markup.
+  const safeBody = escapeHtml(bodyText || DEFAULT_INVOICE_EMAIL_BODY);
+  // Greeting: caller-supplied override wins; otherwise fall back to the first
+  // word of clientName. The Send modal lets the operator type the right name
+  // per send, so there's no auto-detection of company vs person here.
+  const trimmedOverride = greetingName?.trim();
+  const greetingTarget =
+    trimmedOverride || (invoice.clientName.split(" ")[0] || invoice.clientName).trim();
+  const safeGreeting = escapeHtml(greetingTarget);
+  const safeNumber = escapeHtml(invoice.number);
+  const dueDate = escapeHtml(formatDateShort(invoice.dueDate));
+  const totalLabel = escapeHtml(formatNZD(invoice.total));
+  const driveLink = invoice.driveWebUrl
+    ? `<p style="margin:0 0 16px;font-size:14px;color:#555">An online copy is also here: <a href="${escapeHtml(invoice.driveWebUrl)}" style="color:#43bccd">view invoice</a>.</p>`
+    : "";
+  const reviewLine = reviewUrl
+    ? `<p style="margin:24px 0 0;font-size:14px;color:#555">If you've got a moment, I'd love to hear how it went: <a href="${escapeHtml(reviewUrl)}" style="color:#43bccd">share your experience</a>. Quick and anonymous if you prefer.</p>`
+    : "";
+
+  const subject = `Your invoice from ${BUSINESS.company} (${invoice.number})`;
+  const html = `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8" /></head>
+<body style="margin:0;padding:24px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0c0a3e;background:#f6f7f8">
+  <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:12px;padding:24px">
+    <h1 style="margin:0 0 16px;font-size:20px;font-weight:700;color:#0c0a3e">Hi ${safeGreeting},</h1>
+
+    <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#333;white-space:pre-wrap">${safeBody}</p>
+
+    <div style="margin:0 0 16px;padding:12px 16px;background:#f3f4f6;border-radius:8px;font-size:14px;color:#333">
+      <p style="margin:0 0 4px"><strong>Invoice:</strong> ${safeNumber}</p>
+      <p style="margin:0 0 4px"><strong>Total:</strong> ${totalLabel}</p>
+      <p style="margin:0"><strong>Due:</strong> ${dueDate} (${BUSINESS_PAYMENT_TERMS_DAYS} days from issue)</p>
+    </div>
+
+    ${driveLink}
+
+    <p style="margin:0 0 8px;font-size:14px;color:#333"><strong>Bank transfer:</strong></p>
+    <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#333">
+      Payee: ${escapeHtml(BUSINESS.name)}<br />
+      Account: <strong>${escapeHtml(BUSINESS_BANK_ACCOUNT)}</strong><br />
+      Reference: <strong>${safeNumber}</strong>
+    </p>
+
+    <p style="margin:0;font-size:14px;color:#333">Any questions, just reply.</p>
+
+    ${reviewLine}
+
+    ${buildEmailSignature(siteUrl)}
+  </div>
+</body>
+</html>`;
+
+  return { subject, html };
+}
+
+/**
+ * Sends the rendered invoice email via Resend with the PDF attached.
+ * Failures are caught and logged - never throws.
+ * @param args - Send inputs.
+ * @param args.invoice - Invoice row fields needed for the body.
+ * @param args.pdfBytes - Raw PDF bytes returned by `generateInvoicePdf`.
+ * @param args.reviewUrl - Stable per-contact review URL, or null to omit the review line.
+ * @param args.greetingName - Optional operator-typed greeting target (forwarded to buildInvoiceEmail).
+ * @param args.customBody - Optional operator-typed message body that replaces the default intro paragraph.
+ * @returns True if the email was accepted by Resend, false on failure or misconfig.
+ */
+export async function sendInvoiceEmail(args: {
+  invoice: InvoiceEmailData;
+  pdfBytes: Uint8Array;
+  reviewUrl: string | null;
+  greetingName?: string;
+  customBody?: string;
+}): Promise<boolean> {
+  const { invoice, pdfBytes, reviewUrl, greetingName, customBody } = args;
+  const from = process.env.EMAIL_FROM;
+  if (!from || !process.env.RESEND_API_KEY) {
+    console.warn("[email] Resend not configured - skipping invoice email.");
+    return false;
+  }
+  if (!invoice.clientEmail) {
+    console.warn(`[email] Invoice ${invoice.number} has no clientEmail - skipping send.`);
+    return false;
+  }
+
+  const { subject, html } = buildInvoiceEmail({ invoice, reviewUrl, greetingName, customBody });
+  try {
+    await getResend().emails.send({
+      from,
+      replyTo: process.env.ADMIN_EMAIL,
+      to: invoice.clientEmail,
+      subject,
+      html,
+      attachments: [
+        {
+          filename: `Invoice ${invoice.number}.pdf`,
+          content: Buffer.from(pdfBytes),
+        },
+      ],
+    });
+    return true;
+  } catch (error) {
+    console.error(`[email] Failed to send invoice ${invoice.number}:`, error);
+    return false;
   }
 }

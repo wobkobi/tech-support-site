@@ -43,6 +43,8 @@ interface BookingRequestPayload {
   address?: string;
   meetingType: "in-person" | "remote";
   notes: string;
+  /** Honeypot field - real users never fill this; bots usually do. */
+  website?: string;
 }
 
 /**
@@ -68,7 +70,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       address,
       meetingType,
       notes,
+      website,
     } = body;
+
+    // Honeypot trip: silently report success without creating a booking so the
+    // bot moves on. Real users never fill this field (it's visually hidden
+    // and tab-skipped on the form).
+    if (typeof website === "string" && website.trim().length > 0) {
+      console.warn("[booking/request] Honeypot tripped; faking success.", {
+        ip: request.headers.get("x-forwarded-for") ?? "unknown",
+      });
+      return NextResponse.json({ ok: true });
+    }
 
     const payloadCheck = validateBookingPayloadFields(
       { name, email, notes, dateKey, timeOfDay, duration, meetingType, address },

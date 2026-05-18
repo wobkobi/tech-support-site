@@ -8,6 +8,7 @@
 
 import { useEffect } from "react";
 import type React from "react";
+import { FaCaretRight } from "react-icons/fa6";
 import Link from "next/link";
 import { cn } from "@/shared/lib/cn";
 import { formatNZD } from "@/features/business/lib/business";
@@ -197,9 +198,12 @@ export function BreakdownModal({ data, onClose }: BreakdownModalProps): React.Re
             {data.viewAll && (
               <Link
                 href={data.viewAll.href}
-                className={cn("text-russian-violet text-sm font-semibold hover:underline")}
+                className={cn(
+                  "text-russian-violet inline-flex items-center gap-1 text-sm font-semibold hover:underline",
+                )}
               >
                 {data.viewAll.label}
+                <FaCaretRight className={cn("h-4 w-4")} aria-hidden />
               </Link>
             )}
           </div>

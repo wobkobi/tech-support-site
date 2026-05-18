@@ -412,13 +412,15 @@ export function NavBar(): React.ReactElement | null {
       >
         <div
           className={cn(
-            "border-seasalt-400/40 bg-seasalt-800/90 flex h-20 w-full items-center justify-between rounded-2xl border px-5 shadow-lg backdrop-blur-lg transition-all duration-300",
+            "border-seasalt-400/40 bg-seasalt-800/90 flex h-20 w-full flex-nowrap items-center justify-between rounded-2xl border px-5 shadow-lg backdrop-blur-lg transition-[border-color,box-shadow] duration-300",
             isScrolled && "border-opacity-70 shadow-2xl",
           )}
         >
           <Link
             href="/"
-            className={cn("flex items-center gap-2.5 transition-transform hover:scale-105")}
+            className={cn(
+              "flex min-w-0 shrink-0 items-center gap-2.5 transition-transform hover:scale-105",
+            )}
           >
             <Image
               src="/source/logo.svg"
@@ -429,7 +431,9 @@ export function NavBar(): React.ReactElement | null {
               // Rem-sized so it scales with the root font-size on bigger screens.
               className={cn("h-10 w-10 shrink-0 select-none")}
             />
-            <span className={cn("text-russian-violet text-lg font-bold sm:text-xl")}>
+            <span
+              className={cn("text-russian-violet whitespace-nowrap text-lg font-bold sm:text-xl")}
+            >
               To The Point Tech
             </span>
           </Link>

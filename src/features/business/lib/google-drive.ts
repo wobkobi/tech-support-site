@@ -59,18 +59,66 @@ export async function getOrCreateInvoiceFolder(yearCode: string): Promise<string
 }
 
 /**
- * Uploads a PDF buffer to Drive in the correct year folder.
+ * Adds an "anyone with the link can view" permission to a Drive file so the
+ * link we embed in invoice emails works without the recipient having to sign
+ * into Google. Idempotent: Drive accepts repeat calls without duplicating the
+ * permission, and failures are logged but never thrown so this can never break
+ * the surrounding upload flow.
+ * @param fileId - Drive file ID to share.
+ */
+async function ensureAnyoneWithLinkReader(fileId: string): Promise<void> {
+  try {
+    const drive = getDriveClient();
+    await drive.permissions.create({
+      fileId,
+      requestBody: { type: "anyone", role: "reader" },
+      // Suppress the "X shared a file with you" notification email - the
+      // client gets the invoice via Resend; they don't need a Google nudge.
+      sendNotificationEmail: false,
+    });
+  } catch (err) {
+    console.warn(`[drive] Failed to set anyone-with-link reader on ${fileId}:`, err);
+  }
+}
+
+/**
+ * Uploads (or replaces) a PDF buffer in Drive in the correct year folder.
+ * If `existingFileId` is supplied, the file's media is replaced in place so the
+ * Drive URL and file ID stay stable; if missing or the file no longer exists,
+ * a new file is created. The resulting file is shared as "anyone with the link
+ * can view" so the email's view-invoice link works for the recipient.
  * @param buffer - PDF content as a Buffer.
  * @param invoiceNumber - Invoice number used as the filename (e.g. "TTP-2627-0042").
  * @param yearCode - Fiscal year code used to resolve the destination folder.
+ * @param existingFileId - Optional existing Drive file ID to update in place.
  * @returns Object with Drive file ID and web view URL.
  */
 export async function uploadInvoicePdf(
   buffer: Buffer,
   invoiceNumber: string,
   yearCode: string,
+  existingFileId?: string,
 ): Promise<{ fileId: string; webUrl: string }> {
   const drive = getDriveClient();
+
+  if (existingFileId) {
+    try {
+      const res = await drive.files.update({
+        fileId: existingFileId,
+        media: { mimeType: "application/pdf", body: Readable.from(buffer) },
+        fields: "id,webViewLink",
+      });
+      await ensureAnyoneWithLinkReader(res.data.id!);
+      return { fileId: res.data.id!, webUrl: res.data.webViewLink! };
+    } catch (err) {
+      // File may have been deleted from Drive — fall through to create a fresh one.
+      console.warn(
+        `[drive] Update failed for ${existingFileId} (${invoiceNumber}); creating new file:`,
+        err,
+      );
+    }
+  }
+
   const folderId = await getOrCreateInvoiceFolder(yearCode);
   const res = await drive.files.create({
     requestBody: {
@@ -84,6 +132,7 @@ export async function uploadInvoicePdf(
     },
     fields: "id,webViewLink",
   });
+  await ensureAnyoneWithLinkReader(res.data.id!);
   return { fileId: res.data.id!, webUrl: res.data.webViewLink! };
 }
 

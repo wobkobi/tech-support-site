@@ -5,12 +5,9 @@ import type React from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/shared/lib/cn";
 import {
-  formatNZD,
   calcJobTotal,
   jobToLineItems,
   buildIncomeDescription,
-  minsToHoursLabel,
-  billableMins,
   matchRateById,
   effectiveHourlyRate,
   composeDescription,
@@ -18,7 +15,13 @@ import {
 import { ContactPickerModal } from "@/features/business/components/ContactPickerModal";
 import { ParseConfidenceBanner } from "@/features/business/components/ParseConfidenceBanner";
 import { TaxonomyManageModal } from "@/features/business/components/TaxonomyManageModal";
-import { Combobox } from "@/features/business/components/Combobox";
+import { TotalsPanel } from "@/features/business/components/calculator/TotalsPanel";
+import { PartsSection } from "@/features/business/components/calculator/PartsSection";
+import { TravelSection } from "@/features/business/components/calculator/TravelSection";
+import { ClientPickerSection } from "@/features/business/components/calculator/ClientPickerSection";
+import { TasksSection } from "@/features/business/components/calculator/TasksSection";
+import { RateConfigPanel } from "@/features/business/components/calculator/RateConfigPanel";
+import { JobDetailsSection } from "@/features/business/components/calculator/JobDetailsSection";
 import { loadPlacesLibrary } from "@/shared/lib/google-maps-loader";
 import { summariseForBanner, type ActivePromo } from "@/features/business/lib/promos";
 import type {
@@ -88,22 +91,6 @@ function emptyTask(rates: RateConfig[]): TaskLine {
     action: null,
     details: null,
   };
-}
-
-/**
- * Builds a sorted, deduplicated suggestion list for one of the combobox axes
- * (devices or actions) from the current task-template snapshot.
- * @param templates - All saved templates.
- * @param key - "device" or "action" - which field to extract.
- * @returns Sorted unique tag values for that axis.
- */
-function tagSuggestions(templates: TaskTemplate[], key: "device" | "action"): string[] {
-  const set = new Set<string>();
-  for (const t of templates) {
-    const v = t[key];
-    if (typeof v === "string" && v.trim().length > 0) set.add(v.trim());
-  }
-  return Array.from(set).sort((a, b) => a.localeCompare(b, "en", { sensitivity: "base" }));
 }
 
 /**
@@ -831,139 +818,18 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
 
       {/* Rate settings panel */}
       {showRates && (
-        <div className={cn("mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}>
-          <div className={cn("mb-3 flex items-center justify-between gap-2")}>
-            <h2 className={cn("text-russian-violet text-sm font-semibold")}>Rate config</h2>
-            <button
-              type="button"
-              onClick={() => void handleResetRates()}
-              disabled={resettingRates}
-              className={cn(
-                "rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50",
-              )}
-            >
-              {resettingRates ? "Resetting..." : "Reset to defaults"}
-            </button>
-          </div>
-          <table className={cn("mb-4 w-full text-xs")}>
-            <thead>
-              <tr className={cn("border-b border-slate-100")}>
-                {["Label", "Rate", "Unit", "Default", ""].map((h) => (
-                  <th key={h} className={cn("pb-2 text-left text-xs font-semibold text-slate-400")}>
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className={cn("divide-y divide-slate-50")}>
-              {rates.map((r) => (
-                <tr key={r.id} className={cn(editingRateId === r.id ? "bg-russian-violet/5" : "")}>
-                  <td className={cn("py-1.5 text-slate-700")}>{r.label}</td>
-                  <td className={cn("py-1.5 text-slate-500")}>
-                    {r.ratePerHour !== null
-                      ? `$${r.ratePerHour}/hr`
-                      : r.hourlyDelta !== null
-                        ? `${r.hourlyDelta < 0 ? "-" : "+"}$${Math.abs(r.hourlyDelta)}/hr`
-                        : r.flatRate !== null
-                          ? `$${r.flatRate}`
-                          : "-"}
-                  </td>
-                  <td className={cn("py-1.5 text-slate-400")}>{r.unit}</td>
-                  <td className={cn("py-1.5")}>{r.isDefault ? "✓" : ""}</td>
-                  <td className={cn("flex gap-2 py-1.5")}>
-                    <button
-                      onClick={() => handleStartEdit(r)}
-                      className={cn("text-slate-400 hover:text-slate-700")}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDeleteRate(r.id)}
-                      className={cn("text-red-400 hover:text-red-600")}
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <form
-            onSubmit={handleSubmitRate}
-            className={cn("grid grid-cols-1 items-end gap-2 sm:grid-cols-2 lg:grid-cols-5")}
-          >
-            <input
-              type="text"
-              placeholder="Label"
-              required
-              value={rateForm.label}
-              onChange={(e) => setRateForm((p) => ({ ...p, label: e.target.value }))}
-              className={cn(
-                "focus:ring-russian-violet/30 rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 sm:py-2 sm:text-xs",
-              )}
-            />
-            <select
-              value={rateForm.type}
-              onChange={(e) =>
-                setRateForm((p) => ({
-                  ...p,
-                  type: e.target.value as "flat" | "hourly" | "modifier",
-                }))
-              }
-              className={cn(
-                "focus:ring-russian-violet/30 rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 sm:py-2 sm:text-xs",
-              )}
-            >
-              <option value="hourly">Hourly base</option>
-              <option value="modifier">Modifier (+/-)</option>
-              <option value="flat">Flat</option>
-            </select>
-            <input
-              type="number"
-              placeholder={rateForm.type === "modifier" ? "Delta (+/-)" : "Amount"}
-              required
-              step="0.01"
-              // Modifier rates carry a signed delta added to the base $/hr
-              // (e.g. -10 for At home). Flat and hourly rates must be >= 0.
-              min={rateForm.type === "modifier" ? undefined : 0}
-              value={rateForm.amount}
-              onChange={(e) => setRateForm((p) => ({ ...p, amount: e.target.value }))}
-              className={cn(
-                "focus:ring-russian-violet/30 rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 sm:py-2 sm:text-xs",
-              )}
-            />
-            <input
-              type="text"
-              placeholder="Unit"
-              value={rateForm.unit}
-              onChange={(e) => setRateForm((p) => ({ ...p, unit: e.target.value }))}
-              className={cn(
-                "focus:ring-russian-violet/30 rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 sm:py-2 sm:text-xs",
-              )}
-            />
-            <div className={cn("flex gap-2")}>
-              <button
-                type="submit"
-                className={cn(
-                  "bg-russian-violet rounded-lg px-4 py-2.5 text-sm font-medium text-white hover:opacity-90 sm:py-2 sm:text-xs",
-                )}
-              >
-                {editingRateId ? "Update" : "Add"}
-              </button>
-              {editingRateId && (
-                <button
-                  type="button"
-                  onClick={handleCancelEdit}
-                  className={cn(
-                    "rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 sm:py-2 sm:text-xs",
-                  )}
-                >
-                  Cancel
-                </button>
-              )}
-            </div>
-          </form>
-        </div>
+        <RateConfigPanel
+          rates={rates}
+          form={rateForm}
+          onFormChange={setRateForm}
+          editingRateId={editingRateId}
+          resettingRates={resettingRates}
+          onSubmit={handleSubmitRate}
+          onStartEdit={handleStartEdit}
+          onCancelEdit={handleCancelEdit}
+          onDeleteRate={handleDeleteRate}
+          onResetRates={() => void handleResetRates()}
+        />
       )}
 
       <div className={cn("grid gap-6 lg:grid-cols-2")}>
@@ -1066,463 +932,55 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
           </div>
 
           {/* Time */}
-          <div
-            className={cn("space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}
-          >
-            <h2 className={cn("text-russian-violet text-sm font-semibold")}>Time</h2>
-            <div className={cn("grid grid-cols-2 gap-3")}>
-              <div>
-                <label className={cn("mb-1 block text-xs font-medium text-slate-500")}>Start</label>
-                <input
-                  type="time"
-                  value={startTime}
-                  onChange={(e) => {
-                    setStartTime(e.target.value);
-                    setDurationOverride(null);
-                  }}
-                  className={cn(
-                    "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
-                  )}
-                />
-              </div>
-              <div>
-                <label className={cn("mb-1 block text-xs font-medium text-slate-500")}>End</label>
-                <input
-                  type="time"
-                  value={endTime}
-                  onChange={(e) => {
-                    setEndTime(e.target.value);
-                    setDurationOverride(null);
-                  }}
-                  className={cn(
-                    "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
-                  )}
-                />
-              </div>
-            </div>
-            <div className={cn("grid grid-cols-2 gap-3")}>
-              <div>
-                <label className={cn("mb-1 block text-xs font-medium text-slate-500")}>
-                  Duration (override)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="5"
-                  value={durationOverride ?? durationMins}
-                  onChange={(e) => setDurationOverride(parseInt(e.target.value) || 0)}
-                  className={cn(
-                    "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
-                  )}
-                />
-                <p className={cn("mt-1 text-xs text-slate-400")}>
-                  {minsToHoursLabel(durationMins)}
-                  {billableMins(durationMins) !== durationMins && (
-                    <span className={cn("ml-1 text-slate-300")}>
-                      → {minsToHoursLabel(billableMins(durationMins))} billed
-                    </span>
-                  )}
-                </p>
-              </div>
-              <div>
-                <label className={cn("mb-1 block text-xs font-medium text-slate-500")}>
-                  Hourly rate
-                </label>
-                <select
-                  value={hourlyRateId ?? ""}
-                  onChange={(e) => setHourlyRateId(e.target.value || null)}
-                  className={cn(
-                    "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
-                  )}
-                >
-                  <option value="">None</option>
-                  {baseRates.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.label} ({formatNZD(r.ratePerHour ?? 0)}/hr)
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
+          <JobDetailsSection
+            startTime={startTime}
+            onStartTimeChange={setStartTime}
+            endTime={endTime}
+            onEndTimeChange={setEndTime}
+            durationOverride={durationOverride}
+            onDurationOverrideChange={setDurationOverride}
+            durationMins={durationMins}
+            hourlyRateId={hourlyRateId}
+            onHourlyRateIdChange={setHourlyRateId}
+            baseRates={baseRates}
+          />
 
           {/* Travel */}
-          <div className={cn("rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}>
-            <h2 className={cn("text-russian-violet mb-3 text-sm font-semibold")}>Travel</h2>
-            <div className={cn("flex gap-2")}>
-              <input
-                ref={addressInputRef}
-                type="text"
-                placeholder="Client address or suburb"
-                value={jobAddress}
-                onChange={(e) => {
-                  setJobAddress(e.target.value);
-                  setTravelInfo(null);
-                  setTravelOnInvoice(false);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    void handleTravelLookup();
-                  }
-                }}
-                className={cn(
-                  "focus:ring-russian-violet/30 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
-                )}
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  void handleTravelLookup();
-                }}
-                suppressHydrationWarning
-                disabled={lookingUpTravel || !jobAddress.trim()}
-                className={cn(
-                  "rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50",
-                )}
-              >
-                {lookingUpTravel ? "..." : "Look up"}
-              </button>
-            </div>
-            {travelInfo && (
-              <div
-                className={cn(
-                  "mt-2 flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600",
-                )}
-              >
-                <span>
-                  {travelInfo.distanceKm} km
-                  {travelInfo.durationMins > 0
-                    ? ` - approx ${travelInfo.durationMins} min drive`
-                    : ""}{" "}
-                  -{" "}
-                  <span className="font-medium text-slate-800">${travelInfo.cost.toFixed(2)}</span>
-                </span>
-                {travelOnInvoice ? (
-                  <span className={cn("ml-3 text-xs font-medium text-green-600")}>Added</span>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={addTravelToInvoice}
-                    className={cn(
-                      "ml-3 rounded bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-700 hover:bg-slate-300",
-                    )}
-                  >
-                    Add to invoice
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
+          <TravelSection
+            addressInputRef={addressInputRef}
+            jobAddress={jobAddress}
+            onJobAddressChange={setJobAddress}
+            travelInfo={travelInfo}
+            onTravelInfoChange={setTravelInfo}
+            lookingUpTravel={lookingUpTravel}
+            travelOnInvoice={travelOnInvoice}
+            onTravelOnInvoiceChange={setTravelOnInvoice}
+            onLookup={() => void handleTravelLookup()}
+            onAddToInvoice={addTravelToInvoice}
+          />
 
           {/* Tasks */}
-          <div
-            className={cn(
-              "space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5",
-            )}
-          >
-            <div className={cn("flex items-center justify-between gap-2")}>
-              <h2 className={cn("text-russian-violet text-sm font-semibold")}>Tasks</h2>
-              <button
-                type="button"
-                onClick={() => setShowTaxonomyModal(true)}
-                className={cn("text-xs font-medium text-slate-500 underline hover:text-slate-700")}
-              >
-                Manage tags
-              </button>
-            </div>
-            {tasks.map((task, idx) => {
-              // Flat-rate rows (e.g. Travel) keep their old single-line look;
-              // task rows use the device + action combobox layout.
-              const isFlatRate = task.rateConfigId != null;
-              const composed = composeDescription(
-                task.device ?? null,
-                task.action ?? null,
-                task.details ?? null,
-              );
-
-              return (
-                <div
-                  key={idx}
-                  className={cn(
-                    "rounded-lg border border-slate-200 bg-slate-50/60 p-3 sm:bg-white",
-                  )}
-                >
-                  {isFlatRate ? (
-                    /* Flat-rate row (Travel etc.): rate dropdown + qty/price/total/delete inline. */
-                    <div className={cn("flex flex-col gap-2 sm:flex-row sm:items-center")}>
-                      <select
-                        value={`rate:${task.rateConfigId}`}
-                        onChange={(e) => updateTask(idx, "rateConfigId", e.target.value.slice(5))}
-                        className={cn(
-                          "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 sm:w-40 sm:py-2 sm:text-xs",
-                        )}
-                      >
-                        {flatRates.map((r) => (
-                          <option key={r.id} value={`rate:${r.id}`}>
-                            {r.label}
-                          </option>
-                        ))}
-                      </select>
-                      <p
-                        className={cn(
-                          "truncate text-sm text-slate-600 sm:flex-1 sm:text-xs sm:text-slate-500",
-                        )}
-                      >
-                        {task.description}
-                      </p>
-                      <TaskTotalsRow
-                        task={task}
-                        onQty={(v) => updateTask(idx, "qty", v)}
-                        onPrice={(v) => updateTask(idx, "unitPrice", v)}
-                        onDelete={() => setTasks((p) => p.filter((_, i) => i !== idx))}
-                      />
-                    </div>
-                  ) : (
-                    /* Task row: Device + Action comboboxes, optional details input, composed preview, qty/price/total/delete. */
-                    <div className={cn("flex flex-col gap-2")}>
-                      <div className={cn("grid grid-cols-1 gap-2 sm:grid-cols-3")}>
-                        <Combobox
-                          value={task.device ?? ""}
-                          onChange={(v) => {
-                            const next = v.trim() || null;
-                            setTasks((prev) => {
-                              const arr = [...prev];
-                              const updated = { ...arr[idx], device: next };
-                              const composedDesc = composeDescription(
-                                next,
-                                updated.action ?? null,
-                                updated.details ?? null,
-                              );
-                              if (composedDesc) updated.description = composedDesc;
-                              const tmpl =
-                                next && updated.action
-                                  ? taskTemplates.find(
-                                      (t) =>
-                                        (t.device ?? "").toLowerCase() === next.toLowerCase() &&
-                                        (t.action ?? "").toLowerCase() ===
-                                          (updated.action ?? "").toLowerCase(),
-                                    )
-                                  : null;
-                              if (tmpl) {
-                                updated.unitPrice = tmpl.defaultPrice;
-                                updated.lineTotal =
-                                  Math.round(updated.qty * tmpl.defaultPrice * 100) / 100;
-                              }
-                              arr[idx] = updated;
-                              return arr;
-                            });
-                          }}
-                          suggestions={tagSuggestions(taskTemplates, "device")}
-                          placeholder="Device"
-                          ariaLabel="Device"
-                        />
-                        <Combobox
-                          value={task.action ?? ""}
-                          onChange={(v) => {
-                            const next = v.trim() || null;
-                            setTasks((prev) => {
-                              const arr = [...prev];
-                              const updated = { ...arr[idx], action: next };
-                              const composedDesc = composeDescription(
-                                updated.device ?? null,
-                                next,
-                                updated.details ?? null,
-                              );
-                              if (composedDesc) updated.description = composedDesc;
-                              const tmpl =
-                                updated.device && next
-                                  ? taskTemplates.find(
-                                      (t) =>
-                                        (t.device ?? "").toLowerCase() ===
-                                          (updated.device ?? "").toLowerCase() &&
-                                        (t.action ?? "").toLowerCase() === next.toLowerCase(),
-                                    )
-                                  : null;
-                              if (tmpl) {
-                                updated.unitPrice = tmpl.defaultPrice;
-                                updated.lineTotal =
-                                  Math.round(updated.qty * tmpl.defaultPrice * 100) / 100;
-                              }
-                              arr[idx] = updated;
-                              return arr;
-                            });
-                          }}
-                          suggestions={tagSuggestions(taskTemplates, "action")}
-                          placeholder="Action"
-                          ariaLabel="Action"
-                        />
-                        <input
-                          type="text"
-                          value={task.details ?? ""}
-                          onChange={(e) => {
-                            const raw = e.target.value;
-                            setTasks((prev) => {
-                              const arr = [...prev];
-                              const updated = { ...arr[idx], details: raw === "" ? null : raw };
-                              const composedDesc = composeDescription(
-                                updated.device ?? null,
-                                updated.action ?? null,
-                                updated.details,
-                              );
-                              if (composedDesc) updated.description = composedDesc;
-                              arr[idx] = updated;
-                              return arr;
-                            });
-                          }}
-                          placeholder="Details (optional)"
-                          aria-label="Details"
-                          className={cn(
-                            "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 sm:py-2 sm:text-xs",
-                          )}
-                        />
-                      </div>
-                      <p
-                        className={cn(
-                          "truncate rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-700 sm:py-1.5 sm:text-xs",
-                          !composed && "italic text-slate-400",
-                        )}
-                        title={composed || "Pick device + action"}
-                      >
-                        {composed || "Pick device + action"}
-                      </p>
-                      <div className={cn("flex flex-wrap items-center gap-1.5")}>
-                        <select
-                          value={task.baseRateId ?? ""}
-                          onChange={(e) => setTaskBase(idx, e.target.value || null)}
-                          aria-label="Base rate"
-                          className={cn(
-                            "focus:ring-russian-violet/30 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs focus:outline-none focus:ring-2",
-                          )}
-                        >
-                          <option value="">No base</option>
-                          {baseRates.map((r) => (
-                            <option key={r.id} value={r.id}>
-                              {r.label} ({formatNZD(r.ratePerHour ?? 0)}/hr)
-                            </option>
-                          ))}
-                        </select>
-                        {modifierRates.map((m) => {
-                          const active = task.modifierIds?.includes(m.id) ?? false;
-                          const delta = m.hourlyDelta ?? 0;
-                          const sign = delta < 0 ? "-" : "+";
-                          return (
-                            <button
-                              key={m.id}
-                              type="button"
-                              onClick={() => toggleTaskModifier(idx, m.id)}
-                              aria-pressed={active}
-                              className={cn(
-                                "rounded-full border px-2 py-1 text-xs font-medium transition-colors",
-                                active
-                                  ? "border-russian-violet/40 bg-russian-violet/10 text-russian-violet"
-                                  : "border-slate-200 bg-white text-slate-500 hover:border-slate-300",
-                              )}
-                            >
-                              {m.label} {sign}${Math.abs(delta)}
-                            </button>
-                          );
-                        })}
-                        <span className={cn("ml-auto text-xs font-semibold text-slate-700")}>
-                          = {formatNZD(task.unitPrice)}/hr
-                        </span>
-                      </div>
-                      <TaskTotalsRow
-                        task={task}
-                        onQty={(v) => updateTask(idx, "qty", v)}
-                        onPrice={(v) => updateTask(idx, "unitPrice", v)}
-                        onDelete={() => setTasks((p) => p.filter((_, i) => i !== idx))}
-                      />
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-            <button
-              onClick={() => setTasks((p) => [...p, emptyTask(rates)])}
-              className={cn(
-                "hover:text-russian-violet inline-flex h-11 items-center text-sm text-slate-500 underline sm:h-auto sm:text-xs",
-              )}
-            >
-              + Add task
-            </button>
-          </div>
+          <TasksSection
+            tasks={tasks}
+            onTasksChange={setTasks}
+            onUpdateTask={updateTask}
+            onSetTaskBase={setTaskBase}
+            onToggleTaskModifier={toggleTaskModifier}
+            onAddTask={() => setTasks((p) => [...p, emptyTask(rates)])}
+            onManageTags={() => setShowTaxonomyModal(true)}
+            taskTemplates={taskTemplates}
+            baseRates={baseRates}
+            modifierRates={modifierRates}
+            flatRates={flatRates}
+          />
 
           {/* Parts */}
-          <div className={cn("rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}>
-            <button
-              onClick={() => setShowParts((p) => !p)}
-              className={cn(
-                "text-russian-violet flex w-full items-center justify-between text-left text-sm font-semibold",
-              )}
-            >
-              Parts / materials
-              <span className={cn("text-xs text-slate-400")}>{showParts ? "▲" : "▼"}</span>
-            </button>
-            {showParts && (
-              <div className={cn("mt-3 space-y-2")}>
-                {parts.map((part, idx) => (
-                  <div
-                    key={idx}
-                    className={cn(
-                      "grid grid-cols-[minmax(0,1fr)_44px] items-center gap-2",
-                      "sm:grid-cols-[minmax(0,1fr)_88px_28px]",
-                    )}
-                  >
-                    <input
-                      type="text"
-                      placeholder="Description"
-                      value={part.description}
-                      onChange={(e) =>
-                        setParts((p) => {
-                          const n = [...p];
-                          n[idx] = { ...n[idx], description: e.target.value };
-                          return n;
-                        })
-                      }
-                      className={cn(
-                        "focus:ring-russian-violet/30 col-span-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 sm:col-span-1 sm:py-2 sm:text-xs",
-                      )}
-                    />
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      placeholder="Cost"
-                      value={part.cost}
-                      onChange={(e) =>
-                        setParts((p) => {
-                          const n = [...p];
-                          n[idx] = { ...n[idx], cost: parseFloat(e.target.value) || 0 };
-                          return n;
-                        })
-                      }
-                      className={cn(
-                        "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 sm:py-2 sm:text-xs",
-                      )}
-                    />
-                    <button
-                      onClick={() => setParts((p) => p.filter((_, i) => i !== idx))}
-                      aria-label="Remove part"
-                      className={cn(
-                        "inline-flex h-11 w-11 items-center justify-center rounded-lg text-xl leading-none text-slate-400 hover:bg-red-50 hover:text-red-500 sm:h-auto sm:w-auto sm:rounded-none sm:text-lg sm:hover:bg-transparent",
-                      )}
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-                <button
-                  onClick={() => setParts((p) => [...p, { description: "", cost: 0 }])}
-                  className={cn(
-                    "hover:text-russian-violet inline-flex h-11 items-center text-sm text-slate-500 underline sm:h-auto sm:text-xs",
-                  )}
-                >
-                  + Add part
-                </button>
-              </div>
-            )}
-          </div>
+          <PartsSection
+            parts={parts}
+            onPartsChange={setParts}
+            show={showParts}
+            onToggle={() => setShowParts((p) => !p)}
+          />
 
           {/* Notes */}
           <div className={cn("rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}>
@@ -1540,136 +998,27 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
 
         {/* RIGHT column - live summary */}
         <div className={cn("space-y-4")}>
-          <div className={cn("rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}>
-            <h2 className={cn("text-russian-violet mb-4 text-sm font-semibold")}>Summary</h2>
-            <div className={cn("space-y-2 text-sm")}>
-              {durationMins > 0 && hourlyRate && hourlyRate.ratePerHour !== null && (
-                <div className={cn("flex justify-between text-slate-600")}>
-                  <span>
-                    Time ({minsToHoursLabel(billableMins(durationMins))} @{" "}
-                    {formatNZD(hourlyRate.ratePerHour)}/hr)
-                  </span>
-                  <span>{formatNZD(totals.timeCharge)}</span>
-                </div>
-              )}
-              {totals.tasksTotal > 0 && (
-                <div className={cn("flex justify-between text-slate-600")}>
-                  <span>Tasks</span>
-                  <span>{formatNZD(totals.tasksTotal)}</span>
-                </div>
-              )}
-              {totals.partsTotal > 0 && (
-                <div className={cn("flex justify-between text-slate-600")}>
-                  <span>Parts</span>
-                  <span>{formatNZD(totals.partsTotal)}</span>
-                </div>
-              )}
-              {totals.travelTotal > 0 && (
-                <div className={cn("flex justify-between text-slate-600")}>
-                  <span>Travel</span>
-                  <span>{formatNZD(totals.travelTotal)}</span>
-                </div>
-              )}
-              <div
-                className={cn(
-                  "flex justify-between border-t border-slate-100 pt-2 font-medium text-slate-700",
-                )}
-              >
-                <span>Subtotal</span>
-                <span>{formatNZD(totals.subtotal)}</span>
-              </div>
-              {totals.promoDiscount > 0 && activePromo && (
-                <div className={cn("flex justify-between text-amber-700")}>
-                  <span>Promo: {activePromo.title}</span>
-                  <span>-{formatNZD(totals.promoDiscount)}</span>
-                </div>
-              )}
-              <div className={cn("flex items-center justify-between")}>
-                <label className={cn("flex cursor-pointer items-center gap-2 text-slate-600")}>
-                  <input
-                    type="checkbox"
-                    checked={gst}
-                    onChange={(e) => setGst(e.target.checked)}
-                    className={cn("h-3.5 w-3.5")}
-                  />
-                  GST (15%)
-                </label>
-                <span className={cn("text-slate-600")}>{formatNZD(totals.gstAmount)}</span>
-              </div>
-              <div
-                className={cn(
-                  "text-russian-violet flex justify-between border-t border-slate-200 pt-2 text-base font-extrabold",
-                )}
-              >
-                <span>Total</span>
-                <span>{formatNZD(totals.total)}</span>
-              </div>
-            </div>
-          </div>
+          <TotalsPanel
+            durationMins={durationMins}
+            hourlyRate={hourlyRate}
+            totals={totals}
+            activePromo={activePromo}
+            gst={gst}
+            onGstChange={setGst}
+          />
 
           {/* Client */}
-          <div
-            className={cn("space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}
-          >
-            <div className={cn("flex items-center justify-between")}>
-              <h2 className={cn("text-russian-violet text-sm font-semibold")}>Client</h2>
-              <button
-                onClick={() => setShowContactPicker(true)}
-                className={cn("hover:text-russian-violet text-xs text-slate-500 underline")}
-              >
-                Pick from contacts
-              </button>
-            </div>
-            {pickedContactName && (
-              <div className={cn("flex flex-wrap items-center gap-2")}>
-                <span className={cn("text-xs font-medium text-slate-600")}>Address to:</span>
-                {(["name", "company", "custom"] as const).map((mode) => {
-                  const disabled = mode === "company" && !pickedContactCompany;
-                  const active = addressMode === mode;
-                  const label =
-                    mode === "name" ? "Name" : mode === "company" ? "Company" : "Custom";
-                  return (
-                    <button
-                      key={mode}
-                      type="button"
-                      disabled={disabled}
-                      onClick={() => setAddressMode(mode)}
-                      title={disabled ? "Picked contact has no company" : undefined}
-                      className={cn(
-                        "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-                        active
-                          ? "border-russian-violet/40 bg-russian-violet/10 text-russian-violet"
-                          : "border-slate-200 bg-white text-slate-600 hover:border-slate-300",
-                        disabled && "cursor-not-allowed opacity-40 hover:border-slate-200",
-                      )}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-            <input
-              type="text"
-              placeholder="Name"
-              value={clientName}
-              readOnly={addressMode !== "custom"}
-              onChange={(e) => setClientName(e.target.value)}
-              className={cn(
-                "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
-                addressMode !== "custom" && "bg-slate-50 text-slate-700",
-              )}
-            />
-            <input
-              type="email"
-              placeholder="Email"
-              value={clientEmail}
-              onChange={(e) => setClientEmail(e.target.value)}
-              className={cn(
-                "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
-              )}
-            />
-          </div>
+          <ClientPickerSection
+            clientName={clientName}
+            onClientNameChange={setClientName}
+            clientEmail={clientEmail}
+            onClientEmailChange={setClientEmail}
+            pickedContactName={pickedContactName}
+            pickedContactCompany={pickedContactCompany}
+            addressMode={addressMode}
+            onAddressModeChange={setAddressMode}
+            onPickContact={() => setShowContactPicker(true)}
+          />
 
           {/* Actions */}
           <div className={cn("space-y-2")}>
@@ -1727,95 +1076,5 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
         </div>
       </div>
     </>
-  );
-}
-
-/**
- * Compact qty + unit-price + total + delete row shared by both flat-rate and
- * device/action task rows. Stacks on mobile (qty/price/total in a 3-up grid
- * with the delete button to the right) and collapses to an inline strip at
- * sm+ so it sits next to the device/action picker.
- * @param props - Component props.
- * @param props.task - The task line to render controls for.
- * @param props.onQty - Called when the operator edits the hours / qty input.
- * @param props.onPrice - Called when the operator edits the $/unit input.
- * @param props.onDelete - Called when the × button is pressed.
- * @returns Totals strip element.
- */
-function TaskTotalsRow({
-  task,
-  onQty,
-  onPrice,
-  onDelete,
-}: {
-  task: TaskLine;
-  onQty: (v: number) => void;
-  onPrice: (v: number) => void;
-  onDelete: () => void;
-}): React.ReactElement {
-  return (
-    <div
-      className={cn(
-        "grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_44px] items-center gap-2",
-        "sm:flex sm:flex-none sm:items-center sm:gap-2",
-      )}
-    >
-      <label className={cn("flex flex-col gap-0.5 sm:contents")}>
-        <span
-          className={cn("text-[10px] font-medium uppercase tracking-wide text-slate-400 sm:hidden")}
-        >
-          Hrs
-        </span>
-        <input
-          type="number"
-          min="0"
-          step="0.25"
-          inputMode="decimal"
-          value={task.qty}
-          onChange={(e) => onQty(parseFloat(e.target.value) || 0)}
-          aria-label="Quantity"
-          className={cn(
-            "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 bg-white px-2 py-2.5 text-right text-sm focus:outline-none focus:ring-2 sm:w-16 sm:py-2 sm:text-xs",
-          )}
-        />
-      </label>
-      <label className={cn("flex flex-col gap-0.5 sm:contents")}>
-        <span
-          className={cn("text-[10px] font-medium uppercase tracking-wide text-slate-400 sm:hidden")}
-        >
-          $/unit
-        </span>
-        <input
-          type="number"
-          min="0"
-          step="0.01"
-          inputMode="decimal"
-          value={task.unitPrice}
-          onChange={(e) => onPrice(parseFloat(e.target.value) || 0)}
-          aria-label="Unit price"
-          className={cn(
-            "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 bg-white px-2 py-2.5 text-right text-sm focus:outline-none focus:ring-2 sm:w-20 sm:py-2 sm:text-xs",
-          )}
-        />
-      </label>
-      <span
-        className={cn(
-          "self-end text-right text-sm font-semibold text-slate-700 sm:w-20 sm:text-xs",
-        )}
-        aria-label="Line total"
-      >
-        {formatNZD(task.lineTotal)}
-      </span>
-      <button
-        type="button"
-        onClick={onDelete}
-        aria-label="Remove task"
-        className={cn(
-          "inline-flex h-11 w-11 items-center justify-center rounded-lg text-xl leading-none text-slate-400 hover:bg-red-50 hover:text-red-500 sm:h-auto sm:w-auto sm:rounded-none sm:text-lg sm:hover:bg-transparent",
-        )}
-      >
-        ×
-      </button>
-    </div>
   );
 }

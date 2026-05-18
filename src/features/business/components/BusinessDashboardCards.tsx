@@ -15,7 +15,8 @@
 import { useState } from "react";
 import type React from "react";
 import { cn } from "@/shared/lib/cn";
-import { formatNZD, formatNZDate } from "@/features/business/lib/business";
+import { formatNZD } from "@/features/business/lib/business";
+import { formatDateSlash } from "@/shared/lib/date-format";
 import {
   BreakdownModal,
   type BreakdownData,
@@ -78,7 +79,7 @@ function incomeRows(entries: IncomeRow[]): BreakdownRow[] {
     .slice()
     .sort((a, b) => b.date.localeCompare(a.date))
     .map((e) => ({
-      date: formatNZDate(e.date),
+      date: formatDateSlash(e.date),
       label: e.customer,
       sublabel: e.description,
       amount: e.amount,
@@ -96,7 +97,7 @@ function expenseRows(entries: ExpenseRow[], field: "amountExcl" | "gstAmount"): 
     .slice()
     .sort((a, b) => b.date.localeCompare(a.date))
     .map((e) => ({
-      date: formatNZDate(e.date),
+      date: formatDateSlash(e.date),
       label: e.supplier,
       sublabel: e.description,
       amount: field === "amountExcl" ? e.amountExcl : e.gstAmount,
@@ -180,7 +181,7 @@ export function BusinessDashboardCards({
     title: incomePrefix,
     rows: incomeRows(income),
     total: { label: "Total", value: formatNZD(totalIncome) },
-    viewAll: { label: "View all income →", href: `/admin/business/income${tokenSuffix}` },
+    viewAll: { label: "View all income", href: `/admin/business/income${tokenSuffix}` },
   };
 
   /** All-expense (excl. GST) breakdown for the expenses card. */
@@ -188,7 +189,7 @@ export function BusinessDashboardCards({
     title: expensesPrefix,
     rows: expenseRows(expenses, "amountExcl"),
     total: { label: "Total", value: formatNZD(totalExpensesExcl) },
-    viewAll: { label: "View all expenses →", href: `/admin/business/expenses${tokenSuffix}` },
+    viewAll: { label: "View all expenses", href: `/admin/business/expenses${tokenSuffix}` },
   };
 
   /** Calculation walk-through for "Profit". */
@@ -218,7 +219,7 @@ export function BusinessDashboardCards({
     title: "This month income",
     rows: incomeRows(monthIncome),
     total: { label: "Total", value: formatNZD(sumIncome(monthIncome)) },
-    viewAll: { label: "View all income →", href: `/admin/business/income${tokenSuffix}` },
+    viewAll: { label: "View all income", href: `/admin/business/income${tokenSuffix}` },
   };
 
   /** This-month expense breakdown. */
@@ -226,7 +227,7 @@ export function BusinessDashboardCards({
     title: "This month expenses",
     rows: expenseRows(monthExpenses, "amountExcl"),
     total: { label: "Total", value: formatNZD(sumExpense(monthExpenses, "amountExcl")) },
-    viewAll: { label: "View all expenses →", href: `/admin/business/expenses${tokenSuffix}` },
+    viewAll: { label: "View all expenses", href: `/admin/business/expenses${tokenSuffix}` },
   };
 
   /** GST claimable breakdown - shows the GST amount per expense entry. */
@@ -234,7 +235,7 @@ export function BusinessDashboardCards({
     title: "GST claimable",
     rows: expenseRows(expenses, "gstAmount"),
     total: { label: "Total GST", value: formatNZD(totalGst) },
-    viewAll: { label: "View all expenses →", href: `/admin/business/expenses${tokenSuffix}` },
+    viewAll: { label: "View all expenses", href: `/admin/business/expenses${tokenSuffix}` },
   };
 
   /** Invoice list breakdown. */
@@ -244,13 +245,13 @@ export function BusinessDashboardCards({
       .slice()
       .sort((a, b) => b.issueDate.localeCompare(a.issueDate))
       .map((inv) => ({
-        date: formatNZDate(inv.issueDate),
+        date: formatDateSlash(inv.issueDate),
         label: inv.number,
         sublabel: `${inv.clientName} - ${inv.status}`,
         amount: inv.total,
       })),
     total: { label: "Count", value: String(invoices.length) },
-    viewAll: { label: "View all invoices →", href: `/admin/business/invoices${tokenSuffix}` },
+    viewAll: { label: "View all invoices", href: `/admin/business/invoices${tokenSuffix}` },
   };
 
   const cards: Array<{

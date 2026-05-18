@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type React from "react";
+import { FaCaretRight } from "react-icons/fa6";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { cn } from "@/shared/lib/cn";
@@ -215,9 +216,12 @@ export function InvoicesListView({ token }: { token: string }): React.ReactEleme
                     <Link
                       href={`/admin/business/invoices/${inv.id}?token=${encodeURIComponent(token)}`}
                       onClick={(e) => e.stopPropagation()}
-                      className={cn("text-xs text-slate-400 hover:text-slate-700")}
+                      className={cn(
+                        "inline-flex items-center gap-1 text-xs text-slate-400 hover:text-slate-700",
+                      )}
                     >
-                      View →
+                      View
+                      <FaCaretRight className={cn("h-3 w-3")} aria-hidden />
                     </Link>
                   </td>
                 </tr>

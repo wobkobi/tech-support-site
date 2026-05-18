@@ -21,6 +21,7 @@ import {
   FaBars,
   FaXmark,
   FaArrowUpRightFromSquare,
+  FaMagnifyingGlassDollar,
 } from "react-icons/fa6";
 
 export type AdminPage =
@@ -29,6 +30,7 @@ export type AdminPage =
   | "contacts"
   | "bookings"
   | "travel"
+  | "price-estimates"
   | "business"
   | "business-income"
   | "business-expenses"
@@ -74,6 +76,12 @@ const NAV_ITEMS: NavItem[] = [
     label: "Travel",
     icon: <FaRoute className={cn("shrink-0")} />,
     path: "/admin/travel",
+  },
+  {
+    page: "price-estimates",
+    label: "Estimates",
+    icon: <FaMagnifyingGlassDollar className={cn("shrink-0")} />,
+    path: "/admin/price-estimates",
   },
 ];
 
