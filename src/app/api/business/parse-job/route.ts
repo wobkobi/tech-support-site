@@ -7,6 +7,7 @@ import {
   buildParseJobContext,
 } from "@/features/business/lib/prompts/parse-job";
 import { effectiveHourlyRate, composeDescription } from "@/features/business/lib/business";
+import { lookupDriveDistance } from "@/features/business/lib/travel-distance";
 import type {
   ParseJobResponse,
   ParseJobQuestion,
@@ -118,13 +119,28 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   const body = await request.json();
-  const { input, answers } = body as { input: unknown; answers?: Record<string, string> };
+  const { input, answers } = body as { input: unknown; answers?: Record<string, unknown> };
 
   if (!input || typeof input !== "string" || input.trim().length === 0) {
     return NextResponse.json({ error: "input is required" }, { status: 400 });
   }
   if (input.length > 1000) {
     return NextResponse.json({ error: "input must be 1000 characters or fewer" }, { status: 400 });
+  }
+
+  // Whitelist the clarification answer keys to the IDs the model is allowed to
+  // ask about (see the CLARIFICATION MODE block in the system prompt). Anything
+  // else is dropped on the floor so a crafted payload can't smuggle synthetic
+  // "[User clarifications: ...]" annotations into the trusted segment.
+  const ALLOWED_ANSWER_KEYS = new Set(["location", "duration", "tasks"]);
+  const safeAnswers: Record<string, string> = {};
+  if (answers && typeof answers === "object") {
+    for (const [k, v] of Object.entries(answers)) {
+      if (!ALLOWED_ANSWER_KEYS.has(k)) continue;
+      if (typeof v !== "string") continue;
+      const clean = v.trim().slice(0, 200);
+      if (clean) safeAnswers[k] = clean;
+    }
   }
 
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -155,12 +171,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const context = buildParseJobContext(rateDtos, templateDtos, currentTime);
 
     const precomputed = calcSessionMins(input);
-    let userContent =
-      precomputed !== null
-        ? `${context}${input.trim()}\n\n[Pre-computed session total: ${precomputed} min — use this as durationMins without recalculating]`
-        : `${context}${input.trim()}`;
-    if (answers && Object.keys(answers).length > 0) {
-      const clarifications = Object.entries(answers)
+    // Close the untrusted USER DATA block before any server-supplied trusted
+    // annotations so the model knows where operator-controlled text ends.
+    let userContent = `${context}${input.trim()}\n--- END USER DATA ---`;
+    if (precomputed !== null) {
+      userContent += `\n\n[Pre-computed session total: ${precomputed} min — use this as durationMins without recalculating]`;
+    }
+    if (Object.keys(safeAnswers).length > 0) {
+      const clarifications = Object.entries(safeAnswers)
         .map(([k, v]) => `${k}=${v}`)
         .join(", ");
       userContent += `\n\n[User clarifications: ${clarifications}]`;
@@ -193,29 +211,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         destination: parsed.destination ?? undefined,
       };
     } else if (!parsed.noTravelCharge && parsed.destination) {
-      // No stated distance - look up one-way and double for round trip.
-      try {
-        const base = process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
-        const travelRes = await fetch(`${base}/api/pricing/travel-time`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ destination: parsed.destination }),
-        });
-        if (travelRes.ok) {
-          const travelData = (await travelRes.json()) as {
-            distanceKm?: number;
-            durationMins?: number;
-          };
-          if (travelData.distanceKm && travelData.distanceKm > 0) {
-            parsed.travel = {
-              distanceKm: Math.round(travelData.distanceKm * 2 * 10) / 10,
-              durationMins: (travelData.durationMins ?? 0) * 2,
-              destination: parsed.destination,
-            };
-          }
-        }
-      } catch (e) {
-        console.warn("[parse-job] travel lookup failed:", e);
+      // No stated distance - look up one-way distance via Google Distance Matrix
+      // and double it for the round trip charge. Direct call into the helper
+      // instead of a self-fetch so this works without NEXT_PUBLIC_BASE_URL set
+      // and doesn't burn the public route's rate-limit budget.
+      const lookup = await lookupDriveDistance(parsed.destination);
+      if (lookup.status === "ok" && lookup.data.distanceKm > 0) {
+        parsed.travel = {
+          distanceKm: Math.round(lookup.data.distanceKm * 2 * 10) / 10,
+          durationMins: lookup.data.durationMins * 2,
+          destination: parsed.destination,
+        };
       }
     }
 
