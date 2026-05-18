@@ -63,7 +63,12 @@ export default async function AdminPage({
     prisma.booking.count({ where: { status: "held" } }),
     prisma.booking.count({ where: { status: "confirmed" } }),
     prisma.contact.count(),
-    prisma.contact.count({ where: { googleContactId: null } }),
+    // MongoDB gotcha: contacts created before googleContactId existed in the
+    // schema have no field at all, so `null` alone misses them. `isSet: false`
+    // covers that case so the unsynced count is accurate.
+    prisma.contact.count({
+      where: { OR: [{ googleContactId: null }, { googleContactId: { isSet: false } }] },
+    }),
     prisma.booking.findMany({
       where: { status: "confirmed", startAt: { gte: now } },
       orderBy: { startAt: "asc" },

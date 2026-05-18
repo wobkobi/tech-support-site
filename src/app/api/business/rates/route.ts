@@ -73,8 +73,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   if (missing.length > 0) {
     await prisma.rateConfig.createMany({ data: missing });
   }
+  // MongoDB gotcha: a Travel rate row created before flatRate existed in the
+  // schema has no field at all, so `null` alone misses it. `isSet: false`
+  // covers that case so the backfill actually runs on legacy rows.
   await prisma.rateConfig.updateMany({
-    where: { label: "Travel", flatRate: null },
+    where: {
+      label: "Travel",
+      OR: [{ flatRate: null }, { flatRate: { isSet: false } }],
+    },
     data: { flatRate: 1.2 },
   });
 

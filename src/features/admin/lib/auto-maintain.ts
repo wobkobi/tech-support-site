@@ -170,8 +170,12 @@ async function backfillContacts(prisma: PrismaClient): Promise<void> {
  * @param prisma - Prisma client instance.
  */
 async function matchReviewContacts(prisma: PrismaClient): Promise<void> {
+  // MongoDB gotcha: `contactId: null` only matches documents where the field
+  // exists and equals null. Reviews created before contactId was added to the
+  // schema have no contactId field at all, so they need the `isSet: false`
+  // branch to be matched and eligible for auto-linking.
   const unlinked = await prisma.review.findMany({
-    where: { contactId: null },
+    where: { OR: [{ contactId: null }, { contactId: { isSet: false } }] },
     select: { id: true, bookingId: true, customerRef: true },
   });
 
