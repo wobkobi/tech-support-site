@@ -287,6 +287,25 @@ aside.app-admin-drawer {
 }
 
 /* ============================================
+   Number inputs without spinner arrows
+   ============================================
+   The default browser up/down chevrons on type="number" eat ~15-20px of
+   horizontal room and look out of place inside compact form rows like the
+   calculator's qty/price columns. inputMode="decimal" still gives mobile
+   users a numeric keypad. Opt-in via the `number-input-clean` class so
+   number inputs outside the calculator keep the default behaviour. */
+
+.number-input-clean::-webkit-inner-spin-button,
+.number-input-clean::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.number-input-clean {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* ============================================
    Animations
    ============================================ */
 
