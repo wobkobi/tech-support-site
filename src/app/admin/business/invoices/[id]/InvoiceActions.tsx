@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/shared/lib/cn";
 import { DEFAULT_INVOICE_EMAIL_BODY } from "@/features/business/lib/invoice-email-defaults";
+import type { InvoiceReviewEligibility } from "@/features/business/lib/contact-review-token";
 
 interface InvoiceActionsProps {
   backHref: string;
@@ -59,6 +60,10 @@ export function InvoiceActions({
   // Editable email body. Pre-populated with the default copy; operator can
   // tweak before each send. White-space is preserved when rendered.
   const [customBody, setCustomBody] = useState(DEFAULT_INVOICE_EMAIL_BODY);
+  // Review-link inclusion. Defaults to whatever eligibility says when the
+  // modal opens; operator can toggle if eligible.
+  const [includeReview, setIncludeReview] = useState(true);
+  const [eligibility, setEligibility] = useState<InvoiceReviewEligibility | null>(null);
 
   const headers = { "X-Admin-Secret": token, "Content-Type": "application/json" };
   const alreadySent = currentStatus === "SENT" || sentAt !== null;
@@ -151,16 +156,36 @@ export function InvoiceActions({
     if (!preview) setLoading(true);
     setPreviewOpen(true);
     try {
+      // First open: send no includeReview override so the server defaults to
+      // whatever eligibility says, and we adopt that into local state. On
+      // re-fetch (after edits), pass our current toggle so the preview matches.
+      const sendIncludeReview = eligibility !== null;
       const res = await fetch(`/api/business/invoices/${invoiceId}/preview-email`, {
         method: "POST",
         headers,
-        body: JSON.stringify({ greetingName, customBody }),
+        body: JSON.stringify({
+          greetingName,
+          customBody,
+          ...(sendIncludeReview ? { includeReview } : {}),
+        }),
       });
       const d = (await res.json()) as
-        | { ok: true; subject: string; html: string; to: string }
+        | {
+            ok: true;
+            subject: string;
+            html: string;
+            to: string;
+            eligibility: InvoiceReviewEligibility;
+          }
         | { error: string };
       if ("error" in d) throw new Error(d.error);
       setPreview({ subject: d.subject, html: d.html, to: d.to });
+      // On the first open, sync the toggle to eligibility. Subsequent
+      // re-fetches keep the operator's choice (sendIncludeReview === true).
+      if (!sendIncludeReview) {
+        setIncludeReview(d.eligibility.canSend);
+      }
+      setEligibility(d.eligibility);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load preview");
     } finally {
@@ -178,7 +203,7 @@ export function InvoiceActions({
       const res = await fetch(`/api/business/invoices/${invoiceId}/send-email`, {
         method: "POST",
         headers,
-        body: JSON.stringify({ greetingName, customBody }),
+        body: JSON.stringify({ greetingName, customBody, includeReview }),
       });
       const d = (await res.json()) as { ok: true; sentAt: string } | { error: string };
       if ("error" in d) throw new Error(d.error);
@@ -201,6 +226,9 @@ export function InvoiceActions({
     setPreviewOpen(false);
     setPreview(null);
     setError(null);
+    // Drop eligibility so the next open re-fetches it and re-syncs the toggle
+    // (state may have changed since this modal was last opened).
+    setEligibility(null);
   }
 
   return (
@@ -373,6 +401,42 @@ export function InvoiceActions({
                       "ring-russian-violet/20 focus:border-russian-violet focus:outline-none focus:ring-1",
                     )}
                   />
+                  {eligibility && (
+                    <div className={cn("mb-4")}>
+                      <label
+                        className={cn(
+                          "flex items-start gap-2 text-sm",
+                          !eligibility.canSend && "cursor-not-allowed",
+                        )}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={includeReview && eligibility.canSend}
+                          disabled={!eligibility.canSend || sending}
+                          onChange={(e) => {
+                            setIncludeReview(e.target.checked);
+                            void openPreview();
+                          }}
+                          className={cn(
+                            "text-russian-violet focus:ring-russian-violet/30 mt-0.5 h-4 w-4 rounded border-slate-300",
+                          )}
+                        />
+                        <span className={cn(!eligibility.canSend && "text-slate-400")}>
+                          Include review link in this email
+                          {eligibility.canSend === false && (
+                            <span className={cn("ml-1 text-xs italic")}>
+                              {eligibility.reason === "already-reviewed" &&
+                                "(this customer has already left a review)"}
+                              {eligibility.reason === "sent-recently" &&
+                                ` (review request sent ${new Date(eligibility.lastSentAt).toLocaleDateString()} - can re-send from ${new Date(eligibility.nextAllowedAt).toLocaleDateString()})`}
+                              {eligibility.reason === "no-contact" &&
+                                "(no contact record - cannot generate a review link)"}
+                            </span>
+                          )}
+                        </span>
+                      </label>
+                    </div>
+                  )}
                   <p className={cn("mb-2 text-xs font-semibold uppercase text-slate-400")}>
                     Subject
                   </p>

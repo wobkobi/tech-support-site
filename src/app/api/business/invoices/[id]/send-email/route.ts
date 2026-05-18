@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { sendInvoiceEmail } from "@/features/reviews/lib/email";
-import { resolveInvoiceReviewUrl } from "@/features/business/lib/contact-review-token";
+import { getInvoiceReviewEligibility } from "@/features/business/lib/contact-review-token";
 import { extractYearCode, generateInvoicePdf } from "@/features/business/lib/invoice-pdf";
 import { uploadInvoicePdf } from "@/features/business/lib/google-drive";
 
@@ -36,19 +36,31 @@ export async function POST(
   // Optional operator overrides (match the preview):
   // - greetingName: target a specific person inside a company invoice
   // - customBody: replace the default intro paragraph
+  // - includeReview: explicit yes/no for the review link. When omitted we
+  //   default to whatever eligibility says (canSend ? include : skip).
   const body = (await request.json().catch(() => ({}))) as {
     greetingName?: unknown;
     customBody?: unknown;
+    includeReview?: unknown;
   };
   const greetingName = typeof body.greetingName === "string" ? body.greetingName : undefined;
   const customBody = typeof body.customBody === "string" ? body.customBody : undefined;
+  const includeReviewOverride =
+    typeof body.includeReview === "boolean" ? body.includeReview : undefined;
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz";
-  const reviewUrl = await resolveInvoiceReviewUrl({
+  const eligibility = await getInvoiceReviewEligibility({
     contactId: invoice.contactId,
     clientEmail: invoice.clientEmail,
     siteUrl,
   });
+
+  // Server-side gate: if the customer is in cooldown or already reviewed, an
+  // explicit `includeReview: true` from a stale client is ignored - the UI
+  // blocks the checkbox but we shouldn't trust client state.
+  const includeReview = (includeReviewOverride ?? eligibility.canSend) && eligibility.canSend;
+  const reviewUrl =
+    includeReview && "reviewUrl" in eligibility ? (eligibility.reviewUrl ?? null) : null;
 
   let pdfBytes: Buffer;
   try {
@@ -83,9 +95,17 @@ export async function POST(
     return NextResponse.json({ error: "Email send failed" }, { status: 502 });
   }
 
+  // Stamp reviewLinkSentAt iff we actually included the review line. This is
+  // what powers the 30-day cooldown for invoice-to-invoice sends in
+  // getInvoiceReviewEligibility. Resending the same invoice with the toggle
+  // still on re-stamps it; sending with the toggle off leaves it alone (the
+  // last actual send timestamp stands).
   const updated = await prisma.invoice.update({
     where: { id },
-    data: { status: "SENT" },
+    data: {
+      status: "SENT",
+      ...(includeReview ? { reviewLinkSentAt: new Date() } : {}),
+    },
     select: { updatedAt: true },
   });
 

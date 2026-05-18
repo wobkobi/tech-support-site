@@ -233,8 +233,15 @@ model Invoice {
   contactId   String?       @db.ObjectId
   driveFileId String?
   driveWebUrl String?
+  // Timestamp of the last send-email run that included the review link in the
+  // invoice email. Powers the 30-day cooldown in getInvoiceReviewEligibility
+  // so the same customer doesn't get re-asked across consecutive invoices.
+  reviewLinkSentAt DateTime?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
+
+  // Invoice review cooldown lookup: WHERE clientEmail = ? AND reviewLinkSentAt >= cutoff
+  @@index([clientEmail, reviewLinkSentAt])
 }
 
 model IncomeEntry {

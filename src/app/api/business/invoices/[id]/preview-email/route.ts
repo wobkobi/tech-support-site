@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { buildInvoiceEmail } from "@/features/reviews/lib/email";
-import { resolveInvoiceReviewUrl } from "@/features/business/lib/contact-review-token";
+import { getInvoiceReviewEligibility } from "@/features/business/lib/contact-review-token";
 
 /**
  * POST /api/business/invoices/[id]/preview-email
@@ -31,19 +31,30 @@ export async function POST(
   // Optional operator overrides:
   // - greetingName: target a specific person when the invoice is for a company
   // - customBody: replace the default intro paragraph with a per-send message
+  // - includeReview: explicit yes/no for the review link. Defaults to whatever
+  //   the eligibility check decides so the preview reflects the gating UI.
   const body = (await request.json().catch(() => ({}))) as {
     greetingName?: unknown;
     customBody?: unknown;
+    includeReview?: unknown;
   };
   const greetingName = typeof body.greetingName === "string" ? body.greetingName : undefined;
   const customBody = typeof body.customBody === "string" ? body.customBody : undefined;
+  const includeReviewOverride =
+    typeof body.includeReview === "boolean" ? body.includeReview : undefined;
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz";
-  const reviewUrl = await resolveInvoiceReviewUrl({
+  const eligibility = await getInvoiceReviewEligibility({
     contactId: invoice.contactId,
     clientEmail: invoice.clientEmail,
     siteUrl,
   });
+
+  // includeReviewOverride wins when set (so unchecking the box updates the
+  // preview to drop the review line). Default is whatever eligibility says.
+  const includeReview = includeReviewOverride ?? eligibility.canSend;
+  const reviewUrl =
+    includeReview && "reviewUrl" in eligibility ? (eligibility.reviewUrl ?? null) : null;
 
   const { subject, html } = buildInvoiceEmail({
     invoice: {
@@ -60,5 +71,11 @@ export async function POST(
     customBody,
   });
 
-  return NextResponse.json({ ok: true, subject, html, to: invoice.clientEmail });
+  return NextResponse.json({
+    ok: true,
+    subject,
+    html,
+    to: invoice.clientEmail,
+    eligibility,
+  });
 }
