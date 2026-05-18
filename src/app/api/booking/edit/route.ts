@@ -228,7 +228,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Update booking. smsOptIn only makes sense when a phone is present;
     // clearing the phone implicitly revokes consent.
-    const persistedSmsOptIn = phoneE164 && smsOptIn === true;
+    const persistedSmsOptIn = Boolean(phoneE164) && smsOptIn === true;
     try {
       await prisma.booking.update({
         where: { id: booking.id },
