@@ -8,4 +8,4 @@
 
 /** Default text rendered between the greeting and the auto-generated invoice details block. */
 export const DEFAULT_INVOICE_EMAIL_BODY =
-  "Thanks for reaching out to me for your tech support. Your invoice is attached below.";
+  "Thanks so much for the work - I really appreciate you choosing me for your tech support. Your invoice is attached below.";
