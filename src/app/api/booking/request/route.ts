@@ -29,7 +29,7 @@ import {
 import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
 import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
-import { toE164NZ } from "@/shared/lib/normalize-phone";
+import { toE164NZ, isValidPhone } from "@/shared/lib/normalize-phone";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 
 interface BookingRequestPayload {
@@ -40,6 +40,7 @@ interface BookingRequestPayload {
   name: string;
   email: string;
   phone?: string;
+  smsOptIn?: boolean;
   address?: string;
   meetingType: "in-person" | "remote";
   notes: string;
@@ -67,11 +68,24 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       name,
       email,
       phone,
+      smsOptIn,
       address,
       meetingType,
       notes,
       website,
     } = body;
+
+    // Normalise + validate phone up front so a malformed number is rejected
+    // before any of the calendar / DB work runs.
+    const phoneE164 = phone ? toE164NZ(phone) || null : null;
+    if (phone && (!phoneE164 || !isValidPhone(phoneE164))) {
+      return NextResponse.json(
+        { ok: false, error: "Please enter a valid phone number, or leave it blank." },
+        { status: 400 },
+      );
+    }
+    // Only honour the SMS opt-in when an actual phone is on file.
+    const persistedSmsOptIn = Boolean(phoneE164 && smsOptIn === true);
 
     // Honeypot trip: silently report success without creating a booking so the
     // bot moves on. Real users never fill this field (it's visually hidden
@@ -217,7 +231,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         data: {
           name: name.trim(),
           email: email.trim().toLowerCase(),
-          phone: phone ? toE164NZ(phone) || null : null,
+          phone: phoneE164,
+          smsOptIn: persistedSmsOptIn,
           notes: bookingNotes,
           startAt,
           endAt,
@@ -242,7 +257,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             data: {
               name: name.trim(),
               email: contactEmail,
-              phone: phone ? toE164NZ(phone) || null : null,
+              phone: phoneE164,
               address: address?.trim() || null,
             },
           });

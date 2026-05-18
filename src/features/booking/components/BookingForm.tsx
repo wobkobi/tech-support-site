@@ -33,6 +33,7 @@ export interface BookingFormInitialValues {
   name: string;
   email: string;
   phone: string;
+  smsOptIn?: boolean;
   meetingType: "in-person" | "remote" | "";
   address: string;
   notes: string;
@@ -47,7 +48,10 @@ export interface BookingFormInitialValues {
  * @returns Object with `unit` (may be empty) and `rest` (the street + suburb).
  */
 function splitUnitFromAddress(addr: string): { unit: string; rest: string } {
-  const trimmed = addr.trim();
+  // Collapse runs of whitespace to single spaces so addresses that were
+  // captured with stray double spaces (Google Maps autocomplete sometimes
+  // returns "Kepa  Road" with two spaces) display cleanly in the form.
+  const trimmed = addr.replace(/\s+/g, " ").trim();
   const m = trimmed.match(/^(\d{1,4}[A-Za-z]?)\/(.+)$/);
   if (!m) return { unit: "", rest: trimmed };
   return { unit: m[1], rest: m[2].trim() };
@@ -101,6 +105,9 @@ export default function BookingForm({
   const [name, setName] = useState(initialValues?.name ?? "");
   const [email, setEmail] = useState(initialValues?.email ?? "");
   const [phone, setPhone] = useState(initialValues?.phone ?? "");
+  // SMS opt-in disabled - see commented checkbox in JSX below.
+  // const [smsOptIn, setSmsOptIn] = useState(initialValues?.smsOptIn ?? false);
+  const smsOptIn = false;
   const [meetingType, setMeetingType] = useState<"in-person" | "remote" | "">(
     initialValues?.meetingType ?? "",
   );
@@ -335,6 +342,10 @@ export default function BookingForm({
 
     try {
       const endpoint = isEditMode ? "/api/booking/edit" : "/api/booking/request";
+      // Only honour smsOptIn when a phone is actually provided - the SMS cron
+      // also gates on phone presence, but persisting `smsOptIn=true` against a
+      // blank phone would be misleading on the admin/contact views.
+      const optIn = phone.trim() ? smsOptIn : false;
       const payload = isEditMode
         ? {
             cancelToken,
@@ -344,6 +355,7 @@ export default function BookingForm({
             duration,
             name: name.trim(),
             phone: phone.trim() || undefined,
+            smsOptIn: optIn,
             meetingType,
             address: meetingType === "in-person" ? combineUnitAndAddress(unit, address) : undefined,
             notes: notes.trim(),
@@ -356,6 +368,7 @@ export default function BookingForm({
             name: name.trim(),
             email: email.trim(),
             phone: phone.trim() || undefined,
+            smsOptIn: optIn,
             meetingType,
             address: meetingType === "in-person" ? combineUnitAndAddress(unit, address) : undefined,
             notes: notes.trim(),
@@ -725,6 +738,26 @@ export default function BookingForm({
             )}
           />
           {phoneError && <p className={cn("text-coquelicot-600 text-sm")}>{phoneError}</p>}
+          {/* SMS reminder opt-in - disabled while SMS provider is on hold.
+              Re-enable: restore this block and the SMS branch in
+              /api/cron/send-booking-reminders. */}
+          {/* {phone.trim() && (
+            <label
+              className={cn(
+                "text-rich-black/80 mt-1 flex items-start gap-2 text-base",
+                "cursor-pointer select-none",
+                "animate-slide-down",
+              )}
+            >
+              <input
+                type="checkbox"
+                checked={smsOptIn}
+                onChange={(e) => setSmsOptIn(e.target.checked)}
+                className={cn("mt-1 rounded")}
+              />
+              <span>Text me a reminder before my appointment. Reply STOP to opt out.</span>
+            </label>
+          )} */}
         </div>
 
         {/* Meeting Type */}
@@ -776,11 +809,11 @@ export default function BookingForm({
               </div>
               {/* Only mount when in-person so Google Maps script never loads for remote sessions */}
               {meetingType === "in-person" && (
-                <div className={cn("flex flex-col gap-2 sm:flex-row")}>
-                  <div className={cn("flex flex-col gap-1 sm:w-32")}>
+                <div className={cn("flex flex-col gap-2 sm:flex-row sm:items-start")}>
+                  <div className={cn("flex flex-col gap-1 sm:w-44")}>
                     <label
                       htmlFor="booking-unit"
-                      className={cn("text-rich-black/80 text-sm font-medium")}
+                      className={cn("text-rich-black/80 truncate text-sm font-medium")}
                     >
                       Apt / Unit (optional)
                     </label>
@@ -930,6 +963,16 @@ export default function BookingForm({
               ? "Save changes"
               : "Submit request"}
         </Button>
+        {isEditMode && cancelToken && (
+          <Button
+            href={`/booking/cancel?token=${encodeURIComponent(cancelToken)}`}
+            variant="ghost"
+            size="md"
+            disabled={submitting}
+          >
+            Cancel booking instead
+          </Button>
+        )}
       </div>
     </form>
   );
