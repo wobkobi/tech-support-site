@@ -11,6 +11,7 @@ import {
   matchRateById,
   effectiveHourlyRate,
   composeDescription,
+  MIN_TRAVEL_CHARGE,
 } from "@/features/business/lib/business";
 import { ContactPickerModal } from "@/features/business/components/ContactPickerModal";
 import { ParseConfidenceBanner } from "@/features/business/components/ParseConfidenceBanner";
@@ -312,7 +313,15 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
       };
     });
     const parsedParts = result.parts.map((p) => ({ description: p.description, cost: p.cost }));
-    if (result.destination) setJobAddress(result.destination);
+
+    // Reparse semantics: the new parse result is the new truth. Clear any
+    // travel state from a previous parse so changes like "walked instead"
+    // or a new address actually drop the old travel line, then re-set if the
+    // new result carries travel. Without this, switching "drove to X" to
+    // "walked" leaves the old $/km charge in place.
+    setJobAddress(result.destination ?? "");
+    setTravelInfo(null);
+
     if (result.travel && result.travel.distanceKm > 0) {
       const travelRate = rateList.find((r) => r.unit === "km" && r.flatRate !== null);
       const ratePerKm = travelRate?.flatRate ?? 1.2;
@@ -322,7 +331,15 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
         durationMins: result.travel.durationMins,
         cost,
       });
-      setTravelOnInvoice(true);
+      // Auto-add only if the trip is worth charging for. Short trips (cost
+      // below MIN_TRAVEL_CHARGE) still show the calculated travelInfo so the
+      // operator can manually opt in via the Add to invoice button if they
+      // want, but the default is to skip the line item.
+      // Preserve a user-set `true`: if the operator has already added travel
+      // to the invoice, a re-parse shouldn't silently flip it back off.
+      setTravelOnInvoice((prev) => prev || cost >= MIN_TRAVEL_CHARGE);
+    } else {
+      setTravelOnInvoice(false);
     }
     setTasks(parsedTasks);
     setParts(parsedParts);
@@ -543,7 +560,12 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
     setLookingUpTravel(false);
   }
 
-  /** Marks the travel charge as included in the invoice total. */
+  /**
+   * Marks the travel charge as included in the invoice total. Unlike the
+   * parse-result handler, this intentionally bypasses MIN_TRAVEL_CHARGE: the
+   * operator has clicked the button after seeing the cost, so it's an
+   * explicit override of the auto-skip-short-trips default.
+   */
   function addTravelToInvoice(): void {
     if (!travelInfo) return;
     setTravelOnInvoice(true);

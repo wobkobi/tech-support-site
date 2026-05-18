@@ -2,6 +2,15 @@ import type { JobCalculation, LineItem, RateConfig } from "@/features/business/t
 import { formatDateSlash } from "@/shared/lib/date-format";
 
 /**
+ * Minimum travel cost (NZD) below which a calculated travel charge is
+ * skipped rather than added to the invoice. Short trips (a couple of km
+ * to the nearest customers) would otherwise produce a sub-$10 line item
+ * that's awkward to bill and looks petty. The travelInfo is still
+ * surfaced in the UI so the operator can manually add it if they want.
+ */
+export const MIN_TRAVEL_CHARGE = 10;
+
+/**
  * Formats a number as NZD currency string with the sign before the dollar.
  * @param amount - Amount in dollars (positive or negative).
  * @returns Formatted currency string (e.g. "$1,234.56" or "-$1,234.56").
