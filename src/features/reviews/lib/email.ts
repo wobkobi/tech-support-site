@@ -321,7 +321,7 @@ export async function sendCustomerReviewRequest(booking: ReviewRequestData): Pro
   <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
     <h2 style="margin:0 0 12px;color:#0c0a3e;font-size:20px">Hi ${safeFirstName}, how did everything go?</h2>
     <p style="margin:0 0 12px;color:#444;line-height:1.6">It was great meeting you - I hope I managed to get everything sorted and left you feeling a bit less frustrated with technology!</p>
-    <p style="margin:0 0 12px;color:#444;line-height:1.6">If you have a spare moment, I'd love to hear how your experience was. A quick review makes a real difference for a small local business like mine, and helps other people in the area find reliable tech support when they need it.</p>
+    <p style="margin:0 0 12px;color:#444;line-height:1.6">If you have a spare moment, I'd love to hear how your experience was. A quick review makes a real difference for a small local business like mine, and helps other people find reliable tech support when they need it.</p>
     <p style="margin:0 0 24px;color:#444;line-height:1.6">It only takes a minute - and honest feedback is always welcome.</p>
     <a href="${reviewUrl}" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:15px">Share your experience →</a>
 
@@ -364,7 +364,7 @@ export function buildPastClientReviewEmailHtml(firstName: string, reviewUrl: str
   <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
     <h2 style="margin:0 0 12px;color:#0c0a3e;font-size:20px">Hi ${safeFirstName},</h2>
     <p style="margin:0 0 12px;color:#444;line-height:1.6">It's ${BUSINESS.name.split(" ")[0]} from ${BUSINESS.company} Tech - thanks again for letting me help you out!</p>
-    <p style="margin:0 0 12px;color:#444;line-height:1.6">I'm in the process of updating my website and building up my reviews section. If you have a spare moment, a quick review would mean a lot - it really helps other people in the area find reliable local tech support.</p>
+    <p style="margin:0 0 12px;color:#444;line-height:1.6">If you have a spare moment, a quick review would mean a lot - it really helps other people find reliable local tech support.</p>
     <p style="margin:0 0 24px;color:#444;line-height:1.6">No pressure at all, but if you're happy to, I'd really appreciate it.</p>
     <a href="${reviewUrl}" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:15px">Leave a review →</a>
 

@@ -1,6 +1,7 @@
 // src/app/admin/contacts/page.tsx
 import type { Metadata } from "next";
 import type React from "react";
+import Link from "next/link";
 import { prisma } from "@/shared/lib/prisma";
 import { requireAdminToken } from "@/shared/lib/auth";
 import { cn } from "@/shared/lib/cn";
@@ -30,6 +31,10 @@ export default async function AdminContactsPage({
   const t = requireAdminToken(token);
 
   const initialConflicts = await autoMaintain(prisma);
+
+  const pendingConflictsCount = await prisma.contactConflict.count({
+    where: { resolvedAt: null },
+  });
 
   const [allContacts, reviews] = await Promise.all([
     prisma.contact.findMany({
@@ -100,6 +105,21 @@ export default async function AdminContactsPage({
           {allContacts.length}
         </span>
       </h1>
+      {pendingConflictsCount > 0 && (
+        <Link
+          href={`/admin/contacts/conflicts?token=${encodeURIComponent(t)}`}
+          className={cn(
+            "mb-4 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 hover:bg-amber-100",
+          )}
+        >
+          <span>
+            <strong>{pendingConflictsCount}</strong> contact{" "}
+            {pendingConflictsCount === 1 ? "field has" : "fields have"} a sync conflict between the
+            site and Google Contacts.
+          </span>
+          <span className={cn("font-semibold")}>Review &amp; resolve →</span>
+        </Link>
+      )}
       <ContactsAdminView initialConflicts={initialConflicts} contacts={contactRows} token={t} />
     </AdminPageLayout>
   );

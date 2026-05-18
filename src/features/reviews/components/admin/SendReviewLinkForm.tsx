@@ -177,7 +177,7 @@ export function SendReviewLinkForm({
       } else if (data.reviewUrl) {
         const firstName = name.trim().split(" ")[0];
         setSmsText(
-          `Hi ${firstName}, it's Harrison from To The Point Tech. Thanks for letting me help you out! I'm updating my website and a quick review would be greatly appreciated - it really helps: ${data.reviewUrl}`,
+          `Hi ${firstName}, it's Harrison from To The Point Tech. Thanks for letting me help you out! A quick review would be greatly appreciated - it really helps: ${data.reviewUrl}`,
         );
         clearFields();
       }
