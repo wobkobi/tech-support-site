@@ -91,9 +91,18 @@ export default async function ReviewsPage(): Promise<React.ReactElement> {
           </section>
 
           {rows.length === 0 ? (
-            <section className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}>
+            <section
+              aria-labelledby="no-reviews-heading"
+              className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}
+            >
+              <h2
+                id="no-reviews-heading"
+                className={cn("text-russian-violet mb-2 text-xl font-bold sm:text-2xl")}
+              >
+                No reviews yet
+              </h2>
               <p className={cn("text-rich-black/70 text-base sm:text-lg")}>
-                No reviews yet - be the first!{" "}
+                Be the first!{" "}
                 <Link href="/booking" className={linkStyle}>
                   Book an appointment
                 </Link>{" "}
@@ -114,10 +123,10 @@ export default async function ReviewsPage(): Promise<React.ReactElement> {
                       "bg-seasalt-800/80 border-seasalt-400/60 flex flex-col rounded-lg border-2 p-4 sm:p-5",
                     )}
                   >
-                    <p className={cn("text-rich-black flex-1 text-sm sm:text-base")}>{r.text}</p>
+                    <p className={cn("text-rich-black flex-1 text-base sm:text-lg")}>{r.text}</p>
                     <p
                       className={cn(
-                        "text-russian-violet pt-3 text-right text-sm font-semibold sm:text-base",
+                        "text-russian-violet pt-3 text-right text-base font-semibold sm:text-lg",
                       )}
                     >
                       - {formatReviewerName(r)}

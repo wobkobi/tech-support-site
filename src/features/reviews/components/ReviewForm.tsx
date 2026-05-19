@@ -220,7 +220,7 @@ export default function ReviewFormProtected({
           role="alert"
           aria-live="assertive"
           className={cn(
-            "border-coquelicot-500/50 bg-coquelicot-500/10 text-coquelicot-500 rounded-lg border p-3 text-base",
+            "border-coquelicot-500/50 bg-coquelicot-500/10 text-rich-black rounded-lg border p-3 text-base",
           )}
         >
           <p className={cn("font-semibold")}>Please fix the following:</p>

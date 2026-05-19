@@ -384,7 +384,14 @@ export default function BookingForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className={cn("flex flex-col gap-8")} autoComplete="off">
+    <form
+      onSubmit={handleSubmit}
+      // `noValidate` so the JS error-summary takes over from native browser
+      // tooltips; required + aria-required stay for assistive tech.
+      noValidate
+      className={cn("flex flex-col gap-8")}
+      autoComplete="off"
+    >
       {/* Honeypot: visually hidden + off-screen + tab-skipped + aria-hidden.
           Real users never see or focus this. Bots that auto-fill contact-
           style inputs will fill it, and the server fakes a success response
@@ -417,7 +424,7 @@ export default function BookingForm({
         </legend>
 
         {/* Duration */}
-        <div>
+        <div id="booking-duration">
           <label className={cn("text-rich-black mb-2 block text-base font-semibold")}>
             How long do you need? <span className={cn("text-coquelicot-500")}>*</span>
           </label>
@@ -450,7 +457,7 @@ export default function BookingForm({
         </div>
 
         {/* Day Selection */}
-        <div>
+        <div id="booking-day">
           <label className={cn("text-rich-black mb-2 block text-base font-semibold")}>
             Choose a day
           </label>
@@ -535,7 +542,12 @@ export default function BookingForm({
 
         {/* Time Selection */}
         {selectedDay && (
-          <div className={cn("flex flex-col gap-3")} aria-live="polite" aria-atomic="false">
+          <div
+            id="booking-time"
+            className={cn("flex flex-col gap-3")}
+            aria-live="polite"
+            aria-atomic="false"
+          >
             <label className={cn("text-rich-black block text-base font-semibold")}>
               Start time for {selectedDay.fullLabel}
             </label>
@@ -739,7 +751,7 @@ export default function BookingForm({
         </div>
 
         {/* Meeting Type */}
-        <div className={cn("flex flex-col gap-2")}>
+        <div id="booking-meeting-type" className={cn("flex flex-col gap-2")}>
           <label className={cn("text-rich-black text-base font-semibold")}>
             Meeting type <span className={cn("text-coquelicot-500")}>*</span>
           </label>
@@ -942,24 +954,24 @@ export default function BookingForm({
           role="alert"
           aria-live="assertive"
           className={cn(
-            "border-coquelicot-500/50 bg-coquelicot-500/10 text-coquelicot-700 rounded-md border p-4",
+            "border-coquelicot-500/50 bg-coquelicot-500/10 text-rich-black rounded-md border p-4",
           )}
         >
           <p className={cn("text-base font-semibold")}>Please fix the following:</p>
           <ul className={cn("mt-1 list-disc space-y-0.5 pl-5 text-base")}>
             {Object.entries(fieldErrors).map(([key, msg]) => {
-              const anchor =
-                key === "name"
-                  ? "booking-name"
-                  : key === "email"
-                    ? "booking-email"
-                    : key === "phone"
-                      ? "booking-phone"
-                      : key === "address"
-                        ? "booking-address"
-                        : key === "notes"
-                          ? "booking-notes"
-                          : undefined;
+              const anchors: Record<string, string> = {
+                duration: "booking-duration",
+                day: "booking-day",
+                time: "booking-time",
+                name: "booking-name",
+                email: "booking-email",
+                phone: "booking-phone",
+                meetingType: "booking-meeting-type",
+                address: "booking-address",
+                notes: "booking-notes",
+              };
+              const anchor = anchors[key];
               return (
                 <li key={key}>
                   {anchor ? (
