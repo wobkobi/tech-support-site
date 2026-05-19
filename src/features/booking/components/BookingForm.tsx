@@ -47,7 +47,10 @@ export interface BookingFormInitialValues {
  * @returns Object with `unit` (may be empty) and `rest` (the street + suburb).
  */
 function splitUnitFromAddress(addr: string): { unit: string; rest: string } {
-  const trimmed = addr.trim();
+  // Collapse runs of whitespace to single spaces so addresses that were
+  // captured with stray double spaces (Google Maps autocomplete sometimes
+  // returns "Kepa  Road" with two spaces) display cleanly in the form.
+  const trimmed = addr.replace(/\s+/g, " ").trim();
   const m = trimmed.match(/^(\d{1,4}[A-Za-z]?)\/(.+)$/);
   if (!m) return { unit: "", rest: trimmed };
   return { unit: m[1], rest: m[2].trim() };
@@ -776,11 +779,11 @@ export default function BookingForm({
               </div>
               {/* Only mount when in-person so Google Maps script never loads for remote sessions */}
               {meetingType === "in-person" && (
-                <div className={cn("flex flex-col gap-2 sm:flex-row")}>
-                  <div className={cn("flex flex-col gap-1 sm:w-32")}>
+                <div className={cn("flex flex-col gap-2 sm:flex-row sm:items-start")}>
+                  <div className={cn("flex flex-col gap-1 sm:w-44")}>
                     <label
                       htmlFor="booking-unit"
-                      className={cn("text-rich-black/80 text-sm font-medium")}
+                      className={cn("text-rich-black/80 truncate text-sm font-medium")}
                     >
                       Apt / Unit (optional)
                     </label>
@@ -930,6 +933,16 @@ export default function BookingForm({
               ? "Save changes"
               : "Submit request"}
         </Button>
+        {isEditMode && cancelToken && (
+          <Button
+            href={`/booking/cancel?token=${encodeURIComponent(cancelToken)}`}
+            variant="ghost"
+            size="md"
+            disabled={submitting}
+          >
+            Cancel booking instead
+          </Button>
+        )}
       </div>
     </form>
   );

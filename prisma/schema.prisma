@@ -58,6 +58,10 @@ model Booking {
   reviewSentAt      DateTime? // When the review request email was sent
   reviewSubmittedAt DateTime? // When the client submitted a review
 
+  // Reminder tracking. Stamped by /api/cron/send-booking-reminders so the
+  // 24h-out email reminder fires at most once per booking.
+  emailReminderSentAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -69,6 +73,8 @@ model Booking {
   @@index([reviewSentAt])
   // Review email cron: WHERE status="confirmed" AND reviewSentAt=null AND endAt<=threshold
   @@index([status, reviewSentAt, endAt])
+  // Email reminder cron: WHERE status="confirmed" AND startAt in window AND emailReminderSentAt=null
+  @@index([status, startAt, emailReminderSentAt])
   // Contact/admin lookup by phone
   @@index([phone])
 }

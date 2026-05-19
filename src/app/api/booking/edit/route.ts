@@ -24,8 +24,13 @@ import {
   fetchAllCalendarEvents,
 } from "@/features/calendar/lib/google-calendar";
 import { Prisma } from "@prisma/client";
-import { toE164NZ } from "@/shared/lib/normalize-phone";
+import { toE164NZ, isValidPhone } from "@/shared/lib/normalize-phone";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
+import {
+  sendCustomerBookingConfirmation,
+  sendOwnerBookingNotification,
+} from "@/features/reviews/lib/email";
+import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
 
 interface EditBookingPayload {
   cancelToken: string;
@@ -168,6 +173,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       bookingNotes += `Address: ${address.trim()}\n`;
     }
     const phoneE164 = phone ? toE164NZ(phone) || null : null;
+    if (phone && (!phoneE164 || !isValidPhone(phoneE164))) {
+      return NextResponse.json(
+        { ok: false, error: "Please enter a valid phone number, or leave it blank." },
+        { status: 400 },
+      );
+    }
     if (phoneE164) {
       bookingNotes += `Phone: ${phoneE164}\n`;
     }
@@ -209,7 +220,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // Update booking
+    // Capture the original start time before mutating so the rescheduled
+    // email notifications can show "was: <old time>".
+    const previousStartAt = booking.startAt;
+
     try {
       await prisma.booking.update({
         where: { id: booking.id },
@@ -225,7 +239,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         },
       });
       console.log(`[booking/edit] Updated booking: ${booking.id}`);
-      return NextResponse.json({ ok: true });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
         return NextResponse.json(
@@ -235,6 +248,74 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
       throw error;
     }
+
+    // Upsert Contact + sync to Google. Best-effort: a failure here must not
+    // fail the edit (the booking + calendar event are already saved). The
+    // Contact's name/phone/address are kept in step with the booking so a
+    // customer who corrects their phone via the edit form sees that propagate
+    // to the contact and (via syncContactToGoogle's bidirectional merge) to
+    // Google Contacts.
+    try {
+      const contactEmail = booking.email.toLowerCase();
+      const existing = await prisma.contact.findFirst({ where: { email: contactEmail } });
+      let contactId: string | null = existing?.id ?? null;
+      if (existing) {
+        await prisma.contact.update({
+          where: { id: existing.id },
+          data: {
+            name: name.trim(),
+            ...(phoneE164 !== undefined ? { phone: phoneE164 } : {}),
+            ...(meetingType === "in-person" && address ? { address: address.trim() } : {}),
+          },
+        });
+      } else {
+        const created = await prisma.contact.create({
+          data: {
+            name: name.trim(),
+            email: contactEmail,
+            phone: phoneE164,
+            address: meetingType === "in-person" && address ? address.trim() : null,
+          },
+        });
+        contactId = created.id;
+      }
+      if (contactId) {
+        await syncContactToGoogle(contactId);
+      }
+    } catch (contactError) {
+      console.error("[booking/edit] Failed to upsert/sync contact:", contactError);
+    }
+
+    // Notify customer + owner of the reschedule. Both helpers catch their own
+    // errors and never throw - the edit's success doesn't depend on Resend.
+    await Promise.all([
+      sendCustomerBookingConfirmation(
+        {
+          id: booking.id,
+          name: name.trim(),
+          email: booking.email,
+          notes: bookingNotes,
+          startAt,
+          endAt,
+          cancelToken: booking.cancelToken,
+        },
+        { kind: "rescheduled", previousStartAt },
+      ),
+      sendOwnerBookingNotification(
+        {
+          id: booking.id,
+          name: name.trim(),
+          email: booking.email,
+          notes: bookingNotes,
+          startAt,
+          endAt,
+          cancelToken: booking.cancelToken,
+        },
+        { kind: "rescheduled", previousStartAt },
+      ),
+    ]);
+
+    return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("[booking/edit] Error:", error);
     return NextResponse.json(

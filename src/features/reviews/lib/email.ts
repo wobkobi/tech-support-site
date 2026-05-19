@@ -120,7 +120,7 @@ export async function sendOwnerReviewNotification(review: ReviewNotificationData
 
     ${
       !review.verified
-        ? `<a href="${adminUrl}" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:600;font-size:14px">Review &amp; Approve →</a>`
+        ? `<a href="${adminUrl}" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:600;font-size:14px">✅ Review &amp; Approve</a>`
         : `<p style="margin-top:12px;margin-bottom:0;color:#555;font-size:14px">This review has been verified.</p>`
     }
   </div>
@@ -161,13 +161,17 @@ export interface BookingNotificationData {
 }
 
 /**
- * Sends the site owner a notification email when a new booking is submitted.
+ * Sends the site owner a notification email for a new or rescheduled booking.
  * Failures are caught and logged - never throws.
- * @param booking - The new booking details.
+ * @param booking - The booking details.
+ * @param options - Optional flags.
+ * @param options.kind - "new" (default) for fresh bookings, "rescheduled" for edits.
+ * @param options.previousStartAt - Original start time, shown in the body when rescheduled.
  * @returns Promise that resolves when the email is sent (or silently fails).
  */
 export async function sendOwnerBookingNotification(
   booking: BookingNotificationData,
+  options?: { kind?: "new" | "rescheduled"; previousStartAt?: Date },
 ): Promise<void> {
   const adminEmail = process.env.ADMIN_EMAIL;
   const from = process.env.EMAIL_FROM;
@@ -177,11 +181,23 @@ export async function sendOwnerBookingNotification(
     return;
   }
 
+  const kind = options?.kind ?? "new";
   const start = formatDateTimeLong(booking.startAt);
+  const previous = options?.previousStartAt ? formatDateTimeLong(options.previousStartAt) : null;
   const notesHtml = escapeHtml(booking.notes).replace(/\n/g, "<br>");
   const safeName = escapeHtml(booking.name);
   const safeEmail = escapeHtml(booking.email);
   const safeMailto = encodeURIComponent(booking.email);
+
+  const heading = kind === "rescheduled" ? "🔄 Booking rescheduled" : "New booking";
+  const subject =
+    kind === "rescheduled"
+      ? `🔄 Booking rescheduled - ${booking.name} (${start})`
+      : `New booking - ${booking.name} (${start})`;
+  const previousLine =
+    kind === "rescheduled" && previous
+      ? `<p style="margin:0 0 16px;color:#555;font-size:13px">Was: <s>${escapeHtml(previous)}</s></p>`
+      : "";
 
   const html = `
 <!DOCTYPE html>
@@ -189,8 +205,9 @@ export async function sendOwnerBookingNotification(
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="font-family:system-ui,sans-serif;background:#f6f7f8;margin:0;padding:24px">
   <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
-    <h2 style="margin:0 0 4px;color:#0c0a3e;font-size:20px">New booking</h2>
-    <p style="margin:0 0 20px;color:#555;font-size:14px">${start}</p>
+    <h2 style="margin:0 0 4px;color:#0c0a3e;font-size:20px">${heading}</h2>
+    <p style="margin:0 0 4px;color:#555;font-size:14px">${start}</p>
+    ${previousLine}
 
     <div style="background:#f6f7f8;border-radius:8px;padding:16px;margin-bottom:20px">
       <p style="margin:0 0 4px;font-size:14px;color:#888">Customer</p>
@@ -207,7 +224,7 @@ export async function sendOwnerBookingNotification(
       from,
       replyTo: adminEmail,
       to: adminEmail,
-      subject: `New booking - ${booking.name} (${start})`,
+      subject,
       html,
     });
   } catch (error) {
@@ -216,13 +233,20 @@ export async function sendOwnerBookingNotification(
 }
 
 /**
- * Sends the customer a booking confirmation email with their appointment details and cancel link.
+ * Sends the customer a booking confirmation email with their appointment
+ * details and self-serve change/cancel links. Same template handles a
+ * fresh booking confirmation and a reschedule notification - only the
+ * heading + intro paragraph + subject differ.
  * Failures are caught and logged - never throws.
- * @param booking - The new booking details.
+ * @param booking - The booking details.
+ * @param options - Optional flags.
+ * @param options.kind - "new" (default) confirms a fresh booking; "rescheduled" confirms an edit.
+ * @param options.previousStartAt - Original start time, shown crossed-out when rescheduled.
  * @returns Promise that resolves when the email is sent (or silently fails).
  */
 export async function sendCustomerBookingConfirmation(
   booking: BookingNotificationData,
+  options?: { kind?: "new" | "rescheduled"; previousStartAt?: Date },
 ): Promise<void> {
   const from = process.env.EMAIL_FROM;
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz";
@@ -232,11 +256,29 @@ export async function sendCustomerBookingConfirmation(
     return;
   }
 
+  const kind = options?.kind ?? "new";
   const firstName = booking.name.split(" ")[0];
   const safeFirstName = escapeHtml(firstName);
   const start = formatDateTimeLong(booking.startAt);
+  const previous = options?.previousStartAt ? formatDateTimeLong(options.previousStartAt) : null;
   const cancelUrl = `${siteUrl}/booking/cancel?token=${encodeURIComponent(booking.cancelToken)}`;
+  const editUrl = `${siteUrl}/booking/edit?token=${encodeURIComponent(booking.cancelToken)}`;
   const notesHtml = escapeHtml(booking.notes).replace(/\n/g, "<br>");
+
+  const heading =
+    kind === "rescheduled"
+      ? `🔄 Appointment updated, ${safeFirstName}!`
+      : `Booking confirmed, ${safeFirstName}!`;
+  const intro =
+    kind === "rescheduled"
+      ? "Your appointment has been rescheduled. The Google Calendar invite has been updated to match."
+      : "Thanks for choosing To The Point Tech - I'm looking forward to helping you out.";
+  const subject =
+    kind === "rescheduled" ? `🔄 Appointment updated - ${start}` : `Booking confirmed - ${start}`;
+  const previousLine =
+    kind === "rescheduled" && previous
+      ? `<p style="margin:0 0 20px;color:#888;font-size:13px"><s>${escapeHtml(previous)}</s></p>`
+      : "";
 
   const html = `
 <!DOCTYPE html>
@@ -244,21 +286,23 @@ export async function sendCustomerBookingConfirmation(
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="font-family:system-ui,sans-serif;background:#f6f7f8;margin:0;padding:24px">
   <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
-    <h2 style="margin:0 0 12px;color:#0c0a3e;font-size:20px">Booking confirmed, ${safeFirstName}!</h2>
-    <p style="margin:0 0 20px;color:#444;line-height:1.6">Thanks for choosing To The Point Tech - I'm looking forward to helping you out.</p>
+    <h2 style="margin:0 0 12px;color:#0c0a3e;font-size:20px">${heading}</h2>
+    <p style="margin:0 0 20px;color:#444;line-height:1.6">${intro}</p>
 
     <p style="margin:0 0 8px;color:#888;font-size:13px;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Your appointment</p>
-    <p style="margin:0 0 20px;font-size:16px;font-weight:600;color:#0c0a3e">${start}</p>
+    <p style="margin:0 0 4px;font-size:16px;font-weight:600;color:#0c0a3e">${start}</p>
+    ${previousLine}
 
     <div style="background:#f6f7f8;border-radius:8px;padding:16px;margin-bottom:24px">
       <p style="margin:0;font-size:14px;color:#444;line-height:1.6">${notesHtml}</p>
     </div>
 
     <p style="margin:0 0 20px;color:#444;font-size:14px;line-height:1.6">
-      A Google Calendar invite has been sent to this address. If you need to change the time, you can <strong>propose a new time</strong> directly from the calendar invite, or just reply to this email and we'll sort something out.
+      If you need to change the time or any details, use the <strong>Change appointment</strong> button below. You can also <strong>propose a new time</strong> from the calendar invite, or just reply to this email and we'll sort something out.
     </p>
 
-    <a href="${cancelUrl}" style="display:inline-block;background:#e8e8e8;color:#333;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600">Cancel appointment</a>
+    <a href="${editUrl}" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;margin-right:8px">✏️ Change appointment</a>
+    <a href="${cancelUrl}" style="display:inline-block;background:#e8e8e8;color:#333;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600">❌ Cancel appointment</a>
 ${buildEmailSignature(siteUrl)}
   </div>
 </body>
@@ -269,11 +313,78 @@ ${buildEmailSignature(siteUrl)}
       from,
       replyTo: process.env.ADMIN_EMAIL,
       to: booking.email,
-      subject: `Booking confirmed - ${start}`,
+      subject,
       html,
     });
   } catch (error) {
     console.error(`[email] Failed to send booking confirmation for booking ${booking.id}:`, error);
+  }
+}
+
+/**
+ * Sends a short "your appointment is tomorrow" reminder email. Fired by the
+ * /api/cron/send-booking-reminders cron when a confirmed booking enters the
+ * 24h-out window. Reuses the same change/cancel buttons as the confirmation
+ * email so the customer can self-serve without digging through old emails.
+ * Failures are caught and logged - never throws.
+ * @param booking - Booking details (same shape as the confirmation helper).
+ * @returns True if Resend accepted the message, false on misconfig / failure.
+ */
+export async function sendBookingReminderEmail(booking: BookingNotificationData): Promise<boolean> {
+  const from = process.env.EMAIL_FROM;
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz";
+
+  if (!from || !process.env.RESEND_API_KEY) {
+    console.warn("[email] Resend not configured - skipping booking reminder email.");
+    return false;
+  }
+
+  const firstName = booking.name.split(" ")[0];
+  const safeFirstName = escapeHtml(firstName);
+  const start = formatDateTimeLong(booking.startAt);
+  const cancelUrl = `${siteUrl}/booking/cancel?token=${encodeURIComponent(booking.cancelToken)}`;
+  const editUrl = `${siteUrl}/booking/edit?token=${encodeURIComponent(booking.cancelToken)}`;
+  const notesHtml = escapeHtml(booking.notes).replace(/\n/g, "<br>");
+
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="font-family:system-ui,sans-serif;background:#f6f7f8;margin:0;padding:24px">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
+    <h2 style="margin:0 0 12px;color:#0c0a3e;font-size:20px">Hi ${safeFirstName}, just a reminder</h2>
+    <p style="margin:0 0 20px;color:#444;line-height:1.6">Your appointment with To The Point Tech is coming up tomorrow.</p>
+
+    <p style="margin:0 0 8px;color:#888;font-size:13px;text-transform:uppercase;letter-spacing:.05em;font-weight:600">When</p>
+    <p style="margin:0 0 20px;font-size:16px;font-weight:600;color:#0c0a3e">${start}</p>
+
+    <div style="background:#f6f7f8;border-radius:8px;padding:16px;margin-bottom:24px">
+      <p style="margin:0;font-size:14px;color:#444;line-height:1.6">${notesHtml}</p>
+    </div>
+
+    <p style="margin:0 0 20px;color:#444;font-size:14px;line-height:1.6">
+      Need to change anything? Use the buttons below, or just reply to this email.
+    </p>
+
+    <a href="${editUrl}" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;margin-right:8px">✏️ Change appointment</a>
+    <a href="${cancelUrl}" style="display:inline-block;background:#e8e8e8;color:#333;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600">❌ Cancel appointment</a>
+${buildEmailSignature(siteUrl)}
+  </div>
+</body>
+</html>`;
+
+  try {
+    await getResend().emails.send({
+      from,
+      replyTo: process.env.ADMIN_EMAIL,
+      to: booking.email,
+      subject: `Reminder: appointment tomorrow - ${start}`,
+      html,
+    });
+    return true;
+  } catch (error) {
+    console.error(`[email] Failed to send reminder for booking ${booking.id}:`, error);
+    return false;
   }
 }
 
@@ -323,7 +434,7 @@ export async function sendCustomerReviewRequest(booking: ReviewRequestData): Pro
     <p style="margin:0 0 12px;color:#444;line-height:1.6">It was great meeting you - I hope I managed to get everything sorted and left you feeling a bit less frustrated with technology!</p>
     <p style="margin:0 0 12px;color:#444;line-height:1.6">If you have a spare moment, I'd love to hear how your experience was. A quick review makes a real difference for a small local business like mine, and helps other people find reliable tech support when they need it.</p>
     <p style="margin:0 0 24px;color:#444;line-height:1.6">It only takes a minute - and honest feedback is always welcome.</p>
-    <a href="${reviewUrl}" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:15px">Share your experience →</a>
+    <a href="${reviewUrl}" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:15px">Share your experience</a>
 
     <p style="margin:28px 0 20px;color:#444;font-size:14px;line-height:1.6">Thanks again for choosing ${BUSINESS.company} Tech. If you ever need a hand with anything else, don't hesitate to get in touch.</p>
 ${buildEmailSignature(siteUrl)}
@@ -366,7 +477,7 @@ export function buildPastClientReviewEmailHtml(firstName: string, reviewUrl: str
     <p style="margin:0 0 12px;color:#444;line-height:1.6">It's ${BUSINESS.name.split(" ")[0]} from ${BUSINESS.company} Tech - thanks again for letting me help you out!</p>
     <p style="margin:0 0 12px;color:#444;line-height:1.6">If you have a spare moment, a quick review would mean a lot - it really helps other people find reliable local tech support.</p>
     <p style="margin:0 0 24px;color:#444;line-height:1.6">No pressure at all, but if you're happy to, I'd really appreciate it.</p>
-    <a href="${reviewUrl}" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:15px">Leave a review →</a>
+    <a href="${reviewUrl}" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:15px">Leave a review</a>
 
     <p style="margin:28px 0 20px;color:#444;font-size:14px;line-height:1.6">If you ever need a hand with anything else, don't hesitate to get in touch.</p>
 ${buildEmailSignature(siteUrl)}

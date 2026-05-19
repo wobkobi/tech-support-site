@@ -350,7 +350,7 @@ function TaskTotalsRow({
           onChange={(e) => onQty(parseFloat(e.target.value) || 0)}
           aria-label="Quantity"
           className={cn(
-            "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 bg-white px-2 py-2.5 text-right text-sm focus:outline-none focus:ring-2 sm:w-16 sm:py-2 sm:text-xs",
+            "focus:ring-russian-violet/30 number-input-clean w-full rounded-lg border border-slate-200 bg-white px-2 py-2.5 text-right text-sm focus:outline-none focus:ring-2 sm:w-20 sm:py-2 sm:text-xs",
           )}
         />
       </label>
@@ -369,7 +369,7 @@ function TaskTotalsRow({
           onChange={(e) => onPrice(parseFloat(e.target.value) || 0)}
           aria-label="Unit price"
           className={cn(
-            "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 bg-white px-2 py-2.5 text-right text-sm focus:outline-none focus:ring-2 sm:w-20 sm:py-2 sm:text-xs",
+            "focus:ring-russian-violet/30 number-input-clean w-full rounded-lg border border-slate-200 bg-white px-2 py-2.5 text-right text-sm focus:outline-none focus:ring-2 sm:w-24 sm:py-2 sm:text-xs",
           )}
         />
       </label>

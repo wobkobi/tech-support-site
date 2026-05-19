@@ -3,6 +3,7 @@
 import type React from "react";
 import type { RefObject } from "react";
 import { cn } from "@/shared/lib/cn";
+import { MIN_TRAVEL_CHARGE } from "@/features/business/lib/business";
 
 export interface TravelInfo {
   distanceKm: number;
@@ -102,6 +103,11 @@ export function TravelSection({
               ? ` - approx ${travelInfo.durationMins} min drive`
               : ""} -{" "}
             <span className="font-medium text-slate-800">${travelInfo.cost.toFixed(2)}</span>
+            {!travelOnInvoice && travelInfo.cost < MIN_TRAVEL_CHARGE && (
+              <span className={cn("ml-2 italic text-slate-400")}>
+                (below ${MIN_TRAVEL_CHARGE} minimum - not charged by default)
+              </span>
+            )}
           </span>
           {travelOnInvoice ? (
             <span className={cn("ml-3 text-xs font-medium text-green-600")}>Added</span>

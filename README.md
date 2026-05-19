@@ -66,11 +66,12 @@ Marketing poster PDFs (digital + print with 3mm bleed) are generated manually vi
 ## Cron Jobs Setup
 
 Had to use external cron service ([cron-job.org](https://cron-job.org)) since Vercel Hobby plan only
-allows 1 cron job with daily minimum. Set up 3 endpoints that hit every 15 minutes:
+allows 1 cron job with daily minimum. Set up 4 endpoints that hit every 15 minutes:
 
 - `/api/cron/release-holds` - Releases expired booking holds (15-min TTL)
 - `/api/cron/send-review-emails` - Sends review requests 30min after appointments
 - `/api/cron/refresh-calendar-cache` - Keeps Google Calendar availability fresh
+- `/api/cron/send-booking-reminders` - Sends a 24h-out email reminder for upcoming bookings
 
 Each endpoint needs `Authorization: Bearer $CRON_SECRET` header. Set up email alerts on cron-job.org
 for 3 consecutive failures.
