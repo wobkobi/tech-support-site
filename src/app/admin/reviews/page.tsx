@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import type React from "react";
 import { prisma } from "@/shared/lib/prisma";
 import { requireAdminToken } from "@/shared/lib/auth";
-import { toE164NZ } from "@/shared/lib/normalize-phone";
+import { toE164NZ } from "@/shared/lib/normalise-phone";
 import { cn } from "@/shared/lib/cn";
 import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
 import { ReviewApprovalList } from "@/features/reviews/components/admin/ReviewApprovalList";

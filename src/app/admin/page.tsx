@@ -6,7 +6,7 @@ import { prisma } from "@/shared/lib/prisma";
 import { requireAdminToken } from "@/shared/lib/auth";
 import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
 import { DashboardQuickActions } from "@/features/admin/components/DashboardQuickActions";
-import { toE164NZ } from "@/shared/lib/normalize-phone";
+import { toE164NZ } from "@/shared/lib/normalise-phone";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort, formatDateTimeShort } from "@/shared/lib/date-format";
 import { formatNZD } from "@/features/business/lib/business";

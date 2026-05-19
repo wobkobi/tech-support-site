@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
-import { toE164NZ } from "@/shared/lib/normalize-phone";
+import { toE164NZ } from "@/shared/lib/normalise-phone";
 
 interface ResolveBody {
   /** Local contact ID to update. */

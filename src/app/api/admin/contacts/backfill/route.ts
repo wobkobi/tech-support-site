@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
-import { toE164NZ, normalizePhone } from "@/shared/lib/normalize-phone";
+import { toE164NZ, normalisePhone } from "@/shared/lib/normalise-phone";
 
 /**
  * Parse phone and address from structured booking notes.
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       });
     } else if (rr.phone) {
       const phone = toE164NZ(rr.phone) || rr.phone;
-      const normPhone = normalizePhone(phone);
+      const normPhone = normalisePhone(phone);
       if (normPhone && !mergedByPhone.has(normPhone)) {
         mergedByPhone.set(normPhone, { name: rr.name, email: null, phone });
       }

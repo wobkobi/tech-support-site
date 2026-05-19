@@ -29,7 +29,7 @@ import {
 import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
 import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
-import { toE164NZ, isValidPhone } from "@/shared/lib/normalize-phone";
+import { toE164NZ, isValidPhone } from "@/shared/lib/normalise-phone";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 
 interface BookingRequestPayload {

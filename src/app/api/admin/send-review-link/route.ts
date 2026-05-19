@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { sendPastClientReviewRequest } from "@/features/reviews/lib/email";
 import { isAdminRequest } from "@/shared/lib/auth";
-import { toE164NZ, isValidPhone } from "@/shared/lib/normalize-phone";
+import { toE164NZ, isValidPhone } from "@/shared/lib/normalise-phone";
 
 /**
  * POST /api/admin/send-review-link

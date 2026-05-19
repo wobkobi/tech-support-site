@@ -21,7 +21,7 @@
 import { google } from "googleapis";
 import { prisma } from "@/shared/lib/prisma";
 import { getOAuth2Client } from "@/features/calendar/lib/google-calendar";
-import { normalizePhone, toE164NZ } from "@/shared/lib/normalize-phone";
+import { normalisePhone, toE164NZ } from "@/shared/lib/normalise-phone";
 import { recordContactConflict, clearContactConflict } from "./contact-conflicts";
 
 /**
@@ -53,7 +53,7 @@ export async function importFromGoogleContacts(): Promise<number> {
     });
     for (const rr of rrRows) {
       if (!rr.phone || !rr.email) continue;
-      const norm = normalizePhone(toE164NZ(rr.phone) || rr.phone);
+      const norm = normalisePhone(toE164NZ(rr.phone) || rr.phone);
       if (norm && !reviewRequestsByPhone.has(norm)) reviewRequestsByPhone.set(norm, rr.email);
     }
 
@@ -91,7 +91,7 @@ export async function importFromGoogleContacts(): Promise<number> {
         const emailEntry = person.emailAddresses?.[0]?.value?.trim().toLowerCase() ?? null;
         const rawPhone = person.phoneNumbers?.[0]?.value?.trim() ?? null;
         const phone = rawPhone ? toE164NZ(rawPhone) || rawPhone : null;
-        const normPhone = rawPhone ? normalizePhone(toE164NZ(rawPhone) || rawPhone) : null;
+        const normPhone = rawPhone ? normalisePhone(toE164NZ(rawPhone) || rawPhone) : null;
         const name =
           person.names?.[0]?.displayName?.trim() ??
           person.names?.[0]?.givenName?.trim() ??
@@ -310,14 +310,14 @@ function mergePhones(sitePhone: string | null, googlePhones: string[]): string[]
   for (const raw of googlePhones) {
     const trimmed = raw?.trim();
     if (!trimmed) continue;
-    const key = normalizePhone(toE164NZ(trimmed) || trimmed) ?? trimmed;
+    const key = normalisePhone(toE164NZ(trimmed) || trimmed) ?? trimmed;
     if (seen.has(key)) continue;
     seen.add(key);
     result.push(trimmed);
   }
   if (sitePhone?.trim()) {
     const trimmed = sitePhone.trim();
-    const key = normalizePhone(toE164NZ(trimmed) || trimmed) ?? trimmed;
+    const key = normalisePhone(toE164NZ(trimmed) || trimmed) ?? trimmed;
     if (!seen.has(key)) {
       seen.add(key);
       result.push(trimmed);

@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
-import { toE164NZ, normalizePhone } from "@/shared/lib/normalize-phone";
+import { toE164NZ, normalisePhone } from "@/shared/lib/normalise-phone";
 
 /**
  * POST /api/admin/reviews/match-contacts
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const bookingPhoneById = new Map<string, string>();
     for (const b of bookings) {
       if (b.phone) {
-        const norm = normalizePhone(toE164NZ(b.phone) || b.phone);
+        const norm = normalisePhone(toE164NZ(b.phone) || b.phone);
         if (norm) bookingPhoneById.set(b.id, norm);
       }
     }
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     for (const rr of rrRows) {
       if (rr.email) rrEmailByToken.set(rr.reviewToken, rr.email.toLowerCase());
       if (rr.phone) {
-        const norm = normalizePhone(toE164NZ(rr.phone) || rr.phone);
+        const norm = normalisePhone(toE164NZ(rr.phone) || rr.phone);
         if (norm) rrPhoneByToken.set(rr.reviewToken, norm);
       }
     }
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const contactIdByPhone = new Map<string, string>();
     for (const c of contacts) {
       if (c.phone) {
-        const norm = normalizePhone(c.phone);
+        const norm = normalisePhone(c.phone);
         if (norm && !contactIdByPhone.has(norm)) contactIdByPhone.set(norm, c.id);
       }
     }

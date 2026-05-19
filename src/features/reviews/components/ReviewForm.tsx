@@ -11,7 +11,7 @@ import { cn } from "@/shared/lib/cn";
 import { Button } from "@/shared/components/Button";
 import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
-import { formatNZPhone, normalizePhone, isValidPhone } from "@/shared/lib/normalize-phone";
+import { formatNZPhone, normalisePhone, isValidPhone } from "@/shared/lib/normalise-phone";
 
 type NameDisplay = "name" | "anonymous";
 
@@ -87,7 +87,7 @@ export default function ReviewFormProtected({
   const [contactEmail, setContactEmail] = useState(prefillEmail ?? "");
   // Store raw phone digits internally; display formatted
   const [phoneInput, setPhoneInput] = useState(
-    prefillPhone ? formatNZPhone(normalizePhone(prefillPhone)) : "",
+    prefillPhone ? formatNZPhone(normalisePhone(prefillPhone)) : "",
   );
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -100,7 +100,7 @@ export default function ReviewFormProtected({
   const remaining = textMax - textCount;
   const isAnonymous = nameDisplay === "anonymous";
 
-  const phoneNormalized = normalizePhone(phoneInput);
+  const phoneNormalized = normalisePhone(phoneInput);
   const phoneInvalid = !!phoneInput.trim() && !isValidPhone(phoneNormalized);
 
   const NAME_OPTIONS: { value: NameDisplay; label: string }[] = [

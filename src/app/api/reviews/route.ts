@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma as prismaClient } from "@/shared/lib/prisma";
 import { sendOwnerReviewNotification } from "@/features/reviews/lib/email";
-import { normalizePhone } from "@/shared/lib/normalize-phone";
+import { normalisePhone } from "@/shared/lib/normalise-phone";
 import { reviewTextError } from "@/features/reviews/lib/validation";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 
@@ -159,7 +159,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         }
         // Store any contact details the customer provided (only fill blanks, never overwrite)
         const contactEmail = body.contactEmail?.trim().toLowerCase() || null;
-        const contactPhone = body.contactPhone ? normalizePhone(body.contactPhone) : null;
+        const contactPhone = body.contactPhone ? normalisePhone(body.contactPhone) : null;
         await prisma.reviewRequest.update({
           where: { id: reviewRequest.id },
           data: {

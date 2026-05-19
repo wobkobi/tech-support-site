@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
-import { toE164NZ, isValidPhone } from "@/shared/lib/normalize-phone";
+import { toE164NZ, isValidPhone } from "@/shared/lib/normalise-phone";
 
 /**
  * PATCH /api/admin/review-requests/[id]

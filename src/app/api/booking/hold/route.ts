@@ -12,7 +12,7 @@ import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 import { createBookingEvent } from "@/features/calendar/lib/google-calendar";
 import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
-import { toE164NZ } from "@/shared/lib/normalize-phone";
+import { toE164NZ } from "@/shared/lib/normalise-phone";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 
 const HOLD_EXPIRATION_MINUTES = 15;

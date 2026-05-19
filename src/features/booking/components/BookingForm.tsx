@@ -22,7 +22,7 @@ import {
   type StartMinute,
   type JobDuration,
 } from "@/features/booking/lib/booking";
-import { normalizePhone, isValidPhone } from "@/shared/lib/normalize-phone";
+import { normalisePhone, isValidPhone } from "@/shared/lib/normalise-phone";
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 
 export interface BookingFormInitialValues {
@@ -279,7 +279,7 @@ export default function BookingForm({
     // Phone is optional, but if present must be valid. Re-run validation here
     // in case the user typed without blurring (phoneError only sets on blur).
     if (phone.trim()) {
-      const phoneOk = isValidPhone(normalizePhone(phone));
+      const phoneOk = isValidPhone(normalisePhone(phone));
       if (!phoneOk) {
         setPhoneError("Please enter a valid phone number.");
         setError("Please fix the phone number, or leave it blank.");
@@ -715,7 +715,7 @@ export default function BookingForm({
               setPhoneError(null);
             }}
             onBlur={() => {
-              if (phone.trim() && !isValidPhone(normalizePhone(phone))) {
+              if (phone.trim() && !isValidPhone(normalisePhone(phone))) {
                 setPhoneError("Please enter a valid phone number.");
               }
             }}
