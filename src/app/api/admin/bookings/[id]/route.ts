@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { deleteBookingEvent } from "@/features/calendar/lib/google-calendar";
-import { toE164NZ } from "@/shared/lib/normalize-phone";
+import { toE164NZ } from "@/shared/lib/normalise-phone";
 import { sendCustomerReviewRequest } from "@/features/reviews/lib/email";
 
 interface PatchPayload {

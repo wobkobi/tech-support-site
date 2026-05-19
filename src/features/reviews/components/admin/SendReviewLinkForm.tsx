@@ -8,7 +8,7 @@
 import { useState, useRef } from "react";
 import { cn } from "@/shared/lib/cn";
 import { CopyLinkButton } from "./CopyLinkButton";
-import { toE164NZ, formatNZPhone, isValidPhone } from "@/shared/lib/normalize-phone";
+import { toE164NZ, formatNZPhone, isValidPhone } from "@/shared/lib/normalise-phone";
 import type React from "react";
 import { FaCaretLeft } from "react-icons/fa6";
 
@@ -339,7 +339,7 @@ export function SendReviewLinkForm({
             ))}
           </div>
 
-          {/* Email mode: form → preview → confirm send */}
+          {/* Email mode: form > preview > confirm send */}
           {mode === "email" && !previewHtml && (
             <form onSubmit={handlePreview} className={cn("flex flex-col gap-3")}>
               <div className={cn("flex flex-col gap-2")}>

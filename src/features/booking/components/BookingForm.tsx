@@ -22,7 +22,7 @@ import {
   type StartMinute,
   type JobDuration,
 } from "@/features/booking/lib/booking";
-import { normalizePhone, isValidPhone } from "@/shared/lib/normalize-phone";
+import { normalisePhone, isValidPhone } from "@/shared/lib/normalise-phone";
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 
 export interface BookingFormInitialValues {
@@ -195,7 +195,6 @@ export default function BookingForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run on mount
 
-  // Split days into weekdays and weekends
   const weekdays = availableDays.filter((d) => !d.isWeekend);
   const weekends = availableDays.filter((d) => d.isWeekend);
 
@@ -238,7 +237,7 @@ export default function BookingForm({
   }
 
   /**
-   * Format a sub-slot time label, e.g. startHour=14, minute=15 → "2:15pm"
+   * Format a sub-slot time label, e.g. startHour=14, minute=15 > "2:15pm".
    * @param startHour - The hour in 24h format (e.g. 14 for 2pm)
    * @param minute - Minutes past the hour (0, 15, 30, or 45)
    * @returns Formatted time string (e.g. "2:15pm")
@@ -280,7 +279,7 @@ export default function BookingForm({
     // Phone is optional, but if present must be valid. Re-run validation here
     // in case the user typed without blurring (phoneError only sets on blur).
     if (phone.trim()) {
-      const phoneOk = isValidPhone(normalizePhone(phone));
+      const phoneOk = isValidPhone(normalisePhone(phone));
       if (!phoneOk) {
         setPhoneError("Please enter a valid phone number.");
         setError("Please fix the phone number, or leave it blank.");
@@ -311,7 +310,7 @@ export default function BookingForm({
     // Soft geocode check for typed-but-not-picked addresses. First failure
     // sets addressOverrideAcked so the customer can click Submit again to
     // proceed. Network/API outages don't block submission - the booking
-    // still goes through and I can clarify if needed.
+    // still goes through and is clarified out-of-band if needed.
     if (meetingType === "in-person" && !addressVerified && !addressOverrideAcked) {
       try {
         const verifyRes = await fetch("/api/pricing/travel-time", {
@@ -716,7 +715,7 @@ export default function BookingForm({
               setPhoneError(null);
             }}
             onBlur={() => {
-              if (phone.trim() && !isValidPhone(normalizePhone(phone))) {
+              if (phone.trim() && !isValidPhone(normalisePhone(phone))) {
                 setPhoneError("Please enter a valid phone number.");
               }
             }}

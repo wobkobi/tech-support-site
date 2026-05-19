@@ -9,7 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
-import { toE164NZ, normalizePhone } from "@/shared/lib/normalize-phone";
+import { toE164NZ, normalisePhone } from "@/shared/lib/normalise-phone";
 
 export interface ConflictEntry {
   contactId: string;
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const contactByPhone = new Map<string, (typeof allContacts)[0]>();
   for (const c of allContacts) {
     if (c.phone) {
-      const norm = normalizePhone(toE164NZ(c.phone) || c.phone);
+      const norm = normalisePhone(toE164NZ(c.phone) || c.phone);
       if (norm && !contactByPhone.has(norm)) contactByPhone.set(norm, c);
     }
   }
@@ -71,14 +71,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // One entry per source type per contact (most-recent wins)
   const seenRR = new Set<string>();
   const seenRev = new Set<string>();
-  // contactId → enriched value
+  // contactId > enriched value
   const phoneEnrichments = new Map<string, string>();
   const nameEnrichments = new Map<string, string>();
 
   for (const rr of reviewRequests) {
     let contact = rr.email ? contactByEmail.get(rr.email.toLowerCase()) : undefined;
     if (!contact && rr.phone) {
-      const normPhone = normalizePhone(toE164NZ(rr.phone) || rr.phone);
+      const normPhone = normalisePhone(toE164NZ(rr.phone) || rr.phone);
       if (normPhone) contact = contactByPhone.get(normPhone);
     }
     if (!contact || seenRR.has(contact.id)) continue;
@@ -86,8 +86,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const proposedName = rr.name.trim();
     const proposedPhoneRaw = rr.phone?.trim() ?? null;
-    const proposedPhone = proposedPhoneRaw ? normalizePhone(proposedPhoneRaw) : null;
-    const existingPhone = contact.phone ? normalizePhone(contact.phone) : null;
+    const proposedPhone = proposedPhoneRaw ? normalisePhone(proposedPhoneRaw) : null;
+    const existingPhone = contact.phone ? normalisePhone(contact.phone) : null;
 
     // Auto-fill name when contact has only a first name and source provides full name.
     if (

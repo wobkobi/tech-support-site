@@ -6,7 +6,7 @@
  */
 
 import type { PrismaClient } from "@prisma/client";
-import { toE164NZ, normalizePhone } from "@/shared/lib/normalize-phone";
+import { toE164NZ, normalisePhone } from "@/shared/lib/normalise-phone";
 import type { ConflictEntry } from "@/app/api/admin/contacts/enrich-from-reviews/route";
 
 /**
@@ -56,7 +56,7 @@ async function backfillContacts(prisma: PrismaClient): Promise<void> {
   >();
   for (const c of allContacts) {
     if (!c.phone) continue;
-    const norm = normalizePhone(toE164NZ(c.phone) || c.phone);
+    const norm = normalisePhone(toE164NZ(c.phone) || c.phone);
     if (!norm) continue;
     if (!phoneBuckets.has(norm)) phoneBuckets.set(norm, { withEmail: null, phoneOnly: [] });
     const bucket = phoneBuckets.get(norm)!;
@@ -83,13 +83,13 @@ async function backfillContacts(prisma: PrismaClient): Promise<void> {
     existing.filter((c) => c.email).map((c) => c.email!.toLowerCase()),
   );
   const existingPhones = new Set(
-    existing.filter((c) => c.phone).map((c) => normalizePhone(toE164NZ(c.phone!) || c.phone!)),
+    existing.filter((c) => c.phone).map((c) => normalisePhone(toE164NZ(c.phone!) || c.phone!)),
   );
   // Remaining phone-only contacts (post-merge) - used to merge-on-create below
   const phoneOnlyByNorm = new Map<string, (typeof existing)[number]>();
   for (const c of existing) {
     if (!c.email && c.phone) {
-      const norm = normalizePhone(toE164NZ(c.phone) || c.phone);
+      const norm = normalisePhone(toE164NZ(c.phone) || c.phone);
       if (norm) phoneOnlyByNorm.set(norm, c);
     }
   }
@@ -122,7 +122,7 @@ async function backfillContacts(prisma: PrismaClient): Promise<void> {
       });
     } else if (rr.phone) {
       const phone = toE164NZ(rr.phone) || rr.phone;
-      const normPhone = normalizePhone(phone);
+      const normPhone = normalisePhone(phone);
       if (!normPhone || existingPhones.has(normPhone)) continue;
       if (!toCreateByPhone.has(normPhone)) {
         toCreateByPhone.set(normPhone, { name: rr.name, email: null, phone });
@@ -137,7 +137,7 @@ async function backfillContacts(prisma: PrismaClient): Promise<void> {
       // If a phone-only contact already has this phone, merge email into it rather than
       // creating a duplicate contact.
       if (d.phone) {
-        const norm = normalizePhone(toE164NZ(d.phone) || d.phone);
+        const norm = normalisePhone(toE164NZ(d.phone) || d.phone);
         const phoneOnlyMatch = norm ? phoneOnlyByNorm.get(norm) : undefined;
         if (phoneOnlyMatch) {
           const updates: { email: string; name?: string; address?: string } = { email: d.email };
@@ -201,7 +201,7 @@ async function matchReviewContacts(prisma: PrismaClient): Promise<void> {
   const bookingPhoneById = new Map<string, string>();
   for (const b of bookingRows) {
     if (b.phone) {
-      const norm = normalizePhone(toE164NZ(b.phone) || b.phone);
+      const norm = normalisePhone(toE164NZ(b.phone) || b.phone);
       if (norm) bookingPhoneById.set(b.id, norm);
     }
   }
@@ -212,7 +212,7 @@ async function matchReviewContacts(prisma: PrismaClient): Promise<void> {
   const contactIdByPhone = new Map<string, string>();
   for (const c of contacts) {
     if (c.phone) {
-      const norm = normalizePhone(toE164NZ(c.phone) || c.phone);
+      const norm = normalisePhone(toE164NZ(c.phone) || c.phone);
       if (norm && !contactIdByPhone.has(norm)) contactIdByPhone.set(norm, c.id);
     }
   }
@@ -222,7 +222,7 @@ async function matchReviewContacts(prisma: PrismaClient): Promise<void> {
   for (const rr of rrRows) {
     if (rr.email) emailByToken.set(rr.reviewToken, rr.email.toLowerCase());
     if (rr.phone) {
-      const norm = normalizePhone(toE164NZ(rr.phone) || rr.phone);
+      const norm = normalisePhone(toE164NZ(rr.phone) || rr.phone);
       if (norm) phoneByToken.set(rr.reviewToken, norm);
     }
   }
@@ -282,7 +282,7 @@ async function autoEnrich(prisma: PrismaClient): Promise<ConflictEntry[]> {
   const contactByPhone = new Map<string, (typeof contacts)[0]>();
   for (const c of contacts) {
     if (c.phone) {
-      const norm = normalizePhone(toE164NZ(c.phone) || c.phone);
+      const norm = normalisePhone(toE164NZ(c.phone) || c.phone);
       if (norm && !contactByPhone.has(norm)) contactByPhone.set(norm, c);
     }
   }
@@ -302,7 +302,7 @@ async function autoEnrich(prisma: PrismaClient): Promise<ConflictEntry[]> {
       if (c) return c;
     }
     if (phone) {
-      const norm = normalizePhone(toE164NZ(phone) || phone);
+      const norm = normalisePhone(toE164NZ(phone) || phone);
       if (norm) return contactByPhone.get(norm);
     }
     return undefined;
@@ -325,8 +325,8 @@ async function autoEnrich(prisma: PrismaClient): Promise<ConflictEntry[]> {
     if (!contact) continue;
 
     const proposedPhoneRaw = rr.phone?.trim() ?? null;
-    const proposedPhone = proposedPhoneRaw ? normalizePhone(proposedPhoneRaw) : null;
-    const existingPhone = contact.phone ? normalizePhone(contact.phone) : null;
+    const proposedPhone = proposedPhoneRaw ? normalisePhone(proposedPhoneRaw) : null;
+    const existingPhone = contact.phone ? normalisePhone(contact.phone) : null;
 
     if (proposedPhone && !existingPhone && !phoneFilled.has(contact.id)) {
       phoneFilled.add(contact.id);
@@ -387,8 +387,8 @@ async function autoEnrich(prisma: PrismaClient): Promise<ConflictEntry[]> {
     if (!contact) continue;
 
     const proposedPhoneRaw = booking.phone?.trim() ?? null;
-    const proposedPhone = proposedPhoneRaw ? normalizePhone(proposedPhoneRaw) : null;
-    const existingPhone = contact.phone ? normalizePhone(contact.phone) : null;
+    const proposedPhone = proposedPhoneRaw ? normalisePhone(proposedPhoneRaw) : null;
+    const existingPhone = contact.phone ? normalisePhone(contact.phone) : null;
     const address = booking.notes?.match(/Address:\s*(.+)/i)?.[1]?.trim() ?? null;
 
     if (proposedPhone && !existingPhone && !phoneFilled.has(contact.id)) {

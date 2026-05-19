@@ -385,7 +385,7 @@ function drawLineItemsTable(ctx: PdfCtx, invoice: Invoice, y: number): number {
  * @returns Y coordinate below the Total row.
  */
 function drawTotalsBlock(ctx: PdfCtx, invoice: Invoice, y: number): number {
-  // Label area widened (0.4 → 0.6 of CONTENT_W) so long promo titles fit.
+  // Label area widened (0.4 > 0.6 of CONTENT_W) so long promo titles fit.
   const totalsLabelX = MARGIN + CONTENT_W * 0.4;
   const totalsValueX = MARGIN + CONTENT_W;
 
@@ -594,7 +594,7 @@ export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
 }
 
 /**
- * Extracts the fiscal year code from an invoice number (e.g. "TTP-2627-0042" -> "2627").
+ * Extracts the fiscal year code from an invoice number (e.g. "TTP-2627-0042" > "2627").
  * Falls back to deriving the current fiscal year if the number doesn't match.
  * @param invoiceNumber - Invoice number string.
  * @returns Two-digit fiscal year code (e.g. "2627").

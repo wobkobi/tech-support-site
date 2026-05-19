@@ -16,24 +16,21 @@ export const SOFT_CARD = cn(
   "border-seasalt-400/80 bg-seasalt-900/60 rounded-xl border p-3 text-sm sm:p-4 sm:text-base",
 );
 
-/**
- * Props for PageShell component
- */
+/** Props for PageShell. */
 export interface PageShellProps {
-  /** Child elements to render */
+  /** Child elements to render. */
   children: React.ReactNode;
 }
 
 /**
- * Main page shell with backdrop image
- * @param props - Component props
- * @param props.children - Page content
- * @returns Page shell element
+ * Main page shell with fixed backdrop image.
+ * @param props - Component props.
+ * @param props.children - Page content.
+ * @returns Page shell element.
  */
 export function PageShell({ children }: PageShellProps): React.ReactElement {
   return (
     <main className={cn("relative min-h-[calc(100dvh-4rem)] overflow-hidden")}>
-      {/* Backdrop */}
       <div className={cn("pointer-events-none fixed inset-0 -z-10 overflow-hidden")}>
         <Image
           src="/source/backdrop-blur.webp"
@@ -50,25 +47,23 @@ export function PageShell({ children }: PageShellProps): React.ReactElement {
   );
 }
 
-/**
- * Props for FrostedSection component
- */
+/** Props for FrostedSection. */
 export interface FrostedSectionProps {
-  /** Child elements to render */
+  /** Child elements to render. */
   children: React.ReactNode;
-  /** Maximum width constraint. Default scales with viewport: stays at 1440px on 1080p screens, grows to ~1920px on 1440p, caps at 2240px on 4K. */
+  /** Max width override. Default scales with viewport: 1440px on 1080p, ~1920px on 1440p, capped at 2240px on 4K. */
   maxWidth?: string;
-  /** Additional CSS classes */
+  /** Additional CSS classes. */
   className?: string;
 }
 
 /**
- * Frosted glass content section
- * @param props - Component props
- * @param props.children - Section content
- * @param props.maxWidth - Optional max width override
- * @param props.className - Optional additional classes
- * @returns Frosted section element
+ * Frosted glass content section.
+ * @param props - Component props.
+ * @param props.children - Section content.
+ * @param props.maxWidth - Optional max width override.
+ * @param props.className - Optional additional classes.
+ * @returns Frosted section element.
  */
 export function FrostedSection({
   children,

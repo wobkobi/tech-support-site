@@ -11,7 +11,7 @@ import { cn } from "@/shared/lib/cn";
 import { Button } from "@/shared/components/Button";
 import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
-import { formatNZPhone, normalizePhone, isValidPhone } from "@/shared/lib/normalize-phone";
+import { formatNZPhone, normalisePhone, isValidPhone } from "@/shared/lib/normalise-phone";
 
 type NameDisplay = "name" | "anonymous";
 
@@ -64,10 +64,9 @@ export default function ReviewFormProtected({
   const isEditing = !!existingReview;
   const isVerified = !!((bookingId || reviewRequestId) && token);
 
-  // Derive initial name display mode from existing review or booking name
   /**
-   * Returns the initial name display mode based on existing review data or booking name.
-   * @returns The name display mode: "anonymous", "full", or "first".
+   * Initial name-display mode: keep existing anonymity if editing, otherwise show the name.
+   * @returns "anonymous" or "name".
    */
   function initialNameDisplay(): NameDisplay {
     if (existingReview) {
@@ -88,7 +87,7 @@ export default function ReviewFormProtected({
   const [contactEmail, setContactEmail] = useState(prefillEmail ?? "");
   // Store raw phone digits internally; display formatted
   const [phoneInput, setPhoneInput] = useState(
-    prefillPhone ? formatNZPhone(normalizePhone(prefillPhone)) : "",
+    prefillPhone ? formatNZPhone(normalisePhone(prefillPhone)) : "",
   );
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -101,7 +100,7 @@ export default function ReviewFormProtected({
   const remaining = textMax - textCount;
   const isAnonymous = nameDisplay === "anonymous";
 
-  const phoneNormalized = normalizePhone(phoneInput);
+  const phoneNormalized = normalisePhone(phoneInput);
   const phoneInvalid = !!phoneInput.trim() && !isValidPhone(phoneNormalized);
 
   const NAME_OPTIONS: { value: NameDisplay; label: string }[] = [

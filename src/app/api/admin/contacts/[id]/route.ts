@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
-import { toE164NZ, normalizePhone, isValidPhone } from "@/shared/lib/normalize-phone";
+import { toE164NZ, normalisePhone, isValidPhone } from "@/shared/lib/normalise-phone";
 
 interface ContactPatchBody {
   name?: string;
@@ -56,7 +56,7 @@ export async function PATCH(
       }
     }
   }
-  if (body.phone !== undefined && body.phone.trim() && !isValidPhone(normalizePhone(body.phone))) {
+  if (body.phone !== undefined && body.phone.trim() && !isValidPhone(normalisePhone(body.phone))) {
     return NextResponse.json({ error: "Please enter a valid phone number." }, { status: 400 });
   }
 

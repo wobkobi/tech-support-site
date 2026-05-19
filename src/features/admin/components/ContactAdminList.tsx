@@ -13,7 +13,7 @@ import { useState, useEffect } from "react";
 import { cn } from "@/shared/lib/cn";
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import { formatReviewerName } from "@/features/reviews/lib/formatting";
-import { normalizePhone, isValidPhone } from "@/shared/lib/normalize-phone";
+import { normalisePhone, isValidPhone } from "@/shared/lib/normalise-phone";
 import { formatDateShort } from "@/shared/lib/date-format";
 
 export interface ContactRow {
@@ -524,7 +524,7 @@ export function ContactAdminList({
       setEditError("Please enter a valid email address.");
       return;
     }
-    if (editPhone.trim() && !isValidPhone(normalizePhone(editPhone))) {
+    if (editPhone.trim() && !isValidPhone(normalisePhone(editPhone))) {
       setEditError("Please enter a valid phone number.");
       return;
     }
@@ -625,7 +625,7 @@ export function ContactAdminList({
    * Validates the phone field when the input loses focus.
    */
   function handlePhoneBlur(): void {
-    if (editPhone.trim() && !isValidPhone(normalizePhone(editPhone))) {
+    if (editPhone.trim() && !isValidPhone(normalisePhone(editPhone))) {
       setPhoneBlurError("Please enter a valid phone number.");
     }
   }

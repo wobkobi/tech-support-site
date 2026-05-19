@@ -16,7 +16,7 @@ function extractCandidates(filename: string): string[] {
   if (!m) return [];
   const raw = m[1]; // e.g. "TTP-202627-0006" or "TTP-0001"
   const candidates = [raw];
-  // Normalise 6-digit year like "202627" → 4-digit "2627"
+  // Normalise 6-digit year like "202627" > 4-digit "2627"
   const yearMatch = raw.match(/^([A-Z]+-)(\d{6})(-.+)$/i);
   if (yearMatch) candidates.push(`${yearMatch[1]}${yearMatch[2].slice(-4)}${yearMatch[3]}`);
   return candidates;

@@ -210,7 +210,7 @@ export async function fetchAllCalendarEvents(
         } else if (event.start?.date && event.end?.date && !isPersonal) {
           // All-day event from a non-personal calendar - block the full NZ day(s).
           // All-day events use date strings ("YYYY-MM-DD"); end.date is exclusive.
-          // Convert NZ calendar midnight → UTC so slot checking works correctly.
+          // Convert NZ calendar midnight > UTC so slot checking works correctly.
           const startDateStr = event.start.date;
           const endDateStr = event.end.date;
           const [sYear, sMonth, sDay] = startDateStr.split("-").map(Number);

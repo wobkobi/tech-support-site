@@ -10,7 +10,7 @@ import type React from "react";
 import { FaCheck } from "react-icons/fa6";
 import { cn } from "@/shared/lib/cn";
 import { CopyLinkButton } from "./CopyLinkButton";
-import { toE164NZ, formatNZPhone, isValidPhone } from "@/shared/lib/normalize-phone";
+import { toE164NZ, formatNZPhone, isValidPhone } from "@/shared/lib/normalise-phone";
 import { formatDateShort } from "@/shared/lib/date-format";
 
 /**

@@ -5,18 +5,17 @@
  */
 
 /**
- * Get the UTC offset for Pacific/Auckland timezone on a specific date.
- * Automatically handles NZDT (UTC+13, Sep–Apr) and NZST (UTC+12, Apr–Sep).
- * @param year - Full year (e.g., 2026)
- * @param month - Month as 1-12 (not 0-indexed)
- * @param day - Day of month
- * @returns UTC offset in hours (13 during NZDT, 12 during NZST)
+ * UTC offset (hours) for Pacific/Auckland on a given date.
+ * Handles NZDT (UTC+13, Sep-Apr) and NZST (UTC+12, Apr-Sep) automatically.
+ * @param year - Full year.
+ * @param month - Month 1-12 (not 0-indexed).
+ * @param day - Day of month.
+ * @returns Offset in hours (12 or 13).
  */
 export function getPacificAucklandOffset(year: number, month: number, day: number): number {
-  // Create a date at midnight UTC on the target day
+  // Take the NZ wall-clock hour at UTC midnight; since UTC is at hour 0,
+  // that hour equals the offset directly. This sidesteps Intl DST APIs.
   const utcMidnight = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
-
-  // See what hour it is in NZ when it's midnight UTC
   const nzHour = parseInt(
     utcMidnight.toLocaleString("en-US", {
       timeZone: "Pacific/Auckland",
@@ -25,7 +24,5 @@ export function getPacificAucklandOffset(year: number, month: number, day: numbe
     }),
     10,
   );
-
-  // The NZ hour IS the offset (since UTC is at hour 0)
   return nzHour;
 }

@@ -123,7 +123,6 @@ function isSlotFree(
   calendarEvents: Array<{ id: string; start: string; end: string }>,
   bufferMin: number,
 ): boolean {
-  // Check database bookings
   for (const booking of existingBookings) {
     const bookingStart = new Date(booking.startAt.getTime() - booking.bufferBeforeMin * 60 * 1000);
     const bookingEnd = new Date(booking.endAt.getTime() + booking.bufferAfterMin * 60 * 1000);
@@ -190,7 +189,6 @@ export function buildAvailableDays(
     const isToday = i === 0;
     const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
-    // Format labels
     const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
     const shortDayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const monthNames = [
@@ -290,7 +288,6 @@ export function buildAvailableDays(
       });
     }
 
-    // Check if day has any available slots
     const hasAnySlots = timeWindows.some((w) => w.availableShort || w.availableLong);
 
     // Hide today when nothing is bookable (e.g. past same-day cutoff).
@@ -366,7 +363,6 @@ export function validateBookingRequest(
   // Get dynamic UTC offset for this date (handles NZDT/NZST)
   const utcOffset = getPacificAucklandOffset(year, month, day);
 
-  // Check if slot is actually available for this duration
   const durationMinutes = duration === "short" ? 60 : 120;
   const slotStart = new Date(
     Date.UTC(year, month - 1, day, slot.startHour - utcOffset, startMinute, 0),

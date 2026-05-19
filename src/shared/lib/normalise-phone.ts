@@ -1,16 +1,16 @@
-// src/shared/lib/normalize-phone.ts
+// src/shared/lib/normalise-phone.ts
 /**
- * @file normalize-phone.ts
- * @description Shared phone number normalization and validation utilities.
+ * @file normalise-phone.ts
+ * @description Shared phone number normalisation and validation utilities.
  */
 
 /**
- * Strips all non-digit characters except a leading '+'.
- * e.g. "021 123-456" → "021123456", "+64 21 123 456" → "+6421123456"
+ * Strip all non-digit characters except a leading '+'.
+ * e.g. "021 123-456" > "021123456", "+64 21 123 456" > "+6421123456"
  * @param raw - Raw phone input string.
- * @returns Normalized phone string, or empty string if input is blank.
+ * @returns Normalised phone string, or empty string if input is blank.
  */
-export function normalizePhone(raw: string): string {
+export function normalisePhone(raw: string): string {
   const trimmed = raw.trim();
   if (!trimmed) return "";
   const prefix = trimmed.startsWith("+") ? "+" : "";
@@ -59,20 +59,20 @@ export function formatNZPhone(raw: string): string {
 /**
  * Converts a NZ phone number to E.164 format (+64...).
  * Handles all common NZ inputs:
- *   "021 123 1234"  → "+64211231234"
- *   "21 123 1234"   → "+64211231234"  (no leading 0)
- *   "09 123 4567"   → "+6491234567"   (landline)
- *   "+64 21 123 1234" → "+64211231234" (already E.164)
- *   "+61 400 000 000" → "+61400000000" (non-NZ: left as-is)
- * Non-NZ numbers (no leading 0, no NZ mobile prefix, no +) are returned normalized.
+ *   "021 123 1234"  > "+64211231234"
+ *   "21 123 1234"   > "+64211231234"  (no leading 0)
+ *   "09 123 4567"   > "+6491234567"   (landline)
+ *   "+64 21 123 1234" > "+64211231234" (already E.164)
+ *   "+61 400 000 000" > "+61400000000" (non-NZ: left as-is)
+ * Non-NZ numbers (no leading 0, no NZ mobile prefix, no +) are returned normalised.
  * @param raw - Raw phone input string.
- * @returns E.164-normalized phone string, or empty string if input is blank.
+ * @returns E.164-normalised phone string, or empty string if input is blank.
  */
 export function toE164NZ(raw: string): string {
   const trimmed = raw.trim();
   if (!trimmed) return "";
   // Already has a + country code prefix - just strip formatting
-  if (trimmed.startsWith("+")) return normalizePhone(trimmed);
+  if (trimmed.startsWith("+")) return normalisePhone(trimmed);
   const digits = trimmed.replace(/\D/g, "");
   if (!digits) return "";
   // NZ domestic (leading 0): 021xxx, 09xxx, 04xxx etc.
@@ -87,13 +87,13 @@ export function toE164NZ(raw: string): string {
 }
 
 /**
- * Returns true when a normalized phone string looks like a valid phone number.
- * Requires 7–15 digits (E.164 max). The leading '+' is ignored for the count.
- * @param normalized - Already-normalized phone string (from normalizePhone).
+ * Returns true when a normalised phone string looks like a valid phone number.
+ * Requires 7-15 digits (E.164 max). The leading '+' is ignored for the count.
+ * @param normalised - Already-normalised phone string (from normalisePhone).
  * @returns Whether the phone number is valid.
  */
-export function isValidPhone(normalized: string): boolean {
-  if (!normalized) return true; // empty is fine - field is optional
-  const digits = normalized.replace(/\D/g, "");
+export function isValidPhone(normalised: string): boolean {
+  if (!normalised) return true; // empty is fine - field is optional
+  const digits = normalised.replace(/\D/g, "");
   return digits.length >= 7 && digits.length <= 15;
 }

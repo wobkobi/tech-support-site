@@ -14,10 +14,10 @@ import { revalidateReviewPaths } from "@/features/reviews/lib/revalidate";
  * PATCH /api/admin/reviews/[id]
  * Approves or revokes a review, or updates the linked contactId.
  * Authenticated via X-Admin-Secret header.
- * - When body contains { action: "approve" | "revoke" } → moderation flow.
+ * - When body contains { action: "approve" | "revoke" } > moderation flow.
  *   On approve, automatically upserts a Contact record from the review's booking/review-request
  *   and links review.contactId. This is best-effort; failure does not block the approval.
- * - When body contains { contactId: string | null } → contact-link flow.
+ * - When body contains { contactId: string | null } > contact-link flow.
  * @param request - Incoming request.
  * @param params - Route segment params wrapper.
  * @param params.params - Promise resolving to the route segment containing the review ID.

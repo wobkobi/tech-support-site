@@ -24,7 +24,7 @@ import {
   fetchAllCalendarEvents,
 } from "@/features/calendar/lib/google-calendar";
 import { Prisma } from "@prisma/client";
-import { toE164NZ, isValidPhone } from "@/shared/lib/normalize-phone";
+import { toE164NZ, isValidPhone } from "@/shared/lib/normalise-phone";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 import {
   sendCustomerBookingConfirmation,
