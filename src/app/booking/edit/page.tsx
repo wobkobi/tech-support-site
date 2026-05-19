@@ -168,7 +168,6 @@ export default async function EditBookingPage({
       startAt: true,
       endAt: true,
       status: true,
-      smsOptIn: true,
     },
   });
 
@@ -195,7 +194,6 @@ export default async function EditBookingPage({
     name: booking.name,
     email: booking.email,
     phone,
-    smsOptIn: booking.smsOptIn,
     meetingType,
     address,
     notes: userNotes,

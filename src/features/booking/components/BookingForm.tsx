@@ -33,7 +33,6 @@ export interface BookingFormInitialValues {
   name: string;
   email: string;
   phone: string;
-  smsOptIn?: boolean;
   meetingType: "in-person" | "remote" | "";
   address: string;
   notes: string;
@@ -105,9 +104,6 @@ export default function BookingForm({
   const [name, setName] = useState(initialValues?.name ?? "");
   const [email, setEmail] = useState(initialValues?.email ?? "");
   const [phone, setPhone] = useState(initialValues?.phone ?? "");
-  // SMS opt-in disabled - see commented checkbox in JSX below.
-  // const [smsOptIn, setSmsOptIn] = useState(initialValues?.smsOptIn ?? false);
-  const smsOptIn = false;
   const [meetingType, setMeetingType] = useState<"in-person" | "remote" | "">(
     initialValues?.meetingType ?? "",
   );
@@ -342,10 +338,6 @@ export default function BookingForm({
 
     try {
       const endpoint = isEditMode ? "/api/booking/edit" : "/api/booking/request";
-      // Only honour smsOptIn when a phone is actually provided - the SMS cron
-      // also gates on phone presence, but persisting `smsOptIn=true` against a
-      // blank phone would be misleading on the admin/contact views.
-      const optIn = phone.trim() ? smsOptIn : false;
       const payload = isEditMode
         ? {
             cancelToken,
@@ -355,7 +347,6 @@ export default function BookingForm({
             duration,
             name: name.trim(),
             phone: phone.trim() || undefined,
-            smsOptIn: optIn,
             meetingType,
             address: meetingType === "in-person" ? combineUnitAndAddress(unit, address) : undefined,
             notes: notes.trim(),
@@ -368,7 +359,6 @@ export default function BookingForm({
             name: name.trim(),
             email: email.trim(),
             phone: phone.trim() || undefined,
-            smsOptIn: optIn,
             meetingType,
             address: meetingType === "in-person" ? combineUnitAndAddress(unit, address) : undefined,
             notes: notes.trim(),
@@ -738,26 +728,6 @@ export default function BookingForm({
             )}
           />
           {phoneError && <p className={cn("text-coquelicot-600 text-sm")}>{phoneError}</p>}
-          {/* SMS reminder opt-in - disabled while SMS provider is on hold.
-              Re-enable: restore this block and the SMS branch in
-              /api/cron/send-booking-reminders. */}
-          {/* {phone.trim() && (
-            <label
-              className={cn(
-                "text-rich-black/80 mt-1 flex items-start gap-2 text-base",
-                "cursor-pointer select-none",
-                "animate-slide-down",
-              )}
-            >
-              <input
-                type="checkbox"
-                checked={smsOptIn}
-                onChange={(e) => setSmsOptIn(e.target.checked)}
-                className={cn("mt-1 rounded")}
-              />
-              <span>Text me a reminder before my appointment. Reply STOP to opt out.</span>
-            </label>
-          )} */}
         </div>
 
         {/* Meeting Type */}

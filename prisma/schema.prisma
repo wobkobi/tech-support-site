@@ -58,15 +58,9 @@ model Booking {
   reviewSentAt      DateTime? // When the review request email was sent
   reviewSubmittedAt DateTime? // When the client submitted a review
 
-  // Reminder tracking. Stamped by /api/cron/send-booking-reminders so each
-  // window fires at most once per booking. Email = 24h-out window, SMS = 4h-out window.
+  // Reminder tracking. Stamped by /api/cron/send-booking-reminders so the
+  // 24h-out email reminder fires at most once per booking.
   emailReminderSentAt DateTime?
-  smsReminderSentAt   DateTime?
-
-  // Customer-granted permission to send the 4h-out SMS reminder. Required so
-  // we only message customers who explicitly opted in at booking time
-  // (NZ Unsolicited Electronic Messages Act compliance).
-  smsOptIn Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -79,9 +73,8 @@ model Booking {
   @@index([reviewSentAt])
   // Review email cron: WHERE status="confirmed" AND reviewSentAt=null AND endAt<=threshold
   @@index([status, reviewSentAt, endAt])
-  // Reminder crons: WHERE status="confirmed" AND startAt in window AND *ReminderSentAt=null
+  // Email reminder cron: WHERE status="confirmed" AND startAt in window AND emailReminderSentAt=null
   @@index([status, startAt, emailReminderSentAt])
-  @@index([status, startAt, smsReminderSentAt])
   // Contact/admin lookup by phone
   @@index([phone])
 }

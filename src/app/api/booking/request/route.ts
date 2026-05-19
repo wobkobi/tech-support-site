@@ -40,7 +40,6 @@ interface BookingRequestPayload {
   name: string;
   email: string;
   phone?: string;
-  smsOptIn?: boolean;
   address?: string;
   meetingType: "in-person" | "remote";
   notes: string;
@@ -68,7 +67,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       name,
       email,
       phone,
-      smsOptIn,
       address,
       meetingType,
       notes,
@@ -84,8 +82,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         { status: 400 },
       );
     }
-    // Only honour the SMS opt-in when an actual phone is on file.
-    const persistedSmsOptIn = Boolean(phoneE164 && smsOptIn === true);
 
     // Honeypot trip: silently report success without creating a booking so the
     // bot moves on. Real users never fill this field (it's visually hidden
@@ -232,7 +228,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           name: name.trim(),
           email: email.trim().toLowerCase(),
           phone: phoneE164,
-          smsOptIn: persistedSmsOptIn,
           notes: bookingNotes,
           startAt,
           endAt,

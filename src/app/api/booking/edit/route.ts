@@ -40,7 +40,6 @@ interface EditBookingPayload {
   duration: JobDuration;
   name: string;
   phone?: string;
-  smsOptIn?: boolean;
   address?: string;
   meetingType: "in-person" | "remote";
   notes: string;
@@ -66,7 +65,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       duration,
       name,
       phone,
-      smsOptIn,
       address,
       meetingType,
       notes,
@@ -226,9 +224,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // email notifications can show "was: <old time>".
     const previousStartAt = booking.startAt;
 
-    // Update booking. smsOptIn only makes sense when a phone is present;
-    // clearing the phone implicitly revokes consent.
-    const persistedSmsOptIn = Boolean(phoneE164) && smsOptIn === true;
     try {
       await prisma.booking.update({
         where: { id: booking.id },
@@ -241,7 +236,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           activeSlotKey: startAt.toISOString(),
           bufferAfterMin: BOOKING_CONFIG.bookingBufferAfterMin,
           ...(phoneE164 !== undefined ? { phone: phoneE164 } : {}),
-          ...(smsOptIn !== undefined ? { smsOptIn: persistedSmsOptIn } : {}),
         },
       });
       console.log(`[booking/edit] Updated booking: ${booking.id}`);
