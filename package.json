@@ -1,6 +1,6 @@
 {
   "name": "tech-support-site",
-  "version": "1.49.0",
+  "version": "1.49.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,7 +10,6 @@
     "build": "next build --turbopack",
     "start": "next start",
     "db:push": "prisma db push",
-    "seed": "tsx prisma/seed.ts",
     "lint": "eslint \"{src,scripts}/**/*.{js,ts,jsx,tsx}\"",
     "format": "prettier --write \"**/*.{js,ts,jsx,tsx,mjs,css,html,md,json,yml,yaml}\"",
     "build:icons": "tsx scripts/build-icons/index.ts",
