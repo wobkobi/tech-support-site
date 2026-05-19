@@ -91,7 +91,8 @@ export async function calculateTravelMinutes(
   url.searchParams.set("key", apiKey);
 
   try {
-    const res = await fetch(url.toString());
+    // 8s ceiling so a hung Distance Matrix call can't block booking renders.
+    const res = await fetch(url.toString(), { signal: AbortSignal.timeout(8000) });
     if (!res.ok) {
       console.error(`[travel-time] Distance Matrix API HTTP error: ${res.status}`);
       return null;

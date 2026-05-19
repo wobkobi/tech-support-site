@@ -49,17 +49,19 @@ export const metadata: Metadata = {
 // the next request *after* the window, not proactively).
 export const dynamic = "force-dynamic";
 
+interface CalendarFetchResult {
+  events: Array<{ id: string; start: string; end: string }>;
+  /** True when cache was empty AND live fetch failed; UI should hide slots. */
+  degraded: boolean;
+}
+
 /**
- * Get calendar events, preferring cache but falling back to live API
+ * Get calendar events, preferring cache, falling back to live API.
  * @param now - Current date
  * @param maxDate - Maximum booking date
- * @returns Array of calendar events for blocking
+ * @returns Events plus a `degraded` flag for the no-data state.
  */
-async function getCalendarEvents(
-  now: Date,
-  maxDate: Date,
-): Promise<Array<{ id: string; start: string; end: string }>> {
-  // Try cached events first
+async function getCalendarEvents(now: Date, maxDate: Date): Promise<CalendarFetchResult> {
   const cachedEvents = await prisma.calendarEventCache.findMany({
     where: {
       expiresAt: { gt: now },
@@ -74,14 +76,16 @@ async function getCalendarEvents(
 
   if (cachedEvents.length > 0) {
     console.log(`[booking/page] Using ${cachedEvents.length} cached calendar events`);
-    return cachedEvents.map((e) => ({
-      id: e.eventId,
-      start: e.startAt.toISOString(),
-      end: e.endAt.toISOString(),
-    }));
+    return {
+      events: cachedEvents.map((e) => ({
+        id: e.eventId,
+        start: e.startAt.toISOString(),
+        end: e.endAt.toISOString(),
+      })),
+      degraded: false,
+    };
   }
 
-  // Cache empty - fetch directly from Google Calendar
   try {
     const liveEvents = await fetchAllCalendarEvents(now, maxDate);
     console.log(
@@ -113,27 +117,25 @@ async function getCalendarEvents(
       ),
     ).catch((err) => console.error("[booking/page] Failed to populate calendar cache:", err));
 
-    return liveEvents.map((e) => ({
-      id: e.id,
-      start: e.start,
-      end: e.end,
-    }));
+    return {
+      events: liveEvents.map((e) => ({ id: e.id, start: e.start, end: e.end })),
+      degraded: false,
+    };
   } catch (error) {
     console.error("[booking/page] Failed to fetch live calendar events:", error);
-    return [];
+    return { events: [], degraded: true };
   }
 }
 
 /**
- * Fetch available days server-side with calendar blocking
- * @returns Promise resolving to array of bookable days
+ * Fetch available days server-side with calendar blocking.
+ * @returns Bookable days plus the calendar `degraded` flag.
  */
-async function getAvailableDays(): Promise<BookableDay[]> {
+async function getAvailableDays(): Promise<{ days: BookableDay[]; degraded: boolean }> {
   const now = new Date();
   const maxDate = new Date(now.getTime() + BOOKING_CONFIG.maxAdvanceDays * 24 * 60 * 60 * 1000);
 
-  // Run both DB queries in parallel
-  const [existingBookings, calendarEvents] = await Promise.all([
+  const [existingBookings, calendar] = await Promise.all([
     prisma.booking.findMany({
       where: {
         status: { in: ["held", "confirmed"] },
@@ -158,7 +160,10 @@ async function getAvailableDays(): Promise<BookableDay[]> {
     bufferAfterMin: b.bufferAfterMin,
   }));
 
-  return buildAvailableDays(existingForSlots, calendarEvents, now, BOOKING_CONFIG);
+  return {
+    days: buildAvailableDays(existingForSlots, calendar.events, now, BOOKING_CONFIG),
+    degraded: calendar.degraded,
+  };
 }
 
 const STEP_ICON = cn(
@@ -168,13 +173,31 @@ const STEP_ICON = cn(
 const SKELETON_BLOCK = cn("bg-seasalt-900/40 rounded-lg");
 
 /**
- * Async island that fetches slot data and renders the booking form. Held
- * inside a Suspense boundary so the rest of the page can flush instantly.
- * @returns Booking form populated with available days.
+ * Async island that fetches slot data inside the Suspense boundary. Renders
+ * an unavailable banner instead of the form when the calendar fetch failed.
+ * @returns Booking form or an unavailable banner.
  */
 async function BookingFormIsland(): Promise<React.ReactElement> {
-  const availableDays = await getAvailableDays();
-  return <BookingForm availableDays={availableDays} />;
+  const { days, degraded } = await getAvailableDays();
+  if (degraded) {
+    return (
+      <div
+        role="alert"
+        className={cn(
+          "border-coquelicot-500/60 bg-coquelicot-50 text-rich-black flex flex-col gap-3 rounded-lg border-2 p-5",
+        )}
+      >
+        <p className={cn("text-base font-semibold sm:text-lg")}>
+          Availability isn&apos;t loading right now.
+        </p>
+        <p className={cn("text-base sm:text-lg")}>
+          Please refresh the page in a minute, or call/text me directly and I&apos;ll get you booked
+          in.
+        </p>
+      </div>
+    );
+  }
+  return <BookingForm availableDays={days} />;
 }
 
 /**

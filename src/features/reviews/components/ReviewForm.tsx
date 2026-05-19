@@ -94,7 +94,6 @@ export default function ReviewFormProtected({
   const [sent, setSent] = useState(false);
 
   const textMax = 1000;
-  const textHardMax = 1100;
   const textMin = 10;
   const textCount = text.length;
   const remaining = textMax - textCount;
@@ -129,7 +128,7 @@ export default function ReviewFormProtected({
       setErrorMsg(`Review must be at least ${textMin} characters.`);
       return;
     }
-    if (t.length > textHardMax) {
+    if (t.length > textMax) {
       setErrorMsg(`Review must be ${textMax} characters or less.`);
       return;
     }
@@ -431,7 +430,7 @@ export default function ReviewFormProtected({
           )}
           value={text}
           onChange={(e) => setText(e.target.value)}
-          maxLength={textHardMax}
+          maxLength={textMax}
           required
           disabled={loading}
         />
@@ -441,7 +440,7 @@ export default function ReviewFormProtected({
             type="submit"
             variant="secondary"
             size="sm"
-            disabled={loading || textCount < textMin || textCount > textHardMax || phoneInvalid}
+            disabled={loading || textCount < textMin || textCount > textMax || phoneInvalid}
           >
             {loading ? "Sending..." : isEditing ? "Update review" : "Send review"}
           </Button>

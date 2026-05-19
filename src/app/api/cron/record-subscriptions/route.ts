@@ -20,7 +20,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Get start of today in NZ time as a UTC timestamp for comparison
+  // nextDue is stored as UTC midnight (admin form + advanceNextDue), so UTC
+  // midnight of today's NZ date is the correct ceiling for `nextDue <=`.
   const nzDateStr = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Pacific/Auckland",
     year: "numeric",
@@ -36,6 +37,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const recorded: string[] = [];
   const errors: string[] = [];
 
+  const skipped: string[] = [];
+
   for (const sub of due) {
     try {
       const today = new Date();
@@ -43,6 +46,20 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       const inclNum = sub.amountIncl;
       const gstAmount = calcGstFromInclusive(inclNum, rate);
       const amountExcl = Math.round((inclNum - gstAmount) * 100) / 100;
+      const nextDue = advanceNextDue(sub.nextDue, sub.frequency);
+
+      // CAS on the original nextDue: only the run that wins the swap creates
+      // the expense; a retry sees count 0 and skips. If the expense create
+      // below errors after winning, admin can re-record manually - safer than
+      // risking a duplicate.
+      const claim = await prisma.subscription.updateMany({
+        where: { id: sub.id, nextDue: sub.nextDue },
+        data: { nextDue },
+      });
+      if (claim.count === 0) {
+        skipped.push(sub.id);
+        continue;
+      }
 
       await prisma.expenseEntry.create({
         data: {
@@ -58,9 +75,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           notes: sub.notes,
         },
       });
-
-      const nextDue = advanceNextDue(sub.nextDue, sub.frequency);
-      await prisma.subscription.update({ where: { id: sub.id }, data: { nextDue } });
 
       try {
         const sheets = getSheetsClient();
@@ -99,5 +113,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
   }
 
-  return NextResponse.json({ ok: true, recorded: recorded.length, errors });
+  return NextResponse.json({
+    ok: true,
+    recorded: recorded.length,
+    skipped: skipped.length,
+    errors,
+  });
 }
