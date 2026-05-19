@@ -268,8 +268,12 @@ export interface BackdropVariant {
 }
 
 export const BACKDROP_VARIANTS: BackdropVariant[] = [
-  // Site page background - heavily blurred in CSS, so tiny size + low quality is invisible
-  { name: "backdrop-blur", width: 800, quality: 30, format: "webp" },
+  // Primary backdrop served to AVIF-capable browsers via <picture>. q90 +
+  // effort=9 is visually lossless on the pre-blurred gradient.
+  { name: "backdrop-blur", width: 2560, quality: 90, format: "avif" },
+  // WebP fallback for iOS 15 / older Safari (iPhone 7 etc.) - no AVIF support
+  // there. Higher quality since the audience that hits this is small.
+  { name: "backdrop-blur", width: 2560, quality: 90, format: "webp" },
 ];
 
 /* ---------- QR Code Specs ---------- */

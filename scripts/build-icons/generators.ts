@@ -223,14 +223,20 @@ export async function buildBackdropVariants(): Promise<void> {
     const outputPath = `public/source/${name}.${format}`;
     // Pre-blur at build time so the CSS doesn't pay the cost on every paint.
     // Saves ~1 s of LCP on mid-range mobile (vs `blur-xl` applied via CSS).
-    const pipeline = sharp(BACKDROP).resize(width, null, { withoutEnlargement: true }).blur(20);
+    const pipeline = sharp(BACKDROP)
+      .resize(width, null, { withoutEnlargement: true })
+      .blur(20)
+      // Force sRGB so wide-gamut source (e.g. Display P3 phone photos) renders
+      // the same across Safari/Chrome/Firefox.
+      .toColorspace("srgb");
 
     if (format === "avif") {
-      await pipeline.avif({ quality }).toFile(outputPath);
+      // effort=9 is the AVIF encoder's max; CPU-heavy but one-shot at build.
+      await pipeline.avif({ quality, effort: 9 }).toFile(outputPath);
     } else if (format === "jpeg") {
-      await pipeline.jpeg({ quality }).toFile(outputPath);
+      await pipeline.jpeg({ quality, mozjpeg: true }).toFile(outputPath);
     } else {
-      await pipeline.webp({ quality }).toFile(outputPath);
+      await pipeline.webp({ quality, effort: 6, smartSubsample: true }).toFile(outputPath);
     }
 
     console.log(`  ✓ ${name}.${format} (${width}px @ q${quality}, pre-blurred σ=20)`);

@@ -15,25 +15,29 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz";
  */
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
+  // Use the start of the current UTC month as a stable lastModified for pages
+  // that rarely change; stops crawlers seeing "modified today" every fetch.
+  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
 
   const routes: Array<{
     path: string;
     priority: number;
     changeFrequency: "daily" | "weekly" | "monthly" | "yearly";
+    lastModified: Date;
   }> = [
-    { path: "/", priority: 1.0, changeFrequency: "weekly" },
-    { path: "/services", priority: 0.9, changeFrequency: "monthly" },
-    { path: "/pricing", priority: 0.9, changeFrequency: "monthly" },
-    { path: "/booking", priority: 0.9, changeFrequency: "weekly" },
-    { path: "/about", priority: 0.7, changeFrequency: "monthly" },
-    { path: "/contact", priority: 0.8, changeFrequency: "monthly" },
-    { path: "/faq", priority: 0.7, changeFrequency: "monthly" },
-    { path: "/reviews", priority: 0.7, changeFrequency: "weekly" },
+    { path: "/", priority: 1.0, changeFrequency: "weekly", lastModified: now },
+    { path: "/services", priority: 0.9, changeFrequency: "monthly", lastModified: monthStart },
+    { path: "/pricing", priority: 0.9, changeFrequency: "monthly", lastModified: now },
+    { path: "/booking", priority: 0.9, changeFrequency: "weekly", lastModified: now },
+    { path: "/about", priority: 0.7, changeFrequency: "monthly", lastModified: monthStart },
+    { path: "/contact", priority: 0.8, changeFrequency: "monthly", lastModified: monthStart },
+    { path: "/faq", priority: 0.7, changeFrequency: "monthly", lastModified: monthStart },
+    { path: "/reviews", priority: 0.7, changeFrequency: "weekly", lastModified: now },
   ];
 
-  return routes.map(({ path, priority, changeFrequency }) => ({
+  return routes.map(({ path, priority, changeFrequency, lastModified }) => ({
     url: `${siteUrl}${path}`,
-    lastModified: now,
+    lastModified,
     changeFrequency,
     priority,
   }));

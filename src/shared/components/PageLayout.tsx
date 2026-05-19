@@ -5,7 +5,6 @@
  */
 
 import type React from "react";
-import Image from "next/image";
 import { cn } from "@/shared/lib/cn";
 
 export const CARD = cn(
@@ -32,15 +31,19 @@ export function PageShell({ children }: PageShellProps): React.ReactElement {
   return (
     <main id="main" className={cn("relative min-h-[calc(100dvh-4rem)] overflow-hidden")}>
       <div className={cn("pointer-events-none fixed inset-0 -z-10 overflow-hidden")}>
-        <Image
-          src="/source/backdrop-blur.webp"
-          alt=""
-          fill
-          priority
-          sizes="100vw"
-          unoptimized
-          className={cn("scale-110 transform-gpu object-cover")}
-        />
+        {/* Vanilla <picture> not <Image>: the AVIF + WebP variants are pre-built
+            by build:icons; Next's re-transcode reintroduced gradient blocking.
+            WebP source carries iOS 15 / older Safari users who lack AVIF. */}
+        <picture>
+          <source type="image/avif" srcSet="/source/backdrop-blur.avif" />
+          <img
+            src="/source/backdrop-blur.webp"
+            alt=""
+            fetchPriority="high"
+            decoding="async"
+            className={cn("absolute inset-0 h-full w-full scale-110 transform-gpu object-cover")}
+          />
+        </picture>
       </div>
       {children}
     </main>
