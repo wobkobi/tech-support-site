@@ -40,8 +40,8 @@ const canvas = createRequire(import.meta.url)("canvas") as typeof import("canvas
 /**
  * Render a single favicon variant from an SVG logo buffer.
  *
- * - `opaque: false` → resize logo to fill the canvas (transparent passthrough).
- * - `opaque: true` → composite logo onto a coloured background at `logoScale`.
+ * - `opaque: false` > resize logo to fill the canvas (transparent passthrough).
+ * - `opaque: true` > composite logo onto a coloured background at `logoScale`.
  * @param logoSvg - SVG source buffer (light or dark colour variant).
  * @param size - Output square size in pixels.
  * @param opaque - Whether to render on an opaque background.

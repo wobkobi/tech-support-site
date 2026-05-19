@@ -1,20 +1,19 @@
 // src/shared/lib/useOnVisible.ts
 /**
  * @file useOnVisible.ts
- * @description React hook that tracks whether a DOM element is visible in the
- * viewport (via IntersectionObserver) or has received focus, triggering a
- * one-time visibility flag used to defer expensive resource loading.
+ * @description Hook that latches true once an element first becomes visible or
+ * focused, used to defer loading heavy third-party scripts.
  */
 
 import { useEffect, useState } from "react";
 
 /**
- * Hook that returns true when the given element becomes visible in the viewport
- * or receives focus. It disconnects the observer after the first visible event.
- * @param ref - React ref pointing to the element to observe.
- * @param ref.current - The DOM element to observe (or null if not yet mounted).
- * @param options - Optional IntersectionObserver configuration.
- * @returns True once the element has entered the viewport or received focus.
+ * Latch `true` once the element first enters the viewport or receives focus,
+ * then disconnect. Used to defer loading heavy third-party scripts.
+ * @param ref - Ref to the element to observe.
+ * @param ref.current - DOM element (or null while unmounted).
+ * @param options - IntersectionObserver options.
+ * @returns Whether the element has been visible at least once.
  */
 export default function useOnVisible<T extends Element | null = Element>(
   ref: { current: T | null },
@@ -23,8 +22,8 @@ export default function useOnVisible<T extends Element | null = Element>(
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    // If IntersectionObserver is not available (older browsers / test env),
-    // consider the element visible so the script can load when needed.
+    // No IntersectionObserver (old browsers, test env): fall back to "always visible"
+    // so the script still loads rather than silently never firing.
     if (typeof IntersectionObserver === "undefined") {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setVisible(true);
@@ -49,12 +48,12 @@ export default function useOnVisible<T extends Element | null = Element>(
 
       observer.observe(el);
     } catch {
-      // In case the environment throws, fallback to visible.
+      // Defensive fallback if the constructor throws in some exotic env.
       setVisible(true);
     }
 
     /**
-     * Sets the element as visible and disconnects the observer on focus.
+     * Focus fallback: keyboard users may tab to the element before it scrolls in.
      */
     const onFocus = (): void => {
       setVisible(true);

@@ -1,7 +1,7 @@
 // src/features/business/lib/sheets-sync.ts
 /**
  * @file sheets-sync.ts
- * @description Site → Google Sheet write-back. Hidden Sync ID at column Z
+ * @description Site > Google Sheet write-back. Hidden Sync ID at column Z
  * carries a UUID so edits/deletes can find rows. Failures are non-fatal.
  */
 
@@ -11,10 +11,10 @@ import { getDriveClient } from "@/features/business/lib/google-drive";
 import { formatDateSlash } from "@/shared/lib/date-format";
 import { getFinancialYear } from "@/features/business/lib/financial-year";
 
-/** Cache: FY key (e.g. "2025-26") → spreadsheet file ID. */
+/** Cache: FY key (e.g. "2025-26") > spreadsheet file ID. */
 const fySheetCache = new Map<string, string>();
 
-/** Cache: spreadsheet file ID → Set of tab names that have already had Sync ID setup applied. */
+/** Cache: spreadsheet file ID > Set of tab names that have already had Sync ID setup applied. */
 const setupCache = new Map<string, Set<string>>();
 
 /** Column Z (0-indexed 25) is where the Sync ID lives, well clear of any data column. */

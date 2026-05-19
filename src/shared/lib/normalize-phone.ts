@@ -5,8 +5,8 @@
  */
 
 /**
- * Strips all non-digit characters except a leading '+'.
- * e.g. "021 123-456" → "021123456", "+64 21 123 456" → "+6421123456"
+ * Strip all non-digit characters except a leading '+'.
+ * e.g. "021 123-456" > "021123456", "+64 21 123 456" > "+6421123456"
  * @param raw - Raw phone input string.
  * @returns Normalized phone string, or empty string if input is blank.
  */
@@ -59,11 +59,11 @@ export function formatNZPhone(raw: string): string {
 /**
  * Converts a NZ phone number to E.164 format (+64...).
  * Handles all common NZ inputs:
- *   "021 123 1234"  → "+64211231234"
- *   "21 123 1234"   → "+64211231234"  (no leading 0)
- *   "09 123 4567"   → "+6491234567"   (landline)
- *   "+64 21 123 1234" → "+64211231234" (already E.164)
- *   "+61 400 000 000" → "+61400000000" (non-NZ: left as-is)
+ *   "021 123 1234"  > "+64211231234"
+ *   "21 123 1234"   > "+64211231234"  (no leading 0)
+ *   "09 123 4567"   > "+6491234567"   (landline)
+ *   "+64 21 123 1234" > "+64211231234" (already E.164)
+ *   "+61 400 000 000" > "+61400000000" (non-NZ: left as-is)
  * Non-NZ numbers (no leading 0, no NZ mobile prefix, no +) are returned normalized.
  * @param raw - Raw phone input string.
  * @returns E.164-normalized phone string, or empty string if input is blank.

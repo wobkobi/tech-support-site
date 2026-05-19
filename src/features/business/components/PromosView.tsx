@@ -27,7 +27,7 @@ interface FormState {
 }
 
 /**
- * ISO timestamp -> "YYYY-MM-DD" (local date parts) for <input type="date">.
+ * ISO timestamp > "YYYY-MM-DD" (local date parts) for <input type="date">.
  * @param iso - ISO 8601 timestamp.
  * @returns Date-input string, or empty for invalid input.
  */
@@ -45,7 +45,7 @@ function toDateInput(iso: string): string {
 }
 
 /**
- * YYYY-MM-DD -> ISO timestamp at local-midnight (start of day).
+ * YYYY-MM-DD > ISO timestamp at local-midnight (start of day).
  * @param date - YYYY-MM-DD string.
  * @returns ISO timestamp.
  */
@@ -54,7 +54,7 @@ function startOfDayISO(date: string): string {
 }
 
 /**
- * YYYY-MM-DD -> ISO timestamp at start of next day (so end is inclusive).
+ * YYYY-MM-DD > ISO timestamp at start of next day (so end is inclusive).
  * @param date - YYYY-MM-DD string.
  * @returns ISO timestamp.
  */
@@ -65,7 +65,7 @@ function endOfDayISO(date: string): string {
 }
 
 /**
- * `endAt` ISO -> inclusive YYYY-MM-DD (subtracts the day we added on save).
+ * `endAt` ISO > inclusive YYYY-MM-DD (subtracts the day we added on save).
  * @param iso - ISO 8601 timestamp.
  * @returns Date-input string.
  */

@@ -339,7 +339,7 @@ export function SendReviewLinkForm({
             ))}
           </div>
 
-          {/* Email mode: form → preview → confirm send */}
+          {/* Email mode: form > preview > confirm send */}
           {mode === "email" && !previewHtml && (
             <form onSubmit={handlePreview} className={cn("flex flex-col gap-3")}>
               <div className={cn("flex flex-col gap-2")}>

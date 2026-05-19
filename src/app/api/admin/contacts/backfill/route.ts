@@ -37,7 +37,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Build a unified map of email → contact data from all sources.
+  // Build a unified map of email > contact data from all sources.
   // Sources are processed oldest-first so the most recent entry wins.
 
   const mergedByEmail = new Map<

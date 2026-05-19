@@ -195,7 +195,6 @@ export default function BookingForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run on mount
 
-  // Split days into weekdays and weekends
   const weekdays = availableDays.filter((d) => !d.isWeekend);
   const weekends = availableDays.filter((d) => d.isWeekend);
 
@@ -238,7 +237,7 @@ export default function BookingForm({
   }
 
   /**
-   * Format a sub-slot time label, e.g. startHour=14, minute=15 → "2:15pm"
+   * Format a sub-slot time label, e.g. startHour=14, minute=15 > "2:15pm".
    * @param startHour - The hour in 24h format (e.g. 14 for 2pm)
    * @param minute - Minutes past the hour (0, 15, 30, or 45)
    * @returns Formatted time string (e.g. "2:15pm")
@@ -311,7 +310,7 @@ export default function BookingForm({
     // Soft geocode check for typed-but-not-picked addresses. First failure
     // sets addressOverrideAcked so the customer can click Submit again to
     // proceed. Network/API outages don't block submission - the booking
-    // still goes through and I can clarify if needed.
+    // still goes through and is clarified out-of-band if needed.
     if (meetingType === "in-person" && !addressVerified && !addressOverrideAcked) {
       try {
         const verifyRes = await fetch("/api/pricing/travel-time", {

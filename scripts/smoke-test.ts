@@ -5,8 +5,8 @@
  * public page with Puppeteer to collect console errors and navigation timing.
  *
  * Usage:
- *   npx tsx scripts/smoke-test.ts              # build → start → test
- *   npx tsx scripts/smoke-test.ts --skip-build # start → test (reuse existing .next)
+ *   npx tsx scripts/smoke-test.ts              # build > start > test
+ *   npx tsx scripts/smoke-test.ts --skip-build # start > test (reuse existing .next)
  *   npx tsx scripts/smoke-test.ts --port=3001
  *
  * Exit codes:

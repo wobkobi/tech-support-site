@@ -15,7 +15,6 @@ import { Prisma } from "@prisma/client";
 import { toE164NZ } from "@/shared/lib/normalize-phone";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 
-// Hold expiration time in minutes
 const HOLD_EXPIRATION_MINUTES = 15;
 
 /**
@@ -65,11 +64,9 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreateBoo
   if (limited) return limited as NextResponse<CreateBookingResponse>;
 
   try {
-    // Parse and validate request body
     const body = (await request.json()) as CreateBookingRequest;
     const { name, email, phone, notes, dateKey, slotStart, slotEnd, meetingType, address } = body;
 
-    // Basic validation
     if (!name?.trim()) {
       return NextResponse.json({ ok: false, error: "Name is required." }, { status: 400 });
     }

@@ -39,7 +39,7 @@ const DEEP_MIN_SCROLL_DELTA = 1;
 const TOP_HIDE_SCROLL_DISTANCE = 72;
 const MID_HIDE_SCROLL_DISTANCE = 120;
 const DEEP_HIDE_SCROLL_DISTANCE = 170;
-const FULL_HIDE_TRANSLATE = "120%"; // Vertical translate percentage when navbar is fully hidden
+const FULL_HIDE_TRANSLATE = "120%";
 const TOP_IDLE_HIDE_DELAY_MS = 900;
 const MID_IDLE_HIDE_DELAY_MS = 1200;
 const DEEP_IDLE_HIDE_DELAY_MS = 2300;
@@ -118,10 +118,8 @@ export function NavBar(): React.ReactElement | null {
   const headerRef = useRef<HTMLElement | null>(null);
 
   /**
-   * Set hidden state only when it changes.
+   * Set hidden state only when it changes (avoids redundant renders).
    * @param nextHidden - Target hidden state.
-   * @param reason - Why this transition happened.
-   * @param details - Optional context for debug logs.
    */
   const setHiddenSafely = useCallback((nextHidden: boolean): void => {
     setIsHidden((previous) => (previous === nextHidden ? previous : nextHidden));

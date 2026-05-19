@@ -5,6 +5,7 @@
  */
 import { PrismaClient } from "@prisma/client";
 
+// Cache the Prisma client on globalThis so hot-reload in dev doesn't leak connections.
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
 export const prisma =

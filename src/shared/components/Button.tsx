@@ -14,11 +14,10 @@ export type ButtonVariant = "primary" | "secondary" | "tertiary" | "ghost";
 export type ButtonSize = "sm" | "md" | "lg";
 
 /**
- * Button props when rendering as a Next.js Link (href present)
+ * Button props when rendering as a Next.js Link (href present).
  */
 interface ButtonAsLink {
   href: string;
-  // Next.js Link props
   prefetch?: boolean;
   scroll?: boolean;
   replace?: boolean;
@@ -27,7 +26,6 @@ interface ButtonAsLink {
    * Use for file downloads so the browser handles them directly without the router.
    */
   download?: string;
-  // Button-specific props
   variant?: ButtonVariant;
   size?: ButtonSize;
   fullWidth?: boolean;
@@ -38,27 +36,23 @@ interface ButtonAsLink {
   disabled?: boolean;
   className?: string;
   children: React.ReactNode;
-  // Accessibility
   "aria-current"?: "page" | "step" | "location" | "date" | "time" | "true" | "false";
   "aria-label"?: string;
 }
 
 /**
- * Button props when rendering as a native button element (no href)
+ * Button props when rendering as a native button element (no href).
  */
 interface ButtonAsButton {
-  href?: never; // explicitly exclude href
-  // Native button props
+  href?: never;
   type?: "button" | "submit" | "reset";
   disabled?: boolean;
   onClick?: React.MouseEventHandler<HTMLButtonElement>;
-  // Button-specific props
   variant?: ButtonVariant;
   size?: ButtonSize;
   fullWidth?: boolean;
   className?: string;
   children: React.ReactNode;
-  // Accessibility
   "aria-label"?: string;
   "aria-disabled"?: boolean;
 }
@@ -66,9 +60,9 @@ interface ButtonAsButton {
 export type ButtonProps = ButtonAsLink | ButtonAsButton;
 
 /**
- * Get variant-specific classes
- * @param variant - Button variant type
- * @returns Tailwind class string for the variant
+ * Tailwind classes for the given variant.
+ * @param variant - Button variant.
+ * @returns Class string.
  */
 function getVariantClasses(variant: ButtonVariant): string {
   switch (variant) {
@@ -98,9 +92,9 @@ function getVariantClasses(variant: ButtonVariant): string {
 }
 
 /**
- * Get size-specific classes
- * @param size - Button size type
- * @returns Tailwind class string for the size
+ * Tailwind classes for the given size.
+ * @param size - Button size.
+ * @returns Class string.
  */
 function getSizeClasses(size: ButtonSize): string {
   switch (size) {
@@ -132,7 +126,6 @@ export function Button(props: ButtonProps): React.ReactElement {
     ...rest
   } = props;
 
-  // Base classes shared by all buttons
   const baseClasses = cn(
     "inline-flex items-center justify-center gap-2",
     "rounded-lg font-bold",
@@ -144,7 +137,6 @@ export function Button(props: ButtonProps): React.ReactElement {
     className,
   );
 
-  // Discriminate based on href presence
   if ("href" in props && props.href) {
     const {
       href,
@@ -177,15 +169,14 @@ export function Button(props: ButtonProps): React.ReactElement {
         className={baseClasses}
         aria-current={ariaCurrent}
         aria-label={ariaLabel}
-        // Note: disabled is applied via className (opacity/cursor)
-        // Link will still navigate - use conditional rendering if truly disabled
+        // `disabled` here is visual only (opacity/cursor) - Link still navigates.
+        // Use conditional rendering when the link should be truly inert.
       >
         {children}
       </Link>
     );
   }
 
-  // Render as button
   const {
     type = "button",
     onClick,

@@ -64,10 +64,9 @@ export default function ReviewFormProtected({
   const isEditing = !!existingReview;
   const isVerified = !!((bookingId || reviewRequestId) && token);
 
-  // Derive initial name display mode from existing review or booking name
   /**
-   * Returns the initial name display mode based on existing review data or booking name.
-   * @returns The name display mode: "anonymous", "full", or "first".
+   * Initial name-display mode: keep existing anonymity if editing, otherwise show the name.
+   * @returns "anonymous" or "name".
    */
   function initialNameDisplay(): NameDisplay {
     if (existingReview) {

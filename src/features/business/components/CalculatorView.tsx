@@ -515,7 +515,6 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
     if (d.ok) {
       setIncomeToast("Income entry saved.");
       setTimeout(() => setIncomeToast(null), 3000);
-      // Reset
       setDurationOverride(null);
       setTasks([]);
       setParts([]);

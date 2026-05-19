@@ -35,7 +35,7 @@ async function getOrCreateFolder(parentId: string, name: string): Promise<string
 
 /**
  * Converts a year code to the Drive folder name format used by the Apps Script.
- * "202627" → "2026-27" (6-digit, current format); "2627" → "2026-27" (4-digit, legacy fallback).
+ * "202627" > "2026-27" (6-digit, current format); "2627" > "2026-27" (4-digit, legacy fallback).
  * @param yearCode - Compact fiscal year code string
  * @returns Human-readable folder name like "2026-27"
  */

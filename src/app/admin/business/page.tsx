@@ -37,7 +37,7 @@ const SCOPE_PARAM = "fy";
 
 /**
  * Resolves the displayed scope from a search-param value.
- * "all" → the all-time scope (no date filter).
+ * "all" > the all-time scope (no date filter).
  * Otherwise tries to match an FY key (e.g. "2025-26") against the listed FYs.
  * Falls back to the current FY when the param is missing or doesn't match.
  * @param raw - Raw `?fy=` query value (undefined, "all", or an FY key).

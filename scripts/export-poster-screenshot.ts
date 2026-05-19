@@ -46,21 +46,21 @@ interface PageConfig {
   cropMarks: boolean;
   /** Output file name. */
   filename: string;
-  /** URL suffix appended to the base poster URL (e.g. "?mode=print" → /poster?mode=print). */
+  /** URL suffix appended to the base poster URL (e.g. "?mode=print" > /poster?mode=print). */
   urlSuffix?: string;
 }
 
 /* ---------- Constants ---------- */
 
 /**
- * A5 CSS viewport at 300 DPI (148 mm × 210 mm → 1748 px × 2480 px).
+ * A5 CSS viewport at 300 DPI (148 mm × 210 mm > 1748 px × 2480 px).
  * Combined with {@link DEVICE_SCALE_FACTOR} the captured screenshot is
  * 1748×SCALE × 2480×SCALE px, equivalent to 300×SCALE DPI.
  */
 const A5_VIEWPORT = { width: 1748, height: 2480 } as const;
 
 /**
- * Puppeteer device scale factor (CSS pixel → physical pixel multiplier).
+ * Puppeteer device scale factor (CSS pixel > physical pixel multiplier).
  * 1 = 300 DPI (captures 1748 × 2480 px as-is).
  * 2 = 600 DPI effective (3496 × 4960 px screenshot).
  */
@@ -79,7 +79,7 @@ const A5_DIGITAL_CONFIG: PageConfig = {
 /** Configuration for print variant (A5 + 3mm bleed). */
 const A5_PRINT_CONFIG: PageConfig = {
   label: "Print (A5 + 3mm bleed)",
-  // 3 mm bleed at 300 DPI ≈ 35.43 px per side → 1748 + 2×35.43 ≈ 1818.86
+  // 3 mm bleed at 300 DPI ≈ 35.43 px per side > 1748 + 2×35.43 ≈ 1818.86
   // and 2480 + 2×35.43 ≈ 2550.86, which we round up to whole pixels: 1819×2551.
   viewport: { width: 1819, height: 2551 },
   pdfSize: { width: 436.53, height: 612.28 },

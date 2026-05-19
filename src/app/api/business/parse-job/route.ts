@@ -74,7 +74,7 @@ function calcSessionMins(input: string): number | null {
     let dur = end - start;
     if (dur <= 0) {
       // Prefer the smallest positive result that fits a reasonable session (≤ 16h).
-      // +12h handles unmarked am/pm crossing noon (e.g. "11:25-1:20" → 115 min).
+      // +12h handles unmarked am/pm crossing noon (e.g. "11:25-1:20" > 115 min).
       // +24h is the fallback for overnight runs.
       const withNoon = dur + 12 * 60;
       dur = withNoon > 0 && withNoon <= 16 * 60 ? withNoon : dur + 24 * 60;

@@ -45,7 +45,7 @@ const MODES: { value: TransportMode; label: string; icon: string }[] = [
  * Formats a minutes value for display.
  * @param raw - Raw minutes from API, or null.
  * @param rounded - Rounded minutes used for blocking, or null.
- * @returns Formatted string like "21 min → 30 min blocked".
+ * @returns Formatted string like "21 min > 30 min blocked".
  */
 function formatMinutes(raw: number | null, rounded: number | null): string {
   if (raw === null) return "\u2013";

@@ -43,7 +43,7 @@ export async function importFromGoogleContacts(): Promise<number> {
   try {
     const people = getPeopleClient();
 
-    // Build phone → email map from ReviewRequest history so phone-only Google
+    // Build phone > email map from ReviewRequest history so phone-only Google
     // contacts can be matched to a known email and imported.
     const reviewRequestsByPhone = new Map<string, string>();
     const rrRows = await prisma.reviewRequest.findMany({

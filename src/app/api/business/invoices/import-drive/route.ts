@@ -54,7 +54,7 @@ function decodePdfString(s: string): string {
     }
     // Byte 92 ('\') decodes to 'y' (92+29=121). When the PDF escape handler captures
     // '\' + next_byte, both pass through decode and produce spurious 'y' between
-    // uppercase letters (e.g. "HyELP" → "HELP", "DUyE" → "DUE").
+    // uppercase letters (e.g. "HyELP" > "HELP", "DUyE" > "DUE").
     return out.replace(/([A-Z])y([A-Z])/g, "$1$2");
   }
   return s;

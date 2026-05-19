@@ -71,7 +71,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // One entry per source type per contact (most-recent wins)
   const seenRR = new Set<string>();
   const seenRev = new Set<string>();
-  // contactId → enriched value
+  // contactId > enriched value
   const phoneEnrichments = new Map<string, string>();
   const nameEnrichments = new Map<string, string>();
 
