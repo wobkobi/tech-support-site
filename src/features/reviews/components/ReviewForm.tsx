@@ -90,7 +90,8 @@ export default function ReviewFormProtected({
     prefillPhone ? formatNZPhone(normalisePhone(prefillPhone)) : "",
   );
   const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
 
   const textMax = 1000;
@@ -108,38 +109,35 @@ export default function ReviewFormProtected({
   ];
 
   /**
-   * Submit handler
+   * Submit handler. Collects all validation failures into one pass.
    * @param e - Form event
    */
   async function handleSubmit(e: React.SubmitEvent): Promise<void> {
     e.preventDefault();
-    setErrorMsg(null);
+    setSubmitError(null);
     setSent(false);
 
     const t = text.trim();
     const f = firstName.trim();
     const l = lastName.trim();
 
+    const fieldErrors: Record<string, string> = {};
     if (!t) {
-      setErrorMsg("Please write a short review.");
-      return;
-    }
-    if (t.length < textMin) {
-      setErrorMsg(`Review must be at least ${textMin} characters.`);
-      return;
-    }
-    if (t.length > textMax) {
-      setErrorMsg(`Review must be ${textMax} characters or less.`);
-      return;
+      fieldErrors.text = "Please write a short review.";
+    } else if (t.length < textMin) {
+      fieldErrors.text = `Review must be at least ${textMin} characters.`;
+    } else if (t.length > textMax) {
+      fieldErrors.text = `Review must be ${textMax} characters or less.`;
     }
     if (!isAnonymous && !f) {
-      setErrorMsg("First name is required unless posting anonymously.");
-      return;
+      fieldErrors.firstName = "First name is required unless posting anonymously.";
     }
     if (phoneInvalid) {
-      setErrorMsg("Please enter a valid phone number or leave it blank.");
-      return;
+      fieldErrors.phone = "Please enter a valid phone number or leave it blank.";
     }
+
+    setErrors(fieldErrors);
+    if (Object.keys(fieldErrors).length > 0) return;
 
     setLoading(true);
     try {
@@ -184,11 +182,14 @@ export default function ReviewFormProtected({
         router.push("/");
       }, 2000);
     } catch (err: unknown) {
-      setErrorMsg(err instanceof Error ? err.message : "Something went wrong.");
+      setSubmitError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
       setLoading(false);
     }
   }
+
+  const errorEntries = Object.entries(errors);
+  const hasFieldErrors = errorEntries.length > 0;
 
   return (
     <form onSubmit={handleSubmit} aria-busy={loading} className={cn("space-y-4")}>
@@ -214,17 +215,51 @@ export default function ReviewFormProtected({
       )}
 
       {/* Status */}
-      {(errorMsg || sent) && (
+      {hasFieldErrors && (
         <div
-          role="status"
+          role="alert"
+          aria-live="assertive"
+          className={cn(
+            "border-coquelicot-500/50 bg-coquelicot-500/10 text-coquelicot-500 rounded-lg border p-3 text-base",
+          )}
+        >
+          <p className={cn("font-semibold")}>Please fix the following:</p>
+          <ul className={cn("mt-1 list-disc space-y-0.5 pl-5")}>
+            {errorEntries.map(([key, msg]) => {
+              const anchor =
+                key === "text"
+                  ? textId
+                  : key === "firstName"
+                    ? firstId
+                    : key === "phone"
+                      ? phoneId
+                      : undefined;
+              return (
+                <li key={key}>
+                  {anchor ? (
+                    <a href={`#${anchor}`} className={cn("underline")}>
+                      {msg}
+                    </a>
+                  ) : (
+                    msg
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+      {!hasFieldErrors && (submitError || sent) && (
+        <div
+          role={submitError ? "alert" : "status"}
           className={cn(
             "rounded-lg border p-3 text-base",
-            errorMsg
+            submitError
               ? "border-coquelicot-500/50 bg-coquelicot-500/10 text-coquelicot-500"
               : "border-moonstone-500/50 bg-moonstone-600/10 text-moonstone-600",
           )}
         >
-          {errorMsg ??
+          {submitError ??
             (isEditing
               ? "Review updated! It will reappear on the site after approval. Redirecting..."
               : "Thanks for your review! It will appear on the site after approval. Redirecting...")}
@@ -292,13 +327,21 @@ export default function ReviewFormProtected({
                 className={cn(
                   "border-seasalt-400/60 bg-seasalt text-rich-black focus:ring-moonstone-500/50",
                   "w-full rounded-md border px-3 py-2 outline-none focus:ring-2",
+                  errors.firstName && "border-coquelicot-500/60",
                 )}
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
                 maxLength={60}
                 required
                 disabled={loading}
+                aria-invalid={!!errors.firstName || undefined}
+                aria-describedby={errors.firstName ? `${firstId}-error` : undefined}
               />
+              {errors.firstName && (
+                <p id={`${firstId}-error`} className={cn("text-coquelicot-500 mt-1 text-base")}>
+                  {errors.firstName}
+                </p>
+              )}
             </div>
 
             <div>
@@ -362,9 +405,11 @@ export default function ReviewFormProtected({
               onChange={(e) => setPhoneInput(e.target.value)}
               onBlur={(e) => setPhoneInput(formatNZPhone(e.target.value))}
               disabled={loading}
+              aria-invalid={phoneInvalid || undefined}
+              aria-describedby={phoneInvalid ? `${phoneId}-error` : undefined}
             />
             {phoneInvalid && (
-              <p className={cn("text-coquelicot-400 mt-1 text-base")}>
+              <p id={`${phoneId}-error`} className={cn("text-coquelicot-400 mt-1 text-base")}>
                 Doesn&apos;t look right - check the number.
               </p>
             )}
@@ -427,19 +472,28 @@ export default function ReviewFormProtected({
           className={cn(
             "border-seasalt-400/60 bg-seasalt text-rich-black focus:ring-moonstone-500/50",
             "min-h-35 mt-1 w-full rounded-md border px-3 py-2 outline-none focus:ring-2",
+            errors.text && "border-coquelicot-500/60",
           )}
           value={text}
           onChange={(e) => setText(e.target.value)}
           maxLength={textMax}
           required
           disabled={loading}
+          aria-invalid={!!errors.text || undefined}
+          aria-describedby={errors.text ? `${textId}-error` : undefined}
         />
+        {errors.text && (
+          <p id={`${textId}-error`} className={cn("text-coquelicot-500 mt-1 text-base")}>
+            {errors.text}
+          </p>
+        )}
 
         <div className={cn("mt-3 flex items-center justify-between")}>
           <Button
             type="submit"
             variant="secondary"
             size="sm"
+            aria-busy={loading}
             disabled={loading || textCount < textMin || textCount > textMax || phoneInvalid}
           >
             {loading ? "Sending..." : isEditing ? "Update review" : "Send review"}

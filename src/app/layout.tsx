@@ -374,6 +374,12 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${exo.variable} font-sans`}>
       <body suppressHydrationWarning>
+        <a
+          href="#main"
+          className="bg-russian-violet text-seasalt focus:ring-moonstone-500 focus:z-100 sr-only rounded-lg px-5 py-3 text-base font-bold shadow-lg transition-colors focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:outline-none focus:ring-2 focus:ring-offset-2"
+        >
+          Skip to content
+        </a>
         <PromoBanner />
         <NavBar />
         {children}

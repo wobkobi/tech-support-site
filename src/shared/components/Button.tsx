@@ -55,6 +55,7 @@ interface ButtonAsButton {
   children: React.ReactNode;
   "aria-label"?: string;
   "aria-disabled"?: boolean;
+  "aria-busy"?: boolean;
 }
 
 export type ButtonProps = ButtonAsLink | ButtonAsButton;
@@ -182,6 +183,7 @@ export function Button(props: ButtonProps): React.ReactElement {
     onClick,
     "aria-label": ariaLabel,
     "aria-disabled": ariaDisabled,
+    "aria-busy": ariaBusy,
   } = rest as ButtonAsButton;
 
   return (
@@ -192,6 +194,7 @@ export function Button(props: ButtonProps): React.ReactElement {
       className={baseClasses}
       aria-label={ariaLabel}
       aria-disabled={ariaDisabled ?? disabled}
+      aria-busy={ariaBusy}
     >
       {children}
     </button>
