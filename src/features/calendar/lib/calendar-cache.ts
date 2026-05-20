@@ -28,6 +28,12 @@ const TRAVEL_ROUND_BUFFER_MIN = 10;
 const RETURN_CHAINING_LOOKAHEAD_MS = 2 * 60 * 60 * 1000;
 const MIN_HOME_DWELL_MIN = 60;
 
+// Work-cal "No car" events require home arrival this many minutes before they
+// start. Used to disqualify chaining into work-cal blocks and to surface a
+// scheduling warning when the natural travel-back would arrive too late.
+const NO_CAR_MARGIN_MIN = 15;
+const NO_CAR_LOOKAHEAD_MS = 4 * 60 * 60 * 1000;
+
 /**
  * Rounds raw Distance Matrix minutes up with a fixed buffer absorbing job
  * overrun and traffic uncertainty.
@@ -79,16 +85,20 @@ export function findSmartOrigin(
 /**
  * Forward-looking counterpart to {@link findSmartOrigin}. Returns the soonest
  * upcoming event with a resolvable location starting within
- * {@link RETURN_CHAINING_LOOKAHEAD_MS} of the given departure, or null.
+ * {@link RETURN_CHAINING_LOOKAHEAD_MS} of the given departure, or null. Events
+ * from any calendar listed in `excludeCalendarEmails` are skipped (used to
+ * keep work-cal "no car" blocks out of the chaining pool).
  * @param allEvents - All calendar events in the current window.
  * @param currentEvent - The event being left.
  * @param effectiveDeparture - Earliest time the traveller can leave.
+ * @param excludeCalendarEmails - Calendars that must never be chained into.
  * @returns The candidate next event with its location and start, or null.
  */
 export function findNextChainedEvent(
   allEvents: CalendarEvent[],
   currentEvent: CalendarEvent,
   effectiveDeparture: Date,
+  excludeCalendarEmails?: Set<string>,
 ): { event: CalendarEvent; location: string; startAt: Date } | null {
   const departMs = effectiveDeparture.getTime();
 
@@ -99,6 +109,7 @@ export function findNextChainedEvent(
 
   for (const e of allEvents) {
     if (e.id === currentEvent.id) continue;
+    if (excludeCalendarEmails?.has(e.calendarEmail)) continue;
     const loc = e.location ?? e.summary;
     if (!loc) continue;
     const startAt = new Date(e.start);
@@ -114,6 +125,35 @@ export function findNextChainedEvent(
   return best && bestLoc && bestStart
     ? { event: best, location: bestLoc, startAt: bestStart }
     : null;
+}
+
+/**
+ * Returns the soonest upcoming event on the given work calendar within the
+ * no-car lookahead. Used to gate chaining and to flag travel-back legs that
+ * would arrive too close to a "no car" block.
+ * @param allEvents - All calendar events in the current window.
+ * @param fromDate - Earliest start time to consider.
+ * @param workCalendarEmail - Calendar id whose events count as no-car blocks.
+ * @returns The next no-car event with its start time, or null.
+ */
+function findNextNoCarEvent(
+  allEvents: CalendarEvent[],
+  fromDate: Date,
+  workCalendarEmail: string,
+): { event: CalendarEvent; startAt: Date } | null {
+  const fromMs = fromDate.getTime();
+  let best: CalendarEvent | null = null;
+  let bestStart: Date | null = null;
+  for (const e of allEvents) {
+    if (e.calendarEmail !== workCalendarEmail) continue;
+    const startAt = new Date(e.start);
+    const gap = startAt.getTime() - fromMs;
+    if (gap > 0 && gap <= NO_CAR_LOOKAHEAD_MS && (!bestStart || startAt < bestStart)) {
+      best = e;
+      bestStart = startAt;
+    }
+  }
+  return best && bestStart ? { event: best, startAt: bestStart } : null;
 }
 
 /**
@@ -186,6 +226,8 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
   }
 
   const bookingCalId = getBookingCalendarId();
+  const workCalId = process.env.WORK_CALENDAR_ID ?? "";
+  const noCarCalIds = workCalId ? new Set([workCalId]) : new Set<string>();
   const isDev = process.env.NODE_ENV === "development";
 
   if (isDev) {
@@ -291,9 +333,11 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
     // Candidate next-event for chaining. Identity + start are stored on the
     // block so a subsequent run can detect if the candidate moved or vanished.
     // Skipped when admin set a custom back destination - the explicit choice wins.
+    // Work-cal "no car" events are excluded so the system never chains into a
+    // block that means the car is unavailable.
     const chained = hasCustomBackDestination
       ? null
-      : findNextChainedEvent(rawEvents, event, departureForBack);
+      : findNextChainedEvent(rawEvents, event, departureForBack, noCarCalIds);
     const currentChainedId = chained?.event.id ?? null;
     const currentChainedStart = chained?.startAt ?? null;
 
@@ -520,6 +564,23 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
         console.log(
           `[travel] Keeping travel-back to home for "${event.summary}" - dwell ${Math.round(dwellMin)} min`,
         );
+      }
+    }
+
+    // No-car deadline: a work-cal event upcoming after this one requires home
+    // arrival at least NO_CAR_MARGIN_MIN minutes before its start. Flag when
+    // the natural travel-back would miss that deadline so Harrison sees it.
+    if (workCalId && rawTravelBackMinutes !== null && !travelBackSuppressed) {
+      const noCar = findNextNoCarEvent(rawEvents, departureForBack, workCalId);
+      if (noCar) {
+        const homeArrivalMs = departureForBack.getTime() + rawTravelBackMinutes * 60_000;
+        const deadlineMs = noCar.startAt.getTime() - NO_CAR_MARGIN_MIN * 60_000;
+        if (homeArrivalMs > deadlineMs) {
+          const lateMin = Math.ceil((homeArrivalMs - deadlineMs) / 60_000);
+          console.warn(
+            `[travel] No-car deadline conflict for "${event.summary}": travel-back to home arrives ${lateMin} min past the ${NO_CAR_MARGIN_MIN}-min margin before "${noCar.event.summary ?? noCar.event.id}"`,
+          );
+        }
       }
     }
 
