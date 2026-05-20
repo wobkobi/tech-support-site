@@ -27,7 +27,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     case "no_match":
       return NextResponse.json({ durationMins: 0 });
     case "misconfig":
-      console.error("[travel-time] HOME_ADDRESS or GOOGLE_MAPS_API_KEY is not set");
+      console.error("[travel-time] HOME_ADDRESS or Google Maps key is not set");
       return NextResponse.json(
         { error: "Travel lookup is temporarily unavailable." },
         { status: 503 },

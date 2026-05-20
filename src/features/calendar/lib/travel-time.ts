@@ -69,9 +69,13 @@ export async function calculateTravelMinutes(
   departureTime: Date,
   options?: { useArrivalTime?: boolean; mode?: TransportMode },
 ): Promise<number | null> {
-  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  // Server-only key (no referrer restriction) is preferred for Distance Matrix
+  // calls; falls back to the client key when running in dev without the split.
+  const apiKey = process.env.GOOGLE_MAPS_SERVER_KEY ?? process.env.GOOGLE_MAPS_API_KEY;
   if (!apiKey) {
-    console.warn("[travel-time] GOOGLE_MAPS_API_KEY not set - skipping travel time calculation");
+    console.warn(
+      "[travel-time] No GOOGLE_MAPS_SERVER_KEY or GOOGLE_MAPS_API_KEY set - skipping travel time calculation",
+    );
     return null;
   }
 
