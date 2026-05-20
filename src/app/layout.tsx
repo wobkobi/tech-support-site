@@ -89,12 +89,9 @@ export const metadata: Metadata = {
     },
   },
   icons: {
-    // Modern browsers prefer the SVG (handles dark mode internally via CSS).
-    // PNG variants with prefers-color-scheme media queries cover browsers
-    // without SVG-favicon support. favicon.ico is intentionally NOT listed as
-    // a `<link>`: Chrome would otherwise pick it over the SVG. Legacy browsers
-    // (and bots that probe `/favicon.ico` directly) still get it - the file
-    // exists at `/favicon.ico`, just without an explicit hint to use it.
+    // SVG handles dark mode itself; the PNG entries cover browsers without
+    // SVG-favicon support. favicon.ico is intentionally omitted - Chrome would
+    // pick it over the SVG. Bots probing /favicon.ico still find the file.
     icon: [
       { url: "/favicon.svg", type: "image/svg+xml", sizes: "any" },
       {

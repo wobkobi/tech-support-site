@@ -64,10 +64,8 @@ export async function PATCH(
       },
     });
 
-    // Transport-mode overrides on a recurring event apply to the whole series:
-    // persist the choice durably and cascade to sibling instances so they all
-    // recompute with the new mode on the next cron tick. customOrigin stays
-    // per-instance because origins legitimately vary between occurrences.
+    // Transport-mode overrides apply to the whole series - persist + cascade
+    // to siblings. customOrigin stays per-instance (origins vary by occurrence).
     if (hasMode && mode !== undefined && block.recurringEventId) {
       await prisma.recurringTravelPreference.upsert({
         where: {

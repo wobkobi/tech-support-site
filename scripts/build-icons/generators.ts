@@ -100,10 +100,8 @@ export async function buildFavicons(): Promise<void> {
     console.log(`  ✓ ${name} (${size}x${size})${hasDarkVariant ? " + dark" : ""}`);
   }
 
-  // Multi-resolution favicon.ico (16 + 32 + 48) so the OS/browser picks the
-  // sharpest size for each context (tab, taskbar, bookmark bar, etc.). The
-  // previous implementation was a renamed 32x32 PNG that rendered blurry in
-  // small UI like Windows pinned-taskbar icons.
+  // Multi-resolution .ico (16/32/48) so the OS picks the sharpest size per
+  // context - a single 32x32 PNG rendered blurry in the Windows taskbar.
   const ico16 = await sharp(lightSvg).resize(16, 16).png().toBuffer();
   const ico32 = await sharp(lightSvg).resize(32, 32).png().toBuffer();
   const ico48 = await sharp(lightSvg).resize(48, 48).png().toBuffer();
@@ -138,12 +136,9 @@ export async function buildFaviconSvg(): Promise<void> {
     }
   </style>`;
 
-  // Inject the style block right after the opening <svg ...> tag, then strip
-  // every inline `fill="#hex"` from child elements. Without the strip, the
-  // browser briefly renders the inline fills (russian-violet) before the CSS
-  // is applied - visible as a "blue flash" before the dark-mode swap kicks in.
-  // Once inline fills are gone, the CSS is the sole colour source and both
-  // light and dark modes render correctly on first paint.
+  // Inject the style block then strip inline `fill="#hex"` from children.
+  // Without the strip, inline fills paint first - a "blue flash" before the
+  // CSS dark-mode swap kicks in.
   const withStyle = svg.replace(/<svg([^>]*)>/, `<svg$1>${styleBlock}`);
 
   if (withStyle === svg) {

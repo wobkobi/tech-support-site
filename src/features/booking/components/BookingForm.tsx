@@ -107,22 +107,17 @@ export default function BookingForm({
   const [meetingType, setMeetingType] = useState<"in-person" | "remote" | "">(
     initialValues?.meetingType ?? "",
   );
-  // Apartment / unit number is stored separately so Google Places autocomplete
-  // can predict the street part (predictions go cold for NZ "N/" prefixes).
-  // We re-combine on submit and split on pre-fill so saved addresses stay in
-  // the standard "12/160 Kepa Road Orakei" shape.
+  // Unit kept separate so Places autocomplete can predict the street part
+  // (NZ "N/" prefixes break predictions). Re-combined on submit, split on
+  // pre-fill, so saved addresses stay in "12/160 Kepa Road Orakei" shape.
   const initialSplit = splitUnitFromAddress(initialValues?.address ?? "");
   const [unit, setUnit] = useState(initialSplit.unit);
   const [address, setAddress] = useState(initialSplit.rest);
-  // True after the customer picks an autocomplete suggestion; resets to false
-  // on any subsequent keystroke. In edit mode the saved address is treated as
-  // verified (it was accepted on its original submission). Drives the
-  // green-tick hint + the optional submit-time geocode fallback.
+  // True after picking an autocomplete suggestion (or pre-filled in edit mode);
+  // any keystroke resets it. Drives the green-tick hint + submit-time geocode.
   const [addressVerified, setAddressVerified] = useState(Boolean(initialValues?.address));
-  // Flipped true after the submit-time geocode check fails so the customer can
-  // click Submit a second time to proceed with their typed address as-is.
-  // Reset whenever the address changes (so a different mistyped address gets
-  // re-checked, not silently bypassed).
+  // True after a failed submit-time geocode so a second click submits as-is.
+  // Resets on any address change to re-check different mistypes.
   const [addressOverrideAcked, setAddressOverrideAcked] = useState(false);
   const [notes, setNotes] = useState(initialValues?.notes ?? "");
   // Honeypot: real users never see/fill this; bots typically auto-fill any
@@ -290,10 +285,9 @@ export default function BookingForm({
 
     setSubmitting(true);
 
-    // Soft geocode check for typed-but-not-picked addresses. First failure
-    // sets addressOverrideAcked so the customer can click Submit again to
-    // proceed. Network/API outages don't block submission - the booking
-    // still goes through and is clarified out-of-band if needed.
+    // Soft geocode check for typed-but-not-picked addresses. First failure flips
+    // addressOverrideAcked so a second click submits anyway. Network errors
+    // don't block submission - clarify out-of-band if needed.
     if (meetingType === "in-person" && !addressVerified && !addressOverrideAcked) {
       try {
         const verifyRes = await fetch("/api/pricing/travel-time", {
@@ -840,10 +834,9 @@ export default function BookingForm({
                       maxLength={BOOKING_FIELD_LIMITS.address}
                       onChange={(v) => {
                         setAddress(v);
-                        // Any typing invalidates the prior pick. The onChange
-                        // fires before onPlaceSelected on a pick, so React
-                        // batches both updates and the final state is
-                        // verified=true. Keystrokes leave it at false.
+                        // Any keystroke invalidates the prior pick. onChange
+                        // fires before onPlaceSelected on a real pick, so
+                        // batched updates leave verified=true on suggestions.
                         setAddressVerified(false);
                         setAddressOverrideAcked(false);
                       }}
