@@ -65,11 +65,11 @@ function isValidCronBearer(authHeader: string | null): boolean {
 }
 
 /**
- * Validates cron authorization from Vercel Cron or secret token.
+ * Validates cron authorization. Bearer-token-only; cron-job.org is the sole
+ * scheduler.
  * @param request - The incoming request to verify.
  * @returns True if authorized, false otherwise.
  */
 export function isCronAuthorized(request: NextRequest): boolean {
-  if (request.headers.has("x-vercel-cron")) return true;
   return isValidCronBearer(request.headers.get("authorization"));
 }

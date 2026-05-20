@@ -38,7 +38,7 @@ export interface DriveDistance {
 export type DriveDistanceResult =
   | { status: "ok"; data: DriveDistance }
   | { status: "no_match" } // API responded but couldn't resolve the address
-  | { status: "misconfig" } // HOME_ADDRESS or GOOGLE_MAPS_API_KEY missing
+  | { status: "misconfig" } // HOME_ADDRESS or Google Maps key missing
   | { status: "error" }; // Network / parse failure
 
 /**
@@ -51,7 +51,9 @@ export type DriveDistanceResult =
  */
 export async function lookupDriveDistance(destination: string): Promise<DriveDistanceResult> {
   const origin = process.env.HOME_ADDRESS;
-  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  // Server-only key (no referrer restriction) preferred; falls back to the
+  // client key when the split env isn't set up.
+  const apiKey = process.env.GOOGLE_MAPS_SERVER_KEY ?? process.env.GOOGLE_MAPS_API_KEY;
   if (!origin || !apiKey) return { status: "misconfig" };
 
   const trimmed = destination.trim().slice(0, 100);

@@ -132,6 +132,8 @@ export default function BookingForm({
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Submit-time validation errors. Rendered both in a top summary and inline.
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   // True when the server returned 409 (someone booked the same slot first).
   // Drives a more prominent error with a "Refresh available times" link.
   const [slotStale, setSlotStale] = useState(false);
@@ -256,54 +258,35 @@ export default function BookingForm({
     e.preventDefault();
     setError(null);
 
-    if (!duration) {
-      setError("Please select job duration.");
-      return;
-    }
-    if (!selectedDay) {
-      setError("Please select a day and time.");
-      return;
-    }
-    if (!selectedTime) {
-      setError("Please select a time.");
-      return;
-    }
-    if (!name.trim()) {
-      setError("Please enter your name.");
-      return;
-    }
+    // Collect all failures so the user fixes them in one pass. Keys match
+    // the input ids used below for aria-describedby + summary anchors.
+    const fe: Record<string, string> = {};
+    if (!duration) fe.duration = "Please select job duration.";
+    if (!selectedDay) fe.day = "Please select a day and time.";
+    if (!selectedTime) fe.time = "Please select a time.";
+    if (!name.trim()) fe.name = "Please enter your name.";
     if (!email.trim() || !EMAIL_REGEX.test(email.trim())) {
-      setError("Please enter a valid email address.");
-      return;
+      fe.email = "Please enter a valid email address.";
     }
-    // Phone is optional, but if present must be valid. Re-run validation here
-    // in case the user typed without blurring (phoneError only sets on blur).
-    if (phone.trim()) {
-      const phoneOk = isValidPhone(normalisePhone(phone));
-      if (!phoneOk) {
-        setPhoneError("Please enter a valid phone number.");
-        setError("Please fix the phone number, or leave it blank.");
-        return;
-      }
+    if (phone.trim() && !isValidPhone(normalisePhone(phone))) {
+      fe.phone = "Please enter a valid phone number, or leave it blank.";
+      setPhoneError("Please enter a valid phone number.");
     }
-    if (!meetingType) {
-      setError("Please select in-person or remote.");
-      return;
-    }
+    if (!meetingType) fe.meetingType = "Please select in-person or remote.";
     if (meetingType === "in-person" && !address.trim()) {
-      setError("Please enter your address for in-person appointments.");
-      return;
+      fe.address = "Please enter your address for in-person appointments.";
     }
     if (!notes.trim()) {
-      setError("Please describe what you need help with.");
-      return;
+      fe.notes = "Please describe what you need help with.";
+    } else if (notes.trim().length < BOOKING_FIELD_LIMITS.notesMin) {
+      fe.notes = `Please describe the issue in at least ${BOOKING_FIELD_LIMITS.notesMin} characters so I have enough context.`;
     }
-    if (notes.trim().length < BOOKING_FIELD_LIMITS.notesMin) {
-      setError(
-        `Please describe the issue in at least ${BOOKING_FIELD_LIMITS.notesMin} characters so I have enough context.`,
-      );
-      return;
-    }
+
+    setFieldErrors(fe);
+    if (Object.keys(fe).length > 0) return;
+
+    // Field-errors guard above guarantees these are set; narrow for TS.
+    if (!selectedDay || !selectedTime || !duration || !meetingType) return;
 
     setSubmitting(true);
 
@@ -401,7 +384,14 @@ export default function BookingForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className={cn("flex flex-col gap-8")} autoComplete="off">
+    <form
+      onSubmit={handleSubmit}
+      // `noValidate` so the JS error-summary takes over from native browser
+      // tooltips; required + aria-required stay for assistive tech.
+      noValidate
+      className={cn("flex flex-col gap-8")}
+      autoComplete="off"
+    >
       {/* Honeypot: visually hidden + off-screen + tab-skipped + aria-hidden.
           Real users never see or focus this. Bots that auto-fill contact-
           style inputs will fill it, and the server fakes a success response
@@ -434,7 +424,7 @@ export default function BookingForm({
         </legend>
 
         {/* Duration */}
-        <div>
+        <div id="booking-duration">
           <label className={cn("text-rich-black mb-2 block text-base font-semibold")}>
             How long do you need? <span className={cn("text-coquelicot-500")}>*</span>
           </label>
@@ -467,7 +457,7 @@ export default function BookingForm({
         </div>
 
         {/* Day Selection */}
-        <div>
+        <div id="booking-day">
           <label className={cn("text-rich-black mb-2 block text-base font-semibold")}>
             Choose a day
           </label>
@@ -552,7 +542,12 @@ export default function BookingForm({
 
         {/* Time Selection */}
         {selectedDay && (
-          <div className={cn("flex flex-col gap-3")}>
+          <div
+            id="booking-time"
+            className={cn("flex flex-col gap-3")}
+            aria-live="polite"
+            aria-atomic="false"
+          >
             <label className={cn("text-rich-black block text-base font-semibold")}>
               Start time for {selectedDay.fullLabel}
             </label>
@@ -663,14 +658,24 @@ export default function BookingForm({
               id="booking-name"
               type="text"
               autoComplete="name"
+              required
+              aria-required
               maxLength={BOOKING_FIELD_LIMITS.name}
               value={name}
               onChange={(e) => setName(e.target.value)}
+              aria-invalid={!!fieldErrors.name || undefined}
+              aria-describedby={fieldErrors.name ? "booking-name-error" : undefined}
               className={cn(
                 "border-seasalt-400/80 bg-seasalt text-rich-black rounded-md border px-4 py-3 text-base",
                 "focus:border-russian-violet focus:ring-russian-violet/30 focus:outline-none focus:ring-1",
+                fieldErrors.name && "border-coquelicot-500/60",
               )}
             />
+            {fieldErrors.name && (
+              <p id="booking-name-error" className={cn("text-coquelicot-600 text-sm")}>
+                {fieldErrors.name}
+              </p>
+            )}
           </div>
 
           <div className={cn("flex flex-col gap-1.5")}>
@@ -684,6 +689,8 @@ export default function BookingForm({
               id="booking-email"
               type="email"
               autoComplete="email"
+              required
+              aria-required
               maxLength={BOOKING_FIELD_LIMITS.email}
               value={email}
               onChange={(e) => {
@@ -691,11 +698,19 @@ export default function BookingForm({
                 setContactHint(null);
               }}
               onBlur={handleEmailBlur}
+              aria-invalid={!!fieldErrors.email || undefined}
+              aria-describedby={fieldErrors.email ? "booking-email-error" : undefined}
               className={cn(
                 "border-seasalt-400/80 bg-seasalt text-rich-black rounded-md border px-4 py-3 text-base",
                 "focus:border-russian-violet focus:ring-russian-violet/30 focus:outline-none focus:ring-1",
+                fieldErrors.email && "border-coquelicot-500/60",
               )}
             />
+            {fieldErrors.email && (
+              <p id="booking-email-error" className={cn("text-coquelicot-600 text-sm")}>
+                {fieldErrors.email}
+              </p>
+            )}
             {contactHint && <p className={cn("text-rich-black/70 text-sm")}>{contactHint}</p>}
           </div>
         </div>
@@ -719,6 +734,8 @@ export default function BookingForm({
                 setPhoneError("Please enter a valid phone number.");
               }
             }}
+            aria-invalid={!!phoneError || undefined}
+            aria-describedby={phoneError ? "booking-phone-error" : undefined}
             className={cn(
               "border-seasalt-400/80 bg-seasalt text-rich-black rounded-md border px-4 py-3 text-base",
               "focus:border-russian-violet focus:ring-russian-violet/30 focus:outline-none focus:ring-1",
@@ -726,11 +743,15 @@ export default function BookingForm({
               phoneError && "border-coquelicot-500/60",
             )}
           />
-          {phoneError && <p className={cn("text-coquelicot-600 text-sm")}>{phoneError}</p>}
+          {phoneError && (
+            <p id="booking-phone-error" className={cn("text-coquelicot-600 text-sm")}>
+              {phoneError}
+            </p>
+          )}
         </div>
 
         {/* Meeting Type */}
-        <div className={cn("flex flex-col gap-2")}>
+        <div id="booking-meeting-type" className={cn("flex flex-col gap-2")}>
           <label className={cn("text-rich-black text-base font-semibold")}>
             Meeting type <span className={cn("text-coquelicot-500")}>*</span>
           </label>
@@ -829,7 +850,14 @@ export default function BookingForm({
                       onPlaceSelected={() => setAddressVerified(true)}
                       placeholder="Start typing your street address..."
                       required
+                      aria-invalid={!!fieldErrors.address || undefined}
+                      aria-describedby={fieldErrors.address ? "booking-address-error" : undefined}
                     />
+                    {fieldErrors.address && (
+                      <p id="booking-address-error" className={cn("text-coquelicot-600 text-sm")}>
+                        {fieldErrors.address}
+                      </p>
+                    )}
                     {address.trim() &&
                       (addressVerified ? (
                         <p
@@ -871,15 +899,25 @@ export default function BookingForm({
             name="booking-notes-no-autofill"
             autoComplete="new-password"
             rows={4}
+            required
+            aria-required
             maxLength={BOOKING_FIELD_LIMITS.notes}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
+            aria-invalid={!!fieldErrors.notes || undefined}
+            aria-describedby={fieldErrors.notes ? "booking-notes-error" : undefined}
             className={cn(
               "border-seasalt-400/80 bg-seasalt text-rich-black rounded-md border px-4 py-3 text-base",
               "focus:border-russian-violet focus:ring-russian-violet/30 focus:outline-none focus:ring-1",
+              fieldErrors.notes && "border-coquelicot-500/60",
             )}
             placeholder="e.g., Wi-Fi not working, need help with email setup, laptop running slow..."
           />
+          {fieldErrors.notes && (
+            <p id="booking-notes-error" className={cn("text-coquelicot-600 text-sm")}>
+              {fieldErrors.notes}
+            </p>
+          )}
         </div>
       </fieldset>
 
@@ -911,6 +949,44 @@ export default function BookingForm({
           </Button>
         </div>
       )}
+      {Object.keys(fieldErrors).length > 0 && (
+        <div
+          role="alert"
+          aria-live="assertive"
+          className={cn(
+            "border-coquelicot-500/50 bg-coquelicot-500/10 text-rich-black rounded-md border p-4",
+          )}
+        >
+          <p className={cn("text-base font-semibold")}>Please fix the following:</p>
+          <ul className={cn("mt-1 list-disc space-y-0.5 pl-5 text-base")}>
+            {Object.entries(fieldErrors).map(([key, msg]) => {
+              const anchors: Record<string, string> = {
+                duration: "booking-duration",
+                day: "booking-day",
+                time: "booking-time",
+                name: "booking-name",
+                email: "booking-email",
+                phone: "booking-phone",
+                meetingType: "booking-meeting-type",
+                address: "booking-address",
+                notes: "booking-notes",
+              };
+              const anchor = anchors[key];
+              return (
+                <li key={key}>
+                  {anchor ? (
+                    <a href={`#${anchor}`} className={cn("underline")}>
+                      {msg}
+                    </a>
+                  ) : (
+                    msg
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
       {error && (
         <p className={cn("text-coquelicot-600 text-base font-medium")} role="alert">
           {error}
@@ -922,6 +998,7 @@ export default function BookingForm({
           type="submit"
           variant="secondary"
           size="md"
+          aria-busy={submitting}
           disabled={submitting || !availableDays.some((d) => d.hasAnySlots)}
         >
           {submitting

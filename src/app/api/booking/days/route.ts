@@ -4,24 +4,14 @@
  * @description API route to get available booking days (blocks calendar events and DB bookings).
  */
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import {
   BOOKING_CONFIG,
   buildAvailableDays,
   type ExistingBooking,
-  type BookableDay,
 } from "@/features/booking/lib/booking";
-
-/**
- * Response containing available days.
- */
-interface AvailableDaysResponse {
-  /** List of available booking days with time windows. */
-  days: BookableDay[];
-  /** The time zone used for slot labels. */
-  timeZone: string;
-}
+import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 
 /**
  * Fetches calendar events if the module is available
@@ -57,10 +47,15 @@ async function fetchCalendarEventsSafe(
 
 /**
  * GET /api/booking/days
- * Returns available booking days, blocking both calendar events and database bookings
+ * Returns available booking days, blocking both calendar events and database bookings.
+ * Rate-limited per IP because each call hits the DB plus the Google Calendar API.
+ * @param request - Incoming request used for IP-based rate limiting.
  * @returns JSON response with available days
  */
-export async function GET(): Promise<NextResponse<AvailableDaysResponse>> {
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  const limited = rateLimitOrReject(request, "booking-days", 30, 60_000);
+  if (limited) return limited;
+
   try {
     const now = new Date();
     const maxDate = new Date(

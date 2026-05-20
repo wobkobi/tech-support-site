@@ -116,6 +116,8 @@ export function NavBar(): React.ReactElement | null {
   const isScrolledRef = useRef(false);
   const idleHideTimerRef = useRef<number | null>(null);
   const headerRef = useRef<HTMLElement | null>(null);
+  const mobileDrawerRef = useRef<HTMLElement | null>(null);
+  const focusBeforeMenuRef = useRef<HTMLElement | null>(null);
 
   /**
    * Set hidden state only when it changes (avoids redundant renders).
@@ -199,6 +201,50 @@ export function NavBar(): React.ReactElement | null {
 
     openMobileMenu();
   }, [mobileMenuOpen, openMobileMenu, closeMobileMenu]);
+
+  // Focus trap + Escape + focus restore for the mobile drawer.
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+
+    focusBeforeMenuRef.current = document.activeElement as HTMLElement | null;
+    const drawer = mobileDrawerRef.current;
+    if (!drawer) return;
+
+    const FOCUSABLE = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    const focusables = drawer.querySelectorAll<HTMLElement>(FOCUSABLE);
+    focusables[0]?.focus();
+
+    /**
+     * Drawer-scoped key handler: Escape closes, Tab cycles within focusables.
+     * @param e - The keyboard event from the document listener.
+     */
+    const handleKey = (e: KeyboardEvent): void => {
+      if (e.key === "Escape") {
+        closeMobileMenu();
+        return;
+      }
+      if (e.key !== "Tab") return;
+
+      const items = drawer.querySelectorAll<HTMLElement>(FOCUSABLE);
+      if (items.length === 0) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("keydown", handleKey);
+      focusBeforeMenuRef.current?.focus();
+    };
+  }, [mobileMenuOpen, closeMobileMenu]);
 
   // Lock body scroll while mobile menu is open.
   useEffect(() => {
@@ -525,6 +571,7 @@ export function NavBar(): React.ReactElement | null {
       )}
 
       <nav
+        ref={mobileDrawerRef}
         className={cn(
           "border-seasalt-400/40 bg-seasalt-800/95 overscroll-behavior-contain fixed right-4 z-40 max-h-[calc(100dvh-8rem)] max-w-[min(calc(100vw-2rem),18rem)] overflow-y-auto rounded-2xl border shadow-2xl backdrop-blur-xl lg:hidden",
           // `.app-mobile-drawer` (globals.css) owns top + translate transition.
@@ -533,6 +580,9 @@ export function NavBar(): React.ReactElement | null {
         )}
         id="mobile-nav"
         aria-label="Mobile navigation"
+        role={mobileMenuOpen ? "dialog" : undefined}
+        aria-modal={mobileMenuOpen ? true : undefined}
+        aria-hidden={mobileMenuOpen ? undefined : true}
       >
         <div className={cn("flex h-full flex-col gap-2 p-4")}>
           {NAV_ITEMS.map((item) => {

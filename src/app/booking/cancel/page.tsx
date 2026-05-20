@@ -10,7 +10,6 @@
 import type React from "react";
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import Image from "next/image";
 import { cn } from "@/shared/lib/cn";
 import { Button } from "@/shared/components/Button";
 
@@ -74,14 +73,16 @@ function CancelContent(): React.ReactElement {
     <main className={cn("relative min-h-dvh overflow-hidden")}>
       {/* Backdrop */}
       <div className={cn("pointer-events-none absolute inset-0 -z-10 overflow-hidden")}>
-        <Image
-          src="/source/backdrop-blur.webp"
-          alt=""
-          fill
-          priority
-          sizes="100vw"
-          className={cn("scale-110 transform-gpu object-cover")}
-        />
+        <picture>
+          <source type="image/avif" srcSet="/source/backdrop-blur.avif" />
+          <img
+            src="/source/backdrop-blur.webp"
+            alt=""
+            fetchPriority="high"
+            decoding="async"
+            className={cn("absolute inset-0 h-full w-full scale-110 transform-gpu object-cover")}
+          />
+        </picture>
       </div>
 
       {/* Frosted container */}

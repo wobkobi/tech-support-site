@@ -69,6 +69,10 @@ const nextConfig: NextConfig = {
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "same-origin" },
           { key: "Permissions-Policy", value: "geolocation=(), microphone=()" },
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=63072000; includeSubDomains; preload",
+          },
           { key: "Content-Security-Policy", value: isDev ? cspDev : cspProd },
         ],
       },
@@ -83,6 +87,10 @@ const nextConfig: NextConfig = {
         ],
       },
     ];
+  },
+
+  images: {
+    formats: ["image/avif", "image/webp"],
   },
 
   experimental: {

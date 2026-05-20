@@ -55,6 +55,7 @@ interface ButtonAsButton {
   children: React.ReactNode;
   "aria-label"?: string;
   "aria-disabled"?: boolean;
+  "aria-busy"?: boolean;
 }
 
 export type ButtonProps = ButtonAsLink | ButtonAsButton;
@@ -131,9 +132,17 @@ export function Button(props: ButtonProps): React.ReactElement {
     "rounded-lg font-bold",
     "whitespace-nowrap",
     fullWidth && "w-full",
-    disabled && "opacity-60 cursor-not-allowed",
     getVariantClasses(variant),
     getSizeClasses(size),
+    // Disabled appearance is unified across variants (muted grey, dark text)
+    // and overrides the variant's hover/shadow. Placed last so tailwind-merge
+    // resolves bg/text/border conflicts in favour of the disabled look.
+    disabled && [
+      "cursor-not-allowed",
+      "bg-seasalt-400 text-rich-black/70 border-seasalt-400/50",
+      "hover:bg-seasalt-400 hover:text-rich-black/70 hover:border-seasalt-400/50",
+      "shadow-none hover:shadow-none",
+    ],
     className,
   );
 
@@ -182,6 +191,7 @@ export function Button(props: ButtonProps): React.ReactElement {
     onClick,
     "aria-label": ariaLabel,
     "aria-disabled": ariaDisabled,
+    "aria-busy": ariaBusy,
   } = rest as ButtonAsButton;
 
   return (
@@ -192,6 +202,7 @@ export function Button(props: ButtonProps): React.ReactElement {
       className={baseClasses}
       aria-label={ariaLabel}
       aria-disabled={ariaDisabled ?? disabled}
+      aria-busy={ariaBusy}
     >
       {children}
     </button>

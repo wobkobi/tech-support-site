@@ -373,6 +373,16 @@ export function validateBookingRequest(
     return { valid: false, error: "This time slot is in the past" };
   }
 
+  // Server-side enforce the client's min-notice window so direct API calls
+  // can't bypass it.
+  const minNoticeMs = config.minHoursNotice * 60 * 60 * 1000;
+  if (slotStart.getTime() - now.getTime() < minNoticeMs) {
+    return {
+      valid: false,
+      error: `Bookings need at least ${config.minHoursNotice} hours notice`,
+    };
+  }
+
   if (!isSlotFree(slotStart, slotEnd, existingBookings, calendarEvents, config.bufferMin)) {
     return { valid: false, error: "This time slot is no longer available" };
   }

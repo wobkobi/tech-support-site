@@ -39,6 +39,12 @@ export interface AddressAutocompleteProps {
   maxLength?: number;
   /** Input ID for label association */
   id?: string;
+  /** Optional accessible name when no visible <label htmlFor> wraps the field. */
+  "aria-label"?: string;
+  /** Optional id of an element describing the field (e.g. error message). */
+  "aria-describedby"?: string;
+  /** True when the field has a validation error. */
+  "aria-invalid"?: boolean;
 }
 
 /**
@@ -53,6 +59,9 @@ export interface AddressAutocompleteProps {
  * @param props.required - Whether the field is required.
  * @param props.maxLength - Optional max character length for the input.
  * @param props.id - Input ID for label association.
+ * @param props."aria-label" - Accessible name when no visible label wraps the field.
+ * @param props."aria-describedby" - ID of an element describing the field.
+ * @param props."aria-invalid" - True when the field has a validation error.
  * @returns Address autocomplete input element.
  */
 export default function AddressAutocomplete({
@@ -63,6 +72,9 @@ export default function AddressAutocomplete({
   required = false,
   maxLength,
   id = "address-autocomplete",
+  "aria-label": ariaLabel,
+  "aria-describedby": ariaDescribedBy,
+  "aria-invalid": ariaInvalid,
 }: AddressAutocompleteProps): React.ReactElement {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -168,10 +180,14 @@ export default function AddressAutocomplete({
         required={required}
         maxLength={maxLength}
         autoComplete="off"
+        aria-label={ariaLabel}
+        aria-describedby={ariaDescribedBy}
+        aria-invalid={ariaInvalid}
         className={cn(
           "border-seasalt-400/80 bg-seasalt text-rich-black w-full rounded-md border px-4 py-3 text-base",
           "focus:border-russian-violet focus:ring-russian-violet/30 focus:outline-none focus:ring-1",
           showWarning && "border-yellow-500/60",
+          ariaInvalid && "border-coquelicot-500/60",
         )}
       />
 
