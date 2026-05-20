@@ -18,6 +18,29 @@ interface RefreshResult {
   deletedCount: number;
 }
 
+// Travel block padding for job overrun + traffic. +10 then ceil to next 5-min
+// gives ~10 min margin always (e.g. 14 > 25, 30 > 40, 60 > 70).
+const TRAVEL_ROUND_INCREMENT_MIN = 5;
+const TRAVEL_ROUND_BUFFER_MIN = 10;
+
+// Suppress travel-back when the next event is close enough that dwell at home
+// (gap minus current>home minus home>next) falls below MIN_HOME_DWELL_MIN.
+const RETURN_CHAINING_LOOKAHEAD_MS = 2 * 60 * 60 * 1000;
+const MIN_HOME_DWELL_MIN = 60;
+
+/**
+ * Rounds raw Distance Matrix minutes up with a fixed buffer absorbing job
+ * overrun and traffic uncertainty.
+ * @param raw - Raw travel time in minutes from the Distance Matrix API.
+ * @returns Blocked minutes to write into TravelBlock.roundedMinutes.
+ */
+function roundTravelMinutes(raw: number): number {
+  return (
+    Math.ceil((raw + TRAVEL_ROUND_BUFFER_MIN) / TRAVEL_ROUND_INCREMENT_MIN) *
+    TRAVEL_ROUND_INCREMENT_MIN
+  );
+}
+
 /**
  * Finds the best origin address for the travel-to leg of a given event.
  * Looks for a preceding event that ends within 4 hours of the target event's
@@ -51,6 +74,46 @@ export function findSmartOrigin(
   }
 
   return bestOrigin ?? homeAddress;
+}
+
+/**
+ * Forward-looking counterpart to {@link findSmartOrigin}. Returns the soonest
+ * upcoming event with a resolvable location starting within
+ * {@link RETURN_CHAINING_LOOKAHEAD_MS} of the given departure, or null.
+ * @param allEvents - All calendar events in the current window.
+ * @param currentEvent - The event being left.
+ * @param effectiveDeparture - Earliest time the traveller can leave.
+ * @returns The candidate next event with its location and start, or null.
+ */
+export function findNextChainedEvent(
+  allEvents: CalendarEvent[],
+  currentEvent: CalendarEvent,
+  effectiveDeparture: Date,
+): { event: CalendarEvent; location: string; startAt: Date } | null {
+  const departMs = effectiveDeparture.getTime();
+
+  let best: CalendarEvent | null = null;
+  let bestLoc: string | null = null;
+  let bestStart: Date | null = null;
+  let bestGap = Infinity;
+
+  for (const e of allEvents) {
+    if (e.id === currentEvent.id) continue;
+    const loc = e.location ?? e.summary;
+    if (!loc) continue;
+    const startAt = new Date(e.start);
+    const gap = startAt.getTime() - departMs;
+    if (gap > 0 && gap <= RETURN_CHAINING_LOOKAHEAD_MS && gap < bestGap) {
+      best = e;
+      bestLoc = loc;
+      bestStart = startAt;
+      bestGap = gap;
+    }
+  }
+
+  return best && bestLoc && bestStart
+    ? { event: best, location: bestLoc, startAt: bestStart }
+    : null;
 }
 
 /**
@@ -162,6 +225,7 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
       id: true,
       sourceEventId: true,
       calendarEmail: true,
+      recurringEventId: true,
       summary: true,
       eventStartAt: true,
       eventEndAt: true,
@@ -175,12 +239,25 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
       customOrigin: true,
       detectedOrigin: true,
       destination: true,
+      travelBackSuppressed: true,
+      chainedNextEventId: true,
+      chainedNextEventStartAt: true,
     },
   });
   const blockByKey = new Map(
     existingBlocks.map((b) => [`${b.sourceEventId}|${b.calendarEmail}`, b]),
   );
   const currentEventKeys = new Set(rawEvents.map((e) => `${e.id}|${e.calendarEmail}`));
+
+  // Series-level transport mode preferences (one per recurring event series).
+  // Survives stale-cleanup of TravelBlock rows, so a freshly-fetched recurring
+  // instance inherits the mode an admin previously chose for the series.
+  const seriesPrefs = await prisma.recurringTravelPreference.findMany({
+    select: { recurringEventId: true, calendarEmail: true, transportMode: true },
+  });
+  const seriesModeByKey = new Map(
+    seriesPrefs.map((p) => [`${p.recurringEventId}|${p.calendarEmail}`, p.transportMode]),
+  );
 
   if (isDev) {
     console.log(`[travel] Existing TravelBlocks in DB: ${existingBlocks.length}`);
@@ -208,6 +285,12 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
     // customOrigin (user override) takes precedence over auto-detection
     const effectiveOrigin = existing?.customOrigin ?? detectedOrigin;
 
+    // Candidate next-event for chaining. Identity + start are stored on the
+    // block so a subsequent run can detect if the candidate moved or vanished.
+    const chained = findNextChainedEvent(rawEvents, event, departureForBack);
+    const currentChainedId = chained?.event.id ?? null;
+    const currentChainedStart = chained?.startAt ?? null;
+
     // Determine whether a rebuild is needed and whether we can reuse raw minutes
     let needsRebuild = true;
     let reuseRawToMinutes: number | null = null;
@@ -224,15 +307,24 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
         existing.customOrigin ?? existing.detectedOrigin ?? homeAddress;
       const originChanged = effectiveOrigin !== existingEffectiveOrigin;
 
-      if (eventTimesMatch && !originChanged) {
+      // A shift in the chaining candidate invalidates the cached suppression decision.
+      const chainedIdChanged = existing.chainedNextEventId !== currentChainedId;
+      const chainedStartChanged =
+        (existing.chainedNextEventStartAt?.getTime() ?? null) !==
+        (currentChainedStart?.getTime() ?? null);
+      const chainingChanged = chainedIdChanged || chainedStartChanged;
+
+      if (eventTimesMatch && !originChanged && !chainingChanged) {
         // null means the direction was never successfully calculated - treat as needing retry
         const toOk =
           existing.rawTravelMinutes !== null &&
-          Math.ceil(existing.rawTravelMinutes / 15) * 15 === (existing.roundedMinutes ?? -1);
+          roundTravelMinutes(existing.rawTravelMinutes) === (existing.roundedMinutes ?? -1);
+        // Suppressed travel-back is a steady state - no block exists by design.
         const backOk =
-          existing.rawTravelBackMinutes !== null &&
-          Math.ceil(existing.rawTravelBackMinutes / 15) * 15 ===
-            (existing.roundedBackMinutes ?? -1);
+          existing.travelBackSuppressed ||
+          (existing.rawTravelBackMinutes !== null &&
+            roundTravelMinutes(existing.rawTravelBackMinutes) ===
+              (existing.roundedBackMinutes ?? -1));
 
         if (toOk && backOk) {
           if (isDev) console.log(`[travel] Skipping "${event.summary}" - unchanged`);
@@ -247,10 +339,14 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
             );
         }
       } else {
-        if (isDev)
-          console.log(
-            `[travel] Rebuilding "${event.summary}" - ${originChanged ? "origin changed" : "event times changed"}`,
-          );
+        if (isDev) {
+          const reason = originChanged
+            ? "origin changed"
+            : chainingChanged
+              ? "chained next event changed"
+              : "event times changed";
+          console.log(`[travel] Rebuilding "${event.summary}" - ${reason}`);
+        }
       }
 
       if (needsRebuild) {
@@ -313,17 +409,21 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
         });
       }
 
-      // Keep summary, detectedOrigin, and destination up-to-date for display
+      // Backfill display fields and recurringEventId for rows that predate this column.
       const currentSummary = event.summary ?? null;
       const currentDestination = event.location ?? event.summary ?? null;
+      const currentRecurringId = event.recurringEventId ?? null;
       const updates: {
         summary?: string | null;
         detectedOrigin?: string | null;
         destination?: string | null;
+        recurringEventId?: string | null;
       } = {};
       if (existing.summary !== currentSummary) updates.summary = currentSummary;
       if (existing.detectedOrigin !== detectedOrigin) updates.detectedOrigin = detectedOrigin;
       if (existing.destination !== currentDestination) updates.destination = currentDestination;
+      if (existing.recurringEventId !== currentRecurringId)
+        updates.recurringEventId = currentRecurringId;
       if (Object.keys(updates).length > 0) {
         await prisma.travelBlock.update({
           where: { id: existing.id },
@@ -336,11 +436,15 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
     // Effective destination: dedicated location field, or fall back to event title
     const eventLocation = (event.location ?? event.summary)!;
 
-    // Per-block transport mode (default to transit if not set)
-    const travelMode = (existing?.transportMode ?? "transit") as TransportMode;
+    // Mode precedence: per-instance override > series preference > default "transit".
+    const seriesKey = event.recurringEventId
+      ? `${event.recurringEventId}|${event.calendarEmail}`
+      : null;
+    const seriesMode = seriesKey ? (seriesModeByKey.get(seriesKey) ?? null) : null;
+    const travelMode = (existing?.transportMode ?? seriesMode ?? "transit") as TransportMode;
 
-    // Travel-to and travel-back are independent Distance Matrix calls; run them
-    // concurrently per event to roughly halve wall-clock time on the cron job.
+    // Three Distance Matrix calls in parallel - the third (home>next) only
+    // fires when a chaining candidate exists, and feeds the dwell calculation.
     if (isDev && reuseRawToMinutes === null) {
       console.log(
         `[travel] Calculating travel-to: ${effectiveOrigin} → ${eventLocation} (${travelMode})`,
@@ -351,8 +455,13 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
         `[travel] Calculating travel-back: ${eventLocation} → ${homeAddress} (depart ${departureForBack.toISOString()}, ${travelMode})`,
       );
     }
+    if (isDev && chained) {
+      console.log(
+        `[travel] Evaluating chain to "${chained.event.summary}" @ ${chained.location} (gap ${Math.round((chained.startAt.getTime() - departureForBack.getTime()) / 60_000)} min)`,
+      );
+    }
 
-    const [rawTravelToMinutes, rawTravelBackMinutes] = await Promise.all([
+    const [rawTravelToMinutes, rawTravelBackMinutes, rawHomeToNextMinutes] = await Promise.all([
       reuseRawToMinutes !== null
         ? Promise.resolve(reuseRawToMinutes)
         : calculateTravelMinutes(effectiveOrigin, eventLocation, eventStart, {
@@ -364,11 +473,45 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
         : calculateTravelMinutes(eventLocation, homeAddress, departureForBack, {
             mode: travelMode,
           }),
+      chained
+        ? calculateTravelMinutes(homeAddress, chained.location, chained.startAt, {
+            useArrivalTime: true,
+            mode: travelMode,
+          })
+        : Promise.resolve(null),
     ]);
 
     if (isDev) {
       console.log(`[travel] Travel-to result: ${rawTravelToMinutes ?? "null (skipping)"} min`);
       console.log(`[travel] Travel-back result: ${rawTravelBackMinutes ?? "null (skipping)"} min`);
+      if (chained) {
+        console.log(`[travel] Home->next result: ${rawHomeToNextMinutes ?? "null (skipping)"} min`);
+      }
+    }
+
+    // Suppress travel-back when dwell at home would be under MIN_HOME_DWELL_MIN.
+    // The next event's travel-to leg (via findSmartOrigin) reserves the gap instead.
+    let travelBackSuppressed = false;
+    if (
+      chained &&
+      currentChainedStart &&
+      rawTravelBackMinutes !== null &&
+      rawHomeToNextMinutes !== null
+    ) {
+      const gapMin = (currentChainedStart.getTime() - departureForBack.getTime()) / 60_000;
+      const dwellMin = gapMin - rawTravelBackMinutes - rawHomeToNextMinutes;
+      if (dwellMin < MIN_HOME_DWELL_MIN) {
+        travelBackSuppressed = true;
+        if (isDev) {
+          console.log(
+            `[travel] Suppressing travel-back for "${event.summary}" - dwell ${Math.round(dwellMin)} min < ${MIN_HOME_DWELL_MIN} min minimum`,
+          );
+        }
+      } else if (isDev) {
+        console.log(
+          `[travel] Keeping travel-back to home for "${event.summary}" - dwell ${Math.round(dwellMin)} min`,
+        );
+      }
     }
 
     // Skip entirely if both directions failed (try again next cron run)
@@ -380,7 +523,7 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
     // Write cache-only blocks
     let storedBeforeId: string | null = null;
     if (rawTravelToMinutes !== null) {
-      const roundedTo = Math.ceil(rawTravelToMinutes / 15) * 15;
+      const roundedTo = roundTravelMinutes(rawTravelToMinutes);
       const travelToStart = new Date(eventStart.getTime() - roundedTo * 60 * 1000);
       if (isDev) {
         console.log(
@@ -412,8 +555,8 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
     }
 
     let storedAfterId: string | null = null;
-    if (rawTravelBackMinutes !== null) {
-      const roundedBack = Math.ceil(rawTravelBackMinutes / 15) * 15;
+    if (rawTravelBackMinutes !== null && !travelBackSuppressed) {
+      const roundedBack = roundTravelMinutes(rawTravelBackMinutes);
       const travelBackEnd = new Date(departureForBack.getTime() + roundedBack * 60 * 1000);
       if (isDev) {
         console.log(
@@ -444,27 +587,33 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
       }
     }
 
-    // Persist TravelBlock record
+    // Persist the resolved mode (so the admin UI matches reality) and the raw
+    // travel-back minutes even when suppressed, so an un-suppression can reuse them.
+    const persistedMode = existing?.transportMode ?? seriesMode ?? null;
     try {
       await prisma.travelBlock.create({
         data: {
           sourceEventId: event.id,
           calendarEmail: event.calendarEmail,
+          recurringEventId: event.recurringEventId ?? null,
           summary: event.summary ?? null,
           eventStartAt: eventStart,
           eventEndAt: eventEnd,
           rawTravelMinutes: rawTravelToMinutes,
           roundedMinutes:
-            rawTravelToMinutes !== null ? Math.ceil(rawTravelToMinutes / 15) * 15 : null,
+            rawTravelToMinutes !== null ? roundTravelMinutes(rawTravelToMinutes) : null,
           rawTravelBackMinutes,
           roundedBackMinutes:
-            rawTravelBackMinutes !== null ? Math.ceil(rawTravelBackMinutes / 15) * 15 : null,
+            rawTravelBackMinutes !== null ? roundTravelMinutes(rawTravelBackMinutes) : null,
           beforeEventId: storedBeforeId,
           afterEventId: storedAfterId,
-          transportMode: existing?.transportMode ?? null,
+          transportMode: persistedMode,
           customOrigin: existing?.customOrigin ?? null,
           detectedOrigin,
           destination: eventLocation,
+          travelBackSuppressed,
+          chainedNextEventId: currentChainedId,
+          chainedNextEventStartAt: currentChainedStart,
         },
       });
       console.log(`[refreshCalendarCache] Created travel blocks for event: ${event.id}`);

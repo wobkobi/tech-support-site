@@ -64,6 +64,42 @@ export async function PATCH(
       },
     });
 
+    // Transport-mode overrides on a recurring event apply to the whole series:
+    // persist the choice durably and cascade to sibling instances so they all
+    // recompute with the new mode on the next cron tick. customOrigin stays
+    // per-instance because origins legitimately vary between occurrences.
+    if (hasMode && mode !== undefined && block.recurringEventId) {
+      await prisma.recurringTravelPreference.upsert({
+        where: {
+          recurringEventId_calendarEmail: {
+            recurringEventId: block.recurringEventId,
+            calendarEmail: block.calendarEmail,
+          },
+        },
+        create: {
+          recurringEventId: block.recurringEventId,
+          calendarEmail: block.calendarEmail,
+          transportMode: mode,
+        },
+        update: { transportMode: mode },
+      });
+
+      await prisma.travelBlock.updateMany({
+        where: {
+          recurringEventId: block.recurringEventId,
+          calendarEmail: block.calendarEmail,
+          id: { not: id },
+        },
+        data: {
+          transportMode: mode,
+          rawTravelMinutes: null,
+          roundedMinutes: null,
+          rawTravelBackMinutes: null,
+          roundedBackMinutes: null,
+        },
+      });
+    }
+
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("[travel/[id]] Error:", error);

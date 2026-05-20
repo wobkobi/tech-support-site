@@ -127,7 +127,7 @@ model ReviewRequest {
 
 // Contacts built from booking submissions.
 model Contact {
-  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  id              String    @id @default(auto()) @map("_id") @db.ObjectId
   name            String
   email           String?
   phone           String?
@@ -142,8 +142,8 @@ model Contact {
   // Google changed iff current etag != lastGoogleEtag.
   lastSyncedAt    DateTime?
   lastGoogleEtag  String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 }
 
 // Sync conflicts admin resolves at /admin/contacts/conflicts.
@@ -163,25 +163,45 @@ model ContactConflict {
 
 // Travel time blocks created for external calendar events with a location.
 model TravelBlock {
-  id                   String   @id @default(auto()) @map("_id") @db.ObjectId
-  sourceEventId        String
-  calendarEmail        String
-  summary              String? // Google Calendar event title (e.g. "Dentist", "Mario Movie")
-  eventStartAt         DateTime // Source event start - used to detect time changes
-  eventEndAt           DateTime // Source event end - used to detect time changes
-  rawTravelMinutes     Int? // Raw travel-to time from Distance Matrix API
-  roundedMinutes       Int? // Rounded travel-to value used for block window
-  rawTravelBackMinutes Int? // Raw return-trip travel time
-  roundedBackMinutes   Int? // Rounded return-trip value used for block window
-  beforeEventId        String? // Synthetic CalendarEventCache ID blocking travel-to
-  afterEventId         String? // Synthetic CalendarEventCache ID blocking travel-back
-  transportMode        String? // "transit" | "driving" | "walking" | "bicycling" - null treated as "transit"
-  customOrigin         String? // Manual override for travel-to origin address
-  detectedOrigin       String? // Auto-detected origin from preceding event or home address
-  destination          String? // Destination address (event.location ?? event.summary)
-  createdAt            DateTime @default(now())
+  id                      String    @id @default(auto()) @map("_id") @db.ObjectId
+  sourceEventId           String
+  calendarEmail           String
+  recurringEventId        String? // Parent series ID when source event is a recurring instance
+  summary                 String? // Google Calendar event title (e.g. "Dentist", "Mario Movie")
+  eventStartAt            DateTime // Source event start - used to detect time changes
+  eventEndAt              DateTime // Source event end - used to detect time changes
+  rawTravelMinutes        Int? // Raw travel-to time from Distance Matrix API
+  roundedMinutes          Int? // Rounded travel-to value used for block window
+  rawTravelBackMinutes    Int? // Raw return-trip travel time (to home or chained venue)
+  roundedBackMinutes      Int? // Rounded return-trip value used for block window
+  beforeEventId           String? // Synthetic CalendarEventCache ID blocking travel-to
+  afterEventId            String? // Synthetic CalendarEventCache ID blocking travel-back
+  transportMode           String? // "transit" | "driving" | "walking" | "bicycling" - null treated as "transit"
+  customOrigin            String? // Manual override for travel-to origin address
+  detectedOrigin          String? // Auto-detected origin from preceding event or home address
+  destination             String? // Destination address (event.location ?? event.summary)
+  travelBackSuppressed    Boolean   @default(false) // True when chaining to next event beats going home
+  chainedNextEventId      String? // Identity of next event evaluated for chaining (for change detection)
+  chainedNextEventStartAt DateTime? // Start of that next event (rebuild when it shifts)
+  createdAt               DateTime  @default(now())
 
   @@unique([sourceEventId, calendarEmail])
+  // Sibling cascade on admin transport-mode override
+  @@index([recurringEventId, calendarEmail])
+}
+
+// Series-level transport mode preference for recurring Google Calendar events.
+// One row per (recurringEventId, calendarEmail). Survives TravelBlock stale-cleanup
+// so a new instance entering the fetch window picks up the admin's chosen mode.
+model RecurringTravelPreference {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  recurringEventId String
+  calendarEmail    String
+  transportMode    String? // "transit" | "driving" | "walking" | "bicycling"
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([recurringEventId, calendarEmail])
 }
 
 // Cached Google Calendar events for fast booking page loads.
@@ -239,29 +259,29 @@ type LineItem {
 }
 
 model Invoice {
-  id          String        @id @default(auto()) @map("_id") @db.ObjectId
-  number      String        @unique
-  clientName  String
-  clientEmail String
-  issueDate   DateTime
-  dueDate     DateTime
-  lineItems   LineItem[]
-  gst         Boolean       @default(false)
-  subtotal    Float
-  gstAmount   Float
-  total       Float
+  id               String        @id @default(auto()) @map("_id") @db.ObjectId
+  number           String        @unique
+  clientName       String
+  clientEmail      String
+  issueDate        DateTime
+  dueDate          DateTime
+  lineItems        LineItem[]
+  gst              Boolean       @default(false)
+  subtotal         Float
+  gstAmount        Float
+  total            Float
   // Promo snapshot at creation time (kept stable if the source promo changes).
-  promoTitle    String?
-  promoDiscount Float?
-  status      InvoiceStatus @default(DRAFT)
-  notes       String?
-  contactId   String?       @db.ObjectId
-  driveFileId String?
-  driveWebUrl String?
+  promoTitle       String?
+  promoDiscount    Float?
+  status           InvoiceStatus @default(DRAFT)
+  notes            String?
+  contactId        String?       @db.ObjectId
+  driveFileId      String?
+  driveWebUrl      String?
   // Stamped when send-email included the review link; powers the 30-day cooldown.
   reviewLinkSentAt DateTime?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
 
   @@index([clientEmail, reviewLinkSentAt])
 }
