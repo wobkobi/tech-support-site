@@ -237,6 +237,7 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
       customOrigin: true,
       detectedOrigin: true,
       destination: true,
+      customTravelBackDestination: true,
       travelBackSuppressed: true,
       chainedNextEventId: true,
       chainedNextEventStartAt: true,
@@ -283,9 +284,16 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
     // customOrigin (user override) takes precedence over auto-detection
     const effectiveOrigin = existing?.customOrigin ?? detectedOrigin;
 
+    // Travel-back destination: admin override if set, otherwise home.
+    const effectiveBackDestination = existing?.customTravelBackDestination ?? homeAddress;
+    const hasCustomBackDestination = existing?.customTravelBackDestination != null;
+
     // Candidate next-event for chaining. Identity + start are stored on the
     // block so a subsequent run can detect if the candidate moved or vanished.
-    const chained = findNextChainedEvent(rawEvents, event, departureForBack);
+    // Skipped when admin set a custom back destination - the explicit choice wins.
+    const chained = hasCustomBackDestination
+      ? null
+      : findNextChainedEvent(rawEvents, event, departureForBack);
     const currentChainedId = chained?.event.id ?? null;
     const currentChainedStart = chained?.startAt ?? null;
 
@@ -311,6 +319,9 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
         (existing.chainedNextEventStartAt?.getTime() ?? null) !==
         (currentChainedStart?.getTime() ?? null);
       const chainingChanged = chainedIdChanged || chainedStartChanged;
+
+      // customTravelBackDestination changes propagate via the admin route nulling
+      // back-leg minutes; the !backOk path below will then trigger a rebuild.
 
       if (eventTimesMatch && !originChanged && !chainingChanged) {
         // null means the direction was never successfully calculated - treat as needing retry
@@ -450,7 +461,7 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
     }
     if (isDev && reuseRawBackMinutes === null) {
       console.log(
-        `[travel] Calculating travel-back: ${eventLocation} → ${homeAddress} (depart ${departureForBack.toISOString()}, ${travelMode})`,
+        `[travel] Calculating travel-back: ${eventLocation} → ${effectiveBackDestination} (depart ${departureForBack.toISOString()}, ${travelMode})`,
       );
     }
     if (isDev && chained) {
@@ -468,7 +479,7 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
           }),
       reuseRawBackMinutes !== null
         ? Promise.resolve(reuseRawBackMinutes)
-        : calculateTravelMinutes(eventLocation, homeAddress, departureForBack, {
+        : calculateTravelMinutes(eventLocation, effectiveBackDestination, departureForBack, {
             mode: travelMode,
           }),
       chained
@@ -609,6 +620,7 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
           customOrigin: existing?.customOrigin ?? null,
           detectedOrigin,
           destination: eventLocation,
+          customTravelBackDestination: existing?.customTravelBackDestination ?? null,
           travelBackSuppressed,
           chainedNextEventId: currentChainedId,
           chainedNextEventStartAt: currentChainedStart,

@@ -1,8 +1,9 @@
 // src/app/api/admin/travel/[id]/route.ts
 /**
  * @file route.ts
- * @description Admin endpoint to update a TravelBlock's transport mode or custom origin.
- * Setting either clears cached raw minutes so the next recalculation uses the new values.
+ * @description Admin endpoint to update a TravelBlock's transport mode, custom
+ * origin, or custom travel-back destination. Setting any clears cached raw
+ * minutes so the next refresh recalculates.
  */
 
 import { type NextRequest, NextResponse } from "next/server";
@@ -31,6 +32,7 @@ export async function PATCH(
   const body = (await request.json()) as {
     transportMode?: string;
     customOrigin?: string | null;
+    customTravelBackDestination?: string | null;
   };
 
   const mode = body.transportMode;
@@ -40,8 +42,9 @@ export async function PATCH(
 
   const hasMode = mode !== undefined;
   const hasOrigin = "customOrigin" in body;
+  const hasBackDest = "customTravelBackDestination" in body;
 
-  if (!hasMode && !hasOrigin) {
+  if (!hasMode && !hasOrigin && !hasBackDest) {
     return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
   }
 
@@ -56,6 +59,9 @@ export async function PATCH(
       data: {
         ...(hasMode && { transportMode: mode }),
         ...(hasOrigin && { customOrigin: body.customOrigin ?? null }),
+        ...(hasBackDest && {
+          customTravelBackDestination: body.customTravelBackDestination ?? null,
+        }),
         // Clear raw minutes so the next recalculate uses the updated values
         rawTravelMinutes: null,
         roundedMinutes: null,

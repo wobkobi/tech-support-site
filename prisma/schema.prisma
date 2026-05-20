@@ -180,6 +180,7 @@ model TravelBlock {
   customOrigin            String? // Manual override for travel-to origin address
   detectedOrigin          String? // Auto-detected origin from preceding event or home address
   destination             String? // Destination address (event.location ?? event.summary)
+  customTravelBackDestination String? // Manual override for travel-back destination (defaults to home)
   travelBackSuppressed    Boolean   @default(false) // True when chaining to next event beats going home
   chainedNextEventId      String? // Identity of next event evaluated for chaining (for change detection)
   chainedNextEventStartAt DateTime? // Start of that next event (rebuild when it shifts)
