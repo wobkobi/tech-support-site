@@ -244,6 +244,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           details?: string | null;
           baseRateLabel?: string | null;
           modifierLabels?: string[];
+          isShort?: boolean;
         };
         const snap = findTemplateByTags(t.device, t.action, templates);
         const device = snap?.device ?? t.device ?? null;
@@ -278,6 +279,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           unitPrice,
         };
       });
+    }
+
+    // Wall-clock ceiling: AI sometimes inflates durationMins from its own task
+    // estimates ("9-9:30" but emits 50 min). Cap durationMins to the stated
+    // span - gaps only reduce billable time, never increase it.
+    if (parsed.startTime && parsed.endTime && typeof parsed.durationMins === "number") {
+      const [sh, sm] = parsed.startTime.split(":").map(Number);
+      const [eh, em] = parsed.endTime.split(":").map(Number);
+      const wallMin = eh * 60 + em - (sh * 60 + sm);
+      if (wallMin > 0 && parsed.durationMins > wallMin) {
+        parsed.warnings = [
+          ...(parsed.warnings ?? []),
+          `AI emitted durationMins ${parsed.durationMins} > ${wallMin}-min wall-clock span. Capped to ${wallMin}.`,
+        ];
+        parsed.durationMins = wallMin;
+      }
     }
 
     // Safety net: rebalance into the largest task if the sum drifts.

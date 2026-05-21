@@ -110,6 +110,8 @@ export interface TaskLine {
   action?: string | null;
   /** Optional free-text qualifier appended to the composed description (e.g. "corrupted", "Windows OS"). */
   details?: string | null;
+  /** AI-flagged "short" task ("quickly", "briefly", one-shot actions). Pinned at 15 min by the rebalance helper so non-short tasks absorb the correction. */
+  isShort?: boolean;
 }
 
 export interface PartLine {
@@ -173,6 +175,8 @@ export interface ParsedTaskLine {
   action?: string | null;
   /** Optional free-text qualifier from the AI when device + action alone aren't specific enough. */
   details?: string | null;
+  /** True when the AI placed this task in the SHORT set (one-shot, quickly, briefly, etc.). */
+  isShort?: boolean;
 }
 
 export interface ParsedPartLine {

@@ -12,7 +12,10 @@ import {
   effectiveHourlyRate,
   composeDescription,
   MIN_TRAVEL_CHARGE,
+  collapseToWindow,
+  hourlyTaskMinutes,
 } from "@/features/business/lib/business";
+import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 import { ContactPickerModal } from "@/features/business/components/ContactPickerModal";
 import { ParseConfidenceBanner } from "@/features/business/components/ParseConfidenceBanner";
 import { TaxonomyManageModal } from "@/features/business/components/TaxonomyManageModal";
@@ -64,6 +67,34 @@ function timeDiffMins(start: string, end: string): number {
   const [eh, em] = end.split(":").map(Number);
   const diff = eh * 60 + em - (sh * 60 + sm);
   return diff > 0 ? diff : 0;
+}
+
+/**
+ * Builds a UTC ISO timestamp for an HH:MM start time interpreted as NZ wall-clock.
+ * Defaults to today; if the resulting time has already passed today's wall clock,
+ * rolls forward to tomorrow so quotes for "later today" don't accidentally fall
+ * outside Google's traffic-prediction horizon. Returns null when the input isn't
+ * a valid HH:MM string.
+ * @param hhmm - Start time in HH:MM (24h) NZ wall-clock.
+ * @returns ISO 8601 UTC timestamp, or null.
+ */
+function jobStartIsoFromTime(hhmm: string): string | null {
+  if (!/^\d{1,2}:\d{2}$/.test(hhmm)) return null;
+  const [h, m] = hhmm.split(":").map(Number);
+  if (h < 0 || h > 23 || m < 0 || m > 59) return null;
+  const nzDateStr = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Pacific/Auckland",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+  const [y, mo, d] = nzDateStr.split("-").map(Number);
+  const offset = getPacificAucklandOffset(y, mo, d);
+  let utc = new Date(Date.UTC(y, mo - 1, d, h - offset, m, 0));
+  if (utc.getTime() < Date.now()) {
+    utc = new Date(utc.getTime() + 24 * 60 * 60 * 1000);
+  }
+  return utc.toISOString();
 }
 
 /**
@@ -271,7 +302,11 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
       setEndTime(result.endTime);
       // Use durationMins as override when the AI provided it explicitly - handles multi-session
       // work where billed time is less than wall-clock diff due to gaps between sessions.
-      setDurationOverride(result.durationMins ?? null);
+      // Clamp: AI sometimes inflates durationMins from its own task estimates, e.g. emitting
+      // 50 min for a 9-9:30 span. Wall-clock is the ceiling; gaps only reduce billable time.
+      const wallClockMin = timeDiffMins(result.startTime, result.endTime);
+      const aiMin = result.durationMins ?? null;
+      setDurationOverride(aiMin != null && aiMin < wallClockMin ? aiMin : null);
     } else if (result.startTime) {
       setStartTime(result.startTime);
       setEndTime(nowTime());
@@ -310,6 +345,7 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
         device,
         action,
         details,
+        isShort: t.isShort ?? false,
       };
     });
     const parsedParts = result.parts.map((p) => ({ description: p.description, cost: p.cost }));
@@ -341,7 +377,31 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
     } else {
       setTravelOnInvoice(false);
     }
-    setTasks(parsedTasks);
+    // Rebalance parsed tasks to fit the listed window so an AI over-estimating
+    // a single step doesn't silently over-bill. Tasks scale proportionally so
+    // the over-long ones absorb more of the correction; anything that scales
+    // below the minimum is dropped and the rest rescale. When both wall-clock
+    // bounds are present the span is the source of truth - AI's durationMins
+    // only wins when it's lower (genuine multi-session gap case).
+    const wallClockMin =
+      result.startTime && result.endTime ? timeDiffMins(result.startTime, result.endTime) : 0;
+    const aiDurationMins = result.durationMins ?? 0;
+    const parseWindowMin =
+      wallClockMin > 0
+        ? aiDurationMins > 0 && aiDurationMins < wallClockMin
+          ? aiDurationMins
+          : wallClockMin
+        : aiDurationMins;
+    const collapsed = collapseToWindow(parsedTasks, parseWindowMin);
+    setTasks(collapsed.tasks);
+    if (collapsed.rescaled || collapsed.dropped > 0) {
+      const parts: string[] = ["Rebalanced tasks"];
+      if (collapsed.dropped > 0) {
+        parts.push(`(dropped ${collapsed.dropped} tiny task${collapsed.dropped === 1 ? "" : "s"})`);
+      }
+      setIncomeToast(`${parts.join(" ")} to fit the ${parseWindowMin}-min window.`);
+      setTimeout(() => setIncomeToast(null), 4000);
+    }
     setParts(parsedParts);
     if (result.notes) setNotes(result.notes);
   }, []);
@@ -537,10 +597,14 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
     setTravelInfo(null);
     setTravelOnInvoice(false);
     try {
+      const departureTimeIso = jobStartIsoFromTime(startTime);
       const res = await fetch("/api/pricing/travel-time", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ destination: jobAddress }),
+        body: JSON.stringify({
+          destination: jobAddress,
+          ...(departureTimeIso ? { departureTimeIso } : {}),
+        }),
       });
       const d = (await res.json()) as { distanceKm?: number; durationMins?: number };
       if (d.distanceKm && d.distanceKm > 0) {
@@ -980,7 +1044,17 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
             onAddToInvoice={addTravelToInvoice}
           />
 
-          {/* Tasks */}
+          {/* Tasks - inline warning when hourly task minutes drift from the
+              listed job window. AI parses auto-collapse in applyParseResult,
+              so this only fires on manual edits or window changes. */}
+          <TaskTimeWarning
+            tasks={tasks}
+            windowMin={durationMins}
+            onFix={() => {
+              const collapsed = collapseToWindow(tasks, durationMins);
+              setTasks(collapsed.tasks);
+            }}
+          />
           <TasksSection
             tasks={tasks}
             onTasksChange={setTasks}
@@ -1097,5 +1171,60 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
         </div>
       </div>
     </>
+  );
+}
+
+interface TaskTimeWarningProps {
+  tasks: TaskLine[];
+  windowMin: number;
+  onFix: () => void;
+}
+
+/**
+ * Inline banner shown above the tasks panel when hourly task minutes don't
+ * match the listed job window. Stays hidden when the totals line up so the
+ * panel doesn't have a permanent strip of UI in the steady state.
+ * @param props - Component props.
+ * @param props.tasks - Current task lines (hourly + flat).
+ * @param props.windowMin - Job window in minutes (`durationMins`).
+ * @param props.onFix - Handler that collapses hourly tasks to fit the window.
+ * @returns Warning element, or null when totals already match.
+ */
+function TaskTimeWarning({
+  tasks,
+  windowMin,
+  onFix,
+}: TaskTimeWarningProps): React.ReactElement | null {
+  if (windowMin <= 0) return null;
+  const taskMin = hourlyTaskMinutes(tasks);
+  if (taskMin === windowMin) return null;
+  if (taskMin === 0) return null;
+  const over = taskMin > windowMin;
+  return (
+    <div
+      role="status"
+      className={cn(
+        "mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm",
+        over
+          ? "border-amber-200 bg-amber-50 text-amber-900"
+          : "border-sky-200 bg-sky-50 text-sky-900",
+      )}
+    >
+      <span>
+        Tasks total {Math.round(taskMin)} min - listed window is {windowMin} min.
+        {!over && " Bump the end time if you actually worked the extra."}
+      </span>
+      {over && (
+        <button
+          type="button"
+          onClick={onFix}
+          className={cn(
+            "rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100",
+          )}
+        >
+          Fix - rebalance tasks
+        </button>
+      )}
+    </div>
   );
 }

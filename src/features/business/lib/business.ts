@@ -1,4 +1,9 @@
-import type { JobCalculation, LineItem, RateConfig } from "@/features/business/types/business";
+import type {
+  JobCalculation,
+  LineItem,
+  RateConfig,
+  TaskLine,
+} from "@/features/business/types/business";
 import { formatDateSlash } from "@/shared/lib/date-format";
 
 /**
@@ -103,6 +108,139 @@ export function nextInvoiceNumber(
 export function billableMins(mins: number): number {
   if (mins <= 0) return 0;
   return Math.ceil(mins / 15) * 15;
+}
+
+/**
+ * Total minutes contributed by hourly tasks. Flat-rate tasks (Travel, etc.)
+ * carry no time so they're excluded.
+ * @param tasks - Task lines from the calculator.
+ * @returns Sum of hourly task minutes (`qty * 60`).
+ */
+export function hourlyTaskMinutes(tasks: TaskLine[]): number {
+  return tasks.filter((t) => t.baseRateId != null).reduce((sum, t) => sum + t.qty * 60, 0);
+}
+
+/** Minimum minutes a task can shrink to before it's dropped as descriptive noise. */
+const MIN_TASK_MINUTES = 5;
+/** Rounding granularity for task qty after rebalancing (5-min steps). */
+const TASK_QTY_SNAP_MIN = 5;
+/** Minutes every isShort task is pinned to. Matches the AI's 0.25h SHORT-set assignment. */
+const SHORT_TASK_MINUTES = 15;
+
+/**
+ * Collapses task lines so their total hourly minutes fit the listed job window.
+ * Tasks the AI flagged as `isShort` ("quickly", one-shots, etc.) are pinned at
+ * {@link SHORT_TASK_MINUTES}; the remaining non-short tasks scale proportionally
+ * to fill what's left of the window, so an over-long primary task absorbs more
+ * of the correction than a correctly-sized one. Non-short tasks that would
+ * scale below {@link MIN_TASK_MINUTES} are dropped, then the rest rescale.
+ * Snaps qty to 5-min increments and parks any rounding remainder on the
+ * largest survivor so totals match exactly. Flat-rate tasks pass through.
+ * @param tasks - Task lines to collapse.
+ * @param windowMin - Target window in minutes (`durationMins`).
+ * @returns Adjusted task list, count of dropped tasks, and whether any qty was rescaled.
+ */
+export function collapseToWindow(
+  tasks: TaskLine[],
+  windowMin: number,
+): { tasks: TaskLine[]; dropped: number; rescaled: boolean } {
+  if (windowMin <= 0) return { tasks, dropped: 0, rescaled: false };
+  const hourlyIn = tasks.filter((t) => t.baseRateId != null);
+  const flat = tasks.filter((t) => t.baseRateId == null);
+  if (hourlyIn.length === 0) return { tasks, dropped: 0, rescaled: false };
+
+  if (sumTaskMinutes(hourlyIn) <= windowMin) return { tasks, dropped: 0, rescaled: false };
+
+  // Pin short tasks at 15 min each; drop any that don't fit the window.
+  const short: TaskLine[] = hourlyIn
+    .filter((t) => t.isShort)
+    .map((t) => withMinutes(t, SHORT_TASK_MINUTES));
+  let dropped = 0;
+  while (short.length * SHORT_TASK_MINUTES > windowMin) {
+    short.pop();
+    dropped++;
+  }
+
+  let nonShort: TaskLine[] = hourlyIn.filter((t) => !t.isShort);
+  const remainingMin = windowMin - short.length * SHORT_TASK_MINUTES;
+
+  if (nonShort.length === 0) {
+    return { tasks: [...short, ...flat], dropped, rescaled: true };
+  }
+
+  if (remainingMin <= 0) {
+    // Short tasks already cover the whole window; drop every non-short.
+    dropped += nonShort.length;
+    return { tasks: [...short, ...flat], dropped, rescaled: true };
+  }
+
+  // Scale non-short proportionally to fill remainingMin; drop tasks that
+  // would land below MIN_TASK_MINUTES and rescale until everything fits.
+  while (nonShort.length > 0) {
+    const sum = sumTaskMinutes(nonShort);
+    if (sum <= remainingMin) break;
+    const multiplier = remainingMin / sum;
+    const scaled = nonShort.map((t) => ({ task: t, scaledMin: t.qty * 60 * multiplier }));
+    const tooSmall = scaled.filter((s) => s.scaledMin < MIN_TASK_MINUTES);
+    if (tooSmall.length === 0) {
+      nonShort = scaled.map((s) => withMinutes(s.task, snapMinutes(s.scaledMin)));
+      break;
+    }
+    scaled.sort((a, b) => a.scaledMin - b.scaledMin);
+    const removed = scaled[0].task;
+    nonShort = nonShort.filter((t) => t !== removed);
+    dropped++;
+  }
+
+  // Park rounding remainder on the largest non-short survivor so totals match.
+  const combined = [...short, ...nonShort];
+  if (combined.length > 0) {
+    const error = windowMin - sumTaskMinutes(combined);
+    if (error !== 0 && nonShort.length > 0) {
+      let biggestIdx = 0;
+      for (let i = 1; i < nonShort.length; i++) {
+        if (nonShort[i].qty > nonShort[biggestIdx].qty) biggestIdx = i;
+      }
+      const adjustedMin = Math.max(MIN_TASK_MINUTES, nonShort[biggestIdx].qty * 60 + error);
+      nonShort[biggestIdx] = withMinutes(nonShort[biggestIdx], adjustedMin);
+    }
+  }
+
+  return { tasks: [...short, ...nonShort, ...flat], dropped, rescaled: true };
+}
+
+/**
+ * Rounds a minute value to the nearest task-qty snap step.
+ * @param mins - Raw minutes.
+ * @returns Minutes rounded to the nearest {@link TASK_QTY_SNAP_MIN}.
+ */
+function snapMinutes(mins: number): number {
+  return Math.round(mins / TASK_QTY_SNAP_MIN) * TASK_QTY_SNAP_MIN;
+}
+
+/**
+ * Total minutes across the given task lines (`qty` is decimal hours).
+ * @param arr - Task lines.
+ * @returns Sum of minute durations.
+ */
+function sumTaskMinutes(arr: TaskLine[]): number {
+  return arr.reduce((s, t) => s + t.qty * 60, 0);
+}
+
+/**
+ * Returns a clone of `task` with `qty` set to `mins / 60` and `lineTotal`
+ * recomputed against the existing unit price.
+ * @param task - Source task line.
+ * @param mins - New duration in minutes.
+ * @returns Updated task line.
+ */
+function withMinutes(task: TaskLine, mins: number): TaskLine {
+  const qty = mins / 60;
+  return {
+    ...task,
+    qty,
+    lineTotal: Math.round(qty * task.unitPrice * 100) / 100,
+  };
 }
 
 /**

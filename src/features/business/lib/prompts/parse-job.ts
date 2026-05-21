@@ -95,6 +95,7 @@ BILLING — single source of truth for time distribution. Run the algorithm step
       (4) tasks with longer composed descriptions (device + action + details character count);
       (5) source order.
 5. VERIFY the sum of all task qtys equals totalHours exactly. If not, you made an arithmetic error — redo step 4 from scratch. NEVER return tasks whose qtys don't sum to totalHours.
+6. EMIT isShort. For every task you placed in the SHORT set S in step 4a, set "isShort": true on that task. For every other task, set "isShort": false. The calculator uses this flag to pin short tasks at 15 min and absorb any post-parse window mismatch into the non-short tasks instead of scaling everyone equally.
 
 Worked examples:
 - 1.75h across 3 tasks (Streaming setup, Phone factory reset, Car Bluetooth setup): S = {Phone factory reset}, R = 2.
@@ -103,12 +104,14 @@ Worked examples:
 - 2.0h across 5 tasks, security "took most of the time", cleanup "quickly" → S = {cleanup}, R = 4. Cleanup = 0.25. remaining = 1.75. subBase = 0.25, subLeftover = 0.75 → security gets +0.75 → 1.0 / 0.25 / 0.25 / 0.25 / 0.25.
 - 3h across 2 tasks → S empty, subBase = 1.5, subLeftover = 0 → 1.5 / 1.5.
 - 1.75h across 2 tasks ("Set up new laptop with OneDrive + M365 apps" + "Fixed account sign-in for Windows/Edge/M365 business"): S empty, R = 2. subBase = floor((1.75/2)*4)/4 = 0.75. subLeftover = 0.25. Rung 2 fires on the "Set up new laptop" task (action=Setup, device=Laptop, input says "new laptop") so it gets the +0.25 — the sign-in repair is the smaller fixup task. Final: 1.0 / 0.75 (NOT 0.75 / 1.0).
+- 0.5h across 2 tasks ("Removed scareware with Malwarebytes" + "BIOS update quickly"): "quickly" puts BIOS in S, scareware is in R. BIOS = 0.25, remaining = 0.25, scareware = 0.25. Final: 0.25 / 0.25 with isShort = false / true. WRONG: emitting 0.42 / 0.42 (= 25 min each) — the sum 0.83 ≠ 0.5, rule 5 fails. The post-parse rebalance will treat both as equal-weight and you lose the "quickly" hint.
 
 qty is ALWAYS decimal hours. qty=1 means exactly 1 hour, never "1 occurrence".
 
 SESSION TIMES:
 - durationMins: If the input includes "[Pre-computed session total: N min — use this as durationMins without recalculating]", use N exactly. Otherwise sum all worked segment durations (not wall-clock start-to-end span).
 - startTime / endTime: Single session → exact HH:MM 24-hour strings. Multi-session → first start and last end. Open-ended session (e.g. "8:10 -") → use current NZ time above as end. No times mentioned → both null.
+- WALL-CLOCK CEILING: When both startTime and endTime are stated, durationMins MUST NOT exceed (endTime - startTime). Single-session work cannot bill more time than the clock shows. Gaps between sessions reduce billable time below the span, never increase it. If your worked-segment sum exceeds the span, your task estimates are wrong - shrink them, or move the over-estimated work into details, until the sum fits the span.
 - Always set hourlyRateId to null.
 
 RATES — base + stacked modifiers (effective $/hr = base + sum of modifier deltas):
@@ -197,7 +200,8 @@ Return this exact JSON shape (when not asking for clarification):
       "device": string,
       "action": string,
       "details": string | null,
-      "qty": number
+      "qty": number,
+      "isShort": boolean
     }
   ],
   "parts": [
