@@ -14,8 +14,20 @@ import { FaXmark } from "react-icons/fa6";
 import { cn } from "@/shared/lib/cn";
 import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
+import { formatNZPhone, validatePhone } from "@/shared/lib/normalise-phone";
+import { validateEmail } from "@/features/booking/lib/booking";
+import { EmailInput } from "@/shared/components/EmailInput";
+import { PhoneInput } from "@/shared/components/PhoneInput";
 
 const NZ_TZ = "Pacific/Auckland";
+
+interface ContactSuggestion {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+}
 
 interface ManualBookingModalProps {
   token: string;
@@ -38,6 +50,7 @@ export function ManualBookingModal({
 }: ManualBookingModalProps): React.ReactElement {
   const router = useRouter();
   const nameRef = useRef<HTMLInputElement>(null);
+  const nameWrapRef = useRef<HTMLDivElement>(null);
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -50,9 +63,32 @@ export function ManualBookingModal({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [contacts, setContacts] = useState<ContactSuggestion[]>([]);
+  const [nameListOpen, setNameListOpen] = useState(false);
+
   useEffect(() => {
     nameRef.current?.focus();
   }, []);
+
+  useEffect(() => {
+    /**
+     * Loads existing contacts so the customer-name field can autofill from them.
+     * Failure is non-fatal > the form still works without suggestions.
+     */
+    async function loadContacts(): Promise<void> {
+      try {
+        const res = await fetch("/api/admin/contacts", {
+          headers: { "x-admin-secret": token },
+        });
+        if (!res.ok) return;
+        const data = (await res.json()) as { ok?: boolean; contacts?: ContactSuggestion[] };
+        if (data.ok && data.contacts) setContacts(data.contacts);
+      } catch (err) {
+        console.error("[ManualBookingModal] contacts load failed", err);
+      }
+    }
+    void loadContacts();
+  }, [token]);
 
   useEffect(() => {
     /**
@@ -77,10 +113,20 @@ export function ManualBookingModal({
     e.preventDefault();
     setError(null);
 
-    if (!name.trim() || !email.trim()) {
-      setError("Name and email are required.");
+    if (!name.trim()) {
+      setError("Customer name is required.");
       return;
     }
+    if (validateEmail(email) !== "ok") {
+      setError("Enter a valid email address.");
+      return;
+    }
+    const phoneCheck = validatePhone(phone);
+    if (phoneCheck.result === "invalid") {
+      setError("Enter a valid phone number, or leave it blank.");
+      return;
+    }
+    const phoneE164 = phoneCheck.e164;
 
     setSubmitting(true);
     try {
@@ -94,7 +140,7 @@ export function ManualBookingModal({
         body: JSON.stringify({
           name: name.trim(),
           email: email.trim().toLowerCase(),
-          phone: phone.trim() || null,
+          phone: phoneE164 || null,
           address: address.trim() || null,
           notes: notes.trim(),
           startAt: startAt.toISOString(),
@@ -175,38 +221,94 @@ export function ManualBookingModal({
           </div>
 
           <Field label="Customer name" htmlFor="mb-name">
-            <input
-              ref={nameRef}
-              id="mb-name"
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              maxLength={100}
-              className={textInputClasses}
-            />
+            <div
+              ref={nameWrapRef}
+              className={cn("relative")}
+              onBlur={(e) => {
+                if (!nameWrapRef.current?.contains(e.relatedTarget as Node)) {
+                  setNameListOpen(false);
+                }
+              }}
+            >
+              <input
+                ref={nameRef}
+                id="mb-name"
+                type="text"
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  setNameListOpen(true);
+                }}
+                onFocus={() => setNameListOpen(true)}
+                autoComplete="off"
+                required
+                maxLength={100}
+                className={textInputClasses}
+              />
+              {nameListOpen &&
+                contacts.length > 0 &&
+                (() => {
+                  const q = name.trim().toLowerCase();
+                  const matches = contacts.filter((c) => {
+                    if (!q) return true;
+                    return (
+                      c.name.toLowerCase().includes(q) ||
+                      c.email?.toLowerCase().includes(q) ||
+                      c.address?.toLowerCase().includes(q) ||
+                      c.phone?.includes(q)
+                    );
+                  });
+                  if (matches.length === 0) return null;
+                  return (
+                    <div
+                      className={cn(
+                        "absolute left-0 right-0 top-full z-20 mt-1 max-h-64 overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg",
+                      )}
+                    >
+                      {matches.slice(0, 30).map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            setName(c.name);
+                            setEmail(c.email ?? "");
+                            setPhone(c.phone ? formatNZPhone(c.phone) : "");
+                            setAddress(c.address ?? "");
+                            setNameListOpen(false);
+                          }}
+                          className={cn(
+                            "flex w-full flex-col gap-0.5 px-3 py-2 text-left hover:bg-slate-50",
+                          )}
+                        >
+                          <span className={cn("text-sm font-medium text-slate-800")}>{c.name}</span>
+                          {c.address && (
+                            <span className={cn("text-xs text-slate-500")}>{c.address}</span>
+                          )}
+                          <span className={cn("text-xs text-slate-400")}>
+                            {[c.email, c.phone ? formatNZPhone(c.phone) : null]
+                              .filter(Boolean)
+                              .join(" · ") || "No contact info"}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
+            </div>
           </Field>
 
           <div className={cn("grid grid-cols-2 gap-3")}>
             <Field label="Phone" htmlFor="mb-phone">
-              <input
-                id="mb-phone"
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                maxLength={32}
-                className={textInputClasses}
-              />
+              <PhoneInput id="mb-phone" value={phone} onChange={setPhone} />
             </Field>
             <Field label="Email" htmlFor="mb-email">
-              <input
+              <EmailInput
                 id="mb-email"
-                type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={setEmail}
                 required
                 maxLength={320}
-                className={textInputClasses}
               />
             </Field>
           </div>
