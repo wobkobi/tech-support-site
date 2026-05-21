@@ -11,14 +11,18 @@ import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
-import { BOOKING_CONFIG, BOOKING_FIELD_LIMITS, EMAIL_REGEX } from "@/features/booking/lib/booking";
+import {
+  BOOKING_CONFIG,
+  BOOKING_FIELD_LIMITS,
+  validateEmail,
+} from "@/features/booking/lib/booking";
 import {
   createBookingEvent,
   fetchAllCalendarEvents,
 } from "@/features/calendar/lib/google-calendar";
 import { sendCustomerBookingConfirmation } from "@/features/reviews/lib/email";
 import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
-import { toE164NZ, isValidPhone } from "@/shared/lib/normalise-phone";
+import { validatePhone } from "@/shared/lib/normalise-phone";
 
 interface AdminBookingPayload {
   name?: string;
@@ -56,8 +60,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!name || name.length > BOOKING_FIELD_LIMITS.name) {
     return NextResponse.json({ ok: false, error: "Customer name is required." }, { status: 400 });
   }
-  if (!email || !EMAIL_REGEX.test(email) || email.length > BOOKING_FIELD_LIMITS.email) {
-    return NextResponse.json({ ok: false, error: "Valid email is required." }, { status: 400 });
+  const emailCheck = validateEmail(email);
+  if (emailCheck !== "ok") {
+    const msg = emailCheck === "too-long" ? "Email is too long." : "Valid email is required.";
+    return NextResponse.json({ ok: false, error: msg }, { status: 400 });
   }
   if (notes.length > BOOKING_FIELD_LIMITS.notes) {
     return NextResponse.json({ ok: false, error: "Notes too long." }, { status: 400 });
@@ -77,10 +83,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   let phoneE164: string | null = null;
   if (phoneRaw) {
-    phoneE164 = toE164NZ(phoneRaw) || null;
-    if (!phoneE164 || !isValidPhone(phoneE164)) {
+    const phoneCheck = validatePhone(phoneRaw);
+    if (phoneCheck.result !== "ok") {
       return NextResponse.json({ ok: false, error: "Invalid phone number." }, { status: 400 });
     }
+    phoneE164 = phoneCheck.e164;
   }
 
   const startAt = new Date(startAtStr);

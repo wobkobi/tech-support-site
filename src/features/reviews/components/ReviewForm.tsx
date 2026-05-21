@@ -11,7 +11,9 @@ import { cn } from "@/shared/lib/cn";
 import { Button } from "@/shared/components/Button";
 import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
-import { formatNZPhone, normalisePhone, isValidPhone } from "@/shared/lib/normalise-phone";
+import { formatNZPhone, normalisePhone, validatePhone } from "@/shared/lib/normalise-phone";
+import { EmailInput } from "@/shared/components/EmailInput";
+import { PhoneInput } from "@/shared/components/PhoneInput";
 
 type NameDisplay = "name" | "anonymous";
 
@@ -100,8 +102,7 @@ export default function ReviewFormProtected({
   const remaining = textMax - textCount;
   const isAnonymous = nameDisplay === "anonymous";
 
-  const phoneNormalized = normalisePhone(phoneInput);
-  const phoneInvalid = !!phoneInput.trim() && !isValidPhone(phoneNormalized);
+  const phoneInvalid = validatePhone(phoneInput).result === "invalid";
 
   const NAME_OPTIONS: { value: NameDisplay; label: string }[] = [
     { value: "name", label: "Name" },
@@ -149,7 +150,7 @@ export default function ReviewFormProtected({
         lastName: isAnonymous ? null : l || null,
         isAnonymous,
         contactEmail: contactEmail.trim() || null,
-        contactPhone: phoneNormalized || null,
+        contactPhone: normalisePhone(phoneInput) || null,
       };
 
       if (isEditing) {
@@ -391,28 +392,17 @@ export default function ReviewFormProtected({
             >
               Phone
             </label>
-            <input
+            <PhoneInput
               id={phoneId}
-              type="tel"
-              autoComplete="tel"
-              placeholder="021 123 1234"
+              value={phoneInput}
+              onChange={setPhoneInput}
+              disabled={loading}
+              errorMessages={{ invalid: "Doesn't look right - check the number." }}
               className={cn(
                 "border-seasalt-400/60 bg-seasalt text-rich-black focus:ring-moonstone-500/50",
-                "w-full rounded-md border px-3 py-2 outline-none focus:ring-2",
-                phoneInvalid ? "border-coquelicot-500/60" : "",
+                "border px-3 py-2 focus:ring-2",
               )}
-              value={phoneInput}
-              onChange={(e) => setPhoneInput(e.target.value)}
-              onBlur={(e) => setPhoneInput(formatNZPhone(e.target.value))}
-              disabled={loading}
-              aria-invalid={phoneInvalid || undefined}
-              aria-describedby={phoneInvalid ? `${phoneId}-error` : undefined}
             />
-            {phoneInvalid && (
-              <p id={`${phoneId}-error`} className={cn("text-coquelicot-400 mt-1 text-base")}>
-                Doesn&apos;t look right - check the number.
-              </p>
-            )}
           </div>
 
           <div>
@@ -422,18 +412,16 @@ export default function ReviewFormProtected({
             >
               Email
             </label>
-            <input
+            <EmailInput
               id={emailId}
-              type="email"
-              autoComplete="email"
+              value={contactEmail}
+              onChange={setContactEmail}
               placeholder="you@example.com"
+              disabled={loading}
               className={cn(
                 "border-seasalt-400/60 bg-seasalt text-rich-black focus:ring-moonstone-500/50",
-                "w-full rounded-md border px-3 py-2 outline-none focus:ring-2",
+                "border px-3 py-2 focus:ring-2",
               )}
-              value={contactEmail}
-              onChange={(e) => setContactEmail(e.target.value)}
-              disabled={loading}
             />
           </div>
         </div>

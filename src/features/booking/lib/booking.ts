@@ -424,8 +424,31 @@ export const BOOKING_FIELD_LIMITS = {
  * input. The domain is matched as one-or-more dot-separated dot-free segments
  * so dots only appear at explicit boundaries - this eliminates the backtrack
  * ambiguity that triggers the polynomial-ReDoS analyzer.
+ *
+ * Module-internal only - all email validation goes through validateEmail below.
  */
-export const EMAIL_REGEX = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/;
+const EMAIL_REGEX = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/;
+
+/**
+ * Discriminator returned by validateEmail. "empty" means the input is blank
+ * (callers decide whether that's allowed based on whether the field is required).
+ */
+export type EmailValidationResult = "empty" | "invalid" | "too-long" | "ok";
+
+/**
+ * Single canonical email validator used by the shared EmailInput component and
+ * by every submit handler / server route that accepts an email. Returns a
+ * discriminator so callers can pick their own wording.
+ * @param raw - Raw email input.
+ * @returns Validation result.
+ */
+export function validateEmail(raw: string): EmailValidationResult {
+  const trimmed = raw.trim();
+  if (!trimmed) return "empty";
+  if (!EMAIL_REGEX.test(trimmed)) return "invalid";
+  if (trimmed.length > BOOKING_FIELD_LIMITS.email) return "too-long";
+  return "ok";
+}
 
 /**
  * Validates the user-supplied fields on a booking POST/edit payload. Returns
@@ -446,11 +469,17 @@ export function validateBookingPayloadFields(
   if (payload.name && payload.name.length > BOOKING_FIELD_LIMITS.name) {
     return { valid: false, error: "Name is too long." };
   }
-  if (opts.requireEmail && (!payload.email?.trim() || !EMAIL_REGEX.test(payload.email.trim()))) {
-    return { valid: false, error: "Valid email is required." };
-  }
-  if (payload.email && payload.email.length > BOOKING_FIELD_LIMITS.email) {
-    return { valid: false, error: "Email is too long." };
+  if (opts.requireEmail || payload.email?.trim()) {
+    const emailResult = validateEmail(payload.email ?? "");
+    if (opts.requireEmail && emailResult === "empty") {
+      return { valid: false, error: "Valid email is required." };
+    }
+    if (emailResult === "invalid") {
+      return { valid: false, error: "Valid email is required." };
+    }
+    if (emailResult === "too-long") {
+      return { valid: false, error: "Email is too long." };
+    }
   }
   if (!payload.notes?.trim()) {
     return { valid: false, error: "Please describe what you need help with." };
