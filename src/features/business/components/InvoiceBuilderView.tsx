@@ -8,6 +8,8 @@ import { cn } from "@/shared/lib/cn";
 import { calcInvoiceTotals, formatNZD, todayISO } from "@/features/business/lib/business";
 import { formatDateShort } from "@/shared/lib/date-format";
 import { ContactPickerModal } from "@/features/business/components/ContactPickerModal";
+import { AddToContactsModal } from "@/features/business/components/AddToContactsModal";
+import { EmailInput } from "@/shared/components/EmailInput";
 import type { LineItem, GoogleContact } from "@/features/business/types/business";
 import {
   BUSINESS,
@@ -46,6 +48,8 @@ interface FormState {
   pickedContactName: string | null;
   /** Picked contact's company; null when the contact has no company. */
   pickedContactCompany: string | null;
+  /** Picked contact's Google People API resource name (e.g. "people/c1234"). */
+  pickedContactGoogleId: string | null;
   /** Drives whether clientName is sourced from name/company or freely typed. */
   addressMode: AddressMode;
 }
@@ -114,6 +118,7 @@ export function InvoiceBuilderView({
         promoDiscount: editInvoice.promoDiscount ?? 0,
         pickedContactName: null,
         pickedContactCompany: null,
+        pickedContactGoogleId: null,
         addressMode: "custom",
       };
     }
@@ -129,6 +134,7 @@ export function InvoiceBuilderView({
     // the operator doesn't have to re-pick on arrival.
     const pickedContactName = params.get("pickedContactName");
     const pickedContactCompany = params.get("pickedContactCompany");
+    const pickedContactGoogleId = params.get("pickedContactGoogleId");
     const addressModeParam = params.get("addressMode") as AddressMode | null;
     const addressMode: AddressMode =
       addressModeParam === "name" || addressModeParam === "company" || addressModeParam === "custom"
@@ -153,6 +159,7 @@ export function InvoiceBuilderView({
       promoDiscount: promoDiscount > 0 ? promoDiscount : 0,
       pickedContactName: pickedContactName || null,
       pickedContactCompany: pickedContactCompany || null,
+      pickedContactGoogleId: pickedContactGoogleId || null,
       addressMode,
     };
   });
@@ -160,6 +167,9 @@ export function InvoiceBuilderView({
   const [error, setError] = useState<string | null>(null);
   const [sheetWarning, setSheetWarning] = useState(false);
   const [showContactPicker, setShowContactPicker] = useState(false);
+  // Deferred navigation target: set when the post-save "Add to contacts?" popup
+  // intercepts the save and needs to delay the redirect until the modal closes.
+  const [pendingNavId, setPendingNavId] = useState<string | null>(null);
 
   // Prefetch next invoice number - skipped in edit mode (number already set).
   useEffect(() => {
@@ -222,11 +232,36 @@ export function InvoiceBuilderView({
     if (d.ok) {
       if (d.sheetSyncWarning) setSheetWarning(true);
       const targetId = editInvoice ? editInvoice.id : d.invoice.id;
+      // Only prompt to add when an email is present (dedup key) and we're not
+      // editing an existing invoice (the contact would already exist or the
+      // operator already declined).
+      if (!editInvoice && form.clientEmail.trim()) {
+        try {
+          const checkRes = await fetch(
+            `/api/admin/contacts/check?email=${encodeURIComponent(form.clientEmail.trim())}`,
+            { headers },
+          );
+          const checkData = (await checkRes.json()) as { exists?: boolean };
+          if (checkRes.ok && checkData.exists === false) {
+            setPendingNavId(targetId);
+            return;
+          }
+        } catch {
+          // Fail-quiet: just navigate.
+        }
+      }
       router.push(`/admin/business/invoices/${targetId}?token=${encodeURIComponent(token)}`);
     } else {
       setError(d.error ?? "Failed to save");
       setSaving(false);
     }
+  }
+
+  /** Closes the add-to-contacts modal and finishes the deferred navigation. */
+  function handleAddContactClose(): void {
+    const id = pendingNavId;
+    setPendingNavId(null);
+    if (id) router.push(`/admin/business/invoices/${id}?token=${encodeURIComponent(token)}`);
   }
 
   /**
@@ -288,6 +323,7 @@ export function InvoiceBuilderView({
       clientEmail: c.email,
       pickedContactName: c.name,
       pickedContactCompany: company,
+      pickedContactGoogleId: c.id || null,
       addressMode: "name",
     }));
   }
@@ -316,6 +352,16 @@ export function InvoiceBuilderView({
           token={token}
           onSelect={handleContactSelect}
           onClose={() => setShowContactPicker(false)}
+        />
+      )}
+
+      {pendingNavId && (
+        <AddToContactsModal
+          token={token}
+          name={form.clientName}
+          email={form.clientEmail}
+          googleContactId={form.pickedContactGoogleId}
+          onClose={handleAddContactClose}
         />
       )}
 
@@ -437,14 +483,17 @@ export function InvoiceBuilderView({
                 />
               </div>
               <div>
-                <label className={cn("mb-1 block text-xs font-medium text-slate-600")}>Email</label>
-                <input
-                  type="email"
+                <label
+                  htmlFor="invoice-client-email"
+                  className={cn("mb-1 block text-xs font-medium text-slate-600")}
+                >
+                  Email
+                </label>
+                <EmailInput
+                  id="invoice-client-email"
                   value={form.clientEmail}
-                  onChange={(e) => setForm((p) => ({ ...p, clientEmail: e.target.value }))}
-                  className={cn(
-                    "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
-                  )}
+                  onChange={(next) => setForm((p) => ({ ...p, clientEmail: next }))}
+                  className={cn("rounded-lg border-slate-200 focus:ring-2")}
                 />
               </div>
             </div>

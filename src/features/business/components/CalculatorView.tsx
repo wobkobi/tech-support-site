@@ -17,6 +17,7 @@ import {
 } from "@/features/business/lib/business";
 import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 import { ContactPickerModal } from "@/features/business/components/ContactPickerModal";
+import { AddToContactsModal } from "@/features/business/components/AddToContactsModal";
 import { ParseConfidenceBanner } from "@/features/business/components/ParseConfidenceBanner";
 import { TaxonomyManageModal } from "@/features/business/components/TaxonomyManageModal";
 import { TotalsPanel } from "@/features/business/components/calculator/TotalsPanel";
@@ -155,7 +156,11 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
   // the invoice without re-picking.
   const [pickedContactName, setPickedContactName] = useState<string | null>(null);
   const [pickedContactCompany, setPickedContactCompany] = useState<string | null>(null);
+  const [pickedContactGoogleId, setPickedContactGoogleId] = useState<string | null>(null);
   const [addressMode, setAddressModeState] = useState<"name" | "company" | "custom">("custom");
+  // Deferred invoice handoff URL: set when the "Add to contacts?" popup
+  // intercepts handleCreateInvoice; nav fires after the modal closes.
+  const [pendingHandoffUrl, setPendingHandoffUrl] = useState<string | null>(null);
 
   const [aiInput, setAiInput] = useState("");
   const [parsing, setParsing] = useState(false);
@@ -543,6 +548,7 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
     // here, no re-picking.
     if (pickedContactName) q.set("pickedContactName", pickedContactName);
     if (pickedContactCompany) q.set("pickedContactCompany", pickedContactCompany);
+    if (pickedContactGoogleId) q.set("pickedContactGoogleId", pickedContactGoogleId);
     if (pickedContactName) q.set("addressMode", addressMode);
     // Pass promo snapshot to InvoiceBuilder; skipPromo=1 carries the opt-out.
     if (activePromo && !skipPromo && totals.promoDiscount > 0) {
@@ -550,7 +556,33 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
       q.set("promoDiscount", String(totals.promoDiscount));
     }
     if (skipPromo) q.set("skipPromo", "1");
-    router.push(`/admin/business/invoices/new?token=${encodeURIComponent(token)}&${q.toString()}`);
+    const handoffUrl = `/admin/business/invoices/new?token=${encodeURIComponent(token)}&${q.toString()}`;
+
+    // If the client has an email and isn't in the DB Contact table yet, prompt
+    // the operator to add them before navigating. Fail-quiet on any error.
+    if (clientEmail.trim()) {
+      try {
+        const checkRes = await fetch(
+          `/api/admin/contacts/check?email=${encodeURIComponent(clientEmail.trim())}`,
+          { headers },
+        );
+        const checkData = (await checkRes.json()) as { exists?: boolean };
+        if (checkRes.ok && checkData.exists === false) {
+          setPendingHandoffUrl(handoffUrl);
+          return;
+        }
+      } catch {
+        // Fall through and navigate.
+      }
+    }
+    router.push(handoffUrl);
+  }
+
+  /** Closes the add-to-contacts modal and completes the deferred handoff. */
+  function handleAddContactClose(): void {
+    const url = pendingHandoffUrl;
+    setPendingHandoffUrl(null);
+    if (url) router.push(url);
   }
 
   /**
@@ -842,9 +874,20 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
             setClientEmail(c.email);
             setPickedContactName(c.name);
             setPickedContactCompany(company);
+            setPickedContactGoogleId(c.id || null);
             setAddressModeState("name");
           }}
           onClose={() => setShowContactPicker(false)}
+        />
+      )}
+
+      {pendingHandoffUrl && (
+        <AddToContactsModal
+          token={token}
+          name={clientName}
+          email={clientEmail}
+          googleContactId={pickedContactGoogleId}
+          onClose={handleAddContactClose}
         />
       )}
 

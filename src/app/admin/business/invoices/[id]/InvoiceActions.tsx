@@ -8,12 +8,14 @@ import Link from "next/link";
 import { cn } from "@/shared/lib/cn";
 import { DEFAULT_INVOICE_EMAIL_BODY } from "@/features/business/lib/invoice-email-defaults";
 import type { InvoiceReviewEligibility } from "@/features/business/lib/contact-review-token";
+import { AddToContactsModal } from "@/features/business/components/AddToContactsModal";
 
 interface InvoiceActionsProps {
   backHref: string;
   driveWebUrl: string | null;
   invoiceId: string;
   invoiceNumber: string;
+  clientName: string;
   clientEmail: string;
   status: string;
   token: string;
@@ -27,6 +29,7 @@ interface InvoiceActionsProps {
  * @param props.driveWebUrl - Optional Google Drive PDF URL.
  * @param props.invoiceId - Invoice id used by the preview/send routes.
  * @param props.invoiceNumber - Invoice number used in the downloaded PDF filename.
+ * @param props.clientName - Client name; used in the "add to contacts" link inside the send modal.
  * @param props.clientEmail - Recipient email; "Send" is disabled when empty.
  * @param props.status - Current invoice status (drives the "Sent" indicator).
  * @param props.token - Admin token forwarded as X-Admin-Secret on POSTs.
@@ -37,6 +40,7 @@ export function InvoiceActions({
   driveWebUrl,
   invoiceId,
   invoiceNumber,
+  clientName,
   clientEmail,
   status,
   token,
@@ -64,6 +68,9 @@ export function InvoiceActions({
   // modal opens; operator can toggle if eligible.
   const [includeReview, setIncludeReview] = useState(true);
   const [eligibility, setEligibility] = useState<InvoiceReviewEligibility | null>(null);
+  // Drives the inline "Add to contacts" popup spawned from the no-contact
+  // eligibility row inside the send-invoice modal.
+  const [showAddContact, setShowAddContact] = useState(false);
 
   const headers = { "X-Admin-Secret": token, "Content-Type": "application/json" };
   const alreadySent = currentStatus === "SENT" || sentAt !== null;
@@ -376,7 +383,7 @@ export function InvoiceActions({
                     value={greetingName}
                     onChange={(e) => setGreetingName(e.target.value)}
                     onBlur={() => void openPreview()}
-                    placeholder="Vicky (leave blank to use the first word of clientName)"
+                    placeholder="John (leave blank to use the first word of clientName)"
                     disabled={sending}
                     className={cn(
                       "mb-4 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm",
@@ -429,8 +436,21 @@ export function InvoiceActions({
                                 "(this customer has already left a review)"}
                               {eligibility.reason === "sent-recently" &&
                                 ` (review request sent ${new Date(eligibility.lastSentAt).toLocaleDateString()} - can re-send from ${new Date(eligibility.nextAllowedAt).toLocaleDateString()})`}
-                              {eligibility.reason === "no-contact" &&
-                                "(no contact record - cannot generate a review link)"}
+                              {eligibility.reason === "no-contact" && (
+                                <>
+                                  (no contact record -{" "}
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowAddContact(true)}
+                                    className={cn(
+                                      "text-russian-violet font-semibold underline hover:opacity-80",
+                                    )}
+                                  >
+                                    add {clientName?.trim().split(" ")[0] || "them"} to contacts
+                                  </button>
+                                  )
+                                </>
+                              )}
                             </span>
                           )}
                         </span>
@@ -485,6 +505,20 @@ export function InvoiceActions({
             </div>
           </div>
         </div>
+      )}
+
+      {showAddContact && (
+        <AddToContactsModal
+          token={token}
+          name={clientName}
+          email={clientEmail}
+          onClose={() => {
+            setShowAddContact(false);
+            // Re-fetch eligibility so the review-link toggle unlocks once the
+            // contact exists.
+            void openPreview();
+          }}
+        />
       )}
     </>
   );

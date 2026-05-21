@@ -55,6 +55,7 @@ export default async function InvoiceViewPage({
         driveWebUrl={invoice.driveWebUrl}
         invoiceId={invoice.id}
         invoiceNumber={invoice.number}
+        clientName={invoice.clientName}
         clientEmail={invoice.clientEmail}
         status={invoice.status}
         token={t}

@@ -548,7 +548,7 @@ export interface InvoiceEmailData {
  * @param args.reviewUrl - Stable per-contact review URL, or null to omit the review line.
  * @param args.greetingName - Optional operator-typed greeting target. Useful when
  *   the invoice goes to a company but the email goes to a specific person (e.g.
- *   "Vicky" while the invoice header reads "Mars Salt and Sweet Limited").
+ *   "John" while the invoice header reads "Mars Salt and Sweet Limited").
  * @param args.customBody - Optional operator-typed message that replaces the
  *   default intro paragraph. Multi-line allowed (rendered with `white-space:
  *   pre-wrap` so line breaks are preserved). Falls back to
