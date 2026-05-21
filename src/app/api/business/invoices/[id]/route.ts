@@ -105,7 +105,7 @@ export async function PATCH(
 
   // Status-only patch
   const { status } = body;
-  if (!["DRAFT", "SENT", "PAID"].includes(status)) {
+  if (!["DRAFT", "SENT", "PAID", "VOIDED"].includes(status)) {
     return NextResponse.json({ error: "Invalid status" }, { status: 400 });
   }
   const invoice = await prisma.invoice.update({ where: { id }, data: { status } });

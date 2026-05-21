@@ -19,7 +19,7 @@ export interface LineItem {
   lineTotal: number;
 }
 
-export type InvoiceStatus = "DRAFT" | "SENT" | "PAID";
+export type InvoiceStatus = "DRAFT" | "SENT" | "PAID" | "VOIDED";
 
 export interface Invoice {
   id: string;

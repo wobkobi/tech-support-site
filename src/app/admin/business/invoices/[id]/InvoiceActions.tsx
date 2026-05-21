@@ -55,6 +55,7 @@ export function InvoiceActions({
   const [error, setError] = useState<string | null>(null);
   const [sentAt, setSentAt] = useState<string | null>(null);
   const [marking, setMarking] = useState(false);
+  const [voiding, setVoiding] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [currentStatus, setCurrentStatus] = useState(status);
   // Operator-typed greeting override. Empty = use the first word of clientName.
@@ -76,6 +77,7 @@ export function InvoiceActions({
   const alreadySent = currentStatus === "SENT" || sentAt !== null;
   const isPaid = currentStatus === "PAID";
   const isDraft = currentStatus === "DRAFT";
+  const isVoided = currentStatus === "VOIDED";
 
   /**
    * Flips the invoice status to PAID via PATCH; refreshes the page on success.
@@ -98,6 +100,33 @@ export function InvoiceActions({
       setError(err instanceof Error ? err.message : "Could not mark as paid");
     } finally {
       setMarking(false);
+    }
+  }
+
+  /**
+   * Flips the invoice status to VOIDED via PATCH. Used when an invoice has been
+   * sent (or saved) and needs to be cancelled rather than amended in place.
+   * Once voided the PDF gets a diagonal VOID stamp via the same Drive sync.
+   */
+  async function voidInvoice(): Promise<void> {
+    if (!confirm("Void this invoice? It will be marked as cancelled and stamped VOID on the PDF."))
+      return;
+    setError(null);
+    setVoiding(true);
+    try {
+      const res = await fetch(`/api/business/invoices/${invoiceId}`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ status: "VOIDED" }),
+      });
+      const d = (await res.json()) as { ok: true } | { error: string };
+      if ("error" in d) throw new Error(d.error);
+      setCurrentStatus("VOIDED");
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not void invoice");
+    } finally {
+      setVoiding(false);
     }
   }
 
@@ -282,8 +311,20 @@ export function InvoiceActions({
             {deleting ? "Deleting..." : "Delete draft"}
           </button>
         )}
+        {!isDraft && !isPaid && !isVoided && (
+          <button
+            type="button"
+            onClick={() => void voidInvoice()}
+            disabled={voiding}
+            className={cn(
+              "rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50",
+            )}
+          >
+            {voiding ? "Voiding..." : "Void invoice"}
+          </button>
+        )}
         <div className={cn("ml-auto flex flex-wrap gap-3")}>
-          {!isPaid && (
+          {!isPaid && !isVoided && (
             <button
               type="button"
               onClick={() => void markPaid()}
@@ -295,19 +336,21 @@ export function InvoiceActions({
               {marking ? "Saving..." : "Mark as paid"}
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => void openPreview()}
-            disabled={!clientEmail}
-            title={!clientEmail ? "Add a client email to enable sending" : undefined}
-            className={cn(
-              "rounded-lg px-4 py-2 text-sm font-semibold text-white transition-colors",
-              "bg-russian-violet hover:opacity-90",
-              !clientEmail && "cursor-not-allowed opacity-40 hover:opacity-40",
-            )}
-          >
-            {alreadySent ? "Re-send to client" : "Send to client"}
-          </button>
+          {!isVoided && (
+            <button
+              type="button"
+              onClick={() => void openPreview()}
+              disabled={!clientEmail}
+              title={!clientEmail ? "Add a client email to enable sending" : undefined}
+              className={cn(
+                "rounded-lg px-4 py-2 text-sm font-semibold text-white transition-colors",
+                "bg-russian-violet hover:opacity-90",
+                !clientEmail && "cursor-not-allowed opacity-40 hover:opacity-40",
+              )}
+            >
+              {alreadySent ? "Re-send to client" : "Send to client"}
+            </button>
+          )}
         </div>
       </div>
 

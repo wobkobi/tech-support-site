@@ -13,6 +13,7 @@ const STATUS_COLORS: Record<InvoiceStatus, string> = {
   DRAFT: "bg-slate-100 text-slate-600",
   SENT: "bg-blue-100 text-blue-700",
   PAID: "bg-green-100 text-green-700",
+  VOIDED: "bg-[#5a2a82]/15 text-[#5a2a82] line-through",
 };
 
 /**
@@ -196,6 +197,7 @@ export function InvoicesListView({ token }: { token: string }): React.ReactEleme
                       <option value="DRAFT">Draft</option>
                       <option value="SENT">Sent</option>
                       <option value="PAID">Paid</option>
+                      <option value="VOIDED">Voided</option>
                     </select>
                   </td>
                   <td className={cn("px-4 py-3")} onClick={(e) => e.stopPropagation()}>

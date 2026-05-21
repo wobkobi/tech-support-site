@@ -20,6 +20,9 @@ const AMBER = rgb(180 / 255, 83 / 255, 9 / 255); // amber-700 #b45309 (matches w
 const WHITE = rgb(1, 1, 1);
 const PAID_COLOR = rgb(0.1, 0.55, 0.25);
 const OVERDUE_COLOR = rgb(0.78, 0.16, 0.16);
+// Purple #5a2a82 for VOID so a cancelled invoice is visually distinct from the
+// green PAID and red OVERDUE stamps without reading as a warning.
+const VOID_COLOR = rgb(90 / 255, 42 / 255, 130 / 255);
 
 const MARGIN = 42;
 const PAGE_W = 595.28;
@@ -112,7 +115,7 @@ function parseWordmarkPaths(): LogoPath[] {
 }
 
 /**
- * Draws the diagonal PAID / OVERDUE watermark. Painted first so subsequent
+ * Draws the diagonal PAID / VOID / OVERDUE watermark. Painted first so subsequent
  * sections sit on top of it. No-op when the invoice is in a neutral state.
  * @param ctx - PDF drawing context.
  * @param invoice - Invoice being rendered.
@@ -122,9 +125,21 @@ function drawStatusWatermark(ctx: PdfCtx, invoice: Invoice): void {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const isOverdue = invoice.status === "SENT" && dueDate < today;
-  const text = invoice.status === "PAID" ? "PAID" : isOverdue ? "OVERDUE" : null;
+  const text =
+    invoice.status === "PAID"
+      ? "PAID"
+      : invoice.status === "VOIDED"
+        ? "VOID"
+        : isOverdue
+          ? "OVERDUE"
+          : null;
   if (!text) return;
-  const color = invoice.status === "PAID" ? PAID_COLOR : OVERDUE_COLOR;
+  const color =
+    invoice.status === "PAID"
+      ? PAID_COLOR
+      : invoice.status === "VOIDED"
+        ? VOID_COLOR
+        : OVERDUE_COLOR;
   const size = 140;
   const width = ctx.bold.widthOfTextAtSize(text, size);
   ctx.page.drawText(text, {
@@ -179,7 +194,13 @@ function drawHeader(ctx: PdfCtx, invoice: Invoice, logoPaths: LogoPath[]): numbe
   });
   rightY -= 16;
   const statusColor =
-    invoice.status === "PAID" ? PAID_COLOR : invoice.status === "SENT" ? rgb(0.1, 0.35, 0.75) : MID;
+    invoice.status === "PAID"
+      ? PAID_COLOR
+      : invoice.status === "SENT"
+        ? rgb(0.1, 0.35, 0.75)
+        : invoice.status === "VOIDED"
+          ? VOID_COLOR
+          : MID;
   ctx.page.drawText(invoice.status, {
     x: rightX - ctx.bold.widthOfTextAtSize(invoice.status, 11),
     y: rightY,
@@ -567,7 +588,7 @@ function drawFooter(ctx: PdfCtx): void {
 /**
  * Generates a clean professional A4 PDF for the given invoice using pdf-lib.
  * Header is the wordmark logo on the left and the INVOICE/TAX INVOICE title,
- * number, status, and optional GST# on the right. The PAID/OVERDUE watermark
+ * number, status, and optional GST# on the right. The PAID/VOID/OVERDUE watermark
  * sits underneath as a functional status indicator.
  * @param invoice - The invoice record to render.
  * @returns PDF content as a Buffer.

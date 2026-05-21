@@ -250,6 +250,7 @@ enum InvoiceStatus {
   DRAFT
   SENT
   PAID
+  VOIDED
 }
 
 type LineItem {

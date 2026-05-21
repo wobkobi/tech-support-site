@@ -91,7 +91,9 @@ export default async function InvoiceViewPage({
                   ? "font-semibold text-green-600"
                   : invoice.status === "SENT"
                     ? "font-semibold text-blue-600"
-                    : "text-slate-400",
+                    : invoice.status === "VOIDED"
+                      ? "font-semibold text-[#5a2a82] line-through"
+                      : "text-slate-400",
               )}
             >
               {invoice.status}
