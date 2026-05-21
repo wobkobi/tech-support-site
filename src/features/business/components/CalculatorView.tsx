@@ -216,16 +216,16 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
         });
         listener = autocomplete.addListener("place_changed", () => {
           const place = autocomplete.getPlace();
-          // Prefer suburb (locality) since travel-time looks it up; fall back
-          // to the formatted address.
-          const suburb =
+          // Keep the full formatted address so it matches what the AI phraser
+          // receives; travel-time still resolves a suburb out of the full string.
+          const next =
+            place.formatted_address ??
             place.address_components?.find(
               (c) => c.types.includes("locality") || c.types.includes("sublocality_level_1"),
             )?.long_name ??
-            place.formatted_address ??
             "";
-          if (suburb) {
-            setJobAddress(suburb);
+          if (next) {
+            setJobAddress(next);
             setTravelInfo(null);
           }
         });

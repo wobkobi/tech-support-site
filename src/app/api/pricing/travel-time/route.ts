@@ -3,9 +3,13 @@ import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 import { lookupDriveDistance } from "@/features/business/lib/travel-distance";
 
 /**
- * POST /api/pricing/travel-time - Returns drive time from HOME_ADDRESS to a given suburb.
- * Accepts an optional `departureTimeIso` so the calculator can quote rush-hour jobs
- * with traffic-aware duration; if absent (or malformed) Google falls back to "now".
+ * POST /api/pricing/travel-time - Returns drive time from HOME_ADDRESS to the
+ * given destination. Accepts any string Google's Distance Matrix can geocode:
+ * a full street address gives the most accurate quote; a suburb name still
+ * works but routes to the suburb centroid.
+ * Accepts an optional `departureTimeIso` so the calculator can quote rush-hour
+ * jobs with traffic-aware duration; if absent (or malformed) Google falls back
+ * to "now".
  * @param request - Incoming request with { destination: string, departureTimeIso?: string } body
  * @returns JSON with durationMins + distanceKm on success, durationMins: 0 when
  *   the address can't be resolved, or 503 when the upstream is misconfigured /
