@@ -106,11 +106,21 @@ export function WeekView({
       });
     }
     for (const ev of events) {
-      const key = formatNzDateKey(new Date(ev.startAt));
-      const bucket = arr.find((d) => d.key === key);
-      if (!bucket) continue;
-      if (ev.isAllDay) bucket.allDayEvents.push(ev);
-      else bucket.timedEvents.push(ev);
+      if (ev.isAllDay) {
+        // Multi-day all-day events (Busy blocks spanning several days) need to
+        // appear in every day bucket they overlap. Google's all-day end is
+        // exclusive (next NZ midnight), so the YYYY-MM-DD comparison is
+        // start-inclusive, end-exclusive.
+        const startKey = formatNzDateKey(new Date(ev.startAt));
+        const endKey = formatNzDateKey(new Date(ev.endAt));
+        for (const day of arr) {
+          if (day.key >= startKey && day.key < endKey) day.allDayEvents.push(ev);
+        }
+      } else {
+        const key = formatNzDateKey(new Date(ev.startAt));
+        const bucket = arr.find((d) => d.key === key);
+        if (bucket) bucket.timedEvents.push(ev);
+      }
     }
     return arr;
   }, [weekStartIso, events]);
@@ -119,6 +129,26 @@ export function WeekView({
     () => Array.from({ length: DAY_HOURS + 1 }, (_, i) => DAY_START_HOUR + i),
     [],
   );
+
+  // Merge consecutive-day all-day events into spanning bars. Each bar covers
+  // the columns from its first visible day to its last visible day (inclusive).
+  // Column numbering: 1 = time gutter, 2..8 = days, so day index i sits at
+  // grid column i + 2.
+  const allDayBars = useMemo(() => {
+    const seen = new Map<string, { event: WeekEvent; firstIdx: number; lastIdx: number }>();
+    for (let i = 0; i < days.length; i++) {
+      for (const ev of days[i].allDayEvents) {
+        const existing = seen.get(ev.id);
+        if (existing) existing.lastIdx = i;
+        else seen.set(ev.id, { event: ev, firstIdx: i, lastIdx: i });
+      }
+    }
+    return Array.from(seen.values()).map((b) => ({
+      event: b.event,
+      startCol: b.firstIdx + 2,
+      endCol: b.lastIdx + 3,
+    }));
+  }, [days]);
 
   /**
    * Maps a click position inside a day column to a 15-min-rounded UTC ISO
@@ -220,26 +250,34 @@ export function WeekView({
                       onChanged={() => router.refresh()}
                     />
                   </div>
-                  {day.allDayEvents.length > 0 && (
-                    <div className={cn("mt-1 space-y-0.5")}>
-                      {day.allDayEvents.map((ev) => (
-                        <div
-                          key={ev.id}
-                          className={cn(
-                            "truncate rounded border px-1.5 py-0.5 text-[10px] font-semibold",
-                            KIND_STYLES[ev.kind],
-                          )}
-                          title={ev.title}
-                        >
-                          {ev.title}
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
               );
             })}
           </div>
+
+          {/* All-day events bar - merges consecutive days into one continuous
+              span so multi-day Busy blocks read as a single bar. */}
+          {allDayBars.length > 0 && (
+            <div className={cn("border-b border-slate-200 px-0 py-1")}>
+              {allDayBars.map((bar) => (
+                <div
+                  key={bar.event.id}
+                  className={cn("grid grid-cols-[64px_repeat(7,1fr)] py-0.5")}
+                >
+                  <div
+                    className={cn(
+                      "mx-1 truncate rounded border px-2 py-0.5 text-center text-[11px] font-semibold",
+                      KIND_STYLES[bar.event.kind],
+                    )}
+                    style={{ gridColumnStart: bar.startCol, gridColumnEnd: bar.endCol }}
+                    title={bar.event.title}
+                  >
+                    {bar.event.title}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Grid body */}
           <div
