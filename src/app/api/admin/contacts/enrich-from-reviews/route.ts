@@ -160,14 +160,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     });
   }
 
-  await Promise.all([
-    ...[...phoneEnrichments.entries()].map(([id, phone]) =>
-      prisma.contact.update({ where: { id }, data: { phone } }),
+  // Merge per-field updates by contact id so each contact gets at most one
+  // write when both phone and name need enriching in the same pass.
+  const mergedUpdates = new Map<string, { phone?: string; name?: string }>();
+  for (const [id, phone] of phoneEnrichments) {
+    mergedUpdates.set(id, { ...mergedUpdates.get(id), phone });
+  }
+  for (const [id, name] of nameEnrichments) {
+    mergedUpdates.set(id, { ...mergedUpdates.get(id), name });
+  }
+  await Promise.all(
+    [...mergedUpdates.entries()].map(([id, data]) =>
+      prisma.contact.update({ where: { id }, data }),
     ),
-    ...[...nameEnrichments.entries()].map(([id, name]) =>
-      prisma.contact.update({ where: { id }, data: { name } }),
-    ),
-  ]);
+  );
 
   return NextResponse.json({
     ok: true,

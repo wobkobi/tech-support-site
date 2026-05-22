@@ -449,17 +449,24 @@ async function autoEnrich(prisma: PrismaClient): Promise<ConflictEntry[]> {
     }
   }
 
-  await Promise.all([
-    ...[...phoneUpdates.entries()].map(([id, phone]) =>
-      prisma.contact.update({ where: { id }, data: { phone } }),
+  // Merge per-field updates by contact id so each contact gets at most one
+  // write (instead of up to three round-trips when phone/name/address all
+  // changed in the same pass).
+  const mergedUpdates = new Map<string, { phone?: string; name?: string; address?: string }>();
+  for (const [id, phone] of phoneUpdates) {
+    mergedUpdates.set(id, { ...mergedUpdates.get(id), phone });
+  }
+  for (const [id, name] of nameUpdates) {
+    mergedUpdates.set(id, { ...mergedUpdates.get(id), name });
+  }
+  for (const [id, address] of addressUpdates) {
+    mergedUpdates.set(id, { ...mergedUpdates.get(id), address });
+  }
+  await Promise.all(
+    [...mergedUpdates.entries()].map(([id, data]) =>
+      prisma.contact.update({ where: { id }, data }),
     ),
-    ...[...nameUpdates.entries()].map(([id, name]) =>
-      prisma.contact.update({ where: { id }, data: { name } }),
-    ),
-    ...[...addressUpdates.entries()].map(([id, address]) =>
-      prisma.contact.update({ where: { id }, data: { address } }),
-    ),
-  ]);
+  );
 
   return conflicts;
 }
