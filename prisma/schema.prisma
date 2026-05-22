@@ -223,6 +223,10 @@ model TravelBlock {
   travelBackSuppressed        Boolean        @default(false) // True when chaining to next event beats going home
   chainedNextEventId          String? // Identity of next event evaluated for chaining (for change detection)
   chainedNextEventStartAt     DateTime? // Start of that next event (rebuild when it shifts)
+  // True when the admin has flagged this event as "I have the car that day"
+  // (Car-cal override). Cron skips both the calendarEventCache upsert (so the
+  // booking page doesn't block) and the travel-to-home calculation for it.
+  ignored                     Boolean        @default(false)
   createdAt                   DateTime       @default(now())
 
   @@unique([sourceEventId, calendarEmail])

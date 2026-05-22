@@ -34,6 +34,7 @@ export async function PATCH(
     transportMode?: string;
     customOrigin?: string | null;
     customTravelBackDestination?: string | null;
+    ignored?: boolean;
   };
 
   const rawMode = body.transportMode;
@@ -45,8 +46,9 @@ export async function PATCH(
   const hasMode = mode !== undefined;
   const hasOrigin = "customOrigin" in body;
   const hasBackDest = "customTravelBackDestination" in body;
+  const hasIgnored = typeof body.ignored === "boolean";
 
-  if (!hasMode && !hasOrigin && !hasBackDest) {
+  if (!hasMode && !hasOrigin && !hasBackDest && !hasIgnored) {
     return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
   }
 
@@ -64,6 +66,7 @@ export async function PATCH(
         ...(hasBackDest && {
           customTravelBackDestination: body.customTravelBackDestination ?? null,
         }),
+        ...(hasIgnored && { ignored: body.ignored }),
         // Clear raw minutes so the next recalculate uses the updated values
         rawTravelMinutes: null,
         roundedMinutes: null,
@@ -71,6 +74,19 @@ export async function PATCH(
         roundedBackMinutes: null,
       },
     });
+
+    // When toggling ignored=true, eagerly purge the event's calendar cache
+    // entry so the booking page unblocks immediately rather than waiting for
+    // the next cron run. When toggling back to false, the cron will repopulate.
+    if (hasIgnored && body.ignored === true) {
+      try {
+        await prisma.calendarEventCache.deleteMany({
+          where: { eventId: block.sourceEventId, calendarEmail: block.calendarEmail },
+        });
+      } catch (err) {
+        console.error("[travel/[id]] Failed to purge cache entry on ignore:", err);
+      }
+    }
 
     // Transport-mode overrides apply to the whole series - persist + cascade
     // to siblings. customOrigin stays per-instance (origins vary by occurrence).

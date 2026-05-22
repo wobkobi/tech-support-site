@@ -36,7 +36,7 @@ export default async function AdminSchedulePage({
   const weekEndDate = addDays(weekStartDate, 7);
 
   const bookingCalId = process.env.BOOKING_CALENDAR_ID ?? "";
-  const workCalId = process.env.WORK_CALENDAR_ID ?? "";
+  const carCalId = process.env.CAR_CALENDAR_ID ?? process.env.WORK_CALENDAR_ID ?? "";
   const personalCalId = process.env.PERSONAL_CALENDAR_ID ?? "";
 
   // Live calendar fetch covers all configured calendars for the week range.
@@ -74,7 +74,7 @@ export default async function AdminSchedulePage({
    */
   function kindForCalendar(calendarEmail: string): WeekViewKind {
     if (calendarEmail === bookingCalId) return "booking";
-    if (calendarEmail === workCalId) return "work";
+    if (calendarEmail === carCalId) return "car";
     if (calendarEmail === personalCalId) return "personal";
     return "personal";
   }

@@ -27,7 +27,9 @@ export function getBookingCalendarId(): string {
 function fetchAccessibleCalendarIds(): string[] {
   const ids = [
     process.env.BOOKING_CALENDAR_ID,
-    process.env.WORK_CALENDAR_ID,
+    // Car calendar (renamed from Work); fall back to the old env name during
+    // the transition window.
+    process.env.CAR_CALENDAR_ID ?? process.env.WORK_CALENDAR_ID,
     process.env.PERSONAL_CALENDAR_ID,
   ].filter((id): id is string => Boolean(id));
   return ids.length > 0 ? ids : ["primary"];
