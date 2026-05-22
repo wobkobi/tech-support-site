@@ -8,12 +8,14 @@
  */
 
 import { prisma } from "@/shared/lib/prisma";
+import type { ContactField, ConflictResolution } from "@prisma/client";
 
-/** Fields we track conflicts for. Phones are merged as a union, not conflicted. */
-export type ConflictField = "name" | "email" | "address";
-
-/** Resolution choice when an admin picks a winner. */
-export type ConflictResolution = "site" | "google" | "custom";
+// Re-export the Prisma enum types under the names the rest of the codebase
+// uses. The admin-driven resolution endpoint also accepts "auto" via the
+// ConflictResolution enum; that variant is stamped by clearContactConflict
+// rather than picked by a human, so the public TS type below excludes it.
+export type { ContactField };
+export type AdminConflictResolution = Exclude<ConflictResolution, "auto">;
 
 /**
  * Records (or refreshes) a pending conflict for a contact's field. If an
@@ -28,7 +30,7 @@ export type ConflictResolution = "site" | "google" | "custom";
  */
 export async function recordContactConflict(args: {
   contactId: string;
-  field: ConflictField;
+  field: ContactField;
   siteValue: string | null;
   googleValue: string | null;
 }): Promise<void> {
@@ -63,7 +65,7 @@ export async function recordContactConflict(args: {
  * @param field - Which field is no longer in conflict.
  * @returns Promise that resolves when any pending row is marked resolved.
  */
-export async function clearContactConflict(contactId: string, field: ConflictField): Promise<void> {
+export async function clearContactConflict(contactId: string, field: ContactField): Promise<void> {
   try {
     await prisma.contactConflict.updateMany({
       where: { contactId, field, resolvedAt: null },

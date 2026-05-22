@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import type React from "react";
 import Link from "next/link";
 import { prisma } from "@/shared/lib/prisma";
+import { AppEnvironment, type Prisma } from "@prisma/client";
 import { requireAdminToken } from "@/shared/lib/auth";
 import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
 import { cn } from "@/shared/lib/cn";
@@ -52,7 +53,9 @@ export default async function AdminPriceEstimatesPage({
   // By default the admin page hides rows logged from `npm run dev` so my own
   // test submissions don't pollute the audit view. The ?showDev=1 toggle in
   // the header flips this for when I do want to inspect them.
-  const envFilter = includeDev ? {} : { environment: "production" };
+  const envFilter: Prisma.PriceEstimateLogWhereInput = includeDev
+    ? {}
+    : { environment: AppEnvironment.production };
 
   const [logs, todayCount, weekCount, monthCount, devCount] = await Promise.all([
     prisma.priceEstimateLog.findMany({
@@ -66,7 +69,9 @@ export default async function AdminPriceEstimatesPage({
     // Always count hidden dev rows so the toggle can show a hint like "5 dev".
     includeDev
       ? Promise.resolve(0)
-      : prisma.priceEstimateLog.count({ where: { environment: { not: "production" } } }),
+      : prisma.priceEstimateLog.count({
+          where: { environment: { not: AppEnvironment.production } },
+        }),
   ]);
 
   const stats = [

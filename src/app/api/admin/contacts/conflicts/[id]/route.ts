@@ -67,13 +67,9 @@ export async function POST(
         ? conflict.googleValue
         : customValue;
 
-  // Write the chosen value to the site contact. The field guard mirrors
-  // the recordContactConflict producer - only name/email/address are
-  // single-value conflicts.
-  const field = conflict.field as "name" | "email" | "address";
-  if (field !== "name" && field !== "email" && field !== "address") {
-    return NextResponse.json({ error: `Unknown conflict field: ${field}` }, { status: 500 });
-  }
+  // Write the chosen value to the site contact. conflict.field is the
+  // ContactField enum so name/email/address are the only possible values.
+  const field = conflict.field;
 
   try {
     await prisma.contact.update({

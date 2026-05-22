@@ -9,8 +9,9 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
+import { TransportMode } from "@prisma/client";
 
-const VALID_MODES = new Set(["transit", "driving", "walking", "bicycling"]);
+const VALID_MODES = new Set<string>(Object.values(TransportMode));
 
 /**
  * Updates the transport mode and/or custom origin for a travel block.
@@ -35,10 +36,11 @@ export async function PATCH(
     customTravelBackDestination?: string | null;
   };
 
-  const mode = body.transportMode;
-  if (mode !== undefined && !VALID_MODES.has(mode)) {
+  const rawMode = body.transportMode;
+  if (rawMode !== undefined && !VALID_MODES.has(rawMode)) {
     return NextResponse.json({ error: "Invalid transport mode" }, { status: 400 });
   }
+  const mode = rawMode as TransportMode | undefined;
 
   const hasMode = mode !== undefined;
   const hasOrigin = "customOrigin" in body;
