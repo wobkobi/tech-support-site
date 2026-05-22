@@ -113,7 +113,7 @@ export default function ReviewFormProtected({
    * Submit handler. Collects all validation failures into one pass.
    * @param e - Form event
    */
-  async function handleSubmit(e: React.SubmitEvent): Promise<void> {
+  async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault();
     setSubmitError(null);
     setSent(false);

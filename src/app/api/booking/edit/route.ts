@@ -87,7 +87,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     const payloadCheck = validateBookingPayloadFields(
-      { name, notes, dateKey, timeOfDay, duration, meetingType, address },
+      { name, notes, dateKey, timeOfDay, duration, meetingType, address, phone },
       { requireEmail: false },
     );
     if (!payloadCheck.valid) {

@@ -42,7 +42,7 @@ export function AddReviewForm({ token, onAdded }: AddReviewFormProps): React.Rea
    * @param e - Form submit event.
    * @returns Promise resolving when the submit completes.
    */
-  async function handleSubmit(e: React.SubmitEvent): Promise<void> {
+  async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault();
     setLoading(true);
     setError(null);

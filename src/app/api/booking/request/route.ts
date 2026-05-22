@@ -46,6 +46,14 @@ interface BookingRequestPayload {
   notes: string;
   /** Honeypot field - real users never fill this; bots usually do. */
   website?: string;
+  /**
+   * Client-generated UUID; one per form mount. Logged for traceability so a
+   * retried request after a flaky network can be correlated with the original.
+   * The DB unique constraint on `activeSlotKey` is what actually prevents a
+   * double-booking; this is just observability + a hook for future replay-safe
+   * idempotency.
+   */
+  idempotencyKey?: string;
 }
 
 /**
@@ -72,7 +80,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       meetingType,
       notes,
       website,
+      idempotencyKey,
     } = body;
+
+    if (idempotencyKey) {
+      console.log(`[booking/request] idempotencyKey=${idempotencyKey}`);
+    }
 
     // Normalise + validate phone up front so a malformed number is rejected
     // before any of the calendar / DB work runs.
@@ -95,7 +108,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     const payloadCheck = validateBookingPayloadFields(
-      { name, email, notes, dateKey, timeOfDay, duration, meetingType, address },
+      { name, email, notes, dateKey, timeOfDay, duration, meetingType, address, phone },
       { requireEmail: true },
     );
     if (!payloadCheck.valid) {

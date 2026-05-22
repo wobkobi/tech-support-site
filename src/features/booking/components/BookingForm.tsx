@@ -7,7 +7,7 @@
 "use client";
 
 import type React from "react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { FaCheck } from "react-icons/fa6";
 import { useRouter } from "next/navigation";
 import { Button } from "@/shared/components/Button";
@@ -26,6 +26,25 @@ import { validatePhone } from "@/shared/lib/normalise-phone";
 import { EmailInput } from "@/shared/components/EmailInput";
 import { PhoneInput } from "@/shared/components/PhoneInput";
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
+
+/** localStorage key for the new-booking draft. Bumped when the shape changes. */
+const DRAFT_KEY = "booking-draft-v2";
+/** Soft warning kicks in this many chars before the notes hard cap. */
+const NOTES_WARN_GAP = 50;
+
+interface BookingDraft {
+  duration: JobDuration;
+  name: string;
+  email: string;
+  phone: string;
+  meetingType: "in-person" | "remote" | "";
+  unit: string;
+  address: string;
+  notes: string;
+  dateKey?: string;
+  timeOfDay?: TimeOfDay;
+  startMinute?: StartMinute;
+}
 
 export interface BookingFormInitialValues {
   duration: JobDuration;
@@ -94,15 +113,30 @@ export default function BookingForm({
   const router = useRouter();
   const isEditMode = Boolean(cancelToken);
 
-  // Form state
+  // Form state. `selectedDateKey` is stored instead of the full BookableDay
+  // object so that when `availableDays` changes (e.g. after router.refresh on
+  // a 409), we always read the latest slot data from props during render -
+  // no useEffect-driven reconciliation needed.
   const [duration, setDuration] = useState<JobDuration>(initialValues?.duration ?? "short");
-  const [selectedDay, setSelectedDay] = useState<BookableDay | null>(null);
+  const [selectedDateKey, setSelectedDateKey] = useState<string | null>(() => {
+    if (initialValues?.dateKey && availableDays.some((d) => d.dateKey === initialValues.dateKey)) {
+      return initialValues.dateKey;
+    }
+    return availableDays.find((d) => d.hasAnySlots)?.dateKey ?? availableDays[0]?.dateKey ?? null;
+  });
   const [selectedTime, setSelectedTime] = useState<TimeOfDay | null>(
     initialValues?.timeOfDay ?? null,
   );
   const [selectedMinute, setSelectedMinute] = useState<StartMinute>(
     initialValues?.startMinute ?? 0,
   );
+
+  // Resolve the BookableDay object from the stored key on every render. If the
+  // pick has since disappeared from the prop (refresh, etc.), this returns null
+  // and the time picker hides until the user picks again.
+  const selectedDay: BookableDay | null = selectedDateKey
+    ? (availableDays.find((d) => d.dateKey === selectedDateKey) ?? null)
+    : null;
   const [name, setName] = useState(initialValues?.name ?? "");
   const [email, setEmail] = useState(initialValues?.email ?? "");
   const [phone, setPhone] = useState(initialValues?.phone ?? "");
@@ -134,17 +168,58 @@ export default function BookingForm({
   // Drives a more prominent error with a "Refresh available times" link.
   const [slotStale, setSlotStale] = useState(false);
   const [contactHint, setContactHint] = useState<string | null>(null);
+  // True once a localStorage draft has been restored, so the UI can offer a
+  // "Clear form" affordance. New-booking mode only.
+  const [draftRestored, setDraftRestored] = useState(false);
+  // Lit when notes paste is trimmed to fit the cap; auto-clears after 4s.
+  const [pasteTrimmed, setPasteTrimmed] = useState(false);
+  // True once AddressAutocomplete reports the Maps API is unavailable. The
+  // form then skips the "must pick a suggestion" gate.
+  const [mapsFallback, setMapsFallback] = useState(false);
+
+  // Submit guards. `submittingRef` blocks Enter-key spam regardless of React's
+  // setState timing. `idempotencyKey` is generated once per mount via the lazy
+  // useState initialiser (which is allowed to call impure functions); the
+  // server logs it so a retried submit can be correlated with the original.
+  const submittingRef = useRef(false);
+  const [idempotencyKey] = useState<string>(() =>
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  );
+  // Aborts the previous /contact-lookup request when the user blurs a new
+  // email; without this, a slow first response could overwrite the second.
+  const contactLookupAbortRef = useRef<AbortController | null>(null);
+  // Latest email being looked up; the response handler drops anything stale.
+  const contactLookupEmailRef = useRef<string>("");
+  // Debounced draft writer.
+  const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Suppress the very first save so we don't immediately re-persist what we
+  // just restored.
+  const draftLoadedRef = useRef(false);
 
   /**
    * On email blur (new bookings only): look up the email in contacts and
    * pre-fill name / phone / address for any fields the user left empty.
+   * Aborts the prior request and drops the response if the email-in-flight
+   * no longer matches what the user has typed.
    */
   async function handleEmailBlur(): Promise<void> {
     if (isEditMode) return;
     const trimmed = email.trim().toLowerCase();
     if (!trimmed || !trimmed.includes("@")) return;
+
+    // Cancel any prior request so a slow earlier response can't overwrite a
+    // faster newer one.
+    contactLookupAbortRef.current?.abort();
+    const controller = new AbortController();
+    contactLookupAbortRef.current = controller;
+    contactLookupEmailRef.current = trimmed;
+
     try {
-      const res = await fetch(`/api/booking/contact-lookup?email=${encodeURIComponent(trimmed)}`);
+      const res = await fetch(`/api/booking/contact-lookup?email=${encodeURIComponent(trimmed)}`, {
+        signal: controller.signal,
+      });
       if (!res.ok) return;
       const data = (await res.json()) as {
         ok: boolean;
@@ -153,6 +228,8 @@ export default function BookingForm({
         address?: string | null;
       };
       if (!data.ok) return;
+      // Drop the response if the user has since blurred a different email.
+      if (contactLookupEmailRef.current !== trimmed) return;
       const filled: string[] = [];
       if (data.name && !name.trim()) {
         setName(data.name);
@@ -171,27 +248,168 @@ export default function BookingForm({
       if (filled.length > 0) {
         setContactHint(`Pre-filled from your previous booking: ${filled.join(", ")}.`);
       }
-    } catch {
-      // Silently ignore - pre-fill is best-effort
+    } catch (err) {
+      // AbortError on supersede + any network failure are non-fatal; pre-fill
+      // is best-effort.
+      if ((err as { name?: string } | null)?.name === "AbortError") return;
     }
   }
 
-  // Auto-select day on mount: pre-select initial day in edit mode, else first available
+  // Synchronise the selected time during render if it's no longer available
+  // for the current day + duration (e.g. after a router.refresh changed slot
+  // availability). The `selectedTime !== null` guard prevents an infinite
+  // setState loop - once we null the selection, the next render sees null and
+  // stops. This is the React-recommended "adjust state when a prop changes"
+  // pattern, used instead of a useEffect.
+  if (selectedTime !== null && selectedDay) {
+    const window = selectedDay.timeWindows.find((w) => w.value === selectedTime);
+    const sub = window?.subSlots.find((s) => s.minute === selectedMinute);
+    const available = duration === "short" ? !!sub?.availableShort : !!sub?.availableLong;
+    if (!available) {
+      setSelectedTime(null);
+      setSelectedMinute(0);
+    }
+  }
+
+  // Restore a localStorage draft on mount (new-booking mode only). Selection
+  // (dateKey/timeOfDay/startMinute) is only restored when it still matches a
+  // currently-available slot - otherwise we silently drop those fields so the
+  // user picks a fresh time without seeing a misleading pre-pick.
+  //
+  // The setState-in-effect lint is intentionally suppressed: localStorage is
+  // unavailable during SSR, so the read cannot move to a useState lazy
+  // initialiser (it would either crash server-side or cause a hydration
+  // mismatch). This is the canonical "read once from an external source on
+  // mount" pattern.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
-    if (availableDays.length > 0) {
-      if (initialValues?.dateKey) {
-        const preselected = availableDays.find((d) => d.dateKey === initialValues.dateKey);
-        if (preselected) {
-          // eslint-disable-next-line react-hooks/set-state-in-effect
-          setSelectedDay(preselected);
-          return;
+    if (isEditMode) return;
+    if (draftLoadedRef.current) return;
+    draftLoadedRef.current = true;
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      const draft = JSON.parse(raw) as Partial<BookingDraft>;
+      if (draft.duration === "short" || draft.duration === "long") setDuration(draft.duration);
+      if (typeof draft.name === "string" && draft.name) setName(draft.name);
+      if (typeof draft.email === "string" && draft.email) setEmail(draft.email);
+      if (typeof draft.phone === "string" && draft.phone) setPhone(draft.phone);
+      if (draft.meetingType === "in-person" || draft.meetingType === "remote") {
+        setMeetingType(draft.meetingType);
+      }
+      if (typeof draft.unit === "string") setUnit(draft.unit);
+      if (typeof draft.address === "string" && draft.address) {
+        setAddress(draft.address);
+        setAddressVerified(true);
+      }
+      if (typeof draft.notes === "string" && draft.notes) setNotes(draft.notes);
+
+      // Try to restore the time selection if the slot is still bookable.
+      if (draft.dateKey && draft.timeOfDay && availableDays.length > 0) {
+        const day = availableDays.find((d) => d.dateKey === draft.dateKey);
+        const win = day?.timeWindows.find((w) => w.value === draft.timeOfDay);
+        const minute = (draft.startMinute ?? 0) as StartMinute;
+        const sub = win?.subSlots.find((s) => s.minute === minute);
+        const desiredDuration = draft.duration === "long" ? "long" : "short";
+        const available = desiredDuration === "short" ? sub?.availableShort : sub?.availableLong;
+        if (day && win && available) {
+          setSelectedDateKey(day.dateKey);
+          setSelectedTime(draft.timeOfDay);
+          setSelectedMinute(minute);
         }
       }
-      const firstAvailable = availableDays.find((d) => d.hasAnySlots);
-      setSelectedDay(firstAvailable ?? availableDays[0]);
+
+      setDraftRestored(true);
+    } catch (err) {
+      console.warn("[BookingForm] Failed to restore draft:", err);
     }
+    // availableDays is a render-stable prop; we intentionally only run on mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only run on mount
+  }, [isEditMode]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  // Persist draft on change (debounced). Skipped in edit mode and during the
+  // initial restore tick.
+  useEffect(() => {
+    if (isEditMode) return;
+    if (!draftLoadedRef.current) return;
+    if (typeof window === "undefined") return;
+
+    if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+    draftTimerRef.current = setTimeout(() => {
+      const draft: BookingDraft = {
+        duration,
+        name,
+        email,
+        phone,
+        meetingType,
+        unit,
+        address,
+        notes,
+        dateKey: selectedDay?.dateKey,
+        timeOfDay: selectedTime ?? undefined,
+        startMinute: selectedTime ? selectedMinute : undefined,
+      };
+      try {
+        window.localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+      } catch {
+        // Quota / private-mode: persistence is best-effort.
+      }
+    }, 300);
+
+    return () => {
+      if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+    };
+  }, [
+    isEditMode,
+    duration,
+    name,
+    email,
+    phone,
+    meetingType,
+    unit,
+    address,
+    notes,
+    selectedDay,
+    selectedTime,
+    selectedMinute,
+  ]);
+
+  // Auto-clear the "paste was trimmed" hint after a few seconds.
+  useEffect(() => {
+    if (!pasteTrimmed) return;
+    const t = setTimeout(() => setPasteTrimmed(false), 4000);
+    return () => clearTimeout(t);
+  }, [pasteTrimmed]);
+
+  /**
+   * Clear the saved draft + reset all form fields the user filled in. Leaves
+   * the schedule selection alone since that's already constrained by what's
+   * available.
+   */
+  function clearDraft(): void {
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.removeItem(DRAFT_KEY);
+      } catch {
+        // Ignore - removal is best-effort.
+      }
+    }
+    setName("");
+    setEmail("");
+    setPhone("");
+    setMeetingType("");
+    setUnit("");
+    setAddress("");
+    setAddressVerified(false);
+    setAddressOverrideAcked(false);
+    setNotes("");
+    setContactHint(null);
+    setFieldErrors({});
+    setError(null);
+    setDraftRestored(false);
+  }
 
   const weekdays = availableDays.filter((d) => !d.isWeekend);
   const weekends = availableDays.filter((d) => d.isWeekend);
@@ -201,19 +419,11 @@ export default function BookingForm({
    * @param day - Selected bookable day
    */
   function handleDaySelect(day: BookableDay): void {
-    setSelectedDay(day);
+    setSelectedDateKey(day.dateKey);
     // Picking a different day clears the stale-slot warning if it was set.
     setSlotStale(false);
-    // Reset time if current selection + minute not available on new day
-    if (selectedTime) {
-      const window = day.timeWindows.find((w) => w.value === selectedTime);
-      const sub = window?.subSlots.find((s) => s.minute === selectedMinute);
-      const available = duration === "short" ? sub?.availableShort : sub?.availableLong;
-      if (!available) {
-        setSelectedTime(null);
-        setSelectedMinute(0);
-      }
-    }
+    // Time + minute validity gets re-checked during render against the new day
+    // (see the synchronise-during-render block above); no extra work needed.
   }
 
   /**
@@ -247,11 +457,14 @@ export default function BookingForm({
   }
 
   /**
-   * Handle form submission
+   * Handle form submission. The `submittingRef` guard blocks Enter-key spam
+   * (the disabled prop on the submit button doesn't catch keyboard submits
+   * from inside a focused text field).
    * @param e - Form event
    */
-  async function handleSubmit(e: React.SubmitEvent): Promise<void> {
+  async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault();
+    if (submittingRef.current) return;
     setError(null);
 
     // Collect all failures so the user fixes them in one pass. Keys match
@@ -264,7 +477,14 @@ export default function BookingForm({
     if (validateEmail(email) !== "ok") {
       fe.email = "Please enter a valid email address.";
     }
-    if (validatePhone(phone).result === "invalid") {
+    const phoneCheck = validatePhone(phone).result;
+    if (meetingType === "in-person") {
+      if (!phone.trim()) {
+        fe.phone = "Please enter a phone number so I can contact you about arrival.";
+      } else if (phoneCheck === "invalid") {
+        fe.phone = "Please enter a valid phone number.";
+      }
+    } else if (phoneCheck === "invalid") {
       fe.phone = "Please enter a valid phone number, or leave it blank.";
     }
     if (!meetingType) fe.meetingType = "Please select in-person or remote.";
@@ -283,12 +503,15 @@ export default function BookingForm({
     // Field-errors guard above guarantees these are set; narrow for TS.
     if (!selectedDay || !selectedTime || !duration || !meetingType) return;
 
+    submittingRef.current = true;
     setSubmitting(true);
 
     // Soft geocode check for typed-but-not-picked addresses. First failure flips
     // addressOverrideAcked so a second click submits anyway. Network errors
     // don't block submission - clarify out-of-band if needed.
-    if (meetingType === "in-person" && !addressVerified && !addressOverrideAcked) {
+    // Skipped entirely in maps-fallback mode because we can't expect a verified
+    // pick when the autocomplete widget is unavailable.
+    if (meetingType === "in-person" && !addressVerified && !addressOverrideAcked && !mapsFallback) {
       try {
         const verifyRes = await fetch("/api/pricing/travel-time", {
           method: "POST",
@@ -302,6 +525,7 @@ export default function BookingForm({
               "We couldn't find that address on the map. Double-check the spelling, or click Submit again to use it as-is.",
             );
             setAddressOverrideAcked(true);
+            submittingRef.current = false;
             setSubmitting(false);
             return;
           }
@@ -339,6 +563,7 @@ export default function BookingForm({
             address: meetingType === "in-person" ? combineUnitAndAddress(unit, address) : undefined,
             notes: notes.trim(),
             website,
+            idempotencyKey,
           };
 
       const res = await fetch(endpoint, {
@@ -359,8 +584,19 @@ export default function BookingForm({
         } else {
           setError(data.error || "Could not submit request.");
         }
+        submittingRef.current = false;
         setSubmitting(false);
         return;
+      }
+
+      // Successful submit: clear the saved draft so the next page load is a
+      // clean slate.
+      if (!isEditMode && typeof window !== "undefined") {
+        try {
+          window.localStorage.removeItem(DRAFT_KEY);
+        } catch {
+          // Ignore - cleanup is best-effort.
+        }
       }
 
       if (isEditMode) {
@@ -373,6 +609,7 @@ export default function BookingForm({
       }
     } catch {
       setError("Network error. Please try again.");
+      submittingRef.current = false;
       setSubmitting(false);
     }
   }
@@ -455,6 +692,9 @@ export default function BookingForm({
           <label className={cn("text-rich-black mb-2 block text-base font-semibold")}>
             Choose a day
           </label>
+          <p className={cn("text-rich-black/60 mb-2 text-base")}>
+            All times shown in NZ time (Auckland).
+          </p>
 
           {!availableDays.some((d) => d.hasAnySlots) ? (
             <p className={cn("text-rich-black/70 text-base")}>
@@ -471,28 +711,44 @@ export default function BookingForm({
                   >
                     Weekdays
                   </p>
-                  <div className={cn("grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-2")}>
+                  {/* pt-5 reserves space above the first row for the
+                      Today/Tomorrow labels that sit fully outside their button. */}
+                  <div
+                    className={cn(
+                      "grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-x-2 gap-y-3 pt-5",
+                    )}
+                  >
                     {weekdays.map((day) => (
-                      <button
-                        key={day.dateKey}
-                        type="button"
-                        disabled={!day.hasAnySlots}
-                        onClick={() => handleDaySelect(day)}
-                        className={cn(
-                          "whitespace-nowrap rounded-lg border px-3 py-3 text-base font-medium",
-                          !day.hasAnySlots && "cursor-not-allowed opacity-50",
-                          selectedDay?.dateKey === day.dateKey
-                            ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
-                            : day.hasAnySlots
-                              ? "border-seasalt-400/60 bg-seasalt text-rich-black hover:border-russian-violet/40"
-                              : "border-seasalt-400/40 bg-seasalt-900/20 text-rich-black/60",
-                          day.isToday &&
-                            day.hasAnySlots &&
-                            "ring-coquelicot-500/50 ring-2 ring-offset-1",
+                      <div key={day.dateKey} className={cn("relative")}>
+                        {(day.isToday || day.isTomorrow) && day.hasAnySlots && (
+                          <span
+                            className={cn(
+                              "text-coquelicot-600 absolute -top-5 left-0 right-0 text-center text-[10px] font-bold uppercase tracking-wide",
+                            )}
+                          >
+                            {day.isToday ? "Today" : "Tomorrow"}
+                          </span>
                         )}
-                      >
-                        {day.dayLabel}
-                      </button>
+                        <button
+                          type="button"
+                          disabled={!day.hasAnySlots}
+                          onClick={() => handleDaySelect(day)}
+                          className={cn(
+                            "w-full whitespace-nowrap rounded-lg border px-3 py-3 text-base font-medium",
+                            !day.hasAnySlots && "cursor-not-allowed opacity-50",
+                            selectedDay?.dateKey === day.dateKey
+                              ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
+                              : day.hasAnySlots
+                                ? "border-seasalt-400/60 bg-seasalt text-rich-black hover:border-russian-violet/40"
+                                : "border-seasalt-400/40 bg-seasalt-900/20 text-rich-black/60",
+                            day.isToday &&
+                              day.hasAnySlots &&
+                              "ring-coquelicot-500/50 ring-2 ring-offset-1",
+                          )}
+                        >
+                          {day.dayLabel}
+                        </button>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -507,25 +763,42 @@ export default function BookingForm({
                   >
                     Weekends
                   </p>
-                  <div className={cn("grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-2")}>
+                  <div
+                    className={cn(
+                      "grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-x-2 gap-y-3 pt-3",
+                    )}
+                  >
                     {weekends.map((day) => (
-                      <button
-                        key={day.dateKey}
-                        type="button"
-                        disabled={!day.hasAnySlots}
-                        onClick={() => handleDaySelect(day)}
-                        className={cn(
-                          "whitespace-nowrap rounded-lg border px-3 py-3 text-base font-medium",
-                          !day.hasAnySlots && "cursor-not-allowed opacity-50",
-                          selectedDay?.dateKey === day.dateKey
-                            ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
-                            : day.hasAnySlots
-                              ? "border-seasalt-400/60 bg-seasalt text-rich-black hover:border-russian-violet/40"
-                              : "border-seasalt-400/40 bg-seasalt-900/20 text-rich-black/60",
+                      <div key={day.dateKey} className={cn("relative")}>
+                        {(day.isToday || day.isTomorrow) && day.hasAnySlots && (
+                          <span
+                            className={cn(
+                              "text-coquelicot-600 absolute -top-5 left-0 right-0 text-center text-[10px] font-bold uppercase tracking-wide",
+                            )}
+                          >
+                            {day.isToday ? "Today" : "Tomorrow"}
+                          </span>
                         )}
-                      >
-                        {day.dayLabel}
-                      </button>
+                        <button
+                          type="button"
+                          disabled={!day.hasAnySlots}
+                          onClick={() => handleDaySelect(day)}
+                          className={cn(
+                            "w-full whitespace-nowrap rounded-lg border px-3 py-3 text-base font-medium",
+                            !day.hasAnySlots && "cursor-not-allowed opacity-50",
+                            selectedDay?.dateKey === day.dateKey
+                              ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
+                              : day.hasAnySlots
+                                ? "border-seasalt-400/60 bg-seasalt text-rich-black hover:border-russian-violet/40"
+                                : "border-seasalt-400/40 bg-seasalt-900/20 text-rich-black/60",
+                            day.isToday &&
+                              day.hasAnySlots &&
+                              "ring-coquelicot-500/50 ring-2 ring-offset-1",
+                          )}
+                        >
+                          {day.dayLabel}
+                        </button>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -701,14 +974,20 @@ export default function BookingForm({
           </div>
         </div>
 
-        <div className={cn("flex flex-col gap-1.5")}>
+        <div id="booking-phone-wrap" className={cn("flex flex-col gap-1.5")}>
           <label htmlFor="booking-phone" className={cn("text-rich-black text-base font-semibold")}>
-            Phone <span className={cn("text-rich-black/70 text-base")}>(optional)</span>
+            Phone{" "}
+            {meetingType === "in-person" ? (
+              <span className={cn("text-coquelicot-500")}>*</span>
+            ) : (
+              <span className={cn("text-rich-black/70 text-base")}>(optional)</span>
+            )}
           </label>
           <PhoneInput
             id="booking-phone"
             value={phone}
             onChange={setPhone}
+            required={meetingType === "in-person"}
             error={fieldErrors.phone}
             errorId="booking-phone-error"
             maxLength={BOOKING_FIELD_LIMITS.phone}
@@ -719,6 +998,11 @@ export default function BookingForm({
               "sm:max-w-sm",
             )}
           />
+          {meetingType === "in-person" && (
+            <p className={cn("text-rich-black/60 text-sm")}>
+              Needed so I can contact you on arrival (running late, gate codes, etc.).
+            </p>
+          )}
         </div>
 
         {/* Meeting Type */}
@@ -814,10 +1098,22 @@ export default function BookingForm({
                         // Any keystroke invalidates the prior pick. onChange
                         // fires before onPlaceSelected on a real pick, so
                         // batched updates leave verified=true on suggestions.
-                        setAddressVerified(false);
-                        setAddressOverrideAcked(false);
+                        // Skipped in fallback mode - there's no autocomplete to
+                        // verify against.
+                        if (!mapsFallback) {
+                          setAddressVerified(false);
+                          setAddressOverrideAcked(false);
+                        }
                       }}
                       onPlaceSelected={() => setAddressVerified(true)}
+                      onFallbackMode={() => {
+                        setMapsFallback(true);
+                        // No suggestions available > accept the typed address
+                        // outright; the existing submit-time geocode (skipped
+                        // in this mode) was the only thing that would have
+                        // gated submission.
+                        setAddressVerified(true);
+                      }}
                       placeholder="Start typing your street address..."
                       required
                       aria-invalid={!!fieldErrors.address || undefined}
@@ -829,6 +1125,7 @@ export default function BookingForm({
                       </p>
                     )}
                     {address.trim() &&
+                      !mapsFallback &&
                       (addressVerified ? (
                         <p
                           className={cn(
@@ -874,8 +1171,21 @@ export default function BookingForm({
             maxLength={BOOKING_FIELD_LIMITS.notes}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
+            onPaste={(e) => {
+              // Detect when the paste would push us past maxLength so the user
+              // gets a hint that their text was trimmed (browsers silently
+              // truncate on maxLength). textarea selection range narrows the
+              // check to whatever the paste is actually replacing.
+              const pasted = e.clipboardData.getData("text") ?? "";
+              const target = e.currentTarget;
+              const selectionLen = (target.selectionEnd ?? 0) - (target.selectionStart ?? 0);
+              const projected = notes.length - selectionLen + pasted.length;
+              if (projected > BOOKING_FIELD_LIMITS.notes) {
+                setPasteTrimmed(true);
+              }
+            }}
             aria-invalid={!!fieldErrors.notes || undefined}
-            aria-describedby={fieldErrors.notes ? "booking-notes-error" : undefined}
+            aria-describedby={fieldErrors.notes ? "booking-notes-error" : "booking-notes-counter"}
             className={cn(
               "border-seasalt-400/80 bg-seasalt text-rich-black rounded-md border px-4 py-3 text-base",
               "focus:border-russian-violet focus:ring-russian-violet/30 focus:outline-none focus:ring-1",
@@ -883,6 +1193,29 @@ export default function BookingForm({
             )}
             placeholder="e.g., Wi-Fi not working, need help with email setup, laptop running slow..."
           />
+          <div
+            id="booking-notes-counter"
+            className={cn("flex items-center justify-between gap-3 text-sm")}
+          >
+            <span
+              className={cn(pasteTrimmed ? "text-coquelicot-600" : "text-rich-black/60")}
+              aria-live="polite"
+            >
+              {pasteTrimmed
+                ? `Pasted text was trimmed to fit the ${BOOKING_FIELD_LIMITS.notes}-character limit.`
+                : " "}
+            </span>
+            <span
+              className={cn(
+                "tabular-nums",
+                notes.length >= BOOKING_FIELD_LIMITS.notes - NOTES_WARN_GAP
+                  ? "text-coquelicot-600 font-medium"
+                  : "text-rich-black/60",
+              )}
+            >
+              {notes.length} / {BOOKING_FIELD_LIMITS.notes}
+            </span>
+          </div>
           {fieldErrors.notes && (
             <p id="booking-notes-error" className={cn("text-coquelicot-600 text-sm")}>
               {fieldErrors.notes}
@@ -890,6 +1223,102 @@ export default function BookingForm({
           )}
         </div>
       </fieldset>
+
+      {/* Booking summary - live recap of what's selected so the user can see
+          their choices before submit. */}
+      {(() => {
+        const activeWindow =
+          selectedDay && selectedTime
+            ? (selectedDay.timeWindows.find((w) => w.value === selectedTime) ?? null)
+            : null;
+        const timeLabel = activeWindow
+          ? subSlotLabel(activeWindow.startHour, selectedMinute)
+          : null;
+        const durationLabel = DURATION_OPTIONS.find((d) => d.value === duration)?.label ?? null;
+        const combinedAddress =
+          meetingType === "in-person" ? combineUnitAndAddress(unit, address) : "";
+        return (
+          <section
+            aria-label="Your appointment so far"
+            className={cn(
+              "border-moonstone-500/30 bg-moonstone-600/5 flex flex-col gap-2 rounded-lg border p-4",
+            )}
+          >
+            <div className={cn("flex items-start justify-between gap-3")}>
+              <h3 className={cn("text-russian-violet text-base font-bold sm:text-lg")}>
+                Your appointment
+              </h3>
+              {draftRestored && (
+                <button
+                  type="button"
+                  onClick={clearDraft}
+                  className={cn(
+                    "text-rich-black/70 text-sm underline underline-offset-2",
+                    "hover:text-rich-black focus:ring-russian-violet/30 rounded focus:outline-none focus:ring-2",
+                  )}
+                >
+                  Clear form
+                </button>
+              )}
+            </div>
+            <dl className={cn("grid grid-cols-[7rem_1fr] gap-x-3 gap-y-1.5 text-base")}>
+              <dt className={cn("text-rich-black/60")}>Length</dt>
+              <dd className={cn("text-rich-black")}>
+                {durationLabel ?? <span className={cn("text-rich-black/50")}>—</span>}
+              </dd>
+
+              <dt className={cn("text-rich-black/60")}>Date</dt>
+              <dd className={cn("text-rich-black")}>
+                {selectedDay ? (
+                  selectedDay.fullLabel
+                ) : (
+                  <span className={cn("text-rich-black/50")}>—</span>
+                )}
+              </dd>
+
+              <dt className={cn("text-rich-black/60")}>Time</dt>
+              <dd className={cn("text-rich-black")}>
+                {timeLabel ? (
+                  <>
+                    {timeLabel} <span className={cn("text-rich-black/60 text-sm")}>NZ time</span>
+                  </>
+                ) : (
+                  <span className={cn("text-rich-black/50")}>—</span>
+                )}
+              </dd>
+
+              <dt className={cn("text-rich-black/60")}>Meeting</dt>
+              <dd className={cn("text-rich-black capitalize")}>
+                {meetingType ? (
+                  meetingType.replace("-", " ")
+                ) : (
+                  <span className={cn("text-rich-black/50")}>—</span>
+                )}
+              </dd>
+
+              {meetingType === "in-person" && (
+                <>
+                  <dt className={cn("text-rich-black/60")}>Address</dt>
+                  <dd className={cn("text-rich-black wrap-break-word")}>
+                    {combinedAddress.trim() ? (
+                      combinedAddress
+                    ) : (
+                      <span className={cn("text-rich-black/50")}>—</span>
+                    )}
+                  </dd>
+                </>
+              )}
+            </dl>
+          </section>
+        );
+      })()}
+
+      {/* Cancellation / rescheduling policy - keeps expectations clear so a
+          customer who later wants to change their booking knows it's easy. */}
+      <p className={cn("text-rich-black/70 text-sm")}>
+        Need to change or cancel? Use the link in the confirmation email any time before your
+        appointment, or text/call directly.
+      </p>
 
       {/* Submit */}
       {slotStale && (
@@ -904,7 +1333,8 @@ export default function BookingForm({
             That time slot was just taken by another customer.
           </p>
           <p className={cn("text-rich-black/70 text-sm")}>
-            Refresh the page to load the up-to-date availability, then pick another time.
+            Tap below to load the up-to-date availability - your form details will stay where they
+            are.
           </p>
           <Button
             type="button"
@@ -963,7 +1393,15 @@ export default function BookingForm({
         </p>
       )}
 
-      <div className={cn("flex flex-wrap items-center gap-4")}>
+      {/* Submit band: sticky to the viewport bottom on mobile so users on a
+          long form never lose sight of the action; inline on >=sm. */}
+      <div
+        className={cn(
+          "sticky bottom-0 -mx-5 flex flex-wrap items-center gap-4 border-t",
+          "border-seasalt-400/80 bg-seasalt/90 px-5 py-3 backdrop-blur-md",
+          "sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none",
+        )}
+      >
         <Button
           type="submit"
           variant="secondary"
@@ -979,6 +1417,15 @@ export default function BookingForm({
               ? "Save changes"
               : "Submit request"}
         </Button>
+        {Object.keys(fieldErrors).length > 0 && (
+          <a
+            href="#booking-duration"
+            className={cn("text-coquelicot-600 text-sm font-medium underline sm:hidden")}
+          >
+            {Object.keys(fieldErrors).length} issue
+            {Object.keys(fieldErrors).length === 1 ? "" : "s"} - tap to review
+          </a>
+        )}
         {isEditMode && cancelToken && (
           <Button
             href={`/booking/cancel?token=${encodeURIComponent(cancelToken)}`}

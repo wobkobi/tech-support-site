@@ -11,6 +11,7 @@ import { useState } from "react";
 import type React from "react";
 import { cn } from "@/shared/lib/cn";
 import { validateEmail } from "@/features/booking/lib/booking";
+import { suggestEmailCorrection } from "@/shared/lib/email-typo-suggestion";
 
 interface EmailInputProps {
   id: string;
@@ -89,12 +90,16 @@ export function EmailInput({
   type = "email",
 }: EmailInputProps): React.ReactElement {
   const [internalError, setInternalError] = useState<string | null>(null);
+  // Stored separately from the validation error: a typo suggestion is non-
+  // blocking and disappears the moment the user edits the field again.
+  const [suggestion, setSuggestion] = useState<string | null>(null);
   const activeError = error !== undefined ? error : internalError;
   const describedBy = activeError ? (errorId ?? `${id}-error`) : undefined;
 
   /**
    * Runs validateEmail on blur and stashes the result in internal state, then
-   * forwards the event to the caller's onBlur if provided.
+   * forwards the event to the caller's onBlur if provided. Also computes a
+   * "did you mean…?" suggestion when the address is otherwise well-formed.
    * @param e - Blur event.
    */
   function handleBlur(e: React.FocusEvent<HTMLInputElement>): void {
@@ -106,17 +111,30 @@ export function EmailInput({
     } else {
       setInternalError(null);
     }
+    setSuggestion(result === "ok" ? suggestEmailCorrection(value) : null);
     onBlur?.(e);
   }
 
   /**
-   * Clears the internal error when the user edits the field, then forwards the
-   * new value to the caller.
+   * Clears the internal error + any typo suggestion when the user edits the
+   * field, then forwards the new value to the caller.
    * @param next - New input value.
    */
   function handleChange(next: string): void {
     if (internalError) setInternalError(null);
+    if (suggestion) setSuggestion(null);
     onChange(next);
+  }
+
+  /**
+   * Apply the suggested correction. Surfaces the change through onChange so
+   * the parent's controlled state updates, then clears the suggestion.
+   */
+  function acceptSuggestion(): void {
+    if (!suggestion) return;
+    onChange(suggestion);
+    setSuggestion(null);
+    setInternalError(null);
   }
 
   return (
@@ -141,6 +159,22 @@ export function EmailInput({
       {!hideError && activeError && (
         <p id={describedBy} className={cn("text-coquelicot-600 mt-1 text-xs")}>
           {activeError}
+        </p>
+      )}
+      {!activeError && suggestion && (
+        <p className={cn("text-rich-black/80 mt-1 text-sm")}>
+          Did you mean{" "}
+          <button
+            type="button"
+            onClick={acceptSuggestion}
+            className={cn(
+              "text-russian-violet font-semibold underline underline-offset-2",
+              "hover:text-russian-violet/80 focus:ring-russian-violet/30 rounded focus:outline-none focus:ring-2",
+            )}
+          >
+            {suggestion}
+          </button>
+          ?
         </p>
       )}
     </>

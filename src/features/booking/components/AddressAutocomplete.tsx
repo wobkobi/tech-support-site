@@ -31,6 +31,11 @@ export interface AddressAutocompleteProps {
   onChange: (value: string) => void;
   /** Optional callback fired when a Place suggestion is selected. */
   onPlaceSelected?: (place: google.maps.places.PlaceResult) => void;
+  /**
+   * Fired exactly once when the Maps API can't be used (missing key or script
+   * load failure) so the parent can bypass any "must pick a suggestion" gates.
+   */
+  onFallbackMode?: () => void;
   /** Input placeholder text */
   placeholder?: string;
   /** Whether the field is required */
@@ -55,6 +60,7 @@ export interface AddressAutocompleteProps {
  * @param props.value - Current address value.
  * @param props.onChange - Callback when address changes.
  * @param props.onPlaceSelected - Optional callback when a suggestion is selected.
+ * @param props.onFallbackMode - Fired once if the Maps API can't be used (missing key or script error).
  * @param props.placeholder - Input placeholder text.
  * @param props.required - Whether the field is required.
  * @param props.maxLength - Optional max character length for the input.
@@ -68,6 +74,7 @@ export default function AddressAutocomplete({
   value,
   onChange,
   onPlaceSelected,
+  onFallbackMode,
   placeholder = "Start typing your address...",
   required = false,
   maxLength,
@@ -83,8 +90,21 @@ export default function AddressAutocomplete({
   // the env var is inlined at build time - it can't change between renders.
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
   const [apiKeyMissing] = useState(() => !apiKey);
+  // Latch so onFallbackMode fires at most once per mount.
+  const fallbackFiredRef = useRef(false);
 
   const isVisible = useOnVisible(wrapperRef);
+
+  // Notify the parent that we're permanently in fallback mode (no autocomplete
+  // available). Fires whether the cause is a missing key, a script error, or
+  // both. Mirrors the visual warning banner below.
+  useEffect(() => {
+    if (fallbackFiredRef.current) return;
+    if (apiKeyMissing || scriptError) {
+      fallbackFiredRef.current = true;
+      onFallbackMode?.();
+    }
+  }, [apiKeyMissing, scriptError, onFallbackMode]);
 
   // Lazy-load the Maps script once the wrapper scrolls into view, then attach
   // the Autocomplete widget to our existing <input>.

@@ -138,7 +138,7 @@ async function getAvailableDays(excludeBookingId: string): Promise<BookableDay[]
     bufferAfterMin: b.bufferAfterMin,
   }));
 
-  return buildAvailableDays(existing, calendarEvents, now, BOOKING_CONFIG);
+  return buildAvailableDays(existing, calendarEvents, now, BOOKING_CONFIG).days;
 }
 
 /**
@@ -220,6 +220,7 @@ export default async function EditBookingPage({
         day: "numeric",
       }).format(booking.startAt),
       isToday: false,
+      isTomorrow: false,
       isWeekend: [0, 6].includes(booking.startAt.getDay()),
       hasAnySlots: true,
       timeWindows: TIME_OF_DAY_OPTIONS.map((t) => {
