@@ -109,8 +109,12 @@ model Review {
 }
 
 // Standalone review requests sent to past clients by email or SMS.
+// Each row is a send event: one Contact can accumulate many ReviewRequest rows
+// over time. contactId links to the canonical person record; name/email/phone
+// remain populated for legacy rows and as fallbacks during contact lookup.
 model ReviewRequest {
   id                String    @id @default(auto()) @map("_id") @db.ObjectId
+  contactId         String?   @db.ObjectId // FK to Contact - set on create for new rows, backfilled lazily for old
   name              String
   email             String? // Null for SMS-only records; used for deduplication
   phone             String? // Null for email-only records; used for deduplication
@@ -123,6 +127,8 @@ model ReviewRequest {
   // Deduplication before sending a new review link
   @@index([email])
   @@index([phone])
+  // Contact tab: list a contact's send history
+  @@index([contactId])
 }
 
 // Contacts built from booking submissions.

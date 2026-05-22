@@ -22,6 +22,7 @@ import {
 } from "@/features/calendar/lib/google-calendar";
 import { sendCustomerBookingConfirmation } from "@/features/reviews/lib/email";
 import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
+import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-create";
 import { validatePhone } from "@/shared/lib/normalise-phone";
 
 interface AdminBookingPayload {
@@ -192,12 +193,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Best-effort contact upsert + Google sync; never fail the booking on errors.
     try {
-      let contact = await prisma.contact.findFirst({ where: { email } });
-      if (!contact) {
-        contact = await prisma.contact.create({
-          data: { name, email, phone: phoneE164, address },
-        });
-      }
+      const { contact } = await findOrCreateContactByEmail(email, {
+        name,
+        phone: phoneE164,
+        address,
+      });
       await syncContactToGoogle(contact.id);
     } catch (contactErr) {
       console.error("[admin/bookings] Contact upsert failed:", contactErr);

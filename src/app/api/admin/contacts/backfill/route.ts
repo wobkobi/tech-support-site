@@ -9,6 +9,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { toE164NZ, normalisePhone } from "@/shared/lib/normalise-phone";
+import {
+  findOrCreateContactByEmail,
+  findOrCreateContactByPhone,
+} from "@/features/contacts/lib/find-or-create";
 
 /**
  * Parse phone and address from structured booking notes.
@@ -82,18 +86,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   let upsertedCount = 0;
   for (const { name, email, phone, address } of mergedByEmail.values()) {
-    const exists = await prisma.contact.findFirst({ where: { email } });
-    if (!exists) {
-      await prisma.contact.create({ data: { name, email, phone, address } });
-      upsertedCount++;
-    }
+    const { created } = await findOrCreateContactByEmail(email, { name, phone, address });
+    if (created) upsertedCount++;
   }
   for (const { name, email, phone } of mergedByPhone.values()) {
-    const exists = await prisma.contact.findFirst({ where: { phone } });
-    if (!exists) {
-      await prisma.contact.create({ data: { name, email, phone } });
-      upsertedCount++;
-    }
+    const { created } = await findOrCreateContactByPhone(phone, { name, email });
+    if (created) upsertedCount++;
   }
 
   return NextResponse.json({ ok: true, upsertedCount });

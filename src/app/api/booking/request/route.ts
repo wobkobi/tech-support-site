@@ -29,6 +29,7 @@ import {
 import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
 import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
+import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-create";
 import { toE164NZ, isValidPhone } from "@/shared/lib/normalise-phone";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 
@@ -245,19 +246,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
       // Upsert contact record - best effort, never fail the booking on write error
       try {
-        const contactEmail = email.trim().toLowerCase();
-        let existing = await prisma.contact.findFirst({ where: { email: contactEmail } });
-        if (!existing) {
-          existing = await prisma.contact.create({
-            data: {
-              name: name.trim(),
-              email: contactEmail,
-              phone: phoneE164,
-              address: address?.trim() || null,
-            },
-          });
-        }
-        const contact = existing;
+        const { contact } = await findOrCreateContactByEmail(email.trim().toLowerCase(), {
+          name: name.trim(),
+          phone: phoneE164,
+          address: address?.trim() || null,
+        });
         // Best-effort sync to Google Contacts - never fail the booking if it errors.
         await syncContactToGoogle(contact.id);
       } catch (contactError) {

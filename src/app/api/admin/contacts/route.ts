@@ -9,6 +9,7 @@ import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { toE164NZ } from "@/shared/lib/normalise-phone";
 import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
+import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-create";
 
 /**
  * GET /api/admin/contacts
@@ -67,22 +68,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Invalid email" }, { status: 400 });
   }
 
-  const existing = await prisma.contact.findFirst({ where: { email } });
-  if (existing) {
-    return NextResponse.json({ ok: true, created: false, contact: existing });
-  }
-
   const phoneE164 = body.phone ? toE164NZ(body.phone) || null : null;
 
-  const contact = await prisma.contact.create({
-    data: {
-      name: body.name.trim(),
-      email,
-      phone: phoneE164,
-      address: body.address?.trim() || null,
-      googleContactId: body.googleContactId?.trim() || null,
-    },
+  const { contact, created } = await findOrCreateContactByEmail(email, {
+    name: body.name.trim(),
+    phone: phoneE164,
+    address: body.address?.trim() || null,
+    googleContactId: body.googleContactId?.trim() || null,
   });
+
+  if (!created) {
+    return NextResponse.json({ ok: true, created: false, contact });
+  }
 
   // Best-effort: push to Google Contacts so it appears on the operator's phone.
   void syncContactToGoogle(contact.id).catch((err) => {

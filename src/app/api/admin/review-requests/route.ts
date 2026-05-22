@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { toE164NZ, isValidPhone } from "@/shared/lib/normalise-phone";
+import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-create";
 
 /**
  * POST /api/admin/review-requests
@@ -59,23 +60,26 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
      * Upserts a Contact for a given email - best effort, never blocks the response.
      * @param contactEmail - Normalised email address.
      * @param contactName - Contact name from the ReviewRequest.
+     * @returns The contact id, or null if no email or the upsert failed.
      */
     async function upsertContact(
       contactEmail: string | null | undefined,
       contactName: string,
-    ): Promise<void> {
-      if (!contactEmail) return;
+    ): Promise<string | null> {
+      if (!contactEmail) return null;
       try {
-        const exists = await prisma.contact.findFirst({ where: { email: contactEmail } });
-        if (!exists) {
-          await prisma.contact.create({
-            data: { name: contactName, email: contactEmail, phone: normalizedPhone || null },
-          });
-        }
+        const { contact } = await findOrCreateContactByEmail(contactEmail, {
+          name: contactName,
+          phone: normalizedPhone || null,
+        });
+        return contact.id;
       } catch {
-        // best-effort
+        return null;
       }
     }
+
+    const normalisedEmail = email?.trim().toLowerCase() || null;
+    const contactId = await upsertContact(normalisedEmail, name.trim());
 
     if (customerRef) {
       // Legacy review with existing token - create or update ReviewRequest with that token
@@ -87,27 +91,27 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         await prisma.reviewRequest.update({
           where: { id: existing.id },
           data: {
+            contactId,
             name: name.trim(),
-            email: email?.trim().toLowerCase() || null,
+            email: normalisedEmail,
             phone: normalizedPhone || null,
           },
         });
-        await upsertContact(email?.trim().toLowerCase(), name.trim());
         return NextResponse.json({ ok: true, id: existing.id });
       }
 
       const reviewRequest = await prisma.reviewRequest.create({
         data: {
+          contactId,
           reviewToken: customerRef,
           name: name.trim(),
-          email: email?.trim().toLowerCase() || null,
+          email: normalisedEmail,
           phone: normalizedPhone || null,
           reviewSubmittedAt: new Date(),
         },
         select: { id: true, reviewToken: true },
       });
 
-      await upsertContact(email?.trim().toLowerCase(), name.trim());
       return NextResponse.json({
         ok: true,
         id: reviewRequest.id,
@@ -120,8 +124,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // and back-link the original Review record so it no longer appears as tokenless.
     const reviewRequest = await prisma.reviewRequest.create({
       data: {
+        contactId,
         name: name.trim(),
-        email: email?.trim().toLowerCase() || null,
+        email: normalisedEmail,
         phone: normalizedPhone || null,
         reviewSubmittedAt: new Date(),
       },
@@ -132,8 +137,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       where: { id: reviewId },
       data: { customerRef: reviewRequest.reviewToken },
     });
-
-    await upsertContact(email?.trim().toLowerCase(), name.trim());
     return NextResponse.json({
       ok: true,
       id: reviewRequest.id,

@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { revalidateReviewPaths } from "@/features/reviews/lib/revalidate";
+import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-create";
 
 /**
  * PATCH /api/admin/reviews/[id]
@@ -104,16 +105,10 @@ export async function PATCH(
         if (email) {
           const fallbackName =
             [review.firstName, review.lastName].filter(Boolean).join(" ") || "Unknown";
-          let contact = await prisma.contact.findFirst({ where: { email } });
-          if (!contact) {
-            contact = await prisma.contact.create({
-              data: {
-                name: contactName ?? fallbackName,
-                email,
-                ...(contactPhone && { phone: contactPhone }),
-              },
-            });
-          }
+          const { contact } = await findOrCreateContactByEmail(email, {
+            name: contactName ?? fallbackName,
+            phone: contactPhone ?? null,
+          });
           await prisma.review.update({
             where: { id },
             data: { contactId: contact.id },
