@@ -93,8 +93,8 @@ export function ExpensesView({ token }: { token: string }): React.ReactElement {
 
   return (
     <div>
-      {/* Totals bar */}
-      <div className={cn("mb-6 grid grid-cols-3 gap-3")}>
+      {/* Totals bar - stacks on mobile so three values stay readable below ~480px. */}
+      <div className={cn("mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3")}>
         {[
           {
             label: "Total expenses (excl. GST)",
@@ -262,7 +262,7 @@ export function ExpensesView({ token }: { token: string }): React.ReactElement {
       </form>
 
       {/* Table */}
-      <div className={cn("overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm")}>
+      <div className={cn("overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm")}>
         {loading ? (
           <p className={cn("px-5 py-6 text-sm text-slate-400")}>Loading...</p>
         ) : entries.length === 0 ? (

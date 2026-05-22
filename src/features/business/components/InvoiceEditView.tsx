@@ -150,10 +150,10 @@ export function InvoiceEditView({ invoice, token }: InvoiceEditViewProps): React
         </div>
       </div>
 
-      {/* Dates & status */}
+      {/* Dates & status - stacks on mobile so the date pickers don't crowd. */}
       <div className={cn("rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}>
         <h2 className={cn("mb-4 text-sm font-semibold text-slate-700")}>Details</h2>
-        <div className={cn("grid grid-cols-3 gap-4")}>
+        <div className={cn("grid grid-cols-1 gap-4 sm:grid-cols-3")}>
           <div>
             <label className={labelCls}>Issue date</label>
             <input

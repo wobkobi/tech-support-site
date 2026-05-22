@@ -145,7 +145,7 @@ export function InvoicesListView({ token }: { token: string }): React.ReactEleme
         </div>
       </div>
 
-      <div className={cn("overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm")}>
+      <div className={cn("overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm")}>
         {loading ? (
           <p className={cn("px-5 py-6 text-sm text-slate-400")}>Loading...</p>
         ) : invoices.length === 0 ? (

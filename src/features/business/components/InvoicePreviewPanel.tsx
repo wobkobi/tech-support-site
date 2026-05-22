@@ -123,8 +123,11 @@ function InvoicePreviewPanelImpl(props: Props): React.ReactElement {
 
         <div className={cn("mb-0 h-px bg-slate-300")} />
 
-        {/* Line items table - no zebra striping (matches the PDF + Xero/QuickBooks). */}
-        <table className={cn("mb-0 w-full text-xs")}>
+        {/* Line items table - no zebra striping (matches the PDF + Xero/QuickBooks).
+            `table-fixed` enforces the <th> percentage widths even at narrow
+            viewports so long descriptions wrap inside their cell instead of
+            blowing out the column. */}
+        <table className={cn("mb-0 w-full table-fixed text-xs")}>
           <thead>
             <tr className={cn("border-russian-violet border-b-2 text-slate-800")}>
               <th className={cn("w-[67%] px-2 py-2 text-left font-bold")}>Description</th>
@@ -152,7 +155,7 @@ function InvoicePreviewPanelImpl(props: Props): React.ReactElement {
                     idx === lineItems.length - 1 && "border-b-0",
                   )}
                 >
-                  <td className={cn("px-2 py-2 align-top text-slate-700")}>
+                  <td className={cn("wrap-break-word px-2 py-2 align-top text-slate-700")}>
                     {item.description || (
                       <span className={cn("italic text-slate-300")}>(line description)</span>
                     )}

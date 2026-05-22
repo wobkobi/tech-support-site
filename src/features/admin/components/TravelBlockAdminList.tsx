@@ -223,9 +223,9 @@ export function TravelBlockAdminList({
                 {formatEventTime(b.eventStartAt, b.eventEndAt)}
               </p>
 
-              {/* Destination address */}
+              {/* Destination address - wrap long unbroken strings on mobile. */}
               {b.destination && (
-                <p className={cn("text-xs text-slate-500")}>
+                <p className={cn("wrap-break-word text-xs text-slate-500")}>
                   <span className={cn("font-medium text-slate-400")}>To: </span>
                   {b.destination}
                 </p>

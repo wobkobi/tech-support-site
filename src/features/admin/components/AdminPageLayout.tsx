@@ -25,11 +25,16 @@ export function AdminPageLayout({
   contentClassName,
 }: AdminPageLayoutProps): React.ReactElement {
   return (
-    <div className={cn("flex min-h-screen")}>
+    <div className={cn("flex min-h-screen overflow-x-clip")}>
       <AdminSidebar token={token} current={current} />
       {/* Sidebar is fixed-position; reserve its width on lg+ only. Below lg the
-          sidebar slides in as an overlay drawer so content gets the full width. */}
-      <div className={cn("flex-1 bg-slate-50 lg:ml-56 print:ml-0 print:bg-white")}>
+          sidebar slides in as an overlay drawer so content gets the full width.
+          `min-w-0` on the flex child stops intrinsic content (long descriptions,
+          wide tables) from blowing out the column - the canonical flex fix.
+          `overflow-x-clip` on the parent is the safety net for any rogue child
+          that still overflows; `clip` (not `hidden`) preserves `position: sticky`
+          on descendants like the calculator's preview panel at lg+. */}
+      <div className={cn("min-w-0 flex-1 bg-slate-50 lg:ml-56 print:ml-0 print:bg-white")}>
         {/* Top padding bumped on mobile so the page heading clears the
             hamburger button (h-11 + 12px top inset = ~56px). Print drops
             padding so the invoice fills the page edge-to-edge. */}
