@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import type React from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/shared/lib/cn";
@@ -16,13 +16,15 @@ import {
   hourlyTaskMinutes,
   timeDiffMins,
   sessionDurationMins,
+  todayISO,
 } from "@/features/business/lib/business";
+import { BUSINESS_GST_NUMBER, BUSINESS_PAYMENT_TERMS_DAYS } from "@/shared/lib/business-identity";
 import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 import { ContactPickerModal } from "@/features/business/components/ContactPickerModal";
 import { AddToContactsModal } from "@/features/business/components/AddToContactsModal";
 import { ParseConfidenceBanner } from "@/features/business/components/ParseConfidenceBanner";
 import { TaxonomyManageModal } from "@/features/business/components/TaxonomyManageModal";
-import { TotalsPanel } from "@/features/business/components/calculator/TotalsPanel";
+import { InvoicePreviewPanel } from "@/features/business/components/InvoicePreviewPanel";
 import { PartsSection } from "@/features/business/components/calculator/PartsSection";
 import { TravelSection } from "@/features/business/components/calculator/TravelSection";
 import { ClientPickerSection } from "@/features/business/components/calculator/ClientPickerSection";
@@ -42,6 +44,17 @@ import type {
   GoogleContact,
   TaskTemplate,
 } from "@/features/business/types/business";
+
+/**
+ * Returns the YYYY-MM-DD string for today + n days.
+ * @param n - Number of days to add to today.
+ * @returns ISO date string (YYYY-MM-DD).
+ */
+function addDaysISO(n: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
 
 /**
  * Returns the current local time formatted as HH:MM.
@@ -178,9 +191,13 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
   const [pickedContactCompany, setPickedContactCompany] = useState<string | null>(null);
   const [pickedContactGoogleId, setPickedContactGoogleId] = useState<string | null>(null);
   const [addressMode, setAddressModeState] = useState<"name" | "company" | "custom">("custom");
-  // Deferred invoice handoff URL: set when the "Add to contacts?" popup
-  // intercepts handleCreateInvoice; nav fires after the modal closes.
-  const [pendingHandoffUrl, setPendingHandoffUrl] = useState<string | null>(null);
+  // Direct-save (Save invoice) state. pendingInvoiceId is set after a
+  // successful POST so handleAddContactClose can PATCH `contactId` once the
+  // modal returns the new Contact's id, then navigate to the detail page.
+  const [savingInvoice, setSavingInvoice] = useState(false);
+  const [saveInvoiceError, setSaveInvoiceError] = useState<string | null>(null);
+  const [pendingInvoiceId, setPendingInvoiceId] = useState<string | null>(null);
+  const [sheetSyncToast, setSheetSyncToast] = useState<string | null>(null);
 
   const [aiInput, setAiInput] = useState("");
   const [parsing, setParsing] = useState(false);
@@ -325,6 +342,14 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
     sessions,
   };
   const totals = calcJobTotal(job, !skipPromo ? activePromo : null);
+  // Memoise the flattened line items so the preview panel's React.memo can
+  // skip re-render when unrelated parent state changes (e.g. typing in the
+  // AI input box). Recomputes when any meaningful input shifts.
+  const previewLineItems = useMemo(
+    () => jobToLineItems(job),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [tasks, parts, sessions, hourlyRate, travelInfo, gst, clientName, clientEmail, notes],
+  );
 
   /**
    * Applies a parsed job response to the calculator state, hydrating sessions
@@ -614,58 +639,111 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
   }
 
   /**
-   * Saves task templates then navigates to the new-invoice page with the job pre-populated.
+   * Closes the add-to-contacts modal after a direct save. If the modal
+   * created a Contact, PATCH the just-saved invoice with that contact's id
+   * before navigating to the detail page. Best-effort backfill - the invoice
+   * still navigates without the FK if PATCH fails.
+   * @param contactDbId - DB id returned by the modal when the operator
+   *   confirmed and a Contact was created. Null on dismiss / failure.
    */
-  async function handleCreateInvoice(): Promise<void> {
-    await saveTaskTemplates(tasks);
-    const lineItems = jobToLineItems(job);
-    const q = new URLSearchParams({
-      clientName,
-      clientEmail,
-      lineItems: JSON.stringify(lineItems),
-      gst: String(gst),
-      notes,
-    });
-    // Carry the picked-contact + address-mode across so the InvoiceBuilder
-    // restores the same Name/Company/Custom toggle state the operator chose
-    // here, no re-picking.
-    if (pickedContactName) q.set("pickedContactName", pickedContactName);
-    if (pickedContactCompany) q.set("pickedContactCompany", pickedContactCompany);
-    if (pickedContactGoogleId) q.set("pickedContactGoogleId", pickedContactGoogleId);
-    if (pickedContactName) q.set("addressMode", addressMode);
-    // Pass promo snapshot to InvoiceBuilder; skipPromo=1 carries the opt-out.
-    if (activePromo && !skipPromo && totals.promoDiscount > 0) {
-      q.set("promoTitle", activePromo.title);
-      q.set("promoDiscount", String(totals.promoDiscount));
-    }
-    if (skipPromo) q.set("skipPromo", "1");
-    const handoffUrl = `/admin/business/invoices/new?token=${encodeURIComponent(token)}&${q.toString()}`;
-
-    // If the client has an email and isn't in the DB Contact table yet, prompt
-    // the operator to add them before navigating. Fail-quiet on any error.
-    if (clientEmail.trim()) {
+  async function handleAddContactClose(contactDbId?: string | null): Promise<void> {
+    const invoiceId = pendingInvoiceId;
+    if (!invoiceId) return;
+    setPendingInvoiceId(null);
+    if (contactDbId) {
       try {
-        const checkRes = await fetch(
-          `/api/admin/contacts/check?email=${encodeURIComponent(clientEmail.trim())}`,
-          { headers },
-        );
-        const checkData = (await checkRes.json()) as { exists?: boolean };
-        if (checkRes.ok && checkData.exists === false) {
-          setPendingHandoffUrl(handoffUrl);
-          return;
-        }
+        await fetch(`/api/business/invoices/${invoiceId}`, {
+          method: "PATCH",
+          headers: { ...headers, "content-type": "application/json" },
+          body: JSON.stringify({ contactId: contactDbId }),
+        });
       } catch {
-        // Fall through and navigate.
+        // Best-effort backfill; the invoice still saves without the FK.
       }
     }
-    router.push(handoffUrl);
+    router.push(`/admin/business/invoices/${invoiceId}?token=${encodeURIComponent(token)}`);
   }
 
-  /** Closes the add-to-contacts modal and completes the deferred handoff. */
-  function handleAddContactClose(): void {
-    const url = pendingHandoffUrl;
-    setPendingHandoffUrl(null);
-    if (url) router.push(url);
+  /**
+   * Direct save: POSTs the calculator state straight to the invoices API and
+   * navigates to the detail page. Bypasses InvoiceBuilderView entirely. Used
+   * by the "Save invoice" button - the primary action when the operator is
+   * happy with the live preview and doesn't need to override the invoice
+   * number / issue date / due date.
+   *
+   * Backdating / custom invoice number / custom due date is handled by
+   * editing a saved DRAFT after the fact (the [id]/edit route).
+   */
+  async function handleSaveInvoice(): Promise<void> {
+    setSaveInvoiceError(null);
+    if (!clientName.trim()) {
+      setSaveInvoiceError("Client name is required.");
+      return;
+    }
+    if (!clientEmail.trim()) {
+      setSaveInvoiceError("Client email is required.");
+      return;
+    }
+    if (totals.subtotal <= 0) {
+      setSaveInvoiceError("Add a task or line item with a price before saving.");
+      return;
+    }
+    setSavingInvoice(true);
+    try {
+      await saveTaskTemplates(tasks);
+      const lineItems = jobToLineItems(job);
+      const promoActive = activePromo && !skipPromo && totals.promoDiscount > 0;
+      const res = await fetch("/api/business/invoices", {
+        method: "POST",
+        headers: { ...headers, "content-type": "application/json" },
+        body: JSON.stringify({
+          clientName,
+          clientEmail,
+          lineItems,
+          gst,
+          notes: notes || null,
+          promoTitle: promoActive ? activePromo.title : null,
+          promoDiscount: promoActive ? totals.promoDiscount : null,
+          // issueDate, dueDate, number all defaulted server-side.
+        }),
+      });
+      const d = (await res.json()) as
+        | {
+            ok: true;
+            invoice: { id: string };
+            sheetSyncWarning?: boolean;
+          }
+        | { error: string };
+      if ("error" in d) throw new Error(d.error);
+      if (d.sheetSyncWarning) {
+        setSheetSyncToast("Invoice saved - sheet counter sync failed. Update SETTINGS!B17.");
+        setTimeout(() => setSheetSyncToast(null), 6000);
+      }
+      const invoiceId = d.invoice.id;
+      // Add-to-contacts gate: same flow as InvoiceBuilderView. Defer nav
+      // until the modal closes so handleAddContactClose can backfill
+      // contactId via PATCH.
+      if (clientEmail.trim()) {
+        try {
+          const checkRes = await fetch(
+            `/api/admin/contacts/check?email=${encodeURIComponent(clientEmail.trim())}`,
+            { headers },
+          );
+          const checkData = (await checkRes.json()) as { exists?: boolean };
+          if (checkRes.ok && checkData.exists === false) {
+            setPendingInvoiceId(invoiceId);
+            setSavingInvoice(false);
+            return;
+          }
+        } catch {
+          // Fall through to navigate.
+        }
+      }
+      router.push(`/admin/business/invoices/${invoiceId}?token=${encodeURIComponent(token)}`);
+    } catch (err) {
+      setSaveInvoiceError(err instanceof Error ? err.message : "Could not save invoice");
+      setSavingInvoice(false);
+    }
   }
 
   /**
@@ -956,13 +1034,13 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
         />
       )}
 
-      {pendingHandoffUrl && (
+      {pendingInvoiceId && (
         <AddToContactsModal
           token={token}
           name={clientName}
           email={clientEmail}
           googleContactId={pickedContactGoogleId}
-          onClose={handleAddContactClose}
+          onClose={(contactDbId) => void handleAddContactClose(contactDbId)}
         />
       )}
 
@@ -1203,15 +1281,47 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
           </div>
         </div>
 
-        {/* RIGHT column - live summary */}
+        {/* RIGHT column - live invoice preview (replaces the legacy Summary
+            panel - same totals, just inside the actual invoice layout). */}
         <div className={cn("space-y-4")}>
-          <TotalsPanel
-            durationMins={durationMins}
-            hourlyRate={hourlyRate}
-            totals={totals}
-            activePromo={activePromo}
+          {/* Inline GST toggle - previously lived inside TotalsPanel. Visible
+              hint when GST is off and we're GST-registered so we don't ship a
+              non-tax-invoice by accident. */}
+          <div className={cn("rounded-xl border border-slate-200 bg-white p-4 shadow-sm")}>
+            <label className={cn("flex cursor-pointer items-center gap-2 text-sm")}>
+              <input
+                type="checkbox"
+                checked={gst}
+                onChange={(e) => setGst(e.target.checked)}
+                className={cn(
+                  "text-russian-violet focus:ring-russian-violet/30 h-4 w-4 rounded border-slate-300",
+                )}
+              />
+              <span className={cn("font-medium text-slate-700")}>Charge GST (15%)</span>
+            </label>
+            {!gst && BUSINESS_GST_NUMBER && (
+              <p className={cn("mt-2 text-xs italic text-amber-700")}>
+                GST is off - the invoice will read "INVOICE" rather than "TAX INVOICE" and no GST
+                line will be added.
+              </p>
+            )}
+          </div>
+
+          <InvoicePreviewPanel
+            number="DRAFT"
+            clientName={clientName}
+            clientEmail={clientEmail}
+            issueDate={todayISO()}
+            dueDate={addDaysISO(BUSINESS_PAYMENT_TERMS_DAYS)}
+            lineItems={previewLineItems}
             gst={gst}
-            onGstChange={setGst}
+            notes={notes}
+            promoTitle={
+              activePromo && !skipPromo && totals.promoDiscount > 0 ? activePromo.title : null
+            }
+            promoDiscount={
+              activePromo && !skipPromo && totals.promoDiscount > 0 ? totals.promoDiscount : 0
+            }
           />
 
           {/* Client */}
@@ -1238,20 +1348,41 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
                 {incomeToast}
               </div>
             )}
+            {sheetSyncToast && (
+              <div
+                className={cn(
+                  "rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800",
+                )}
+              >
+                {sheetSyncToast}
+              </div>
+            )}
+            {saveInvoiceError && (
+              <p
+                className={cn(
+                  "rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700",
+                )}
+              >
+                {saveInvoiceError}
+              </p>
+            )}
             <button
-              onClick={handleCreateInvoice}
+              onClick={() => void handleSaveInvoice()}
+              disabled={savingInvoice || parsing}
+              suppressHydrationWarning
               className={cn(
-                "bg-russian-violet w-full rounded-lg px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90",
+                "bg-russian-violet w-full rounded-lg px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50",
               )}
             >
-              Create invoice from this job
+              {savingInvoice ? "Saving..." : "Save invoice"}
             </button>
             <button
               onClick={handleSaveIncome}
               suppressHydrationWarning
-              disabled={savingIncome || totals.subtotal === 0}
+              disabled={savingIncome || totals.subtotal === 0 || savingInvoice}
+              title="For cash jobs handled outside the invoice flow."
               className={cn(
-                "w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50",
+                "w-full rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-50",
               )}
             >
               {savingIncome ? "Saving..." : "Save as income entry"}

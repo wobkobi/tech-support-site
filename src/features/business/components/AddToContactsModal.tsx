@@ -27,8 +27,13 @@ export interface AddToContactsModalProps {
   phone?: string | null;
   /** Optional Google People API resource name (e.g. "people/c1234"). */
   googleContactId?: string | null;
-  /** Called whenever the modal closes - Yes, No, backdrop, Escape. */
-  onClose: () => void;
+  /**
+   * Called whenever the modal closes - Yes, No, backdrop, Escape.
+   * When the operator confirmed and the POST returned a Contact id, that id
+   * is passed back so the caller can backfill an FK (e.g. patch the just-
+   * saved invoice's `contactId`). Null on dismiss / failure.
+   */
+  onClose: (contactDbId?: string | null) => void;
 }
 
 /**
@@ -60,13 +65,18 @@ export function AddToContactsModal({
      * @param e - Keyboard event.
      */
     function handleKey(e: KeyboardEvent): void {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") onClose(null);
     }
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
   }, [onClose]);
 
-  /** Persists the contact then closes. Closes anyway if the request fails. */
+  /**
+   * Persists the contact then closes. Passes the new Contact's DB id back via
+   * `onClose` so the caller can backfill an FK on a parent row (e.g. set
+   * `Invoice.contactId`). Closes anyway with `null` if the request fails so
+   * the caller's deferred navigation still happens.
+   */
   async function handleConfirm(): Promise<void> {
     setSaving(true);
     setError(null);
@@ -80,7 +90,11 @@ export function AddToContactsModal({
         const data = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(data.error ?? "Could not save contact");
       }
-      onClose();
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        contact?: { id?: string };
+      };
+      onClose(data.contact?.id ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save contact");
       setSaving(false);
@@ -92,7 +106,7 @@ export function AddToContactsModal({
       className={cn(
         "fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm",
       )}
-      onClick={onClose}
+      onClick={() => onClose(null)}
       role="dialog"
       aria-modal="true"
       aria-label="Add to contacts"
@@ -109,7 +123,7 @@ export function AddToContactsModal({
           <h2 className={cn("text-russian-violet text-base font-semibold")}>Add to contacts?</h2>
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => onClose(null)}
             className={cn(
               "text-2xl leading-none text-slate-400 transition-colors hover:text-slate-700",
             )}
@@ -133,7 +147,7 @@ export function AddToContactsModal({
         <div className={cn("flex justify-end gap-2 border-t border-slate-200 px-5 py-3")}>
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => onClose(null)}
             disabled={saving}
             className={cn(
               "rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50",

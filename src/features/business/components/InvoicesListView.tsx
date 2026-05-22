@@ -135,7 +135,7 @@ export function InvoicesListView({ token }: { token: string }): React.ReactEleme
             {syncing ? "Syncing..." : "Sync Drive"}
           </button>
           <Link
-            href={`/admin/business/invoices/new?token=${encodeURIComponent(token)}`}
+            href={`/admin/business/calculator?token=${encodeURIComponent(token)}`}
             className={cn(
               "bg-russian-violet rounded-lg px-4 py-2 text-sm font-medium text-white hover:opacity-90",
             )}
