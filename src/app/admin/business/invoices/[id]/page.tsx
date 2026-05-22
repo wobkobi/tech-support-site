@@ -98,6 +98,11 @@ export default async function InvoiceViewPage({
             >
               {invoice.status}
             </p>
+            {invoice.status === "VOIDED" && invoice.voidedAt && (
+              <p className={cn("mt-0.5 text-xs text-slate-400")}>
+                Voided {formatDateShort(invoice.voidedAt)}
+              </p>
+            )}
             {BUSINESS_GST_NUMBER && (
               <p className={cn("mt-1 text-xs text-slate-500")}>GST# {BUSINESS_GST_NUMBER}</p>
             )}

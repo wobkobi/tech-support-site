@@ -326,6 +326,10 @@ model Invoice {
   contactId        String?       @db.ObjectId
   driveFileId      String?
   driveWebUrl      String?
+  // Stamped when status transitions to VOIDED. Audit trail + powers "Voided
+  // on DD MMM" on the detail page. Null on pre-VOIDED-feature rows and on
+  // any invoice that was never voided.
+  voidedAt         DateTime?
   // Stamped when send-email included the review link; powers the 30-day cooldown.
   reviewLinkSentAt DateTime?
   createdAt        DateTime      @default(now())

@@ -4,6 +4,39 @@ import { isAdminRequest } from "@/shared/lib/auth";
 import { calcInvoiceTotals } from "@/features/business/lib/business";
 import { extractYearCode, generateInvoicePdf } from "@/features/business/lib/invoice-pdf";
 import { uploadInvoicePdf } from "@/features/business/lib/google-drive";
+import type { InvoiceStatus } from "@prisma/client";
+
+/**
+ * Builds the patch payload for a status change. Stamps `voidedAt` when the
+ * target is VOIDED so the audit trail records when the cancellation happened;
+ * clears `voidedAt` when the target is any non-VOIDED status so an un-voided
+ * invoice doesn't keep the stale "Voided 22 May" label on the detail page.
+ * All paths that flip status (the void endpoint, the dropdown PATCH, the
+ * full-update PATCH) funnel through here for consistency.
+ * @param next - Target InvoiceStatus.
+ * @returns Partial update payload to splat into prisma.invoice.update data.
+ */
+function statusDataFor(next: InvoiceStatus): { status: InvoiceStatus; voidedAt?: Date } {
+  if (next === "VOIDED") return { status: next, voidedAt: new Date() };
+  return { status: next };
+}
+
+/**
+ * Returns null when the transition is allowed, or an error message when it's
+ * not. VOIDED is terminal - once a tax invoice is cancelled the audit trail
+ * must remain (NZ IRD record-retention). To "un-void", issue a fresh invoice;
+ * use the resend-notification button if the cancellation email needs to go
+ * out again.
+ * @param current - The invoice's current status.
+ * @param next - The requested target status.
+ * @returns Error message, or null when allowed.
+ */
+function validateTransition(current: InvoiceStatus, next: InvoiceStatus): string | null {
+  if (current === "VOIDED" && next !== "VOIDED") {
+    return "Voided invoices are terminal; issue a new invoice instead of re-opening this one.";
+  }
+  return null;
+}
 
 /**
  * Re-uploads the invoice's PDF to Drive (replacing the existing file in place when
@@ -81,10 +114,32 @@ export async function PATCH(
   const { id } = await params;
   const body = await request.json();
 
+  // Load the current row so we can enforce transition rules + the
+  // VOIDED-is-immutable invariant. One extra query in exchange for a much
+  // stronger audit guarantee.
+  const current = await prisma.invoice.findUnique({
+    where: { id },
+    select: { status: true },
+  });
+  if (!current) {
+    return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+  }
+
   // Full update
   if (body.clientName !== undefined || body.lineItems !== undefined) {
+    if (current.status === "VOIDED") {
+      return NextResponse.json(
+        { error: "Voided invoices are immutable; issue a new invoice instead." },
+        { status: 409 },
+      );
+    }
     const { clientName, clientEmail, issueDate, dueDate, lineItems, gst, notes, status } = body;
+    if (status !== undefined) {
+      const err = validateTransition(current.status, status as InvoiceStatus);
+      if (err) return NextResponse.json({ error: err }, { status: 409 });
+    }
     const { subtotal, gstAmount, total } = calcInvoiceTotals(lineItems ?? [], gst ?? false);
+    const statusPatch = status !== undefined ? statusDataFor(status as InvoiceStatus) : {};
     const invoice = await prisma.invoice.update({
       where: { id },
       data: {
@@ -95,7 +150,7 @@ export async function PATCH(
         ...(lineItems !== undefined && { lineItems, subtotal, gstAmount, total }),
         ...(gst !== undefined && { gst }),
         ...(notes !== undefined && { notes: notes || null }),
-        ...(status !== undefined && { status }),
+        ...statusPatch,
       },
     });
     // Any field change should be reflected in the Drive archive copy.
@@ -103,12 +158,23 @@ export async function PATCH(
     return NextResponse.json({ ok: true, invoice });
   }
 
-  // Status-only patch
+  // Status-only patch. The dropdown on the list view hits this path - it's a
+  // low-friction admin override that intentionally does NOT trigger the void
+  // notification flow (that lives at /void). voidedAt is stamped/cleared by
+  // statusDataFor so the detail page label stays in sync if the operator
+  // un-voids an invoice they cancelled by mistake.
   const { status } = body;
   if (!["DRAFT", "SENT", "PAID", "VOIDED"].includes(status)) {
     return NextResponse.json({ error: "Invalid status" }, { status: 400 });
   }
-  const invoice = await prisma.invoice.update({ where: { id }, data: { status } });
+  const transitionErr = validateTransition(current.status, status as InvoiceStatus);
+  if (transitionErr) {
+    return NextResponse.json({ error: transitionErr }, { status: 409 });
+  }
+  const invoice = await prisma.invoice.update({
+    where: { id },
+    data: statusDataFor(status as InvoiceStatus),
+  });
   // Status changes (Mark as paid, etc.) should be reflected in the Drive archive copy.
   await syncInvoicePdfToDrive(id);
   return NextResponse.json({ ok: true, invoice });
@@ -130,6 +196,26 @@ export async function DELETE(
   }
 
   const { id } = await params;
+  // Only DRAFT invoices are deletable. SENT/PAID/VOIDED are part of the audit
+  // trail (and for VOIDED in particular, the IRD record-retention rule) so
+  // they can never be removed - the UI hides the delete button for those
+  // statuses, but we enforce it server-side too in case of crafted requests.
+  const existing = await prisma.invoice.findUnique({
+    where: { id },
+    select: { status: true },
+  });
+  if (!existing) {
+    return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+  }
+  if (existing.status !== "DRAFT") {
+    return NextResponse.json(
+      {
+        error:
+          "Only DRAFT invoices can be deleted. Void the invoice instead to preserve the audit trail.",
+      },
+      { status: 409 },
+    );
+  }
   await prisma.invoice.delete({ where: { id } });
   return NextResponse.json({ ok: true });
 }
