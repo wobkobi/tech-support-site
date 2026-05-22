@@ -109,7 +109,7 @@ export function ManualBookingModal({
    * @param e - Submit event from the form.
    * @returns Promise that resolves once the request settles.
    */
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>): Promise<void> {
+  async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault();
     setError(null);
 

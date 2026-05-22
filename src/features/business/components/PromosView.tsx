@@ -206,7 +206,7 @@ export function PromosView({ token, initial }: Props): React.ReactElement {
    * POST/PATCH the form, swap into local state on success.
    * @param e - Form submit event.
    */
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>): Promise<void> {
+  async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault();
     setError(null);
     const amount = parseFloat(form.amount);
