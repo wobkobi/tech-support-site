@@ -34,7 +34,7 @@ export default async function AdminReviewsPage({
   // Soft caps to prevent unbounded scans as data grows. The page joins these
   // sets to build a unified link history; if the most recent 1000 ever stops
   // being enough, swap in cursor pagination per section.
-  const [reviews, sentBookings, sentRequests, allContacts] = await Promise.all([
+  const [reviews, sentBookings, sentContacts, allContacts] = await Promise.all([
     prisma.review.findMany({
       orderBy: { createdAt: "desc" },
       take: 1000,
@@ -64,17 +64,21 @@ export default async function AdminReviewsPage({
         reviewToken: true,
       },
     }),
-    prisma.reviewRequest.findMany({
-      orderBy: { createdAt: "desc" },
+    // Contacts with manual review-link sends. Replaces the ReviewRequest
+    // history table - one row per contact (most-recent send), not per send.
+    prisma.contact.findMany({
+      where: { reviewLinkSentAt: { not: null } },
+      orderBy: { reviewLinkSentAt: "desc" },
       take: 1000,
       select: {
         id: true,
         name: true,
         email: true,
         phone: true,
-        createdAt: true,
-        reviewSubmittedAt: true,
         reviewToken: true,
+        reviewLinkSentAt: true,
+        reviewLinkSentMode: true,
+        reviewLinkSubmittedAt: true,
       },
     }),
     prisma.contact.findMany({
@@ -110,11 +114,11 @@ export default async function AdminReviewsPage({
   }));
 
   const sentEmails = new Set<string>([
-    ...sentRequests.flatMap((r) => (r.email ? [r.email.toLowerCase()] : [])),
+    ...sentContacts.flatMap((c) => (c.email ? [c.email.toLowerCase()] : [])),
     ...sentBookings.flatMap((b) => (b.email ? [b.email.toLowerCase()] : [])),
   ]);
   const sentPhones = new Set<string>(
-    sentRequests.flatMap((r) => (r.phone ? [toE164NZ(r.phone)] : [])),
+    sentContacts.flatMap((c) => (c.phone ? [toE164NZ(c.phone)] : [])),
   );
   const contactSuggestions = allContacts
     .filter((c) => {
@@ -129,9 +133,9 @@ export default async function AdminReviewsPage({
     "",
   );
 
-  const knownTokens = new Set([
+  const knownTokens = new Set<string>([
     ...sentBookings.map((b) => b.reviewToken),
-    ...sentRequests.map((r) => r.reviewToken),
+    ...sentContacts.flatMap((c) => (c.reviewToken ? [c.reviewToken] : [])),
   ]);
   const knownBookingIds = new Set(sentBookings.map((b) => b.id));
 
@@ -173,21 +177,21 @@ export default async function AdminReviewsPage({
       source: "Auto" as const,
       reviewUrl: `${siteUrl}/review?token=${b.reviewToken}`,
     })),
-    ...sentRequests.map((r) => ({
-      id: r.id,
-      customerRef: r.reviewToken,
+    ...sentContacts.map((c) => ({
+      id: c.id,
+      customerRef: c.reviewToken,
       reviewId: null as string | null,
-      name: r.name,
-      email: r.email,
-      phone: r.phone,
-      sentAt: r.createdAt.toISOString(),
-      reviewed: !!r.reviewSubmittedAt,
-      source: (r.email ? "Manual email" : "Manual SMS") as
+      name: c.name,
+      email: c.email,
+      phone: c.phone,
+      sentAt: c.reviewLinkSentAt!.toISOString(),
+      reviewed: !!c.reviewLinkSubmittedAt,
+      source: (c.reviewLinkSentMode === "sms" ? "Manual SMS" : "Manual email") as
         | "Auto"
         | "Manual email"
         | "Manual SMS"
         | "Legacy",
-      reviewUrl: `${siteUrl}/review?token=${r.reviewToken}`,
+      reviewUrl: c.reviewToken ? `${siteUrl}/review?token=${c.reviewToken}` : "",
     })),
     ...legacyReviews.map((r) => {
       const tok =

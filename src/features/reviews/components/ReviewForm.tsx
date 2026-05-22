@@ -19,12 +19,12 @@ type NameDisplay = "name" | "anonymous";
 
 interface ReviewFormProtectedProps {
   bookingId?: string;
-  reviewRequestId?: string;
+  contactId?: string;
   token?: string;
   prefillName?: string;
-  /** Pre-filled email from the booking or review request record */
+  /** Pre-filled email from the booking or contact record */
   prefillEmail?: string;
-  /** Pre-filled phone from the review request record */
+  /** Pre-filled phone from the contact record */
   prefillPhone?: string;
   existingReview?: {
     id: string;
@@ -36,20 +36,20 @@ interface ReviewFormProtectedProps {
 }
 
 /**
- * Protected review form with optional booking or review-request verification
- * @param props - Component props
- * @param props.bookingId - Booking ID for verified reviews from real bookings
- * @param props.reviewRequestId - ReviewRequest ID for verified reviews from manual requests
- * @param props.token - Review token for verification
- * @param props.prefillName - Pre-fill customer name
- * @param props.prefillEmail - Pre-fill email from booking/review request
- * @param props.prefillPhone - Pre-fill phone from review request
- * @param props.existingReview - Existing review data for editing
- * @returns Review form element
+ * Protected review form with optional booking or contact verification.
+ * @param props - Component props.
+ * @param props.bookingId - Booking ID for verified reviews tied to a real appointment.
+ * @param props.contactId - Contact ID for verified reviews from manual admin sends.
+ * @param props.token - Review token for verification.
+ * @param props.prefillName - Pre-fill customer name.
+ * @param props.prefillEmail - Pre-fill email from booking/contact.
+ * @param props.prefillPhone - Pre-fill phone from contact.
+ * @param props.existingReview - Existing review data for editing.
+ * @returns Review form element.
  */
 export default function ReviewFormProtected({
   bookingId,
-  reviewRequestId,
+  contactId,
   token,
   prefillName,
   prefillEmail,
@@ -64,7 +64,7 @@ export default function ReviewFormProtected({
   const phoneId = useId();
 
   const isEditing = !!existingReview;
-  const isVerified = !!((bookingId || reviewRequestId) && token);
+  const isVerified = !!((bookingId || contactId) && token);
 
   /**
    * Initial name-display mode: keep existing anonymity if editing, otherwise show the name.
@@ -166,7 +166,7 @@ export default function ReviewFormProtected({
           body: JSON.stringify({
             ...payload,
             bookingId: isVerified ? bookingId : undefined,
-            reviewRequestId: isVerified ? reviewRequestId : undefined,
+            contactId: isVerified ? contactId : undefined,
             reviewToken: isVerified ? token : undefined,
           }),
         });

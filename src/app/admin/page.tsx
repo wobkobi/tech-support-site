@@ -49,7 +49,7 @@ export default async function AdminPage({
     pendingReviews,
     recentContacts,
     pastConfirmedBookings,
-    allReviewRequests,
+    contactsWithReviewSent,
     allContacts,
     bookingsWithReviewSent,
     todaysBookings,
@@ -99,7 +99,8 @@ export default async function AdminPage({
       take: 10,
       select: { id: true, name: true, email: true, startAt: true, reviewSentAt: true },
     }),
-    prisma.reviewRequest.findMany({
+    prisma.contact.findMany({
+      where: { reviewLinkSentAt: { not: null } },
       select: { email: true, phone: true },
     }),
     prisma.contact.findMany({
@@ -155,11 +156,11 @@ export default async function AdminPage({
   ]);
 
   const sentEmails = new Set<string>([
-    ...allReviewRequests.flatMap((r) => (r.email ? [r.email.toLowerCase()] : [])),
+    ...contactsWithReviewSent.flatMap((c) => (c.email ? [c.email.toLowerCase()] : [])),
     ...bookingsWithReviewSent.flatMap((b) => (b.email ? [b.email.toLowerCase()] : [])),
   ]);
   const sentPhones = new Set<string>([
-    ...allReviewRequests.flatMap((r) => (r.phone ? [toE164NZ(r.phone)] : [])),
+    ...contactsWithReviewSent.flatMap((c) => (c.phone ? [toE164NZ(c.phone)] : [])),
     ...bookingsWithReviewSent.flatMap((b) => (b.phone ? [toE164NZ(b.phone)] : [])),
   ]);
   const contactsWithoutReviewLinks = allContacts.filter((c) => {

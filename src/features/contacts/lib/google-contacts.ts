@@ -43,18 +43,18 @@ export async function importFromGoogleContacts(): Promise<number> {
   try {
     const people = getPeopleClient();
 
-    // Build phone > email map from ReviewRequest history so phone-only Google
-    // contacts can be matched to a known email and imported.
-    const reviewRequestsByPhone = new Map<string, string>();
-    const rrRows = await prisma.reviewRequest.findMany({
+    // Build phone > email map from existing Contact rows so phone-only Google
+    // contacts can be matched to a known email and imported. Used to live on
+    // the ReviewRequest model; Contact carries the same data now.
+    const contactEmailByPhone = new Map<string, string>();
+    const contactRows = await prisma.contact.findMany({
       where: { phone: { not: null }, email: { not: null } },
-      orderBy: { createdAt: "desc" },
       select: { phone: true, email: true },
     });
-    for (const rr of rrRows) {
-      if (!rr.phone || !rr.email) continue;
-      const norm = normalisePhone(toE164NZ(rr.phone) || rr.phone);
-      if (norm && !reviewRequestsByPhone.has(norm)) reviewRequestsByPhone.set(norm, rr.email);
+    for (const c of contactRows) {
+      if (!c.phone || !c.email) continue;
+      const norm = normalisePhone(toE164NZ(c.phone) || c.phone);
+      if (norm && !contactEmailByPhone.has(norm)) contactEmailByPhone.set(norm, c.email);
     }
 
     let pageToken: string | undefined;
@@ -99,7 +99,7 @@ export async function importFromGoogleContacts(): Promise<number> {
           null;
         const address = person.addresses?.[0]?.formattedValue?.trim() ?? null;
         const email =
-          emailEntry ?? (normPhone ? (reviewRequestsByPhone.get(normPhone) ?? null) : null);
+          emailEntry ?? (normPhone ? (contactEmailByPhone.get(normPhone) ?? null) : null);
         const etag = person.etag ?? null;
 
         resolved.push({ resourceName, etag, email, phone, normPhone, name, address });

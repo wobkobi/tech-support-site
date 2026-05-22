@@ -11,36 +11,150 @@ import type { ConflictEntry } from "@/app/api/admin/contacts/enrich-from-reviews
 
 /**
  * Runs all maintenance tasks in order:
- * 1. Creates Contact records for any booking or ReviewRequest email not yet in the DB.
- * 2. Links Review records to their matching Contact by email or phone.
- * 3. Auto-fills missing contact fields from bookings/review requests.
+ * 1. Migrates legacy ReviewRequest send state onto Contact (one-shot per row, idempotent).
+ * 2. Creates Contact records for any booking email not yet in the DB.
+ * 3. Links Review records to their matching Contact by email or phone.
+ * 4. Auto-fills missing contact fields from bookings.
  * Returns conflict entries (differing values) for the admin to resolve.
  * @param prisma - Prisma client instance.
  * @returns Array of conflict entries for admin resolution.
  */
 export async function autoMaintain(prisma: PrismaClient): Promise<ConflictEntry[]> {
+  // Migration runs first so subsequent steps see the unified Contact state.
+  await migrateReviewRequestsToContacts(prisma);
   await backfillContacts(prisma);
   await matchReviewContacts(prisma);
   return autoEnrich(prisma);
 }
 
 /**
- * Creates a Contact for every unique email found in Booking or ReviewRequest records
- * that does not already have a corresponding Contact.
- * Also merges phone-only contacts into their email-based counterpart when both share
- * the same phone number. Existing contacts are never overwritten otherwise -
- * admin edits are the source of truth.
+ * Lifts ReviewRequest state onto Contact so the standalone model could be
+ * retired. The ReviewRequest model is no longer in the Prisma schema, so we
+ * read the orphaned collection via raw MongoDB to bridge any pre-retirement
+ * rows into Contact fields. For each row with a resolvable contact, sets
+ * Contact.reviewToken (only if null), Contact.reviewLinkSentAt (only if
+ * older or null), Contact.reviewLinkSentMode (when missing), and
+ * Contact.reviewLinkSubmittedAt (when newer or null). Idempotent.
+ * @param prisma - Prisma client instance.
+ */
+async function migrateReviewRequestsToContacts(prisma: PrismaClient): Promise<void> {
+  interface OrphanedRR {
+    _id: { $oid: string } | string;
+    contactId?: { $oid: string } | string | null;
+    email?: string | null;
+    phone?: string | null;
+    reviewToken: string;
+    reviewSubmittedAt?: { $date: string } | Date | null;
+    createdAt: { $date: string } | Date;
+  }
+
+  let rrs: OrphanedRR[] = [];
+  try {
+    const result = (await prisma.$runCommandRaw({
+      find: "ReviewRequest",
+      filter: {},
+    })) as { cursor?: { firstBatch?: OrphanedRR[] } };
+    rrs = result.cursor?.firstBatch ?? [];
+  } catch {
+    // Collection doesn't exist (fresh DB or already cleaned up) - nothing to do.
+    return;
+  }
+  if (rrs.length === 0) return;
+
+  const contacts = await prisma.contact.findMany({
+    select: {
+      id: true,
+      email: true,
+      phone: true,
+      reviewToken: true,
+      reviewLinkSentAt: true,
+      reviewLinkSubmittedAt: true,
+    },
+  });
+  const contactById = new Map(contacts.map((c) => [c.id, c]));
+  const contactByEmail = new Map(
+    contacts.filter((c) => c.email).map((c) => [c.email!.toLowerCase(), c]),
+  );
+  const contactByPhone = new Map<string, (typeof contacts)[number]>();
+  for (const c of contacts) {
+    if (c.phone) {
+      const norm = normalisePhone(toE164NZ(c.phone) || c.phone);
+      if (norm) contactByPhone.set(norm, c);
+    }
+  }
+
+  /**
+   * Pulls an ObjectId hex string out of the extended-JSON shape Mongo's raw
+   * cursor returns. The driver sometimes returns `{ $oid: "..." }` and
+   * sometimes the bare string, depending on the call site.
+   * @param v - Raw value from the cursor (string, extended-JSON object, or null).
+   * @returns The hex id, or null when the input is missing.
+   */
+  function unwrapOid(v: OrphanedRR["contactId"]): string | null {
+    if (!v) return null;
+    if (typeof v === "string") return v;
+    return v.$oid;
+  }
+  /**
+   * Coerces an extended-JSON date (or already-Date) into a Date object.
+   * @param v - Raw date value from the cursor.
+   * @returns Date instance.
+   */
+  function unwrapDate(v: OrphanedRR["createdAt"]): Date {
+    if (v instanceof Date) return v;
+    return new Date(v.$date);
+  }
+
+  for (const rr of rrs) {
+    const rrContactId = unwrapOid(rr.contactId ?? null);
+    const contact = rrContactId
+      ? contactById.get(rrContactId)
+      : ((rr.email ? contactByEmail.get(rr.email.toLowerCase()) : undefined) ??
+        (rr.phone
+          ? contactByPhone.get(normalisePhone(toE164NZ(rr.phone) || rr.phone) ?? "")
+          : undefined));
+    if (!contact) continue;
+
+    const createdAt = unwrapDate(rr.createdAt);
+    const submittedAt = rr.reviewSubmittedAt ? unwrapDate(rr.reviewSubmittedAt) : null;
+
+    const update: {
+      reviewToken?: string;
+      reviewLinkSentAt?: Date;
+      reviewLinkSentMode?: "email" | "sms";
+      reviewLinkSubmittedAt?: Date;
+    } = {};
+
+    if (!contact.reviewToken && rr.reviewToken) update.reviewToken = rr.reviewToken;
+    if (!contact.reviewLinkSentAt || contact.reviewLinkSentAt < createdAt) {
+      update.reviewLinkSentAt = createdAt;
+      update.reviewLinkSentMode = rr.email ? "email" : rr.phone ? "sms" : undefined;
+    }
+    if (
+      submittedAt &&
+      (!contact.reviewLinkSubmittedAt || contact.reviewLinkSubmittedAt < submittedAt)
+    ) {
+      update.reviewLinkSubmittedAt = submittedAt;
+    }
+
+    if (Object.keys(update).length === 0) continue;
+
+    await prisma.contact.update({ where: { id: contact.id }, data: update }).catch(() => null);
+  }
+}
+
+/**
+ * Creates a Contact for every unique email found in Booking records that does
+ * not already have a corresponding Contact. Also merges phone-only contacts
+ * into their email-based counterpart when both share the same phone number.
+ * Existing contacts are never overwritten - admin edits are the source of truth.
  * @param prisma - Prisma client instance.
  */
 async function backfillContacts(prisma: PrismaClient): Promise<void> {
-  const [bookings, reviewRequests, allContacts] = await Promise.all([
+  const [bookings, allContacts] = await Promise.all([
     prisma.booking.findMany({
       orderBy: { createdAt: "asc" },
       select: { name: true, email: true, phone: true, notes: true },
-    }),
-    prisma.reviewRequest.findMany({
-      orderBy: { createdAt: "asc" },
-      select: { name: true, email: true, phone: true },
     }),
     prisma.contact.findMany({ select: { id: true, email: true, phone: true, name: true } }),
   ]);
@@ -82,9 +196,6 @@ async function backfillContacts(prisma: PrismaClient): Promise<void> {
   const existingEmails = new Set(
     existing.filter((c) => c.email).map((c) => c.email!.toLowerCase()),
   );
-  const existingPhones = new Set(
-    existing.filter((c) => c.phone).map((c) => normalisePhone(toE164NZ(c.phone!) || c.phone!)),
-  );
   // Remaining phone-only contacts (post-merge) - used to merge-on-create below
   const phoneOnlyByNorm = new Map<string, (typeof existing)[number]>();
   for (const c of existing) {
@@ -98,7 +209,6 @@ async function backfillContacts(prisma: PrismaClient): Promise<void> {
     string,
     { name: string; email: string; phone: string | null; address: string | null }
   >();
-  const toCreateByPhone = new Map<string, { name: string; email: null; phone: string }>();
 
   // Bookings sorted asc - most recent overwrites earlier entries in the Map
   for (const b of bookings) {
@@ -108,32 +218,10 @@ async function backfillContacts(prisma: PrismaClient): Promise<void> {
     toCreateByEmail.set(email, { name: b.name, email, phone: b.phone ?? null, address });
   }
 
-  // ReviewRequests sorted asc - email-based update existing map, phone-only go in separate map
-  for (const rr of reviewRequests) {
-    if (rr.email) {
-      const email = rr.email.toLowerCase();
-      if (existingEmails.has(email)) continue;
-      const prev = toCreateByEmail.get(email);
-      toCreateByEmail.set(email, {
-        name: rr.name,
-        email,
-        phone: prev?.phone ?? rr.phone ?? null,
-        address: prev?.address ?? null,
-      });
-    } else if (rr.phone) {
-      const phone = toE164NZ(rr.phone) || rr.phone;
-      const normPhone = normalisePhone(phone);
-      if (!normPhone || existingPhones.has(normPhone)) continue;
-      if (!toCreateByPhone.has(normPhone)) {
-        toCreateByPhone.set(normPhone, { name: rr.name, email: null, phone });
-      }
-    }
-  }
+  if (toCreateByEmail.size === 0) return;
 
-  if (toCreateByEmail.size === 0 && toCreateByPhone.size === 0) return;
-
-  await Promise.all([
-    ...[...toCreateByEmail.values()].map(async (d) => {
+  await Promise.all(
+    [...toCreateByEmail.values()].map(async (d) => {
       // If a phone-only contact already has this phone, merge email into it rather than
       // creating a duplicate contact.
       if (d.phone) {
@@ -155,18 +243,13 @@ async function backfillContacts(prisma: PrismaClient): Promise<void> {
         .then((exists) => (exists ? null : prisma.contact.create({ data: d })))
         .catch(() => null);
     }),
-    ...[...toCreateByPhone.values()].map((d) =>
-      prisma.contact
-        .findFirst({ where: { phone: d.phone } })
-        .then((exists) => (exists ? null : prisma.contact.create({ data: d })))
-        .catch(() => null),
-    ),
-  ]);
+  );
 }
 
 /**
- * Links Review records that have no contactId to their matching Contact,
- * using the booking or ReviewRequest email as the primary key, with phone as a fallback.
+ * Links Review records that have no contactId to their matching Contact.
+ * Booking-linked reviews resolve via the booking's email/phone; standalone
+ * reviews resolve by their customerRef matching Contact.reviewToken.
  * @param prisma - Prisma client instance.
  */
 async function matchReviewContacts(prisma: PrismaClient): Promise<void> {
@@ -183,17 +266,15 @@ async function matchReviewContacts(prisma: PrismaClient): Promise<void> {
 
   const bookingIds = unlinked.map((r) => r.bookingId).filter((id): id is string => id !== null);
 
-  const [bookingRows, contacts, rrRows] = await Promise.all([
+  const [bookingRows, contacts] = await Promise.all([
     bookingIds.length > 0
       ? prisma.booking.findMany({
           where: { id: { in: bookingIds } },
           select: { id: true, email: true, phone: true },
         })
       : Promise.resolve([]),
-    prisma.contact.findMany({ select: { id: true, email: true, phone: true } }),
-    // Include all review requests (email or phone only) for phone-based fallback
-    prisma.reviewRequest.findMany({
-      select: { reviewToken: true, email: true, phone: true },
+    prisma.contact.findMany({
+      select: { id: true, email: true, phone: true, reviewToken: true },
     }),
   ]);
 
@@ -216,16 +297,9 @@ async function matchReviewContacts(prisma: PrismaClient): Promise<void> {
       if (norm && !contactIdByPhone.has(norm)) contactIdByPhone.set(norm, c.id);
     }
   }
-
-  const emailByToken = new Map<string, string>();
-  const phoneByToken = new Map<string, string>();
-  for (const rr of rrRows) {
-    if (rr.email) emailByToken.set(rr.reviewToken, rr.email.toLowerCase());
-    if (rr.phone) {
-      const norm = normalisePhone(toE164NZ(rr.phone) || rr.phone);
-      if (norm) phoneByToken.set(rr.reviewToken, norm);
-    }
-  }
+  const contactIdByToken = new Map(
+    contacts.filter((c) => c.reviewToken).map((c) => [c.reviewToken!, c.id]),
+  );
 
   await Promise.all(
     unlinked.map(async (r) => {
@@ -239,12 +313,7 @@ async function matchReviewContacts(prisma: PrismaClient): Promise<void> {
           if (phone) contactId = contactIdByPhone.get(phone);
         }
       } else if (r.customerRef) {
-        const email = emailByToken.get(r.customerRef);
-        if (email) contactId = contactIdByEmail.get(email);
-        if (!contactId) {
-          const phone = phoneByToken.get(r.customerRef);
-          if (phone) contactId = contactIdByPhone.get(phone);
-        }
+        contactId = contactIdByToken.get(r.customerRef);
       }
 
       if (!contactId) return;
@@ -254,21 +323,16 @@ async function matchReviewContacts(prisma: PrismaClient): Promise<void> {
 }
 
 /**
- * Auto-fills missing contact fields (phone, address) from the most recent matching
- * ReviewRequest or Booking, matching by email or phone. Returns a list of conflicts
- * where existing contact data differs from the source data.
- * Review requests are checked before bookings; within each source type, newest wins.
+ * Auto-fills missing contact fields (phone, address) from the most recent
+ * matching Booking. Returns a list of conflicts where existing contact data
+ * differs from the source data.
  * @param prisma - Prisma client instance.
  * @returns Array of conflicts for admin resolution.
  */
 async function autoEnrich(prisma: PrismaClient): Promise<ConflictEntry[]> {
-  const [contacts, reviewRequests, bookings] = await Promise.all([
+  const [contacts, bookings] = await Promise.all([
     prisma.contact.findMany({
       select: { id: true, name: true, email: true, phone: true, address: true },
-    }),
-    prisma.reviewRequest.findMany({
-      orderBy: { createdAt: "desc" },
-      select: { id: true, name: true, email: true, phone: true },
     }),
     prisma.booking.findMany({
       orderBy: { createdAt: "desc" },
@@ -309,8 +373,6 @@ async function autoEnrich(prisma: PrismaClient): Promise<ConflictEntry[]> {
   }
 
   const conflicts: ConflictEntry[] = [];
-  // Per-contact tracking: newest-matching source wins for conflicts;
-  // fills use independent tracking so a booking can fill address even after an RR filled phone.
   const conflictSeen = new Set<string>();
   const phoneFilled = new Set<string>();
   const nameFilled = new Set<string>();
@@ -318,68 +380,6 @@ async function autoEnrich(prisma: PrismaClient): Promise<ConflictEntry[]> {
   const phoneUpdates = new Map<string, string>();
   const nameUpdates = new Map<string, string>();
   const addressUpdates = new Map<string, string>();
-
-  // ReviewRequests - newest first per contact: fill phone, detect conflicts
-  for (const rr of reviewRequests) {
-    const contact = findContact(rr.email, rr.phone);
-    if (!contact) continue;
-
-    const proposedPhoneRaw = rr.phone?.trim() ?? null;
-    const proposedPhone = proposedPhoneRaw ? normalisePhone(proposedPhoneRaw) : null;
-    const existingPhone = contact.phone ? normalisePhone(contact.phone) : null;
-
-    if (proposedPhone && !existingPhone && !phoneFilled.has(contact.id)) {
-      phoneFilled.add(contact.id);
-      phoneUpdates.set(contact.id, toE164NZ(proposedPhoneRaw!) || proposedPhoneRaw!);
-    }
-
-    // Auto-fill name when contact has only a first name and source provides full name.
-    const proposedNameRR = rr.name.trim();
-    if (
-      proposedNameRR &&
-      contact.name &&
-      !nameFilled.has(contact.id) &&
-      proposedNameRR.toLowerCase().startsWith(contact.name.toLowerCase() + " ")
-    ) {
-      nameFilled.add(contact.id);
-      nameUpdates.set(contact.id, proposedNameRR);
-    }
-
-    if (!conflictSeen.has(contact.id)) {
-      conflictSeen.add(contact.id);
-      const conflictFields: ("name" | "phone")[] = [];
-      const proposedName = proposedNameRR;
-      const contactNameLower = contact.name.toLowerCase();
-      const proposedNameLower = proposedName.toLowerCase();
-      // Only flag a name conflict when the proposed name is genuinely different -
-      // not when it is simply the contact's first name without the last name.
-      if (
-        proposedName &&
-        contact.name &&
-        proposedNameLower !== contactNameLower &&
-        !contactNameLower.startsWith(proposedNameLower + " ") &&
-        !proposedNameLower.startsWith(contactNameLower + " ")
-      ) {
-        conflictFields.push("name");
-      }
-      if (proposedPhone && existingPhone && proposedPhone !== existingPhone) {
-        conflictFields.push("phone");
-      }
-      if (conflictFields.length > 0) {
-        conflicts.push({
-          contactId: contact.id,
-          contactName: contact.name,
-          contactEmail: contact.email,
-          contactPhone: contact.phone,
-          source: "ReviewRequest",
-          sourceId: rr.id,
-          sourceName: conflictFields.includes("name") ? proposedName : null,
-          sourcePhone: conflictFields.includes("phone") ? proposedPhoneRaw : null,
-          conflictFields,
-        });
-      }
-    }
-  }
 
   // Bookings - newest first per contact: fill phone + address, detect conflicts
   for (const booking of bookings) {

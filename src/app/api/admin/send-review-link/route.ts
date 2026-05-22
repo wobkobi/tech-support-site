@@ -2,10 +2,15 @@
 /**
  * @file route.ts
  * @description Admin endpoint to send a review request link to a past client.
+ * Lands a Contact (creating one if needed), ensures Contact.reviewToken is set,
+ * stamps Contact.reviewLinkSentAt, then sends the email/SMS. The standalone
+ * ReviewRequest model was retired; all send-state lives on Contact now.
  */
 
+import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
+import { ReviewLinkMode } from "@prisma/client";
 import { sendPastClientReviewRequest } from "@/features/reviews/lib/email";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { toE164NZ, isValidPhone } from "@/shared/lib/normalise-phone";
@@ -16,10 +21,11 @@ import {
 
 /**
  * POST /api/admin/send-review-link
- * Creates a minimal booking record and sends a review request email to a past client.
- * Authenticated via X-Admin-Secret header.
+ * Sends a review link to a past client via email or SMS and stamps the state
+ * onto their Contact row. Authenticated via X-Admin-Secret header.
  * @param request - The incoming request.
- * @returns JSON response indicating success or failure.
+ * @returns JSON with reviewUrl (and `existing: true` when the same link was
+ * already issued earlier).
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!isAdminRequest(request)) {
@@ -47,36 +53,35 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       "",
     );
 
-    // Deduplication for SMS: if this phone already received a link, return the existing one
-    if (mode === "sms" && phone) {
-      const normalizedPhone = toE164NZ(phone);
-      if (!isValidPhone(normalizedPhone)) {
-        return NextResponse.json({ ok: false, error: "Invalid phone number." }, { status: 400 });
+    // Land the Contact first so we know who we're talking to.
+    const normalisedEmail = mode === "email" ? email!.trim().toLowerCase() : null;
+    let normalisedPhone: string | null = null;
+    if (mode === "sms") {
+      if (!phone) {
+        return NextResponse.json({ ok: false, error: "Phone is required." }, { status: 400 });
       }
-      const existingRequest = await prisma.reviewRequest.findFirst({
-        where: { phone: normalizedPhone },
-        select: { reviewToken: true },
-      });
-      if (existingRequest) {
-        const reviewUrl = `${siteUrl}/review?token=${existingRequest.reviewToken}`;
-        return NextResponse.json({ ok: true, reviewUrl, existing: true });
+      normalisedPhone = toE164NZ(phone);
+      if (!isValidPhone(normalisedPhone)) {
+        return NextResponse.json({ ok: false, error: "Invalid phone number." }, { status: 400 });
       }
     }
 
-    // Deduplication for email: if this email already received a link, return the existing one
-    if (mode === "email" && email) {
-      const normalizedEmail = email.trim().toLowerCase();
-      const existingRequest = await prisma.reviewRequest.findFirst({
-        where: { email: normalizedEmail },
-        select: { reviewToken: true },
-      });
-      if (existingRequest) {
-        const reviewUrl = `${siteUrl}/review?token=${existingRequest.reviewToken}`;
-        return NextResponse.json({ ok: true, reviewUrl, existing: true });
-      }
+    const { contact } = normalisedEmail
+      ? await findOrCreateContactByEmail(normalisedEmail, { name: name.trim() })
+      : await findOrCreateContactByPhone(normalisedPhone!, { name: name.trim() });
+
+    // Dedup: if this contact has already been sent a link, return the same URL
+    // rather than rotating the token (so old emails keep working).
+    if (contact.reviewLinkSentAt && contact.reviewToken) {
+      const reviewUrl = `${siteUrl}/review?token=${contact.reviewToken}`;
+      return NextResponse.json({ ok: true, reviewUrl, existing: true });
+    }
+
+    // Dedup against the booking auto-send so we don't double-up via a different channel.
+    if (normalisedEmail) {
       const existingBooking = await prisma.booking.findFirst({
         where: {
-          email: { equals: normalizedEmail, mode: "insensitive" },
+          email: { equals: normalisedEmail, mode: "insensitive" },
           reviewSentAt: { not: null },
         },
         select: { reviewToken: true },
@@ -87,46 +92,31 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     }
 
-    // Land the Contact first so the ReviewRequest row can carry the FK.
-    // Best-effort: if the contact lookup fails, fall through with contactId null.
-    const rrEmail = mode === "email" ? email!.trim().toLowerCase() : null;
-    const rrPhone = mode === "sms" && phone ? toE164NZ(phone) : null;
-    let contactId: string | null = null;
-    try {
-      if (rrEmail) {
-        const result = await findOrCreateContactByEmail(rrEmail, { name: name.trim() });
-        contactId = result.contact.id;
-      } else if (rrPhone) {
-        const result = await findOrCreateContactByPhone(rrPhone, { name: name.trim() });
-        contactId = result.contact.id;
-      }
-    } catch {
-      // best-effort - leave contactId null
-    }
-
-    const reviewRequest = await prisma.reviewRequest.create({
+    // Ensure the contact carries a stable review token and stamp the send.
+    const reviewToken = contact.reviewToken ?? randomUUID();
+    await prisma.contact.update({
+      where: { id: contact.id },
       data: {
-        contactId,
-        name: name.trim(),
-        email: rrEmail,
-        phone: rrPhone,
+        reviewToken,
+        reviewLinkSentAt: new Date(),
+        reviewLinkSentMode: mode === "email" ? ReviewLinkMode.email : ReviewLinkMode.sms,
       },
     });
 
-    const reviewUrl = `${siteUrl}/review?token=${reviewRequest.reviewToken}`;
+    const reviewUrl = `${siteUrl}/review?token=${reviewToken}`;
 
     if (mode === "sms") {
       return NextResponse.json({ ok: true, reviewUrl });
     }
 
     await sendPastClientReviewRequest({
-      id: reviewRequest.id,
+      id: contact.id,
       name: name.trim(),
-      email: email!.trim().toLowerCase(),
-      reviewToken: reviewRequest.reviewToken,
+      email: normalisedEmail!,
+      reviewToken,
     });
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, reviewUrl });
   } catch (error) {
     console.error("[admin/send-review-link] Error:", error);
     return NextResponse.json({ ok: false, error: "Failed to send review link." }, { status: 500 });

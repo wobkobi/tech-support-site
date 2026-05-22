@@ -1,18 +1,16 @@
 // src/app/api/admin/contacts/backfill/route.ts
 /**
  * @file route.ts
- * @description One-time backfill: upserts a Contact for every unique email in Booking and
- * ReviewRequest history.
+ * @description One-time backfill: upserts a Contact for every unique email in
+ * Booking history. The standalone ReviewRequest model was retired; bookings
+ * are the only remaining seed for backfill.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
-import { toE164NZ, normalisePhone } from "@/shared/lib/normalise-phone";
-import {
-  findOrCreateContactByEmail,
-  findOrCreateContactByPhone,
-} from "@/features/contacts/lib/find-or-create";
+import { toE164NZ } from "@/shared/lib/normalise-phone";
+import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-create";
 
 /**
  * Parse phone and address from structured booking notes.
@@ -29,9 +27,9 @@ function parseNotes(notes: string | null): { phone: string | null; address: stri
 
 /**
  * POST /api/admin/contacts/backfill
- * Scans all Bookings and ReviewRequests, and upserts a Contact for each unique email.
- * For each email, the most recent Booking or ReviewRequest is used as the source of truth.
- * Existing contacts are never overwritten - admin edits take precedence.
+ * Scans all Bookings and upserts a Contact for each unique email. For each
+ * email, the most recent Booking is used as the source of truth. Existing
+ * contacts are never overwritten - admin edits take precedence.
  * Requires X-Admin-Secret header.
  * @param request - Incoming request.
  * @returns JSON with upserted count.
@@ -41,16 +39,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Build a unified map of email > contact data from all sources.
-  // Sources are processed oldest-first so the most recent entry wins.
-
   const mergedByEmail = new Map<
     string,
     { name: string; email: string; phone: string | null; address: string | null }
   >();
-  const mergedByPhone = new Map<string, { name: string; email: null; phone: string }>();
 
-  // 1. Bookings (sorted ascending - most recent wins the Map)
+  // Bookings sorted ascending - most recent overwrites earlier entries in the Map.
   const bookings = await prisma.booking.findMany({
     orderBy: { createdAt: "asc" },
     select: { name: true, email: true, notes: true },
@@ -60,37 +54,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     mergedByEmail.set(b.email.toLowerCase(), { name: b.name, email: b.email, phone, address });
   }
 
-  // 2. ReviewRequests - email-based and phone-only (sorted ascending - most recent wins)
-  const reviewRequests = await prisma.reviewRequest.findMany({
-    orderBy: { createdAt: "asc" },
-    select: { name: true, email: true, phone: true },
-  });
-  for (const rr of reviewRequests) {
-    if (rr.email) {
-      const existing = mergedByEmail.get(rr.email.toLowerCase());
-      mergedByEmail.set(rr.email.toLowerCase(), {
-        name: rr.name,
-        email: rr.email,
-        // Prefer booking phone/address if we already have them from a booking record
-        phone: existing?.phone ?? (rr.phone ? toE164NZ(rr.phone) || rr.phone : null),
-        address: existing?.address ?? null,
-      });
-    } else if (rr.phone) {
-      const phone = toE164NZ(rr.phone) || rr.phone;
-      const normPhone = normalisePhone(phone);
-      if (normPhone && !mergedByPhone.has(normPhone)) {
-        mergedByPhone.set(normPhone, { name: rr.name, email: null, phone });
-      }
-    }
-  }
-
   let upsertedCount = 0;
   for (const { name, email, phone, address } of mergedByEmail.values()) {
     const { created } = await findOrCreateContactByEmail(email, { name, phone, address });
-    if (created) upsertedCount++;
-  }
-  for (const { name, email, phone } of mergedByPhone.values()) {
-    const { created } = await findOrCreateContactByPhone(phone, { name, email });
     if (created) upsertedCount++;
   }
 

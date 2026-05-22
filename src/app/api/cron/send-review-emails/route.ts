@@ -69,22 +69,22 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
 
     // Deduplicate by email: skip bookings whose email already received a review request
-    // (either from another booking or a manual ReviewRequest record).
+    // (either from another booking or a manual Contact send via admin).
     // Only query emails that are actually in this batch to avoid full-table scans.
     const batchEmails = bookingsToEmail.map((b) => b.email);
-    const [alreadyEmailedBookings, alreadyEmailedRequests] = await Promise.all([
+    const [alreadyEmailedBookings, alreadyEmailedContacts] = await Promise.all([
       prisma.booking.findMany({
         where: { reviewSentAt: { not: null }, email: { in: batchEmails } },
         select: { email: true },
       }),
-      prisma.reviewRequest.findMany({
-        where: { email: { in: batchEmails } },
+      prisma.contact.findMany({
+        where: { reviewLinkSentAt: { not: null }, email: { in: batchEmails } },
         select: { email: true },
       }),
     ]);
     const reviewedEmails = new Set([
       ...alreadyEmailedBookings.map((b) => b.email.toLowerCase()),
-      ...alreadyEmailedRequests.map((r) => r.email!.toLowerCase()),
+      ...alreadyEmailedContacts.map((c) => c.email!.toLowerCase()),
     ]);
 
     // Within-batch dedup: only send once per email if multiple bookings for same person

@@ -56,8 +56,9 @@ export const GET = createReviewsHandlers().GET;
 /**
  * POST /api/reviews
  * Submits a new review. Optionally verifies the reviewer against a booking
- * or manual review request using bookingId/reviewRequestId and reviewToken.
- * @param request - Incoming Next.js request containing review text, optional name fields, and optional booking verification fields.
+ * (bookingId + reviewToken) or against a contact-level manual link
+ * (contactId + reviewToken).
+ * @param request - Incoming Next.js request containing review text, optional name fields, and optional verification fields.
  * @returns JSON response with ok flag and review id on success (201), or an error message on failure.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -72,7 +73,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       lastName?: string;
       isAnonymous?: boolean;
       bookingId?: string;
-      reviewRequestId?: string;
+      contactId?: string;
       reviewToken?: string;
       contactEmail?: string;
       contactPhone?: string;
@@ -125,52 +126,28 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     }
 
-    // Verify against a manual review request
-    if (!verified && body.reviewRequestId && body.reviewToken) {
-      const reviewRequest = await prisma.reviewRequest.findFirst({
-        where: { id: body.reviewRequestId, reviewToken: body.reviewToken },
+    // Verify against a contact-level manual review link
+    if (!verified && body.contactId && body.reviewToken) {
+      const contact = await prisma.contact.findFirst({
+        where: { id: body.contactId, reviewToken: body.reviewToken },
+        select: { id: true, email: true, phone: true },
       });
 
-      if (reviewRequest) {
+      if (contact) {
         verified = true;
-        customerRef = reviewRequest.reviewToken;
-        // Auto-link to Contact by ReviewRequest email (primary) or phone (fallback).
-        if (reviewRequest.email) {
-          try {
-            const contact = await prisma.contact.findFirst({
-              where: { email: reviewRequest.email.trim().toLowerCase() },
-              select: { id: true },
-            });
-            if (contact) autoContactId = contact.id;
-          } catch {
-            // best-effort
-          }
-        }
-        if (!autoContactId && reviewRequest.phone) {
-          try {
-            const contact = await prisma.contact.findFirst({
-              where: { phone: reviewRequest.phone },
-              select: { id: true },
-            });
-            if (contact) autoContactId = contact.id;
-          } catch {
-            // best-effort
-          }
-        }
-        // Store any contact details the customer provided (only fill blanks, never overwrite).
-        // Also backfill contactId on the ReviewRequest if a match was found and the row
-        // didn't already have one (legacy rows pre-date the FK).
-        const contactEmail = body.contactEmail?.trim().toLowerCase() || null;
-        const contactPhone = body.contactPhone ? normalisePhone(body.contactPhone) : null;
-        await prisma.reviewRequest.update({
-          where: { id: reviewRequest.id },
-          data: {
-            reviewSubmittedAt: new Date(),
-            email: reviewRequest.email ?? contactEmail,
-            phone: reviewRequest.phone ?? contactPhone,
-            ...(reviewRequest.contactId || !autoContactId ? {} : { contactId: autoContactId }),
-          },
-        });
+        customerRef = body.reviewToken;
+        autoContactId = contact.id;
+
+        // Fill blanks on the Contact from any details the customer typed,
+        // never overwriting an existing value.
+        const submittedEmail = body.contactEmail?.trim().toLowerCase() || null;
+        const submittedPhone = body.contactPhone ? normalisePhone(body.contactPhone) : null;
+        const contactUpdate: { email?: string; phone?: string; reviewLinkSubmittedAt: Date } = {
+          reviewLinkSubmittedAt: new Date(),
+        };
+        if (!contact.email && submittedEmail) contactUpdate.email = submittedEmail;
+        if (!contact.phone && submittedPhone) contactUpdate.phone = submittedPhone;
+        await prisma.contact.update({ where: { id: contact.id }, data: contactUpdate });
       }
     }
 

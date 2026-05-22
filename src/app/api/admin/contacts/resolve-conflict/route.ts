@@ -1,8 +1,8 @@
 // src/app/api/admin/contacts/resolve-conflict/route.ts
 /**
  * @file route.ts
- * @description Resolves a contact conflict by applying a chosen value to both the contact
- * and the source record (ReviewRequest, Booking, or Review).
+ * @description Resolves a contact conflict by applying a chosen value to both
+ * the contact and the source record (Booking or Review).
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -16,7 +16,7 @@ interface ResolveBody {
   /** Source record ID to write back to. */
   sourceId: string;
   /** Source type - determines which table to update. */
-  source: "ReviewRequest" | "Booking" | "Review";
+  source: "Booking" | "Review";
   /** Fields and their chosen values. */
   name?: string;
   phone?: string;
@@ -50,14 +50,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     await prisma.contact.update({ where: { id: contactId }, data: contactUpdate });
 
-    if (source === "ReviewRequest") {
-      const rrUpdate: Record<string, string | null> = {};
-      if (name !== undefined) rrUpdate.name = name.trim();
-      if (phone !== undefined) rrUpdate.phone = toE164NZ(phone) || phone.trim() || null;
-      if (Object.keys(rrUpdate).length > 0) {
-        await prisma.reviewRequest.update({ where: { id: sourceId }, data: rrUpdate });
-      }
-    } else if (source === "Booking") {
+    if (source === "Booking") {
       const bookingUpdate: Record<string, string | null> = {};
       if (name !== undefined) bookingUpdate.name = name.trim();
       if (phone !== undefined) bookingUpdate.phone = toE164NZ(phone) || phone.trim() || null;

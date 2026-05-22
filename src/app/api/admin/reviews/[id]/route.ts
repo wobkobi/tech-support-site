@@ -83,7 +83,7 @@ export async function PATCH(
       try {
         let email: string | null = null;
         let contactName: string | null = null;
-        let contactPhone: string | null = null;
+        let directContactId: string | null = null;
 
         if (review.bookingId) {
           const booking = await prisma.booking.findUnique({
@@ -93,21 +93,25 @@ export async function PATCH(
           email = booking?.email ?? null;
           contactName = booking?.name ?? null;
         } else if (review.customerRef) {
-          const rr = await prisma.reviewRequest.findFirst({
+          // Standalone reviews carry the token from the Contact magic link;
+          // look the contact up directly rather than going through email.
+          const linkedContact = await prisma.contact.findFirst({
             where: { reviewToken: review.customerRef },
-            select: { email: true, name: true, phone: true },
+            select: { id: true },
           });
-          email = rr?.email ?? null;
-          contactName = rr?.name ?? null;
-          contactPhone = rr?.phone ?? null;
+          directContactId = linkedContact?.id ?? null;
         }
 
-        if (email) {
+        if (directContactId) {
+          await prisma.review.update({
+            where: { id },
+            data: { contactId: directContactId },
+          });
+        } else if (email) {
           const fallbackName =
             [review.firstName, review.lastName].filter(Boolean).join(" ") || "Unknown";
           const { contact } = await findOrCreateContactByEmail(email, {
             name: contactName ?? fallbackName,
-            phone: contactPhone ?? null,
           });
           await prisma.review.update({
             where: { id },

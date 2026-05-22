@@ -17,17 +17,14 @@ import { formatDateShort } from "@/shared/lib/date-format";
  * A single row in the review link history table.
  */
 export interface LinkHistoryEntry {
-  /** ReviewRequest id - null for auto-sent booking entries and unlinked legacy entries */
+  /** Contact id for manual sends; null for auto-sent booking entries and legacy entries. */
   id: string | null;
   /**
    * Review token used as the customerRef on the Review record.
    * Set for manual and legacy entries; null for auto booking entries.
    */
   customerRef: string | null;
-  /**
-   * Original Review document id - set for all legacy entries so tokenless reviews
-   * can still be edited (a new ReviewRequest is created and the Review is back-linked).
-   */
+  /** Original Review document id - set for legacy entries (read-only in the new model). */
   reviewId: string | null;
   name: string;
   /** Email address, or null for SMS-only or legacy entries */
@@ -106,7 +103,7 @@ export function ReviewLinkHistoryTable({
   }
 
   /**
-   * Revokes a review link by deleting the ReviewRequest record.
+   * Revokes a review link by clearing the send state on the contact row.
    * @param entry - The entry to revoke.
    */
   async function handleRevoke(entry: LinkHistoryEntry): Promise<void> {
@@ -114,8 +111,8 @@ export function ReviewLinkHistoryTable({
     setRevoking(true);
     setRevokeError(null);
     try {
-      const res = await fetch(`/api/admin/review-requests/${entry.id}`, {
-        method: "DELETE",
+      const res = await fetch(`/api/admin/contacts/${entry.id}/clear-review-link`, {
+        method: "POST",
         headers: { "X-Admin-Secret": token },
       });
       const data = (await res.json()) as { ok?: boolean; error?: string };
@@ -134,75 +131,29 @@ export function ReviewLinkHistoryTable({
    * @param entry - The entry being saved.
    */
   async function handleSave(entry: LinkHistoryEntry): Promise<void> {
+    if (!entry.id) return;
     setSaving(true);
     setSaveError(null);
     try {
-      let savedId = entry.id;
-      let savedCustomerRef = entry.customerRef;
-      let savedReviewUrl = entry.reviewUrl;
-
-      if (entry.id) {
-        // PATCH existing ReviewRequest
-        const res = await fetch(`/api/admin/review-requests/${entry.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json", "X-Admin-Secret": token },
-          body: JSON.stringify({
-            name: entry.name,
-            email: editEmail,
-            phone: editPhoneInput,
-          }),
-        });
-        const data = (await res.json()) as { ok?: boolean; error?: string };
-        if (!res.ok) throw new Error(data.error ?? "Request failed");
-      } else if (entry.customerRef) {
-        // POST to create (or update) a ReviewRequest for a legacy review with existing token
-        const res = await fetch(`/api/admin/review-requests`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "X-Admin-Secret": token },
-          body: JSON.stringify({
-            customerRef: entry.customerRef,
-            name: entry.name,
-            email: editEmail,
-            phone: editPhoneInput,
-          }),
-        });
-        const data = (await res.json()) as { ok?: boolean; id?: string; error?: string };
-        if (!res.ok) throw new Error(data.error ?? "Request failed");
-        savedId = data.id ?? null;
-      } else if (entry.reviewId) {
-        // POST to create a new ReviewRequest for a tokenless legacy review.
-        // The server generates a fresh token and back-links it to the Review record.
-        const res = await fetch(`/api/admin/review-requests`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "X-Admin-Secret": token },
-          body: JSON.stringify({
-            reviewId: entry.reviewId,
-            name: entry.name,
-            email: editEmail,
-            phone: editPhoneInput,
-          }),
-        });
-        const data = (await res.json()) as {
-          ok?: boolean;
-          id?: string;
-          token?: string;
-          reviewUrl?: string;
-          error?: string;
-        };
-        if (!res.ok) throw new Error(data.error ?? "Request failed");
-        savedId = data.id ?? null;
-        savedCustomerRef = data.token ?? null;
-        savedReviewUrl = data.reviewUrl ?? "";
-      }
+      // PATCH the Contact row - email/phone live there now that the
+      // standalone ReviewRequest model has been retired. Legacy entries
+      // (customerRef / reviewId only) are read-only.
+      const res = await fetch(`/api/admin/contacts/${entry.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "X-Admin-Secret": token },
+        body: JSON.stringify({
+          email: editEmail,
+          phone: editPhoneInput,
+        }),
+      });
+      const data = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok) throw new Error(data.error ?? "Request failed");
 
       setEntries((prev) =>
         prev.map((e) =>
           entryKey(e) === editingKey
             ? {
                 ...e,
-                id: savedId,
-                customerRef: savedCustomerRef,
-                reviewUrl: savedReviewUrl,
                 email: editEmail.trim().toLowerCase() || null,
                 phone: toE164NZ(editPhoneInput) || null,
               }
@@ -251,7 +202,9 @@ export function ReviewLinkHistoryTable({
           {visibleEntries.map((entry) => {
             const key = entryKey(entry);
             const isEditing = key !== null && editingKey === key;
-            const canEdit = key !== null;
+            // Only contact-backed rows are editable; legacy and auto-booking
+            // rows display read-only since their fields live elsewhere.
+            const canEdit = entry.id !== null;
 
             const sourceBadge = (
               <span

@@ -1,15 +1,16 @@
 // src/app/api/admin/contacts/enrich-from-reviews/route.ts
 /**
  * @file route.ts
- * @description Enriches Contact records by comparing them against ReviewRequest and Review data.
- * Auto-fills missing phone numbers from ReviewRequests, and returns a list of conflicts
- * where field values differ so the admin can resolve them manually.
+ * @description Enriches Contact records by comparing them against Review data.
+ * Returns a list of name conflicts where review-supplied names differ from the
+ * Contact's stored name so the admin can resolve them manually. The standalone
+ * ReviewRequest model has been retired, so phone-enrichment from RRs is gone -
+ * bookings handle phone enrichment via auto-maintain.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
-import { toE164NZ, normalisePhone } from "@/shared/lib/normalise-phone";
 
 export interface ConflictEntry {
   contactId: string;
@@ -17,7 +18,7 @@ export interface ConflictEntry {
   contactEmail: string | null;
   contactPhone: string | null;
   /** Where the conflicting data came from. */
-  source: "ReviewRequest" | "Review" | "Booking";
+  source: "Review" | "Booking";
   sourceId: string;
   /** Suggested name (present when name is a conflicting field). */
   sourceName: string | null;
@@ -28,10 +29,9 @@ export interface ConflictEntry {
 
 /**
  * POST /api/admin/contacts/enrich-from-reviews
- * Compares all ReviewRequest and Review records against Contact records (matched by email).
- * - Auto-fills a contact's missing phone from the most recent matching ReviewRequest.
- * - Returns a conflict entry for any matched pair where name or phone values differ.
- * Only the most recent ReviewRequest / Review per contact email is used to avoid duplicate conflicts.
+ * Compares Review records against their linked Contacts and returns a name
+ * conflict entry per Contact where the reviewer's displayed name differs from
+ * the stored name.
  * Requires X-Admin-Secret header.
  * @param request - Incoming request.
  * @returns JSON with enrichedCount and conflicts array.
@@ -42,24 +42,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   const allContacts = await prisma.contact.findMany({
-    select: { id: true, name: true, email: true, phone: true },
+    select: { id: true, name: true, email: true, phone: true, reviewToken: true },
   });
-  const contactByEmail = new Map(
-    allContacts.filter((c) => c.email).map((c) => [c.email!.toLowerCase(), c]),
+  const contactByToken = new Map(
+    allContacts.filter((c) => c.reviewToken).map((c) => [c.reviewToken!, c]),
   );
-  const contactByPhone = new Map<string, (typeof allContacts)[0]>();
-  for (const c of allContacts) {
-    if (c.phone) {
-      const norm = normalisePhone(toE164NZ(c.phone) || c.phone);
-      if (norm && !contactByPhone.has(norm)) contactByPhone.set(norm, c);
-    }
-  }
-
-  // Most recent first so the first match per contact wins (include SMS-only review requests)
-  const reviewRequests = await prisma.reviewRequest.findMany({
-    orderBy: { createdAt: "desc" },
-    select: { id: true, name: true, email: true, phone: true },
-  });
 
   const reviews = await prisma.review.findMany({
     where: { customerRef: { not: null } },
@@ -68,74 +55,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   });
 
   const conflicts: ConflictEntry[] = [];
-  // One entry per source type per contact (most-recent wins)
-  const seenRR = new Set<string>();
   const seenRev = new Set<string>();
-  // contactId > enriched value
-  const phoneEnrichments = new Map<string, string>();
-  const nameEnrichments = new Map<string, string>();
-
-  for (const rr of reviewRequests) {
-    let contact = rr.email ? contactByEmail.get(rr.email.toLowerCase()) : undefined;
-    if (!contact && rr.phone) {
-      const normPhone = normalisePhone(toE164NZ(rr.phone) || rr.phone);
-      if (normPhone) contact = contactByPhone.get(normPhone);
-    }
-    if (!contact || seenRR.has(contact.id)) continue;
-    seenRR.add(contact.id);
-
-    const proposedName = rr.name.trim();
-    const proposedPhoneRaw = rr.phone?.trim() ?? null;
-    const proposedPhone = proposedPhoneRaw ? normalisePhone(proposedPhoneRaw) : null;
-    const existingPhone = contact.phone ? normalisePhone(contact.phone) : null;
-
-    // Auto-fill name when contact has only a first name and source provides full name.
-    if (
-      proposedName &&
-      contact.name &&
-      proposedName.toLowerCase().startsWith(contact.name.toLowerCase() + " ")
-    ) {
-      nameEnrichments.set(contact.id, proposedName);
-    }
-
-    const conflictFields: ("name" | "phone")[] = [];
-
-    if (
-      proposedName &&
-      contact.name &&
-      proposedName.toLowerCase() !== contact.name.toLowerCase() &&
-      !contact.name.toLowerCase().startsWith(proposedName.toLowerCase() + " ") &&
-      !proposedName.toLowerCase().startsWith(contact.name.toLowerCase() + " ")
-    ) {
-      conflictFields.push("name");
-    }
-
-    if (proposedPhone) {
-      if (!existingPhone) {
-        phoneEnrichments.set(contact.id, toE164NZ(proposedPhoneRaw!) || proposedPhoneRaw!);
-      } else if (proposedPhone !== existingPhone) {
-        conflictFields.push("phone");
-      }
-    }
-
-    if (conflictFields.length > 0) {
-      conflicts.push({
-        contactId: contact.id,
-        contactName: contact.name,
-        contactEmail: contact.email,
-        contactPhone: contact.phone,
-        source: "ReviewRequest",
-        sourceId: rr.id,
-        sourceName: conflictFields.includes("name") ? proposedName : null,
-        sourcePhone: conflictFields.includes("phone") ? proposedPhoneRaw : null,
-        conflictFields,
-      });
-    }
-  }
 
   for (const review of reviews) {
     if (!review.customerRef) continue;
-    const contact = contactByEmail.get(review.customerRef.toLowerCase());
+    const contact = contactByToken.get(review.customerRef);
     if (!contact || seenRev.has(contact.id)) continue;
     seenRev.add(contact.id);
 
@@ -160,24 +84,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     });
   }
 
-  // Merge per-field updates by contact id so each contact gets at most one
-  // write when both phone and name need enriching in the same pass.
-  const mergedUpdates = new Map<string, { phone?: string; name?: string }>();
-  for (const [id, phone] of phoneEnrichments) {
-    mergedUpdates.set(id, { ...mergedUpdates.get(id), phone });
-  }
-  for (const [id, name] of nameEnrichments) {
-    mergedUpdates.set(id, { ...mergedUpdates.get(id), name });
-  }
-  await Promise.all(
-    [...mergedUpdates.entries()].map(([id, data]) =>
-      prisma.contact.update({ where: { id }, data }),
-    ),
-  );
-
   return NextResponse.json({
     ok: true,
-    enrichedCount: phoneEnrichments.size + nameEnrichments.size,
+    enrichedCount: 0,
     conflicts,
   });
 }
