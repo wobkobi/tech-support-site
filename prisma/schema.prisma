@@ -60,6 +60,13 @@ enum AiEstimateCategory {
   complex
 }
 
+// Channel used to send a contact their review link. Set on Contact when an
+// admin clicks "Send a review link" (formerly a ReviewRequest row).
+enum ReviewLinkMode {
+  email
+  sms
+}
+
 model Booking {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 
@@ -148,29 +155,6 @@ model Review {
   @@index([contactId])
 }
 
-// Standalone review requests sent to past clients by email or SMS.
-// Each row is a send event: one Contact can accumulate many ReviewRequest rows
-// over time. contactId links to the canonical person record; name/email/phone
-// remain populated for legacy rows and as fallbacks during contact lookup.
-model ReviewRequest {
-  id                String    @id @default(auto()) @map("_id") @db.ObjectId
-  contactId         String?   @db.ObjectId // FK to Contact - set on create for new rows, backfilled lazily for old
-  name              String
-  email             String? // Null for SMS-only records; used for deduplication
-  phone             String? // Null for email-only records; used for deduplication
-  reviewToken       String    @unique @default(uuid())
-  reviewSubmittedAt DateTime?
-  createdAt         DateTime  @default(now())
-
-  // Admin page listing: ORDER BY createdAt DESC
-  @@index([createdAt(sort: Desc)])
-  // Deduplication before sending a new review link
-  @@index([email])
-  @@index([phone])
-  // Contact tab: list a contact's send history
-  @@index([contactId])
-}
-
 // Contacts built from booking submissions.
 model Contact {
   id              String    @id @default(auto()) @map("_id") @db.ObjectId
@@ -188,8 +172,17 @@ model Contact {
   // Google changed iff current etag != lastGoogleEtag.
   lastSyncedAt    DateTime?
   lastGoogleEtag  String?
+  // Review-link send tracking. Stamped by the admin "Send a review link" flow
+  // (formerly stored on the per-send ReviewRequest model). The most-recent send
+  // wins - we no longer track historical sends.
+  reviewLinkSentAt       DateTime?
+  reviewLinkSentMode     ReviewLinkMode?
+  reviewLinkSubmittedAt  DateTime?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+
+  // Admin reviews tab: list send history sorted by most-recent send.
+  @@index([reviewLinkSentAt])
 }
 
 // Sync conflicts admin resolves at /admin/contacts/conflicts.

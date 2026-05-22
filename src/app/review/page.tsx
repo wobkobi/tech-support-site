@@ -31,7 +31,7 @@ export default async function ReviewPage({
   const token = Array.isArray(tokenValue) ? tokenValue[0] : tokenValue;
 
   let sourceId: string | null = null;
-  let sourceType: "booking" | "reviewRequest" | null = null;
+  let sourceType: "booking" | "contact" | null = null;
   let prefillName: string | null = null;
   let prefillEmail: string | null = null;
   let prefillPhone: string | null = null;
@@ -45,16 +45,22 @@ export default async function ReviewPage({
     isAnonymous: boolean;
   } | null = null;
 
-  // If token provided, validate against both Booking and ReviewRequest tables in parallel
+  // If token provided, validate against both Booking and Contact in parallel
   if (token) {
-    const [booking, reviewRequest, maybeExistingReview] = await Promise.all([
+    const [booking, contact, maybeExistingReview] = await Promise.all([
       prisma.booking.findFirst({
         where: { reviewToken: token },
         select: { id: true, name: true, email: true, reviewSubmittedAt: true },
       }),
-      prisma.reviewRequest.findFirst({
+      prisma.contact.findFirst({
         where: { reviewToken: token },
-        select: { id: true, name: true, email: true, phone: true, reviewSubmittedAt: true },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          reviewLinkSubmittedAt: true,
+        },
       }),
       // Fetch speculatively - only used if the token maps to an already-reviewed source
       prisma.review.findFirst({
@@ -70,14 +76,14 @@ export default async function ReviewPage({
       prefillEmail = booking.email;
       tokenValid = true;
       alreadyReviewed = !!booking.reviewSubmittedAt;
-    } else if (reviewRequest) {
-      sourceId = reviewRequest.id;
-      sourceType = "reviewRequest";
-      prefillName = reviewRequest.name;
-      prefillEmail = reviewRequest.email;
-      prefillPhone = reviewRequest.phone;
+    } else if (contact) {
+      sourceId = contact.id;
+      sourceType = "contact";
+      prefillName = contact.name;
+      prefillEmail = contact.email;
+      prefillPhone = contact.phone;
       tokenValid = true;
-      alreadyReviewed = !!reviewRequest.reviewSubmittedAt;
+      alreadyReviewed = !!contact.reviewLinkSubmittedAt;
     }
 
     if (tokenValid && alreadyReviewed) {
@@ -130,7 +136,7 @@ export default async function ReviewPage({
               <section className={cn(CARD)}>
                 <ReviewFormProtected
                   bookingId={sourceType === "booking" ? sourceId! : undefined}
-                  reviewRequestId={sourceType === "reviewRequest" ? sourceId! : undefined}
+                  contactId={sourceType === "contact" ? sourceId! : undefined}
                   token={token!}
                   prefillName={prefillName!}
                   prefillEmail={prefillEmail ?? undefined}

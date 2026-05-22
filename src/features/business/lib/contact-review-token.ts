@@ -167,9 +167,9 @@ export async function getInvoiceReviewEligibility(args: {
     try {
       // Three sources of "was asked recently":
       // - Booking.reviewSentAt (cron auto-send + admin "mark complete" + manual resend)
-      // - ReviewRequest.createdAt (manual "Send a review link" admin sends)
+      // - Contact.reviewLinkSentAt (manual "Send a review link" admin sends)
       // - Invoice.reviewLinkSentAt (prior invoice that included the review line)
-      const [recentBooking, recentRequest, recentInvoice] = await Promise.all([
+      const [recentBooking, recentContact, recentInvoice] = await Promise.all([
         prisma.booking.findFirst({
           where: {
             email: { equals: trimmedEmail, mode: "insensitive" },
@@ -178,13 +178,13 @@ export async function getInvoiceReviewEligibility(args: {
           select: { reviewSentAt: true },
           orderBy: { reviewSentAt: "desc" },
         }),
-        prisma.reviewRequest.findFirst({
+        prisma.contact.findFirst({
           where: {
             email: { equals: trimmedEmail, mode: "insensitive" },
-            createdAt: { gte: cooldownStart },
+            reviewLinkSentAt: { gte: cooldownStart },
           },
-          select: { createdAt: true },
-          orderBy: { createdAt: "desc" },
+          select: { reviewLinkSentAt: true },
+          orderBy: { reviewLinkSentAt: "desc" },
         }),
         prisma.invoice.findFirst({
           where: {
@@ -198,7 +198,7 @@ export async function getInvoiceReviewEligibility(args: {
 
       const candidates = [
         recentBooking?.reviewSentAt,
-        recentRequest?.createdAt,
+        recentContact?.reviewLinkSentAt,
         recentInvoice?.reviewLinkSentAt,
       ].filter((d): d is Date => d instanceof Date);
       const lastSent = candidates.sort((a, b) => b.getTime() - a.getTime())[0];

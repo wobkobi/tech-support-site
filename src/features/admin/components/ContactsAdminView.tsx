@@ -126,11 +126,7 @@ export function ContactsAdminView({
                         "rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700",
                       )}
                     >
-                      {conflict.source === "ReviewRequest"
-                        ? "Review request"
-                        : conflict.source === "Booking"
-                          ? "Booking"
-                          : "Review"}
+                      {conflict.source === "Booking" ? "Booking" : "Review"}
                     </span>
                   </div>
                   <div className={cn("space-y-3")}>
