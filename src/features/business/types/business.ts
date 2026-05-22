@@ -119,18 +119,45 @@ export interface PartLine {
   cost: number;
 }
 
-export interface JobCalculation {
+/**
+ * One work session within a multi-session job. Sessions are time-only
+ * containers; tasks/parts stay job-level for v1. When sessions.length === 1
+ * the calculator UI and emitted invoice line items look identical to the
+ * pre-multi-session behaviour.
+ */
+export interface JobSession {
+  /** Display label like "Session 1"; operator-editable when multi-session. */
+  label: string;
+  /** Optional ISO YYYY-MM-DD date. Null when the operator hasn't set one (single-day default). */
+  date?: string | null;
+  /** HH:MM start time. */
   startTime: string;
+  /** HH:MM end time. */
   endTime: string;
+  /** Manual duration override per session (e.g. when gaps exist inside a single session). */
+  durationMins?: number | null;
+  /** True when this session was a separate trip and should bill its own travel line. */
+  includeTravel: boolean;
+}
+
+export interface JobCalculation {
+  /** Aggregate first-session start (derived from sessions). */
+  startTime: string;
+  /** Aggregate last-session end (derived from sessions). */
+  endTime: string;
+  /** Aggregate total billable minutes summed across all sessions. */
   durationMins: number;
   hourlyRate: RateConfig | null;
   tasks: TaskLine[];
   parts: PartLine[];
+  /** Per-trip travel cost (NOT total). Total = travelCost × count(sessions where includeTravel). */
   travelCost: number | null;
   notes: string;
   gst: boolean;
   clientName: string;
   clientEmail: string;
+  /** Always at least one session. Single-session jobs keep the legacy invoice shape. */
+  sessions: JobSession[];
 }
 
 export interface ParseJobRequest {
@@ -158,6 +185,22 @@ export interface ParseJobResponse {
   statedDistanceKm: number | null;
   noTravelCharge: boolean;
   travel?: TravelInfo;
+  /** Per-session ranges extracted server-side. Always has at least one entry when start/end could be resolved. */
+  sessions?: ParsedSession[];
+}
+
+/**
+ * One parsed time range from the AI input. Dates are populated only when the
+ * server can confidently extract an ISO date from the line - we never invent
+ * a year. The hydrator wraps a flat single-range result into one ParsedSession
+ * if the route emits sessions: [].
+ */
+export interface ParsedSession {
+  label?: string | null;
+  date?: string | null;
+  startTime: string;
+  endTime: string;
+  durationMins?: number | null;
 }
 
 export interface ParsedTaskLine {

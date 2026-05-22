@@ -14,6 +14,8 @@ import {
   MIN_TRAVEL_CHARGE,
   collapseToWindow,
   hourlyTaskMinutes,
+  timeDiffMins,
+  sessionDurationMins,
 } from "@/features/business/lib/business";
 import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 import { ContactPickerModal } from "@/features/business/components/ContactPickerModal";
@@ -34,6 +36,7 @@ import type {
   TaskLine,
   PartLine,
   JobCalculation,
+  JobSession,
   ParseJobResponse,
   ParseJobQuestion,
   GoogleContact,
@@ -57,19 +60,6 @@ function addHour(t: string): string {
   const [h, m] = t.split(":").map(Number);
   return `${String((h + 1) % 24).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
-/**
- * Calculates the difference in minutes between two HH:MM time strings.
- * @param start - The start time in HH:MM format.
- * @param end - The end time in HH:MM format.
- * @returns The number of minutes between start and end, or 0 if end is not after start.
- */
-function timeDiffMins(start: string, end: string): number {
-  const [sh, sm] = start.split(":").map(Number);
-  const [eh, em] = end.split(":").map(Number);
-  const diff = eh * 60 + em - (sh * 60 + sm);
-  return diff > 0 ? diff : 0;
-}
-
 /**
  * Builds a UTC ISO timestamp for an HH:MM start time interpreted as NZ wall-clock.
  * Defaults to today; if the resulting time has already passed today's wall clock,
@@ -96,6 +86,26 @@ function jobStartIsoFromTime(hhmm: string): string | null {
     utc = new Date(utc.getTime() + 24 * 60 * 60 * 1000);
   }
   return utc.toISOString();
+}
+
+/**
+ * Builds a fresh single-session list seeded with the current time as the
+ * start and one hour later as the end. Used for the initial state, Clear,
+ * and the post-income reset.
+ * @returns One-element sessions array.
+ */
+function freshSessions(): JobSession[] {
+  const now = nowTime();
+  return [
+    {
+      label: "Session 1",
+      date: null,
+      startTime: now,
+      endTime: addHour(now),
+      durationMins: null,
+      includeTravel: false,
+    },
+  ];
 }
 
 /**
@@ -139,9 +149,19 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
 
   const [rates, setRates] = useState<RateConfig[]>([]);
   const [taskTemplates, setTaskTemplates] = useState<TaskTemplate[]>([]);
-  const [startTime, setStartTime] = useState<string>("");
-  const [endTime, setEndTime] = useState<string>("");
-  const [durationOverride, setDurationOverride] = useState<number | null>(null);
+  // Sessions are the source of truth for time. Single-session jobs have one
+  // entry and look visually identical to the pre-multi-session UI; multi-
+  // session jobs add more entries via "+ Add session" in JobDetailsSection.
+  const [sessions, setSessions] = useState<JobSession[]>([
+    {
+      label: "Session 1",
+      date: null,
+      startTime: "",
+      endTime: "",
+      durationMins: null,
+      includeTravel: false,
+    },
+  ]);
   const [hourlyRateId, setHourlyRateId] = useState<string | null>(null);
   const [tasks, setTasks] = useState<TaskLine[]>([]);
   const [parts, setParts] = useState<PartLine[]>([]);
@@ -177,7 +197,6 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
     cost: number;
   } | null>(null);
   const [lookingUpTravel, setLookingUpTravel] = useState(false);
-  const [travelOnInvoice, setTravelOnInvoice] = useState(false);
   const addressInputRef = useRef<HTMLInputElement>(null);
 
   const [showContactPicker, setShowContactPicker] = useState(false);
@@ -255,8 +274,9 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
         { ok: boolean; templates: TaskTemplate[] },
         { ok: boolean; promo: ActivePromo | null },
       ]) => {
-        setStartTime(now);
-        setEndTime(addHour(now));
+        setSessions((prev) =>
+          prev.map((s, i) => (i === 0 ? { ...s, startTime: now, endTime: addHour(now) } : s)),
+        );
         if (ratesData.ok) {
           setRates(ratesData.rates);
           const def = ratesData.rates.find((r) => r.isDefault);
@@ -268,7 +288,15 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
     );
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const durationMins = durationOverride ?? timeDiffMins(startTime, endTime);
+  const durationMins = sessions.reduce((s, x) => s + sessionDurationMins(x), 0);
+  // Aggregate start/end - sort by date+startTime so out-of-order operator
+  // entries still produce sensible aggregates (used for the travel-time
+  // departure ISO and the JobCalculation handoff).
+  const sortedSessions = [...sessions].sort((a, b) =>
+    `${a.date ?? ""}${a.startTime}`.localeCompare(`${b.date ?? ""}${b.startTime}`),
+  );
+  const aggregateStartTime = sortedSessions[0]?.startTime ?? "";
+  const aggregateEndTime = sortedSessions[sortedSessions.length - 1]?.endTime ?? "";
   const hourlyRate = matchRateById(rates, hourlyRateId);
   // Base hourly rates (e.g. Standard $65/hr) — used for the top-level Time
   // selector and as the per-task base rate.
@@ -281,51 +309,103 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
   const flatRates = rates.filter((r) => r.flatRate !== null);
 
   const job: JobCalculation = {
-    startTime,
-    endTime,
+    startTime: aggregateStartTime,
+    endTime: aggregateEndTime,
     durationMins,
     hourlyRate,
     tasks,
     parts,
-    travelCost: travelOnInvoice && travelInfo ? travelInfo.cost : null,
+    // travelCost is the per-trip cost; jobToLineItems and calcJobTotal
+    // multiply by the count of sessions where includeTravel is true.
+    travelCost: travelInfo?.cost ?? null,
     notes,
     gst,
     clientName,
     clientEmail,
+    sessions,
   };
   const totals = calcJobTotal(job, !skipPromo ? activePromo : null);
 
   /**
-   * Applies a parsed job response to the calculator state, setting duration, hourly rate, tasks,
-   * parts, and notes from the AI parse result.
+   * Applies a parsed job response to the calculator state, hydrating sessions
+   * + tasks + parts + notes from the AI parse result. Per-session
+   * `includeTravel` defaults: true when the round-trip cost clears
+   * MIN_TRAVEL_CHARGE, false otherwise. Operators can flip the checkbox per
+   * session after the fact.
    * @param result - The parsed job response returned by the AI.
-   * @param rateList - The current list of rate configurations (unused directly but kept for future use).
+   * @param rateList - The current list of rate configurations (used for travel rate lookup).
    */
   const applyParseResult = useCallback((result: ParseJobResponse, rateList: RateConfig[]) => {
-    if (result.startTime && result.endTime) {
-      setStartTime(result.startTime);
-      setEndTime(result.endTime);
-      // Use durationMins as override when the AI provided it explicitly - handles multi-session
-      // work where billed time is less than wall-clock diff due to gaps between sessions.
-      // Clamp: AI sometimes inflates durationMins from its own task estimates, e.g. emitting
-      // 50 min for a 9-9:30 span. Wall-clock is the ceiling; gaps only reduce billable time.
+    // Compute the would-be travel cost first so we can seed each session's
+    // includeTravel default to a sensible value before render.
+    let travelCostForDefault = 0;
+    if (result.travel && result.travel.distanceKm > 0) {
+      const travelRate = rateList.find((r) => r.unit === "km" && r.flatRate !== null);
+      const ratePerKm = travelRate?.flatRate ?? 1.2;
+      travelCostForDefault = Math.round(result.travel.distanceKm * ratePerKm * 100) / 100;
+    }
+    const includeTravelDefault = travelCostForDefault >= MIN_TRAVEL_CHARGE;
+
+    // Hydrate sessions. The parser always returns at least one session when
+    // start/end could be resolved; otherwise we fall back to synthesising one
+    // from the flat startTime/endTime/durationMins shape.
+    let nextSessions: JobSession[] | null = null;
+    if (result.sessions && result.sessions.length > 0) {
+      nextSessions = result.sessions.map((ps, i) => ({
+        label: ps.label ?? `Session ${i + 1}`,
+        date: ps.date ?? null,
+        startTime: ps.startTime,
+        endTime: ps.endTime,
+        durationMins: ps.durationMins ?? null,
+        includeTravel: includeTravelDefault,
+      }));
+    } else if (result.startTime && result.endTime) {
+      // Clamp: AI sometimes inflates durationMins from its own task estimates
+      // (e.g. 50 min for a 9-9:30 span). Wall-clock is the ceiling; gaps only
+      // reduce billable time, never increase it.
       const wallClockMin = timeDiffMins(result.startTime, result.endTime);
       const aiMin = result.durationMins ?? null;
-      setDurationOverride(aiMin != null && aiMin < wallClockMin ? aiMin : null);
+      const durationOverride = aiMin != null && aiMin < wallClockMin ? aiMin : null;
+      nextSessions = [
+        {
+          label: "Session 1",
+          date: null,
+          startTime: result.startTime,
+          endTime: result.endTime,
+          durationMins: durationOverride,
+          includeTravel: includeTravelDefault,
+        },
+      ];
     } else if (result.startTime) {
-      setStartTime(result.startTime);
-      setEndTime(nowTime());
-      setDurationOverride(null);
+      nextSessions = [
+        {
+          label: "Session 1",
+          date: null,
+          startTime: result.startTime,
+          endTime: nowTime(),
+          durationMins: null,
+          includeTravel: includeTravelDefault,
+        },
+      ];
     } else if (result.durationMins !== null) {
       const now = new Date();
       const endTotalMins = now.getHours() * 60 + now.getMinutes();
       const startTotalMins = Math.max(0, endTotalMins - result.durationMins);
       const sh = Math.floor(startTotalMins / 60);
       const sm = startTotalMins % 60;
-      setStartTime(`${String(sh).padStart(2, "0")}:${String(sm).padStart(2, "0")}`);
-      setEndTime(nowTime());
-      setDurationOverride(null);
+      nextSessions = [
+        {
+          label: "Session 1",
+          date: null,
+          startTime: `${String(sh).padStart(2, "0")}:${String(sm).padStart(2, "0")}`,
+          endTime: nowTime(),
+          durationMins: null,
+          includeTravel: includeTravelDefault,
+        },
+      ];
     }
+    if (nextSessions) setSessions(nextSessions);
+
     setHourlyRateId(result.hourlyRateId);
     const parsedTasks: TaskLine[] = result.tasks.map((t) => {
       const device = t.device ?? null;
@@ -372,31 +452,34 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
         durationMins: result.travel.durationMins,
         cost,
       });
-      // Auto-add only if the trip is worth charging for. Short trips (cost
-      // below MIN_TRAVEL_CHARGE) still show the calculated travelInfo so the
-      // operator can manually opt in via the Add to invoice button if they
-      // want, but the default is to skip the line item.
-      // Preserve a user-set `true`: if the operator has already added travel
-      // to the invoice, a re-parse shouldn't silently flip it back off.
-      setTravelOnInvoice((prev) => prev || cost >= MIN_TRAVEL_CHARGE);
+      // Per-session includeTravel defaults were already seeded above based on
+      // travelCostForDefault; nothing extra to do here. Short trips (cost
+      // below MIN_TRAVEL_CHARGE) leave all session checkboxes off - the
+      // operator can manually tick a session to bill anyway.
     } else {
-      setTravelOnInvoice(false);
+      // No travel from parse: clear includeTravel on every session so a
+      // previous parse's "drove to X" result doesn't leak through after the
+      // operator reparses with "walked instead".
+      setSessions((prev) => prev.map((s) => ({ ...s, includeTravel: false })));
     }
     // Rebalance parsed tasks to fit the listed window so an AI over-estimating
     // a single step doesn't silently over-bill. Tasks scale proportionally so
     // the over-long ones absorb more of the correction; anything that scales
-    // below the minimum is dropped and the rest rescale. When both wall-clock
-    // bounds are present the span is the source of truth - AI's durationMins
-    // only wins when it's lower (genuine multi-session gap case).
+    // below the minimum is dropped and the rest rescale. When sessions are
+    // populated, the rebalance window is the sum of session durations (matches
+    // the aggregate `durationMins` consumed everywhere else).
+    const sessionsWindowMin = nextSessions?.reduce((s, x) => s + sessionDurationMins(x), 0) ?? 0;
     const wallClockMin =
       result.startTime && result.endTime ? timeDiffMins(result.startTime, result.endTime) : 0;
     const aiDurationMins = result.durationMins ?? 0;
     const parseWindowMin =
-      wallClockMin > 0
-        ? aiDurationMins > 0 && aiDurationMins < wallClockMin
-          ? aiDurationMins
-          : wallClockMin
-        : aiDurationMins;
+      sessionsWindowMin > 0
+        ? sessionsWindowMin
+        : wallClockMin > 0
+          ? aiDurationMins > 0 && aiDurationMins < wallClockMin
+            ? aiDurationMins
+            : wallClockMin
+          : aiDurationMins;
     const collapsed = collapseToWindow(parsedTasks, parseWindowMin);
     setTasks(collapsed.tasks);
     if (collapsed.rescaled || collapsed.dropped > 0) {
@@ -607,7 +690,7 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
     if (d.ok) {
       setIncomeToast("Income entry saved.");
       setTimeout(() => setIncomeToast(null), 3000);
-      setDurationOverride(null);
+      setSessions(freshSessions());
       setTasks([]);
       setParts([]);
       setNotes("");
@@ -627,9 +710,12 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
     if (!jobAddress.trim()) return;
     setLookingUpTravel(true);
     setTravelInfo(null);
-    setTravelOnInvoice(false);
+    // Clear includeTravel on every session so a fresh lookup doesn't silently
+    // bill travel before the operator has seen the new cost. Operator ticks
+    // the session(s) they want to bill via the per-session checkbox.
+    setSessions((prev) => prev.map((s) => ({ ...s, includeTravel: false })));
     try {
-      const departureTimeIso = jobStartIsoFromTime(startTime);
+      const departureTimeIso = jobStartIsoFromTime(aggregateStartTime);
       const res = await fetch("/api/pricing/travel-time", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -653,17 +739,6 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
       // silently ignore - travel is optional
     }
     setLookingUpTravel(false);
-  }
-
-  /**
-   * Marks the travel charge as included in the invoice total. Unlike the
-   * parse-result handler, this intentionally bypasses MIN_TRAVEL_CHARGE: the
-   * operator has clicked the button after seeing the cost, so it's an
-   * explicit override of the auto-skip-short-trips default.
-   */
-  function addTravelToInvoice(): void {
-    if (!travelInfo) return;
-    setTravelOnInvoice(true);
   }
 
   // Rate management
@@ -1061,16 +1136,13 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
 
           {/* Time */}
           <JobDetailsSection
-            startTime={startTime}
-            onStartTimeChange={setStartTime}
-            endTime={endTime}
-            onEndTimeChange={setEndTime}
-            durationOverride={durationOverride}
-            onDurationOverrideChange={setDurationOverride}
+            sessions={sessions}
+            onSessionsChange={setSessions}
             durationMins={durationMins}
             hourlyRateId={hourlyRateId}
             onHourlyRateIdChange={setHourlyRateId}
             baseRates={baseRates}
+            hasTravelInfo={travelInfo !== null}
           />
 
           {/* Travel */}
@@ -1081,10 +1153,7 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
             travelInfo={travelInfo}
             onTravelInfoChange={setTravelInfo}
             lookingUpTravel={lookingUpTravel}
-            travelOnInvoice={travelOnInvoice}
-            onTravelOnInvoiceChange={setTravelOnInvoice}
             onLookup={() => void handleTravelLookup()}
-            onAddToInvoice={addTravelToInvoice}
           />
 
           {/* Tasks - inline warning when hourly task minutes drift from the
@@ -1189,7 +1258,7 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
             </button>
             <button
               onClick={() => {
-                setDurationOverride(null);
+                setSessions(freshSessions());
                 setTasks([]);
                 setParts([]);
                 setNotes("");

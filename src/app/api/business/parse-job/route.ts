@@ -11,6 +11,7 @@ import { lookupDriveDistance } from "@/features/business/lib/travel-distance";
 import type {
   ParseJobResponse,
   ParseJobQuestion,
+  ParsedSession,
   RateConfig,
 } from "@/features/business/types/business";
 
@@ -51,38 +52,78 @@ function parseTimeMins(s: string, assume: Meridiem = null): number | null {
 }
 
 /**
- * Sums all HH:MM–HH:MM segments on lines that start with a digit.
- * Handles noon/midnight crossings and trailing meridiems (e.g. "7-9pm" = 7pm-9pm).
- * @param input - Raw job description text.
- * @returns Total worked minutes, or null if no time ranges detected.
+ * Formats minutes-since-midnight as a HH:MM string. Wraps at 24h boundaries
+ * so a "11pm-1am" overnight range still serialises cleanly.
+ * @param mins - Minutes since midnight (may exceed 1440 for cross-midnight ends).
+ * @returns HH:MM string.
  */
-function calcSessionMins(input: string): number | null {
-  let total = 0;
-  let found = false;
+function minsToHHMM(mins: number): string {
+  const wrapped = ((mins % (24 * 60)) + 24 * 60) % (24 * 60);
+  const h = Math.floor(wrapped / 60);
+  const m = wrapped % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+// ISO date or D-MMM / MMM-D leading patterns; only confident matches populate session.date.
+const LEADING_DATE_RE = /^\s*(\d{4}-\d{2}-\d{2})\b/;
+
+/**
+ * Extracts one ParsedSession per HH:MM–HH:MM segment found on digit-led lines.
+ * Mirrors the original calcSessionMins regex behaviour (multi-session sum is
+ * still reported via the returned array's durations) but also returns the raw
+ * start/end so the calculator UI can render per-session rows.
+ * @param input - Raw job description text.
+ * @returns Array of parsed sessions (may be empty when no time ranges detected).
+ */
+function extractSessions(input: string): ParsedSession[] {
+  const sessions: ParsedSession[] = [];
   for (const line of input.split("\n")) {
     if (!/^\d/.test(line.trim())) continue;
     TIME_RANGE_RE.lastIndex = 0;
     const m = TIME_RANGE_RE.exec(line);
     if (!m) continue;
-    // "7-9pm" -> both pm; "9-11am" -> both am. If only one side has a marker,
-    // the other side inherits it (covers the common shorthand).
     const startMeridiem = meridiemOf(m[1]);
     const endMeridiem = meridiemOf(m[2]);
     const start = parseTimeMins(m[1], startMeridiem ?? endMeridiem);
     const end = parseTimeMins(m[2], endMeridiem ?? startMeridiem);
     if (start === null || end === null) continue;
+    let endResolved = end;
     let dur = end - start;
     if (dur <= 0) {
-      // Prefer the smallest positive result that fits a reasonable session (≤ 16h).
-      // +12h handles unmarked am/pm crossing noon (e.g. "11:25-1:20" > 115 min).
-      // +24h is the fallback for overnight runs.
       const withNoon = dur + 12 * 60;
-      dur = withNoon > 0 && withNoon <= 16 * 60 ? withNoon : dur + 24 * 60;
+      if (withNoon > 0 && withNoon <= 16 * 60) {
+        endResolved = end + 12 * 60;
+        dur = withNoon;
+      } else {
+        endResolved = end + 24 * 60;
+        dur = dur + 24 * 60;
+      }
     }
-    total += dur;
-    found = true;
+    // Only set date when the line starts with an unambiguous ISO date.
+    // Don't invent a year for things like "Tuesday" - leave date null and
+    // let the operator fill it via the date picker if needed.
+    const dateMatch = LEADING_DATE_RE.exec(line);
+    sessions.push({
+      label: `Session ${sessions.length + 1}`,
+      date: dateMatch ? dateMatch[1] : null,
+      startTime: minsToHHMM(start),
+      endTime: minsToHHMM(endResolved),
+      durationMins: dur,
+    });
   }
-  return found ? total : null;
+  return sessions;
+}
+
+/**
+ * Sums all HH:MM–HH:MM segments on lines that start with a digit. Thin
+ * convenience wrapper around extractSessions for the AI pre-compute hint.
+ * @param input - Raw job description text.
+ * @returns Total worked minutes, or null if no time ranges detected.
+ */
+function calcSessionMins(input: string): number | null {
+  const sessions = extractSessions(input);
+  if (sessions.length === 0) return null;
+  return sessions.reduce((s, x) => s + (x.durationMins ?? 0), 0);
 }
 
 /**
@@ -279,6 +320,27 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           unitPrice,
         };
       });
+    }
+
+    // Attach per-session ranges extracted from the raw input. When the regex
+    // finds nothing (e.g. "worked 3 hours" with no times) we synthesise one
+    // session from the AI's flat startTime/endTime so the calculator hydrator
+    // always has at least one editable row. Empty array = no times resolved.
+    const extracted = extractSessions(input);
+    if (extracted.length > 0) {
+      parsed.sessions = extracted;
+    } else if (parsed.startTime && parsed.endTime) {
+      parsed.sessions = [
+        {
+          label: "Session 1",
+          date: null,
+          startTime: parsed.startTime,
+          endTime: parsed.endTime,
+          durationMins: parsed.durationMins,
+        },
+      ];
+    } else {
+      parsed.sessions = [];
     }
 
     // Wall-clock ceiling: AI sometimes inflates durationMins from its own task

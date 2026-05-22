@@ -18,18 +18,16 @@ interface Props {
   travelInfo: TravelInfo | null;
   onTravelInfoChange: (info: TravelInfo | null) => void;
   lookingUpTravel: boolean;
-  travelOnInvoice: boolean;
-  onTravelOnInvoiceChange: (on: boolean) => void;
   onLookup: () => void;
-  onAddToInvoice: () => void;
 }
 
 /**
  * Travel address input + travel-time lookup card. The text input is wired to
  * Google Places autocomplete via a ref owned by the parent (so the parent's
  * effect can attach the listener and clean up). Once a lookup returns, an
- * info chip shows distance, drive time, and cost with an "Add to invoice"
- * button that flips to "Added" when committed.
+ * info chip shows distance, drive time, and cost. The actual decision of
+ * whether to bill travel lives on each session card (per-session checkbox in
+ * JobDetailsSection) - this card is purely the lookup affordance.
  * @param props - Component props.
  * @param props.addressInputRef - Ref forwarded to the address input so the parent can attach the Maps autocomplete.
  * @param props.jobAddress - Current address text.
@@ -37,10 +35,7 @@ interface Props {
  * @param props.travelInfo - Result of the most recent lookup, or null.
  * @param props.onTravelInfoChange - Setter for the lookup result (used when the user edits the address, to clear stale info).
  * @param props.lookingUpTravel - True while a lookup is in flight; disables the button.
- * @param props.travelOnInvoice - True once the operator has clicked "Add to invoice".
- * @param props.onTravelOnInvoiceChange - Setter for the "added" flag (used to reset when the address changes).
  * @param props.onLookup - Click handler for the "Look up" button and Enter key.
- * @param props.onAddToInvoice - Click handler for the "Add to invoice" button.
  * @returns Travel section element.
  */
 export function TravelSection({
@@ -50,10 +45,7 @@ export function TravelSection({
   travelInfo,
   onTravelInfoChange,
   lookingUpTravel,
-  travelOnInvoice,
-  onTravelOnInvoiceChange,
   onLookup,
-  onAddToInvoice,
 }: Props): React.ReactElement {
   return (
     <div className={cn("rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}>
@@ -67,7 +59,6 @@ export function TravelSection({
           onChange={(e) => {
             onJobAddressChange(e.target.value);
             onTravelInfoChange(null);
-            onTravelOnInvoiceChange(false);
           }}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
@@ -103,25 +94,12 @@ export function TravelSection({
               ? ` - approx ${travelInfo.durationMins} min drive`
               : ""} -{" "}
             <span className="font-medium text-slate-800">${travelInfo.cost.toFixed(2)}</span>
-            {!travelOnInvoice && travelInfo.cost < MIN_TRAVEL_CHARGE && (
+            {travelInfo.cost < MIN_TRAVEL_CHARGE && (
               <span className={cn("ml-2 italic text-slate-400")}>
-                (below ${MIN_TRAVEL_CHARGE} minimum - not charged by default)
+                (below ${MIN_TRAVEL_CHARGE} minimum - tick the session below to bill anyway)
               </span>
             )}
           </span>
-          {travelOnInvoice ? (
-            <span className={cn("ml-3 text-xs font-medium text-green-600")}>Added</span>
-          ) : (
-            <button
-              type="button"
-              onClick={onAddToInvoice}
-              className={cn(
-                "ml-3 rounded bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-700 hover:bg-slate-300",
-              )}
-            >
-              Add to invoice
-            </button>
-          )}
         </div>
       )}
     </div>

@@ -1,5 +1,6 @@
 import type {
   JobCalculation,
+  JobSession,
   LineItem,
   RateConfig,
   TaskLine,
@@ -108,6 +109,58 @@ export function nextInvoiceNumber(
 export function billableMins(mins: number): number {
   if (mins <= 0) return 0;
   return Math.ceil(mins / 15) * 15;
+}
+
+/**
+ * Minutes between two HH:MM strings on the same day. Empty/invalid inputs
+ * collapse to 0 (matches the calculator's pre-existing behaviour). Returns 0
+ * for reversed times so a half-typed session doesn't sneak negative minutes
+ * into the aggregate. Cross-midnight handling is intentionally not done here -
+ * use the per-session `durationMins` override for overnight cases.
+ * @param start - HH:MM start.
+ * @param end - HH:MM end.
+ * @returns Non-negative minute diff, or 0 when inputs are unusable.
+ */
+export function timeDiffMins(start: string, end: string): number {
+  if (!start || !end) return 0;
+  const [sh, sm] = start.split(":").map(Number);
+  const [eh, em] = end.split(":").map(Number);
+  if ([sh, sm, eh, em].some((n) => Number.isNaN(n))) return 0;
+  const diff = eh * 60 + em - (sh * 60 + sm);
+  return diff > 0 ? diff : 0;
+}
+
+/**
+ * Resolves a session's billable minutes - the explicit override when set,
+ * otherwise the start/end diff.
+ * @param session - Session to measure.
+ * @returns Non-negative minute count.
+ */
+export function sessionDurationMins(session: JobSession): number {
+  if (session.durationMins != null) return session.durationMins;
+  return timeDiffMins(session.startTime, session.endTime);
+}
+
+/**
+ * Count of sessions flagged as a separate trip - feeds the travel total
+ * multiplier and the per-session travel line emission in jobToLineItems.
+ * @param sessions - Job sessions (always at least one).
+ * @returns Number of billed trips (0 means travel is excluded from totals).
+ */
+export function travelTripCount(sessions: JobSession[]): number {
+  return sessions.filter((s) => s.includeTravel).length;
+}
+
+/**
+ * Formats the bracketed `(date, start-end)` qualifier appended to per-session
+ * labour and travel descriptions. Omits the date part when null so undated
+ * sessions read as `(09:00-11:00)`.
+ * @param session - Session to render.
+ * @returns Bracketed string ready to append after the row label.
+ */
+function sessionQualifier(session: JobSession): string {
+  const parts = [session.date, `${session.startTime}-${session.endTime}`].filter(Boolean);
+  return `(${parts.join(", ")})`;
 }
 
 /**
@@ -313,13 +366,35 @@ export function effectiveHourlyRate(
 
 /**
  * Converts a job calculation into a flat array of invoice line items.
- * @param job - Job calculation with time, tasks, and parts
+ * Multi-session jobs emit one labour row per session (description prefixed
+ * with the session label + date/time) and one travel row per session that
+ * was billed as a trip. Tasks and parts stay job-level for v1 - if a task
+ * only applied to a specific session, put that context in the description
+ * manually. (Per-task session tagging is deliberately deferred.)
+ * @param job - Job calculation with time, tasks, parts, and sessions
  * @returns Array of line items ready for an invoice
  */
 export function jobToLineItems(job: JobCalculation): LineItem[] {
   const items: LineItem[] = [];
+  const sessions = job.sessions ?? [];
+  const multi = sessions.length > 1;
 
-  if (job.durationMins > 0 && job.hourlyRate) {
+  if (multi && job.hourlyRate) {
+    const rate = job.hourlyRate.ratePerHour ?? 0;
+    for (const session of sessions) {
+      const dur = sessionDurationMins(session);
+      if (dur <= 0) continue;
+      const billed = billableMins(dur);
+      const hours = billed / 60;
+      const lineTotal = Math.round(hours * rate * 100) / 100;
+      items.push({
+        description: `Labour - ${session.label} ${sessionQualifier(session)} - ${minsToHoursLabel(billed)} @ ${formatNZD(rate)}/hr`,
+        qty: 1,
+        unitPrice: lineTotal,
+        lineTotal,
+      });
+    }
+  } else if (job.durationMins > 0 && job.hourlyRate) {
     const billed = billableMins(job.durationMins);
     const hours = billed / 60;
     const rate = job.hourlyRate.ratePerHour ?? 0;
@@ -350,13 +425,19 @@ export function jobToLineItems(job: JobCalculation): LineItem[] {
     });
   }
 
+  // Travel: one row per session flagged as a separate trip. travelCost is the
+  // per-trip cost (not a total). Single-session jobs render as plain "Travel"
+  // to match pre-multi-session output; multi-session jobs get a labelled row.
   if (job.travelCost) {
-    items.push({
-      description: "Travel",
-      qty: 1,
-      unitPrice: job.travelCost,
-      lineTotal: job.travelCost,
-    });
+    for (const session of sessions) {
+      if (!session.includeTravel) continue;
+      items.push({
+        description: multi ? `Travel - ${session.label} ${sessionQualifier(session)}` : "Travel",
+        qty: 1,
+        unitPrice: job.travelCost,
+        lineTotal: job.travelCost,
+      });
+    }
   }
 
   return items;
@@ -436,7 +517,9 @@ export function calcJobTotal(
   const timeCharge = Math.round(hours * rate * 100) / 100;
   const tasksTotal = job.tasks.reduce((s, t) => s + t.qty * t.unitPrice, 0);
   const partsTotal = job.parts.reduce((s, p) => s + p.cost, 0);
-  const travelTotal = job.travelCost ?? 0;
+  // travelCost is per-trip; multiply by the number of sessions flagged as a
+  // separate trip so multi-day continuations bill travel twice (or more).
+  const travelTotal = (job.travelCost ?? 0) * travelTripCount(job.sessions);
   // Subtotal = gross (pre-promo); promo shown as its own line in the Summary.
   const subtotal = Math.round((timeCharge + tasksTotal + partsTotal + travelTotal) * 100) / 100;
   const promoDiscount = computeJobPromoDiscount(job, promo);
@@ -495,7 +578,8 @@ export function buildIncomeDescription(job: JobCalculation): string {
     parts.push(job.tasks.map((t) => t.description).join(", "));
   }
   if (job.durationMins > 0) {
-    parts.push(`${minsToHoursLabel(job.durationMins)} labour`);
+    const suffix = job.sessions.length > 1 ? ` over ${job.sessions.length} sessions` : "";
+    parts.push(`${minsToHoursLabel(job.durationMins)} labour${suffix}`);
   }
   const today = formatDateSlash(new Date());
   return `Job: ${parts.join(" + ")} - ${today}`;
