@@ -1,4 +1,10 @@
-import type { JobCalculation, LineItem, RateConfig } from "@/features/business/types/business";
+import type {
+  JobCalculation,
+  JobSession,
+  LineItem,
+  RateConfig,
+  TaskLine,
+} from "@/features/business/types/business";
 import { formatDateSlash } from "@/shared/lib/date-format";
 
 /**
@@ -106,6 +112,191 @@ export function billableMins(mins: number): number {
 }
 
 /**
+ * Minutes between two HH:MM strings on the same day. Empty/invalid inputs
+ * collapse to 0 (matches the calculator's pre-existing behaviour). Returns 0
+ * for reversed times so a half-typed session doesn't sneak negative minutes
+ * into the aggregate. Cross-midnight handling is intentionally not done here -
+ * use the per-session `durationMins` override for overnight cases.
+ * @param start - HH:MM start.
+ * @param end - HH:MM end.
+ * @returns Non-negative minute diff, or 0 when inputs are unusable.
+ */
+export function timeDiffMins(start: string, end: string): number {
+  if (!start || !end) return 0;
+  const [sh, sm] = start.split(":").map(Number);
+  const [eh, em] = end.split(":").map(Number);
+  if ([sh, sm, eh, em].some((n) => Number.isNaN(n))) return 0;
+  const diff = eh * 60 + em - (sh * 60 + sm);
+  return diff > 0 ? diff : 0;
+}
+
+/**
+ * Resolves a session's billable minutes - the explicit override when set,
+ * otherwise the start/end diff.
+ * @param session - Session to measure.
+ * @returns Non-negative minute count.
+ */
+export function sessionDurationMins(session: JobSession): number {
+  if (session.durationMins != null) return session.durationMins;
+  return timeDiffMins(session.startTime, session.endTime);
+}
+
+/**
+ * Count of sessions flagged as a separate trip - feeds the travel total
+ * multiplier and the per-session travel line emission in jobToLineItems.
+ * @param sessions - Job sessions (always at least one).
+ * @returns Number of billed trips (0 means travel is excluded from totals).
+ */
+export function travelTripCount(sessions: JobSession[]): number {
+  return sessions.filter((s) => s.includeTravel).length;
+}
+
+/**
+ * Formats the bracketed `(date, start-end)` qualifier appended to per-session
+ * labour and travel descriptions. Omits the date part when null so undated
+ * sessions read as `(09:00-11:00)`.
+ * @param session - Session to render.
+ * @returns Bracketed string ready to append after the row label.
+ */
+function sessionQualifier(session: JobSession): string {
+  const parts = [session.date, `${session.startTime}-${session.endTime}`].filter(Boolean);
+  return `(${parts.join(", ")})`;
+}
+
+/**
+ * Total minutes contributed by hourly tasks. Flat-rate tasks (Travel, etc.)
+ * carry no time so they're excluded.
+ * @param tasks - Task lines from the calculator.
+ * @returns Sum of hourly task minutes (`qty * 60`).
+ */
+export function hourlyTaskMinutes(tasks: TaskLine[]): number {
+  return tasks.filter((t) => t.baseRateId != null).reduce((sum, t) => sum + t.qty * 60, 0);
+}
+
+/** Minimum minutes a task can shrink to before it's dropped as descriptive noise. */
+const MIN_TASK_MINUTES = 5;
+/** Rounding granularity for task qty after rebalancing (5-min steps). */
+const TASK_QTY_SNAP_MIN = 5;
+/** Minutes every isShort task is pinned to. Matches the AI's 0.25h SHORT-set assignment. */
+const SHORT_TASK_MINUTES = 15;
+
+/**
+ * Collapses task lines so their total hourly minutes fit the listed job window.
+ * Tasks the AI flagged as `isShort` ("quickly", one-shots, etc.) are pinned at
+ * {@link SHORT_TASK_MINUTES}; the remaining non-short tasks scale proportionally
+ * to fill what's left of the window, so an over-long primary task absorbs more
+ * of the correction than a correctly-sized one. Non-short tasks that would
+ * scale below {@link MIN_TASK_MINUTES} are dropped, then the rest rescale.
+ * Snaps qty to 5-min increments and parks any rounding remainder on the
+ * largest survivor so totals match exactly. Flat-rate tasks pass through.
+ * @param tasks - Task lines to collapse.
+ * @param windowMin - Target window in minutes (`durationMins`).
+ * @returns Adjusted task list, count of dropped tasks, and whether any qty was rescaled.
+ */
+export function collapseToWindow(
+  tasks: TaskLine[],
+  windowMin: number,
+): { tasks: TaskLine[]; dropped: number; rescaled: boolean } {
+  if (windowMin <= 0) return { tasks, dropped: 0, rescaled: false };
+  const hourlyIn = tasks.filter((t) => t.baseRateId != null);
+  const flat = tasks.filter((t) => t.baseRateId == null);
+  if (hourlyIn.length === 0) return { tasks, dropped: 0, rescaled: false };
+
+  if (sumTaskMinutes(hourlyIn) <= windowMin) return { tasks, dropped: 0, rescaled: false };
+
+  // Pin short tasks at 15 min each; drop any that don't fit the window.
+  const short: TaskLine[] = hourlyIn
+    .filter((t) => t.isShort)
+    .map((t) => withMinutes(t, SHORT_TASK_MINUTES));
+  let dropped = 0;
+  while (short.length * SHORT_TASK_MINUTES > windowMin) {
+    short.pop();
+    dropped++;
+  }
+
+  let nonShort: TaskLine[] = hourlyIn.filter((t) => !t.isShort);
+  const remainingMin = windowMin - short.length * SHORT_TASK_MINUTES;
+
+  if (nonShort.length === 0) {
+    return { tasks: [...short, ...flat], dropped, rescaled: true };
+  }
+
+  if (remainingMin <= 0) {
+    // Short tasks already cover the whole window; drop every non-short.
+    dropped += nonShort.length;
+    return { tasks: [...short, ...flat], dropped, rescaled: true };
+  }
+
+  // Scale non-short proportionally to fill remainingMin; drop tasks that
+  // would land below MIN_TASK_MINUTES and rescale until everything fits.
+  while (nonShort.length > 0) {
+    const sum = sumTaskMinutes(nonShort);
+    if (sum <= remainingMin) break;
+    const multiplier = remainingMin / sum;
+    const scaled = nonShort.map((t) => ({ task: t, scaledMin: t.qty * 60 * multiplier }));
+    const tooSmall = scaled.filter((s) => s.scaledMin < MIN_TASK_MINUTES);
+    if (tooSmall.length === 0) {
+      nonShort = scaled.map((s) => withMinutes(s.task, snapMinutes(s.scaledMin)));
+      break;
+    }
+    scaled.sort((a, b) => a.scaledMin - b.scaledMin);
+    const removed = scaled[0].task;
+    nonShort = nonShort.filter((t) => t !== removed);
+    dropped++;
+  }
+
+  // Park rounding remainder on the largest non-short survivor so totals match.
+  const combined = [...short, ...nonShort];
+  if (combined.length > 0) {
+    const error = windowMin - sumTaskMinutes(combined);
+    if (error !== 0 && nonShort.length > 0) {
+      let biggestIdx = 0;
+      for (let i = 1; i < nonShort.length; i++) {
+        if (nonShort[i].qty > nonShort[biggestIdx].qty) biggestIdx = i;
+      }
+      const adjustedMin = Math.max(MIN_TASK_MINUTES, nonShort[biggestIdx].qty * 60 + error);
+      nonShort[biggestIdx] = withMinutes(nonShort[biggestIdx], adjustedMin);
+    }
+  }
+
+  return { tasks: [...short, ...nonShort, ...flat], dropped, rescaled: true };
+}
+
+/**
+ * Rounds a minute value to the nearest task-qty snap step.
+ * @param mins - Raw minutes.
+ * @returns Minutes rounded to the nearest {@link TASK_QTY_SNAP_MIN}.
+ */
+function snapMinutes(mins: number): number {
+  return Math.round(mins / TASK_QTY_SNAP_MIN) * TASK_QTY_SNAP_MIN;
+}
+
+/**
+ * Total minutes across the given task lines (`qty` is decimal hours).
+ * @param arr - Task lines.
+ * @returns Sum of minute durations.
+ */
+function sumTaskMinutes(arr: TaskLine[]): number {
+  return arr.reduce((s, t) => s + t.qty * 60, 0);
+}
+
+/**
+ * Returns a clone of `task` with `qty` set to `mins / 60` and `lineTotal`
+ * recomputed against the existing unit price.
+ * @param task - Source task line.
+ * @param mins - New duration in minutes.
+ * @returns Updated task line.
+ */
+function withMinutes(task: TaskLine, mins: number): TaskLine {
+  const qty = mins / 60;
+  return {
+    ...task,
+    qty,
+    lineTotal: Math.round(qty * task.unitPrice * 100) / 100,
+  };
+}
+
+/**
  * Converts a duration in minutes to a human-readable label.
  * @param mins - Duration in minutes
  * @returns Formatted label (e.g. "1h 30min")
@@ -175,13 +366,35 @@ export function effectiveHourlyRate(
 
 /**
  * Converts a job calculation into a flat array of invoice line items.
- * @param job - Job calculation with time, tasks, and parts
+ * Multi-session jobs emit one labour row per session (description prefixed
+ * with the session label + date/time) and one travel row per session that
+ * was billed as a trip. Tasks and parts stay job-level for v1 - if a task
+ * only applied to a specific session, put that context in the description
+ * manually. (Per-task session tagging is deliberately deferred.)
+ * @param job - Job calculation with time, tasks, parts, and sessions
  * @returns Array of line items ready for an invoice
  */
 export function jobToLineItems(job: JobCalculation): LineItem[] {
   const items: LineItem[] = [];
+  const sessions = job.sessions ?? [];
+  const multi = sessions.length > 1;
 
-  if (job.durationMins > 0 && job.hourlyRate) {
+  if (multi && job.hourlyRate) {
+    const rate = job.hourlyRate.ratePerHour ?? 0;
+    for (const session of sessions) {
+      const dur = sessionDurationMins(session);
+      if (dur <= 0) continue;
+      const billed = billableMins(dur);
+      const hours = billed / 60;
+      const lineTotal = Math.round(hours * rate * 100) / 100;
+      items.push({
+        description: `Labour - ${session.label} ${sessionQualifier(session)} - ${minsToHoursLabel(billed)} @ ${formatNZD(rate)}/hr`,
+        qty: 1,
+        unitPrice: lineTotal,
+        lineTotal,
+      });
+    }
+  } else if (job.durationMins > 0 && job.hourlyRate) {
     const billed = billableMins(job.durationMins);
     const hours = billed / 60;
     const rate = job.hourlyRate.ratePerHour ?? 0;
@@ -212,13 +425,19 @@ export function jobToLineItems(job: JobCalculation): LineItem[] {
     });
   }
 
+  // Travel: one row per session flagged as a separate trip. travelCost is the
+  // per-trip cost (not a total). Single-session jobs render as plain "Travel"
+  // to match pre-multi-session output; multi-session jobs get a labelled row.
   if (job.travelCost) {
-    items.push({
-      description: "Travel",
-      qty: 1,
-      unitPrice: job.travelCost,
-      lineTotal: job.travelCost,
-    });
+    for (const session of sessions) {
+      if (!session.includeTravel) continue;
+      items.push({
+        description: multi ? `Travel - ${session.label} ${sessionQualifier(session)}` : "Travel",
+        qty: 1,
+        unitPrice: job.travelCost,
+        lineTotal: job.travelCost,
+      });
+    }
   }
 
   return items;
@@ -298,7 +517,9 @@ export function calcJobTotal(
   const timeCharge = Math.round(hours * rate * 100) / 100;
   const tasksTotal = job.tasks.reduce((s, t) => s + t.qty * t.unitPrice, 0);
   const partsTotal = job.parts.reduce((s, p) => s + p.cost, 0);
-  const travelTotal = job.travelCost ?? 0;
+  // travelCost is per-trip; multiply by the number of sessions flagged as a
+  // separate trip so multi-day continuations bill travel twice (or more).
+  const travelTotal = (job.travelCost ?? 0) * travelTripCount(job.sessions);
   // Subtotal = gross (pre-promo); promo shown as its own line in the Summary.
   const subtotal = Math.round((timeCharge + tasksTotal + partsTotal + travelTotal) * 100) / 100;
   const promoDiscount = computeJobPromoDiscount(job, promo);
@@ -357,7 +578,8 @@ export function buildIncomeDescription(job: JobCalculation): string {
     parts.push(job.tasks.map((t) => t.description).join(", "));
   }
   if (job.durationMins > 0) {
-    parts.push(`${minsToHoursLabel(job.durationMins)} labour`);
+    const suffix = job.sessions.length > 1 ? ` over ${job.sessions.length} sessions` : "";
+    parts.push(`${minsToHoursLabel(job.durationMins)} labour${suffix}`);
   }
   const today = formatDateSlash(new Date());
   return `Job: ${parts.join(" + ")} - ${today}`;

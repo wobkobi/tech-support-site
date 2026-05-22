@@ -20,6 +20,46 @@ enum ReviewStatus {
   approved
 }
 
+// Google Distance Matrix travel mode. Null on TravelBlock is treated as transit.
+enum TransportMode {
+  transit
+  driving
+  walking
+  bicycling
+}
+
+// Single-value Contact fields tracked by the Google sync conflict flow.
+// Phones are merged as a union, not conflicted.
+enum ContactField {
+  name
+  email
+  address
+}
+
+// Admin choice when resolving a ContactConflict.
+// "auto" is stamped by clearContactConflict when both sides converge on their own.
+enum ConflictResolution {
+  site
+  google
+  custom
+  auto
+}
+
+// NODE_ENV value at the time of a PriceEstimateLog write. The admin page hides
+// non-production rows by default.
+enum AppEnvironment {
+  production
+  development
+  test
+}
+
+// AI-assigned rate band for a PriceEstimateLog. "complex" jobs are priced at
+// the higher hourly rate; "standard" covers routine work.
+enum AiEstimateCategory {
+  standard
+  complex
+}
+
 model Booking {
   id String @id @default(auto()) @map("_id") @db.ObjectId
 
@@ -109,8 +149,12 @@ model Review {
 }
 
 // Standalone review requests sent to past clients by email or SMS.
+// Each row is a send event: one Contact can accumulate many ReviewRequest rows
+// over time. contactId links to the canonical person record; name/email/phone
+// remain populated for legacy rows and as fallbacks during contact lookup.
 model ReviewRequest {
   id                String    @id @default(auto()) @map("_id") @db.ObjectId
+  contactId         String?   @db.ObjectId // FK to Contact - set on create for new rows, backfilled lazily for old
   name              String
   email             String? // Null for SMS-only records; used for deduplication
   phone             String? // Null for email-only records; used for deduplication
@@ -123,11 +167,13 @@ model ReviewRequest {
   // Deduplication before sending a new review link
   @@index([email])
   @@index([phone])
+  // Contact tab: list a contact's send history
+  @@index([contactId])
 }
 
 // Contacts built from booking submissions.
 model Contact {
-  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  id              String    @id @default(auto()) @map("_id") @db.ObjectId
   name            String
   email           String?
   phone           String?
@@ -142,20 +188,20 @@ model Contact {
   // Google changed iff current etag != lastGoogleEtag.
   lastSyncedAt    DateTime?
   lastGoogleEtag  String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 }
 
 // Sync conflicts admin resolves at /admin/contacts/conflicts.
 model ContactConflict {
-  id          String    @id @default(auto()) @map("_id") @db.ObjectId
-  contactId   String    @db.ObjectId
-  field       String // "name" | "email" | "address"
+  id          String              @id @default(auto()) @map("_id") @db.ObjectId
+  contactId   String              @db.ObjectId
+  field       ContactField
   siteValue   String?
   googleValue String?
   resolvedAt  DateTime?
-  resolution  String? // "site" | "google" | "custom" | "auto"
-  createdAt   DateTime  @default(now())
+  resolution  ConflictResolution?
+  createdAt   DateTime            @default(now())
 
   @@index([resolvedAt, createdAt(sort: Desc)])
   @@index([contactId, field, resolvedAt])
@@ -163,25 +209,46 @@ model ContactConflict {
 
 // Travel time blocks created for external calendar events with a location.
 model TravelBlock {
-  id                   String   @id @default(auto()) @map("_id") @db.ObjectId
-  sourceEventId        String
-  calendarEmail        String
-  summary              String? // Google Calendar event title (e.g. "Dentist", "Mario Movie")
-  eventStartAt         DateTime // Source event start - used to detect time changes
-  eventEndAt           DateTime // Source event end - used to detect time changes
-  rawTravelMinutes     Int? // Raw travel-to time from Distance Matrix API
-  roundedMinutes       Int? // Rounded travel-to value used for block window
-  rawTravelBackMinutes Int? // Raw return-trip travel time
-  roundedBackMinutes   Int? // Rounded return-trip value used for block window
-  beforeEventId        String? // Synthetic CalendarEventCache ID blocking travel-to
-  afterEventId         String? // Synthetic CalendarEventCache ID blocking travel-back
-  transportMode        String? // "transit" | "driving" | "walking" | "bicycling" - null treated as "transit"
-  customOrigin         String? // Manual override for travel-to origin address
-  detectedOrigin       String? // Auto-detected origin from preceding event or home address
-  destination          String? // Destination address (event.location ?? event.summary)
-  createdAt            DateTime @default(now())
+  id                          String         @id @default(auto()) @map("_id") @db.ObjectId
+  sourceEventId               String
+  calendarEmail               String
+  recurringEventId            String? // Parent series ID when source event is a recurring instance
+  summary                     String? // Google Calendar event title (e.g. "Dentist", "Mario Movie")
+  eventStartAt                DateTime // Source event start - used to detect time changes
+  eventEndAt                  DateTime // Source event end - used to detect time changes
+  rawTravelMinutes            Int? // Raw travel-to time from Distance Matrix API
+  roundedMinutes              Int? // Rounded travel-to value used for block window
+  rawTravelBackMinutes        Int? // Raw return-trip travel time (to home or chained venue)
+  roundedBackMinutes          Int? // Rounded return-trip value used for block window
+  beforeEventId               String? // Synthetic CalendarEventCache ID blocking travel-to
+  afterEventId                String? // Synthetic CalendarEventCache ID blocking travel-back
+  transportMode               TransportMode? // Null treated as transit at read time
+  customOrigin                String? // Manual override for travel-to origin address
+  detectedOrigin              String? // Auto-detected origin from preceding event or home address
+  destination                 String? // Destination address (event.location ?? event.summary)
+  customTravelBackDestination String? // Manual override for travel-back destination (defaults to home)
+  travelBackSuppressed        Boolean        @default(false) // True when chaining to next event beats going home
+  chainedNextEventId          String? // Identity of next event evaluated for chaining (for change detection)
+  chainedNextEventStartAt     DateTime? // Start of that next event (rebuild when it shifts)
+  createdAt                   DateTime       @default(now())
 
   @@unique([sourceEventId, calendarEmail])
+  // Sibling cascade on admin transport-mode override
+  @@index([recurringEventId, calendarEmail])
+}
+
+// Series-level transport mode preference for recurring Google Calendar events.
+// One row per (recurringEventId, calendarEmail). Survives TravelBlock stale-cleanup
+// so a new instance entering the fetch window picks up the admin's chosen mode.
+model RecurringTravelPreference {
+  id               String         @id @default(auto()) @map("_id") @db.ObjectId
+  recurringEventId String
+  calendarEmail    String
+  transportMode    TransportMode?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@unique([recurringEventId, calendarEmail])
 }
 
 // Cached Google Calendar events for fast booking page loads.
@@ -229,6 +296,7 @@ enum InvoiceStatus {
   DRAFT
   SENT
   PAID
+  VOIDED
 }
 
 type LineItem {
@@ -239,29 +307,33 @@ type LineItem {
 }
 
 model Invoice {
-  id          String        @id @default(auto()) @map("_id") @db.ObjectId
-  number      String        @unique
-  clientName  String
-  clientEmail String
-  issueDate   DateTime
-  dueDate     DateTime
-  lineItems   LineItem[]
-  gst         Boolean       @default(false)
-  subtotal    Float
-  gstAmount   Float
-  total       Float
+  id               String        @id @default(auto()) @map("_id") @db.ObjectId
+  number           String        @unique
+  clientName       String
+  clientEmail      String
+  issueDate        DateTime
+  dueDate          DateTime
+  lineItems        LineItem[]
+  gst              Boolean       @default(false)
+  subtotal         Float
+  gstAmount        Float
+  total            Float
   // Promo snapshot at creation time (kept stable if the source promo changes).
-  promoTitle    String?
-  promoDiscount Float?
-  status      InvoiceStatus @default(DRAFT)
-  notes       String?
-  contactId   String?       @db.ObjectId
-  driveFileId String?
-  driveWebUrl String?
+  promoTitle       String?
+  promoDiscount    Float?
+  status           InvoiceStatus @default(DRAFT)
+  notes            String?
+  contactId        String?       @db.ObjectId
+  driveFileId      String?
+  driveWebUrl      String?
+  // Stamped when status transitions to VOIDED. Audit trail + powers "Voided
+  // on DD MMM" on the detail page. Null on pre-VOIDED-feature rows and on
+  // any invoice that was never voided.
+  voidedAt         DateTime?
   // Stamped when send-email included the review link; powers the 30-day cooldown.
   reviewLinkSentAt DateTime?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
 
   @@index([clientEmail, reviewLinkSentAt])
 }
@@ -379,7 +451,7 @@ model PriceEstimateLog {
 
   // AI output captured verbatim.
   aiEstimatedMins Int
-  aiCategory      String // "standard" | "complex"
+  aiCategory      AiEstimateCategory
   aiExplanation   String
   aiTasks         EstimateTask[]
 
@@ -396,11 +468,9 @@ model PriceEstimateLog {
   promoTitle String?
   promoLabel String?
 
-  // NODE_ENV at the time of the request - "production" for real public
-  // traffic, "development" when I hit the wizard from `npm run dev`. The
-  // admin page hides non-production rows by default and exposes a toggle
-  // so I can audit my own test submissions when I need to.
-  environment String @default("production")
+  // NODE_ENV at the time of the request. The admin page hides non-production
+  // rows by default and exposes a toggle so I can audit test submissions.
+  environment AppEnvironment @default(production)
 
   createdAt DateTime @default(now())
 

@@ -16,13 +16,15 @@ import {
   DURATION_OPTIONS,
   SUB_SLOT_MINUTES,
   BOOKING_FIELD_LIMITS,
-  EMAIL_REGEX,
+  validateEmail,
   type BookableDay,
   type TimeOfDay,
   type StartMinute,
   type JobDuration,
 } from "@/features/booking/lib/booking";
-import { normalisePhone, isValidPhone } from "@/shared/lib/normalise-phone";
+import { validatePhone } from "@/shared/lib/normalise-phone";
+import { EmailInput } from "@/shared/components/EmailInput";
+import { PhoneInput } from "@/shared/components/PhoneInput";
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 
 export interface BookingFormInitialValues {
@@ -107,29 +109,23 @@ export default function BookingForm({
   const [meetingType, setMeetingType] = useState<"in-person" | "remote" | "">(
     initialValues?.meetingType ?? "",
   );
-  // Apartment / unit number is stored separately so Google Places autocomplete
-  // can predict the street part (predictions go cold for NZ "N/" prefixes).
-  // We re-combine on submit and split on pre-fill so saved addresses stay in
-  // the standard "12/160 Kepa Road Orakei" shape.
+  // Unit kept separate so Places autocomplete can predict the street part
+  // (NZ "N/" prefixes break predictions). Re-combined on submit, split on
+  // pre-fill, so saved addresses stay in "12/160 Kepa Road Orakei" shape.
   const initialSplit = splitUnitFromAddress(initialValues?.address ?? "");
   const [unit, setUnit] = useState(initialSplit.unit);
   const [address, setAddress] = useState(initialSplit.rest);
-  // True after the customer picks an autocomplete suggestion; resets to false
-  // on any subsequent keystroke. In edit mode the saved address is treated as
-  // verified (it was accepted on its original submission). Drives the
-  // green-tick hint + the optional submit-time geocode fallback.
+  // True after picking an autocomplete suggestion (or pre-filled in edit mode);
+  // any keystroke resets it. Drives the green-tick hint + submit-time geocode.
   const [addressVerified, setAddressVerified] = useState(Boolean(initialValues?.address));
-  // Flipped true after the submit-time geocode check fails so the customer can
-  // click Submit a second time to proceed with their typed address as-is.
-  // Reset whenever the address changes (so a different mistyped address gets
-  // re-checked, not silently bypassed).
+  // True after a failed submit-time geocode so a second click submits as-is.
+  // Resets on any address change to re-check different mistypes.
   const [addressOverrideAcked, setAddressOverrideAcked] = useState(false);
   const [notes, setNotes] = useState(initialValues?.notes ?? "");
   // Honeypot: real users never see/fill this; bots typically auto-fill any
   // input that looks like a contact field. A non-empty value tells the server
   // to fake a success response without creating a booking.
   const [website, setWebsite] = useState("");
-  const [phoneError, setPhoneError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Submit-time validation errors. Rendered both in a top summary and inline.
@@ -265,12 +261,11 @@ export default function BookingForm({
     if (!selectedDay) fe.day = "Please select a day and time.";
     if (!selectedTime) fe.time = "Please select a time.";
     if (!name.trim()) fe.name = "Please enter your name.";
-    if (!email.trim() || !EMAIL_REGEX.test(email.trim())) {
+    if (validateEmail(email) !== "ok") {
       fe.email = "Please enter a valid email address.";
     }
-    if (phone.trim() && !isValidPhone(normalisePhone(phone))) {
+    if (validatePhone(phone).result === "invalid") {
       fe.phone = "Please enter a valid phone number, or leave it blank.";
-      setPhoneError("Please enter a valid phone number.");
     }
     if (!meetingType) fe.meetingType = "Please select in-person or remote.";
     if (meetingType === "in-person" && !address.trim()) {
@@ -290,10 +285,9 @@ export default function BookingForm({
 
     setSubmitting(true);
 
-    // Soft geocode check for typed-but-not-picked addresses. First failure
-    // sets addressOverrideAcked so the customer can click Submit again to
-    // proceed. Network/API outages don't block submission - the booking
-    // still goes through and is clarified out-of-band if needed.
+    // Soft geocode check for typed-but-not-picked addresses. First failure flips
+    // addressOverrideAcked so a second click submits anyway. Network errors
+    // don't block submission - clarify out-of-band if needed.
     if (meetingType === "in-person" && !addressVerified && !addressOverrideAcked) {
       try {
         const verifyRes = await fetch("/api/pricing/travel-time", {
@@ -685,32 +679,24 @@ export default function BookingForm({
             >
               Email <span className={cn("text-coquelicot-500")}>*</span>
             </label>
-            <input
+            <EmailInput
               id="booking-email"
-              type="email"
-              autoComplete="email"
-              required
-              aria-required
-              maxLength={BOOKING_FIELD_LIMITS.email}
               value={email}
-              onChange={(e) => {
-                setEmail(e.target.value);
+              onChange={(next) => {
+                setEmail(next);
                 setContactHint(null);
               }}
               onBlur={handleEmailBlur}
-              aria-invalid={!!fieldErrors.email || undefined}
-              aria-describedby={fieldErrors.email ? "booking-email-error" : undefined}
+              error={fieldErrors.email}
+              errorId="booking-email-error"
+              required
+              maxLength={BOOKING_FIELD_LIMITS.email}
+              errorMessages={{ invalid: "Please enter a valid email address." }}
               className={cn(
-                "border-seasalt-400/80 bg-seasalt text-rich-black rounded-md border px-4 py-3 text-base",
-                "focus:border-russian-violet focus:ring-russian-violet/30 focus:outline-none focus:ring-1",
-                fieldErrors.email && "border-coquelicot-500/60",
+                "border-seasalt-400/80 bg-seasalt text-rich-black border px-4 py-3 text-base",
+                "focus:border-russian-violet focus:ring-russian-violet/30 focus:ring-1",
               )}
             />
-            {fieldErrors.email && (
-              <p id="booking-email-error" className={cn("text-coquelicot-600 text-sm")}>
-                {fieldErrors.email}
-              </p>
-            )}
             {contactHint && <p className={cn("text-rich-black/70 text-sm")}>{contactHint}</p>}
           </div>
         </div>
@@ -719,35 +705,20 @@ export default function BookingForm({
           <label htmlFor="booking-phone" className={cn("text-rich-black text-base font-semibold")}>
             Phone <span className={cn("text-rich-black/70 text-base")}>(optional)</span>
           </label>
-          <input
+          <PhoneInput
             id="booking-phone"
-            type="tel"
-            autoComplete="tel"
-            maxLength={BOOKING_FIELD_LIMITS.phone}
             value={phone}
-            onChange={(e) => {
-              setPhone(e.target.value);
-              setPhoneError(null);
-            }}
-            onBlur={() => {
-              if (phone.trim() && !isValidPhone(normalisePhone(phone))) {
-                setPhoneError("Please enter a valid phone number.");
-              }
-            }}
-            aria-invalid={!!phoneError || undefined}
-            aria-describedby={phoneError ? "booking-phone-error" : undefined}
+            onChange={setPhone}
+            error={fieldErrors.phone}
+            errorId="booking-phone-error"
+            maxLength={BOOKING_FIELD_LIMITS.phone}
+            errorMessages={{ invalid: "Please enter a valid phone number." }}
             className={cn(
-              "border-seasalt-400/80 bg-seasalt text-rich-black rounded-md border px-4 py-3 text-base",
-              "focus:border-russian-violet focus:ring-russian-violet/30 focus:outline-none focus:ring-1",
+              "border-seasalt-400/80 bg-seasalt text-rich-black border px-4 py-3 text-base",
+              "focus:border-russian-violet focus:ring-russian-violet/30 focus:ring-1",
               "sm:max-w-sm",
-              phoneError && "border-coquelicot-500/60",
             )}
           />
-          {phoneError && (
-            <p id="booking-phone-error" className={cn("text-coquelicot-600 text-sm")}>
-              {phoneError}
-            </p>
-          )}
         </div>
 
         {/* Meeting Type */}
@@ -840,10 +811,9 @@ export default function BookingForm({
                       maxLength={BOOKING_FIELD_LIMITS.address}
                       onChange={(v) => {
                         setAddress(v);
-                        // Any typing invalidates the prior pick. The onChange
-                        // fires before onPlaceSelected on a pick, so React
-                        // batches both updates and the final state is
-                        // verified=true. Keystrokes leave it at false.
+                        // Any keystroke invalidates the prior pick. onChange
+                        // fires before onPlaceSelected on a real pick, so
+                        // batched updates leave verified=true on suggestions.
                         setAddressVerified(false);
                         setAddressOverrideAcked(false);
                       }}

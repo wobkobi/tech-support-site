@@ -55,6 +55,7 @@ export default async function InvoiceViewPage({
         driveWebUrl={invoice.driveWebUrl}
         invoiceId={invoice.id}
         invoiceNumber={invoice.number}
+        clientName={invoice.clientName}
         clientEmail={invoice.clientEmail}
         status={invoice.status}
         token={t}
@@ -90,11 +91,18 @@ export default async function InvoiceViewPage({
                   ? "font-semibold text-green-600"
                   : invoice.status === "SENT"
                     ? "font-semibold text-blue-600"
-                    : "text-slate-400",
+                    : invoice.status === "VOIDED"
+                      ? "font-semibold text-[#5a2a82] line-through"
+                      : "text-slate-400",
               )}
             >
               {invoice.status}
             </p>
+            {invoice.status === "VOIDED" && invoice.voidedAt && (
+              <p className={cn("mt-0.5 text-xs text-slate-400")}>
+                Voided {formatDateShort(invoice.voidedAt)}
+              </p>
+            )}
             {BUSINESS_GST_NUMBER && (
               <p className={cn("mt-1 text-xs text-slate-500")}>GST# {BUSINESS_GST_NUMBER}</p>
             )}

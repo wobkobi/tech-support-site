@@ -5,6 +5,7 @@ import { calcInvoiceTotals, nextInvoiceNumber } from "@/features/business/lib/bu
 import { generateInvoicePdf, extractYearCode } from "@/features/business/lib/invoice-pdf";
 import { uploadInvoicePdf } from "@/features/business/lib/google-drive";
 import { getInvoiceCounter, setInvoiceCounter } from "@/features/business/lib/google-sheets";
+import { BUSINESS_PAYMENT_TERMS_DAYS } from "@/shared/lib/business-identity";
 
 /**
  * Fetches the next invoice number from Google Sheets, falling back to MongoDB on failure.
@@ -81,9 +82,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     promoDiscount?: number | null;
   };
 
-  if (!clientName || !clientEmail || !issueDate || !dueDate || !Array.isArray(lineItems)) {
+  if (!clientName || !clientEmail || !Array.isArray(lineItems)) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
+
+  // Default issue + due dates server-side so the calculator's direct-save path
+  // doesn't need to send them. Operators using the "Edit details first" route
+  // can still override either via the InvoiceBuilderView form fields.
+  const issueDateValue = issueDate ? new Date(issueDate) : new Date();
+  const dueDateValue = dueDate
+    ? new Date(dueDate)
+    : new Date(Date.now() + BUSINESS_PAYMENT_TERMS_DAYS * 24 * 60 * 60 * 1000);
 
   const { number, sheetNextCount, sheetSyncWarning } = await getNextInvoiceNumber();
   const discount = typeof promoDiscount === "number" && promoDiscount > 0 ? promoDiscount : 0;
@@ -94,8 +103,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       number,
       clientName,
       clientEmail,
-      issueDate: new Date(issueDate),
-      dueDate: new Date(dueDate),
+      issueDate: issueDateValue,
+      dueDate: dueDateValue,
       lineItems,
       gst: gst ?? false,
       subtotal,

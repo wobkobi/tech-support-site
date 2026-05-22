@@ -157,7 +157,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             // best-effort
           }
         }
-        // Store any contact details the customer provided (only fill blanks, never overwrite)
+        // Store any contact details the customer provided (only fill blanks, never overwrite).
+        // Also backfill contactId on the ReviewRequest if a match was found and the row
+        // didn't already have one (legacy rows pre-date the FK).
         const contactEmail = body.contactEmail?.trim().toLowerCase() || null;
         const contactPhone = body.contactPhone ? normalisePhone(body.contactPhone) : null;
         await prisma.reviewRequest.update({
@@ -166,6 +168,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             reviewSubmittedAt: new Date(),
             email: reviewRequest.email ?? contactEmail,
             phone: reviewRequest.phone ?? contactPhone,
+            ...(reviewRequest.contactId || !autoContactId ? {} : { contactId: autoContactId }),
           },
         });
       }

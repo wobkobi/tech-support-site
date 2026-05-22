@@ -9,6 +9,10 @@ import { prisma } from "@/shared/lib/prisma";
 import { sendPastClientReviewRequest } from "@/features/reviews/lib/email";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { toE164NZ, isValidPhone } from "@/shared/lib/normalise-phone";
+import {
+  findOrCreateContactByEmail,
+  findOrCreateContactByPhone,
+} from "@/features/contacts/lib/find-or-create";
 
 /**
  * POST /api/admin/send-review-link
@@ -83,38 +87,31 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     }
 
+    // Land the Contact first so the ReviewRequest row can carry the FK.
+    // Best-effort: if the contact lookup fails, fall through with contactId null.
+    const rrEmail = mode === "email" ? email!.trim().toLowerCase() : null;
+    const rrPhone = mode === "sms" && phone ? toE164NZ(phone) : null;
+    let contactId: string | null = null;
+    try {
+      if (rrEmail) {
+        const result = await findOrCreateContactByEmail(rrEmail, { name: name.trim() });
+        contactId = result.contact.id;
+      } else if (rrPhone) {
+        const result = await findOrCreateContactByPhone(rrPhone, { name: name.trim() });
+        contactId = result.contact.id;
+      }
+    } catch {
+      // best-effort - leave contactId null
+    }
+
     const reviewRequest = await prisma.reviewRequest.create({
       data: {
+        contactId,
         name: name.trim(),
-        email: mode === "email" ? email!.trim().toLowerCase() : null,
-        phone: mode === "sms" && phone ? toE164NZ(phone) : null,
+        email: rrEmail,
+        phone: rrPhone,
       },
     });
-
-    // Upsert a Contact record - best effort, never blocks.
-    if (mode === "email" && reviewRequest.email) {
-      try {
-        const exists = await prisma.contact.findFirst({ where: { email: reviewRequest.email } });
-        if (!exists) {
-          await prisma.contact.create({
-            data: { name: name.trim(), email: reviewRequest.email, phone: null },
-          });
-        }
-      } catch {
-        // best-effort
-      }
-    } else if (mode === "sms" && reviewRequest.phone) {
-      try {
-        const exists = await prisma.contact.findFirst({ where: { phone: reviewRequest.phone } });
-        if (!exists) {
-          await prisma.contact.create({
-            data: { name: name.trim(), email: null, phone: reviewRequest.phone },
-          });
-        }
-      } catch {
-        // best-effort
-      }
-    }
 
     const reviewUrl = `${siteUrl}/review?token=${reviewRequest.reviewToken}`;
 

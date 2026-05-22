@@ -1,15 +1,17 @@
 // src/app/api/admin/travel/[id]/route.ts
 /**
  * @file route.ts
- * @description Admin endpoint to update a TravelBlock's transport mode or custom origin.
- * Setting either clears cached raw minutes so the next recalculation uses the new values.
+ * @description Admin endpoint to update a TravelBlock's transport mode, custom
+ * origin, or custom travel-back destination. Setting any clears cached raw
+ * minutes so the next refresh recalculates.
  */
 
 import { type NextRequest, NextResponse } from "next/server";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
+import { TransportMode } from "@prisma/client";
 
-const VALID_MODES = new Set(["transit", "driving", "walking", "bicycling"]);
+const VALID_MODES = new Set<string>(Object.values(TransportMode));
 
 /**
  * Updates the transport mode and/or custom origin for a travel block.
@@ -31,17 +33,20 @@ export async function PATCH(
   const body = (await request.json()) as {
     transportMode?: string;
     customOrigin?: string | null;
+    customTravelBackDestination?: string | null;
   };
 
-  const mode = body.transportMode;
-  if (mode !== undefined && !VALID_MODES.has(mode)) {
+  const rawMode = body.transportMode;
+  if (rawMode !== undefined && !VALID_MODES.has(rawMode)) {
     return NextResponse.json({ error: "Invalid transport mode" }, { status: 400 });
   }
+  const mode = rawMode as TransportMode | undefined;
 
   const hasMode = mode !== undefined;
   const hasOrigin = "customOrigin" in body;
+  const hasBackDest = "customTravelBackDestination" in body;
 
-  if (!hasMode && !hasOrigin) {
+  if (!hasMode && !hasOrigin && !hasBackDest) {
     return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
   }
 
@@ -56,6 +61,9 @@ export async function PATCH(
       data: {
         ...(hasMode && { transportMode: mode }),
         ...(hasOrigin && { customOrigin: body.customOrigin ?? null }),
+        ...(hasBackDest && {
+          customTravelBackDestination: body.customTravelBackDestination ?? null,
+        }),
         // Clear raw minutes so the next recalculate uses the updated values
         rawTravelMinutes: null,
         roundedMinutes: null,
@@ -63,6 +71,40 @@ export async function PATCH(
         roundedBackMinutes: null,
       },
     });
+
+    // Transport-mode overrides apply to the whole series - persist + cascade
+    // to siblings. customOrigin stays per-instance (origins vary by occurrence).
+    if (hasMode && mode !== undefined && block.recurringEventId) {
+      await prisma.recurringTravelPreference.upsert({
+        where: {
+          recurringEventId_calendarEmail: {
+            recurringEventId: block.recurringEventId,
+            calendarEmail: block.calendarEmail,
+          },
+        },
+        create: {
+          recurringEventId: block.recurringEventId,
+          calendarEmail: block.calendarEmail,
+          transportMode: mode,
+        },
+        update: { transportMode: mode },
+      });
+
+      await prisma.travelBlock.updateMany({
+        where: {
+          recurringEventId: block.recurringEventId,
+          calendarEmail: block.calendarEmail,
+          id: { not: id },
+        },
+        data: {
+          transportMode: mode,
+          rawTravelMinutes: null,
+          roundedMinutes: null,
+          rawTravelBackMinutes: null,
+          roundedBackMinutes: null,
+        },
+      });
+    }
 
     return NextResponse.json({ ok: true });
   } catch (error) {

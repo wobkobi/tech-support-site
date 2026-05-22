@@ -15,11 +15,12 @@ const BRAND = rgb(12 / 255, 10 / 255, 62 / 255); // russian-violet #0c0a3e
 const DARK = rgb(30 / 255, 41 / 255, 59 / 255); // slate-800 #1e293b
 const MID = rgb(100 / 255, 116 / 255, 139 / 255); // slate-500 #64748b
 const LIGHT = rgb(203 / 255, 213 / 255, 225 / 255); // slate-300 #cbd5e1
-const ROW_ALT = rgb(248 / 255, 250 / 255, 252 / 255); // slate-50 #f8fafc
 const AMBER = rgb(180 / 255, 83 / 255, 9 / 255); // amber-700 #b45309 (matches web promo)
-const WHITE = rgb(1, 1, 1);
 const PAID_COLOR = rgb(0.1, 0.55, 0.25);
 const OVERDUE_COLOR = rgb(0.78, 0.16, 0.16);
+// Purple #5a2a82 for VOID so a cancelled invoice is visually distinct from the
+// green PAID and red OVERDUE stamps without reading as a warning.
+const VOID_COLOR = rgb(90 / 255, 42 / 255, 130 / 255);
 
 const MARGIN = 42;
 const PAGE_W = 595.28;
@@ -112,7 +113,7 @@ function parseWordmarkPaths(): LogoPath[] {
 }
 
 /**
- * Draws the diagonal PAID / OVERDUE watermark. Painted first so subsequent
+ * Draws the diagonal PAID / VOID / OVERDUE watermark. Painted first so subsequent
  * sections sit on top of it. No-op when the invoice is in a neutral state.
  * @param ctx - PDF drawing context.
  * @param invoice - Invoice being rendered.
@@ -122,14 +123,33 @@ function drawStatusWatermark(ctx: PdfCtx, invoice: Invoice): void {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const isOverdue = invoice.status === "SENT" && dueDate < today;
-  const text = invoice.status === "PAID" ? "PAID" : isOverdue ? "OVERDUE" : null;
+  const text =
+    invoice.status === "PAID"
+      ? "PAID"
+      : invoice.status === "VOIDED"
+        ? "VOID"
+        : isOverdue
+          ? "OVERDUE"
+          : null;
   if (!text) return;
-  const color = invoice.status === "PAID" ? PAID_COLOR : OVERDUE_COLOR;
+  const color =
+    invoice.status === "PAID"
+      ? PAID_COLOR
+      : invoice.status === "VOIDED"
+        ? VOID_COLOR
+        : OVERDUE_COLOR;
   const size = 140;
   const width = ctx.bold.widthOfTextAtSize(text, size);
+  // Offset the baseline-left anchor so the visual centre of the rotated text
+  // lands at the page centre. cap-height ~0.35 * font size above the baseline.
+  const angle = (-25 * Math.PI) / 180;
+  const cx = width / 2;
+  const cy = size * 0.35;
+  const rx = cx * Math.cos(angle) - cy * Math.sin(angle);
+  const ry = cx * Math.sin(angle) + cy * Math.cos(angle);
   ctx.page.drawText(text, {
-    x: PAGE_W / 2 - (width / 2) * 0.87, // adjust for rotation pivot
-    y: PAGE_H / 2 - 80,
+    x: PAGE_W / 2 - rx,
+    y: PAGE_H / 2 - ry,
     size,
     font: ctx.bold,
     color,
@@ -179,7 +199,13 @@ function drawHeader(ctx: PdfCtx, invoice: Invoice, logoPaths: LogoPath[]): numbe
   });
   rightY -= 16;
   const statusColor =
-    invoice.status === "PAID" ? PAID_COLOR : invoice.status === "SENT" ? rgb(0.1, 0.35, 0.75) : MID;
+    invoice.status === "PAID"
+      ? PAID_COLOR
+      : invoice.status === "SENT"
+        ? rgb(0.1, 0.35, 0.75)
+        : invoice.status === "VOIDED"
+          ? VOID_COLOR
+          : MID;
   ctx.page.drawText(invoice.status, {
     x: rightX - ctx.bold.widthOfTextAtSize(invoice.status, 11),
     y: rightY,
@@ -313,15 +339,15 @@ function drawLineItemsTable(ctx: PdfCtx, invoice: Invoice, y: number): number {
     thickness: 1.5,
     color: BRAND,
   });
-  y -= ROW_H;
+  // Drop the header bottom-border + add a small breather before the first row
+  // so the description text isn't crammed against the brand-coloured line.
+  y -= ROW_H + 6;
 
   const descMaxW = COL.qty - COL.desc - 8;
   const LINE_GAP = 14;
   invoice.lineItems.forEach((item, idx) => {
     const lines = wrapText(item.description, descMaxW, CELL_SIZE, ctx.font);
     const rowH = ROW_H + (lines.length - 1) * LINE_GAP;
-    const bg = idx % 2 === 1 ? ROW_ALT : WHITE;
-    ctx.page.drawRectangle({ x: MARGIN, y: y - rowH, width: CONTENT_W, height: rowH, color: bg });
 
     // Top-aligned: first description line baseline matches qty/price/total baseline.
     // Baseline at y - 10 puts the text cap height ~2pt below the row top (tight top align).
@@ -364,6 +390,17 @@ function drawLineItemsTable(ctx: PdfCtx, invoice: Invoice, y: number): number {
     });
 
     y -= rowH;
+
+    // Hairline separator between rows (Xero/QuickBooks style). Skipped after
+    // the last row - drawLineItemsTable's closing border serves the same role.
+    if (idx < invoice.lineItems.length - 1) {
+      ctx.page.drawLine({
+        start: { x: MARGIN, y },
+        end: { x: MARGIN + CONTENT_W, y },
+        thickness: 0.3,
+        color: LIGHT,
+      });
+    }
   });
 
   ctx.page.drawLine({
@@ -464,15 +501,15 @@ function drawPaymentCallout(ctx: PdfCtx, invoice: Invoice, y: number): number {
   const lineH = 16;
   const boxLines = 5; // heading + payee + account + reference + due-by
   const BOX_H = BOX_PAD_Y * 2 + 22 + (boxLines - 1) * lineH; // heading taller than rows
-  const BOX_TINT = rgb(0.97, 0.97, 0.99); // very pale violet wash
+  // Border-only callout (no fill) so the diagonal status watermark shows
+  // through cleanly behind it. Matches Xero/QuickBooks invoice convention.
   ctx.page.drawRectangle({
     x: MARGIN,
     y: boxTop - BOX_H,
     width: CONTENT_W,
     height: BOX_H,
-    color: BOX_TINT,
-    borderColor: rgb(0.85, 0.85, 0.93),
-    borderWidth: 0.6,
+    borderColor: LIGHT,
+    borderWidth: 0.8,
   });
 
   let by = boxTop - BOX_PAD_Y - 2;
@@ -567,7 +604,7 @@ function drawFooter(ctx: PdfCtx): void {
 /**
  * Generates a clean professional A4 PDF for the given invoice using pdf-lib.
  * Header is the wordmark logo on the left and the INVOICE/TAX INVOICE title,
- * number, status, and optional GST# on the right. The PAID/OVERDUE watermark
+ * number, status, and optional GST# on the right. The PAID/VOID/OVERDUE watermark
  * sits underneath as a functional status indicator.
  * @param invoice - The invoice record to render.
  * @returns PDF content as a Buffer.

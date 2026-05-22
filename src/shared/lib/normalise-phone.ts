@@ -97,3 +97,24 @@ export function isValidPhone(normalised: string): boolean {
   const digits = normalised.replace(/\D/g, "");
   return digits.length >= 7 && digits.length <= 15;
 }
+
+/**
+ * Discriminator returned by validatePhone. "empty" means the input is blank
+ * (callers decide whether that's allowed based on whether the field is required).
+ */
+export type PhoneValidationResult = "empty" | "invalid" | "ok";
+
+/**
+ * Single canonical phone validator used by the shared PhoneInput component and
+ * by every submit handler that accepts a phone number. Returns a discriminator
+ * so callers can pick their own wording, plus the E.164 form for storage.
+ * @param raw - Raw phone input.
+ * @returns Validation result and the E.164-normalised value (empty when not "ok").
+ */
+export function validatePhone(raw: string): { result: PhoneValidationResult; e164: string } {
+  const trimmed = raw.trim();
+  if (!trimmed) return { result: "empty", e164: "" };
+  const e164 = toE164NZ(trimmed);
+  if (!isValidPhone(e164)) return { result: "invalid", e164: "" };
+  return { result: "ok", e164 };
+}

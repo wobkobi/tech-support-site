@@ -12,7 +12,10 @@ import {
 } from "@/shared/lib/business-identity";
 import { formatDateTimeLong, formatDateShort } from "@/shared/lib/date-format";
 import { formatNZD } from "@/features/business/lib/business";
-import { DEFAULT_INVOICE_EMAIL_BODY } from "@/features/business/lib/invoice-email-defaults";
+import {
+  DEFAULT_INVOICE_EMAIL_BODY,
+  DEFAULT_VOID_EMAIL_BODY,
+} from "@/features/business/lib/invoice-email-defaults";
 
 /**
  * Escapes HTML special characters so user-supplied values can be safely
@@ -548,7 +551,7 @@ export interface InvoiceEmailData {
  * @param args.reviewUrl - Stable per-contact review URL, or null to omit the review line.
  * @param args.greetingName - Optional operator-typed greeting target. Useful when
  *   the invoice goes to a company but the email goes to a specific person (e.g.
- *   "Vicky" while the invoice header reads "Mars Salt and Sweet Limited").
+ *   "John" while the invoice header reads "Mars Salt and Sweet Limited").
  * @param args.customBody - Optional operator-typed message that replaces the
  *   default intro paragraph. Multi-line allowed (rendered with `white-space:
  *   pre-wrap` so line breaks are preserved). Falls back to
@@ -668,6 +671,127 @@ export async function sendInvoiceEmail(args: {
     return true;
   } catch (error) {
     console.error(`[email] Failed to send invoice ${invoice.number}:`, error);
+    return false;
+  }
+}
+
+/**
+ * Renders the "your invoice has been voided" email subject + body. Mirrors
+ * buildInvoiceEmail but drops the bank-transfer block and review line - voided
+ * invoices never request payment or a review.
+ * @param args - Render inputs.
+ * @param args.invoice - Invoice row fields needed for the body (the issueDate
+ *   helps the client identify which email this voids).
+ * @param args.greetingName - Optional operator-typed greeting target.
+ * @param args.customBody - Optional override; falls back to DEFAULT_VOID_EMAIL_BODY.
+ * @returns Subject + escaped HTML body.
+ */
+export function buildVoidEmail(args: {
+  invoice: InvoiceEmailData;
+  greetingName?: string;
+  customBody?: string;
+}): { subject: string; html: string } {
+  const { invoice, greetingName, customBody } = args;
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz";
+  const bodyText = (customBody ?? DEFAULT_VOID_EMAIL_BODY).trim();
+  const safeBody = escapeHtml(bodyText || DEFAULT_VOID_EMAIL_BODY);
+  const trimmedOverride = greetingName?.trim();
+  const greetingTarget =
+    trimmedOverride || (invoice.clientName.split(" ")[0] || invoice.clientName).trim();
+  const safeGreeting = escapeHtml(greetingTarget);
+  const safeNumber = escapeHtml(invoice.number);
+  const issueDate = escapeHtml(formatDateShort(invoice.issueDate));
+  const totalLabel = escapeHtml(formatNZD(invoice.total));
+
+  const subject = `Invoice ${invoice.number} - voided`;
+  const html = `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8" /></head>
+<body style="margin:0;padding:24px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0c0a3e;background:#f6f7f8">
+  <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:12px;padding:24px">
+    <h1 style="margin:0 0 16px;font-size:20px;font-weight:700;color:#0c0a3e">Hi ${safeGreeting},</h1>
+
+    <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#333;white-space:pre-wrap">${safeBody}</p>
+
+    <div style="margin:0 0 16px;padding:12px 16px;background:#f3f4f6;border-radius:8px;font-size:14px;color:#333">
+      <p style="margin:0 0 4px"><strong>Voided invoice:</strong> ${safeNumber}</p>
+      <p style="margin:0 0 4px"><strong>Original amount:</strong> ${totalLabel}</p>
+      <p style="margin:0"><strong>Issued:</strong> ${issueDate}</p>
+    </div>
+
+    <p style="margin:0;font-size:14px;color:#333">Any questions, just reply.</p>
+
+    ${buildEmailSignature(siteUrl)}
+  </div>
+</body>
+</html>`;
+
+  return { subject, html };
+}
+
+/**
+ * Sends the void notification email via Resend with the VOID-stamped PDF
+ * attached. Mirrors sendInvoiceEmail's error handling - logs and returns
+ * false on failure rather than throwing, so the caller (void endpoint) can
+ * report `notified: false` without rolling back the status change.
+ * @param args - Send inputs.
+ * @param args.invoice - Invoice row fields needed for the body.
+ * @param args.pdfBytes - Raw PDF bytes (already VOID-stamped via generateInvoicePdf on the VOIDED row).
+ * @param args.greetingName - Optional operator-typed greeting target.
+ * @param args.customBody - Optional operator-typed body override.
+ * @returns True if Resend accepted the email, false otherwise.
+ */
+export async function sendVoidNotification(args: {
+  invoice: InvoiceEmailData;
+  pdfBytes: Uint8Array;
+  greetingName?: string;
+  customBody?: string;
+}): Promise<boolean> {
+  const { invoice, pdfBytes, greetingName, customBody } = args;
+  const from = process.env.EMAIL_FROM;
+  if (!from || !process.env.RESEND_API_KEY) {
+    console.warn("[email] Resend not configured - skipping void notification.");
+    return false;
+  }
+  if (!invoice.clientEmail) {
+    console.warn(
+      `[email] Invoice ${invoice.number} has no clientEmail - skipping void notification.`,
+    );
+    return false;
+  }
+
+  const { subject, html } = buildVoidEmail({ invoice, greetingName, customBody });
+  try {
+    // Resend SDK v3+ returns { data, error } instead of throwing on API-level
+    // failures (invalid sender, rate limit, etc.). Check error explicitly so
+    // we don't silently report "Client notified" when Resend rejected the call.
+    const result = await getResend().emails.send({
+      from,
+      replyTo: process.env.ADMIN_EMAIL,
+      to: invoice.clientEmail,
+      subject,
+      html,
+      attachments: [
+        {
+          filename: `Invoice ${invoice.number} VOIDED.pdf`,
+          content: Buffer.from(pdfBytes),
+        },
+      ],
+    });
+    if (result.error) {
+      console.error(
+        `[email] Resend rejected void notification for ${invoice.number}:`,
+        result.error,
+      );
+      return false;
+    }
+    console.log(
+      `[email] Void notification sent for ${invoice.number}:`,
+      result.data?.id ?? "(no id returned)",
+    );
+    return true;
+  } catch (error) {
+    console.error(`[email] Failed to send void notification for ${invoice.number}:`, error);
     return false;
   }
 }

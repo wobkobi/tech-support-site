@@ -48,10 +48,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       const amountExcl = Math.round((inclNum - gstAmount) * 100) / 100;
       const nextDue = advanceNextDue(sub.nextDue, sub.frequency);
 
-      // CAS on the original nextDue: only the run that wins the swap creates
-      // the expense; a retry sees count 0 and skips. If the expense create
-      // below errors after winning, admin can re-record manually - safer than
-      // risking a duplicate.
+      // CAS on nextDue makes concurrent runs idempotent. Post-CAS errors leave
+      // admin to re-record manually - safer than risking a duplicate.
       const claim = await prisma.subscription.updateMany({
         where: { id: sub.id, nextDue: sub.nextDue },
         data: { nextDue },

@@ -2,19 +2,15 @@
 
 import { useState, useEffect, useCallback } from "react";
 import type React from "react";
-import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/shared/lib/cn";
 import { calcInvoiceTotals, formatNZD, todayISO } from "@/features/business/lib/business";
-import { formatDateShort } from "@/shared/lib/date-format";
 import { ContactPickerModal } from "@/features/business/components/ContactPickerModal";
+import { AddToContactsModal } from "@/features/business/components/AddToContactsModal";
+import { InvoicePreviewPanel } from "@/features/business/components/InvoicePreviewPanel";
+import { EmailInput } from "@/shared/components/EmailInput";
 import type { LineItem, GoogleContact } from "@/features/business/types/business";
-import {
-  BUSINESS,
-  BUSINESS_BANK_ACCOUNT,
-  BUSINESS_GST_NUMBER,
-  BUSINESS_PAYMENT_TERMS_DAYS,
-} from "@/shared/lib/business-identity";
+import { BUSINESS_PAYMENT_TERMS_DAYS } from "@/shared/lib/business-identity";
 
 /**
  * Returns a date string (YYYY-MM-DD) for the date that is n days from today.
@@ -46,6 +42,8 @@ interface FormState {
   pickedContactName: string | null;
   /** Picked contact's company; null when the contact has no company. */
   pickedContactCompany: string | null;
+  /** Picked contact's Google People API resource name (e.g. "people/c1234"). */
+  pickedContactGoogleId: string | null;
   /** Drives whether clientName is sourced from name/company or freely typed. */
   addressMode: AddressMode;
 }
@@ -114,6 +112,7 @@ export function InvoiceBuilderView({
         promoDiscount: editInvoice.promoDiscount ?? 0,
         pickedContactName: null,
         pickedContactCompany: null,
+        pickedContactGoogleId: null,
         addressMode: "custom",
       };
     }
@@ -129,6 +128,7 @@ export function InvoiceBuilderView({
     // the operator doesn't have to re-pick on arrival.
     const pickedContactName = params.get("pickedContactName");
     const pickedContactCompany = params.get("pickedContactCompany");
+    const pickedContactGoogleId = params.get("pickedContactGoogleId");
     const addressModeParam = params.get("addressMode") as AddressMode | null;
     const addressMode: AddressMode =
       addressModeParam === "name" || addressModeParam === "company" || addressModeParam === "custom"
@@ -143,7 +143,7 @@ export function InvoiceBuilderView({
     return {
       number: "",
       issueDate: todayISO(),
-      dueDate: inDays(7),
+      dueDate: inDays(BUSINESS_PAYMENT_TERMS_DAYS),
       clientName,
       clientEmail,
       lineItems: clientName || clientEmail || rawItems ? lineItems : [emptyLine()],
@@ -153,6 +153,7 @@ export function InvoiceBuilderView({
       promoDiscount: promoDiscount > 0 ? promoDiscount : 0,
       pickedContactName: pickedContactName || null,
       pickedContactCompany: pickedContactCompany || null,
+      pickedContactGoogleId: pickedContactGoogleId || null,
       addressMode,
     };
   });
@@ -160,6 +161,9 @@ export function InvoiceBuilderView({
   const [error, setError] = useState<string | null>(null);
   const [sheetWarning, setSheetWarning] = useState(false);
   const [showContactPicker, setShowContactPicker] = useState(false);
+  // Deferred navigation target: set when the post-save "Add to contacts?" popup
+  // intercepts the save and needs to delay the redirect until the modal closes.
+  const [pendingNavId, setPendingNavId] = useState<string | null>(null);
 
   // Prefetch next invoice number - skipped in edit mode (number already set).
   useEffect(() => {
@@ -222,11 +226,36 @@ export function InvoiceBuilderView({
     if (d.ok) {
       if (d.sheetSyncWarning) setSheetWarning(true);
       const targetId = editInvoice ? editInvoice.id : d.invoice.id;
+      // Only prompt to add when an email is present (dedup key) and we're not
+      // editing an existing invoice (the contact would already exist or the
+      // operator already declined).
+      if (!editInvoice && form.clientEmail.trim()) {
+        try {
+          const checkRes = await fetch(
+            `/api/admin/contacts/check?email=${encodeURIComponent(form.clientEmail.trim())}`,
+            { headers },
+          );
+          const checkData = (await checkRes.json()) as { exists?: boolean };
+          if (checkRes.ok && checkData.exists === false) {
+            setPendingNavId(targetId);
+            return;
+          }
+        } catch {
+          // Fail-quiet: just navigate.
+        }
+      }
       router.push(`/admin/business/invoices/${targetId}?token=${encodeURIComponent(token)}`);
     } else {
       setError(d.error ?? "Failed to save");
       setSaving(false);
     }
+  }
+
+  /** Closes the add-to-contacts modal and finishes the deferred navigation. */
+  function handleAddContactClose(): void {
+    const id = pendingNavId;
+    setPendingNavId(null);
+    if (id) router.push(`/admin/business/invoices/${id}?token=${encodeURIComponent(token)}`);
   }
 
   /**
@@ -288,6 +317,7 @@ export function InvoiceBuilderView({
       clientEmail: c.email,
       pickedContactName: c.name,
       pickedContactCompany: company,
+      pickedContactGoogleId: c.id || null,
       addressMode: "name",
     }));
   }
@@ -316,6 +346,16 @@ export function InvoiceBuilderView({
           token={token}
           onSelect={handleContactSelect}
           onClose={() => setShowContactPicker(false)}
+        />
+      )}
+
+      {pendingNavId && (
+        <AddToContactsModal
+          token={token}
+          name={form.clientName}
+          email={form.clientEmail}
+          googleContactId={form.pickedContactGoogleId}
+          onClose={handleAddContactClose}
         />
       )}
 
@@ -437,14 +477,17 @@ export function InvoiceBuilderView({
                 />
               </div>
               <div>
-                <label className={cn("mb-1 block text-xs font-medium text-slate-600")}>Email</label>
-                <input
-                  type="email"
+                <label
+                  htmlFor="invoice-client-email"
+                  className={cn("mb-1 block text-xs font-medium text-slate-600")}
+                >
+                  Email
+                </label>
+                <EmailInput
+                  id="invoice-client-email"
                   value={form.clientEmail}
-                  onChange={(e) => setForm((p) => ({ ...p, clientEmail: e.target.value }))}
-                  className={cn(
-                    "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
-                  )}
+                  onChange={(next) => setForm((p) => ({ ...p, clientEmail: next }))}
+                  className={cn("rounded-lg border-slate-200 focus:ring-2")}
                 />
               </div>
             </div>
@@ -563,185 +606,20 @@ export function InvoiceBuilderView({
 
         {/* RIGHT - Live preview (mirrors invoice-pdf.ts so the operator sees
             the same layout they'll get when they download / email the PDF).
-            Locked to A4 portrait proportions on lg+ so the preview renders as
-            a recognisable sheet of paper rather than a squashed card. Long
-            line-item lists scroll inside the sheet. */}
-        <div
-          className={cn(
-            "flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm",
-            "lg:aspect-210/297 lg:sticky lg:top-4 lg:overflow-y-auto",
-            // Print overrides: defeat the lg: sticky + scroll constraints so
-            // the browser captures the FULL invoice rather than just the
-            // currently-visible scroll position.
-            "print:static print:aspect-auto print:overflow-visible print:rounded-none print:border-0 print:shadow-none",
-          )}
-        >
-          {/* Body: chip-logo header (left) + invoice block (right), then
-              bill-to / table / totals / bank-transfer. flex column so the
-              bank block stays at the bottom of the A4 sheet on lg+. */}
-          <div className={cn("flex flex-1 flex-col px-10 pb-10 pt-10")}>
-            {/* Header row: chip + wordmark on the left, INVOICE block on the right. */}
-            <div className={cn("mb-8 flex items-start justify-between gap-4")}>
-              <Image
-                src="/source/logo-wordmark.svg"
-                alt="To The Point Tech"
-                width={2000}
-                height={674}
-                className={cn("h-20 w-auto")}
-                priority
-              />
-              <div className={cn("text-right")}>
-                <p className={cn("text-russian-violet text-2xl font-extrabold leading-none")}>
-                  {BUSINESS_GST_NUMBER ? "TAX INVOICE" : "INVOICE"}
-                </p>
-                <p className={cn("mt-2 font-mono text-sm text-slate-700")}>
-                  {form.number || "TTP-XXXX-0000"}
-                </p>
-                <p className={cn("mt-1 text-[11px] font-bold uppercase text-slate-400")}>DRAFT</p>
-                {BUSINESS_GST_NUMBER && (
-                  <p className={cn("mt-1 text-[11px] text-slate-500")}>
-                    GST# {BUSINESS_GST_NUMBER}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Bill to (left) + dates (right) - mirrors PDF layout. */}
-            <div className={cn("mb-6 flex items-start justify-between gap-6")}>
-              <div>
-                <p
-                  className={cn(
-                    "mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400",
-                  )}
-                >
-                  Bill to
-                </p>
-                <p className={cn("text-sm font-bold text-slate-800")}>
-                  {form.clientName || "Client name"}
-                </p>
-                <p className={cn("text-xs text-slate-500")}>
-                  {form.clientEmail || "client@email.com"}
-                </p>
-              </div>
-              <div className={cn("space-y-1 text-[11px]")}>
-                <p className={cn("flex justify-between gap-4")}>
-                  <span className={cn("text-slate-500")}>Issued:</span>
-                  <span className={cn("font-bold text-slate-800")}>
-                    {form.issueDate ? formatDateShort(form.issueDate) : "-"}
-                  </span>
-                </p>
-                <p className={cn("flex justify-between gap-4")}>
-                  <span className={cn("text-slate-500")}>Due:</span>
-                  <span className={cn("font-bold text-slate-800")}>
-                    {form.dueDate ? formatDateShort(form.dueDate) : "-"}
-                  </span>
-                </p>
-              </div>
-            </div>
-
-            {/* Separator above table - matches the PDF's thin grey line. */}
-            <div className={cn("mb-0 h-px bg-slate-300")} />
-
-            {/* Clean table (matches PDF): bold dark headers on white with a brand-coloured
-                bottom border. Column widths in % match the PDF: Description 67%, Qty 9%,
-                Unit price 11%, Total 13%. */}
-            <table className={cn("mb-0 w-full text-xs")}>
-              <thead>
-                <tr className={cn("border-russian-violet border-b-2 text-slate-800")}>
-                  <th className={cn("w-[67%] px-2 py-2 text-left font-bold")}>Description</th>
-                  <th className={cn("w-[9%] px-2 py-2 text-center font-bold")}>Qty</th>
-                  <th className={cn("w-[11%] px-2 py-2 text-center font-bold")}>Price</th>
-                  <th className={cn("w-[13%] px-2 py-2 text-center font-bold")}>Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {form.lineItems.map((item, idx) => (
-                  <tr key={idx} className={cn(idx % 2 === 1 ? "bg-slate-50" : "bg-white")}>
-                    <td className={cn("px-2 py-2 align-top text-slate-700")}>
-                      {item.description || (
-                        <span className={cn("italic text-slate-300")}>(line description)</span>
-                      )}
-                    </td>
-                    <td className={cn("px-2 py-2 text-right align-top text-slate-700")}>
-                      {item.qty}
-                    </td>
-                    <td className={cn("px-2 py-2 text-right align-top text-slate-700")}>
-                      {formatNZD(item.unitPrice)}
-                    </td>
-                    <td className={cn("px-2 py-2 text-right align-top font-bold text-slate-700")}>
-                      {formatNZD(item.lineTotal)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            <div className={cn("mb-4 h-px bg-slate-300")} />
-
-            {/* Totals (right-aligned, matches PDF). */}
-            <div className={cn("mb-6 ml-auto w-3/5 space-y-1 text-xs")}>
-              <div className={cn("flex justify-between gap-3")}>
-                <span className={cn("text-slate-500")}>Subtotal</span>
-                <span className={cn("whitespace-nowrap text-slate-700")}>
-                  {formatNZD(totals.subtotal)}
-                </span>
-              </div>
-              {form.promoDiscount > 0 && (
-                <div className={cn("flex justify-between gap-3 text-amber-700")}>
-                  <span>Promo (labor only){form.promoTitle ? `: ${form.promoTitle}` : ""}</span>
-                  <span className={cn("whitespace-nowrap")}>-{formatNZD(form.promoDiscount)}</span>
-                </div>
-              )}
-              {form.gst && (
-                <div className={cn("flex justify-between gap-3")}>
-                  <span className={cn("text-slate-500")}>GST (15%)</span>
-                  <span className={cn("whitespace-nowrap text-slate-700")}>
-                    {formatNZD(totals.gstAmount)}
-                  </span>
-                </div>
-              )}
-              <div className={cn("h-px bg-slate-300")} />
-              <div
-                className={cn(
-                  "text-russian-violet flex justify-between gap-3 text-sm font-extrabold",
-                )}
-              >
-                <span>Total</span>
-                <span className={cn("whitespace-nowrap")}>{formatNZD(totals.total)}</span>
-              </div>
-            </div>
-
-            {/* Bank transfer call-out: tinted box mirrors the PDF's visual emphasis. */}
-            <div
-              className={cn(
-                "mb-4 space-y-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-[11px]",
-              )}
-            >
-              <p className={cn("text-russian-violet text-xs font-bold")}>Bank transfer</p>
-              <p className={cn("text-slate-500")}>Payee: {BUSINESS.name}</p>
-              <p className={cn("font-semibold text-slate-700")}>Account: {BUSINESS_BANK_ACCOUNT}</p>
-              <p className={cn("font-semibold text-slate-700")}>
-                Reference: {form.number || "[invoice number]"}
-              </p>
-              <p className={cn("text-slate-500")}>
-                Due within {BUSINESS_PAYMENT_TERMS_DAYS} days of issue
-                {form.dueDate ? ` (by ${formatDateShort(form.dueDate)}).` : "."}
-              </p>
-            </div>
-
-            {form.notes && <p className={cn("mb-6 text-[11px] text-slate-500")}>{form.notes}</p>}
-
-            {/* Sender contact footer (matches the page-bottom footer in the PDF). */}
-            <div
-              className={cn(
-                "mt-auto border-t border-slate-200 pt-3 text-center text-[10px] text-slate-500",
-              )}
-            >
-              {BUSINESS.email} &nbsp;·&nbsp; {BUSINESS.phone} &nbsp;·&nbsp; {BUSINESS.website}
-              &nbsp;·&nbsp; {BUSINESS.location}
-            </div>
-          </div>
-        </div>
+            Extracted into InvoicePreviewPanel so the calculator's right
+            column can share the exact same layout. */}
+        <InvoicePreviewPanel
+          number={form.number || "DRAFT"}
+          clientName={form.clientName}
+          clientEmail={form.clientEmail}
+          issueDate={form.issueDate}
+          dueDate={form.dueDate}
+          lineItems={form.lineItems}
+          gst={form.gst}
+          notes={form.notes}
+          promoTitle={form.promoTitle}
+          promoDiscount={form.promoDiscount}
+        />
       </div>
     </>
   );

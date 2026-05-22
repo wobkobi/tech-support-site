@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
+import { AiEstimateCategory } from "@prisma/client";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 
 interface LogBody {
@@ -60,8 +61,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!description) return NextResponse.json({ error: "description required" }, { status: 400 });
 
   const aiEstimatedMins = Math.max(0, Math.round(Number(body.aiEstimatedMins) || 0));
-  const aiCategory =
-    typeof body.aiCategory === "string" ? body.aiCategory.slice(0, 32) : "standard";
+  const aiCategory: AiEstimateCategory =
+    body.aiCategory === AiEstimateCategory.complex
+      ? AiEstimateCategory.complex
+      : AiEstimateCategory.standard;
   const aiExplanation =
     typeof body.aiExplanation === "string" ? body.aiExplanation.trim().slice(0, 400) : "";
   const aiTasks = cleanTasks(body.aiTasks);

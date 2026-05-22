@@ -182,6 +182,7 @@ export function InvoiceEditView({ invoice, token }: InvoiceEditViewProps): React
               <option value="DRAFT">Draft</option>
               <option value="SENT">Sent</option>
               <option value="PAID">Paid</option>
+              <option value="VOIDED">Voided</option>
             </select>
           </div>
         </div>

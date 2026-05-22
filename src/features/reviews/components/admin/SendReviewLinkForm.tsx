@@ -8,7 +8,9 @@
 import { useState, useRef } from "react";
 import { cn } from "@/shared/lib/cn";
 import { CopyLinkButton } from "./CopyLinkButton";
-import { toE164NZ, formatNZPhone, isValidPhone } from "@/shared/lib/normalise-phone";
+import { formatNZPhone, validatePhone } from "@/shared/lib/normalise-phone";
+import { EmailInput } from "@/shared/components/EmailInput";
+import { PhoneInput } from "@/shared/components/PhoneInput";
 import type React from "react";
 import { FaCaretLeft } from "react-icons/fa6";
 
@@ -199,8 +201,9 @@ export function SendReviewLinkForm({
     setTimeout(() => setCopied(false), 2000);
   }
 
-  const phoneE164 = toE164NZ(phoneInput);
-  const phoneValid = isValidPhone(phoneE164);
+  const phoneCheck = validatePhone(phoneInput);
+  const phoneE164 = phoneCheck.e164;
+  const phoneValid = phoneCheck.result === "ok";
 
   /**
    * Pre-fills the form fields from a selected contact suggestion.
@@ -354,16 +357,14 @@ export function SendReviewLinkForm({
                     "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-1",
                   )}
                 />
-                <input
-                  type="email"
-                  autoComplete="off"
+                <EmailInput
+                  id="srl-email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={setEmail}
                   placeholder="Email address"
+                  autoComplete="off"
                   required
-                  className={cn(
-                    "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-1",
-                  )}
+                  className={cn("rounded-lg")}
                 />
               </div>
               {error && <p className={cn("text-coquelicot-400 text-xs")}>{error}</p>}
@@ -439,17 +440,14 @@ export function SendReviewLinkForm({
                     "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-1",
                   )}
                 />
-                <input
-                  type="tel"
-                  autoComplete="off"
+                <PhoneInput
+                  id="srl-phone"
                   value={phoneInput}
-                  onChange={(e) => setPhoneInput(e.target.value)}
-                  onBlur={(e) => setPhoneInput(formatNZPhone(e.target.value))}
-                  placeholder="021 123 1234"
-                  className={cn(
-                    "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-1",
-                    phoneInput && !phoneValid ? "border-coquelicot-500/60" : "",
-                  )}
+                  onChange={setPhoneInput}
+                  autoComplete="off"
+                  required
+                  hideError
+                  className={cn("rounded-lg")}
                 />
               </div>
               {phoneInput && (

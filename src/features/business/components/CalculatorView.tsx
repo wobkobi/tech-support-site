@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import type React from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/shared/lib/cn";
@@ -12,11 +12,19 @@ import {
   effectiveHourlyRate,
   composeDescription,
   MIN_TRAVEL_CHARGE,
+  collapseToWindow,
+  hourlyTaskMinutes,
+  timeDiffMins,
+  sessionDurationMins,
+  todayISO,
 } from "@/features/business/lib/business";
+import { BUSINESS_GST_NUMBER, BUSINESS_PAYMENT_TERMS_DAYS } from "@/shared/lib/business-identity";
+import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 import { ContactPickerModal } from "@/features/business/components/ContactPickerModal";
+import { AddToContactsModal } from "@/features/business/components/AddToContactsModal";
 import { ParseConfidenceBanner } from "@/features/business/components/ParseConfidenceBanner";
 import { TaxonomyManageModal } from "@/features/business/components/TaxonomyManageModal";
-import { TotalsPanel } from "@/features/business/components/calculator/TotalsPanel";
+import { InvoicePreviewPanel } from "@/features/business/components/InvoicePreviewPanel";
 import { PartsSection } from "@/features/business/components/calculator/PartsSection";
 import { TravelSection } from "@/features/business/components/calculator/TravelSection";
 import { ClientPickerSection } from "@/features/business/components/calculator/ClientPickerSection";
@@ -30,11 +38,23 @@ import type {
   TaskLine,
   PartLine,
   JobCalculation,
+  JobSession,
   ParseJobResponse,
   ParseJobQuestion,
   GoogleContact,
   TaskTemplate,
 } from "@/features/business/types/business";
+
+/**
+ * Returns the YYYY-MM-DD string for today + n days.
+ * @param n - Number of days to add to today.
+ * @returns ISO date string (YYYY-MM-DD).
+ */
+function addDaysISO(n: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
 
 /**
  * Returns the current local time formatted as HH:MM.
@@ -54,16 +74,51 @@ function addHour(t: string): string {
   return `${String((h + 1) % 24).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 /**
- * Calculates the difference in minutes between two HH:MM time strings.
- * @param start - The start time in HH:MM format.
- * @param end - The end time in HH:MM format.
- * @returns The number of minutes between start and end, or 0 if end is not after start.
+ * Builds a UTC ISO timestamp for an HH:MM start time interpreted as NZ wall-clock.
+ * Defaults to today; if the resulting time has already passed today's wall clock,
+ * rolls forward to tomorrow so quotes for "later today" don't accidentally fall
+ * outside Google's traffic-prediction horizon. Returns null when the input isn't
+ * a valid HH:MM string.
+ * @param hhmm - Start time in HH:MM (24h) NZ wall-clock.
+ * @returns ISO 8601 UTC timestamp, or null.
  */
-function timeDiffMins(start: string, end: string): number {
-  const [sh, sm] = start.split(":").map(Number);
-  const [eh, em] = end.split(":").map(Number);
-  const diff = eh * 60 + em - (sh * 60 + sm);
-  return diff > 0 ? diff : 0;
+function jobStartIsoFromTime(hhmm: string): string | null {
+  if (!/^\d{1,2}:\d{2}$/.test(hhmm)) return null;
+  const [h, m] = hhmm.split(":").map(Number);
+  if (h < 0 || h > 23 || m < 0 || m > 59) return null;
+  const nzDateStr = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Pacific/Auckland",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+  const [y, mo, d] = nzDateStr.split("-").map(Number);
+  const offset = getPacificAucklandOffset(y, mo, d);
+  let utc = new Date(Date.UTC(y, mo - 1, d, h - offset, m, 0));
+  if (utc.getTime() < Date.now()) {
+    utc = new Date(utc.getTime() + 24 * 60 * 60 * 1000);
+  }
+  return utc.toISOString();
+}
+
+/**
+ * Builds a fresh single-session list seeded with the current time as the
+ * start and one hour later as the end. Used for the initial state, Clear,
+ * and the post-income reset.
+ * @returns One-element sessions array.
+ */
+function freshSessions(): JobSession[] {
+  const now = nowTime();
+  return [
+    {
+      label: "Session 1",
+      date: null,
+      startTime: now,
+      endTime: addHour(now),
+      durationMins: null,
+      includeTravel: false,
+    },
+  ];
 }
 
 /**
@@ -107,9 +162,19 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
 
   const [rates, setRates] = useState<RateConfig[]>([]);
   const [taskTemplates, setTaskTemplates] = useState<TaskTemplate[]>([]);
-  const [startTime, setStartTime] = useState<string>("");
-  const [endTime, setEndTime] = useState<string>("");
-  const [durationOverride, setDurationOverride] = useState<number | null>(null);
+  // Sessions are the source of truth for time. Single-session jobs have one
+  // entry and look visually identical to the pre-multi-session UI; multi-
+  // session jobs add more entries via "+ Add session" in JobDetailsSection.
+  const [sessions, setSessions] = useState<JobSession[]>([
+    {
+      label: "Session 1",
+      date: null,
+      startTime: "",
+      endTime: "",
+      durationMins: null,
+      includeTravel: false,
+    },
+  ]);
   const [hourlyRateId, setHourlyRateId] = useState<string | null>(null);
   const [tasks, setTasks] = useState<TaskLine[]>([]);
   const [parts, setParts] = useState<PartLine[]>([]);
@@ -124,7 +189,15 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
   // the invoice without re-picking.
   const [pickedContactName, setPickedContactName] = useState<string | null>(null);
   const [pickedContactCompany, setPickedContactCompany] = useState<string | null>(null);
+  const [pickedContactGoogleId, setPickedContactGoogleId] = useState<string | null>(null);
   const [addressMode, setAddressModeState] = useState<"name" | "company" | "custom">("custom");
+  // Direct-save (Save invoice) state. pendingInvoiceId is set after a
+  // successful POST so handleAddContactClose can PATCH `contactId` once the
+  // modal returns the new Contact's id, then navigate to the detail page.
+  const [savingInvoice, setSavingInvoice] = useState(false);
+  const [saveInvoiceError, setSaveInvoiceError] = useState<string | null>(null);
+  const [pendingInvoiceId, setPendingInvoiceId] = useState<string | null>(null);
+  const [sheetSyncToast, setSheetSyncToast] = useState<string | null>(null);
 
   const [aiInput, setAiInput] = useState("");
   const [parsing, setParsing] = useState(false);
@@ -141,7 +214,6 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
     cost: number;
   } | null>(null);
   const [lookingUpTravel, setLookingUpTravel] = useState(false);
-  const [travelOnInvoice, setTravelOnInvoice] = useState(false);
   const addressInputRef = useRef<HTMLInputElement>(null);
 
   const [showContactPicker, setShowContactPicker] = useState(false);
@@ -180,16 +252,16 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
         });
         listener = autocomplete.addListener("place_changed", () => {
           const place = autocomplete.getPlace();
-          // Prefer suburb (locality) since travel-time looks it up; fall back
-          // to the formatted address.
-          const suburb =
+          // Keep the full formatted address so it matches what the AI phraser
+          // receives; travel-time still resolves a suburb out of the full string.
+          const next =
+            place.formatted_address ??
             place.address_components?.find(
               (c) => c.types.includes("locality") || c.types.includes("sublocality_level_1"),
             )?.long_name ??
-            place.formatted_address ??
             "";
-          if (suburb) {
-            setJobAddress(suburb);
+          if (next) {
+            setJobAddress(next);
             setTravelInfo(null);
           }
         });
@@ -219,8 +291,9 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
         { ok: boolean; templates: TaskTemplate[] },
         { ok: boolean; promo: ActivePromo | null },
       ]) => {
-        setStartTime(now);
-        setEndTime(addHour(now));
+        setSessions((prev) =>
+          prev.map((s, i) => (i === 0 ? { ...s, startTime: now, endTime: addHour(now) } : s)),
+        );
         if (ratesData.ok) {
           setRates(ratesData.rates);
           const def = ratesData.rates.find((r) => r.isDefault);
@@ -232,7 +305,15 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
     );
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const durationMins = durationOverride ?? timeDiffMins(startTime, endTime);
+  const durationMins = sessions.reduce((s, x) => s + sessionDurationMins(x), 0);
+  // Aggregate start/end - sort by date+startTime so out-of-order operator
+  // entries still produce sensible aggregates (used for the travel-time
+  // departure ISO and the JobCalculation handoff).
+  const sortedSessions = [...sessions].sort((a, b) =>
+    `${a.date ?? ""}${a.startTime}`.localeCompare(`${b.date ?? ""}${b.startTime}`),
+  );
+  const aggregateStartTime = sortedSessions[0]?.startTime ?? "";
+  const aggregateEndTime = sortedSessions[sortedSessions.length - 1]?.endTime ?? "";
   const hourlyRate = matchRateById(rates, hourlyRateId);
   // Base hourly rates (e.g. Standard $65/hr) — used for the top-level Time
   // selector and as the per-task base rate.
@@ -245,47 +326,111 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
   const flatRates = rates.filter((r) => r.flatRate !== null);
 
   const job: JobCalculation = {
-    startTime,
-    endTime,
+    startTime: aggregateStartTime,
+    endTime: aggregateEndTime,
     durationMins,
     hourlyRate,
     tasks,
     parts,
-    travelCost: travelOnInvoice && travelInfo ? travelInfo.cost : null,
+    // travelCost is the per-trip cost; jobToLineItems and calcJobTotal
+    // multiply by the count of sessions where includeTravel is true.
+    travelCost: travelInfo?.cost ?? null,
     notes,
     gst,
     clientName,
     clientEmail,
+    sessions,
   };
   const totals = calcJobTotal(job, !skipPromo ? activePromo : null);
+  // Memoise the flattened line items so the preview panel's React.memo can
+  // skip re-render when unrelated parent state changes (e.g. typing in the
+  // AI input box). Recomputes when any meaningful input shifts.
+  const previewLineItems = useMemo(
+    () => jobToLineItems(job),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [tasks, parts, sessions, hourlyRate, travelInfo, gst, clientName, clientEmail, notes],
+  );
 
   /**
-   * Applies a parsed job response to the calculator state, setting duration, hourly rate, tasks,
-   * parts, and notes from the AI parse result.
+   * Applies a parsed job response to the calculator state, hydrating sessions
+   * + tasks + parts + notes from the AI parse result. Per-session
+   * `includeTravel` defaults: true when the round-trip cost clears
+   * MIN_TRAVEL_CHARGE, false otherwise. Operators can flip the checkbox per
+   * session after the fact.
    * @param result - The parsed job response returned by the AI.
-   * @param rateList - The current list of rate configurations (unused directly but kept for future use).
+   * @param rateList - The current list of rate configurations (used for travel rate lookup).
    */
   const applyParseResult = useCallback((result: ParseJobResponse, rateList: RateConfig[]) => {
-    if (result.startTime && result.endTime) {
-      setStartTime(result.startTime);
-      setEndTime(result.endTime);
-      // Use durationMins as override when the AI provided it explicitly - handles multi-session
-      // work where billed time is less than wall-clock diff due to gaps between sessions.
-      setDurationOverride(result.durationMins ?? null);
+    // Compute the would-be travel cost first so we can seed each session's
+    // includeTravel default to a sensible value before render.
+    let travelCostForDefault = 0;
+    if (result.travel && result.travel.distanceKm > 0) {
+      const travelRate = rateList.find((r) => r.unit === "km" && r.flatRate !== null);
+      const ratePerKm = travelRate?.flatRate ?? 1.2;
+      travelCostForDefault = Math.round(result.travel.distanceKm * ratePerKm * 100) / 100;
+    }
+    const includeTravelDefault = travelCostForDefault >= MIN_TRAVEL_CHARGE;
+
+    // Hydrate sessions. The parser always returns at least one session when
+    // start/end could be resolved; otherwise we fall back to synthesising one
+    // from the flat startTime/endTime/durationMins shape.
+    let nextSessions: JobSession[] | null = null;
+    if (result.sessions && result.sessions.length > 0) {
+      nextSessions = result.sessions.map((ps, i) => ({
+        label: ps.label ?? `Session ${i + 1}`,
+        date: ps.date ?? null,
+        startTime: ps.startTime,
+        endTime: ps.endTime,
+        durationMins: ps.durationMins ?? null,
+        includeTravel: includeTravelDefault,
+      }));
+    } else if (result.startTime && result.endTime) {
+      // Clamp: AI sometimes inflates durationMins from its own task estimates
+      // (e.g. 50 min for a 9-9:30 span). Wall-clock is the ceiling; gaps only
+      // reduce billable time, never increase it.
+      const wallClockMin = timeDiffMins(result.startTime, result.endTime);
+      const aiMin = result.durationMins ?? null;
+      const durationOverride = aiMin != null && aiMin < wallClockMin ? aiMin : null;
+      nextSessions = [
+        {
+          label: "Session 1",
+          date: null,
+          startTime: result.startTime,
+          endTime: result.endTime,
+          durationMins: durationOverride,
+          includeTravel: includeTravelDefault,
+        },
+      ];
     } else if (result.startTime) {
-      setStartTime(result.startTime);
-      setEndTime(nowTime());
-      setDurationOverride(null);
+      nextSessions = [
+        {
+          label: "Session 1",
+          date: null,
+          startTime: result.startTime,
+          endTime: nowTime(),
+          durationMins: null,
+          includeTravel: includeTravelDefault,
+        },
+      ];
     } else if (result.durationMins !== null) {
       const now = new Date();
       const endTotalMins = now.getHours() * 60 + now.getMinutes();
       const startTotalMins = Math.max(0, endTotalMins - result.durationMins);
       const sh = Math.floor(startTotalMins / 60);
       const sm = startTotalMins % 60;
-      setStartTime(`${String(sh).padStart(2, "0")}:${String(sm).padStart(2, "0")}`);
-      setEndTime(nowTime());
-      setDurationOverride(null);
+      nextSessions = [
+        {
+          label: "Session 1",
+          date: null,
+          startTime: `${String(sh).padStart(2, "0")}:${String(sm).padStart(2, "0")}`,
+          endTime: nowTime(),
+          durationMins: null,
+          includeTravel: includeTravelDefault,
+        },
+      ];
     }
+    if (nextSessions) setSessions(nextSessions);
+
     setHourlyRateId(result.hourlyRateId);
     const parsedTasks: TaskLine[] = result.tasks.map((t) => {
       const device = t.device ?? null;
@@ -310,6 +455,7 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
         device,
         action,
         details,
+        isShort: t.isShort ?? false,
       };
     });
     const parsedParts = result.parts.map((p) => ({ description: p.description, cost: p.cost }));
@@ -331,17 +477,44 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
         durationMins: result.travel.durationMins,
         cost,
       });
-      // Auto-add only if the trip is worth charging for. Short trips (cost
-      // below MIN_TRAVEL_CHARGE) still show the calculated travelInfo so the
-      // operator can manually opt in via the Add to invoice button if they
-      // want, but the default is to skip the line item.
-      // Preserve a user-set `true`: if the operator has already added travel
-      // to the invoice, a re-parse shouldn't silently flip it back off.
-      setTravelOnInvoice((prev) => prev || cost >= MIN_TRAVEL_CHARGE);
+      // Per-session includeTravel defaults were already seeded above based on
+      // travelCostForDefault; nothing extra to do here. Short trips (cost
+      // below MIN_TRAVEL_CHARGE) leave all session checkboxes off - the
+      // operator can manually tick a session to bill anyway.
     } else {
-      setTravelOnInvoice(false);
+      // No travel from parse: clear includeTravel on every session so a
+      // previous parse's "drove to X" result doesn't leak through after the
+      // operator reparses with "walked instead".
+      setSessions((prev) => prev.map((s) => ({ ...s, includeTravel: false })));
     }
-    setTasks(parsedTasks);
+    // Rebalance parsed tasks to fit the listed window so an AI over-estimating
+    // a single step doesn't silently over-bill. Tasks scale proportionally so
+    // the over-long ones absorb more of the correction; anything that scales
+    // below the minimum is dropped and the rest rescale. When sessions are
+    // populated, the rebalance window is the sum of session durations (matches
+    // the aggregate `durationMins` consumed everywhere else).
+    const sessionsWindowMin = nextSessions?.reduce((s, x) => s + sessionDurationMins(x), 0) ?? 0;
+    const wallClockMin =
+      result.startTime && result.endTime ? timeDiffMins(result.startTime, result.endTime) : 0;
+    const aiDurationMins = result.durationMins ?? 0;
+    const parseWindowMin =
+      sessionsWindowMin > 0
+        ? sessionsWindowMin
+        : wallClockMin > 0
+          ? aiDurationMins > 0 && aiDurationMins < wallClockMin
+            ? aiDurationMins
+            : wallClockMin
+          : aiDurationMins;
+    const collapsed = collapseToWindow(parsedTasks, parseWindowMin);
+    setTasks(collapsed.tasks);
+    if (collapsed.rescaled || collapsed.dropped > 0) {
+      const parts: string[] = ["Rebalanced tasks"];
+      if (collapsed.dropped > 0) {
+        parts.push(`(dropped ${collapsed.dropped} tiny task${collapsed.dropped === 1 ? "" : "s"})`);
+      }
+      setIncomeToast(`${parts.join(" ")} to fit the ${parseWindowMin}-min window.`);
+      setTimeout(() => setIncomeToast(null), 4000);
+    }
     setParts(parsedParts);
     if (result.notes) setNotes(result.notes);
   }, []);
@@ -466,31 +639,111 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
   }
 
   /**
-   * Saves task templates then navigates to the new-invoice page with the job pre-populated.
+   * Closes the add-to-contacts modal after a direct save. If the modal
+   * created a Contact, PATCH the just-saved invoice with that contact's id
+   * before navigating to the detail page. Best-effort backfill - the invoice
+   * still navigates without the FK if PATCH fails.
+   * @param contactDbId - DB id returned by the modal when the operator
+   *   confirmed and a Contact was created. Null on dismiss / failure.
    */
-  async function handleCreateInvoice(): Promise<void> {
-    await saveTaskTemplates(tasks);
-    const lineItems = jobToLineItems(job);
-    const q = new URLSearchParams({
-      clientName,
-      clientEmail,
-      lineItems: JSON.stringify(lineItems),
-      gst: String(gst),
-      notes,
-    });
-    // Carry the picked-contact + address-mode across so the InvoiceBuilder
-    // restores the same Name/Company/Custom toggle state the operator chose
-    // here, no re-picking.
-    if (pickedContactName) q.set("pickedContactName", pickedContactName);
-    if (pickedContactCompany) q.set("pickedContactCompany", pickedContactCompany);
-    if (pickedContactName) q.set("addressMode", addressMode);
-    // Pass promo snapshot to InvoiceBuilder; skipPromo=1 carries the opt-out.
-    if (activePromo && !skipPromo && totals.promoDiscount > 0) {
-      q.set("promoTitle", activePromo.title);
-      q.set("promoDiscount", String(totals.promoDiscount));
+  async function handleAddContactClose(contactDbId?: string | null): Promise<void> {
+    const invoiceId = pendingInvoiceId;
+    if (!invoiceId) return;
+    setPendingInvoiceId(null);
+    if (contactDbId) {
+      try {
+        await fetch(`/api/business/invoices/${invoiceId}`, {
+          method: "PATCH",
+          headers: { ...headers, "content-type": "application/json" },
+          body: JSON.stringify({ contactId: contactDbId }),
+        });
+      } catch {
+        // Best-effort backfill; the invoice still saves without the FK.
+      }
     }
-    if (skipPromo) q.set("skipPromo", "1");
-    router.push(`/admin/business/invoices/new?token=${encodeURIComponent(token)}&${q.toString()}`);
+    router.push(`/admin/business/invoices/${invoiceId}?token=${encodeURIComponent(token)}`);
+  }
+
+  /**
+   * Direct save: POSTs the calculator state straight to the invoices API and
+   * navigates to the detail page. Bypasses InvoiceBuilderView entirely. Used
+   * by the "Save invoice" button - the primary action when the operator is
+   * happy with the live preview and doesn't need to override the invoice
+   * number / issue date / due date.
+   *
+   * Backdating / custom invoice number / custom due date is handled by
+   * editing a saved DRAFT after the fact (the [id]/edit route).
+   */
+  async function handleSaveInvoice(): Promise<void> {
+    setSaveInvoiceError(null);
+    if (!clientName.trim()) {
+      setSaveInvoiceError("Client name is required.");
+      return;
+    }
+    if (!clientEmail.trim()) {
+      setSaveInvoiceError("Client email is required.");
+      return;
+    }
+    if (totals.subtotal <= 0) {
+      setSaveInvoiceError("Add a task or line item with a price before saving.");
+      return;
+    }
+    setSavingInvoice(true);
+    try {
+      await saveTaskTemplates(tasks);
+      const lineItems = jobToLineItems(job);
+      const promoActive = activePromo && !skipPromo && totals.promoDiscount > 0;
+      const res = await fetch("/api/business/invoices", {
+        method: "POST",
+        headers: { ...headers, "content-type": "application/json" },
+        body: JSON.stringify({
+          clientName,
+          clientEmail,
+          lineItems,
+          gst,
+          notes: notes || null,
+          promoTitle: promoActive ? activePromo.title : null,
+          promoDiscount: promoActive ? totals.promoDiscount : null,
+          // issueDate, dueDate, number all defaulted server-side.
+        }),
+      });
+      const d = (await res.json()) as
+        | {
+            ok: true;
+            invoice: { id: string };
+            sheetSyncWarning?: boolean;
+          }
+        | { error: string };
+      if ("error" in d) throw new Error(d.error);
+      if (d.sheetSyncWarning) {
+        setSheetSyncToast("Invoice saved - sheet counter sync failed. Update SETTINGS!B17.");
+        setTimeout(() => setSheetSyncToast(null), 6000);
+      }
+      const invoiceId = d.invoice.id;
+      // Add-to-contacts gate: same flow as InvoiceBuilderView. Defer nav
+      // until the modal closes so handleAddContactClose can backfill
+      // contactId via PATCH.
+      if (clientEmail.trim()) {
+        try {
+          const checkRes = await fetch(
+            `/api/admin/contacts/check?email=${encodeURIComponent(clientEmail.trim())}`,
+            { headers },
+          );
+          const checkData = (await checkRes.json()) as { exists?: boolean };
+          if (checkRes.ok && checkData.exists === false) {
+            setPendingInvoiceId(invoiceId);
+            setSavingInvoice(false);
+            return;
+          }
+        } catch {
+          // Fall through to navigate.
+        }
+      }
+      router.push(`/admin/business/invoices/${invoiceId}?token=${encodeURIComponent(token)}`);
+    } catch (err) {
+      setSaveInvoiceError(err instanceof Error ? err.message : "Could not save invoice");
+      setSavingInvoice(false);
+    }
   }
 
   /**
@@ -515,7 +768,7 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
     if (d.ok) {
       setIncomeToast("Income entry saved.");
       setTimeout(() => setIncomeToast(null), 3000);
-      setDurationOverride(null);
+      setSessions(freshSessions());
       setTasks([]);
       setParts([]);
       setNotes("");
@@ -535,12 +788,19 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
     if (!jobAddress.trim()) return;
     setLookingUpTravel(true);
     setTravelInfo(null);
-    setTravelOnInvoice(false);
+    // Clear includeTravel on every session so a fresh lookup doesn't silently
+    // bill travel before the operator has seen the new cost. Operator ticks
+    // the session(s) they want to bill via the per-session checkbox.
+    setSessions((prev) => prev.map((s) => ({ ...s, includeTravel: false })));
     try {
+      const departureTimeIso = jobStartIsoFromTime(aggregateStartTime);
       const res = await fetch("/api/pricing/travel-time", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ destination: jobAddress }),
+        body: JSON.stringify({
+          destination: jobAddress,
+          ...(departureTimeIso ? { departureTimeIso } : {}),
+        }),
       });
       const d = (await res.json()) as { distanceKm?: number; durationMins?: number };
       if (d.distanceKm && d.distanceKm > 0) {
@@ -557,17 +817,6 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
       // silently ignore - travel is optional
     }
     setLookingUpTravel(false);
-  }
-
-  /**
-   * Marks the travel charge as included in the invoice total. Unlike the
-   * parse-result handler, this intentionally bypasses MIN_TRAVEL_CHARGE: the
-   * operator has clicked the button after seeing the cost, so it's an
-   * explicit override of the auto-skip-short-trips default.
-   */
-  function addTravelToInvoice(): void {
-    if (!travelInfo) return;
-    setTravelOnInvoice(true);
   }
 
   // Rate management
@@ -778,9 +1027,20 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
             setClientEmail(c.email);
             setPickedContactName(c.name);
             setPickedContactCompany(company);
+            setPickedContactGoogleId(c.id || null);
             setAddressModeState("name");
           }}
           onClose={() => setShowContactPicker(false)}
+        />
+      )}
+
+      {pendingInvoiceId && (
+        <AddToContactsModal
+          token={token}
+          name={clientName}
+          email={clientEmail}
+          googleContactId={pickedContactGoogleId}
+          onClose={(contactDbId) => void handleAddContactClose(contactDbId)}
         />
       )}
 
@@ -954,16 +1214,13 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
 
           {/* Time */}
           <JobDetailsSection
-            startTime={startTime}
-            onStartTimeChange={setStartTime}
-            endTime={endTime}
-            onEndTimeChange={setEndTime}
-            durationOverride={durationOverride}
-            onDurationOverrideChange={setDurationOverride}
+            sessions={sessions}
+            onSessionsChange={setSessions}
             durationMins={durationMins}
             hourlyRateId={hourlyRateId}
             onHourlyRateIdChange={setHourlyRateId}
             baseRates={baseRates}
+            hasTravelInfo={travelInfo !== null}
           />
 
           {/* Travel */}
@@ -974,13 +1231,20 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
             travelInfo={travelInfo}
             onTravelInfoChange={setTravelInfo}
             lookingUpTravel={lookingUpTravel}
-            travelOnInvoice={travelOnInvoice}
-            onTravelOnInvoiceChange={setTravelOnInvoice}
             onLookup={() => void handleTravelLookup()}
-            onAddToInvoice={addTravelToInvoice}
           />
 
-          {/* Tasks */}
+          {/* Tasks - inline warning when hourly task minutes drift from the
+              listed job window. AI parses auto-collapse in applyParseResult,
+              so this only fires on manual edits or window changes. */}
+          <TaskTimeWarning
+            tasks={tasks}
+            windowMin={durationMins}
+            onFix={() => {
+              const collapsed = collapseToWindow(tasks, durationMins);
+              setTasks(collapsed.tasks);
+            }}
+          />
           <TasksSection
             tasks={tasks}
             onTasksChange={setTasks}
@@ -1017,15 +1281,47 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
           </div>
         </div>
 
-        {/* RIGHT column - live summary */}
+        {/* RIGHT column - live invoice preview (replaces the legacy Summary
+            panel - same totals, just inside the actual invoice layout). */}
         <div className={cn("space-y-4")}>
-          <TotalsPanel
-            durationMins={durationMins}
-            hourlyRate={hourlyRate}
-            totals={totals}
-            activePromo={activePromo}
+          {/* Inline GST toggle - previously lived inside TotalsPanel. Visible
+              hint when GST is off and we're GST-registered so we don't ship a
+              non-tax-invoice by accident. */}
+          <div className={cn("rounded-xl border border-slate-200 bg-white p-4 shadow-sm")}>
+            <label className={cn("flex cursor-pointer items-center gap-2 text-sm")}>
+              <input
+                type="checkbox"
+                checked={gst}
+                onChange={(e) => setGst(e.target.checked)}
+                className={cn(
+                  "text-russian-violet focus:ring-russian-violet/30 h-4 w-4 rounded border-slate-300",
+                )}
+              />
+              <span className={cn("font-medium text-slate-700")}>Charge GST (15%)</span>
+            </label>
+            {!gst && BUSINESS_GST_NUMBER && (
+              <p className={cn("mt-2 text-xs italic text-amber-700")}>
+                GST is off - the invoice will read "INVOICE" rather than "TAX INVOICE" and no GST
+                line will be added.
+              </p>
+            )}
+          </div>
+
+          <InvoicePreviewPanel
+            number="DRAFT"
+            clientName={clientName}
+            clientEmail={clientEmail}
+            issueDate={todayISO()}
+            dueDate={addDaysISO(BUSINESS_PAYMENT_TERMS_DAYS)}
+            lineItems={previewLineItems}
             gst={gst}
-            onGstChange={setGst}
+            notes={notes}
+            promoTitle={
+              activePromo && !skipPromo && totals.promoDiscount > 0 ? activePromo.title : null
+            }
+            promoDiscount={
+              activePromo && !skipPromo && totals.promoDiscount > 0 ? totals.promoDiscount : 0
+            }
           />
 
           {/* Client */}
@@ -1052,27 +1348,48 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
                 {incomeToast}
               </div>
             )}
+            {sheetSyncToast && (
+              <div
+                className={cn(
+                  "rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800",
+                )}
+              >
+                {sheetSyncToast}
+              </div>
+            )}
+            {saveInvoiceError && (
+              <p
+                className={cn(
+                  "rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700",
+                )}
+              >
+                {saveInvoiceError}
+              </p>
+            )}
             <button
-              onClick={handleCreateInvoice}
+              onClick={() => void handleSaveInvoice()}
+              disabled={savingInvoice || parsing}
+              suppressHydrationWarning
               className={cn(
-                "bg-russian-violet w-full rounded-lg px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90",
+                "bg-russian-violet w-full rounded-lg px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50",
               )}
             >
-              Create invoice from this job
+              {savingInvoice ? "Saving..." : "Save invoice"}
             </button>
             <button
               onClick={handleSaveIncome}
               suppressHydrationWarning
-              disabled={savingIncome || totals.subtotal === 0}
+              disabled={savingIncome || totals.subtotal === 0 || savingInvoice}
+              title="For cash jobs handled outside the invoice flow."
               className={cn(
-                "w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50",
+                "w-full rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-50",
               )}
             >
               {savingIncome ? "Saving..." : "Save as income entry"}
             </button>
             <button
               onClick={() => {
-                setDurationOverride(null);
+                setSessions(freshSessions());
                 setTasks([]);
                 setParts([]);
                 setNotes("");
@@ -1097,5 +1414,60 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
         </div>
       </div>
     </>
+  );
+}
+
+interface TaskTimeWarningProps {
+  tasks: TaskLine[];
+  windowMin: number;
+  onFix: () => void;
+}
+
+/**
+ * Inline banner shown above the tasks panel when hourly task minutes don't
+ * match the listed job window. Stays hidden when the totals line up so the
+ * panel doesn't have a permanent strip of UI in the steady state.
+ * @param props - Component props.
+ * @param props.tasks - Current task lines (hourly + flat).
+ * @param props.windowMin - Job window in minutes (`durationMins`).
+ * @param props.onFix - Handler that collapses hourly tasks to fit the window.
+ * @returns Warning element, or null when totals already match.
+ */
+function TaskTimeWarning({
+  tasks,
+  windowMin,
+  onFix,
+}: TaskTimeWarningProps): React.ReactElement | null {
+  if (windowMin <= 0) return null;
+  const taskMin = hourlyTaskMinutes(tasks);
+  if (taskMin === windowMin) return null;
+  if (taskMin === 0) return null;
+  const over = taskMin > windowMin;
+  return (
+    <div
+      role="status"
+      className={cn(
+        "mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm",
+        over
+          ? "border-amber-200 bg-amber-50 text-amber-900"
+          : "border-sky-200 bg-sky-50 text-sky-900",
+      )}
+    >
+      <span>
+        Tasks total {Math.round(taskMin)} min - listed window is {windowMin} min.
+        {!over && " Bump the end time if you actually worked the extra."}
+      </span>
+      {over && (
+        <button
+          type="button"
+          onClick={onFix}
+          className={cn(
+            "rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100",
+          )}
+        >
+          Fix - rebalance tasks
+        </button>
+      )}
+    </div>
   );
 }

@@ -70,6 +70,9 @@ export interface CalendarEvent {
   description?: string;
   location?: string;
   calendarEmail: string; // Which calendar this event is from
+  // Parent series ID when this event is a recurring instance (from Google Calendar
+  // singleEvents expansion). Stable across all occurrences of the same series.
+  recurringEventId?: string;
 }
 
 /**
@@ -154,6 +157,44 @@ export async function deleteBookingEvent(params: { eventId: string }): Promise<v
 }
 
 /**
+ * Creates an all-day "Busy" event on the booking calendar to block out the day
+ * for new bookings. The existing fetchAllCalendarEvents path treats non-personal
+ * all-day events as full-day blockers, so this is the same shape Harrison was
+ * already making by hand.
+ * @param params - Create parameters.
+ * @param params.dateKey - NZ-local YYYY-MM-DD for the day to block.
+ * @param params.summary - Event title (defaults to "Busy").
+ * @returns Created event id.
+ */
+export async function createBlockedDayEvent(params: {
+  dateKey: string;
+  summary?: string;
+}): Promise<{ eventId: string }> {
+  const calendar = getCalendarClient();
+
+  // All-day events use YYYY-MM-DD strings and an exclusive end date.
+  const [y, m, d] = params.dateKey.split("-").map(Number);
+  const next = new Date(Date.UTC(y, m - 1, d + 1, 12, 0, 0));
+  const endDateKey = next.toISOString().slice(0, 10);
+
+  const response = await calendar.events.insert({
+    calendarId: getBookingCalendarId(),
+    requestBody: {
+      summary: params.summary ?? "Busy",
+      start: { date: params.dateKey },
+      end: { date: endDateKey },
+      transparency: "opaque",
+    },
+  });
+
+  if (!response.data.id) {
+    throw new Error("Failed to create blocked-day event - no event ID returned");
+  }
+
+  return { eventId: response.data.id };
+}
+
+/**
  * Fetches all calendar events from specified calendars (no list permission needed)
  * @param startDate - Start of range
  * @param endDate - End of range
@@ -206,6 +247,7 @@ export async function fetchAllCalendarEvents(
             description: event.description || undefined,
             location: event.location || undefined,
             calendarEmail: calendarId,
+            recurringEventId: event.recurringEventId || undefined,
           });
         } else if (event.start?.date && event.end?.date && !isPersonal) {
           // All-day event from a non-personal calendar - block the full NZ day(s).
@@ -227,6 +269,7 @@ export async function fetchAllCalendarEvents(
             description: event.description || undefined,
             location: event.location || undefined,
             calendarEmail: calendarId,
+            recurringEventId: event.recurringEventId || undefined,
           });
         }
         // All-day events from the personal calendar are intentionally skipped

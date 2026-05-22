@@ -10,6 +10,7 @@ import {
   FaStar,
   FaAddressBook,
   FaCalendarDays,
+  FaCalendarWeek,
   FaRoute,
   FaBriefcase,
   FaArrowTrendUp,
@@ -28,6 +29,7 @@ export type AdminPage =
   | "dashboard"
   | "reviews"
   | "contacts"
+  | "schedule"
   | "bookings"
   | "travel"
   | "price-estimates"
@@ -64,6 +66,12 @@ const NAV_ITEMS: NavItem[] = [
     label: "Contacts",
     icon: <FaAddressBook className={cn("shrink-0")} />,
     path: "/admin/contacts",
+  },
+  {
+    page: "schedule",
+    label: "Schedule",
+    icon: <FaCalendarWeek className={cn("shrink-0")} />,
+    path: "/admin/schedule",
   },
   {
     page: "bookings",

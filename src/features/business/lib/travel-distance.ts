@@ -13,6 +13,9 @@ interface DistanceMatrixElement {
   status: string;
   duration: { value: number; text: string };
   distance: { value: number; text: string };
+  // Present only when departure_time is set on the request - reflects Google's
+  // best-guess traffic prediction at that time.
+  duration_in_traffic?: { value: number; text: string };
 }
 
 interface DistanceMatrixResponse {
@@ -44,12 +47,18 @@ export type DriveDistanceResult =
 /**
  * Looks up driving distance + duration from HOME_ADDRESS to the given
  * destination. Appends ", New Zealand" to the destination string so the
- * Distance Matrix API resolves NZ addresses reliably.
+ * Distance Matrix API resolves NZ addresses reliably. When `departureTime`
+ * is supplied, asks Google for traffic-aware duration at that time and
+ * prefers `duration_in_traffic` over the free-flow `duration`.
  * @param destination - Free-text destination address (1-100 chars).
+ * @param departureTime - Optional intended departure time for traffic-aware lookup.
  * @returns Discriminated result so callers can tell misconfig (operator
  *   error, should surface) from a legitimate no-match (charge $0 travel).
  */
-export async function lookupDriveDistance(destination: string): Promise<DriveDistanceResult> {
+export async function lookupDriveDistance(
+  destination: string,
+  departureTime?: Date,
+): Promise<DriveDistanceResult> {
   const origin = process.env.HOME_ADDRESS;
   // Server-only key (no referrer restriction) preferred; falls back to the
   // client key when the split env isn't set up.
@@ -67,6 +76,13 @@ export async function lookupDriveDistance(destination: string): Promise<DriveDis
   url.searchParams.set("key", apiKey);
   url.searchParams.set("units", "metric");
 
+  // Distance Matrix only accepts departure_time in the future (or "now"). If
+  // the caller asked for a past time, drop it and let Google use real-time.
+  if (departureTime && departureTime.getTime() > Date.now()) {
+    url.searchParams.set("departure_time", Math.floor(departureTime.getTime() / 1000).toString());
+    url.searchParams.set("traffic_model", "best_guess");
+  }
+
   try {
     const res = await fetch(url.toString());
     if (!res.ok) return { status: "error" };
@@ -74,9 +90,10 @@ export async function lookupDriveDistance(destination: string): Promise<DriveDis
     const element = data?.rows?.[0]?.elements?.[0];
     if (element?.status !== "OK") return { status: "no_match" };
 
-    // Google has been known to return OK with missing nested fields for some
-    // address shapes; verify both before doing arithmetic on them.
-    const durationValue = element.duration?.value;
+    // Prefer the traffic-aware duration when Google returned one; fall back
+    // to free-flow duration otherwise. Google may omit duration_in_traffic
+    // for far-future departure times outside its prediction horizon.
+    const durationValue = element.duration_in_traffic?.value ?? element.duration?.value;
     const distanceValue = element.distance?.value;
     if (typeof durationValue !== "number" || typeof distanceValue !== "number") {
       return { status: "no_match" };
