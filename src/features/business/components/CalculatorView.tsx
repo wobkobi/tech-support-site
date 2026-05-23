@@ -11,12 +11,12 @@ import {
   matchRateById,
   effectiveHourlyRate,
   composeDescription,
-  MIN_TRAVEL_CHARGE,
   collapseToWindow,
   hourlyTaskMinutes,
   timeDiffMins,
   todayISO,
 } from "@/features/business/lib/business";
+import { calcTravelCharge } from "@/features/business/lib/pricing-policy";
 import { BUSINESS_PAYMENT_TERMS_DAYS } from "@/shared/lib/business-identity";
 import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 import { ContactPickerModal } from "@/features/business/components/ContactPickerModal";
@@ -333,21 +333,16 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
   /**
    * Applies a parsed job response to the calculator state, hydrating time +
    * tasks + parts + notes from the AI parse result. The auto travel entry is
-   * created only when the round-trip cost clears MIN_TRAVEL_CHARGE; the
-   * operator can add a manual entry afterwards if they want to bill anyway.
+   * created whenever the parser found any drive time; calcTravelCharge applies
+   * the $10 minimum so a 1-min drive still bills the published floor.
    * @param result - The parsed job response returned by the AI.
    * @param rateList - The current list of rate configurations (used for travel rate lookup).
    */
   const applyParseResult = useCallback((result: ParseJobResponse, rateList: RateConfig[]) => {
-    // Compute the would-be travel cost first so we can gate the auto entry
-    // before render.
-    let travelCostForDefault = 0;
-    if (result.travel && result.travel.distanceKm > 0) {
-      const travelRate = rateList.find((r) => r.unit === "km" && r.flatRate !== null);
-      const ratePerKm = travelRate?.flatRate ?? 1.2;
-      travelCostForDefault = Math.round(result.travel.distanceKm * ratePerKm * 100) / 100;
-    }
-    const includeTravelDefault = travelCostForDefault >= MIN_TRAVEL_CHARGE;
+    // Add the auto travel entry when the parser found any drive time. The
+    // $10 floor in calcTravelCharge handles the petty-billing concern - a
+    // 1-min drive still bills $10 because that's the published minimum.
+    const includeTravelDefault = (result.travel?.durationMins ?? 0) > 0;
 
     // Hydrate the time slots. Prefer the per-range list when the parser found
     // segments; otherwise synthesise one slot from startTime/endTime, or as a
@@ -432,21 +427,15 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
     // so the operator doesn't have to re-type them after every AI tweak.
     setJobAddress(result.destination ?? "");
 
-    if (
-      result.travel &&
-      result.travel.distanceKm > 0 &&
-      // Skip the auto entry for very-short trips (below the minimum charge);
-      // the operator can still add a manual entry if they want to bill anyway.
-      includeTravelDefault
-    ) {
-      const travelRate = rateList.find((r) => r.unit === "km" && r.flatRate !== null);
-      const ratePerKm = travelRate?.flatRate ?? 1.2;
-      const cost = Math.round(result.travel.distanceKm * ratePerKm * 100) / 100;
-      const label = result.destination?.trim() || `${result.travel.distanceKm} km`;
+    if (result.travel && includeTravelDefault) {
+      const travelRatePerHour =
+        rateList.find((r) => r.unit === "travel-hour" && r.ratePerHour !== null)?.ratePerHour ?? 40;
+      const cost = calcTravelCharge(result.travel.durationMins, travelRatePerHour);
+      const label = result.destination?.trim() || `${result.travel.durationMins} min drive`;
       setTravelEntries((prev) => [{ label, cost, isAuto: true }, ...prev.filter((e) => !e.isAuto)]);
     } else {
-      // No billable travel from parse: drop any stale auto entry, leave
-      // manual entries alone.
+      // No drive time from the parse (remote work or geocode-to-origin): drop
+      // any stale auto entry, leave manual entries alone.
       setTravelEntries((prev) => prev.filter((e) => !e.isAuto));
     }
     // Rebalance parsed tasks to fit the listed window so an AI over-estimating
@@ -736,8 +725,8 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
   /**
    * Calls the travel-time API with the current job address and replaces the
    * single auto travel entry. Manual entries (parking, etc.) are preserved.
-   * Trips below MIN_TRAVEL_CHARGE leave no auto entry - the operator can
-   * still add a manual one if they want to bill anyway.
+   * Drive time of 0 (geocoded to origin or no match) leaves no auto entry;
+   * any non-zero drive time bills the $10 minimum via calcTravelCharge.
    */
   async function handleTravelLookup(): Promise<void> {
     if (!jobAddress.trim()) return;
@@ -756,18 +745,17 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
         }),
       });
       const d = (await res.json()) as { distanceKm?: number; durationMins?: number };
-      if (d.distanceKm && d.distanceKm > 0) {
-        const travelRate = rates.find((r) => r.unit === "km" && r.flatRate !== null);
-        const ratePerKm = travelRate?.flatRate ?? 1.2;
-        const roundTripKm = Math.round(d.distanceKm * 2 * 10) / 10;
-        const cost = Math.round(roundTripKm * ratePerKm * 100) / 100;
-        if (cost >= MIN_TRAVEL_CHARGE) {
-          const label = jobAddress.trim() || `${roundTripKm} km`;
-          setTravelEntries((prev) => [
-            { label, cost, isAuto: true },
-            ...prev.filter((e) => !e.isAuto),
-          ]);
-        }
+      if (d.durationMins && d.durationMins > 0) {
+        const travelRatePerHour =
+          rates.find((r) => r.unit === "travel-hour" && r.ratePerHour !== null)?.ratePerHour ?? 40;
+        // calcTravelCharge doubles to round-trip internally and floors at
+        // MIN_TRAVEL_CHARGE, so a 1-min drive still bills the $10 minimum.
+        const cost = calcTravelCharge(d.durationMins, travelRatePerHour);
+        const label = jobAddress.trim() || `${d.durationMins} min drive`;
+        setTravelEntries((prev) => [
+          { label, cost, isAuto: true },
+          ...prev.filter((e) => !e.isAuto),
+        ]);
       }
     } catch {
       // silently ignore - travel is optional

@@ -3,7 +3,7 @@ export interface RateConfig {
   label: string;
   /** Set on base hourly rates (e.g. Standard $65/hr). Null on modifiers and flat rates. */
   ratePerHour: number | null;
-  /** Set on flat rates (e.g. Travel $1.20/km). Null on hourly bases and modifiers. */
+  /** Set on flat per-unit rates (e.g. legacy Travel $1.20/km row before the time-based switch). Null on hourly bases and modifiers. */
   flatRate: number | null;
   /** Set on modifier rates (signed $/hr delta, e.g. -10 for At home). Null on bases and flat rates. */
   hourlyDelta: number | null;
