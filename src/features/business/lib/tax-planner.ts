@@ -12,12 +12,12 @@
  */
 
 /**
- * Whether the business is GST-registered. NZ requires registration once
- * turnover crosses $60k/year. While false, the dashboard hides the GST card
- * entirely (the planner still computes the figures so they're a one-line UI
- * change to surface). Flip to `true` here when registered.
+ * Re-exported from pricing-policy.ts so the planner and the invoice engine
+ * share one source of truth for GST registration. Flip the flag in
+ * pricing-policy.ts when registered (and set the BUSINESS_GST_NUMBER env var
+ * alongside it - the invoice header keys on the env var).
  */
-export const GST_REGISTERED = false;
+export { GST_REGISTERED } from "@/features/business/lib/pricing-policy";
 
 /**
  * Rates used by the planner. The first three come from `SETTINGS!B13:B15`

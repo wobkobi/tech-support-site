@@ -29,6 +29,7 @@ export interface Invoice {
   issueDate: string;
   dueDate: string;
   lineItems: LineItem[];
+  /** @deprecated Legacy boolean kept for storage shape. The engine derives GST mode from GST_REGISTERED in pricing-policy.ts; renderers gate on `gstAmount > 0`. */
   gst: boolean;
   subtotal: number;
   gstAmount: number;
@@ -146,6 +147,7 @@ export interface JobCalculation {
   /** Every travel charge for this job; summed into a single "Travel" invoice line. */
   travelEntries: TravelEntry[];
   notes: string;
+  /** @deprecated Ignored by calcJobTotal; GST mode comes from GST_REGISTERED in pricing-policy.ts. Pass `false`. */
   gst: boolean;
   clientName: string;
   clientEmail: string;

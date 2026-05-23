@@ -17,7 +17,7 @@ import {
   timeDiffMins,
   todayISO,
 } from "@/features/business/lib/business";
-import { BUSINESS_GST_NUMBER, BUSINESS_PAYMENT_TERMS_DAYS } from "@/shared/lib/business-identity";
+import { BUSINESS_PAYMENT_TERMS_DAYS } from "@/shared/lib/business-identity";
 import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 import { ContactPickerModal } from "@/features/business/components/ContactPickerModal";
 import { AddToContactsModal } from "@/features/business/components/AddToContactsModal";
@@ -158,7 +158,6 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
   const [showParts, setShowParts] = useState(false);
   const [showTaxonomyModal, setShowTaxonomyModal] = useState(false);
   const [notes, setNotes] = useState("");
-  const [gst, setGst] = useState(false);
   const [clientName, setClientName] = useState("");
   const [clientEmail, setClientEmail] = useState("");
   // Address-to state mirrors the InvoiceBuilder's segmented control so the
@@ -307,7 +306,7 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
     parts,
     travelEntries,
     notes,
-    gst,
+    gst: false,
     clientName,
     clientEmail,
   };
@@ -325,7 +324,6 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
       durationMins,
       hourlyRate,
       travelEntries,
-      gst,
       clientName,
       clientEmail,
       notes,
@@ -650,7 +648,6 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
           clientName,
           clientEmail,
           lineItems,
-          gst,
           notes: notes || null,
           promoTitle: promoActive ? activePromo.title : null,
           promoDiscount: promoActive ? totals.promoDiscount : null,
@@ -1244,29 +1241,6 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
         {/* RIGHT column - live invoice preview (replaces the legacy Summary
             panel - same totals, just inside the actual invoice layout). */}
         <div className={cn("space-y-4")}>
-          {/* Inline GST toggle - previously lived inside TotalsPanel. Visible
-              hint when GST is off and we're GST-registered so we don't ship a
-              non-tax-invoice by accident. */}
-          <div className={cn("rounded-xl border border-slate-200 bg-white p-4 shadow-sm")}>
-            <label className={cn("flex cursor-pointer items-center gap-2 text-sm")}>
-              <input
-                type="checkbox"
-                checked={gst}
-                onChange={(e) => setGst(e.target.checked)}
-                className={cn(
-                  "text-russian-violet focus:ring-russian-violet/30 h-4 w-4 rounded border-slate-300",
-                )}
-              />
-              <span className={cn("font-medium text-slate-700")}>Charge GST (15%)</span>
-            </label>
-            {!gst && BUSINESS_GST_NUMBER && (
-              <p className={cn("mt-2 text-xs italic text-amber-700")}>
-                GST is off - the invoice will read "INVOICE" rather than "TAX INVOICE" and no GST
-                line will be added.
-              </p>
-            )}
-          </div>
-
           {/* Client - moved above the preview so it stays in reach without
               scrolling past the full A4-sized invoice render. */}
           <ClientPickerSection
@@ -1345,7 +1319,6 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
                 setAiInput("");
                 setParseResult(null);
                 setHasParsed(false);
-                setGst(false);
                 setJobAddress("");
                 setClarifyQuestions([]);
                 setClarifyAnswers({});
@@ -1367,7 +1340,6 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
             issueDate={todayISO()}
             dueDate={addDaysISO(BUSINESS_PAYMENT_TERMS_DAYS)}
             lineItems={previewLineItems}
-            gst={gst}
             notes={notes}
             promoTitle={
               activePromo && !skipPromo && totals.promoDiscount > 0 ? activePromo.title : null

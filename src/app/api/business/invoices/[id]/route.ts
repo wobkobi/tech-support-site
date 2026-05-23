@@ -133,12 +133,15 @@ export async function PATCH(
         { status: 409 },
       );
     }
-    const { clientName, clientEmail, issueDate, dueDate, lineItems, gst, notes, status } = body;
+    const { clientName, clientEmail, issueDate, dueDate, lineItems, notes, status } = body;
     if (status !== undefined) {
       const err = validateTransition(current.status, status as InvoiceStatus);
       if (err) return NextResponse.json({ error: err }, { status: 409 });
     }
-    const { subtotal, gstAmount, total } = calcInvoiceTotals(lineItems ?? [], gst ?? false);
+    // GST mode is driven by GST_REGISTERED in pricing-policy.ts; the request
+    // body no longer carries gst. gstAmount may be non-zero in the future
+    // when the flag flips, stays 0 today.
+    const { subtotal, gstAmount, total } = calcInvoiceTotals(lineItems ?? []);
     const statusPatch = status !== undefined ? statusDataFor(status as InvoiceStatus) : {};
     const invoice = await prisma.invoice.update({
       where: { id },
@@ -147,8 +150,13 @@ export async function PATCH(
         ...(clientEmail !== undefined && { clientEmail }),
         ...(issueDate !== undefined && { issueDate: new Date(issueDate) }),
         ...(dueDate !== undefined && { dueDate: new Date(dueDate) }),
-        ...(lineItems !== undefined && { lineItems, subtotal, gstAmount, total }),
-        ...(gst !== undefined && { gst }),
+        ...(lineItems !== undefined && {
+          lineItems,
+          subtotal,
+          gstAmount,
+          total,
+          gst: gstAmount > 0,
+        }),
         ...(notes !== undefined && { notes: notes || null }),
         ...statusPatch,
       },

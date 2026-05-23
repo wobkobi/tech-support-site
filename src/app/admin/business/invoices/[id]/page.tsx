@@ -176,9 +176,9 @@ export default async function InvoiceViewPage({
               <span className={cn("whitespace-nowrap")}>-{formatNZD(invoice.promoDiscount)}</span>
             </div>
           )}
-          {invoice.gst && (
+          {invoice.gstAmount > 0 && (
             <div className={cn("flex justify-between gap-3")}>
-              <span className={cn("text-slate-500")}>GST (15%)</span>
+              <span className={cn("text-slate-500")}>Includes GST</span>
               <span className={cn("whitespace-nowrap font-medium text-slate-700")}>
                 {formatNZD(invoice.gstAmount)}
               </span>

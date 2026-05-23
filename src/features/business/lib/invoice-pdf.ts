@@ -471,7 +471,21 @@ function drawTotalsBlock(ctx: PdfCtx, invoice: Invoice, y: number): number {
       : "Promo discount (labor only)";
     drawRow(label, `-${fmt(invoice.promoDiscount)}`, { isPromo: true });
   }
-  if (invoice.gst) drawRow("GST (15%)", fmt(invoice.gstAmount));
+  // Gate on gstAmount > 0 (not the legacy `gst` boolean) so the line shows
+  // whenever the stored snapshot carries non-zero GST. When GST_REGISTERED
+  // flips true the engine back-calculates an inclusive amount and this row
+  // lights up automatically; today's flag-false world skips it entirely.
+  if (invoice.gstAmount > 0) {
+    drawRow("Includes GST", fmt(invoice.gstAmount));
+    // GST-inclusive amounts must be accompanied by a registration number on
+    // the invoice header (NZ IRD requirement). Warn if the env var is unset
+    // so the deployer notices a half-flipped GST switch.
+    if (!BUSINESS_GST_NUMBER) {
+      console.warn(
+        "[invoice-pdf] Invoice has GST but BUSINESS_GST_NUMBER env var is unset; the header will read 'INVOICE' instead of 'TAX INVOICE'.",
+      );
+    }
+  }
   ctx.page.drawLine({
     start: { x: totalsLabelX, y: y + 6 },
     end: { x: totalsValueX, y: y + 6 },

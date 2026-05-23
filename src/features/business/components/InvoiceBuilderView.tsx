@@ -32,7 +32,6 @@ interface FormState {
   clientName: string;
   clientEmail: string;
   lineItems: LineItem[];
-  gst: boolean;
   notes: string;
   /** Promo title shown on the invoice; null when no promo. */
   promoTitle: string | null;
@@ -69,7 +68,6 @@ export interface InvoiceBuilderEditPayload {
   clientName: string;
   clientEmail: string;
   lineItems: LineItem[];
-  gst: boolean;
   notes: string | null;
   promoTitle: string | null;
   promoDiscount: number | null;
@@ -106,7 +104,6 @@ export function InvoiceBuilderView({
         clientName: editInvoice.clientName,
         clientEmail: editInvoice.clientEmail,
         lineItems: editInvoice.lineItems.length ? editInvoice.lineItems : [emptyLine()],
-        gst: editInvoice.gst,
         notes: editInvoice.notes ?? "",
         promoTitle: editInvoice.promoTitle,
         promoDiscount: editInvoice.promoDiscount ?? 0,
@@ -119,7 +116,6 @@ export function InvoiceBuilderView({
     const clientName = params.get("clientName") ?? "";
     const clientEmail = params.get("clientEmail") ?? "";
     const rawItems = params.get("lineItems");
-    const gst = params.get("gst") === "true";
     const notes = params.get("notes") ?? "";
     const promoTitle = params.get("promoTitle");
     const promoDiscountRaw = params.get("promoDiscount");
@@ -147,7 +143,6 @@ export function InvoiceBuilderView({
       clientName,
       clientEmail,
       lineItems: clientName || clientEmail || rawItems ? lineItems : [emptyLine()],
-      gst,
       notes,
       promoTitle: promoTitle && promoDiscount > 0 ? promoTitle : null,
       promoDiscount: promoDiscount > 0 ? promoDiscount : 0,
@@ -194,7 +189,7 @@ export function InvoiceBuilderView({
     });
   }, []);
 
-  const totals = calcInvoiceTotals(form.lineItems, form.gst, form.promoDiscount);
+  const totals = calcInvoiceTotals(form.lineItems, form.promoDiscount);
 
   /**
    * Submits the form. In create mode POSTs to /api/business/invoices and
@@ -216,7 +211,6 @@ export function InvoiceBuilderView({
         issueDate: form.issueDate,
         dueDate: form.dueDate,
         lineItems: form.lineItems,
-        gst: form.gst,
         notes: form.notes || null,
         promoTitle: form.promoTitle,
         promoDiscount: form.promoDiscount > 0 ? form.promoDiscount : null,
@@ -277,7 +271,6 @@ export function InvoiceBuilderView({
           issueDate: form.issueDate,
           dueDate: form.dueDate,
           lineItems: form.lineItems,
-          gst: form.gst,
           subtotal: totals.subtotal,
           gstAmount: totals.gstAmount,
           total: totals.total,
@@ -552,19 +545,6 @@ export function InvoiceBuilderView({
             >
               + Add line
             </button>
-
-            <div className={cn("flex items-center gap-2 pt-1")}>
-              <input
-                type="checkbox"
-                id="gst"
-                checked={form.gst}
-                onChange={(e) => setForm((p) => ({ ...p, gst: e.target.checked }))}
-                className={cn("h-4 w-4 rounded border-slate-300")}
-              />
-              <label htmlFor="gst" className={cn("text-sm text-slate-600")}>
-                Add GST (15%)
-              </label>
-            </div>
           </div>
 
           <div className={cn("rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}>
@@ -615,7 +595,6 @@ export function InvoiceBuilderView({
           issueDate={form.issueDate}
           dueDate={form.dueDate}
           lineItems={form.lineItems}
-          gst={form.gst}
           notes={form.notes}
           promoTitle={form.promoTitle}
           promoDiscount={form.promoDiscount}

@@ -13,7 +13,6 @@ interface FormState {
   issueDate: string;
   dueDate: string;
   lineItems: LineItem[];
-  gst: boolean;
   notes: string;
   status: string;
 }
@@ -57,14 +56,13 @@ export function InvoiceEditView({ invoice, token }: InvoiceEditViewProps): React
     issueDate: toDateInput(invoice.issueDate),
     dueDate: toDateInput(invoice.dueDate),
     lineItems: invoice.lineItems.length > 0 ? invoice.lineItems : [emptyLine()],
-    gst: invoice.gst,
     notes: invoice.notes ?? "",
     status: invoice.status,
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const totals = calcInvoiceTotals(form.lineItems, form.gst);
+  const totals = calcInvoiceTotals(form.lineItems);
 
   const updateLine = useCallback((idx: number, field: keyof LineItem, val: string | number) => {
     setForm((p) => {
@@ -91,7 +89,6 @@ export function InvoiceEditView({ invoice, token }: InvoiceEditViewProps): React
         issueDate: form.issueDate,
         dueDate: form.dueDate,
         lineItems: form.lineItems,
-        gst: form.gst,
         notes: form.notes || null,
         status: form.status,
       }),
@@ -269,25 +266,13 @@ export function InvoiceEditView({ invoice, token }: InvoiceEditViewProps): React
         </button>
 
         <div className={cn("mt-4 space-y-1 border-t border-slate-100 pt-3 text-sm")}>
-          <div className={cn("flex items-center gap-2")}>
-            <input
-              type="checkbox"
-              id="gst-edit"
-              checked={form.gst}
-              onChange={(e) => setForm((p) => ({ ...p, gst: e.target.checked }))}
-              className={cn("rounded")}
-            />
-            <label htmlFor="gst-edit" className={cn("text-xs text-slate-500")}>
-              Add GST (15%)
-            </label>
-          </div>
           <div className={cn("flex justify-between text-slate-500")}>
             <span>Subtotal</span>
             <span>{formatNZD(totals.subtotal)}</span>
           </div>
-          {form.gst && (
+          {totals.gstAmount > 0 && (
             <div className={cn("flex justify-between text-slate-500")}>
-              <span>GST</span>
+              <span>Includes GST</span>
               <span>{formatNZD(totals.gstAmount)}</span>
             </div>
           )}

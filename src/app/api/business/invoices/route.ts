@@ -63,7 +63,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     issueDate,
     dueDate,
     lineItems,
-    gst,
     notes,
     contactId,
     // Optional promo snapshot from the calculator (persisted for history).
@@ -75,7 +74,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     issueDate?: string;
     dueDate?: string;
     lineItems?: { qty: number; unitPrice: number; description: string; lineTotal: number }[];
-    gst?: boolean;
     notes?: string | null;
     contactId?: string | null;
     promoTitle?: string | null;
@@ -96,7 +94,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   const { number, sheetNextCount, sheetSyncWarning } = await getNextInvoiceNumber();
   const discount = typeof promoDiscount === "number" && promoDiscount > 0 ? promoDiscount : 0;
-  const { subtotal, gstAmount, total } = calcInvoiceTotals(lineItems, gst ?? false, discount);
+  // GST mode is driven by GST_REGISTERED in pricing-policy.ts; the request
+  // body no longer carries gst. gstAmount may be non-zero in the future when
+  // the flag flips, stays 0 today.
+  const { subtotal, gstAmount, total } = calcInvoiceTotals(lineItems, discount);
 
   const invoice = await prisma.invoice.create({
     data: {
@@ -106,7 +107,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       issueDate: issueDateValue,
       dueDate: dueDateValue,
       lineItems,
-      gst: gst ?? false,
+      gst: gstAmount > 0,
       subtotal,
       gstAmount,
       total,

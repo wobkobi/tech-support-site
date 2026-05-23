@@ -24,7 +24,6 @@ interface Props {
   /** ISO YYYY-MM-DD. */
   dueDate: string;
   lineItems: LineItem[];
-  gst: boolean;
   notes: string;
   promoTitle: string | null;
   /** Dollar amount; rendered when > 0. */
@@ -51,12 +50,11 @@ function InvoicePreviewPanelImpl(props: Props): React.ReactElement {
     issueDate,
     dueDate,
     lineItems,
-    gst,
     notes,
     promoTitle,
     promoDiscount,
   } = props;
-  const totals = calcInvoiceTotals(lineItems, gst, promoDiscount);
+  const totals = calcInvoiceTotals(lineItems, promoDiscount);
   const showPromoLine = promoDiscount > 0;
   return (
     <div
@@ -191,9 +189,9 @@ function InvoicePreviewPanelImpl(props: Props): React.ReactElement {
               <span className={cn("whitespace-nowrap")}>-{formatNZD(promoDiscount)}</span>
             </div>
           )}
-          {gst && (
+          {totals.gstAmount > 0 && (
             <div className={cn("flex justify-between gap-3")}>
-              <span className={cn("text-slate-500")}>GST (15%)</span>
+              <span className={cn("text-slate-500")}>Includes GST</span>
               <span className={cn("whitespace-nowrap text-slate-700")}>
                 {formatNZD(totals.gstAmount)}
               </span>
