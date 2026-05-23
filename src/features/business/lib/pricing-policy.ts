@@ -112,6 +112,11 @@ export function floorBillableMins(rawMins: number): number {
 // always matches the live values it depends on. Calling sites pass the
 // rate / threshold they just looked up from the DB (or the policy
 // constants) and get a consistent string back.
+//
+// Bold convention: key figures and policy boundaries are wrapped in `**…**`
+// so the pricing page can render them as `<strong>` while emails / FAQs can
+// pass the string through as-is (the markers read as emphasis in plain text
+// and are also valid markdown if a downstream renderer wants to honour them).
 
 /**
  * Cancellation policy text used on the pricing page accordion, the booking
@@ -121,10 +126,10 @@ export function floorBillableMins(rawMins: number): number {
  */
 export function cancellationCopy(p: CancellationPolicy = CANCELLATION): string {
   return (
-    `Free if cancelled at least ${p.freeNoticeHours} hours before your appointment. ` +
-    `Inside that window, a $${p.callOutFee} call-out fee applies. ` +
-    `If cancelled within ${p.travelChargeHours} hours of the appointment ` +
-    `(when I would already be on the way), the fee also includes round-trip travel.`
+    `**Free** if cancelled at least **${p.freeNoticeHours} hours** before your appointment. ` +
+    `Inside that window, a **$${p.callOutFee} call-out fee** applies. ` +
+    `If cancelled within **${p.travelChargeHours} hours** of the appointment ` +
+    `(when I would already be on the way), the fee also includes **round-trip travel**.`
   );
 }
 
@@ -137,9 +142,9 @@ export function cancellationCopy(p: CancellationPolicy = CANCELLATION): string {
 export function unsuccessfulWorkCopy(): string {
   return (
     "Two outcomes count as a successful visit, charged at the agreed rate:\n\n" +
-    "1. Fixed: the issue described no longer reproduces by the end of the visit.\n" +
-    "2. Diagnosed: I leave you with a written explanation of the root cause and what would be needed to resolve it (for example, 'your hard drive is failing - here is the data recovery specialist you will need to use').\n\n" +
-    "Half price applies only when I leave with neither - the symptom is still happening AND I cannot tell you why. Remote sessions are free in that case.\n\n" +
+    "1. **Fixed**: the issue described no longer reproduces by the end of the visit.\n" +
+    "2. **Diagnosed**: I leave you with a written explanation of the root cause and what would be needed to resolve it (for example, 'your hard drive is failing - here is the data recovery specialist you will need to use').\n\n" +
+    "**Half price** applies only when I leave with neither - the symptom is still happening AND I cannot tell you why. Remote sessions are **free** in that case.\n\n" +
     "A partial fix counts as a fix. A confirmed external blocker (for example, 'you need a part from the manufacturer, here is the part number') counts as a diagnosis."
   );
 }
@@ -152,10 +157,10 @@ export function unsuccessfulWorkCopy(): string {
  */
 export function travelCopy(travelRatePerHour: number): string {
   return (
-    `Travel is one round trip billed at $${travelRatePerHour}/h - a separate, ` +
+    `Travel is **one round trip** billed at **$${travelRatePerHour}/h** - a separate, ` +
     `lower rate than labour. ` +
-    `Minimum $${MIN_TRAVEL_CHARGE} when there is any travel at all. ` +
-    `If a job runs long and needs a second visit, that second trip is on me.`
+    `**Minimum $${MIN_TRAVEL_CHARGE}** when there is any travel at all. ` +
+    `If a job runs long and needs a second visit, **that second trip is on me**.`
   );
 }
 
@@ -165,9 +170,9 @@ export function travelCopy(travelRatePerHour: number): string {
  */
 export function minimumsCopy(): string {
   return (
-    `${MIN_BILLABLE_MINS} minutes minimum on anything billable, then ` +
-    `${BILLING_INCREMENT_MINS}-minute increments after that. ` +
-    `Quick calls and emails stay free - a "remote session" is when I log in ` +
+    `**${MIN_BILLABLE_MINS} minutes minimum** on anything billable, then ` +
+    `**${BILLING_INCREMENT_MINS}-minute increments** after that. ` +
+    `Quick calls and emails stay **free** - a "remote session" is when I log in ` +
     `and start working on your machine.`
   );
 }
@@ -179,8 +184,8 @@ export function minimumsCopy(): string {
  */
 export function publicHolidayCopy(uplift: number = PUBLIC_HOLIDAY_UPLIFT): string {
   return (
-    `Available on NZ public holidays; a ${Math.round(uplift * 100)}% surcharge ` +
-    `applies to labour. Travel and parts are unchanged.`
+    `Available on NZ public holidays; a **${Math.round(uplift * 100)}% surcharge** ` +
+    `applies to labour. **Travel and parts are unchanged.**`
   );
 }
 
@@ -191,8 +196,8 @@ export function publicHolidayCopy(uplift: number = PUBLIC_HOLIDAY_UPLIFT): strin
  */
 export function gstCopy(registered: boolean = GST_REGISTERED): string {
   return registered
-    ? "Prices include 15% GST. The price you see is the price you pay; the invoice shows the GST breakdown."
-    : "Not GST registered. The price you see is the price you pay.";
+    ? "Prices **include 15% GST**. The price you see is the price you pay; the invoice shows the GST breakdown."
+    : "**Not GST registered.** The price you see is the price you pay.";
 }
 
 export interface Policy {

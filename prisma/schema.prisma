@@ -351,11 +351,15 @@ model RateConfig {
   // Applied after hourlyDelta in effectiveHourlyRate so the percentage
   // acts on the post-modifier base.
   percentDelta Float?
-  unit         String   @default("hour")
-  isDefault    Boolean  @default(false)
-  createdAt    DateTime @default(now())
-  // Powers the "Rates last updated on {date}" footer on /pricing.
-  updatedAt    DateTime @updatedAt
+  unit         String    @default("hour")
+  isDefault    Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  // Powers the "Rates last updated on {date}" footer on /pricing. Nullable
+  // because legacy rows created before this field existed don't carry the
+  // value - Prisma cannot coerce a missing Mongo field to a non-nullable
+  // DateTime at read time. @updatedAt still stamps every write, so any
+  // operator edit or the seed-handler's migration backfill fills it in.
+  updatedAt    DateTime? @updatedAt
 }
 
 enum InvoiceStatus {

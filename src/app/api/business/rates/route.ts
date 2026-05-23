@@ -97,6 +97,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     data: { ratePerHour: 40, flatRate: null, unit: "travel-hour" },
   });
 
+  // updatedAt backfill: rows created before the field existed have no value
+  // in Mongo and Prisma cannot coerce that to a non-null DateTime at read.
+  // Stamp them once with "now" so the pricing-page footer has something to
+  // show; future edits stamp via @updatedAt automatically. Idempotent.
+  await prisma.rateConfig.updateMany({
+    where: { updatedAt: { isSet: false } },
+    data: { updatedAt: new Date() },
+  });
+
   const rates = await prisma.rateConfig.findMany({ orderBy: { label: "asc" } });
   return NextResponse.json({ ok: true, rates });
 }
