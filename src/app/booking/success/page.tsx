@@ -64,8 +64,7 @@ export default async function BookingSuccessPage({
 
               <p className={cn("text-rich-black/80 mb-6 text-sm sm:text-base")}>
                 Your appointment is confirmed. Check your email for the details and a Google
-                Calendar invite - if you don&apos;t see it within a few minutes, check your spam
-                folder.
+                Calendar invite - if you don't see it within a few minutes, check your spam folder.
               </p>
 
               <div className={cn("flex flex-wrap justify-center gap-3")}>
@@ -111,7 +110,7 @@ export default async function BookingSuccessPage({
                 <li>
                   To cancel or reschedule, use the link in the confirmation email or reply to it
                 </li>
-                <li>I&apos;ll send you a review link after your appointment</li>
+                <li>I'll send you a review link after your appointment</li>
               </ol>
             </section>
           </div>

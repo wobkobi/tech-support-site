@@ -86,7 +86,7 @@ export default async function ReviewsPage(): Promise<React.ReactElement> {
               What clients say
             </h1>
             <p className={cn("text-rich-black/80 text-base sm:text-lg")}>
-              Feedback from people I&apos;ve helped.
+              Feedback from people I've helped.
             </p>
           </section>
 
@@ -106,7 +106,7 @@ export default async function ReviewsPage(): Promise<React.ReactElement> {
                 <Link href="/booking" className={linkStyle}>
                   Book an appointment
                 </Link>{" "}
-                and you&apos;ll get a review link after your visit.
+                and you'll get a review link after your visit.
               </p>
             </section>
           ) : (
@@ -142,7 +142,7 @@ export default async function ReviewsPage(): Promise<React.ReactElement> {
             className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-200")}
           >
             <p className={cn("text-rich-black text-sm sm:text-base")}>
-              Had an appointment? You&apos;ll receive a review link by email after your visit. Or{" "}
+              Had an appointment? You'll receive a review link by email after your visit. Or{" "}
               <Link href="/booking" className={linkStyle}>
                 book now
               </Link>{" "}

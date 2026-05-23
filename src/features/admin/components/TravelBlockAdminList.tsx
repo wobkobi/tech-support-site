@@ -297,7 +297,7 @@ export function TravelBlockAdminList({
                 <p
                   className={cn("mb-1 text-xs font-medium uppercase tracking-wide text-slate-400")}
                 >
-                  How I&apos;m getting there
+                  How I'm getting there
                 </p>
                 <div className={cn("flex flex-wrap gap-1")}>
                   {MODES.map((m) => (

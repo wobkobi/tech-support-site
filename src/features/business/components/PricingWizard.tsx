@@ -408,8 +408,8 @@ export function PricingWizard(): React.ReactElement {
                 "border-coquelicot/30 bg-coquelicot/5 text-coquelicot-500 mt-4 rounded-lg border px-3 py-2 text-base font-bold",
               )}
             >
-              You&apos;re charged for the actual time worked at the agreed hourly rate. Jobs that
-              turn out more involved than described will cost more than this estimate.
+              You're charged for the actual time worked at the agreed hourly rate. Jobs that turn
+              out more involved than described will cost more than this estimate.
             </p>
             <p className="mt-2 text-sm text-slate-500">
               {result.includesTravel && "Includes drive time. "}

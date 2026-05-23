@@ -194,11 +194,10 @@ async function BookingFormIsland(): Promise<React.ReactElement> {
         )}
       >
         <p className={cn("text-base font-semibold sm:text-lg")}>
-          Availability isn&apos;t loading right now.
+          Availability isn't loading right now.
         </p>
         <p className={cn("text-base sm:text-lg")}>
-          Please refresh the page in a minute, or call/text me directly and I&apos;ll get you booked
-          in.
+          Please refresh the page in a minute, or call/text me directly and I'll get you booked in.
         </p>
       </div>
     );

@@ -379,8 +379,7 @@ export default function ReviewFormProtected({
             Stay in touch <span className={cn("text-rich-black/40 font-normal")}>(optional)</span>
           </p>
           <p className={cn("text-rich-black/50 mt-0.5 text-base")}>
-            Leave your number or email if you&apos;d like me to be able to reach you - totally up to
-            you.
+            Leave your number or email if you'd like me to be able to reach you - totally up to you.
           </p>
         </div>
 
