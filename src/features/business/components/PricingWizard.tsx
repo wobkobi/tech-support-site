@@ -11,12 +11,14 @@ import {
   summariseForBanner,
   type ActivePromo,
 } from "@/features/business/lib/promos";
+import { calcTravelCharge, MIN_BILLABLE_MINS } from "@/features/business/lib/pricing-policy";
 
 const SOFT_CARD = cn(
   "border-seasalt-400/80 bg-seasalt-900/60 rounded-xl border p-3 text-base sm:p-4 sm:text-lg",
 );
 
-type Step = "issue" | "address" | "results";
+type Step = "issue" | "meeting" | "address" | "results";
+type MeetingMode = "on-site" | "remote";
 
 /**
  * Whole-dollar NZD string (no cents) for the pricing range UI.
@@ -51,7 +53,9 @@ export function PricingWizard(): React.ReactElement {
   const [loading, setLoading] = useState(true);
   const [step, setStep] = useState<Step>("issue");
   const [issueDescription, setIssueDescription] = useState("");
+  const [meeting, setMeeting] = useState<MeetingMode>("on-site");
   const [address, setAddress] = useState("");
+  const [addressNotFound, setAddressNotFound] = useState(false);
   const [aiExplanation, setAiExplanation] = useState("");
   const [aiEstimatedMins, setAiEstimatedMins] = useState(0);
   const [result, setResult] = useState<PriceRange | null>(null);
@@ -81,12 +85,17 @@ export function PricingWizard(): React.ReactElement {
   /** Calls both APIs in parallel then computes a price range from the AI's time estimate. */
   async function getEstimate(): Promise<void> {
     setIsCalculating(true);
+    setAddressNotFound(false);
 
-    // Strip trailing ", New Zealand" — travel-time API appends it automatically
-    const dest = address
-      .trim()
-      .replace(/,?\s*New Zealand$/i, "")
-      .trim();
+    // Strip trailing ", New Zealand" — travel-time API appends it automatically.
+    // Skip the lookup entirely for remote sessions.
+    const dest =
+      meeting === "remote"
+        ? ""
+        : address
+            .trim()
+            .replace(/,?\s*New Zealand$/i, "")
+            .trim();
 
     const [travelRes, estimateRes] = await Promise.allSettled([
       dest
@@ -114,7 +123,23 @@ export function PricingWizard(): React.ReactElement {
       ),
     ]);
 
-    const travelMins = travelRes.status === "fulfilled" ? (travelRes.value.durationMins ?? 0) : 0;
+    // Travel minutes are one-way from the API. calcTravelCharge doubles for
+    // round-trip internally. Remote sessions force 0 even if an address was
+    // typed before the user backed up - defensive against state leakage.
+    const travelMins =
+      meeting === "remote"
+        ? 0
+        : travelRes.status === "fulfilled"
+          ? (travelRes.value.durationMins ?? 0)
+          : 0;
+
+    // Surface a disclaimer when the user typed an address but Google couldn't
+    // geocode it (returns durationMins: 0). Without this the wizard silently
+    // quotes $0 travel and the customer wonders why their quote doesn't
+    // include the drive they expect.
+    if (meeting === "on-site" && dest && travelMins === 0) {
+      setAddressNotFound(true);
+    }
 
     let estimatedMins = 60;
     let fullRate = 65;
@@ -129,17 +154,28 @@ export function PricingWizard(): React.ReactElement {
       category = ai.category;
       tasks = Array.isArray(ai.tasks) ? ai.tasks : [];
 
-      // Standard base + Complex modifier delta when AI flags the job complex.
+      // Standard base + stacked modifier deltas (Complex when AI flags it,
+      // Remote when the customer picked remote support). Mirrors how
+      // effectiveHourlyRate composes the rate in the calculator.
       const baseStandard =
         rates.find((r) => r.ratePerHour !== null && r.isDefault)?.ratePerHour ??
         rates.find((r) => r.ratePerHour !== null)?.ratePerHour ??
         65;
-      const complexModifier = rates.find((r) => r.label === "Complex" && r.hourlyDelta !== null);
-      const complexRate = complexModifier
-        ? baseStandard + (complexModifier.hourlyDelta ?? 0)
-        : baseStandard;
-      fullRate = ai.category === "complex" ? complexRate : baseStandard;
+      const complexDelta =
+        ai.category === "complex"
+          ? (rates.find((r) => r.label === "Complex" && r.hourlyDelta !== null)?.hourlyDelta ?? 0)
+          : 0;
+      const remoteDelta =
+        meeting === "remote"
+          ? (rates.find((r) => r.label === "Remote" && r.hourlyDelta !== null)?.hourlyDelta ?? 0)
+          : 0;
+      fullRate = baseStandard + complexDelta + remoteDelta;
     }
+
+    // Look up the dedicated Travel rate ($40/h by default) - decoupled from
+    // labour so Complex/Remote/promo never affect it.
+    const travelRatePerHour =
+      rates.find((r) => r.unit === "travel-hour" && r.ratePerHour !== null)?.ratePerHour ?? 40;
 
     const promoRate = applyPromoToHourlyRate(fullRate, activePromo);
     const promoApplied = promoRate < fullRate;
@@ -147,12 +183,11 @@ export function PricingWizard(): React.ReactElement {
     setAiExplanation(explanation);
     setAiEstimatedMins(estimatedMins);
 
-    // 30-min minimum visit floors short jobs so we never quote less than half
-    // an hour of billable time. The wider ±25% (vs the old ±15%) and bumped
+    // 15-min minimum visit floors short jobs so we never quote less than the
+    // published billable minimum. The wider ±25% (vs the old ±15%) and bumped
     // $20 minimum spread make the high end defensible against "but the site
     // said $X" complaints. Applies to the visit total, not each task line.
-    const MIN_VISIT_MINS = 30;
-    const effectiveMins = Math.max(MIN_VISIT_MINS, estimatedMins);
+    const effectiveMins = Math.max(MIN_BILLABLE_MINS, estimatedMins);
 
     /**
      * Builds a ±25% price range for a given duration + rate, rounded to the
@@ -169,10 +204,12 @@ export function PricingWizard(): React.ReactElement {
       return { low, high };
     };
 
-    // Travel is never discounted by promos (matches the schema rule:
-    // promos apply to labor only - parts and Travel are full price).
-    // Computed once with fullRate and reused across both branches.
-    const travel = Math.round(((travelMins / 60) * fullRate) / 5) * 5;
+    // Travel is never discounted by promos (matches the schema rule: promos
+    // apply to labor only - parts and Travel are full price). Computed via
+    // calcTravelCharge so the round-trip + $10 minimum match the calculator
+    // and invoice exactly. Always uses the dedicated Travel rate, never the
+    // labour rate, so Complex/Remote/promo don't bleed into the travel line.
+    const travel = calcTravelCharge(travelMins, travelRatePerHour);
 
     /**
      * Builds the visit total (with floor applied) plus the flat travel
@@ -264,7 +301,8 @@ export function PricingWizard(): React.ReactElement {
     setStep("results");
 
     // Audit log: fire-and-forget so failures don't break the UX. Captures
-    // the raw text, AI interpretation, and the exact range we just showed.
+    // the raw text, AI interpretation, meeting mode the customer picked, and
+    // the exact range shown so disputes can be reconstructed.
     void fetch("/api/pricing/log-estimate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -276,6 +314,7 @@ export function PricingWizard(): React.ReactElement {
         aiTasks: tasks,
         address: dest || null,
         travelMins,
+        meetingType: meeting === "on-site" ? "in_person" : "remote",
         hourlyRate: promoRate,
         priceLow: promoRange.low,
         priceHigh: promoRange.high,
@@ -287,25 +326,43 @@ export function PricingWizard(): React.ReactElement {
     });
   }
 
-  /** Advances to the next step, or triggers estimate calculation on the address step. */
+  /**
+   * Advances to the next step. Remote sessions skip the address step (there's
+   * no travel to look up); the address step is the trigger for the estimate
+   * on-site, the meeting step is the trigger for remote.
+   */
   async function nextStep(): Promise<void> {
+    if (step === "issue") {
+      setStep("meeting");
+      return;
+    }
+    if (step === "meeting") {
+      if (meeting === "remote") {
+        await getEstimate();
+        return;
+      }
+      setStep("address");
+      return;
+    }
     if (step === "address") {
       await getEstimate();
       return;
     }
-    setStep("address");
   }
 
-  /** Returns to the previous step. */
+  /** Returns to the previous step. Remote-mode results jump back to meeting. */
   function prevStep(): void {
-    if (step === "address") setStep("issue");
+    if (step === "meeting") setStep("issue");
+    else if (step === "address") setStep("meeting");
   }
 
   /** Resets all wizard state back to the first step. */
   function reset(): void {
     setStep("issue");
     setIssueDescription("");
+    setMeeting("on-site");
     setAddress("");
+    setAddressNotFound(false);
     setAiExplanation("");
     setAiEstimatedMins(0);
     setResult(null);
@@ -320,7 +377,10 @@ export function PricingWizard(): React.ReactElement {
     return true;
   }
 
-  const stepIndex = step === "issue" ? 0 : 1;
+  // Step progression: on-site has 3 steps (issue > meeting > address), remote
+  // has 2 (issue > meeting). stepIndex / totalSteps drive the progress bar.
+  const totalSteps = meeting === "remote" ? 2 : 3;
+  const stepIndex = step === "issue" ? 0 : step === "meeting" ? 1 : 2;
 
   if (loading) {
     return <div className="py-8 text-center text-sm text-slate-400">Loading calculator...</div>;
@@ -330,7 +390,7 @@ export function PricingWizard(): React.ReactElement {
     <div>
       {step !== "results" && (
         <div className="mb-6 flex items-center gap-2">
-          {[0, 1].map((i) => (
+          {Array.from({ length: totalSteps }, (_, i) => (
             <div
               key={i}
               className={cn(
@@ -343,7 +403,9 @@ export function PricingWizard(): React.ReactElement {
               )}
             />
           ))}
-          <span className="ml-2 whitespace-nowrap text-xs text-slate-400">{stepIndex + 1} / 2</span>
+          <span className="ml-2 whitespace-nowrap text-xs text-slate-400">
+            {stepIndex + 1} / {totalSteps}
+          </span>
         </div>
       )}
 
@@ -367,11 +429,58 @@ export function PricingWizard(): React.ReactElement {
         </div>
       )}
 
+      {step === "meeting" && (
+        <div>
+          <h3 className="text-russian-violet mb-1 text-lg font-bold">
+            How would you like the work done?
+          </h3>
+          <p className="mb-4 text-base text-slate-600">
+            On-site visits include travel; remote sessions get a small rate reduction and no travel
+            charge.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {(
+              [
+                {
+                  value: "on-site",
+                  title: "On-site visit",
+                  body: "I come to you. Best for Wi-Fi, printers, hardware, anything hands-on.",
+                },
+                {
+                  value: "remote",
+                  title: "Remote session",
+                  body: "I log in via screen share. Best for software, accounts, quick fixes.",
+                },
+              ] as const
+            ).map((option) => {
+              const selected = meeting === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setMeeting(option.value)}
+                  className={cn(
+                    "rounded-xl border p-4 text-left transition-all",
+                    selected
+                      ? "border-russian-violet bg-russian-violet/5 ring-russian-violet/30 ring-2"
+                      : "border-slate-200 bg-white hover:border-slate-300",
+                  )}
+                >
+                  <p className="text-russian-violet text-base font-bold">{option.title}</p>
+                  <p className="mt-1 text-sm text-slate-600">{option.body}</p>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {step === "address" && (
         <div>
           <h3 className="text-russian-violet mb-1 text-lg font-bold">Where are you located?</h3>
           <p className="mb-4 text-base text-slate-600">
-            Enter your address to include drive time, or skip for an estimate without travel.
+            Enter your address so drive time can be included, or skip for an estimate without
+            travel.
           </p>
           <AddressAutocomplete
             value={address}
@@ -412,7 +521,13 @@ export function PricingWizard(): React.ReactElement {
               out more involved than described will cost more than this estimate.
             </p>
             <p className="mt-2 text-sm text-slate-500">
-              {result.includesTravel && "Includes drive time. "}
+              {meeting === "remote"
+                ? "Remote session - no travel charge. "
+                : result.includesTravel
+                  ? "Includes round-trip drive time at the Travel rate, $10 minimum. "
+                  : addressNotFound
+                    ? "Address not found - actual travel will be confirmed before work begins. "
+                    : ""}
               All prices in NZD. No GST.
             </p>
           </div>
@@ -469,7 +584,7 @@ export function PricingWizard(): React.ReactElement {
 
       {step !== "results" && (
         <div className="mt-6 flex gap-3">
-          {step === "address" && (
+          {(step === "meeting" || step === "address") && (
             <button
               onClick={prevStep}
               className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-base font-semibold text-slate-700 hover:bg-slate-50"
@@ -487,7 +602,11 @@ export function PricingWizard(): React.ReactElement {
                 : "cursor-not-allowed bg-slate-300",
             )}
           >
-            {isCalculating ? "Estimating..." : step === "address" ? "Get a rough estimate" : "Next"}
+            {isCalculating
+              ? "Estimating..."
+              : step === "address" || (step === "meeting" && meeting === "remote")
+                ? "Get a rough estimate"
+                : "Next"}
           </button>
         </div>
       )}
