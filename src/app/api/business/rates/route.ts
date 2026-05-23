@@ -3,15 +3,17 @@ import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
 
 // Seed shape: one base hourly rate (Standard), modifier rates that shift the
-// effective $/hr (Complex +$20, At home -$10, Remote -$10), and the Travel
-// flat rate. Replaces the previous mess of fixed rates like "Complex at home"
-// / "Complex work" / "At home" - those are now derived.
+// effective $/hr (Complex +$20, At home -$10, Remote -$10), a percentage
+// modifier for Public Holiday (+25%), and the Travel flat rate. Replaces
+// the previous mess of fixed rates like "Complex at home" / "Complex work"
+// / "At home" - those are now derived.
 const DEFAULTS = [
   {
     label: "Standard",
     ratePerHour: 65,
     flatRate: null,
     hourlyDelta: null,
+    percentDelta: null,
     unit: "hour",
     isDefault: true,
   },
@@ -20,6 +22,7 @@ const DEFAULTS = [
     ratePerHour: null,
     flatRate: null,
     hourlyDelta: 20,
+    percentDelta: null,
     unit: "modifier",
     isDefault: false,
   },
@@ -28,6 +31,7 @@ const DEFAULTS = [
     ratePerHour: null,
     flatRate: null,
     hourlyDelta: -10,
+    percentDelta: null,
     unit: "modifier",
     isDefault: false,
   },
@@ -36,6 +40,16 @@ const DEFAULTS = [
     ratePerHour: null,
     flatRate: null,
     hourlyDelta: -10,
+    percentDelta: null,
+    unit: "modifier",
+    isDefault: false,
+  },
+  {
+    label: "Public Holiday",
+    ratePerHour: null,
+    flatRate: null,
+    hourlyDelta: null,
+    percentDelta: 0.25,
     unit: "modifier",
     isDefault: false,
   },
@@ -44,6 +58,7 @@ const DEFAULTS = [
     ratePerHour: null,
     flatRate: 1.2,
     hourlyDelta: null,
+    percentDelta: null,
     unit: "km",
     isDefault: false,
   },
