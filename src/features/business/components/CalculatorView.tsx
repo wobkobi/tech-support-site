@@ -828,7 +828,7 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
   async function handleResetRates(): Promise<void> {
     if (
       !confirm(
-        "Wipe all rates and reseed the defaults (Standard, Complex, At home, Student, Remote, Travel)? Any custom rates you've added will be deleted.",
+        "Wipe all rates and reseed the defaults (Standard, Complex, At home, Remote, Travel)? Any custom rates you've added will be deleted.",
       )
     ) {
       return;

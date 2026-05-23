@@ -320,7 +320,7 @@ export function matchRateById(rates: RateConfig[], id: string | null): RateConfi
 
 /**
  * Computes the effective hourly rate for a task by adding modifier deltas to
- * a base rate. E.g. Standard ($65) + At home (-$10) + Student (-$20) = $35.
+ * a base rate. E.g. Standard ($65) + At home (-$10) = $55.
  * @param rates - All rate configurations (used to look up by ID).
  * @param baseRateId - Base rate ID (must point to a rate with ratePerHour set).
  * @param modifierIds - Modifier rate IDs (each must point to a rate with hourlyDelta set).

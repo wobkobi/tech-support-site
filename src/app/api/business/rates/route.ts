@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
 
-// Seed shape: one base hourly rate (Standard), a handful of modifier rates that
-// shift the effective $/hr (Complex +$20, At home -$10, Student -$20, Remote
-// -$10), and the Travel flat rate. Replaces the previous mess of fixed rates
-// like "Complex at home" / "Complex work" / "At home" - those are now derived.
+// Seed shape: one base hourly rate (Standard), modifier rates that shift the
+// effective $/hr (Complex +$20, At home -$10, Remote -$10), and the Travel
+// flat rate. Replaces the previous mess of fixed rates like "Complex at home"
+// / "Complex work" / "At home" - those are now derived.
 const DEFAULTS = [
   {
     label: "Standard",
@@ -28,14 +28,6 @@ const DEFAULTS = [
     ratePerHour: null,
     flatRate: null,
     hourlyDelta: -10,
-    unit: "modifier",
-    isDefault: false,
-  },
-  {
-    label: "Student",
-    ratePerHour: null,
-    flatRate: null,
-    hourlyDelta: -20,
     unit: "modifier",
     isDefault: false,
   },
@@ -73,16 +65,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   if (missing.length > 0) {
     await prisma.rateConfig.createMany({ data: missing });
   }
-  // MongoDB gotcha: a Travel rate row created before flatRate existed in the
-  // schema has no field at all, so `null` alone misses it. `isSet: false`
-  // covers that case so the backfill actually runs on legacy rows.
-  await prisma.rateConfig.updateMany({
-    where: {
-      label: "Travel",
-      OR: [{ flatRate: null }, { flatRate: { isSet: false } }],
-    },
-    data: { flatRate: 1.2 },
-  });
+  // Passive cleanup: the Student modifier was removed in the "rock solid
+  // pricing" pass. Delete any leftover row on every seed call so production
+  // matches the new DEFAULTS shape without needing a manual migration.
+  await prisma.rateConfig.deleteMany({ where: { label: "Student" } });
 
   const rates = await prisma.rateConfig.findMany({ orderBy: { label: "asc" } });
   return NextResponse.json({ ok: true, rates });

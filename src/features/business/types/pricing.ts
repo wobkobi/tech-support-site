@@ -34,6 +34,3 @@ export interface PriceRange {
   /** Customer-facing label of the active promo, when applied. */
   promoLabel?: string;
 }
-
-export type Urgency = "flexible" | "this-week" | "asap";
-export type DurationGuess = "quick" | "hour" | "few-hours" | "unsure" | null;
