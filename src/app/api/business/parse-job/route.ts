@@ -11,9 +11,14 @@ import { lookupDriveDistance } from "@/features/business/lib/travel-distance";
 import type {
   ParseJobResponse,
   ParseJobQuestion,
-  ParsedSession,
+  ParsedRange,
   RateConfig,
 } from "@/features/business/types/business";
+
+/** Internal extension that carries the per-range duration (used by the pre-compute hint). */
+interface RangeWithDuration extends ParsedRange {
+  durationMins: number;
+}
 
 const TIME_RANGE_RE =
   /(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\s*[-–—]\s*(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/gi;
@@ -64,19 +69,15 @@ function minsToHHMM(mins: number): string {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
-// ISO date or D-MMM / MMM-D leading patterns; only confident matches populate session.date.
-const LEADING_DATE_RE = /^\s*(\d{4}-\d{2}-\d{2})\b/;
-
 /**
- * Extracts one ParsedSession per HH:MM–HH:MM segment found on digit-led lines.
- * Mirrors the original calcSessionMins regex behaviour (multi-session sum is
- * still reported via the returned array's durations) but also returns the raw
- * start/end so the calculator UI can render per-session rows.
+ * Extracts every HH:MM–HH:MM segment found on digit-led lines. Used internally
+ * to compute the worked-minutes hint passed to the AI as a "pre-computed
+ * session total" annotation.
  * @param input - Raw job description text.
- * @returns Array of parsed sessions (may be empty when no time ranges detected).
+ * @returns Array of parsed time ranges (may be empty when nothing detected).
  */
-function extractSessions(input: string): ParsedSession[] {
-  const sessions: ParsedSession[] = [];
+function extractRanges(input: string): RangeWithDuration[] {
+  const ranges: RangeWithDuration[] = [];
   for (const line of input.split("\n")) {
     if (!/^\d/.test(line.trim())) continue;
     TIME_RANGE_RE.lastIndex = 0;
@@ -99,31 +100,25 @@ function extractSessions(input: string): ParsedSession[] {
         dur = dur + 24 * 60;
       }
     }
-    // Only set date when the line starts with an unambiguous ISO date.
-    // Don't invent a year for things like "Tuesday" - leave date null and
-    // let the operator fill it via the date picker if needed.
-    const dateMatch = LEADING_DATE_RE.exec(line);
-    sessions.push({
-      label: `Session ${sessions.length + 1}`,
-      date: dateMatch ? dateMatch[1] : null,
+    ranges.push({
       startTime: minsToHHMM(start),
       endTime: minsToHHMM(endResolved),
       durationMins: dur,
     });
   }
-  return sessions;
+  return ranges;
 }
 
 /**
- * Sums all HH:MM–HH:MM segments on lines that start with a digit. Thin
- * convenience wrapper around extractSessions for the AI pre-compute hint.
+ * Sums all HH:MM–HH:MM segments on lines that start with a digit. Feeds the
+ * AI pre-compute hint so the model uses the operator-stated minutes verbatim.
  * @param input - Raw job description text.
  * @returns Total worked minutes, or null if no time ranges detected.
  */
 function calcSessionMins(input: string): number | null {
-  const sessions = extractSessions(input);
-  if (sessions.length === 0) return null;
-  return sessions.reduce((s, x) => s + (x.durationMins ?? 0), 0);
+  const ranges = extractRanges(input);
+  if (ranges.length === 0) return null;
+  return ranges.reduce((s, x) => s + x.durationMins, 0);
 }
 
 /**
@@ -322,25 +317,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       });
     }
 
-    // Attach per-session ranges extracted from the raw input. When the regex
-    // finds nothing (e.g. "worked 3 hours" with no times) we synthesise one
-    // session from the AI's flat startTime/endTime so the calculator hydrator
-    // always has at least one editable row. Empty array = no times resolved.
-    const extracted = extractSessions(input);
-    if (extracted.length > 0) {
-      parsed.sessions = extracted;
+    // Attach the operator-stated ranges so the calculator can render one row
+    // per detected segment. Strip the internal durationMins - the calc derives
+    // it from start/end on its own.
+    const extractedRanges = extractRanges(input);
+    if (extractedRanges.length > 0) {
+      parsed.ranges = extractedRanges.map(({ startTime, endTime }) => ({ startTime, endTime }));
     } else if (parsed.startTime && parsed.endTime) {
-      parsed.sessions = [
-        {
-          label: "Session 1",
-          date: null,
-          startTime: parsed.startTime,
-          endTime: parsed.endTime,
-          durationMins: parsed.durationMins,
-        },
-      ];
+      parsed.ranges = [{ startTime: parsed.startTime, endTime: parsed.endTime }];
     } else {
-      parsed.sessions = [];
+      parsed.ranges = [];
     }
 
     // Wall-clock ceiling: AI sometimes inflates durationMins from its own task
@@ -359,7 +345,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     }
 
-    // Safety net: rebalance into the largest task if the sum drifts.
+    // Safety net: scale every task proportionally so the sum matches the
+    // billable hours total. Previous behaviour dumped the entire gap onto the
+    // single largest task, which produced lopsided distributions like
+    // Setup=2.33h, Config=0.75h, Website=0.5h for a 3.58h window.
     if (
       parsed.tasks?.length > 0 &&
       typeof parsed.durationMins === "number" &&
@@ -370,19 +359,29 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       const targetHours = Math.ceil((parsed.durationMins / 60) * 4) / 4;
       const sumQty = parsed.tasks.reduce((s, t) => s + (t.qty || 0), 0);
       const diff = Math.round((targetHours - sumQty) * 100) / 100;
-      if (Math.abs(diff) >= 0.25) {
-        const largestIdx = parsed.tasks.reduce(
-          (maxI, t, i, arr) => (t.qty > arr[maxI].qty ? i : maxI),
-          0,
-        );
-        const adjusted = Math.max(
-          0.25,
-          Math.round((parsed.tasks[largestIdx].qty + diff) * 100) / 100,
-        );
-        parsed.tasks[largestIdx] = { ...parsed.tasks[largestIdx], qty: adjusted };
+      if (sumQty > 0 && Math.abs(diff) >= 0.25) {
+        const multiplier = targetHours / sumQty;
+        parsed.tasks = parsed.tasks.map((t) => ({
+          ...t,
+          qty: Math.max(0.25, Math.round(t.qty * multiplier * 100) / 100),
+        }));
+        // Park any rounding remainder on the largest task so the sum lands
+        // exactly on targetHours (otherwise we leak a few cents on the invoice).
+        const adjustedSum = parsed.tasks.reduce((s, t) => s + t.qty, 0);
+        const drift = Math.round((targetHours - adjustedSum) * 100) / 100;
+        if (drift !== 0) {
+          const largestIdx = parsed.tasks.reduce(
+            (maxI, t, i, arr) => (t.qty > arr[maxI].qty ? i : maxI),
+            0,
+          );
+          parsed.tasks[largestIdx] = {
+            ...parsed.tasks[largestIdx],
+            qty: Math.max(0.25, Math.round((parsed.tasks[largestIdx].qty + drift) * 100) / 100),
+          };
+        }
         parsed.warnings = [
           ...(parsed.warnings ?? []),
-          `Rebalanced task quantities to match the ${targetHours}h total (added ${diff}h to "${parsed.tasks[largestIdx].description}").`,
+          `Rebalanced task quantities proportionally to match the ${targetHours}h total.`,
         ];
       }
     }
