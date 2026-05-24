@@ -1,36 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
-import { calcInvoiceTotals, nextInvoiceNumber } from "@/features/business/lib/business";
+import { calcInvoiceTotals } from "@/features/business/lib/business";
 import { generateInvoicePdf, extractYearCode } from "@/features/business/lib/invoice-pdf";
 import { uploadInvoicePdf } from "@/features/business/lib/google-drive";
-import { getInvoiceCounter, setInvoiceCounter } from "@/features/business/lib/google-sheets";
+import {
+  getNextInvoiceNumber,
+  writeBackInvoiceCounter,
+} from "@/features/business/lib/invoice-numbering";
 import { BUSINESS_PAYMENT_TERMS_DAYS } from "@/shared/lib/business-identity";
-
-/**
- * Fetches the next invoice number from Google Sheets, falling back to MongoDB on failure.
- * @returns Next invoice number string, sheet count for write-back, and sync warning flag
- */
-async function getNextInvoiceNumber(): Promise<{
-  number: string;
-  sheetNextCount: number | null;
-  sheetSyncWarning: boolean;
-}> {
-  try {
-    const data = await getInvoiceCounter();
-    return { number: data.nextFormatted, sheetNextCount: data.nextNumber, sheetSyncWarning: false };
-  } catch {
-    const last = await prisma.invoice.findFirst({ orderBy: { number: "desc" } });
-    const now = new Date();
-    const fy = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
-    const yearCode = String(fy) + String(fy + 1).slice(2);
-    return {
-      number: nextInvoiceNumber(last?.number ?? null, yearCode),
-      sheetNextCount: null,
-      sheetSyncWarning: true,
-    };
-  }
-}
 
 /**
  * GET /api/business/invoices - Returns all invoices ordered by creation date descending.
@@ -118,14 +96,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     },
   });
 
-  // Write back to sheet if we got a count from it
-  if (sheetNextCount !== null) {
-    try {
-      await setInvoiceCounter(sheetNextCount);
-    } catch {
-      // Non-fatal - invoice is already saved
-    }
-  }
+  // Keep the Sheets counter in sync; the helper swallows + logs failures
+  // so the just-saved invoice isn't compromised by a transient Sheets hiccup.
+  await writeBackInvoiceCounter(sheetNextCount);
 
   // Fire-and-forget: generate PDF and upload to Drive, then store the Drive URL
   void (async () => {

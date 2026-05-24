@@ -7,7 +7,9 @@
  * POST flips status to "cancelled", deletes the Google Calendar event, and
  * stamps cancelledAt + cancelledBy + lateCancellation + travelChargeApplies
  * against the policy's cancellation-window helpers (server clock so a skewed
- * client cannot argue around the boundary).
+ * client cannot argue around the boundary). When a customer cancels inside
+ * the fee window, a DRAFT cancellation invoice is auto-generated so the
+ * operator can review + send (or waive) it without rebuilding from scratch.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -18,6 +20,7 @@ import {
   isWithinCancellationWindow,
   isWithinTravelWindow,
 } from "@/features/business/lib/pricing-policy";
+import { createDraftCancellationInvoice } from "@/features/business/lib/cancellation-invoice";
 
 interface CancelPayload {
   cancelToken: string;
@@ -60,7 +63,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
  * Cancels a booking by its cancel token and removes from Google Calendar.
  * Stamps cancellation flags (lateCancellation, travelChargeApplies,
  * cancelledBy, cancelledAt) so the late-cancel fee path has the
- * authoritative server-decided values.
+ * authoritative server-decided values. When the cancellation lands inside
+ * the fee window, a DRAFT invoice is generated as a fire-and-forget task.
  * @param request - The incoming cancel request.
  * @returns JSON response indicating success or failure.
  */
@@ -106,7 +110,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const lateCancellation = isWithinCancellationWindow(booking.startAt, now);
     const travelChargeApplies = isWithinTravelWindow(booking.startAt, now);
 
-    await prisma.booking.update({
+    const updated = await prisma.booking.update({
       where: { id: booking.id },
       data: {
         status: "cancelled",
@@ -117,6 +121,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         travelChargeApplies,
       },
     });
+
+    // Auto-draft the cancellation invoice when the customer cancelled inside
+    // the fee window. Fire-and-forget so a failure here never blocks the
+    // cancellation itself - the operator can still build the invoice by hand.
+    if (lateCancellation) {
+      void createDraftCancellationInvoice(updated, {
+        includeTravel: travelChargeApplies,
+        reason: "late-cancellation",
+      }).catch((err) =>
+        console.error("[booking/cancel] Failed to draft cancellation invoice:", err),
+      );
+    }
 
     return NextResponse.json({
       ok: true,
