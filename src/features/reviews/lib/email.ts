@@ -19,8 +19,7 @@ import {
 import { cancellationCopy } from "@/features/business/lib/pricing-policy";
 
 /**
- * Escapes HTML special characters so user-supplied values can be safely
- * interpolated into HTML email bodies without breaking layout or injecting markup.
+ * Escapes HTML so user-supplied values can be interpolated into email bodies.
  * @param value - The string to escape.
  * @returns The escaped string.
  */
@@ -34,11 +33,8 @@ function escapeHtml(value: string): string {
 }
 
 /**
- * Renders a pricing-policy copy string (the `**…**` emphasis convention) as
- * email-safe HTML. The non-marker segments are HTML-escaped so any future
- * mid-string user value cannot inject markup; only the literal `<strong>`
- * tags slip through. Policy text is trusted today but the escape is cheap
- * insurance.
+ * Renders a pricing-policy `**…**` copy string as email-safe HTML. Non-marker
+ * segments are HTML-escaped as cheap insurance against future user input.
  * @param text - Copy string containing zero or more `**…**` segments.
  * @returns HTML fragment ready to drop into an email body.
  */
@@ -53,8 +49,7 @@ function renderEmphasisedHtml(text: string): string {
 }
 
 /**
- * Renders the standard email signature block (logo, name, role, phone, email,
- * site link, location). Trusted static content; no escaping needed.
+ * Renders the standard email signature block (logo, name, contact, footer).
  * @param siteUrl - Canonical site URL for the logo link and footer.
  * @returns HTML string for the signature.
  */
@@ -73,7 +68,7 @@ function buildEmailSignature(siteUrl: string): string {
     </div>`;
 }
 
-// Lazy singleton - created on first use so module import never throws in test environments.
+// Lazy singleton so module import never throws when RESEND_API_KEY is unset.
 let _resend: Resend | null = null;
 /**
  * Returns the shared Resend client, initialising it on first call.
@@ -256,16 +251,12 @@ export async function sendOwnerBookingNotification(
 }
 
 /**
- * Sends the customer a booking confirmation email with their appointment
- * details and self-serve change/cancel links. Same template handles a
- * fresh booking confirmation and a reschedule notification - only the
- * heading + intro paragraph + subject differ.
+ * Sends the customer a booking confirmation or reschedule notification.
  * Failures are caught and logged - never throws.
  * @param booking - The booking details.
  * @param options - Optional flags.
- * @param options.kind - "new" (default) confirms a fresh booking; "rescheduled" confirms an edit.
+ * @param options.kind - "new" (default) for a fresh booking; "rescheduled" for an edit.
  * @param options.previousStartAt - Original start time, shown crossed-out when rescheduled.
- * @returns Promise that resolves when the email is sent (or silently fails).
  */
 export async function sendCustomerBookingConfirmation(
   booking: BookingNotificationData,
@@ -348,11 +339,8 @@ ${buildEmailSignature(siteUrl)}
 }
 
 /**
- * Sends a short "your appointment is tomorrow" reminder email. Fired by the
- * /api/cron/send-booking-reminders cron when a confirmed booking enters the
- * 24h-out window. Reuses the same change/cancel buttons as the confirmation
- * email so the customer can self-serve without digging through old emails.
- * Failures are caught and logged - never throws.
+ * Sends a "your appointment is tomorrow" reminder. Fired by the
+ * /api/cron/send-booking-reminders cron. Failures are logged - never throws.
  * @param booking - Booking details (same shape as the confirmation helper).
  * @returns True if Resend accepted the message, false on misconfig / failure.
  */

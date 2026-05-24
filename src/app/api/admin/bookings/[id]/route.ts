@@ -24,19 +24,11 @@ interface PatchPayload {
   address?: string;
   status?: "confirmed" | "cancelled" | "completed";
   /**
-   * Distinguishes between the operator cancelling the booking themselves
-   * (sick, scheduling clash) and the operator cancelling on behalf of a
-   * customer who phoned/emailed instead of using the magic-link cancel page.
-   * Only "on-behalf" triggers the late-cancellation fee flow; operator
-   * cancels never charge the customer.
-   * Defaults to "operator" when omitted.
+   * "operator" (default) = operator cancel, no customer fee. "on-behalf" =
+   * customer cancelled by phone/email; uses the standard fee rules.
    */
   cancelMode?: "operator" | "on-behalf";
-  /**
-   * Marks the booking as a no-show. Equivalent to a customer cancellation
-   * stamped at startAt (so it always lands inside both windows), plus
-   * `noShow: true`. Triggers the draft-invoice flow.
-   */
+  /** No-show: always charges callout + travel via the draft-invoice flow. */
   markNoShow?: boolean;
 }
 
@@ -81,10 +73,7 @@ export async function PATCH(
   }
 
   if (body.markNoShow && booking.status !== "cancelled") {
-    // No-show: equivalent to a customer cancellation that happened AT the
-    // booking time, so both windows are inside. Always charge the callout
-    // + travel via the draft invoice. cancelledBy stays "customer" because
-    // the customer's absence is what triggered the charge.
+    // No-show ~ a customer cancel at startAt: both windows are inside.
     if (booking.calendarEventId) {
       try {
         await deleteBookingEvent({ eventId: booking.calendarEventId });
@@ -112,10 +101,7 @@ export async function PATCH(
     data.status = "cancelled";
     data.activeSlotKey = `released:${id}`;
     data.cancelledAt = now;
-    // Operator cancels never trigger the late-fee flow regardless of timing
-    // (it was the operator's call, not the customer's); on-behalf cancels
-    // follow the customer rules so a customer phoning to cancel inside the
-    // window pays the same fee they would pay through the magic link.
+    // Operator cancels never charge; on-behalf follows customer fee rules.
     data.cancelledBy = onBehalf ? "customer" : "operator";
     data.lateCancellation = onBehalf ? isWithinCancellationWindow(booking.startAt, now) : false;
     data.travelChargeApplies = onBehalf ? isWithinTravelWindow(booking.startAt, now) : false;
@@ -128,10 +114,7 @@ export async function PATCH(
 
   const updated = await prisma.booking.update({ where: { id }, data });
 
-  // Fire-and-forget the cancellation invoice draft when the flags warrant
-  // it. Mirrors the customer-side cancel flow so an operator-marked no-show
-  // or an on-behalf cancel inside the fee window produces the same draft
-  // the customer self-serve path would.
+  // Mirrors the customer-side cancel flow - same draft for on-behalf + no-show.
   if (
     updated.lateCancellation &&
     updated.cancelledBy === "customer" &&

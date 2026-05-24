@@ -34,13 +34,7 @@ interface Props {
 
 /**
  * Live A4-styled invoice preview. Mirrors invoice-pdf.ts so the operator sees
- * the same layout the customer will receive. Used by both the calculator's
- * right column (live preview while building) and InvoiceBuilderView's right
- * column (form edits). Pure presentational - no fetches, no state.
- *
- * Layout deliberately matches the no-zebra / no-tint convention the PDF uses
- * (matches Xero / QuickBooks output). Long line-item lists scroll inside the
- * sheet on lg+ via the parent's sticky+overflow wrapper.
+ * the same layout the customer will receive. Pure presentational.
  * @param props - Component props.
  * @returns Invoice preview element.
  */
@@ -65,9 +59,7 @@ function InvoicePreviewPanelImpl(props: Props): React.ReactElement {
       className={cn(
         "flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm",
         "lg:aspect-210/297 lg:sticky lg:top-4 lg:overflow-y-auto",
-        // Print overrides: defeat the lg: sticky + scroll constraints so the
-        // browser captures the FULL invoice rather than just the visible scroll
-        // position.
+        // Print: defeat sticky + scroll so the browser captures the full invoice.
         "print:static print:aspect-auto print:overflow-visible print:rounded-none print:border-0 print:shadow-none",
       )}
     >
@@ -216,7 +208,7 @@ function InvoicePreviewPanelImpl(props: Props): React.ReactElement {
           </div>
         </div>
 
-        {/* Bank transfer call-out - border-only (no tint) to match the PDF. */}
+        {/* Bank transfer call-out. */}
         <div
           className={cn("mb-4 space-y-1 rounded-lg border border-slate-200 px-3 py-3 text-[11px]")}
         >
@@ -248,9 +240,5 @@ function InvoicePreviewPanelImpl(props: Props): React.ReactElement {
   );
 }
 
-/**
- * Memoised export so callers passing identical props (memoised line items,
- * stable string fields) avoid re-rendering the panel on unrelated parent
- * state changes (e.g. typing in an AI input box elsewhere).
- */
+// Memoised so parent re-renders with identical props skip the preview.
 export const InvoicePreviewPanel = memo(InvoicePreviewPanelImpl);

@@ -1,15 +1,10 @@
 // src/app/api/booking/cancel/route.ts
 /**
  * @file route.ts
- * @description API route to cancel a booking using a cancel token.
- * GET returns booking info (startAt, status) so the customer-facing cancel
- * page can render the cancellation-fee banner before they confirm.
- * POST flips status to "cancelled", deletes the Google Calendar event, and
- * stamps cancelledAt + cancelledBy + lateCancellation + travelChargeApplies
- * against the policy's cancellation-window helpers (server clock so a skewed
- * client cannot argue around the boundary). When a customer cancels inside
- * the fee window, a DRAFT cancellation invoice is auto-generated so the
- * operator can review + send (or waive) it without rebuilding from scratch.
+ * @description Cancel a booking by cancel token. GET returns startAt +
+ * status so the cancel page can render the fee banner before firing. POST
+ * cancels, stamps cancellation flags from the server clock, and auto-drafts
+ * a DRAFT invoice when the cancel lands inside the fee window.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -28,9 +23,7 @@ interface CancelPayload {
 
 /**
  * GET /api/booking/cancel?token=...
- * Returns minimal booking info the cancel page needs to render the
- * confirmation gate (the appointment time + current status). Never mutates
- * state - the actual cancellation is a separate POST.
+ * Booking info for the confirmation gate. Never mutates state.
  * @param request - Incoming request, expects ?token=... in the query string.
  * @returns JSON `{ ok, startAt, status }` or `{ ok: false, error }`.
  */
@@ -60,11 +53,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
 /**
  * POST /api/booking/cancel
- * Cancels a booking by its cancel token and removes from Google Calendar.
- * Stamps cancellation flags (lateCancellation, travelChargeApplies,
- * cancelledBy, cancelledAt) so the late-cancel fee path has the
- * authoritative server-decided values. When the cancellation lands inside
- * the fee window, a DRAFT invoice is generated as a fire-and-forget task.
+ * Cancels the booking, removes its Google Calendar event, stamps the
+ * cancellation flags, and fires the auto-draft invoice when inside the fee window.
  * @param request - The incoming cancel request.
  * @returns JSON response indicating success or failure.
  */
@@ -80,7 +70,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ ok: false, error: "Missing cancel token." }, { status: 400 });
     }
 
-    // Find the booking
     const booking = await prisma.booking.findFirst({
       where: { cancelToken },
     });
@@ -93,19 +82,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ ok: false, error: "Booking already cancelled." }, { status: 400 });
     }
 
-    // Delete from Google Calendar if there's an event ID
     if (booking.calendarEventId) {
       try {
         await deleteBookingEvent({ eventId: booking.calendarEventId });
       } catch (err) {
+        // Don't block the DB cancel on a Google API hiccup.
         console.error("[booking/cancel] Failed to delete calendar event:", err);
-        // Continue anyway - we still want to mark as cancelled in our DB
       }
     }
 
-    // Compute the cancellation-fee flags against the server clock so a skewed
-    // client cannot argue around the boundary. Both flags are derived from
-    // the booking's startAt and the policy's window helpers.
+    // Server clock decides the fee flags so a skewed client can't move the boundary.
     const now = new Date();
     const lateCancellation = isWithinCancellationWindow(booking.startAt, now);
     const travelChargeApplies = isWithinTravelWindow(booking.startAt, now);
@@ -122,9 +108,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       },
     });
 
-    // Auto-draft the cancellation invoice when the customer cancelled inside
-    // the fee window. Fire-and-forget so a failure here never blocks the
-    // cancellation itself - the operator can still build the invoice by hand.
+    // Fire-and-forget so a draft failure never blocks the cancel response.
     if (lateCancellation) {
       void createDraftCancellationInvoice(updated, {
         includeTravel: travelChargeApplies,

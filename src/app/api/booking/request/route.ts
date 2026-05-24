@@ -237,13 +237,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // Snapshot the live rates + active promo + one-way travel time onto the
-    // booking row so the price the customer was quoted survives later rate
-    // edits / promo expiry / address changes. The late-cancellation invoice
-    // path (createDraftCancellationInvoice) and the upcoming "open invoice
-    // from booking" path both rely on these snapshots. All three snapshot
-    // groups are best-effort: failures degrade to null rather than blocking
-    // the booking, since the booking itself is the primary write.
+    // Snapshot rates + active promo + one-way travel time so the quoted
+    // price survives later admin rate edits / promo expiry. Consumed by the
+    // late-cancellation invoice helper + future "open invoice from booking".
+    // Best-effort: failures degrade to null rather than blocking the booking.
     const [rates, activePromo] = await Promise.all([
       prisma.rateConfig.findMany().catch((err) => {
         console.warn("[booking/request] RateConfig snapshot fetch failed:", err);
@@ -264,10 +261,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         : null;
     const travelRatePerHourAtBooking = travelRow?.ratePerHour ?? null;
 
-    // One-way drive time for in-person bookings; powers the late-cancel
-    // travel charge without a re-lookup at cancel time. Distance Matrix
-    // failures are non-blocking - the cancel handler has a notes-parse
-    // fallback for legacy rows without this field.
+    // One-way drive time for in-person bookings; lets the late-cancel
+    // handler bill travel without a re-lookup. Non-blocking on failure.
     let travelMinsAtBooking: number | null = null;
     if (meetingType === "in-person" && address && address.trim()) {
       try {
@@ -297,20 +292,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           activeSlotKey: startAt.toISOString(), // Unique constraint for double-booking prevention
           bufferBeforeMin: 0,
           bufferAfterMin: BOOKING_CONFIG.bookingBufferAfterMin,
-          // Structured booking inputs. Notes text is dual-written above so
-          // existing admin code that regex-parses "Address: X" keeps working
-          // until the readers migrate to these fields directly.
+          // Structured fields; notes text above is dual-written for legacy
+          // admin code that still regex-parses "Address: X" out of it.
           address: address?.trim() || null,
           meetingType: meetingType === "in-person" ? "in_person" : "remote",
           duration,
           travelMinsAtBooking,
-          // Rate snapshot - lets the late-cancel + future invoice flows
-          // honour the price the customer was quoted at booking time.
+          // Rate snapshot locks in the quoted price against later admin edits.
           baseRateAtBooking,
           complexRateAtBooking,
           travelRatePerHourAtBooking,
-          // Promo snapshot - denormalised so the original deal survives even
-          // if the Promo row is deleted before the appointment.
+          // Promo snapshot denormalised - survives Promo deletion before service.
           promoIdAtBooking: activePromo?.id ?? null,
           promoTitleAtBooking: activePromo?.title ?? null,
           promoFlatHourlyRateAtBooking: activePromo?.flatHourlyRate ?? null,

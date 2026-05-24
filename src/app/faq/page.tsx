@@ -54,9 +54,7 @@ const linkStyle = cn(
 );
 
 /**
- * Strips the `**…**` emphasis markers from a pricing-policy copy string so
- * the text can be inlined into JSON-LD (FAQPage) or other plain-text contexts
- * where bold markers would read as literal asterisks.
+ * Strips `**…\=**` markers for JSON-LD plain-text contexts.
  * @param text - Copy string with `**…**` segments.
  * @returns Plain-text equivalent.
  */
@@ -65,9 +63,7 @@ function stripEmphasis(text: string): string {
 }
 
 /**
- * Renders the `**…**` emphasis convention as `<strong>` spans. Keeps the
- * FAQ accordion bodies visually consistent with /pricing and the booking
- * confirmation email body.
+ * Renders `**…**` as `<strong>` spans for the JSX accordion bodies.
  * @param text - Copy string containing zero or more `**…**` segments.
  * @returns Array of React nodes ready to drop into a parent block element.
  */

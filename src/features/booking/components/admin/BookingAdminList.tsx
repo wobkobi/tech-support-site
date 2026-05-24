@@ -63,10 +63,7 @@ export function BookingAdminList({
   const [saving, setSaving] = useState<string | null>(null);
   const [resending, setResending] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  // "Now" snapshot used by the Mark no-show button visibility check. Stable
-  // across renders so React's purity rule doesn't flag the comparison
-  // (react-hooks/purity bans Date.now() in render). The operator refreshes
-  // the admin list often enough that staleness here is fine.
+  // Stable "now" so the no-show button check doesn't trigger react-hooks/purity.
   const [renderedAt] = useState(() => Date.now());
 
   const counts = {

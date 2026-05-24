@@ -58,17 +58,12 @@ export function formatUTCDDMMYYYY(date: Date): string {
 }
 
 /**
- * Calculates invoice totals with an optional promo discount. GST mode is
- * driven by the GST_REGISTERED flag in pricing-policy.ts (single source of
- * truth - per-invoice override would re-introduce drift):
- * - GST_REGISTERED=false (today): gstAmount=0, total = post-discount subtotal.
- * - GST_REGISTERED=true (future): displayed rates are treated as GST-inclusive;
- *   gstAmount is back-calculated from the taxable amount via
- *   calcGstFromInclusive and total stays equal to taxableAmount (the customer
- *   already paid the GST inside the quoted price - nothing is added on top).
- * The discount is subtracted from the gross subtotal before GST is computed,
- * matching the Calculator's Summary panel and IRD's "discount = price
- * reduction" treatment.
+ * Invoice totals with an optional discount. GST mode is driven by
+ * GST_REGISTERED in pricing-policy.ts. When false (today), gstAmount=0;
+ * when true (future), gstAmount is back-calculated from the inclusive
+ * total via calcGstFromInclusive and total stays equal to taxableAmount
+ * (GST is already inside the displayed price). Discount is subtracted
+ * before GST is computed, matching IRD's price-reduction treatment.
  * @param lineItems - Array of line items with qty and unit price.
  * @param promoDiscount - Optional dollar discount (e.g. from a promo snapshot).
  * @returns Subtotal (gross), GST amount, and total (post-discount, post-GST).
@@ -449,25 +444,14 @@ export function computeJobPromoDiscount(job: JobCalculation, promo: JobPromo | n
 }
 
 /**
- * Calculates the complete cost breakdown for a job. When `promo` is supplied
- * (and the job has labor), a `promoDiscount` is computed via
- * `computeJobPromoDiscount` and subtracted from the subtotal before GST.
- * Travel + parts are never discounted.
- *
- * GST handling matches calcInvoiceTotals: when GST_REGISTERED is true the
- * quoted rates are treated as GST-inclusive and gstAmount is back-calculated
- * from the taxable amount (so the total stays equal to the discounted
- * subtotal - GST is already inside the displayed price). When false,
- * gstAmount is 0 and no GST line is printed. job.gst is ignored - the flag
- * is the single source of truth.
- *
- * Travel floor is enforced here as defence in depth: a hand-edited travel
- * entry that sums below MIN_TRAVEL_CHARGE bumps to the minimum, but only
- * when at least one auto entry contributed to the total (manual-only
- * travel like a parking fee passes through unchanged).
+ * Cost breakdown for a job. Promo discount applies to labour only; travel +
+ * parts stay at full price. Unsuccessful-work flag halves the labour
+ * portion. GST mode is driven by GST_REGISTERED (see calcInvoiceTotals);
+ * job.gst is ignored. Travel floor (MIN_TRAVEL_CHARGE) only applies when an
+ * auto entry contributed - manual-only travel passes through unchanged.
  * @param job - Job calculation with time, tasks, and parts.
  * @param promo - Optional active promo to apply.
- * @returns Cost breakdown including promoDiscount.
+ * @returns Cost breakdown with promo + unsuccessful discounts split out.
  */
 export function calcJobTotal(
   job: JobCalculation,
@@ -490,22 +474,14 @@ export function calcJobTotal(
   const tasksTotal = job.tasks.reduce((s, t) => s + t.qty * t.unitPrice, 0);
   const partsTotal = job.parts.reduce((s, p) => s + p.cost, 0);
   const rawTravelTotal = travelEntriesTotal(job.travelEntries);
-  // Floor the travel line at MIN_TRAVEL_CHARGE only when there's an
-  // automatic (lookup-populated) entry contributing to it. A manual-only
-  // total (e.g. operator added a $5 parking fee, no drive entry) bypasses
-  // the floor because the operator explicitly chose the amount.
+  // Auto entries trigger the floor; manual-only entries (parking, etc.) don't.
   const hasAutoEntry = job.travelEntries.some((e) => e.isAuto && e.cost > 0);
   const travelTotal =
     hasAutoEntry && rawTravelTotal > 0 && rawTravelTotal < MIN_TRAVEL_CHARGE
       ? MIN_TRAVEL_CHARGE
       : rawTravelTotal;
-  // Subtotal = gross (pre-promo); promo shown as its own line in the Summary.
   const subtotal = Math.round((timeCharge + tasksTotal + partsTotal + travelTotal) * 100) / 100;
   const promoDiscount = computeJobPromoDiscount(job, promo);
-  // Unsuccessful-work clause: half off labour (time charge + hourly tasks
-  // only) when the operator ticks "unsuccessful" because they couldn't fix
-  // the issue AND couldn't diagnose it. Parts and travel stay at full
-  // price - they were real costs regardless of outcome.
   let unsuccessfulDiscount = 0;
   if (job.unsuccessful) {
     const hourlyTasksTotal = job.tasks
@@ -514,7 +490,7 @@ export function calcJobTotal(
     const labourBase = timeCharge + hourlyTasksTotal;
     unsuccessfulDiscount = Math.round(labourBase * 0.5 * 100) / 100;
   }
-  // GST applies to the discounted amount per NZ IRD treatment.
+  // GST applied to the discounted amount per NZ IRD price-reduction treatment.
   const taxableAmount = Math.round((subtotal - promoDiscount - unsuccessfulDiscount) * 100) / 100;
   const gstAmount = GST_REGISTERED ? calcGstFromInclusive(taxableAmount, GST_RATE) : 0;
   return {

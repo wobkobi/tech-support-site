@@ -158,9 +158,7 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
   const [showParts, setShowParts] = useState(false);
   const [showTaxonomyModal, setShowTaxonomyModal] = useState(false);
   const [notes, setNotes] = useState("");
-  // Operator-set unsuccessful-work flag (per pricing-policy unsuccessfulWorkCopy:
-  // half off labour when I couldn't fix AND couldn't diagnose). Travel + parts
-  // unaffected. Persists onto the invoice as Invoice.unsuccessful for audit.
+  // Half off labour when ticked (per pricing-policy.unsuccessfulWorkCopy).
   const [unsuccessful, setUnsuccessful] = useState(false);
   const [clientName, setClientName] = useState("");
   const [clientEmail, setClientEmail] = useState("");
@@ -1252,11 +1250,7 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
             onPickContact={() => setShowContactPicker(true)}
           />
 
-          {/* Unsuccessful-work toggle: per pricing-policy unsuccessfulWorkCopy,
-              half off labour when I couldn't fix AND couldn't diagnose.
-              Travel + parts unaffected. Tick this only when neither test was
-              met - a partial fix counts as a fix; a written diagnosis counts
-              as a diagnosis. */}
+          {/* Half off labour when ticked (couldn't fix AND couldn't diagnose). */}
           <div className={cn("rounded-xl border border-slate-200 bg-white p-3 shadow-sm")}>
             <label
               className={cn("flex cursor-pointer items-start gap-2 text-sm")}

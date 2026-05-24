@@ -53,14 +53,12 @@ export const CANCELLATION: CancellationPolicy = {
 };
 
 /**
- * Round-trip travel charge for a single trip. Always doubles the one-way
- * drive time, snaps to $5, and floors at MIN_TRAVEL_CHARGE so a 2-minute
- * trip cannot bill a sub-$10 line item. Returns 0 when there is no travel
- * (remote sessions, or addresses that geocode to the origin) so the floor
- * does not invent a charge out of nothing.
+ * Round-trip travel charge. Doubles one-way drive time, snaps to $5, and
+ * floors at MIN_TRAVEL_CHARGE. Returns 0 for no travel (remote, or geocoded
+ * to origin) so the floor doesn't invent a charge.
  *
- * Pass ONE-WAY travelMins; this function doubles internally. Passing
- * round-trip minutes would 4x the bill.
+ * Pass ONE-WAY travelMins; this doubles internally. Passing round-trip
+ * minutes would 4x the bill.
  * @param travelMins - One-way drive time in minutes (from `lookupDriveDistance`).
  * @param travelRatePerHour - Travel hourly rate, sourced from the `Travel` RateConfig.
  * @returns Charge in NZD (whole dollars after $5 rounding), or 0 when no travel.
@@ -108,19 +106,13 @@ export function floorBillableMins(rawMins: number): number {
 }
 
 // > Copy generators
-// Each generator takes its variable inputs explicitly so the rendered text
-// always matches the live values it depends on. Calling sites pass the
-// rate / threshold they just looked up from the DB (or the policy
-// constants) and get a consistent string back.
-//
-// Bold convention: key figures and policy boundaries are wrapped in `**…**`
-// so the pricing page can render them as `<strong>` while emails / FAQs can
-// pass the string through as-is (the markers read as emphasis in plain text
-// and are also valid markdown if a downstream renderer wants to honour them).
+// Generators take their variable inputs explicitly so the rendered text
+// always matches the live values. Key figures are wrapped in `**…**` so the
+// pricing page can emit `<strong>` while emails / FAQs pass the markers
+// through as plain-text emphasis.
 
 /**
- * Cancellation policy text used on the pricing page accordion, the booking
- * confirmation email, the reminder email, and the cancel-confirmation page.
+ * Cancellation policy text (pricing accordion + booking emails + cancel page).
  * @param p - Cancellation policy (defaults to the module constant).
  * @returns Multi-line copy describing the cancellation rules.
  */
@@ -134,9 +126,7 @@ export function cancellationCopy(p: CancellationPolicy = CANCELLATION): string {
 }
 
 /**
- * Unsuccessful-work definition used on the pricing page accordion and the
- * FAQ. Spells out the two-test rule so neither party can argue what counts
- * as "unsuccessful".
+ * Two-test definition for "unsuccessful" so neither party can argue it.
  * @returns Multi-paragraph copy describing the half-price rule.
  */
 export function unsuccessfulWorkCopy(): string {
@@ -150,8 +140,8 @@ export function unsuccessfulWorkCopy(): string {
 }
 
 /**
- * Travel-policy text. Caller supplies the live Travel rate so the page
- * always quotes the figure the operator is actually billing.
+ * Travel-policy text. Caller passes the live Travel rate so the page always
+ * quotes the figure the operator is actually billing.
  * @param travelRatePerHour - Current Travel rate from the RateConfig row.
  * @returns Copy describing the travel charge model.
  */
@@ -211,11 +201,9 @@ export interface Policy {
 }
 
 /**
- * Forward-looking accessor that returns every policy value in one object.
- * Async from day one so the future swap to a `prisma.setting.findMany()`
- * implementation does not break any consumer. Today it just bundles the
- * module constants; consumers read `(await getPolicy()).CANCELLATION.callOutFee`
- * instead of importing each constant separately.
+ * Forward-looking accessor that bundles every policy value. Async so a
+ * future swap to a `prisma.setting.findMany()` backing doesn't break
+ * consumers - they `(await getPolicy()).CANCELLATION.callOutFee` already.
  * @returns Current policy values.
  */
 export async function getPolicy(): Promise<Policy> {

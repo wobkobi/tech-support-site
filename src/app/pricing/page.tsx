@@ -1,10 +1,9 @@
 // src/app/pricing/page.tsx
 /**
  * @file page.tsx
- * @description Pricing page: transparent pricing structure for tech support
- * services. Rates fetched live from the RateConfig table (single source of
- * truth shared with the calculator and the wizard); accordion copy pulled
- * from pricing-policy.ts so the page, booking emails, and FAQ stay aligned.
+ * @description Pricing page. Rates come from RateConfig (shared with the
+ * calculator and wizard); accordion copy comes from pricing-policy.ts so the
+ * page, booking emails, and FAQ stay aligned.
  */
 
 import type { Metadata } from "next";
@@ -31,8 +30,7 @@ import {
 import { formatDateShort } from "@/shared/lib/date-format";
 import { FaCaretDown, FaCheck } from "react-icons/fa6";
 
-// Promo + rate-config state changes the rendered figures; force-dynamic keeps
-// the page always-fresh so an admin rate edit shows up on the next visit.
+// Admin rate / promo edits must show on next visit.
 export const dynamic = "force-dynamic";
 
 /**
@@ -70,11 +68,7 @@ const linkStyle = cn(
 );
 
 /**
- * Renders the `**…**` emphasis convention used by pricing-policy.ts copy
- * generators as `<strong>` spans. Older customers scan for figures and
- * policy boundaries first; bolding them makes the accordion bodies
- * dispute-proof at a glance. Emails get the same strings with the markers
- * left as-is (read as plain-text emphasis).
+ * Renders `**…**` segments from pricing-policy copy as `<strong>` spans.
  * @param text - Copy string containing zero or more `**…**` segments.
  * @returns Array of React nodes ready to drop into a `<div>`.
  */

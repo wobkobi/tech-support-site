@@ -87,8 +87,7 @@ export function PricingWizard(): React.ReactElement {
     setIsCalculating(true);
     setAddressNotFound(false);
 
-    // Strip trailing ", New Zealand" — travel-time API appends it automatically.
-    // Skip the lookup entirely for remote sessions.
+    // Travel-time API appends ", New Zealand"; strip before re-sending. Remote skips.
     const dest =
       meeting === "remote"
         ? ""
@@ -123,9 +122,8 @@ export function PricingWizard(): React.ReactElement {
       ),
     ]);
 
-    // Travel minutes are one-way from the API. calcTravelCharge doubles for
-    // round-trip internally. Remote sessions force 0 even if an address was
-    // typed before the user backed up - defensive against state leakage.
+    // travelMins is one-way; calcTravelCharge doubles internally for round-trip.
+    // Force 0 for remote even if an address was typed before backing up.
     const travelMins =
       meeting === "remote"
         ? 0
@@ -133,10 +131,8 @@ export function PricingWizard(): React.ReactElement {
           ? (travelRes.value.durationMins ?? 0)
           : 0;
 
-    // Surface a disclaimer when the user typed an address but Google couldn't
-    // geocode it (returns durationMins: 0). Without this the wizard silently
-    // quotes $0 travel and the customer wonders why their quote doesn't
-    // include the drive they expect.
+    // Disclaim when an address was typed but geocoding returned durationMins: 0.
+    // Without this the wizard silently quotes $0 travel.
     if (meeting === "on-site" && dest && travelMins === 0) {
       setAddressNotFound(true);
     }
@@ -154,9 +150,7 @@ export function PricingWizard(): React.ReactElement {
       category = ai.category;
       tasks = Array.isArray(ai.tasks) ? ai.tasks : [];
 
-      // Standard base + stacked modifier deltas (Complex when AI flags it,
-      // Remote when the customer picked remote support). Mirrors how
-      // effectiveHourlyRate composes the rate in the calculator.
+      // Mirror effectiveHourlyRate: Standard base + stacked modifier deltas.
       const baseStandard =
         rates.find((r) => r.ratePerHour !== null && r.isDefault)?.ratePerHour ??
         rates.find((r) => r.ratePerHour !== null)?.ratePerHour ??
@@ -172,8 +166,7 @@ export function PricingWizard(): React.ReactElement {
       fullRate = baseStandard + complexDelta + remoteDelta;
     }
 
-    // Look up the dedicated Travel rate ($40/h by default) - decoupled from
-    // labour so Complex/Remote/promo never affect it.
+    // Travel rate is decoupled from labour; Complex/Remote/promo never touch it.
     const travelRatePerHour =
       rates.find((r) => r.unit === "travel-hour" && r.ratePerHour !== null)?.ratePerHour ?? 40;
 
@@ -183,16 +176,12 @@ export function PricingWizard(): React.ReactElement {
     setAiExplanation(explanation);
     setAiEstimatedMins(estimatedMins);
 
-    // 15-min minimum visit floors short jobs so we never quote less than the
-    // published billable minimum. The wider ±25% (vs the old ±15%) and bumped
-    // $20 minimum spread make the high end defensible against "but the site
-    // said $X" complaints. Applies to the visit total, not each task line.
+    // Floor short jobs to the published billable minimum. ±25% spread with a
+    // $20 minimum bucket keeps the high end defensible per published policy.
     const effectiveMins = Math.max(MIN_BILLABLE_MINS, estimatedMins);
 
     /**
-     * Builds a ±25% price range for a given duration + rate, rounded to the
-     * nearest $5 with a $20 minimum spread. Used for the visit total AND each
-     * breakdown line; the caller chooses whether to apply the visit floor.
+     * Builds a ±25% price range rounded to the nearest $5 with a $20 min spread.
      * @param mins - Minutes for this slice.
      * @param rate - Effective $/hr.
      * @returns Whole-dollar low/high range.
@@ -204,18 +193,14 @@ export function PricingWizard(): React.ReactElement {
       return { low, high };
     };
 
-    // Travel is never discounted by promos (matches the schema rule: promos
-    // apply to labor only - parts and Travel are full price). Computed via
-    // calcTravelCharge so the round-trip + $10 minimum match the calculator
-    // and invoice exactly. Always uses the dedicated Travel rate, never the
-    // labour rate, so Complex/Remote/promo don't bleed into the travel line.
+    // Travel uses the dedicated Travel rate (never promo-discounted, never
+    // labour-rate). Routes through calcTravelCharge so the floor + round-trip
+    // doubling match the calculator and invoice exactly.
     const travel = calcTravelCharge(travelMins, travelRatePerHour);
 
     /**
-     * Builds the visit total (with floor applied) plus the flat travel
-     * surcharge. Called once per labor rate branch so the post-promo and
-     * crossed-out original ranges stay consistent.
-     * @param rate - Effective $/hr for labor.
+     * Visit total (floor applied) plus flat travel surcharge.
+     * @param rate - Effective $/hr for labour.
      * @returns Visit low/high plus the (rate-invariant) drive-time charge.
      */
     const buildVisitRange = (rate: number): { low: number; high: number; travel: number } => {
@@ -224,23 +209,17 @@ export function PricingWizard(): React.ReactElement {
     };
 
     const promoRange = buildVisitRange(promoRate);
-    // Cosmetic safety net: only surface the crossed-out original when the
-    // rounded range actually differs - if both branches happen to round to
-    // the same bucket, identical struck/un-struck prices read as a glitch.
+    // Only show the crossed-out original when it actually differs after rounding.
     const rawOriginal = promoApplied ? buildVisitRange(fullRate) : null;
     const original =
       rawOriginal && (rawOriginal.low !== promoRange.low || rawOriginal.high !== promoRange.high)
         ? rawOriginal
         : null;
 
-    // Per-task breakdown: when the AI returned >1 task, allocate the VISIT
-    // job range proportionally to each task's share of the total mins.
-    // Going line-by-line with rangeFor would re-apply the $20 min spread per
-    // line and inflate the breakdown above the visit total, then drift
-    // correction would squish the largest line to a single price. The
-    // proportional split keeps each task's slice honest and guarantees the
-    // lines sum exactly to the visit total (rounding drift snaps to the
-    // largest line).
+    // Per-task breakdown: allocate the visit range proportionally to each
+    // task's share of total mins. Per-line rangeFor would re-apply the $20 min
+    // spread and inflate beyond the visit total; proportional split keeps the
+    // sum honest with drift snapping to the largest line.
     const taskLines = (() => {
       const visitJob = rangeFor(effectiveMins, promoRate);
       if (tasks.length <= 1) {

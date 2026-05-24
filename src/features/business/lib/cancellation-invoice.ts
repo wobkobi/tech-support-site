@@ -2,15 +2,9 @@
 /**
  * @file cancellation-invoice.ts
  * @description Builds + writes the DRAFT invoice that covers a late
- * cancellation. Shared by:
- * - /api/booking/cancel (customer self-serve cancel inside the fee window)
- * - /api/admin/bookings/[id] (operator cancels on the customer's behalf, or
- *   marks a no-show)
- *
- * The helper is intentionally side-effecting (creates an Invoice row,
- * potentially writes the Sheets counter back) and fire-and-forget callable.
- * Failures log; they never throw - the cancel/no-show action that triggered
- * this should never be blocked by an invoice draft failure.
+ * cancellation or no-show. Shared by /api/booking/cancel (customer) and
+ * /api/admin/bookings/[id] (operator). Fire-and-forget callable; failures
+ * log but never throw so the cancel action that triggered this stays clean.
  */
 
 import type { Booking } from "@prisma/client";
@@ -35,11 +29,10 @@ export interface DraftCancellationInvoiceOptions {
 }
 
 /**
- * Builds + persists the DRAFT cancellation invoice for a booking. Idempotency
- * is the caller's responsibility - this just creates a new draft each time it
- * is called. Travel time is sourced from the booking-time snapshot when
- * present and falls back to a live `Address: X` parse + Distance Matrix
- * lookup when the booking pre-dates the snapshot wiring.
+ * Builds + persists a DRAFT cancellation invoice. Idempotency is the
+ * caller's job; this creates a new draft per call. Travel time prefers the
+ * booking-time snapshot, falls back to parsing "Address: X" from notes +
+ * a live Distance Matrix lookup for legacy rows.
  * @param booking - Booking row, already stamped with cancellation flags.
  * @param options - Travel + reason flags.
  */
@@ -65,8 +58,7 @@ export async function createDraftCancellationInvoice(
   if (options.includeTravel) {
     let travelMins = booking.travelMinsAtBooking ?? 0;
     if (!travelMins) {
-      // Legacy fallback: parse "Address: X" out of notes, attempt a live
-      // Distance Matrix lookup. Pre-dates the booking-time snapshot wiring.
+      // Legacy fallback for pre-snapshot rows: notes-parse + live lookup.
       const addressMatch = booking.notes?.match(/Address:\s*(.+)/i);
       const address = addressMatch?.[1]?.trim();
       if (address) {
@@ -79,8 +71,7 @@ export async function createDraftCancellationInvoice(
       }
     }
     if (travelMins > 0) {
-      // Prefer the snapshotted Travel rate (locks in what the customer was
-      // quoted at booking time); fall back to the current rate.
+      // Snapshot wins to lock in the rate the customer was quoted.
       let travelRatePerHour = booking.travelRatePerHourAtBooking ?? 0;
       if (!travelRatePerHour) {
         const travelRow = await prisma.rateConfig.findFirst({
@@ -100,14 +91,11 @@ export async function createDraftCancellationInvoice(
     }
   }
 
-  // Same numbering source as the regular invoice create flow so we never
-  // collide on the unique Invoice.number index.
+  // Shared numbering avoids unique-constraint collisions with the admin flow.
   const { number, sheetNextCount } = await getNextInvoiceNumber();
   const { subtotal, gstAmount, total } = calcInvoiceTotals(lineItems, 0);
   const now = new Date();
 
-  // Best-effort contact link so the invoice shows up under the right Contact
-  // row in admin. Failures are non-fatal.
   let contactId: string | null = null;
   try {
     const { contact } = await findOrCreateContactByEmail(booking.email.trim().toLowerCase(), {

@@ -44,12 +44,9 @@ const MODIFIER_DESCRIPTIONS: Record<string, string> = {
 };
 
 /**
- * Returns the public-facing pricing snapshot used by the pricing page.
- * Reads RateConfig directly (no self-fetch via /api/pricing/rates) so the
- * page renders in one Prisma round-trip during the server render.
- *
- * Falls back to the hardcoded $65 / $40 defaults when a row is missing so
- * the page never renders blank prices even mid-migration.
+ * Public pricing snapshot for the pricing + FAQ pages. Reads RateConfig
+ * directly so the render takes one Prisma round-trip. Falls back to
+ * hardcoded $65 / $40 defaults when a row is missing.
  * @returns Live pricing snapshot.
  */
 export async function getPublicPricing(): Promise<PublicPricing> {
@@ -66,9 +63,7 @@ export async function getPublicPricing(): Promise<PublicPricing> {
   const travelRatePerHour =
     rows.find((r) => r.unit === "travel-hour" && r.ratePerHour !== null)?.ratePerHour ?? 40;
 
-  // Modifiers list mirrors the rate-config rows but enriched with a customer-
-  // friendly description and effective $/hr. Public Holiday is rendered as a
-  // percentage uplift since the schema field is percentDelta, not hourlyDelta.
+  // Public Holiday uses percentDelta; the rest use hourlyDelta.
   const modifiers: PublicModifier[] = [];
   for (const row of rows) {
     if (row.unit !== "modifier") continue;
@@ -98,8 +93,7 @@ export async function getPublicPricing(): Promise<PublicPricing> {
     }
   }
 
-  // Latest mtime across all RateConfig rows. Powers "Rates last updated on
-  // {date}" so a customer can't claim the page showed an older figure.
+  // Latest mtime across rows; powers the "Rates last updated on {date}" footer.
   const ratesUpdatedAt = rows.reduce<Date | null>((max, r) => {
     const t = r.updatedAt;
     if (!t) return max;

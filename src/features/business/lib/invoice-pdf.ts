@@ -18,8 +18,7 @@ const LIGHT = rgb(203 / 255, 213 / 255, 225 / 255); // slate-300 #cbd5e1
 const AMBER = rgb(180 / 255, 83 / 255, 9 / 255); // amber-700 #b45309 (matches web promo)
 const PAID_COLOR = rgb(0.1, 0.55, 0.25);
 const OVERDUE_COLOR = rgb(0.78, 0.16, 0.16);
-// Purple #5a2a82 for VOID so a cancelled invoice is visually distinct from the
-// green PAID and red OVERDUE stamps without reading as a warning.
+// Purple distinguishes VOID from PAID (green) and OVERDUE (red).
 const VOID_COLOR = rgb(90 / 255, 42 / 255, 130 / 255);
 
 const MARGIN = 42;
@@ -88,10 +87,8 @@ function wrapText(text: string, maxW: number, size: number, font: PDFFont): stri
 }
 
 /**
- * Parses the wordmark SVG into a list of native PDF vector paths. The source
- * has two sections: chip body/tabs and a `<g transform="translate(0 10)">`
- * wrapper around text+separator. Each path tracks the Y offset its enclosing
- * group applied so the orchestrator can re-apply it after scaling.
+ * Parses the wordmark SVG into PDF vector paths. Each path tracks its enclosing
+ * `<g transform="translate(0 Y)">` offset so the caller can re-apply after scaling.
  * @returns Parsed paths in source order.
  */
 function parseWordmarkPaths(): LogoPath[] {
@@ -140,8 +137,7 @@ function drawStatusWatermark(ctx: PdfCtx, invoice: Invoice): void {
         : OVERDUE_COLOR;
   const size = 140;
   const width = ctx.bold.widthOfTextAtSize(text, size);
-  // Offset the baseline-left anchor so the visual centre of the rotated text
-  // lands at the page centre. cap-height ~0.35 * font size above the baseline.
+  // Offset the baseline-left anchor so the rotated text centres on the page.
   const angle = (-25 * Math.PI) / 180;
   const cx = width / 2;
   const cy = size * 0.35;
@@ -179,7 +175,7 @@ function drawHeader(ctx: PdfCtx, invoice: Invoice, logoPaths: LogoPath[]): numbe
   }
 
   const rightX = MARGIN + CONTENT_W;
-  // NZ IRD requires "Tax invoice" wording when GST-registered. GST# env presence = registered.
+  // IRD requires "Tax invoice" wording when GST-registered.
   const invTitle = BUSINESS_GST_NUMBER ? "TAX INVOICE" : "INVOICE";
   let rightY = HEADER_TOP - 20;
   ctx.page.drawText(invTitle, {
@@ -316,9 +312,7 @@ function drawLineItemsTable(ctx: PdfCtx, invoice: Invoice, y: number): number {
   const HEADER_SIZE = 11;
   const CELL_SIZE = 11;
 
-  // Clean header (no coloured bar): bold dark text on white with a 1.5pt brand-coloured
-  // bottom border. Description left-aligns; numeric headers centre in their column so they
-  // sit as a label above the right-aligned values without left-edge mismatch.
+  // Description left-aligns; numeric headers centre over their right-aligned values.
   const headers = ["Description", "Qty", "Price", "Total"];
   const cols = [COL.desc, COL.qty, COL.price, COL.total];
   headers.forEach((h, i) => {
@@ -339,8 +333,7 @@ function drawLineItemsTable(ctx: PdfCtx, invoice: Invoice, y: number): number {
     thickness: 1.5,
     color: BRAND,
   });
-  // Drop the header bottom-border + add a small breather before the first row
-  // so the description text isn't crammed against the brand-coloured line.
+  // Breather between the brand-coloured header line and the first row.
   y -= ROW_H + 6;
 
   const descMaxW = COL.qty - COL.desc - 8;
@@ -349,8 +342,7 @@ function drawLineItemsTable(ctx: PdfCtx, invoice: Invoice, y: number): number {
     const lines = wrapText(item.description, descMaxW, CELL_SIZE, ctx.font);
     const rowH = ROW_H + (lines.length - 1) * LINE_GAP;
 
-    // Top-aligned: first description line baseline matches qty/price/total baseline.
-    // Baseline at y - 10 puts the text cap height ~2pt below the row top (tight top align).
+    // Top-aligned: first description line baseline matches the numeric columns.
     const firstBaselineY = y - 10;
     lines.forEach((line, i) => {
       ctx.page.drawText(line, {
@@ -391,8 +383,7 @@ function drawLineItemsTable(ctx: PdfCtx, invoice: Invoice, y: number): number {
 
     y -= rowH;
 
-    // Hairline separator between rows (Xero/QuickBooks style). Skipped after
-    // the last row - drawLineItemsTable's closing border serves the same role.
+    // Skip after the last row - the closing border handles that line.
     if (idx < invoice.lineItems.length - 1) {
       ctx.page.drawLine({
         start: { x: MARGIN, y },
@@ -462,18 +453,13 @@ function drawTotalsBlock(ctx: PdfCtx, invoice: Invoice, y: number): number {
   };
 
   drawRow("Subtotal", fmt(invoice.subtotal));
-  // Promo discount line (snapshot fields keep historical totals stable; amber matches web).
   if (invoice.promoDiscount && invoice.promoDiscount > 0) {
-    // Label suffix clarifies the discount only applies to labor lines, never
-    // travel or parts - matches how computeJobPromoDiscount actually works.
+    // Suffix clarifies the discount only applies to labour lines.
     const label = invoice.promoTitle
       ? `Promo (labor only): ${invoice.promoTitle}`
       : "Promo discount (labor only)";
     drawRow(label, `-${fmt(invoice.promoDiscount)}`, { isPromo: true });
   }
-  // Unsuccessful-visit discount: half off labour when the operator ticked
-  // the unsuccessful-work checkbox in the calculator (couldn't fix AND
-  // couldn't diagnose). Travel and parts stay at full price.
   if (invoice.unsuccessfulDiscount && invoice.unsuccessfulDiscount > 0) {
     drawRow(
       "Unsuccessful-visit discount (half off labour)",
@@ -481,15 +467,11 @@ function drawTotalsBlock(ctx: PdfCtx, invoice: Invoice, y: number): number {
       { isPromo: true },
     );
   }
-  // Gate on gstAmount > 0 (not the legacy `gst` boolean) so the line shows
-  // whenever the stored snapshot carries non-zero GST. When GST_REGISTERED
-  // flips true the engine back-calculates an inclusive amount and this row
-  // lights up automatically; today's flag-false world skips it entirely.
+  // Gate on gstAmount (not the legacy `gst` boolean) so the row lights up
+  // automatically when GST_REGISTERED flips and the engine emits an inclusive amount.
   if (invoice.gstAmount > 0) {
     drawRow("Includes GST", fmt(invoice.gstAmount));
-    // GST-inclusive amounts must be accompanied by a registration number on
-    // the invoice header (NZ IRD requirement). Warn if the env var is unset
-    // so the deployer notices a half-flipped GST switch.
+    // IRD requires a GST number on the header when an invoice carries GST.
     if (!BUSINESS_GST_NUMBER) {
       console.warn(
         "[invoice-pdf] Invoice has GST but BUSINESS_GST_NUMBER env var is unset; the header will read 'INVOICE' instead of 'TAX INVOICE'.",
@@ -502,7 +484,7 @@ function drawTotalsBlock(ctx: PdfCtx, invoice: Invoice, y: number): number {
     thickness: 0.5,
     color: LIGHT,
   });
-  // Push Total below the divider - bold 14pt text would otherwise overlap the line.
+  // Push Total below the divider so 14pt bold doesn't overlap the line.
   y -= 12;
   drawRow("Total", fmt(invoice.total), { isBold: true });
 
@@ -525,8 +507,7 @@ function drawPaymentCallout(ctx: PdfCtx, invoice: Invoice, y: number): number {
   const lineH = 16;
   const boxLines = 5; // heading + payee + account + reference + due-by
   const BOX_H = BOX_PAD_Y * 2 + 22 + (boxLines - 1) * lineH; // heading taller than rows
-  // Border-only callout (no fill) so the diagonal status watermark shows
-  // through cleanly behind it. Matches Xero/QuickBooks invoice convention.
+  // Border-only so the diagonal status watermark shows through cleanly.
   ctx.page.drawRectangle({
     x: MARGIN,
     y: boxTop - BOX_H,

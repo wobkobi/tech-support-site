@@ -1,11 +1,9 @@
 // src/app/booking/cancel/page.tsx
 /**
  * @file page.tsx
- * @description Booking cancel page. Server-side renders the magic-link landing
- * with a confirmation gate so the customer sees the cancellation-fee banner
- * before the cancel actually fires. Previous version auto-fired on mount,
- * which gave the customer no chance to back out of a mis-click and no
- * chance to see the fee disclosure.
+ * @description Booking cancel page. Confirmation gate with a three-state
+ * fee banner so the customer sees the cancellation cost before they fire
+ * the cancel.
  */
 
 "use client";
@@ -37,12 +35,11 @@ type SubmitState =
   | { kind: "error"; message: string };
 
 /**
- * Pre-cancellation banner. Three states driven by the policy window helpers
- * - green when the cancel is free, amber when only the callout fee applies,
- * red when travel is also added. Empty when the booking is already cancelled.
+ * Pre-cancellation fee banner. Green = no fee, amber = $30 callout,
+ * red = $30 + round-trip travel.
  * @param props - Component props.
  * @param props.startAt - Booking start time.
- * @returns Banner element appropriate for the current cancellation timing.
+ * @returns Banner element for the current cancellation timing.
  */
 function FeeBanner({ startAt }: { startAt: Date }): React.ReactElement {
   const now = new Date();
@@ -94,8 +91,8 @@ function FeeBanner({ startAt }: { startAt: Date }): React.ReactElement {
 function CancelContent(): React.ReactElement {
   const searchParams = useSearchParams();
   const token = searchParams.get("token") ?? undefined;
-  // Initialise from the token presence so we never call setState
-  // synchronously inside the effect (react-hooks/set-state-in-effect).
+  // Seed from token presence so the effect doesn't synchronously setState
+  // (react-hooks/set-state-in-effect).
   const [load, setLoad] = useState<LoadState>(() =>
     token ? { kind: "loading" } : { kind: "error", message: "Missing cancel token." },
   );
