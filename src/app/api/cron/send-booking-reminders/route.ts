@@ -3,16 +3,23 @@
  * @file route.ts
  * @description Cron that sends a 24h-out email reminder for confirmed bookings.
  *
- * Window: bookings starting in 3-25 hours from now, not previously emailed.
+ * Window: bookings starting in 13-25 hours from now, not previously emailed.
  * Idempotent via Booking.emailReminderSentAt. Designed to be called every
  * 15 minutes via cron-job.org so a booking enters the window on the next cron
  * run after the threshold.
+ *
+ * Lower bound is CANCELLATION.freeNoticeHours + 1 (12 + 1 = 13) so the
+ * reminder always lands while the customer can still cancel free. Otherwise
+ * a reminder firing at 3h-out would be the first thing the customer sees
+ * about the $30 callout fee that's about to apply if they want to cancel,
+ * which reads as a bait-and-switch.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { sendBookingReminderEmail } from "@/features/reviews/lib/email";
 import { isCronAuthorized } from "@/shared/lib/auth";
+import { CANCELLATION } from "@/features/business/lib/pricing-policy";
 
 /**
  * GET /api/cron/send-booking-reminders
@@ -26,15 +33,21 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   try {
     const now = new Date();
-    const in3h = new Date(now.getTime() + 3 * 60 * 60 * 1000);
+    // Lower bound = CANCELLATION.freeNoticeHours + 1 so the reminder always
+    // lands while the customer can still cancel free. Anything below that
+    // would deliver a "you can no longer cancel without a fee" message as
+    // the first the customer hears of it.
+    const lowerHours = CANCELLATION.freeNoticeHours + 1;
+    const fromTime = new Date(now.getTime() + lowerHours * 60 * 60 * 1000);
     const in25h = new Date(now.getTime() + 25 * 60 * 60 * 1000);
 
-    // Bookings 3-25h out: the "24h before" window with 1h padding either side
-    // so the cron's 15-min cadence always catches a booking entering it.
+    // Bookings in the (freeNoticeHours + 1, 25h] window: the "24h before"
+    // reminder with padding above so the cron's 15-min cadence always
+    // catches a booking entering it.
     const emailCandidates = await prisma.booking.findMany({
       where: {
         status: "confirmed",
-        startAt: { gt: in3h, lte: in25h },
+        startAt: { gt: fromTime, lte: in25h },
         OR: [{ emailReminderSentAt: null }, { emailReminderSentAt: { isSet: false } }],
       },
       select: {

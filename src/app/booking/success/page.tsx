@@ -8,8 +8,23 @@ import type React from "react";
 import { cn } from "@/shared/lib/cn";
 import { Button } from "@/shared/components/Button";
 import { FaCircleCheck, FaHouse, FaPenToSquare } from "react-icons/fa6";
+import { cancellationCopy } from "@/features/business/lib/pricing-policy";
 
 const CARD = "border-seasalt-400/60 bg-seasalt-800 rounded-xl border p-5 shadow-sm sm:p-6";
+
+/**
+ * Renders the `**…**` emphasis convention from pricing-policy.ts copy
+ * generators as `<strong>` spans, so customer-facing copy bolds the same
+ * figures + policy boundaries the pricing page does.
+ * @param text - Copy string containing zero or more `**…**` segments.
+ * @returns Array of React nodes ready to drop into a parent block element.
+ */
+function renderEmphasised(text: string): React.ReactNode[] {
+  return text.split(/(\*\*[^*]+\*\*)/g).map((part, i) => {
+    const m = part.match(/^\*\*([^*]+)\*\*$/);
+    return m ? <strong key={i}>{m[1]}</strong> : <span key={i}>{part}</span>;
+  });
+}
 
 /**
  * Booking success page component.
@@ -112,6 +127,15 @@ export default async function BookingSuccessPage({
                 </li>
                 <li>I'll send you a review link after your appointment</li>
               </ol>
+            </section>
+
+            <section className={cn(CARD)}>
+              <h2 className={cn("text-russian-violet mb-2 text-lg font-bold sm:text-xl")}>
+                Cancellation policy
+              </h2>
+              <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
+                {renderEmphasised(cancellationCopy())}
+              </p>
             </section>
           </div>
         </div>

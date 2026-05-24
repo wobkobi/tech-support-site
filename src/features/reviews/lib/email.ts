@@ -16,6 +16,7 @@ import {
   DEFAULT_INVOICE_EMAIL_BODY,
   DEFAULT_VOID_EMAIL_BODY,
 } from "@/features/business/lib/invoice-email-defaults";
+import { cancellationCopy } from "@/features/business/lib/pricing-policy";
 
 /**
  * Escapes HTML special characters so user-supplied values can be safely
@@ -30,6 +31,25 @@ function escapeHtml(value: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+/**
+ * Renders a pricing-policy copy string (the `**…**` emphasis convention) as
+ * email-safe HTML. The non-marker segments are HTML-escaped so any future
+ * mid-string user value cannot inject markup; only the literal `<strong>`
+ * tags slip through. Policy text is trusted today but the escape is cheap
+ * insurance.
+ * @param text - Copy string containing zero or more `**…**` segments.
+ * @returns HTML fragment ready to drop into an email body.
+ */
+function renderEmphasisedHtml(text: string): string {
+  return text
+    .split(/(\*\*[^*]+\*\*)/g)
+    .map((part) => {
+      const m = part.match(/^\*\*([^*]+)\*\*$/);
+      return m ? `<strong>${escapeHtml(m[1])}</strong>` : escapeHtml(part);
+    })
+    .join("");
 }
 
 /**
@@ -306,6 +326,9 @@ export async function sendCustomerBookingConfirmation(
 
     <a href="${editUrl}" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;margin-right:8px">✏️ Change appointment</a>
     <a href="${cancelUrl}" style="display:inline-block;background:#e8e8e8;color:#333;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600">❌ Cancel appointment</a>
+
+    <p style="margin:28px 0 6px;color:#888;font-size:13px;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Cancellation policy</p>
+    <p style="margin:0;color:#444;font-size:13px;line-height:1.6">${renderEmphasisedHtml(cancellationCopy())}</p>
 ${buildEmailSignature(siteUrl)}
   </div>
 </body>
@@ -371,6 +394,9 @@ export async function sendBookingReminderEmail(booking: BookingNotificationData)
 
     <a href="${editUrl}" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;margin-right:8px">✏️ Change appointment</a>
     <a href="${cancelUrl}" style="display:inline-block;background:#e8e8e8;color:#333;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600">❌ Cancel appointment</a>
+
+    <p style="margin:28px 0 6px;color:#888;font-size:13px;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Cancellation policy</p>
+    <p style="margin:0;color:#444;font-size:13px;line-height:1.6">${renderEmphasisedHtml(cancellationCopy())}</p>
 ${buildEmailSignature(siteUrl)}
   </div>
 </body>
