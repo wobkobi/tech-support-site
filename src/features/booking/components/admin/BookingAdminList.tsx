@@ -63,6 +63,11 @@ export function BookingAdminList({
   const [saving, setSaving] = useState<string | null>(null);
   const [resending, setResending] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  // "Now" snapshot used by the Mark no-show button visibility check. Stable
+  // across renders so React's purity rule doesn't flag the comparison
+  // (react-hooks/purity bans Date.now() in render). The operator refreshes
+  // the admin list often enough that staleness here is fine.
+  const [renderedAt] = useState(() => Date.now());
 
   const counts = {
     held: bookings.filter((b) => b.status === "held").length,
@@ -169,11 +174,32 @@ export function BookingAdminList({
    * Changes a booking's status to cancelled or completed.
    * @param id - Booking ID.
    * @param status - New status to apply.
+   * @param cancelMode - When cancelling, distinguishes operator-side cancels (no fee)
+   *   from on-behalf-of-customer cancels (customer fee rules apply). Ignored for "completed".
    */
-  async function changeStatus(id: string, status: "cancelled" | "completed"): Promise<void> {
-    const ok = await patch(id, { status });
+  async function changeStatus(
+    id: string,
+    status: "cancelled" | "completed",
+    cancelMode: "operator" | "on-behalf" = "operator",
+  ): Promise<void> {
+    const body: Record<string, unknown> = { status };
+    if (status === "cancelled") body.cancelMode = cancelMode;
+    const ok = await patch(id, body);
     if (ok) {
       setBookings((prev) => prev.map((b) => (b.id === id ? { ...b, status } : b)));
+      setExpandedId(null);
+    }
+  }
+
+  /**
+   * Marks a booking as a no-show. Triggers the draft late-cancellation
+   * invoice (callout + travel) just like a same-time customer cancel would.
+   * @param id - Booking ID.
+   */
+  async function markNoShow(id: string): Promise<void> {
+    const ok = await patch(id, { markNoShow: true });
+    if (ok) {
+      setBookings((prev) => prev.map((b) => (b.id === id ? { ...b, status: "cancelled" } : b)));
       setExpandedId(null);
     }
   }
@@ -436,19 +462,66 @@ export function BookingAdminList({
                       </button>
                     )}
 
-                    <button
-                      onClick={() => {
-                        if (confirm("Cancel this booking? This cannot be undone.")) {
-                          void changeStatus(b.id, "cancelled");
-                        }
-                      }}
-                      disabled={isSaving}
-                      className={cn(
-                        "rounded-lg bg-red-500/20 px-4 py-2 text-xs font-medium text-red-600 transition-colors hover:bg-red-500/30 disabled:opacity-50",
-                      )}
-                    >
-                      Cancel booking
-                    </button>
+                    {b.status !== "cancelled" && (
+                      <>
+                        <button
+                          onClick={() => {
+                            if (
+                              confirm(
+                                "Cancel this booking on my end? No fee will be charged to the customer.",
+                              )
+                            ) {
+                              void changeStatus(b.id, "cancelled", "operator");
+                            }
+                          }}
+                          disabled={isSaving}
+                          className={cn(
+                            "rounded-lg bg-slate-200 px-4 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-300 disabled:opacity-50",
+                          )}
+                          title="Operator cancel (sick, scheduling clash, etc.) - never charges the customer"
+                        >
+                          Cancel (my call)
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (
+                              confirm(
+                                "Cancel for the customer? The standard cancellation fee rules will apply (callout + travel inside the fee windows).",
+                              )
+                            ) {
+                              void changeStatus(b.id, "cancelled", "on-behalf");
+                            }
+                          }}
+                          disabled={isSaving}
+                          className={cn(
+                            "rounded-lg bg-red-500/20 px-4 py-2 text-xs font-medium text-red-600 transition-colors hover:bg-red-500/30 disabled:opacity-50",
+                          )}
+                          title="Customer-initiated cancel they phoned/emailed in - uses the standard fee rules"
+                        >
+                          Cancel for customer
+                        </button>
+                        {new Date(b.startAt).getTime() < renderedAt && (
+                          <button
+                            onClick={() => {
+                              if (
+                                confirm(
+                                  "Mark as no-show? A draft invoice will be created for the call-out fee plus round-trip travel.",
+                                )
+                              ) {
+                                void markNoShow(b.id);
+                              }
+                            }}
+                            disabled={isSaving}
+                            className={cn(
+                              "rounded-lg bg-amber-500/20 px-4 py-2 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-500/30 disabled:opacity-50",
+                            )}
+                            title="Customer didn't show up - bills the full call-out + travel"
+                          >
+                            Mark no-show
+                          </button>
+                        )}
+                      </>
+                    )}
 
                     {(b.status === "confirmed" || b.status === "completed") && (
                       <button

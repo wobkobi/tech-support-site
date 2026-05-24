@@ -10,6 +10,11 @@ import { isAdminRequest } from "@/shared/lib/auth";
 import { deleteBookingEvent } from "@/features/calendar/lib/google-calendar";
 import { toE164NZ } from "@/shared/lib/normalise-phone";
 import { sendCustomerReviewRequest } from "@/features/reviews/lib/email";
+import {
+  isWithinCancellationWindow,
+  isWithinTravelWindow,
+} from "@/features/business/lib/pricing-policy";
+import { createDraftCancellationInvoice } from "@/features/business/lib/cancellation-invoice";
 
 interface PatchPayload {
   name?: string;
@@ -18,6 +23,21 @@ interface PatchPayload {
   notes?: string;
   address?: string;
   status?: "confirmed" | "cancelled" | "completed";
+  /**
+   * Distinguishes between the operator cancelling the booking themselves
+   * (sick, scheduling clash) and the operator cancelling on behalf of a
+   * customer who phoned/emailed instead of using the magic-link cancel page.
+   * Only "on-behalf" triggers the late-cancellation fee flow; operator
+   * cancels never charge the customer.
+   * Defaults to "operator" when omitted.
+   */
+  cancelMode?: "operator" | "on-behalf";
+  /**
+   * Marks the booking as a no-show. Equivalent to a customer cancellation
+   * stamped at startAt (so it always lands inside both windows), plus
+   * `noShow: true`. Triggers the draft-invoice flow.
+   */
+  markNoShow?: boolean;
 }
 
 /**
@@ -60,7 +80,11 @@ export async function PATCH(
     }
   }
 
-  if (body.status === "cancelled" && booking.status !== "cancelled") {
+  if (body.markNoShow && booking.status !== "cancelled") {
+    // No-show: equivalent to a customer cancellation that happened AT the
+    // booking time, so both windows are inside. Always charge the callout
+    // + travel via the draft invoice. cancelledBy stays "customer" because
+    // the customer's absence is what triggered the charge.
     if (booking.calendarEventId) {
       try {
         await deleteBookingEvent({ eventId: booking.calendarEventId });
@@ -70,6 +94,31 @@ export async function PATCH(
     }
     data.status = "cancelled";
     data.activeSlotKey = `released:${id}`;
+    data.cancelledAt = new Date();
+    data.cancelledBy = "customer";
+    data.lateCancellation = true;
+    data.travelChargeApplies = true;
+    data.noShow = true;
+  } else if (body.status === "cancelled" && booking.status !== "cancelled") {
+    if (booking.calendarEventId) {
+      try {
+        await deleteBookingEvent({ eventId: booking.calendarEventId });
+      } catch (err) {
+        console.error("[admin/bookings] Failed to delete calendar event:", err);
+      }
+    }
+    const now = new Date();
+    const onBehalf = body.cancelMode === "on-behalf";
+    data.status = "cancelled";
+    data.activeSlotKey = `released:${id}`;
+    data.cancelledAt = now;
+    // Operator cancels never trigger the late-fee flow regardless of timing
+    // (it was the operator's call, not the customer's); on-behalf cancels
+    // follow the customer rules so a customer phoning to cancel inside the
+    // window pays the same fee they would pay through the magic link.
+    data.cancelledBy = onBehalf ? "customer" : "operator";
+    data.lateCancellation = onBehalf ? isWithinCancellationWindow(booking.startAt, now) : false;
+    data.travelChargeApplies = onBehalf ? isWithinTravelWindow(booking.startAt, now) : false;
   } else if (body.status === "completed") {
     data.status = "completed";
     data.activeSlotKey = `released:${id}`;
@@ -77,7 +126,22 @@ export async function PATCH(
     data.status = "confirmed";
   }
 
-  await prisma.booking.update({ where: { id }, data });
+  const updated = await prisma.booking.update({ where: { id }, data });
+
+  // Fire-and-forget the cancellation invoice draft when the flags warrant
+  // it. Mirrors the customer-side cancel flow so an operator-marked no-show
+  // or an on-behalf cancel inside the fee window produces the same draft
+  // the customer self-serve path would.
+  if (
+    updated.lateCancellation &&
+    updated.cancelledBy === "customer" &&
+    booking.status !== "cancelled"
+  ) {
+    void createDraftCancellationInvoice(updated, {
+      includeTravel: updated.travelChargeApplies,
+      reason: updated.noShow ? "no-show" : "late-cancellation",
+    }).catch((err) => console.error("[admin/bookings] Failed to draft cancellation invoice:", err));
+  }
 
   // When transitioning to "completed", send the review request email if one
   // has not already gone out. updateMany with the null-or-missing guard is
