@@ -391,6 +391,12 @@ model Invoice {
   // Promo snapshot at creation time (kept stable if the source promo changes).
   promoTitle       String?
   promoDiscount    Float?
+  // Half-price labour discount applied when the visit couldn't be fixed AND
+  // couldn't be diagnosed (see pricing-policy.ts unsuccessfulWorkCopy).
+  // Audit trail: lets the admin dashboard count how often the half-price
+  // clause was invoked so a pattern of abuse is spottable.
+  unsuccessful     Boolean       @default(false)
+  unsuccessfulDiscount Float?
   status           InvoiceStatus @default(DRAFT)
   notes            String?
   contactId        String?       @db.ObjectId

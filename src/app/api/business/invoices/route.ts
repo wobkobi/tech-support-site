@@ -46,6 +46,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Optional promo snapshot from the calculator (persisted for history).
     promoTitle,
     promoDiscount,
+    // Optional unsuccessful-work flag + discount snapshot. Audit trail so
+    // the admin dashboard can count how often the half-price clause fires.
+    unsuccessful,
+    unsuccessfulDiscount,
   } = body as {
     clientName?: string;
     clientEmail?: string;
@@ -56,6 +60,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     contactId?: string | null;
     promoTitle?: string | null;
     promoDiscount?: number | null;
+    unsuccessful?: boolean;
+    unsuccessfulDiscount?: number | null;
   };
 
   if (!clientName || !clientEmail || !Array.isArray(lineItems)) {
@@ -72,10 +78,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   const { number, sheetNextCount, sheetSyncWarning } = await getNextInvoiceNumber();
   const discount = typeof promoDiscount === "number" && promoDiscount > 0 ? promoDiscount : 0;
+  const unsuccessfulDiscountValue =
+    typeof unsuccessfulDiscount === "number" && unsuccessfulDiscount > 0 ? unsuccessfulDiscount : 0;
   // GST mode is driven by GST_REGISTERED in pricing-policy.ts; the request
   // body no longer carries gst. gstAmount may be non-zero in the future when
-  // the flag flips, stays 0 today.
-  const { subtotal, gstAmount, total } = calcInvoiceTotals(lineItems, discount);
+  // the flag flips, stays 0 today. Promo + unsuccessful both reduce the
+  // taxable amount before GST (per IRD treatment of price reductions); they
+  // sum into a single discount argument for calcInvoiceTotals, then get
+  // persisted as separate audit fields on the row.
+  const { subtotal, gstAmount, total } = calcInvoiceTotals(
+    lineItems,
+    discount + unsuccessfulDiscountValue,
+  );
 
   const invoice = await prisma.invoice.create({
     data: {
@@ -91,6 +105,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       total,
       promoTitle: discount > 0 && promoTitle ? promoTitle : null,
       promoDiscount: discount > 0 ? discount : null,
+      unsuccessful: unsuccessful === true,
+      unsuccessfulDiscount:
+        typeof unsuccessfulDiscount === "number" && unsuccessfulDiscount > 0
+          ? unsuccessfulDiscount
+          : null,
       notes: notes ?? null,
       contactId: contactId ?? null,
     },

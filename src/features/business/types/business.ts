@@ -38,6 +38,10 @@ export interface Invoice {
   promoTitle?: string | null;
   /** Dollar discount applied to the labor subtotal at creation time. */
   promoDiscount?: number | null;
+  /** Operator ticked the unsuccessful-work checkbox: half off labour (parts + travel unaffected). */
+  unsuccessful?: boolean;
+  /** Computed labour-half discount, persisted for audit + PDF rendering. */
+  unsuccessfulDiscount?: number | null;
   status: InvoiceStatus;
   notes: string | null;
   contactId: string | null;
@@ -149,6 +153,13 @@ export interface JobCalculation {
   notes: string;
   /** @deprecated Ignored by calcJobTotal; GST mode comes from GST_REGISTERED in pricing-policy.ts. Pass `false`. */
   gst: boolean;
+  /**
+   * Operator-set flag: when true, calcJobTotal halves the labour portion
+   * (time charge + hourly tasks) per the published unsuccessful-work
+   * policy. Travel and parts are not discounted. Auditable on the saved
+   * invoice via Invoice.unsuccessful + Invoice.unsuccessfulDiscount.
+   */
+  unsuccessful?: boolean;
   clientName: string;
   clientEmail: string;
 }

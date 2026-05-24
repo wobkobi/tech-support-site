@@ -28,6 +28,8 @@ interface Props {
   promoTitle: string | null;
   /** Dollar amount; rendered when > 0. */
   promoDiscount: number;
+  /** Half-price labour discount when operator ticked unsuccessful; rendered when > 0. */
+  unsuccessfulDiscount?: number;
 }
 
 /**
@@ -53,9 +55,11 @@ function InvoicePreviewPanelImpl(props: Props): React.ReactElement {
     notes,
     promoTitle,
     promoDiscount,
+    unsuccessfulDiscount = 0,
   } = props;
-  const totals = calcInvoiceTotals(lineItems, promoDiscount);
+  const totals = calcInvoiceTotals(lineItems, promoDiscount + unsuccessfulDiscount);
   const showPromoLine = promoDiscount > 0;
+  const showUnsuccessfulLine = unsuccessfulDiscount > 0;
   return (
     <div
       className={cn(
@@ -187,6 +191,12 @@ function InvoicePreviewPanelImpl(props: Props): React.ReactElement {
             <div className={cn("flex justify-between gap-3 text-amber-700")}>
               <span>Promo (labor only){promoTitle ? `: ${promoTitle}` : ""}</span>
               <span className={cn("whitespace-nowrap")}>-{formatNZD(promoDiscount)}</span>
+            </div>
+          )}
+          {showUnsuccessfulLine && (
+            <div className={cn("flex justify-between gap-3 text-amber-700")}>
+              <span>Unsuccessful-visit discount (half off labour)</span>
+              <span className={cn("whitespace-nowrap")}>-{formatNZD(unsuccessfulDiscount)}</span>
             </div>
           )}
           {totals.gstAmount > 0 && (

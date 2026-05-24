@@ -158,6 +158,10 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
   const [showParts, setShowParts] = useState(false);
   const [showTaxonomyModal, setShowTaxonomyModal] = useState(false);
   const [notes, setNotes] = useState("");
+  // Operator-set unsuccessful-work flag (per pricing-policy unsuccessfulWorkCopy:
+  // half off labour when I couldn't fix AND couldn't diagnose). Travel + parts
+  // unaffected. Persists onto the invoice as Invoice.unsuccessful for audit.
+  const [unsuccessful, setUnsuccessful] = useState(false);
   const [clientName, setClientName] = useState("");
   const [clientEmail, setClientEmail] = useState("");
   // Address-to state mirrors the InvoiceBuilder's segmented control so the
@@ -307,6 +311,7 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
     travelEntries,
     notes,
     gst: false,
+    unsuccessful,
     clientName,
     clientEmail,
   };
@@ -327,6 +332,7 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
       clientName,
       clientEmail,
       notes,
+      unsuccessful,
     ],
   );
 
@@ -640,6 +646,9 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
           notes: notes || null,
           promoTitle: promoActive ? activePromo.title : null,
           promoDiscount: promoActive ? totals.promoDiscount : null,
+          unsuccessful,
+          unsuccessfulDiscount:
+            totals.unsuccessfulDiscount > 0 ? totals.unsuccessfulDiscount : null,
           // issueDate, dueDate, number all defaulted server-side.
         }),
       });
@@ -1243,6 +1252,40 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
             onPickContact={() => setShowContactPicker(true)}
           />
 
+          {/* Unsuccessful-work toggle: per pricing-policy unsuccessfulWorkCopy,
+              half off labour when I couldn't fix AND couldn't diagnose.
+              Travel + parts unaffected. Tick this only when neither test was
+              met - a partial fix counts as a fix; a written diagnosis counts
+              as a diagnosis. */}
+          <div className={cn("rounded-xl border border-slate-200 bg-white p-3 shadow-sm")}>
+            <label
+              className={cn("flex cursor-pointer items-start gap-2 text-sm")}
+              title="Tick only when you left with neither a fix nor a diagnosis."
+            >
+              <input
+                type="checkbox"
+                checked={unsuccessful}
+                onChange={(e) => setUnsuccessful(e.target.checked)}
+                className={cn(
+                  "text-russian-violet focus:ring-russian-violet/30 mt-0.5 h-4 w-4 rounded border-slate-300",
+                )}
+              />
+              <span>
+                <span className={cn("font-medium text-slate-700")}>
+                  Mark as unsuccessful (half-price labour)
+                </span>
+                <span className={cn("mt-0.5 block text-xs text-slate-500")}>
+                  Half off the labour portion. Travel + parts unchanged.
+                </span>
+              </span>
+            </label>
+            {unsuccessful && totals.unsuccessfulDiscount > 0 && (
+              <p className={cn("mt-2 text-xs font-semibold text-amber-700")}>
+                -${totals.unsuccessfulDiscount.toFixed(2)} applied to labour
+              </p>
+            )}
+          </div>
+
           {/* Actions */}
           <div className={cn("space-y-2")}>
             {incomeToast && (
@@ -1310,6 +1353,7 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
                 setJobAddress("");
                 setClarifyQuestions([]);
                 setClarifyAnswers({});
+                setUnsuccessful(false);
               }}
               className={cn(
                 "w-full rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-500 hover:bg-slate-50",
@@ -1329,6 +1373,7 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
             dueDate={addDaysISO(BUSINESS_PAYMENT_TERMS_DAYS)}
             lineItems={previewLineItems}
             notes={notes}
+            unsuccessfulDiscount={totals.unsuccessfulDiscount}
             promoTitle={
               activePromo && !skipPromo && totals.promoDiscount > 0 ? activePromo.title : null
             }

@@ -471,6 +471,16 @@ function drawTotalsBlock(ctx: PdfCtx, invoice: Invoice, y: number): number {
       : "Promo discount (labor only)";
     drawRow(label, `-${fmt(invoice.promoDiscount)}`, { isPromo: true });
   }
+  // Unsuccessful-visit discount: half off labour when the operator ticked
+  // the unsuccessful-work checkbox in the calculator (couldn't fix AND
+  // couldn't diagnose). Travel and parts stay at full price.
+  if (invoice.unsuccessfulDiscount && invoice.unsuccessfulDiscount > 0) {
+    drawRow(
+      "Unsuccessful-visit discount (half off labour)",
+      `-${fmt(invoice.unsuccessfulDiscount)}`,
+      { isPromo: true },
+    );
+  }
   // Gate on gstAmount > 0 (not the legacy `gst` boolean) so the line shows
   // whenever the stored snapshot carries non-zero GST. When GST_REGISTERED
   // flips true the engine back-calculates an inclusive amount and this row

@@ -479,6 +479,7 @@ export function calcJobTotal(
   travelTotal: number;
   subtotal: number;
   promoDiscount: number;
+  unsuccessfulDiscount: number;
   gstAmount: number;
   total: number;
 } {
@@ -501,8 +502,20 @@ export function calcJobTotal(
   // Subtotal = gross (pre-promo); promo shown as its own line in the Summary.
   const subtotal = Math.round((timeCharge + tasksTotal + partsTotal + travelTotal) * 100) / 100;
   const promoDiscount = computeJobPromoDiscount(job, promo);
+  // Unsuccessful-work clause: half off labour (time charge + hourly tasks
+  // only) when the operator ticks "unsuccessful" because they couldn't fix
+  // the issue AND couldn't diagnose it. Parts and travel stay at full
+  // price - they were real costs regardless of outcome.
+  let unsuccessfulDiscount = 0;
+  if (job.unsuccessful) {
+    const hourlyTasksTotal = job.tasks
+      .filter((t) => t.baseRateId != null || t.rateConfigId == null)
+      .reduce((s, t) => s + t.qty * t.unitPrice, 0);
+    const labourBase = timeCharge + hourlyTasksTotal;
+    unsuccessfulDiscount = Math.round(labourBase * 0.5 * 100) / 100;
+  }
   // GST applies to the discounted amount per NZ IRD treatment.
-  const taxableAmount = Math.round((subtotal - promoDiscount) * 100) / 100;
+  const taxableAmount = Math.round((subtotal - promoDiscount - unsuccessfulDiscount) * 100) / 100;
   const gstAmount = GST_REGISTERED ? calcGstFromInclusive(taxableAmount, GST_RATE) : 0;
   return {
     timeCharge,
@@ -511,6 +524,7 @@ export function calcJobTotal(
     travelTotal,
     subtotal,
     promoDiscount,
+    unsuccessfulDiscount,
     gstAmount,
     total: taxableAmount,
   };

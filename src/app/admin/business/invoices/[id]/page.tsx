@@ -176,6 +176,14 @@ export default async function InvoiceViewPage({
               <span className={cn("whitespace-nowrap")}>-{formatNZD(invoice.promoDiscount)}</span>
             </div>
           )}
+          {invoice.unsuccessfulDiscount && invoice.unsuccessfulDiscount > 0 && (
+            <div className={cn("flex justify-between gap-3 text-amber-700")}>
+              <span>Unsuccessful-visit discount (half off labour)</span>
+              <span className={cn("whitespace-nowrap")}>
+                -{formatNZD(invoice.unsuccessfulDiscount)}
+              </span>
+            </div>
+          )}
           {invoice.gstAmount > 0 && (
             <div className={cn("flex justify-between gap-3")}>
               <span className={cn("text-slate-500")}>Includes GST</span>
