@@ -39,83 +39,148 @@ export interface ContactRow {
   }>;
 }
 
+interface EditValues {
+  name: string;
+  email: string;
+  phone: string;
+  address: string;
+}
+
+interface EditFormState {
+  values: EditValues;
+  saving: boolean;
+  error: string | null;
+  setField: <K extends keyof EditValues>(field: K, value: EditValues[K]) => void;
+  save: () => void;
+  cancel: () => void;
+}
+
 interface ContactCardProps {
   c: ContactRow;
-  editingId: string | null;
-  editName: string;
-  editEmail: string;
-  editPhone: string;
-  editAddress: string;
-  saving: boolean;
-  editError: string | null;
-  syncingId: string | null;
-  confirmSyncId: string | null;
-  expandedReviewsId: string | null;
-  onStartEdit: (c: ContactRow) => void;
-  onCancelEdit: () => void;
-  onSaveEdit: (id: string) => void;
-  onRequestSyncToGoogle: (id: string) => void;
-  onConfirmSyncToGoogle: (id: string) => void;
-  onCancelSyncToGoogle: () => void;
-  onToggleReviews: (id: string) => void;
-  onEditName: (v: string) => void;
-  onEditEmail: (v: string) => void;
-  onEditPhone: (v: string) => void;
-  onEditAddress: (v: string) => void;
+  /** Non-null only when this card is the one being edited. */
+  edit: EditFormState | null;
+  isSyncing: boolean;
+  isConfirmingSync: boolean;
+  isReviewsExpanded: boolean;
+  onStartEdit: () => void;
+  onRequestSync: () => void;
+  onConfirmSync: () => void;
+  onCancelSync: () => void;
+  onToggleReviews: () => void;
 }
+
+interface FieldRenderProps {
+  id: string;
+  value: string;
+  onChange: (v: string) => void;
+}
+
+interface ContactEditField {
+  key: keyof EditValues;
+  label: string;
+  render: (p: FieldRenderProps) => React.ReactNode;
+}
+
+/**
+ * Plain text input used by the Name field.
+ * @param props - Field render props.
+ * @param props.id - DOM id for label association.
+ * @param props.value - Current value.
+ * @param props.onChange - Change handler.
+ * @returns Input element.
+ */
+function renderNameField({ id, value, onChange }: FieldRenderProps): React.ReactElement {
+  return (
+    <input
+      id={id}
+      type="text"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={cn(
+        "focus:border-russian-violet focus:ring-russian-violet/30 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-1",
+      )}
+    />
+  );
+}
+
+/**
+ * Email input wrapper for the field array.
+ * @param props - Field render props.
+ * @param props.id - DOM id for label association.
+ * @param props.value - Current value.
+ * @param props.onChange - Change handler.
+ * @returns Email input element.
+ */
+function renderEmailField({ id, value, onChange }: FieldRenderProps): React.ReactElement {
+  return <EmailInput id={id} value={value} onChange={onChange} />;
+}
+
+/**
+ * Phone input wrapper for the field array.
+ * @param props - Field render props.
+ * @param props.id - DOM id for label association.
+ * @param props.value - Current value.
+ * @param props.onChange - Change handler.
+ * @returns Phone input element.
+ */
+function renderPhoneField({ id, value, onChange }: FieldRenderProps): React.ReactElement {
+  return <PhoneInput id={id} value={value} onChange={onChange} />;
+}
+
+/**
+ * Address autocomplete wrapper for the field array.
+ * @param props - Field render props.
+ * @param props.id - DOM id for label association.
+ * @param props.value - Current value.
+ * @param props.onChange - Change handler.
+ * @returns Address input element.
+ */
+function renderAddressField({ id, value, onChange }: FieldRenderProps): React.ReactElement {
+  return (
+    <AddressAutocomplete
+      id={id}
+      value={value}
+      onChange={onChange}
+      placeholder="Start typing address..."
+    />
+  );
+}
+
+const CONTACT_EDIT_FIELDS: ReadonlyArray<ContactEditField> = [
+  { key: "name", label: "Name", render: renderNameField },
+  { key: "email", label: "Email", render: renderEmailField },
+  { key: "phone", label: "Phone", render: renderPhoneField },
+  { key: "address", label: "Address", render: renderAddressField },
+];
 
 /**
  * Renders a single contact row, either in view or edit mode.
  * @param props - Contact card props.
- * @param props.c - The contact row data.
- * @param props.editingId - ID of the contact currently being edited, or null.
- * @param props.editName - Current value of the name edit field.
- * @param props.editEmail - Current value of the email edit field.
- * @param props.editPhone - Current value of the phone edit field.
- * @param props.editAddress - Current value of the address edit field.
- * @param props.saving - Whether a save is in progress.
- * @param props.editError - Validation or API error message for the current edit, or null.
- * @param props.syncingId - ID of the contact currently being synced, or null.
- * @param props.confirmSyncId - ID of the contact awaiting sync confirmation, or null.
- * @param props.expandedReviewsId - ID of the contact whose reviews are expanded, or null.
- * @param props.onStartEdit - Opens the edit form for the given contact.
- * @param props.onCancelEdit - Closes the edit form without saving.
- * @param props.onSaveEdit - Saves the edited contact with the given ID.
- * @param props.onRequestSyncToGoogle - Opens the sync confirmation for the given contact.
- * @param props.onConfirmSyncToGoogle - Confirms and executes the sync for the given contact.
- * @param props.onCancelSyncToGoogle - Cancels the pending sync confirmation.
- * @param props.onToggleReviews - Toggles the reviews panel for the given contact ID.
- * @param props.onEditName - Updates the name edit field value.
- * @param props.onEditEmail - Updates the email edit field value.
- * @param props.onEditPhone - Updates the phone edit field value.
- * @param props.onEditAddress - Updates the address edit field value.
+ * @param props.c - Contact row data.
+ * @param props.edit - Edit form state when this card is being edited; null otherwise.
+ * @param props.isSyncing - True while this contact is mid-sync to Google.
+ * @param props.isConfirmingSync - True when the sync confirmation panel is open.
+ * @param props.isReviewsExpanded - True when the linked-reviews panel is open.
+ * @param props.onStartEdit - Opens the edit form for this contact.
+ * @param props.onRequestSync - Opens the sync-to-Google confirmation.
+ * @param props.onConfirmSync - Confirms and runs the sync.
+ * @param props.onCancelSync - Cancels the pending sync confirmation.
+ * @param props.onToggleReviews - Toggles the linked-reviews panel.
  * @returns Contact card element.
  */
 function ContactCard({
   c,
-  editingId,
-  editName,
-  editEmail,
-  editPhone,
-  editAddress,
-  saving,
-  editError,
-  syncingId,
-  confirmSyncId,
-  expandedReviewsId,
+  edit,
+  isSyncing,
+  isConfirmingSync,
+  isReviewsExpanded,
   onStartEdit,
-  onCancelEdit,
-  onSaveEdit,
-  onRequestSyncToGoogle,
-  onConfirmSyncToGoogle,
-  onCancelSyncToGoogle,
+  onRequestSync,
+  onConfirmSync,
+  onCancelSync,
   onToggleReviews,
-  onEditName,
-  onEditEmail,
-  onEditPhone,
-  onEditAddress,
 }: ContactCardProps): React.ReactElement {
-  if (editingId === c.id) {
+  if (edit) {
     return (
       <div className={cn("flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4")}>
         <div className={cn("flex flex-wrap items-center justify-between gap-2")}>
@@ -124,69 +189,37 @@ function ContactCard({
           </span>
           <span className={cn("text-xs text-slate-400")}>{formatDateShort(c.createdAt)}</span>
         </div>
-        <div className={cn("flex flex-col gap-1")}>
-          <label
-            className={cn("text-russian-violet text-xs font-semibold")}
-            htmlFor={`edit-name-${c.id}`}
-          >
-            Name
-          </label>
-          <input
-            id={`edit-name-${c.id}`}
-            type="text"
-            value={editName}
-            onChange={(e) => onEditName(e.target.value)}
-            className={cn(
-              "focus:border-russian-violet focus:ring-russian-violet/30 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-1",
-            )}
-          />
-        </div>
-        <div className={cn("flex flex-col gap-1")}>
-          <label
-            className={cn("text-russian-violet text-xs font-semibold")}
-            htmlFor={`edit-email-${c.id}`}
-          >
-            Email
-          </label>
-          <EmailInput id={`edit-email-${c.id}`} value={editEmail} onChange={onEditEmail} />
-        </div>
-        <div className={cn("flex flex-col gap-1")}>
-          <label
-            className={cn("text-russian-violet text-xs font-semibold")}
-            htmlFor={`edit-phone-${c.id}`}
-          >
-            Phone
-          </label>
-          <PhoneInput id={`edit-phone-${c.id}`} value={editPhone} onChange={onEditPhone} />
-        </div>
-        <div className={cn("flex flex-col gap-1")}>
-          <label
-            className={cn("text-russian-violet text-xs font-semibold")}
-            htmlFor={`edit-address-${c.id}`}
-          >
-            Address
-          </label>
-          <AddressAutocomplete
-            id={`edit-address-${c.id}`}
-            value={editAddress}
-            onChange={onEditAddress}
-            placeholder="Start typing address..."
-          />
-        </div>
-        {editError && <p className={cn("text-coquelicot-600 text-xs font-medium")}>{editError}</p>}
+        {CONTACT_EDIT_FIELDS.map((f) => {
+          const inputId = `edit-${f.key}-${c.id}`;
+          return (
+            <div key={f.key} className={cn("flex flex-col gap-1")}>
+              <label className={cn("text-russian-violet text-xs font-semibold")} htmlFor={inputId}>
+                {f.label}
+              </label>
+              {f.render({
+                id: inputId,
+                value: edit.values[f.key],
+                onChange: edit.setField.bind(null, f.key),
+              })}
+            </div>
+          );
+        })}
+        {edit.error && (
+          <p className={cn("text-coquelicot-600 text-xs font-medium")}>{edit.error}</p>
+        )}
         <div className={cn("flex gap-2")}>
           <button
-            onClick={() => onSaveEdit(c.id)}
-            disabled={saving}
+            onClick={edit.save}
+            disabled={edit.saving}
             className={cn(
               "bg-russian-violet hover:bg-russian-violet/90 disabled:bg-russian-violet/40 rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition-colors",
             )}
           >
-            {saving ? "Saving…" : "Save"}
+            {edit.saving ? "Saving…" : "Save"}
           </button>
           <button
-            onClick={onCancelEdit}
-            disabled={saving}
+            onClick={edit.cancel}
+            disabled={edit.saving}
             className={cn(
               "rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-200 disabled:opacity-40",
             )}
@@ -209,9 +242,9 @@ function ContactCard({
         <div className={cn("flex items-center gap-2")}>
           <span className={cn("text-xs text-slate-400")}>{formatDateShort(c.createdAt)}</span>
           {!c.googleContactId &&
-            (syncingId === c.id ? (
+            (isSyncing ? (
               <span className={cn("text-xs text-slate-400")}>Syncing…</span>
-            ) : confirmSyncId === c.id ? (
+            ) : isConfirmingSync ? (
               <div
                 className={cn(
                   "flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs",
@@ -226,7 +259,7 @@ function ContactCard({
                 </div>
                 <div className={cn("flex gap-2")}>
                   <button
-                    onClick={() => onConfirmSyncToGoogle(c.id)}
+                    onClick={onConfirmSync}
                     className={cn(
                       "bg-russian-violet hover:bg-russian-violet/90 rounded px-2 py-0.5 text-xs font-semibold text-white transition-colors",
                     )}
@@ -234,7 +267,7 @@ function ContactCard({
                     Confirm
                   </button>
                   <button
-                    onClick={onCancelSyncToGoogle}
+                    onClick={onCancelSync}
                     className={cn(
                       "rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-200",
                     )}
@@ -245,7 +278,7 @@ function ContactCard({
               </div>
             ) : (
               <button
-                onClick={() => onRequestSyncToGoogle(c.id)}
+                onClick={onRequestSync}
                 className={cn(
                   "text-russian-violet/70 hover:text-russian-violet rounded px-1.5 py-0.5 text-xs font-medium transition-colors",
                 )}
@@ -257,7 +290,7 @@ function ContactCard({
             <span className={cn("rounded px-1.5 py-0.5 text-xs text-slate-400")}>Synced</span>
           )}
           <button
-            onClick={() => onStartEdit(c)}
+            onClick={onStartEdit}
             className={cn(
               "text-russian-violet/70 hover:text-russian-violet rounded px-1.5 py-0.5 text-xs font-medium transition-colors",
             )}
@@ -290,16 +323,16 @@ function ContactCard({
       {c.reviews.length > 0 && (
         <div className={cn("mt-1")}>
           <button
-            onClick={() => onToggleReviews(c.id)}
+            onClick={onToggleReviews}
             className={cn(
               "text-russian-violet/60 hover:text-russian-violet text-xs font-medium transition-colors",
             )}
           >
-            {expandedReviewsId === c.id
+            {isReviewsExpanded
               ? "Hide reviews"
               : `${c.reviews.length} linked review${c.reviews.length === 1 ? "" : "s"}`}
           </button>
-          {expandedReviewsId === c.id && (
+          {isReviewsExpanded && (
             <div className={cn("mt-2 flex flex-col gap-1.5")}>
               {c.reviews.map((rv) => (
                 <div
@@ -360,10 +393,12 @@ export function ContactAdminList({
     setContacts(initialContacts);
   }, [initialContacts]);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editName, setEditName] = useState("");
-  const [editEmail, setEditEmail] = useState("");
-  const [editPhone, setEditPhone] = useState("");
-  const [editAddress, setEditAddress] = useState("");
+  const [editValues, setEditValues] = useState<EditValues>({
+    name: "",
+    email: "",
+    phone: "",
+    address: "",
+  });
   const [saving, setSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [syncingId, setSyncingId] = useState<string | null>(null);
@@ -415,11 +450,22 @@ export function ContactAdminList({
    */
   function startEdit(c: ContactRow): void {
     setEditingId(c.id);
-    setEditName(c.name);
-    setEditEmail(c.email ?? "");
-    setEditPhone(c.phone ?? "");
-    setEditAddress(c.address ?? "");
+    setEditValues({
+      name: c.name,
+      email: c.email ?? "",
+      phone: c.phone ?? "",
+      address: c.address ?? "",
+    });
     setEditError(null);
+  }
+
+  /**
+   * Updates one field of the edit form.
+   * @param field - Field key.
+   * @param value - New value.
+   */
+  function setEditField<K extends keyof EditValues>(field: K, value: EditValues[K]): void {
+    setEditValues((prev) => ({ ...prev, [field]: value }));
   }
 
   /**
@@ -490,15 +536,15 @@ export function ContactAdminList({
    * @param id - The contact ID being saved.
    */
   async function saveEdit(id: string): Promise<void> {
-    if (!editName.trim()) {
+    if (!editValues.name.trim()) {
       setEditError("Name is required.");
       return;
     }
-    if (validateEmail(editEmail) !== "ok") {
+    if (validateEmail(editValues.email) !== "ok") {
       setEditError("Please enter a valid email address.");
       return;
     }
-    if (validatePhone(editPhone).result === "invalid") {
+    if (validatePhone(editValues.phone).result === "invalid") {
       setEditError("Please enter a valid phone number.");
       return;
     }
@@ -511,12 +557,7 @@ export function ContactAdminList({
           "Content-Type": "application/json",
           "X-Admin-Secret": token,
         },
-        body: JSON.stringify({
-          name: editName,
-          email: editEmail,
-          phone: editPhone,
-          address: editAddress,
-        }),
+        body: JSON.stringify(editValues),
       });
       const data = (await res.json()) as {
         ok: boolean;
@@ -586,29 +627,34 @@ export function ContactAdminList({
     setConfirmSyncId(null);
   }
 
-  const sharedCardProps = {
-    editingId,
-    editName,
-    editEmail,
-    editPhone,
-    editAddress,
-    saving,
-    editError,
-    syncingId,
-    confirmSyncId,
-    expandedReviewsId,
-    onStartEdit: startEdit,
-    onCancelEdit: cancelEdit,
-    onSaveEdit: handleSaveEdit,
-    onRequestSyncToGoogle: setConfirmSyncId,
-    onConfirmSyncToGoogle: handleConfirmSyncToGoogle,
-    onCancelSyncToGoogle: handleCancelSyncToGoogle,
-    onToggleReviews: toggleReviews,
-    onEditName: setEditName,
-    onEditEmail: setEditEmail,
-    onEditPhone: setEditPhone,
-    onEditAddress: setEditAddress,
-  };
+  /**
+   * Builds the per-card props (everything except `c` itself).
+   * @param c - Contact row this card is for.
+   * @returns Card props excluding `c`.
+   */
+  function buildCardProps(c: ContactRow): Omit<ContactCardProps, "c"> {
+    return {
+      edit:
+        editingId === c.id
+          ? {
+              values: editValues,
+              saving,
+              error: editError,
+              setField: setEditField,
+              save: handleSaveEdit.bind(null, c.id),
+              cancel: cancelEdit,
+            }
+          : null,
+      isSyncing: syncingId === c.id,
+      isConfirmingSync: confirmSyncId === c.id,
+      isReviewsExpanded: expandedReviewsId === c.id,
+      onStartEdit: startEdit.bind(null, c),
+      onRequestSync: setConfirmSyncId.bind(null, c.id),
+      onConfirmSync: handleConfirmSyncToGoogle.bind(null, c.id),
+      onCancelSync: handleCancelSyncToGoogle,
+      onToggleReviews: toggleReviews.bind(null, c.id),
+    };
+  }
 
   if (contacts.length === 0) {
     return (
@@ -660,7 +706,7 @@ export function ContactAdminList({
             </span>
           </h3>
           {newContacts.map((c) => (
-            <ContactCard key={c.id} c={c} {...sharedCardProps} />
+            <ContactCard key={c.id} c={c} {...buildCardProps(c)} />
           ))}
         </div>
       )}
@@ -672,7 +718,7 @@ export function ContactAdminList({
             Needs syncing ({unsynced.length})
           </h3>
           {unsynced.map((c) => (
-            <ContactCard key={c.id} c={c} {...sharedCardProps} />
+            <ContactCard key={c.id} c={c} {...buildCardProps(c)} />
           ))}
         </div>
       ) : (
@@ -694,7 +740,7 @@ export function ContactAdminList({
           {syncedOpen && (
             <div className={cn("flex flex-col gap-3")}>
               {synced.map((c) => (
-                <ContactCard key={c.id} c={c} {...sharedCardProps} />
+                <ContactCard key={c.id} c={c} {...buildCardProps(c)} />
               ))}
             </div>
           )}

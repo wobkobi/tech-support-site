@@ -31,17 +31,15 @@ interface Props {
 }
 
 /**
- * Open-vocabulary combobox. Always accepts the typed value as the answer; the
- * suggestions panel only assists, never restricts. Suggestions filter by
- * substring (case-insensitive) and a "Use «typed»" row appears at the top
- * when the typed value isn't already in the list, making the
- * keep-as-typed action explicit.
+ * Open-vocabulary combobox. The typed value is always the answer; suggestions
+ * filter by case-insensitive substring and a "Use «typed»" row makes
+ * keep-as-typed explicit when the value isn't in the list.
  * @param props - Component props.
  * @param props.value - Current text value (controlled).
- * @param props.onChange - Called whenever the typed value changes.
- * @param props.suggestions - Existing values shown in the dropdown panel.
- * @param props.placeholder - Placeholder text for the input.
- * @param props.ariaLabel - Accessible label for screen readers.
+ * @param props.onChange - Typed-value change handler.
+ * @param props.suggestions - Existing values in the dropdown.
+ * @param props.placeholder - Placeholder text.
+ * @param props.ariaLabel - Accessible label.
  * @param props.className - Extra class on the wrapper.
  * @param props.inputClassName - Extra class on the inner input.
  * @returns Combobox element.

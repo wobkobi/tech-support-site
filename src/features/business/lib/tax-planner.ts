@@ -71,16 +71,12 @@ export interface TaxPlan {
 }
 
 /**
- * Builds the full tax plan from raw income/expense totals plus the GST
- * claimable already aggregated across expenses.
- *
- * Set-asides are computed on PROFIT (income minus expenses excl. GST), not
- * on raw income, matching the spreadsheet model. Savings targets divide the
- * total set-aside across 52 weeks / 12 months so the operator can save
- * incrementally rather than facing a lump sum at year-end.
+ * Builds the full tax plan from income/expense totals + GST claimable.
+ * Set-asides are computed on PROFIT (income - expenses excl. GST), matching
+ * the spreadsheet model; savings targets divide across 52 weeks / 12 months.
  * @param income - Total income for the period (e.g. current FY).
  * @param expensesExcl - Total expenses excluding GST for the period.
- * @param gstClaimable - GST input claimable on those expenses (already on the dashboard).
+ * @param gstClaimable - GST input claimable on those expenses.
  * @param rates - Per-rate overrides; defaults to DEFAULT_TAX_RATES.
  * @returns Computed plan.
  */

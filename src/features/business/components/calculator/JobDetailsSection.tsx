@@ -25,18 +25,17 @@ interface Props {
 }
 
 /**
- * Time + hourly-rate card. Renders one Start/End row per time slot - operators
- * can add more via "+ Add time slot" and the slot durations all sum into a
- * single billable total (one Labour line, no per-slot labels or line items).
+ * Time + hourly-rate card. Multiple Start/End slots sum into a single Labour
+ * line; a manual duration override wins over the slot sum when set.
  * @param props - Component props.
- * @param props.timeRanges - Time slots (always at least one); each contributes to the sum.
+ * @param props.timeRanges - Time slots (always at least one).
  * @param props.onTimeRangesChange - Replaces the slots array.
- * @param props.durationMinsOverride - Manual duration override; null means "use slot sum".
+ * @param props.durationMinsOverride - Manual override; null means "use slot sum".
  * @param props.onDurationOverrideChange - Sets or clears the override.
- * @param props.durationMins - Live billable minutes (override OR sum of slots).
- * @param props.hourlyRateId - Currently selected base hourly rate id.
+ * @param props.durationMins - Live billable minutes (override or slot sum).
+ * @param props.hourlyRateId - Selected base hourly rate id.
  * @param props.onHourlyRateIdChange - Picks a different base hourly rate.
- * @param props.baseRates - Available base hourly rates for the select.
+ * @param props.baseRates - Available base hourly rates.
  * @returns Time/rate card element.
  */
 export function JobDetailsSection({

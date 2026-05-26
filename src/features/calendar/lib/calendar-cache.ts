@@ -78,10 +78,8 @@ export function findSmartOrigin(
 
 /**
  * Forward-looking counterpart to {@link findSmartOrigin}. Returns the soonest
- * upcoming event with a resolvable location starting within
- * {@link RETURN_CHAINING_LOOKAHEAD_MS} of the given departure, or null. Events
- * from any calendar listed in `excludeCalendarEmails` are skipped (used to
- * keep work-cal "no car" blocks out of the chaining pool).
+ * upcoming located event within {@link RETURN_CHAINING_LOOKAHEAD_MS} of
+ * departure, skipping any calendar in `excludeCalendarEmails`.
  * @param allEvents - All calendar events in the current window.
  * @param currentEvent - The event being left.
  * @param effectiveDeparture - Earliest time the traveller can leave.

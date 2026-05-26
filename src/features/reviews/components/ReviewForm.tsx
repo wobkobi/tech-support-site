@@ -38,7 +38,7 @@ interface ReviewFormProtectedProps {
 /**
  * Protected review form with optional booking or contact verification.
  * @param props - Component props.
- * @param props.bookingId - Booking ID for verified reviews tied to a real appointment.
+ * @param props.bookingId - Booking ID for verified reviews tied to an appointment.
  * @param props.contactId - Contact ID for verified reviews from manual admin sends.
  * @param props.token - Review token for verification.
  * @param props.prefillName - Pre-fill customer name.

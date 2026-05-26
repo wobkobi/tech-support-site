@@ -556,29 +556,29 @@ export interface InvoiceEmailData {
   driveWebUrl?: string | null;
 }
 
-/**
- * Renders the invoice email subject + HTML body without sending. Used by the
- * preview modal AND the send route so what the operator previews is exactly
- * what the customer receives.
- * @param args - Render inputs.
- * @param args.invoice - Invoice row fields needed for the body.
- * @param args.reviewUrl - Stable per-contact review URL, or null to omit the review line.
- * @param args.greetingName - Optional operator-typed greeting target. Useful when
- *   the invoice goes to a company but the email goes to a specific person (e.g.
- *   "John" while the invoice header reads "Mars Salt and Sweet Limited").
- * @param args.customBody - Optional operator-typed message that replaces the
- *   default intro paragraph. Multi-line allowed (rendered with `white-space:
- *   pre-wrap` so line breaks are preserved). Falls back to
- *   DEFAULT_INVOICE_EMAIL_BODY when omitted.
- * @returns Subject + escaped HTML body.
- */
-export function buildInvoiceEmail(args: {
+interface BuildInvoiceEmailArgs {
   invoice: InvoiceEmailData;
   reviewUrl: string | null;
   greetingName?: string;
   customBody?: string;
-}): { subject: string; html: string } {
-  const { invoice, reviewUrl, greetingName, customBody } = args;
+}
+
+/**
+ * Renders the invoice email subject + HTML body without sending. Shared by
+ * the preview modal and the send route so the preview matches what's sent.
+ * @param args - Render inputs.
+ * @param args.invoice - Invoice row fields needed for the body.
+ * @param args.reviewUrl - Stable per-contact review URL, or null to omit.
+ * @param args.greetingName - Optional greeting target (e.g. person inside a company).
+ * @param args.customBody - Optional intro replacement (multi-line via pre-wrap).
+ * @returns Subject + escaped HTML body.
+ */
+export function buildInvoiceEmail({
+  invoice,
+  reviewUrl,
+  greetingName,
+  customBody,
+}: BuildInvoiceEmailArgs): { subject: string; html: string } {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz";
   const bodyText = (customBody ?? DEFAULT_INVOICE_EMAIL_BODY).trim();
   // pre-wrap preserves line breaks the operator typed; escape first so the
@@ -638,6 +638,14 @@ export function buildInvoiceEmail(args: {
   return { subject, html };
 }
 
+interface SendInvoiceEmailArgs {
+  invoice: InvoiceEmailData;
+  pdfBytes: Uint8Array;
+  reviewUrl: string | null;
+  greetingName?: string;
+  customBody?: string;
+}
+
 /**
  * Sends the rendered invoice email via Resend with the PDF attached.
  * Failures are caught and logged - never throws.
@@ -645,18 +653,17 @@ export function buildInvoiceEmail(args: {
  * @param args.invoice - Invoice row fields needed for the body.
  * @param args.pdfBytes - Raw PDF bytes returned by `generateInvoicePdf`.
  * @param args.reviewUrl - Stable per-contact review URL, or null to omit the review line.
- * @param args.greetingName - Optional operator-typed greeting target (forwarded to buildInvoiceEmail).
- * @param args.customBody - Optional operator-typed message body that replaces the default intro paragraph.
+ * @param args.greetingName - Optional greeting target (forwarded to buildInvoiceEmail).
+ * @param args.customBody - Optional intro replacement.
  * @returns True if the email was accepted by Resend, false on failure or misconfig.
  */
-export async function sendInvoiceEmail(args: {
-  invoice: InvoiceEmailData;
-  pdfBytes: Uint8Array;
-  reviewUrl: string | null;
-  greetingName?: string;
-  customBody?: string;
-}): Promise<boolean> {
-  const { invoice, pdfBytes, reviewUrl, greetingName, customBody } = args;
+export async function sendInvoiceEmail({
+  invoice,
+  pdfBytes,
+  reviewUrl,
+  greetingName,
+  customBody,
+}: SendInvoiceEmailArgs): Promise<boolean> {
   const from = process.env.EMAIL_FROM;
   if (!from || !process.env.RESEND_API_KEY) {
     console.warn("[email] Resend not configured - skipping invoice email.");
@@ -689,23 +696,26 @@ export async function sendInvoiceEmail(args: {
   }
 }
 
+interface BuildVoidEmailArgs {
+  invoice: InvoiceEmailData;
+  greetingName?: string;
+  customBody?: string;
+}
+
 /**
  * Renders the "your invoice has been voided" email subject + body. Mirrors
  * buildInvoiceEmail but drops the bank-transfer block and review line - voided
  * invoices never request payment or a review.
  * @param args - Render inputs.
- * @param args.invoice - Invoice row fields needed for the body (the issueDate
- *   helps the client identify which email this voids).
+ * @param args.invoice - Invoice row fields needed for the body.
  * @param args.greetingName - Optional operator-typed greeting target.
  * @param args.customBody - Optional override; falls back to DEFAULT_VOID_EMAIL_BODY.
  * @returns Subject + escaped HTML body.
  */
-export function buildVoidEmail(args: {
-  invoice: InvoiceEmailData;
-  greetingName?: string;
-  customBody?: string;
-}): { subject: string; html: string } {
-  const { invoice, greetingName, customBody } = args;
+export function buildVoidEmail({ invoice, greetingName, customBody }: BuildVoidEmailArgs): {
+  subject: string;
+  html: string;
+} {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz";
   const bodyText = (customBody ?? DEFAULT_VOID_EMAIL_BODY).trim();
   const safeBody = escapeHtml(bodyText || DEFAULT_VOID_EMAIL_BODY);
@@ -743,25 +753,30 @@ export function buildVoidEmail(args: {
   return { subject, html };
 }
 
-/**
- * Sends the void notification email via Resend with the VOID-stamped PDF
- * attached. Mirrors sendInvoiceEmail's error handling - logs and returns
- * false on failure rather than throwing, so the caller (void endpoint) can
- * report `notified: false` without rolling back the status change.
- * @param args - Send inputs.
- * @param args.invoice - Invoice row fields needed for the body.
- * @param args.pdfBytes - Raw PDF bytes (already VOID-stamped via generateInvoicePdf on the VOIDED row).
- * @param args.greetingName - Optional operator-typed greeting target.
- * @param args.customBody - Optional operator-typed body override.
- * @returns True if Resend accepted the email, false otherwise.
- */
-export async function sendVoidNotification(args: {
+interface SendVoidNotificationArgs {
   invoice: InvoiceEmailData;
   pdfBytes: Uint8Array;
   greetingName?: string;
   customBody?: string;
-}): Promise<boolean> {
-  const { invoice, pdfBytes, greetingName, customBody } = args;
+}
+
+/**
+ * Sends the void notification with the VOID-stamped PDF attached.
+ * Logs + returns false on failure rather than throwing so the void endpoint
+ * can report `notified: false` without rolling back the status change.
+ * @param args - Send inputs.
+ * @param args.invoice - Invoice row fields needed for the body.
+ * @param args.pdfBytes - PDF bytes (already VOID-stamped).
+ * @param args.greetingName - Optional greeting target.
+ * @param args.customBody - Optional intro replacement.
+ * @returns True if Resend accepted the email, false otherwise.
+ */
+export async function sendVoidNotification({
+  invoice,
+  pdfBytes,
+  greetingName,
+  customBody,
+}: SendVoidNotificationArgs): Promise<boolean> {
   const from = process.env.EMAIL_FROM;
   if (!from || !process.env.RESEND_API_KEY) {
     console.warn("[email] Resend not configured - skipping void notification.");

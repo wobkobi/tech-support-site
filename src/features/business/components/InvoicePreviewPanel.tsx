@@ -36,21 +36,30 @@ interface Props {
  * Live A4-styled invoice preview. Mirrors invoice-pdf.ts so the operator sees
  * the same layout the customer will receive. Pure presentational.
  * @param props - Component props.
+ * @param props.number - Invoice number to display ("DRAFT" for unsaved).
+ * @param props.clientName - Client name shown on the invoice header.
+ * @param props.clientEmail - Client email shown on the invoice header.
+ * @param props.issueDate - ISO YYYY-MM-DD issue date.
+ * @param props.dueDate - ISO YYYY-MM-DD due date.
+ * @param props.lineItems - Line items to render.
+ * @param props.notes - Footer notes text.
+ * @param props.promoTitle - Promo title (when discount > 0).
+ * @param props.promoDiscount - Promo discount in dollars; renders the line when > 0.
+ * @param props.unsuccessfulDiscount - Half-price labour discount; renders the line when > 0.
  * @returns Invoice preview element.
  */
-function InvoicePreviewPanelImpl(props: Props): React.ReactElement {
-  const {
-    number,
-    clientName,
-    clientEmail,
-    issueDate,
-    dueDate,
-    lineItems,
-    notes,
-    promoTitle,
-    promoDiscount,
-    unsuccessfulDiscount = 0,
-  } = props;
+function InvoicePreviewPanelImpl({
+  number,
+  clientName,
+  clientEmail,
+  issueDate,
+  dueDate,
+  lineItems,
+  notes,
+  promoTitle,
+  promoDiscount,
+  unsuccessfulDiscount = 0,
+}: Props): React.ReactElement {
   const totals = calcInvoiceTotals(lineItems, promoDiscount + unsuccessfulDiscount);
   const showPromoLine = promoDiscount > 0;
   const showUnsuccessfulLine = unsuccessfulDiscount > 0;

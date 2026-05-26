@@ -135,17 +135,15 @@ function sumExpense(rows: ExpenseRow[], field: "amountExcl" | "gstAmount"): numb
 }
 
 /**
- * Overview stat cards driven by the scope selected on the parent page. Each
- * card is a button that opens a BreakdownModal explaining the value (rows
- * that summed to it, or the calculation that produced it).
+ * Overview stat cards. Each card opens a BreakdownModal explaining the value.
  * @param props - Component props.
  * @param props.token - Admin token used by the inner breakdown modal.
- * @param props.scope - Current "this month" / "this FY" selection from the parent.
+ * @param props.scope - Current "this month" / "this FY" selection.
  * @param props.income - Income rows in scope.
  * @param props.expenses - Expense rows in scope.
  * @param props.invoices - Invoice rows in scope.
- * @param props.monthStartISO - ISO timestamp for the start of the active month.
- * @param props.monthEndISO - ISO timestamp for the end of the active month.
+ * @param props.monthStartISO - ISO start of the active month.
+ * @param props.monthEndISO - ISO end of the active month.
  * @returns Cards section.
  */
 export function BusinessDashboardCards({

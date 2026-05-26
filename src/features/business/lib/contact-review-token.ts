@@ -34,6 +34,12 @@ export async function ensureContactReviewToken(contactId: string): Promise<strin
   }
 }
 
+interface InvoiceReviewLookupArgs {
+  contactId: string | null | undefined;
+  clientEmail: string | null | undefined;
+  siteUrl: string;
+}
+
 /**
  * Resolves a review URL for an invoice. Tries the contactId path first, then
  * falls back to matching the invoice's clientEmail against existing contacts.
@@ -45,13 +51,11 @@ export async function ensureContactReviewToken(contactId: string): Promise<strin
  * @param args.siteUrl - Public origin to prefix the review URL with.
  * @returns Full review URL or null when no contact can be resolved.
  */
-export async function resolveInvoiceReviewUrl(args: {
-  contactId: string | null | undefined;
-  clientEmail: string | null | undefined;
-  siteUrl: string;
-}): Promise<string | null> {
-  const { contactId, clientEmail, siteUrl } = args;
-
+export async function resolveInvoiceReviewUrl({
+  contactId,
+  clientEmail,
+  siteUrl,
+}: InvoiceReviewLookupArgs): Promise<string | null> {
   if (contactId) {
     const token = await ensureContactReviewToken(contactId);
     if (token) return `${siteUrl}/review?token=${token}`;
@@ -96,36 +100,21 @@ export type InvoiceReviewEligibility =
     };
 
 /**
- * Decides whether the invoice email should include the review link, and
- * returns the URL (when available) so the UI can still preview it.
- *
- * Rules:
- * - `no-contact`: couldn't resolve a per-contact review URL (no contactId and
- *   no matching Contact by email) - nothing to send
- * - `already-reviewed`: the customer has already submitted a review (Review
- *   linked by contactId, or with `customerRef` matching the contact's
- *   reviewToken) - permanently disabled, don't re-ask
- * - `sent-recently`: a review request went out within the cooldown window
- *   (Booking.reviewSentAt or ReviewRequest.createdAt) and no review has been
- *   submitted yet - disabled until the cooldown elapses
- * - `canSend: true`: never asked, or asked >cooldown days ago - safe to send
- *
- * The `reviewUrl` is still returned for `already-reviewed` and `sent-recently`
- * so the operator can still preview what *would* be sent. The UI gates the
- * checkbox; the send route gates the actual inclusion.
+ * Decides whether the invoice email should include the review link.
+ * Returns `reviewUrl` even when blocked so the operator can preview it; the
+ * UI gates the checkbox and the send route gates actual inclusion.
+ * Verdicts: `no-contact` / `already-reviewed` / `sent-recently` / `canSend: true`.
  * @param args - Lookup inputs.
  * @param args.contactId - Optional Contact id from the invoice.
  * @param args.clientEmail - Invoice's clientEmail (case-insensitive).
  * @param args.siteUrl - Public origin to prefix the review URL with.
  * @returns Eligibility verdict + URL when one can be resolved.
  */
-export async function getInvoiceReviewEligibility(args: {
-  contactId: string | null | undefined;
-  clientEmail: string | null | undefined;
-  siteUrl: string;
-}): Promise<InvoiceReviewEligibility> {
-  const { contactId, clientEmail, siteUrl } = args;
-
+export async function getInvoiceReviewEligibility({
+  contactId,
+  clientEmail,
+  siteUrl,
+}: InvoiceReviewLookupArgs): Promise<InvoiceReviewEligibility> {
   const reviewUrl = await resolveInvoiceReviewUrl({ contactId, clientEmail, siteUrl });
   if (!reviewUrl) {
     return { canSend: false, reason: "no-contact" };

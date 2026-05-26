@@ -82,13 +82,11 @@ async function ensureAnyoneWithLinkReader(fileId: string): Promise<void> {
 }
 
 /**
- * Uploads (or replaces) a PDF buffer in Drive in the correct year folder.
- * If `existingFileId` is supplied, the file's media is replaced in place so the
- * Drive URL and file ID stay stable; if missing or the file no longer exists,
- * a new file is created. The resulting file is shared as "anyone with the link
- * can view" so the email's view-invoice link works for the recipient.
+ * Uploads (or replaces in-place) an invoice PDF in the correct year folder.
+ * Replace keeps the existing file ID/URL stable; a missing/deleted file
+ * triggers a fresh create. Shares as "anyone with the link can view".
  * @param buffer - PDF content as a Buffer.
- * @param invoiceNumber - Invoice number used as the filename (e.g. "TTP-2627-0042").
+ * @param invoiceNumber - Filename (e.g. "TTP-2627-0042").
  * @param yearCode - Fiscal year code used to resolve the destination folder.
  * @param existingFileId - Optional existing Drive file ID to update in place.
  * @returns Object with Drive file ID and web view URL.

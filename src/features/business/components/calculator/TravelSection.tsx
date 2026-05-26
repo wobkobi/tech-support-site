@@ -17,19 +17,17 @@ interface Props {
 }
 
 /**
- * Travel address input + per-entry travel cost list. The address input is
- * wired to Google Places autocomplete via a ref owned by the parent. Each
- * lookup populates (or replaces) a single auto entry; operators can add
- * additional manual entries (parking, ferry, etc.) and the invoice lumps
- * every entry into one "Travel" line.
+ * Travel address input + per-entry travel cost list. Lookup populates a single
+ * auto entry; operators can add manual entries (parking, ferry). Every entry
+ * lumps into one "Travel" invoice line.
  * @param props - Component props.
- * @param props.addressInputRef - Ref forwarded to the address input so the parent can attach Maps autocomplete.
+ * @param props.addressInputRef - Ref the parent attaches Maps autocomplete to.
  * @param props.jobAddress - Current address text.
- * @param props.onJobAddressChange - Setter invoked when the user types in the address input.
- * @param props.travelEntries - All travel charges (auto + manual); summed for the invoice line.
+ * @param props.onJobAddressChange - Address change handler.
+ * @param props.travelEntries - All travel charges (auto + manual).
  * @param props.onTravelEntriesChange - Replaces the entries array.
- * @param props.lookingUpTravel - True while a lookup is in flight; disables the button.
- * @param props.onLookup - Click handler for the "Look up" button and Enter key.
+ * @param props.lookingUpTravel - True while a lookup is in flight.
+ * @param props.onLookup - "Look up" / Enter handler.
  * @returns Travel section element.
  */
 export function TravelSection({

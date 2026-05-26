@@ -345,17 +345,16 @@ interface BlockDayButtonProps {
 }
 
 /**
- * Small day-header button that toggles an all-day "Busy" event on the booking
- * calendar. Disabled when timed bookings already occupy the day, since the
- * existing calendar code would still let them slip through.
+ * Day-header button toggling an all-day "Busy" event on the booking calendar.
+ * Disabled when timed bookings exist on the day (they'd slip through otherwise).
  * @param props - Component props.
  * @param props.token - Admin token forwarded as x-admin-secret.
  * @param props.dateKey - NZ YYYY-MM-DD for the target day.
- * @param props.busyEventId - Existing all-day booking-cal event id (toggle to delete).
+ * @param props.busyEventId - Existing all-day event id, or null.
  * @param props.hasBookings - True when timed bookings exist on the day.
- * @param props.busyAction - Date key currently submitting (disables all other buttons).
- * @param props.onPending - Sets the in-flight dateKey while a request is open.
- * @param props.onChanged - Called after a successful change so the parent refreshes.
+ * @param props.busyAction - Date key currently submitting.
+ * @param props.onPending - Sets the in-flight dateKey.
+ * @param props.onChanged - Called after a successful change.
  * @returns Block/Unblock button element.
  */
 function BlockDayButton({

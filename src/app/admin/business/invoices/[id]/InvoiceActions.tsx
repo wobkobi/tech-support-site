@@ -25,17 +25,16 @@ interface InvoiceActionsProps {
 }
 
 /**
- * Action bar for an invoice detail page: back, print, Drive PDF, and Send to
- * client (with an email-preview modal).
+ * Action bar for an invoice detail page: back, print, Drive PDF, send-to-client.
  * @param props - Component props.
  * @param props.backHref - URL for the back button.
  * @param props.driveWebUrl - Optional Google Drive PDF URL.
  * @param props.invoiceId - Invoice id used by the preview/send routes.
- * @param props.invoiceNumber - Invoice number used in the downloaded PDF filename.
- * @param props.clientName - Client name; used in the "add to contacts" link inside the send modal.
- * @param props.clientEmail - Recipient email; "Send" is disabled when empty.
- * @param props.status - Current invoice status (drives the "Sent" indicator).
- * @param props.token - Admin token forwarded as X-Admin-Secret on POSTs.
+ * @param props.invoiceNumber - Filename for the downloaded PDF.
+ * @param props.clientName - Used in the "add to contacts" link in the send modal.
+ * @param props.clientEmail - Recipient; "Send" is disabled when empty.
+ * @param props.status - Drives the "Sent" indicator.
+ * @param props.token - Admin token forwarded as X-Admin-Secret.
  * @returns Invoice actions element with modal.
  */
 export function InvoiceActions({

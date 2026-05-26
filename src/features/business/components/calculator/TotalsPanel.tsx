@@ -21,17 +21,13 @@ interface Props {
 }
 
 /**
- * Live job summary card on the right rail of the calculator: time charge,
- * tasks, promo (under labor lines so it's visually attached to what it
- * discounts), parts, travel, subtotal (already net of promo), and the bold
- * final total. GST (if any) is back-calculated by the engine when
- * GST_REGISTERED flips true; no operator toggle. Pure display - state lives
- * in the parent.
+ * Right-rail live job summary: time charge, tasks, promo (under labour lines),
+ * parts, travel, subtotal, and the bold final total. Pure display.
  * @param props - Component props.
- * @param props.durationMins - Job duration in minutes (drives the time-charge row visibility).
- * @param props.hourlyRate - Active hourly rate (drives the time-charge row visibility and label).
- * @param props.totals - Output of calcJobTotal: per-bucket subtotals plus subtotal/gst/total.
- * @param props.activePromo - Promo applied to this job, or null when none.
+ * @param props.durationMins - Job duration; drives time-charge row visibility.
+ * @param props.hourlyRate - Active hourly rate; drives label + row visibility.
+ * @param props.totals - Output of calcJobTotal.
+ * @param props.activePromo - Promo applied to this job, or null.
  * @returns Summary card element.
  */
 export function TotalsPanel({

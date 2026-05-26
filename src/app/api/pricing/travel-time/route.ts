@@ -3,17 +3,12 @@ import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 import { lookupDriveDistance } from "@/features/business/lib/travel-distance";
 
 /**
- * POST /api/pricing/travel-time - Returns drive time from HOME_ADDRESS to the
- * given destination. Accepts any string Google's Distance Matrix can geocode:
- * a full street address gives the most accurate quote; a suburb name still
- * works but routes to the suburb centroid.
- * Accepts an optional `departureTimeIso` so the calculator can quote rush-hour
- * jobs with traffic-aware duration; if absent (or malformed) Google falls back
- * to "now".
- * @param request - Incoming request with { destination: string, departureTimeIso?: string } body
- * @returns JSON with durationMins + distanceKm on success, durationMins: 0 when
- *   the address can't be resolved, or 503 when the upstream is misconfigured /
- *   erroring so the operator notices instead of silently quoting $0 travel.
+ * POST /api/pricing/travel-time - Drive time from HOME_ADDRESS to destination.
+ * Optional `departureTimeIso` enables traffic-aware quoting; malformed/missing
+ * values fall back to "now".
+ * @param request - Body: `{ destination: string, departureTimeIso?: string }`.
+ * @returns `{ durationMins, distanceKm }` on success, durationMins: 0 when
+ *   unresolvable, 503 on misconfig / upstream errors so the operator notices.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const limited = rateLimitOrReject(request, "travel-time", 5, 60_000);

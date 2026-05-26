@@ -49,19 +49,16 @@ function toReliableDeparture(departureTime: Date, now: Date): Date {
 export type TransportMode = "transit" | "driving" | "walking" | "bicycling";
 
 /**
- * Calculates travel time in minutes between two addresses.
- * When the departure/arrival time is more than {@link SCHEDULE_HORIZON_DAYS} days away
- * and mode is transit, the nearest upcoming date with the same day-of-week is used so
- * that transit schedule data is available.
- * Returns null if the API key is not configured, the route cannot be determined,
- * or any error occurs. Never throws.
+ * Travel time between two addresses, in minutes (ceiling).
+ * Transit lookups beyond {@link SCHEDULE_HORIZON_DAYS} snap to the nearest
+ * same-day-of-week within range so schedule data is available.
  * @param origin - Starting address or coordinates.
  * @param destination - Destination address or coordinates.
- * @param departureTime - Desired departure (or arrival) time for transit schedule lookup.
+ * @param departureTime - Departure (or arrival) time for transit schedule lookup.
  * @param options - Optional flags.
  * @param options.useArrivalTime - When true, uses arrival_time instead of departure_time.
  * @param options.mode - Travel mode (default: "transit").
- * @returns Travel time in minutes (ceiling), or null.
+ * @returns Travel time in minutes, or null on misconfig / failure.
  */
 export async function calculateTravelMinutes(
   origin: string,

@@ -1,21 +1,11 @@
 // src/features/contacts/lib/google-contacts.ts
 /**
  * @file google-contacts.ts
- * @description Google People API integration with bidirectional latest-wins
- * sync. The site DB and Google Contacts both have authority, with conflict
- * resolution:
- *
- * - Phones: always merged as a union. A second number from a new booking is
- *   appended to Google's existing phones; nothing is ever overwritten.
- * - Names, emails, addresses (single-value fields): latest-wins when only one
- *   side changed since the last sync (using Contact.lastSyncedAt and the
- *   stored Google etag in lastGoogleEtag to detect change). When BOTH sides
- *   changed and values differ, a ContactConflict row is recorded and the
- *   admin resolves it from /admin/contacts/conflicts. The site DB is not
- *   updated until the admin picks a winner.
- *
- * On first contact (lastSyncedAt null), Google's values win for any field
- * Google has populated, with site values used to fill remaining blanks.
+ * @description Google People API bidirectional sync. Phones merge as a union
+ * (never overwrite). Single-value fields (name, email, address) are latest-wins
+ * via `lastSyncedAt` + `lastGoogleEtag`; if both sides changed and differ, a
+ * `ContactConflict` is recorded and the admin resolves it. First-time sync
+ * (lastSyncedAt null) lets Google win for any field it has populated.
  */
 
 import { google } from "googleapis";
@@ -327,20 +317,11 @@ function mergePhones(sitePhone: string | null, googlePhones: string[]): string[]
 }
 
 /**
- * Bidirectional sync between a site Contact and its Google Contacts counterpart.
- *
- * Loads the contact, finds (or creates) the matching Google person, then:
- * - merges phones as a union so booking-time phone variations are appended,
- *   never lost,
- * - for name / email / address, uses latest-wins when only one side changed
- *   since the last sync (Contact.lastSyncedAt vs Google's etag); when both
- *   sides changed and values diverge, records a ContactConflict for admin
- *   approval and leaves the site value alone.
- *
- * Stamps Contact.lastSyncedAt + Contact.lastGoogleEtag on success so the next
- * sync can detect change correctly. Never throws - all errors are logged.
+ * Bidirectional sync between a site Contact and its Google counterpart.
+ * Phones merge as a union; name/email/address use latest-wins via lastSyncedAt
+ * + etag, recording a ContactConflict when both sides changed and diverge.
+ * Stamps lastSyncedAt + lastGoogleEtag on success. Never throws.
  * @param contactId - The local DB contact ID to sync.
- * @returns Promise that resolves when the sync attempt is complete.
  */
 export async function syncContactToGoogle(contactId: string): Promise<void> {
   try {

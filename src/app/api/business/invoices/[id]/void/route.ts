@@ -8,13 +8,9 @@ import { uploadInvoicePdf } from "@/features/business/lib/google-drive";
 
 /**
  * POST /api/business/invoices/[id]/void
- *
- * Atomic void flow: flips status to VOIDED, stamps voidedAt, regenerates the
- * PDF with the diagonal VOID watermark, optionally emails the client a
- * notification with that stamped PDF attached, and syncs the stamped PDF to
- * the Drive archive. The status change is the source of truth; notification
- * and Drive sync are best-effort and never roll back the void.
- *
+ * Flips status to VOIDED, stamps voidedAt, regenerates the PDF with the VOID
+ * watermark. Optional client email + Drive sync are best-effort; the status
+ * change is authoritative and never rolls back on those failing.
  * Body: { sendNotification: boolean, greetingName?, customBody? }
  * @param request - Next.js request (admin-auth gated).
  * @param ctx - Route ctx with the invoice id.
