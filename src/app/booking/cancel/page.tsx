@@ -1,8 +1,9 @@
 // src/app/booking/cancel/page.tsx
 /**
  * @file page.tsx
- * @description Booking cancel page. Statically rendered shell - token is read
- * client-side via useSearchParams, so this page has no server-side dependencies.
+ * @description Booking cancel page. Confirmation gate with a three-state
+ * fee banner so the customer sees the cancellation cost before they fire
+ * the cancel.
  */
 
 "use client";
@@ -12,62 +13,151 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { cn } from "@/shared/lib/cn";
 import { Button } from "@/shared/components/Button";
+import {
+  CANCELLATION,
+  isWithinCancellationWindow,
+  isWithinTravelWindow,
+} from "@/features/business/lib/pricing-policy";
+import { formatDateShort } from "@/shared/lib/date-format";
 
 const CARD = "border-seasalt-400/60 bg-seasalt-800 rounded-xl border p-5 shadow-sm sm:p-6";
 
+type LoadState =
+  | { kind: "loading" }
+  | { kind: "ready"; startAt: Date }
+  | { kind: "alreadyCancelled" }
+  | { kind: "error"; message: string };
+
+type SubmitState =
+  | { kind: "idle" }
+  | { kind: "submitting" }
+  | { kind: "done" }
+  | { kind: "error"; message: string };
+
 /**
- * Cancel page inner content. Reads the token from the URL and fires the cancel API.
- * Wrapped in Suspense by the page export to satisfy the useSearchParams requirement.
+ * Pre-cancellation fee banner. Green = no fee, amber = $30 callout,
+ * red = $30 + round-trip travel.
+ * @param props - Component props.
+ * @param props.startAt - Booking start time.
+ * @returns Banner element for the current cancellation timing.
+ */
+function FeeBanner({ startAt }: { startAt: Date }): React.ReactElement {
+  const now = new Date();
+  const inTravel = isWithinTravelWindow(startAt, now);
+  const inCancel = isWithinCancellationWindow(startAt, now);
+  if (inTravel) {
+    return (
+      <div
+        role="alert"
+        className={cn(
+          "border-coquelicot-500/60 bg-coquelicot-50 text-rich-black rounded-lg border-2 p-4 text-sm sm:text-base",
+        )}
+      >
+        <strong>${CANCELLATION.callOutFee} call-out fee plus round-trip travel</strong> will apply -
+        we're inside the {CANCELLATION.travelChargeHours}-hour window when I would normally be on
+        the way to you. Please call or text me directly if anything has changed.
+      </div>
+    );
+  }
+  if (inCancel) {
+    return (
+      <div
+        role="alert"
+        className={cn(
+          "border-mustard-500/60 bg-mustard-900/40 text-rich-black rounded-lg border-2 p-4 text-sm sm:text-base",
+        )}
+      >
+        <strong>${CANCELLATION.callOutFee} call-out fee</strong> will apply - you're inside the{" "}
+        {CANCELLATION.freeNoticeHours}-hour cancellation window.
+      </div>
+    );
+  }
+  return (
+    <div
+      className={cn(
+        "border-moonstone-500/50 bg-moonstone-600/10 text-rich-black rounded-lg border-2 p-4 text-sm sm:text-base",
+      )}
+    >
+      <strong>No fee</strong> applies for this cancellation - thanks for the heads up.
+    </div>
+  );
+}
+
+/**
+ * Inner content component. Wrapped in Suspense by the page export because
+ * useSearchParams requires it.
  * @returns The cancel UI element.
  */
 function CancelContent(): React.ReactElement {
   const searchParams = useSearchParams();
   const token = searchParams.get("token") ?? undefined;
-  const [state, setState] = useState<"idle" | "loading" | "done" | "error">("idle");
-  const [message, setMessage] = useState("");
+  // Seed from token presence so the effect doesn't synchronously setState
+  // (react-hooks/set-state-in-effect).
+  const [load, setLoad] = useState<LoadState>(() =>
+    token ? { kind: "loading" } : { kind: "error", message: "Missing cancel token." },
+  );
+  const [submit, setSubmit] = useState<SubmitState>({ kind: "idle" });
 
   useEffect(() => {
+    if (!token) return;
     let cancelled = false;
 
-    /** Executes the cancellation API call. */
-    async function runCancel(): Promise<void> {
-      if (!token) {
-        setState("error");
-        setMessage("Missing cancel token.");
-        return;
-      }
-
-      setState("loading");
-
+    /** Loads the booking's startAt + status so the banner can render. */
+    async function loadInfo(): Promise<void> {
       try {
-        const res = await fetch("/api/booking/cancel", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ cancelToken: token }),
+        const res = await fetch(`/api/booking/cancel?token=${encodeURIComponent(token!)}`, {
+          method: "GET",
         });
-
-        const data = (await res.json()) as { ok?: boolean; error?: string };
+        const data = (await res.json()) as {
+          ok?: boolean;
+          startAt?: string;
+          status?: string;
+          error?: string;
+        };
         if (cancelled) return;
-
-        if (data.ok) {
-          setState("done");
-          setMessage("Booking cancelled successfully.");
-        } else {
-          setState("error");
-          setMessage(data.error || "Could not cancel booking.");
+        if (!data.ok || !data.startAt) {
+          setLoad({ kind: "error", message: data.error || "Booking not found." });
+          return;
         }
+        if (data.status === "cancelled") {
+          setLoad({ kind: "alreadyCancelled" });
+          return;
+        }
+        setLoad({ kind: "ready", startAt: new Date(data.startAt) });
       } catch {
         if (cancelled) return;
-        setState("error");
-        setMessage("Network error.");
+        setLoad({ kind: "error", message: "Network error." });
       }
     }
-
-    void runCancel();
+    void loadInfo();
     return () => {
       cancelled = true;
     };
   }, [token]);
+
+  /** Fires the actual cancellation POST after the user confirms. */
+  async function runCancel(): Promise<void> {
+    if (!token) {
+      setSubmit({ kind: "error", message: "Missing cancel token." });
+      return;
+    }
+    setSubmit({ kind: "submitting" });
+    try {
+      const res = await fetch("/api/booking/cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cancelToken: token }),
+      });
+      const data = (await res.json()) as { ok?: boolean; error?: string };
+      if (data.ok) {
+        setSubmit({ kind: "done" });
+      } else {
+        setSubmit({ kind: "error", message: data.error || "Could not cancel booking." });
+      }
+    } catch {
+      setSubmit({ kind: "error", message: "Network error." });
+    }
+  }
 
   return (
     <main className={cn("relative min-h-dvh overflow-hidden")}>
@@ -98,18 +188,64 @@ function CancelContent(): React.ReactElement {
                 Cancel booking
               </h1>
 
-              {state === "loading" && <p className={cn("text-rich-black")}>Cancelling...</p>}
+              {load.kind === "loading" && (
+                <p className={cn("text-rich-black")}>Loading booking details...</p>
+              )}
 
-              {state !== "loading" && <p className={cn("text-rich-black")}>{message}</p>}
+              {load.kind === "error" && <p className={cn("text-rich-black")}>{load.message}</p>}
 
-              <div className={cn("mt-4 flex flex-wrap gap-3")}>
-                <Button href="/" variant="secondary" size="sm">
-                  Back to home
-                </Button>
-                <Button href="/booking" variant="ghost" size="sm">
-                  Book another time
-                </Button>
-              </div>
+              {load.kind === "alreadyCancelled" && (
+                <p className={cn("text-rich-black")}>
+                  This booking has already been cancelled - no further action needed.
+                </p>
+              )}
+
+              {load.kind === "ready" && submit.kind === "done" && (
+                <p className={cn("text-rich-black")}>
+                  Booking cancelled. A confirmation email will follow shortly.
+                </p>
+              )}
+
+              {load.kind === "ready" && submit.kind !== "done" && (
+                <div className={cn("space-y-4")}>
+                  <p className={cn("text-rich-black")}>
+                    You're about to cancel your appointment for{" "}
+                    <strong>{formatDateShort(load.startAt)}</strong>.
+                  </p>
+                  <FeeBanner startAt={load.startAt} />
+                  {submit.kind === "error" && (
+                    <p className={cn("text-coquelicot-500 text-sm")}>{submit.message}</p>
+                  )}
+                  <div className={cn("flex flex-wrap gap-3")}>
+                    <button
+                      type="button"
+                      onClick={() => void runCancel()}
+                      disabled={submit.kind === "submitting"}
+                      className={cn(
+                        "bg-coquelicot-500 hover:bg-coquelicot-600 rounded-xl px-5 py-2.5 text-base font-semibold text-white transition-colors disabled:opacity-50",
+                      )}
+                    >
+                      {submit.kind === "submitting" ? "Cancelling..." : "Confirm cancellation"}
+                    </button>
+                    <Button href="/" variant="secondary" size="sm">
+                      Keep my booking
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {(load.kind === "alreadyCancelled" ||
+                load.kind === "error" ||
+                submit.kind === "done") && (
+                <div className={cn("mt-4 flex flex-wrap gap-3")}>
+                  <Button href="/" variant="secondary" size="sm">
+                    Back to home
+                  </Button>
+                  <Button href="/booking" variant="ghost" size="sm">
+                    Book another time
+                  </Button>
+                </div>
+              )}
             </section>
           </div>
         </div>

@@ -72,7 +72,7 @@ export default async function SettingsPage({
     {
       label: "Rates",
       description:
-        "Standard hourly + modifier deltas (Complex, At home, Student, etc.) and flat rates like Travel.",
+        "Standard hourly + modifier deltas (Complex, At home, Remote) and flat rates like Travel.",
       href: `/admin/business/calculator?token=${encodeURIComponent(t)}`,
     },
     {

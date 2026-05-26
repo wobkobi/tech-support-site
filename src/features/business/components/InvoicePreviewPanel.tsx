@@ -24,48 +24,51 @@ interface Props {
   /** ISO YYYY-MM-DD. */
   dueDate: string;
   lineItems: LineItem[];
-  gst: boolean;
   notes: string;
   promoTitle: string | null;
   /** Dollar amount; rendered when > 0. */
   promoDiscount: number;
+  /** Half-price labour discount when operator ticked unsuccessful; rendered when > 0. */
+  unsuccessfulDiscount?: number;
 }
 
 /**
  * Live A4-styled invoice preview. Mirrors invoice-pdf.ts so the operator sees
- * the same layout the customer will receive. Used by both the calculator's
- * right column (live preview while building) and InvoiceBuilderView's right
- * column (form edits). Pure presentational - no fetches, no state.
- *
- * Layout deliberately matches the no-zebra / no-tint convention the PDF uses
- * (matches Xero / QuickBooks output). Long line-item lists scroll inside the
- * sheet on lg+ via the parent's sticky+overflow wrapper.
+ * the same layout the customer will receive. Pure presentational.
  * @param props - Component props.
+ * @param props.number - Invoice number to display ("DRAFT" for unsaved).
+ * @param props.clientName - Client name shown on the invoice header.
+ * @param props.clientEmail - Client email shown on the invoice header.
+ * @param props.issueDate - ISO YYYY-MM-DD issue date.
+ * @param props.dueDate - ISO YYYY-MM-DD due date.
+ * @param props.lineItems - Line items to render.
+ * @param props.notes - Footer notes text.
+ * @param props.promoTitle - Promo title (when discount > 0).
+ * @param props.promoDiscount - Promo discount in dollars; renders the line when > 0.
+ * @param props.unsuccessfulDiscount - Half-price labour discount; renders the line when > 0.
  * @returns Invoice preview element.
  */
-function InvoicePreviewPanelImpl(props: Props): React.ReactElement {
-  const {
-    number,
-    clientName,
-    clientEmail,
-    issueDate,
-    dueDate,
-    lineItems,
-    gst,
-    notes,
-    promoTitle,
-    promoDiscount,
-  } = props;
-  const totals = calcInvoiceTotals(lineItems, gst, promoDiscount);
+function InvoicePreviewPanelImpl({
+  number,
+  clientName,
+  clientEmail,
+  issueDate,
+  dueDate,
+  lineItems,
+  notes,
+  promoTitle,
+  promoDiscount,
+  unsuccessfulDiscount = 0,
+}: Props): React.ReactElement {
+  const totals = calcInvoiceTotals(lineItems, promoDiscount + unsuccessfulDiscount);
   const showPromoLine = promoDiscount > 0;
+  const showUnsuccessfulLine = unsuccessfulDiscount > 0;
   return (
     <div
       className={cn(
         "flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm",
         "lg:aspect-210/297 lg:sticky lg:top-4 lg:overflow-y-auto",
-        // Print overrides: defeat the lg: sticky + scroll constraints so the
-        // browser captures the FULL invoice rather than just the visible scroll
-        // position.
+        // Print: defeat sticky + scroll so the browser captures the full invoice.
         "print:static print:aspect-auto print:overflow-visible print:rounded-none print:border-0 print:shadow-none",
       )}
     >
@@ -123,8 +126,11 @@ function InvoicePreviewPanelImpl(props: Props): React.ReactElement {
 
         <div className={cn("mb-0 h-px bg-slate-300")} />
 
-        {/* Line items table - no zebra striping (matches the PDF + Xero/QuickBooks). */}
-        <table className={cn("mb-0 w-full text-xs")}>
+        {/* Line items table - no zebra striping (matches the PDF + Xero/QuickBooks).
+            `table-fixed` enforces the <th> percentage widths even at narrow
+            viewports so long descriptions wrap inside their cell instead of
+            blowing out the column. */}
+        <table className={cn("mb-0 w-full table-fixed text-xs")}>
           <thead>
             <tr className={cn("border-russian-violet border-b-2 text-slate-800")}>
               <th className={cn("w-[67%] px-2 py-2 text-left font-bold")}>Description</th>
@@ -152,7 +158,7 @@ function InvoicePreviewPanelImpl(props: Props): React.ReactElement {
                     idx === lineItems.length - 1 && "border-b-0",
                   )}
                 >
-                  <td className={cn("px-2 py-2 align-top text-slate-700")}>
+                  <td className={cn("wrap-break-word px-2 py-2 align-top text-slate-700")}>
                     {item.description || (
                       <span className={cn("italic text-slate-300")}>(line description)</span>
                     )}
@@ -188,9 +194,15 @@ function InvoicePreviewPanelImpl(props: Props): React.ReactElement {
               <span className={cn("whitespace-nowrap")}>-{formatNZD(promoDiscount)}</span>
             </div>
           )}
-          {gst && (
+          {showUnsuccessfulLine && (
+            <div className={cn("flex justify-between gap-3 text-amber-700")}>
+              <span>Unsuccessful-visit discount (half off labour)</span>
+              <span className={cn("whitespace-nowrap")}>-{formatNZD(unsuccessfulDiscount)}</span>
+            </div>
+          )}
+          {totals.gstAmount > 0 && (
             <div className={cn("flex justify-between gap-3")}>
-              <span className={cn("text-slate-500")}>GST (15%)</span>
+              <span className={cn("text-slate-500")}>Includes GST</span>
               <span className={cn("whitespace-nowrap text-slate-700")}>
                 {formatNZD(totals.gstAmount)}
               </span>
@@ -205,7 +217,7 @@ function InvoicePreviewPanelImpl(props: Props): React.ReactElement {
           </div>
         </div>
 
-        {/* Bank transfer call-out - border-only (no tint) to match the PDF. */}
+        {/* Bank transfer call-out. */}
         <div
           className={cn("mb-4 space-y-1 rounded-lg border border-slate-200 px-3 py-3 text-[11px]")}
         >
@@ -237,9 +249,5 @@ function InvoicePreviewPanelImpl(props: Props): React.ReactElement {
   );
 }
 
-/**
- * Memoised export so callers passing identical props (memoised line items,
- * stable string fields) avoid re-rendering the panel on unrelated parent
- * state changes (e.g. typing in an AI input box elsewhere).
- */
+// Memoised so parent re-renders with identical props skip the preview.
 export const InvoicePreviewPanel = memo(InvoicePreviewPanelImpl);

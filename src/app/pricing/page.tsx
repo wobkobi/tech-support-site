@@ -1,7 +1,9 @@
 // src/app/pricing/page.tsx
 /**
  * @file page.tsx
- * @description Pricing page: transparent pricing structure for tech support services.
+ * @description Pricing page. Rates come from RateConfig (shared with the
+ * calculator and wizard); accordion copy comes from pricing-policy.ts so the
+ * page, booking emails, and FAQ stay aligned.
  */
 
 import type { Metadata } from "next";
@@ -16,26 +18,35 @@ import {
   getActivePromo,
   summariseForBanner,
 } from "@/features/business/lib/promos";
+import { getPublicPricing } from "@/features/business/lib/pricing-policy.server";
+import {
+  cancellationCopy,
+  travelCopy,
+  minimumsCopy,
+  unsuccessfulWorkCopy,
+  publicHolidayCopy,
+  gstCopy,
+} from "@/features/business/lib/pricing-policy";
 import { formatDateShort } from "@/shared/lib/date-format";
 import { FaCaretDown, FaCheck } from "react-icons/fa6";
 
-// Promo state changes metadata text; cached lookup keeps this cheap.
+// Admin rate / promo edits must show on next visit.
 export const dynamic = "force-dynamic";
 
 /**
- * Builds page metadata; reflects the active promo in title/description.
+ * Builds page metadata; reflects the active promo and live base/complex rates.
  * @returns Metadata object.
  */
 export async function generateMetadata(): Promise<Metadata> {
-  const promo = await getActivePromo();
+  const [promo, pricing] = await Promise.all([getActivePromo(), getPublicPricing()]);
   const rateBlurb = promo
     ? `Limited offer: ${summariseForBanner(promo)}.`
-    : "$65/h for most jobs, $85/h for complex work.";
+    : `$${pricing.baseRate}/h for most jobs, $${pricing.complexRate}/h for complex work.`;
   return {
     title: promo
       ? `Pricing - ${summariseForBanner(promo)} | To The Point Tech`
-      : "Pricing - $65/h Tech Support in Auckland",
-    description: `Transparent tech support pricing in Auckland. ${rateBlurb} No hidden fees, no upselling. On-site and remote rates the same.`,
+      : `Pricing - $${pricing.baseRate}/h Tech Support in Auckland`,
+    description: `Transparent tech support pricing in Auckland. ${rateBlurb} No hidden fees, no upselling. On-site and remote rates available.`,
     keywords: [
       "tech support pricing Auckland",
       "computer repair cost Auckland",
@@ -57,11 +68,38 @@ const linkStyle = cn(
 );
 
 /**
- * Pricing page; branches rate cards on the active promo server-side.
+ * Renders `**…**` segments from pricing-policy copy as `<strong>` spans.
+ * @param text - Copy string containing zero or more `**…**` segments.
+ * @returns Array of React nodes ready to drop into a `<div>`.
+ */
+function renderEmphasised(text: string): React.ReactNode[] {
+  return text.split(/(\*\*[^*]+\*\*)/g).map((part, i) => {
+    const m = part.match(/^\*\*([^*]+)\*\*$/);
+    return m ? <strong key={i}>{m[1]}</strong> : <span key={i}>{part}</span>;
+  });
+}
+
+const ACCORDION_DETAILS = cn(
+  "group rounded-xl border border-seasalt-400/60 bg-seasalt-900/40 p-0 open:bg-white open:shadow-sm",
+);
+const ACCORDION_SUMMARY = cn(
+  "text-russian-violet flex cursor-pointer items-center justify-between gap-3 rounded-xl px-5 py-4 text-base font-semibold sm:text-lg",
+  "hover:bg-white/60 marker:hidden",
+  "[&::-webkit-details-marker]:hidden",
+);
+const ACCORDION_BODY = cn(
+  "text-rich-black/90 space-y-3 whitespace-pre-line px-5 pb-5 pt-1 text-sm sm:text-base",
+);
+
+/**
+ * Pricing page; fetches live rates + the active promo server-side so a single
+ * rate change in the admin UI propagates without a deploy.
  * @returns Pricing page element.
  */
 export default async function PricingPage(): Promise<React.ReactElement> {
-  const promo = await getActivePromo();
+  const [promo, pricing] = await Promise.all([getActivePromo(), getPublicPricing()]);
+  const baseRate = pricing.baseRate;
+  const complexRate = pricing.complexRate;
   return (
     <PageShell>
       <BreadcrumbJsonLd
@@ -98,10 +136,10 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                 <div className={cn("grid gap-4 sm:grid-cols-2")}>
                   <div className={cn("border-mustard-400 bg-mustard-900 rounded-lg border p-5")}>
                     <p className={cn("text-rich-black/60 mb-1 text-lg line-through sm:text-xl")}>
-                      $65/h
+                      ${baseRate}/h
                     </p>
                     <p className={cn("text-russian-violet mb-2 text-3xl font-bold sm:text-4xl")}>
-                      ${applyPromoToHourlyRate(65, promo).toFixed(0)}/h
+                      ${applyPromoToHourlyRate(baseRate, promo).toFixed(0)}/h
                     </p>
                     <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
                       Most jobs - troubleshooting, setup, software, tune-ups, Wi-Fi, backups, and
@@ -111,10 +149,10 @@ export default async function PricingPage(): Promise<React.ReactElement> {
 
                   <div className={cn("border-mustard-400 bg-mustard-900 rounded-lg border p-5")}>
                     <p className={cn("text-rich-black/60 mb-1 text-lg line-through sm:text-xl")}>
-                      $85/h
+                      ${complexRate}/h
                     </p>
                     <p className={cn("text-russian-violet mb-2 text-3xl font-bold sm:text-4xl")}>
-                      ${applyPromoToHourlyRate(85, promo).toFixed(0)}/h
+                      ${applyPromoToHourlyRate(complexRate, promo).toFixed(0)}/h
                     </p>
                     <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
                       Complex or lengthy work - data recovery, hardware repairs, or full PC
@@ -138,36 +176,31 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                 </div>
               </>
             ) : (
-              <>
-                <div className={cn("grid gap-4 sm:grid-cols-2")}>
-                  <div
-                    className={cn("bg-seasalt-900/40 border-seasalt-400/60 rounded-lg border p-5")}
-                  >
-                    <p className={cn("text-russian-violet mb-2 text-3xl font-bold sm:text-4xl")}>
-                      $65/h
-                    </p>
-                    <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
-                      Most jobs - troubleshooting, setup, software, tune-ups, Wi-Fi, backups, and
-                      more.
-                    </p>
-                  </div>
-
-                  <div
-                    className={cn("bg-seasalt-900/40 border-seasalt-400/60 rounded-lg border p-5")}
-                  >
-                    <p className={cn("text-russian-violet mb-2 text-3xl font-bold sm:text-4xl")}>
-                      $85/h
-                    </p>
-                    <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
-                      Complex or lengthy work - data recovery, hardware repairs, or full PC
-                      migrations.
-                    </p>
-                  </div>
+              <div className={cn("grid gap-4 sm:grid-cols-2")}>
+                <div
+                  className={cn("bg-seasalt-900/40 border-seasalt-400/60 rounded-lg border p-5")}
+                >
+                  <p className={cn("text-russian-violet mb-2 text-3xl font-bold sm:text-4xl")}>
+                    ${baseRate}/h
+                  </p>
+                  <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
+                    Most jobs - troubleshooting, setup, software, tune-ups, Wi-Fi, backups, and
+                    more.
+                  </p>
                 </div>
-                <p className={cn("text-rich-black/80 mt-3 text-sm sm:text-base")}>
-                  Discounts available - just ask. Students and at-home jobs get a small reduction.
-                </p>
-              </>
+
+                <div
+                  className={cn("bg-seasalt-900/40 border-seasalt-400/60 rounded-lg border p-5")}
+                >
+                  <p className={cn("text-russian-violet mb-2 text-3xl font-bold sm:text-4xl")}>
+                    ${complexRate}/h
+                  </p>
+                  <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
+                    Complex or lengthy work - data recovery, hardware repairs, or full PC
+                    migrations.
+                  </p>
+                </div>
+              </div>
             )}
 
             <a
@@ -185,8 +218,8 @@ export default async function PricingPage(): Promise<React.ReactElement> {
               <p className={cn("text-rich-black/90 flex gap-3 text-sm sm:text-base")}>
                 <FaCheck className={cn("text-moonstone-600 mt-1.5 h-4 w-4 shrink-0")} aria-hidden />
                 <span>
-                  <strong>Quick calls and emails are free.</strong> If you have a simple question,
-                  just reach out.
+                  <strong>Quick calls and emails are free.</strong> A "remote session" is when I log
+                  in and start working on your machine.
                 </span>
               </p>
               <p className={cn("text-rich-black/90 flex gap-3 text-sm sm:text-base")}>
@@ -222,11 +255,15 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                 <ul className={cn("text-rich-black space-y-2.5 text-sm sm:text-base")}>
                   <li className={cn("flex gap-3")}>
                     <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
-                    <span>Same hourly rate applies</span>
+                    <span>Standard hourly rate (${baseRate}/h)</span>
                   </li>
                   <li className={cn("flex gap-3")}>
                     <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
-                    <span>Travel to your location included</span>
+                    <span>
+                      <strong>One round trip</strong> billed at{" "}
+                      <strong>${pricing.travelRatePerHour}/h</strong> (lower than the labour rate),{" "}
+                      <strong>$10 minimum</strong>
+                    </span>
                   </li>
                   <li className={cn("flex gap-3")}>
                     <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
@@ -245,11 +282,11 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                 <ul className={cn("text-rich-black space-y-2.5 text-sm sm:text-base")}>
                   <li className={cn("flex gap-3")}>
                     <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
-                    <span>Cost varies normally less than on-site visits</span>
+                    <span>Discounted rate, no travel charge</span>
                   </li>
                   <li className={cn("flex gap-3")}>
                     <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
-                    <span>No travel time means quicker turnaround</span>
+                    <span>No drive time means quicker turnaround</span>
                   </li>
                   <li className={cn("flex gap-3")}>
                     <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
@@ -274,7 +311,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
               No surprises
             </h2>
 
-            <ul className={cn("text-rich-black space-y-2.5 text-sm sm:text-base")}>
+            <ul className={cn("text-rich-black mb-5 space-y-2.5 text-sm sm:text-base")}>
               <li className={cn("flex gap-3")}>
                 <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
                 <span>
@@ -291,19 +328,114 @@ export default async function PricingPage(): Promise<React.ReactElement> {
               <li className={cn("flex gap-3")}>
                 <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
                 <span>
-                  <strong>Fair pricing for unsuccessful work.</strong> If I can't fix the problem,
-                  on-site visits are half price. Remote support is usually free, though I may charge
-                  for extended troubleshooting sessions.
-                </span>
-              </li>
-              <li className={cn("flex gap-3")}>
-                <span className={cn("text-moonstone-600 mt-1 text-lg")}>•</span>
-                <span>
                   <strong>Clear communication.</strong> If a job is taking longer than expected,
                   I'll let you know before continuing.
                 </span>
               </li>
             </ul>
+
+            <h3 className={cn("text-russian-violet mb-3 text-lg font-bold sm:text-xl")}>
+              Full details
+            </h3>
+            <p className={cn("text-rich-black/70 mb-4 text-sm sm:text-base")}>
+              The fine print, in plain English. Click any section to expand.
+            </p>
+
+            <div className={cn("space-y-3")}>
+              <details className={ACCORDION_DETAILS}>
+                <summary className={ACCORDION_SUMMARY}>
+                  <span>Rate modifiers</span>
+                  <FaCaretDown
+                    className={cn("h-4 w-4 transition-transform group-open:rotate-180")}
+                    aria-hidden
+                  />
+                </summary>
+                <div className={ACCORDION_BODY}>
+                  <p>
+                    The Standard rate is the starting point. These modifiers can stack on top
+                    depending on the job:
+                  </p>
+                  <ul className={cn("space-y-2")}>
+                    {pricing.modifiers.map((mod) => (
+                      <li key={mod.label} className={cn("flex flex-col")}>
+                        <span>
+                          <strong>{mod.label}</strong> ({mod.deltaDescription} ={" "}
+                          <strong>${mod.effectiveRate}/h</strong>) - {mod.description}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </details>
+
+              <details className={ACCORDION_DETAILS}>
+                <summary className={ACCORDION_SUMMARY}>
+                  <span>Travel</span>
+                  <FaCaretDown
+                    className={cn("h-4 w-4 transition-transform group-open:rotate-180")}
+                    aria-hidden
+                  />
+                </summary>
+                <div className={ACCORDION_BODY}>
+                  {renderEmphasised(travelCopy(pricing.travelRatePerHour))}
+                </div>
+              </details>
+
+              <details className={ACCORDION_DETAILS}>
+                <summary className={ACCORDION_SUMMARY}>
+                  <span>Minimum charge</span>
+                  <FaCaretDown
+                    className={cn("h-4 w-4 transition-transform group-open:rotate-180")}
+                    aria-hidden
+                  />
+                </summary>
+                <div className={ACCORDION_BODY}>{renderEmphasised(minimumsCopy())}</div>
+              </details>
+
+              <details className={ACCORDION_DETAILS}>
+                <summary className={ACCORDION_SUMMARY}>
+                  <span>Cancellation</span>
+                  <FaCaretDown
+                    className={cn("h-4 w-4 transition-transform group-open:rotate-180")}
+                    aria-hidden
+                  />
+                </summary>
+                <div className={ACCORDION_BODY}>{renderEmphasised(cancellationCopy())}</div>
+              </details>
+
+              <details className={ACCORDION_DETAILS}>
+                <summary className={ACCORDION_SUMMARY}>
+                  <span>Unsuccessful work</span>
+                  <FaCaretDown
+                    className={cn("h-4 w-4 transition-transform group-open:rotate-180")}
+                    aria-hidden
+                  />
+                </summary>
+                <div className={ACCORDION_BODY}>{renderEmphasised(unsuccessfulWorkCopy())}</div>
+              </details>
+
+              <details className={ACCORDION_DETAILS}>
+                <summary className={ACCORDION_SUMMARY}>
+                  <span>Public holidays</span>
+                  <FaCaretDown
+                    className={cn("h-4 w-4 transition-transform group-open:rotate-180")}
+                    aria-hidden
+                  />
+                </summary>
+                <div className={ACCORDION_BODY}>{renderEmphasised(publicHolidayCopy())}</div>
+              </details>
+
+              <details className={ACCORDION_DETAILS}>
+                <summary className={ACCORDION_SUMMARY}>
+                  <span>GST</span>
+                  <FaCaretDown
+                    className={cn("h-4 w-4 transition-transform group-open:rotate-180")}
+                    aria-hidden
+                  />
+                </summary>
+                <div className={ACCORDION_BODY}>{renderEmphasised(gstCopy())}</div>
+              </details>
+            </div>
           </section>
 
           <section
@@ -337,6 +469,12 @@ export default async function PricingPage(): Promise<React.ReactElement> {
             </p>
             <PricingWizard />
           </section>
+
+          {pricing.ratesUpdatedAt && (
+            <p className={cn("text-rich-black/50 text-center text-xs sm:text-sm")}>
+              Rates last updated on {formatDateShort(pricing.ratesUpdatedAt)}.
+            </p>
+          )}
         </div>
       </FrostedSection>
     </PageShell>

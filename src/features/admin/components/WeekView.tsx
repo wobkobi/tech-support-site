@@ -22,7 +22,7 @@ import { cn } from "@/shared/lib/cn";
 import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 import { ManualBookingModal } from "@/features/admin/components/ManualBookingModal";
 
-export type WeekViewKind = "booking" | "work" | "personal" | "travel";
+export type WeekViewKind = "booking" | "car" | "personal" | "travel";
 
 export interface WeekEvent {
   id: string;
@@ -51,7 +51,7 @@ const NZ_TZ = "Pacific/Auckland";
 
 const KIND_STYLES: Record<WeekViewKind, string> = {
   booking: "bg-russian-violet/90 text-white border-russian-violet ring-1 ring-white/10",
-  work: "bg-red-100 text-red-900 border-red-300",
+  car: "bg-red-100 text-red-900 border-red-300",
   personal: "bg-slate-200 text-slate-700 border-slate-300",
   travel: "bg-amber-100 text-amber-900 border-amber-300",
 };
@@ -313,7 +313,7 @@ export function WeekView({
             )}
           >
             <LegendDot kind="booking" label="Booking" />
-            <LegendDot kind="work" label="No car (work cal)" />
+            <LegendDot kind="car" label="No car (Car cal)" />
             <LegendDot kind="personal" label="Personal" />
             <LegendDot kind="travel" label="Travel" />
             <span className={cn("ml-auto text-slate-400")}>
@@ -345,17 +345,16 @@ interface BlockDayButtonProps {
 }
 
 /**
- * Small day-header button that toggles an all-day "Busy" event on the booking
- * calendar. Disabled when timed bookings already occupy the day, since the
- * existing calendar code would still let them slip through.
+ * Day-header button toggling an all-day "Busy" event on the booking calendar.
+ * Disabled when timed bookings exist on the day (they'd slip through otherwise).
  * @param props - Component props.
  * @param props.token - Admin token forwarded as x-admin-secret.
  * @param props.dateKey - NZ YYYY-MM-DD for the target day.
- * @param props.busyEventId - Existing all-day booking-cal event id (toggle to delete).
+ * @param props.busyEventId - Existing all-day event id, or null.
  * @param props.hasBookings - True when timed bookings exist on the day.
- * @param props.busyAction - Date key currently submitting (disables all other buttons).
- * @param props.onPending - Sets the in-flight dateKey while a request is open.
- * @param props.onChanged - Called after a successful change so the parent refreshes.
+ * @param props.busyAction - Date key currently submitting.
+ * @param props.onPending - Sets the in-flight dateKey.
+ * @param props.onChanged - Called after a successful change.
  * @returns Block/Unblock button element.
  */
 function BlockDayButton({

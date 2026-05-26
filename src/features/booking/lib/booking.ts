@@ -88,9 +88,20 @@ export interface BookableDay {
   dayLabel: string;
   fullLabel: string;
   isToday: boolean;
+  isTomorrow: boolean;
   isWeekend: boolean;
   timeWindows: TimeWindow[];
   hasAnySlots: boolean; // True if any time slots are available
+}
+
+export interface BuildAvailableDaysResult {
+  days: BookableDay[];
+  /**
+   * True when today was filtered out because the same-day cutoff or minimum
+   * notice window has elapsed. Surfaced to the UI so we can explain to the
+   * user why the list starts at tomorrow instead of silently shifting.
+   */
+  sameDayClosed: boolean;
 }
 
 export interface ExistingBooking {
@@ -151,20 +162,21 @@ function isSlotFree(
 }
 
 /**
- * Build available days with duration-aware slot checking
+ * Build available days with duration-aware slot checking.
  * @param existingBookings - Array of existing bookings from database
  * @param calendarEvents - Array of calendar events to block
  * @param now - Current date/time
  * @param config - Booking configuration settings
- * @returns Array of bookable days with time windows
+ * @returns Bookable days + a flag indicating whether today was filtered out.
  */
 export function buildAvailableDays(
   existingBookings: ExistingBooking[],
   calendarEvents: Array<{ id: string; start: string; end: string }>,
   now: Date,
   config: typeof BOOKING_CONFIG,
-): BookableDay[] {
+): BuildAvailableDaysResult {
   const days: BookableDay[] = [];
+  let sameDayClosed = false;
 
   // Use toLocaleString only for extracting NZ wall-clock hour/minute -
   // getHours()/getMinutes() on the resulting Date give the correct NZ values
@@ -187,6 +199,7 @@ export function buildAvailableDays(
     const dayOfWeek = dayUTC.getUTCDay();
 
     const isToday = i === 0;
+    const isTomorrow = i === 1;
     const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
     const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -292,20 +305,24 @@ export function buildAvailableDays(
 
     // Hide today when nothing is bookable (e.g. past same-day cutoff).
     // Future fully-booked days stay in the array so they appear greyed out.
-    if (isToday && !hasAnySlots) continue;
+    if (isToday && !hasAnySlots) {
+      sameDayClosed = true;
+      continue;
+    }
 
     days.push({
       dateKey,
       dayLabel,
       fullLabel,
       isToday,
+      isTomorrow,
       isWeekend,
       timeWindows,
       hasAnySlots,
     });
   }
 
-  return days;
+  return { days, sameDayClosed };
 }
 
 /**
@@ -403,6 +420,7 @@ export interface BookingPayloadFields {
   duration?: string;
   meetingType?: string;
   address?: string;
+  phone?: string;
 }
 
 /**
@@ -507,6 +525,15 @@ export function validateBookingPayloadFields(
   }
   if (payload.address && payload.address.length > BOOKING_FIELD_LIMITS.address) {
     return { valid: false, error: "Address is too long." };
+  }
+  // A reachable phone is needed for in-person so the technician can contact the
+  // customer on arrival (gate codes, running late, etc.). Remote sessions don't
+  // need it because the calendar invite + email are sufficient.
+  if (payload.meetingType === "in-person" && !payload.phone?.trim()) {
+    return {
+      valid: false,
+      error: "Phone number is required for in-person appointments.",
+    };
   }
   return { valid: true };
 }

@@ -143,7 +143,7 @@ export function SubscriptionsView({ token }: { token: string }): React.ReactElem
    * Submits the subscription form - creates or updates via API.
    * @param e - Form submit event.
    */
-  async function handleSubmit(e: React.FormEvent): Promise<void> {
+  async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault();
     setSaving(true);
     try {

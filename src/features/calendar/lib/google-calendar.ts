@@ -27,7 +27,9 @@ export function getBookingCalendarId(): string {
 function fetchAccessibleCalendarIds(): string[] {
   const ids = [
     process.env.BOOKING_CALENDAR_ID,
-    process.env.WORK_CALENDAR_ID,
+    // Car calendar (renamed from Work); fall back to the old env name during
+    // the transition window.
+    process.env.CAR_CALENDAR_ID ?? process.env.WORK_CALENDAR_ID,
     process.env.PERSONAL_CALENDAR_ID,
   ].filter((id): id is string => Boolean(id));
   return ids.length > 0 ? ids : ["primary"];
@@ -76,17 +78,17 @@ export interface CalendarEvent {
 }
 
 /**
- * Creates a calendar event
- * @param params - Event parameters
- * @param params.summary - Event title
- * @param params.description - Event description
- * @param params.startAt - Start time (UTC Date object)
- * @param params.endAt - End time (UTC Date object)
- * @param params.timeZone - Timezone for display
- * @param params.attendeeEmail - Attendee email address
- * @param params.attendeeName - Attendee name
- * @param params.location - Event location (for in-person)
- * @returns Created event with ID
+ * Creates a booking calendar event with the attendee.
+ * @param params - Event parameters.
+ * @param params.summary - Event title.
+ * @param params.description - Event body / notes.
+ * @param params.startAt - Start time (UTC).
+ * @param params.endAt - End time (UTC).
+ * @param params.timeZone - Display timezone for the invite.
+ * @param params.attendeeEmail - Attendee email address.
+ * @param params.attendeeName - Attendee display name.
+ * @param params.location - Optional event location (in-person address).
+ * @returns Created event with ID.
  */
 export async function createBookingEvent(params: {
   summary: string;

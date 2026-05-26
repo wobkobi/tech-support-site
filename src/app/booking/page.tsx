@@ -129,9 +129,13 @@ async function getCalendarEvents(now: Date, maxDate: Date): Promise<CalendarFetc
 
 /**
  * Fetch available days server-side with calendar blocking.
- * @returns Bookable days plus the calendar `degraded` flag.
+ * @returns Bookable days plus the calendar `degraded` and `sameDayClosed` flags.
  */
-async function getAvailableDays(): Promise<{ days: BookableDay[]; degraded: boolean }> {
+async function getAvailableDays(): Promise<{
+  days: BookableDay[];
+  degraded: boolean;
+  sameDayClosed: boolean;
+}> {
   const now = new Date();
   const maxDate = new Date(now.getTime() + BOOKING_CONFIG.maxAdvanceDays * 24 * 60 * 60 * 1000);
 
@@ -160,9 +164,11 @@ async function getAvailableDays(): Promise<{ days: BookableDay[]; degraded: bool
     bufferAfterMin: b.bufferAfterMin,
   }));
 
+  const built = buildAvailableDays(existingForSlots, calendar.events, now, BOOKING_CONFIG);
   return {
-    days: buildAvailableDays(existingForSlots, calendar.events, now, BOOKING_CONFIG),
+    days: built.days,
     degraded: calendar.degraded,
+    sameDayClosed: built.sameDayClosed,
   };
 }
 
@@ -178,7 +184,7 @@ const SKELETON_BLOCK = cn("bg-seasalt-900/40 rounded-lg");
  * @returns Booking form or an unavailable banner.
  */
 async function BookingFormIsland(): Promise<React.ReactElement> {
-  const { days, degraded } = await getAvailableDays();
+  const { days, degraded, sameDayClosed } = await getAvailableDays();
   if (degraded) {
     return (
       <div
@@ -188,16 +194,31 @@ async function BookingFormIsland(): Promise<React.ReactElement> {
         )}
       >
         <p className={cn("text-base font-semibold sm:text-lg")}>
-          Availability isn&apos;t loading right now.
+          Availability isn't loading right now.
         </p>
         <p className={cn("text-base sm:text-lg")}>
-          Please refresh the page in a minute, or call/text me directly and I&apos;ll get you booked
-          in.
+          Please refresh the page in a minute, or call/text me directly and I'll get you booked in.
         </p>
       </div>
     );
   }
-  return <BookingForm availableDays={days} />;
+  return (
+    <div className={cn("flex flex-col gap-5")}>
+      {sameDayClosed && (
+        <div
+          className={cn(
+            "border-moonstone-500/40 bg-moonstone-600/10 text-rich-black rounded-lg border p-4",
+          )}
+        >
+          <p className={cn("text-base")}>
+            Same-day bookings are closed for today (2 hours notice required, 6pm cut-off). The
+            earliest available time is tomorrow.
+          </p>
+        </div>
+      )}
+      <BookingForm availableDays={days} />
+    </div>
+  );
 }
 
 /**

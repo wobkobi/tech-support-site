@@ -12,13 +12,10 @@ import { revalidateReviewPaths } from "@/features/reviews/lib/revalidate";
 import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-create";
 
 /**
- * PATCH /api/admin/reviews/[id]
- * Approves or revokes a review, or updates the linked contactId.
- * Authenticated via X-Admin-Secret header.
- * - When body contains { action: "approve" | "revoke" } > moderation flow.
- *   On approve, automatically upserts a Contact record from the review's booking/review-request
- *   and links review.contactId. This is best-effort; failure does not block the approval.
- * - When body contains { contactId: string | null } > contact-link flow.
+ * PATCH /api/admin/reviews/[id] - admin-auth gated.
+ * `{ action: "approve" | "revoke" }` moderates; approve also best-effort
+ * upserts + links a Contact from the booking/review-request (never blocking).
+ * `{ contactId: string | null }` updates the link directly.
  * @param request - Incoming request.
  * @param params - Route segment params wrapper.
  * @param params.params - Promise resolving to the route segment containing the review ID.

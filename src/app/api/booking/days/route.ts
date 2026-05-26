@@ -90,10 +90,16 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     // Fetch calendar events (safe - returns empty array if not available)
     const calendarEvents = await fetchCalendarEventsSafe(now, maxDate);
 
-    const days = buildAvailableDays(existingForSlots, calendarEvents, now, BOOKING_CONFIG);
+    const { days, sameDayClosed } = buildAvailableDays(
+      existingForSlots,
+      calendarEvents,
+      now,
+      BOOKING_CONFIG,
+    );
 
     return NextResponse.json({
       days,
+      sameDayClosed,
       timeZone: BOOKING_CONFIG.timeZone,
     });
   } catch (error) {

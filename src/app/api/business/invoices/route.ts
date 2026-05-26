@@ -1,36 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
-import { calcInvoiceTotals, nextInvoiceNumber } from "@/features/business/lib/business";
+import { calcInvoiceTotals } from "@/features/business/lib/business";
 import { generateInvoicePdf, extractYearCode } from "@/features/business/lib/invoice-pdf";
 import { uploadInvoicePdf } from "@/features/business/lib/google-drive";
-import { getInvoiceCounter, setInvoiceCounter } from "@/features/business/lib/google-sheets";
+import {
+  getNextInvoiceNumber,
+  writeBackInvoiceCounter,
+} from "@/features/business/lib/invoice-numbering";
 import { BUSINESS_PAYMENT_TERMS_DAYS } from "@/shared/lib/business-identity";
-
-/**
- * Fetches the next invoice number from Google Sheets, falling back to MongoDB on failure.
- * @returns Next invoice number string, sheet count for write-back, and sync warning flag
- */
-async function getNextInvoiceNumber(): Promise<{
-  number: string;
-  sheetNextCount: number | null;
-  sheetSyncWarning: boolean;
-}> {
-  try {
-    const data = await getInvoiceCounter();
-    return { number: data.nextFormatted, sheetNextCount: data.nextNumber, sheetSyncWarning: false };
-  } catch {
-    const last = await prisma.invoice.findFirst({ orderBy: { number: "desc" } });
-    const now = new Date();
-    const fy = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
-    const yearCode = String(fy) + String(fy + 1).slice(2);
-    return {
-      number: nextInvoiceNumber(last?.number ?? null, yearCode),
-      sheetNextCount: null,
-      sheetSyncWarning: true,
-    };
-  }
-}
 
 /**
  * GET /api/business/invoices - Returns all invoices ordered by creation date descending.
@@ -63,23 +41,27 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     issueDate,
     dueDate,
     lineItems,
-    gst,
     notes,
     contactId,
     // Optional promo snapshot from the calculator (persisted for history).
     promoTitle,
     promoDiscount,
+    // Optional unsuccessful-work flag + discount snapshot. Audit trail so
+    // the admin dashboard can count how often the half-price clause fires.
+    unsuccessful,
+    unsuccessfulDiscount,
   } = body as {
     clientName?: string;
     clientEmail?: string;
     issueDate?: string;
     dueDate?: string;
     lineItems?: { qty: number; unitPrice: number; description: string; lineTotal: number }[];
-    gst?: boolean;
     notes?: string | null;
     contactId?: string | null;
     promoTitle?: string | null;
     promoDiscount?: number | null;
+    unsuccessful?: boolean;
+    unsuccessfulDiscount?: number | null;
   };
 
   if (!clientName || !clientEmail || !Array.isArray(lineItems)) {
@@ -96,7 +78,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   const { number, sheetNextCount, sheetSyncWarning } = await getNextInvoiceNumber();
   const discount = typeof promoDiscount === "number" && promoDiscount > 0 ? promoDiscount : 0;
-  const { subtotal, gstAmount, total } = calcInvoiceTotals(lineItems, gst ?? false, discount);
+  const unsuccessfulDiscountValue =
+    typeof unsuccessfulDiscount === "number" && unsuccessfulDiscount > 0 ? unsuccessfulDiscount : 0;
+  // GST mode is driven by GST_REGISTERED in pricing-policy.ts; the request
+  // body no longer carries gst. gstAmount may be non-zero in the future when
+  // the flag flips, stays 0 today. Promo + unsuccessful both reduce the
+  // taxable amount before GST (per IRD treatment of price reductions); they
+  // sum into a single discount argument for calcInvoiceTotals, then get
+  // persisted as separate audit fields on the row.
+  const { subtotal, gstAmount, total } = calcInvoiceTotals(
+    lineItems,
+    discount + unsuccessfulDiscountValue,
+  );
 
   const invoice = await prisma.invoice.create({
     data: {
@@ -106,25 +99,25 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       issueDate: issueDateValue,
       dueDate: dueDateValue,
       lineItems,
-      gst: gst ?? false,
+      gst: gstAmount > 0,
       subtotal,
       gstAmount,
       total,
       promoTitle: discount > 0 && promoTitle ? promoTitle : null,
       promoDiscount: discount > 0 ? discount : null,
+      unsuccessful: unsuccessful === true,
+      unsuccessfulDiscount:
+        typeof unsuccessfulDiscount === "number" && unsuccessfulDiscount > 0
+          ? unsuccessfulDiscount
+          : null,
       notes: notes ?? null,
       contactId: contactId ?? null,
     },
   });
 
-  // Write back to sheet if we got a count from it
-  if (sheetNextCount !== null) {
-    try {
-      await setInvoiceCounter(sheetNextCount);
-    } catch {
-      // Non-fatal - invoice is already saved
-    }
-  }
+  // Keep the Sheets counter in sync; the helper swallows + logs failures
+  // so the just-saved invoice isn't compromised by a transient Sheets hiccup.
+  await writeBackInvoiceCounter(sheetNextCount);
 
   // Fire-and-forget: generate PDF and upload to Drive, then store the Drive URL
   void (async () => {

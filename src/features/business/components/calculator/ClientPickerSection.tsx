@@ -18,20 +18,18 @@ interface Props {
 }
 
 /**
- * Right-rail "Client" card. Shows a "Pick from contacts" link, and once a
- * contact is picked, exposes a segmented Address-to control (Name / Company /
- * Custom). The Name input becomes read-only in Name/Company modes so the
- * picked-contact value can't be edited away accidentally.
+ * Right-rail "Client" card. Pick-from-contacts plus a Name/Company/Custom
+ * segmented control; Name is read-only outside Custom to lock the picked value.
  * @param props - Component props.
- * @param props.clientName - Current value for the Name input.
- * @param props.onClientNameChange - Setter for the Name input (only fires when addressMode is "custom").
- * @param props.clientEmail - Current value for the Email input.
- * @param props.onClientEmailChange - Setter for the Email input.
- * @param props.pickedContactName - Name of the contact that was picked, or null.
- * @param props.pickedContactCompany - Company of the picked contact (drives Company button availability).
+ * @param props.clientName - Current Name value.
+ * @param props.onClientNameChange - Name setter (fires only when addressMode is "custom").
+ * @param props.clientEmail - Current Email value.
+ * @param props.onClientEmailChange - Email setter.
+ * @param props.pickedContactName - Picked contact's name, or null.
+ * @param props.pickedContactCompany - Picked contact's company (drives Company availability).
  * @param props.addressMode - Current segmented-control selection.
- * @param props.onAddressModeChange - Handler that flips the segmented control AND updates clientName to match.
- * @param props.onPickContact - Click handler for "Pick from contacts" (opens the contact picker modal).
+ * @param props.onAddressModeChange - Flips the segmented control + updates clientName.
+ * @param props.onPickContact - Opens the contact picker modal.
  * @returns Client card element.
  */
 export function ClientPickerSection({

@@ -38,7 +38,7 @@ interface ReviewFormProtectedProps {
 /**
  * Protected review form with optional booking or contact verification.
  * @param props - Component props.
- * @param props.bookingId - Booking ID for verified reviews tied to a real appointment.
+ * @param props.bookingId - Booking ID for verified reviews tied to an appointment.
  * @param props.contactId - Contact ID for verified reviews from manual admin sends.
  * @param props.token - Review token for verification.
  * @param props.prefillName - Pre-fill customer name.
@@ -113,7 +113,7 @@ export default function ReviewFormProtected({
    * Submit handler. Collects all validation failures into one pass.
    * @param e - Form event
    */
-  async function handleSubmit(e: React.SubmitEvent): Promise<void> {
+  async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault();
     setSubmitError(null);
     setSent(false);
@@ -379,8 +379,7 @@ export default function ReviewFormProtected({
             Stay in touch <span className={cn("text-rich-black/40 font-normal")}>(optional)</span>
           </p>
           <p className={cn("text-rich-black/50 mt-0.5 text-base")}>
-            Leave your number or email if you&apos;d like me to be able to reach you - totally up to
-            you.
+            Leave your number or email if you'd like me to be able to reach you - totally up to you.
           </p>
         </div>
 

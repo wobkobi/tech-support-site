@@ -12,12 +12,12 @@
  */
 
 /**
- * Whether the business is GST-registered. NZ requires registration once
- * turnover crosses $60k/year. While false, the dashboard hides the GST card
- * entirely (the planner still computes the figures so they're a one-line UI
- * change to surface). Flip to `true` here when registered.
+ * Re-exported from pricing-policy.ts so the planner and the invoice engine
+ * share one source of truth for GST registration. Flip the flag in
+ * pricing-policy.ts when registered (and set the BUSINESS_GST_NUMBER env var
+ * alongside it - the invoice header keys on the env var).
  */
-export const GST_REGISTERED = false;
+export { GST_REGISTERED } from "@/features/business/lib/pricing-policy";
 
 /**
  * Rates used by the planner. The first three come from `SETTINGS!B13:B15`
@@ -71,16 +71,12 @@ export interface TaxPlan {
 }
 
 /**
- * Builds the full tax plan from raw income/expense totals plus the GST
- * claimable already aggregated across expenses.
- *
- * Set-asides are computed on PROFIT (income minus expenses excl. GST), not
- * on raw income, matching the spreadsheet model. Savings targets divide the
- * total set-aside across 52 weeks / 12 months so the operator can save
- * incrementally rather than facing a lump sum at year-end.
+ * Builds the full tax plan from income/expense totals + GST claimable.
+ * Set-asides are computed on PROFIT (income - expenses excl. GST), matching
+ * the spreadsheet model; savings targets divide across 52 weeks / 12 months.
  * @param income - Total income for the period (e.g. current FY).
  * @param expensesExcl - Total expenses excluding GST for the period.
- * @param gstClaimable - GST input claimable on those expenses (already on the dashboard).
+ * @param gstClaimable - GST input claimable on those expenses.
  * @param rates - Per-rate overrides; defaults to DEFAULT_TAX_RATES.
  * @returns Computed plan.
  */

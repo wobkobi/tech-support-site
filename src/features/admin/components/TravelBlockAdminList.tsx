@@ -29,6 +29,15 @@ export interface TravelBlockRow {
   customOrigin: string | null;
   detectedOrigin: string | null;
   destination: string | null;
+  /**
+   * True when the travel-back cache is intentionally absent because the next
+   * event was chained (no time to go home in between).
+   */
+  travelBackSuppressed: boolean;
+  /** True when admin has marked this Car event as "I have the car that day". */
+  ignored: boolean;
+  /** True when the source event lives on the Car calendar. */
+  isCarEvent: boolean;
   createdAt: string;
 }
 
@@ -152,6 +161,27 @@ export function TravelBlockAdminList({
   }
 
   /**
+   * Toggles the "ignored" flag on a Car-cal event so the booking page stops
+   * treating it as a no-car window and the travel-to-home block is dropped.
+   * @param id - TravelBlock id.
+   * @param next - Desired ignored state.
+   */
+  async function setIgnored(id: string, next: boolean): Promise<void> {
+    setSaving(id);
+    try {
+      const res = await fetch(`/api/admin/travel/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-admin-secret": token },
+        body: JSON.stringify({ ignored: next }),
+      });
+      if (!res.ok) return;
+      setBlocks((prev) => prev.map((b) => (b.id === id ? { ...b, ignored: next } : b)));
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  /**
    * Saves a custom origin override (or clears it when null).
    * @param id - TravelBlock id.
    * @param customOrigin - New origin address, or null to clear.
@@ -196,13 +226,19 @@ export function TravelBlockAdminList({
   return (
     <div className={cn("grid grid-cols-1 gap-3 xl:grid-cols-2")}>
       {blocks.map((b) => {
-        const currentMode = (b.transportMode ?? "transit") as TransportMode;
+        const currentMode = (b.transportMode ?? "driving") as TransportMode;
         const isSaving = saving === b.id;
         const isEditingOrigin = editingOriginId === b.id;
         const effectiveOrigin = b.customOrigin ?? b.detectedOrigin ?? null;
 
         return (
-          <div key={b.id} className={cn("rounded-xl border border-slate-200 bg-white/50 p-4")}>
+          <div
+            key={b.id}
+            className={cn(
+              "rounded-xl border border-slate-200 p-4",
+              b.ignored ? "bg-slate-100/60 opacity-70" : "bg-white/50",
+            )}
+          >
             <div className={cn("flex flex-col gap-2")}>
               {/* Header: event identity */}
               <div className={cn("flex min-w-0 flex-wrap items-center gap-2")}>
@@ -216,6 +252,31 @@ export function TravelBlockAdminList({
                 >
                   {calendarLabels[b.calendarEmail] ?? b.calendarEmail}
                 </span>
+                {b.ignored && (
+                  <span
+                    className={cn(
+                      "shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700",
+                    )}
+                  >
+                    Ignored - I have the car
+                  </span>
+                )}
+                {b.isCarEvent && (
+                  <label
+                    className={cn(
+                      "ml-auto flex shrink-0 cursor-pointer items-center gap-1.5 text-xs text-slate-600",
+                    )}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={b.ignored}
+                      disabled={isSaving}
+                      onChange={(e) => void setIgnored(b.id, e.target.checked)}
+                      className={cn("h-3.5 w-3.5")}
+                    />
+                    Ignore (I have the car)
+                  </label>
+                )}
               </div>
 
               {/* Event time */}
@@ -223,9 +284,9 @@ export function TravelBlockAdminList({
                 {formatEventTime(b.eventStartAt, b.eventEndAt)}
               </p>
 
-              {/* Destination address */}
+              {/* Destination address - wrap long unbroken strings on mobile. */}
               {b.destination && (
-                <p className={cn("text-xs text-slate-500")}>
+                <p className={cn("wrap-break-word text-xs text-slate-500")}>
                   <span className={cn("font-medium text-slate-400")}>To: </span>
                   {b.destination}
                 </p>
@@ -236,7 +297,7 @@ export function TravelBlockAdminList({
                 <p
                   className={cn("mb-1 text-xs font-medium uppercase tracking-wide text-slate-400")}
                 >
-                  How I&apos;m getting there
+                  How I'm getting there
                 </p>
                 <div className={cn("flex flex-wrap gap-1")}>
                   {MODES.map((m) => (
@@ -376,6 +437,7 @@ export function TravelBlockAdminList({
                         ? "text-red-500"
                         : "text-slate-400",
                     )}
+                    suppressHydrationWarning
                   >
                     {formatExpiry(b.beforeExpiresAt)}
                   </p>
@@ -389,18 +451,27 @@ export function TravelBlockAdminList({
                     Travel back
                   </p>
                   <p className={cn("text-sm text-slate-700")}>
-                    {formatMinutes(b.rawTravelBackMinutes, b.roundedBackMinutes)}
+                    {b.travelBackSuppressed
+                      ? "chained to next event"
+                      : formatMinutes(b.rawTravelBackMinutes, b.roundedBackMinutes)}
                   </p>
-                  <p
-                    className={cn(
-                      "text-xs",
-                      !b.afterExpiresAt || new Date(b.afterExpiresAt) < new Date()
-                        ? "text-red-500"
-                        : "text-slate-400",
-                    )}
-                  >
-                    {formatExpiry(b.afterExpiresAt)}
-                  </p>
+                  {b.travelBackSuppressed ? (
+                    <p className={cn("text-xs text-slate-400")}>
+                      no return trip - suppressed by design
+                    </p>
+                  ) : (
+                    <p
+                      className={cn(
+                        "text-xs",
+                        !b.afterExpiresAt || new Date(b.afterExpiresAt) < new Date()
+                          ? "text-red-500"
+                          : "text-slate-400",
+                      )}
+                      suppressHydrationWarning
+                    >
+                      {formatExpiry(b.afterExpiresAt)}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

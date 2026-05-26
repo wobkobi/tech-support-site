@@ -10,6 +10,11 @@ import { isAdminRequest } from "@/shared/lib/auth";
 import { deleteBookingEvent } from "@/features/calendar/lib/google-calendar";
 import { toE164NZ } from "@/shared/lib/normalise-phone";
 import { sendCustomerReviewRequest } from "@/features/reviews/lib/email";
+import {
+  isWithinCancellationWindow,
+  isWithinTravelWindow,
+} from "@/features/business/lib/pricing-policy";
+import { createDraftCancellationInvoice } from "@/features/business/lib/cancellation-invoice";
 
 interface PatchPayload {
   name?: string;
@@ -18,6 +23,13 @@ interface PatchPayload {
   notes?: string;
   address?: string;
   status?: "confirmed" | "cancelled" | "completed";
+  /**
+   * "operator" (default) = operator cancel, no customer fee. "on-behalf" =
+   * customer cancelled by phone/email; uses the standard fee rules.
+   */
+  cancelMode?: "operator" | "on-behalf";
+  /** No-show: always charges callout + travel via the draft-invoice flow. */
+  markNoShow?: boolean;
 }
 
 /**
@@ -60,7 +72,8 @@ export async function PATCH(
     }
   }
 
-  if (body.status === "cancelled" && booking.status !== "cancelled") {
+  if (body.markNoShow && booking.status !== "cancelled") {
+    // No-show ~ a customer cancel at startAt: both windows are inside.
     if (booking.calendarEventId) {
       try {
         await deleteBookingEvent({ eventId: booking.calendarEventId });
@@ -70,6 +83,28 @@ export async function PATCH(
     }
     data.status = "cancelled";
     data.activeSlotKey = `released:${id}`;
+    data.cancelledAt = new Date();
+    data.cancelledBy = "customer";
+    data.lateCancellation = true;
+    data.travelChargeApplies = true;
+    data.noShow = true;
+  } else if (body.status === "cancelled" && booking.status !== "cancelled") {
+    if (booking.calendarEventId) {
+      try {
+        await deleteBookingEvent({ eventId: booking.calendarEventId });
+      } catch (err) {
+        console.error("[admin/bookings] Failed to delete calendar event:", err);
+      }
+    }
+    const now = new Date();
+    const onBehalf = body.cancelMode === "on-behalf";
+    data.status = "cancelled";
+    data.activeSlotKey = `released:${id}`;
+    data.cancelledAt = now;
+    // Operator cancels never charge; on-behalf follows customer fee rules.
+    data.cancelledBy = onBehalf ? "customer" : "operator";
+    data.lateCancellation = onBehalf ? isWithinCancellationWindow(booking.startAt, now) : false;
+    data.travelChargeApplies = onBehalf ? isWithinTravelWindow(booking.startAt, now) : false;
   } else if (body.status === "completed") {
     data.status = "completed";
     data.activeSlotKey = `released:${id}`;
@@ -77,7 +112,19 @@ export async function PATCH(
     data.status = "confirmed";
   }
 
-  await prisma.booking.update({ where: { id }, data });
+  const updated = await prisma.booking.update({ where: { id }, data });
+
+  // Mirrors the customer-side cancel flow - same draft for on-behalf + no-show.
+  if (
+    updated.lateCancellation &&
+    updated.cancelledBy === "customer" &&
+    booking.status !== "cancelled"
+  ) {
+    void createDraftCancellationInvoice(updated, {
+      includeTravel: updated.travelChargeApplies,
+      reason: updated.noShow ? "no-show" : "late-cancellation",
+    }).catch((err) => console.error("[admin/bookings] Failed to draft cancellation invoice:", err));
+  }
 
   // When transitioning to "completed", send the review request email if one
   // has not already gone out. updateMany with the null-or-missing guard is

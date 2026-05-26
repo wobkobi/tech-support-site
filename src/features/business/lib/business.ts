@@ -1,10 +1,11 @@
 import type {
   JobCalculation,
-  JobSession,
   LineItem,
   RateConfig,
   TaskLine,
+  TravelEntry,
 } from "@/features/business/types/business";
+import { GST_REGISTERED, GST_RATE } from "@/features/business/lib/pricing-policy";
 import { formatDateSlash } from "@/shared/lib/date-format";
 
 /**
@@ -57,28 +58,28 @@ export function formatUTCDDMMYYYY(date: Date): string {
 }
 
 /**
- * Calculates invoice totals including optional GST and an optional promo
- * discount. The discount is subtracted from the gross subtotal before GST,
- * matching the Calculator's Summary panel and IRD's "discount = price
- * reduction" treatment.
- * @param lineItems - Array of line items with qty and unit price
- * @param gst - Whether to apply 15% GST
- * @param promoDiscount - Optional dollar discount (e.g. from a promo snapshot)
- * @returns Subtotal (gross), GST amount, and total (post-discount, post-GST)
+ * Invoice totals with an optional discount. GST mode is driven by
+ * GST_REGISTERED in pricing-policy.ts. When false (today), gstAmount=0;
+ * when true (future), gstAmount is back-calculated from the inclusive
+ * total via calcGstFromInclusive and total stays equal to taxableAmount
+ * (GST is already inside the displayed price). Discount is subtracted
+ * before GST is computed, matching IRD's price-reduction treatment.
+ * @param lineItems - Array of line items with qty and unit price.
+ * @param promoDiscount - Optional dollar discount (e.g. from a promo snapshot).
+ * @returns Subtotal (gross), GST amount, and total (post-discount, post-GST).
  */
 export function calcInvoiceTotals(
   lineItems: { qty: number; unitPrice: number }[],
-  gst: boolean,
   promoDiscount = 0,
 ): { subtotal: number; gstAmount: number; total: number } {
   const subtotal =
     Math.round(lineItems.reduce((sum, item) => sum + item.qty * item.unitPrice, 0) * 100) / 100;
   const taxableAmount = Math.max(0, Math.round((subtotal - promoDiscount) * 100) / 100);
-  const gstAmount = gst ? Math.round(taxableAmount * 0.15 * 100) / 100 : 0;
+  const gstAmount = GST_REGISTERED ? calcGstFromInclusive(taxableAmount, GST_RATE) : 0;
   return {
     subtotal,
     gstAmount,
-    total: Math.round((taxableAmount + gstAmount) * 100) / 100,
+    total: taxableAmount,
   };
 }
 
@@ -116,7 +117,7 @@ export function billableMins(mins: number): number {
  * collapse to 0 (matches the calculator's pre-existing behaviour). Returns 0
  * for reversed times so a half-typed session doesn't sneak negative minutes
  * into the aggregate. Cross-midnight handling is intentionally not done here -
- * use the per-session `durationMins` override for overnight cases.
+ * use the duration override for overnight cases.
  * @param start - HH:MM start.
  * @param end - HH:MM end.
  * @returns Non-negative minute diff, or 0 when inputs are unusable.
@@ -131,36 +132,13 @@ export function timeDiffMins(start: string, end: string): number {
 }
 
 /**
- * Resolves a session's billable minutes - the explicit override when set,
- * otherwise the start/end diff.
- * @param session - Session to measure.
- * @returns Non-negative minute count.
+ * Sums every travel-entry cost into the single "Travel" total used by the
+ * invoice line item and the job totals breakdown.
+ * @param entries - Travel entries from the calculator (may be empty).
+ * @returns Total travel charge in NZD, rounded to 2dp.
  */
-export function sessionDurationMins(session: JobSession): number {
-  if (session.durationMins != null) return session.durationMins;
-  return timeDiffMins(session.startTime, session.endTime);
-}
-
-/**
- * Count of sessions flagged as a separate trip - feeds the travel total
- * multiplier and the per-session travel line emission in jobToLineItems.
- * @param sessions - Job sessions (always at least one).
- * @returns Number of billed trips (0 means travel is excluded from totals).
- */
-export function travelTripCount(sessions: JobSession[]): number {
-  return sessions.filter((s) => s.includeTravel).length;
-}
-
-/**
- * Formats the bracketed `(date, start-end)` qualifier appended to per-session
- * labour and travel descriptions. Omits the date part when null so undated
- * sessions read as `(09:00-11:00)`.
- * @param session - Session to render.
- * @returns Bracketed string ready to append after the row label.
- */
-function sessionQualifier(session: JobSession): string {
-  const parts = [session.date, `${session.startTime}-${session.endTime}`].filter(Boolean);
-  return `(${parts.join(", ")})`;
+export function travelEntriesTotal(entries: TravelEntry[]): number {
+  return Math.round(entries.reduce((s, e) => s + (e.cost || 0), 0) * 100) / 100;
 }
 
 /**
@@ -281,14 +259,15 @@ function sumTaskMinutes(arr: TaskLine[]): number {
 }
 
 /**
- * Returns a clone of `task` with `qty` set to `mins / 60` and `lineTotal`
- * recomputed against the existing unit price.
+ * Returns a clone of `task` with `qty` set to `mins / 60` (rounded to 2 dp so
+ * snapped minute totals never produce ugly `2.3333…` qty values) and
+ * `lineTotal` recomputed against the existing unit price.
  * @param task - Source task line.
  * @param mins - New duration in minutes.
  * @returns Updated task line.
  */
 function withMinutes(task: TaskLine, mins: number): TaskLine {
-  const qty = mins / 60;
+  const qty = Math.round((mins / 60) * 100) / 100;
   return {
     ...task,
     qty,
@@ -342,7 +321,7 @@ export function matchRateById(rates: RateConfig[], id: string | null): RateConfi
 
 /**
  * Computes the effective hourly rate for a task by adding modifier deltas to
- * a base rate. E.g. Standard ($65) + At home (-$10) + Student (-$20) = $35.
+ * a base rate. E.g. Standard ($65) + At home (-$10) = $55.
  * @param rates - All rate configurations (used to look up by ID).
  * @param baseRateId - Base rate ID (must point to a rate with ratePerHour set).
  * @param modifierIds - Modifier rate IDs (each must point to a rate with hourlyDelta set).
@@ -366,35 +345,15 @@ export function effectiveHourlyRate(
 
 /**
  * Converts a job calculation into a flat array of invoice line items.
- * Multi-session jobs emit one labour row per session (description prefixed
- * with the session label + date/time) and one travel row per session that
- * was billed as a trip. Tasks and parts stay job-level for v1 - if a task
- * only applied to a specific session, put that context in the description
- * manually. (Per-task session tagging is deliberately deferred.)
- * @param job - Job calculation with time, tasks, parts, and sessions
- * @returns Array of line items ready for an invoice
+ * Emits one Labour row (when hours + rate are set), one row per task, one row
+ * per part, and a single Travel row summed from `travelEntries`.
+ * @param job - Job calculation with time, tasks, parts.
+ * @returns Array of line items ready for an invoice.
  */
 export function jobToLineItems(job: JobCalculation): LineItem[] {
   const items: LineItem[] = [];
-  const sessions = job.sessions ?? [];
-  const multi = sessions.length > 1;
 
-  if (multi && job.hourlyRate) {
-    const rate = job.hourlyRate.ratePerHour ?? 0;
-    for (const session of sessions) {
-      const dur = sessionDurationMins(session);
-      if (dur <= 0) continue;
-      const billed = billableMins(dur);
-      const hours = billed / 60;
-      const lineTotal = Math.round(hours * rate * 100) / 100;
-      items.push({
-        description: `Labour - ${session.label} ${sessionQualifier(session)} - ${minsToHoursLabel(billed)} @ ${formatNZD(rate)}/hr`,
-        qty: 1,
-        unitPrice: lineTotal,
-        lineTotal,
-      });
-    }
-  } else if (job.durationMins > 0 && job.hourlyRate) {
+  if (job.durationMins > 0 && job.hourlyRate) {
     const billed = billableMins(job.durationMins);
     const hours = billed / 60;
     const rate = job.hourlyRate.ratePerHour ?? 0;
@@ -425,19 +384,14 @@ export function jobToLineItems(job: JobCalculation): LineItem[] {
     });
   }
 
-  // Travel: one row per session flagged as a separate trip. travelCost is the
-  // per-trip cost (not a total). Single-session jobs render as plain "Travel"
-  // to match pre-multi-session output; multi-session jobs get a labelled row.
-  if (job.travelCost) {
-    for (const session of sessions) {
-      if (!session.includeTravel) continue;
-      items.push({
-        description: multi ? `Travel - ${session.label} ${sessionQualifier(session)}` : "Travel",
-        qty: 1,
-        unitPrice: job.travelCost,
-        lineTotal: job.travelCost,
-      });
-    }
+  const travelTotal = travelEntriesTotal(job.travelEntries);
+  if (travelTotal > 0) {
+    items.push({
+      description: "Travel",
+      qty: 1,
+      unitPrice: travelTotal,
+      lineTotal: travelTotal,
+    });
   }
 
   return items;
@@ -490,13 +444,14 @@ export function computeJobPromoDiscount(job: JobCalculation, promo: JobPromo | n
 }
 
 /**
- * Calculates the complete cost breakdown for a job. When `promo` is supplied
- * (and the job has labor), a `promoDiscount` is computed via
- * `computeJobPromoDiscount` and subtracted from the subtotal before GST.
- * Travel + parts are never discounted.
+ * Cost breakdown for a job. Promo discount applies to labour only; travel +
+ * parts stay at full price. Unsuccessful-work flag halves the labour
+ * portion. GST mode is driven by GST_REGISTERED (see calcInvoiceTotals);
+ * job.gst is ignored. Travel floor (MIN_TRAVEL_CHARGE) only applies when an
+ * auto entry contributed - manual-only travel passes through unchanged.
  * @param job - Job calculation with time, tasks, and parts.
  * @param promo - Optional active promo to apply.
- * @returns Cost breakdown including promoDiscount.
+ * @returns Cost breakdown with promo + unsuccessful discounts split out.
  */
 export function calcJobTotal(
   job: JobCalculation,
@@ -508,6 +463,7 @@ export function calcJobTotal(
   travelTotal: number;
   subtotal: number;
   promoDiscount: number;
+  unsuccessfulDiscount: number;
   gstAmount: number;
   total: number;
 } {
@@ -517,15 +473,26 @@ export function calcJobTotal(
   const timeCharge = Math.round(hours * rate * 100) / 100;
   const tasksTotal = job.tasks.reduce((s, t) => s + t.qty * t.unitPrice, 0);
   const partsTotal = job.parts.reduce((s, p) => s + p.cost, 0);
-  // travelCost is per-trip; multiply by the number of sessions flagged as a
-  // separate trip so multi-day continuations bill travel twice (or more).
-  const travelTotal = (job.travelCost ?? 0) * travelTripCount(job.sessions);
-  // Subtotal = gross (pre-promo); promo shown as its own line in the Summary.
+  const rawTravelTotal = travelEntriesTotal(job.travelEntries);
+  // Auto entries trigger the floor; manual-only entries (parking, etc.) don't.
+  const hasAutoEntry = job.travelEntries.some((e) => e.isAuto && e.cost > 0);
+  const travelTotal =
+    hasAutoEntry && rawTravelTotal > 0 && rawTravelTotal < MIN_TRAVEL_CHARGE
+      ? MIN_TRAVEL_CHARGE
+      : rawTravelTotal;
   const subtotal = Math.round((timeCharge + tasksTotal + partsTotal + travelTotal) * 100) / 100;
   const promoDiscount = computeJobPromoDiscount(job, promo);
-  // GST applies to the discounted amount per NZ IRD treatment.
-  const taxableAmount = Math.round((subtotal - promoDiscount) * 100) / 100;
-  const gstAmount = job.gst ? Math.round(taxableAmount * 0.15 * 100) / 100 : 0;
+  let unsuccessfulDiscount = 0;
+  if (job.unsuccessful) {
+    const hourlyTasksTotal = job.tasks
+      .filter((t) => t.baseRateId != null || t.rateConfigId == null)
+      .reduce((s, t) => s + t.qty * t.unitPrice, 0);
+    const labourBase = timeCharge + hourlyTasksTotal;
+    unsuccessfulDiscount = Math.round(labourBase * 0.5 * 100) / 100;
+  }
+  // GST applied to the discounted amount per NZ IRD price-reduction treatment.
+  const taxableAmount = Math.round((subtotal - promoDiscount - unsuccessfulDiscount) * 100) / 100;
+  const gstAmount = GST_REGISTERED ? calcGstFromInclusive(taxableAmount, GST_RATE) : 0;
   return {
     timeCharge,
     tasksTotal,
@@ -533,8 +500,9 @@ export function calcJobTotal(
     travelTotal,
     subtotal,
     promoDiscount,
+    unsuccessfulDiscount,
     gstAmount,
-    total: Math.round((taxableAmount + gstAmount) * 100) / 100,
+    total: taxableAmount,
   };
 }
 
@@ -578,8 +546,7 @@ export function buildIncomeDescription(job: JobCalculation): string {
     parts.push(job.tasks.map((t) => t.description).join(", "));
   }
   if (job.durationMins > 0) {
-    const suffix = job.sessions.length > 1 ? ` over ${job.sessions.length} sessions` : "";
-    parts.push(`${minsToHoursLabel(job.durationMins)} labour${suffix}`);
+    parts.push(`${minsToHoursLabel(job.durationMins)} labour`);
   }
   const today = formatDateSlash(new Date());
   return `Job: ${parts.join(" + ")} - ${today}`;

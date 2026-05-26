@@ -15,6 +15,29 @@ enum BookingStatus {
   completed
 }
 
+// Meeting modality on a Booking and a PriceEstimateLog. Stored as snake_case
+// per Prisma enum rules; the API boundary maps to/from the hyphenated form
+// the booking form uses ("in-person").
+enum MeetingType {
+  in_person
+  remote
+}
+
+// Length band picked on the booking form. Matches the JobDuration type in
+// features/booking/lib/booking.ts.
+enum JobDuration {
+  short
+  long
+}
+
+// Who initiated a cancellation. Operator cancels never trigger the
+// late-cancel auto-invoice path; customer cancels do when the cancel
+// lands inside the fee window.
+enum CancelledBy {
+  customer
+  operator
+}
+
 enum ReviewStatus {
   pending
   approved
@@ -108,6 +131,46 @@ model Booking {
   // Reminder tracking. Stamped by /api/cron/send-booking-reminders so the
   // 24h-out email reminder fires at most once per booking.
   emailReminderSentAt DateTime?
+
+  // Structured booking inputs. Currently mirrored into the notes text for
+  // backwards compat with the admin UI / contacts backfill / auto-maintain
+  // code paths that regex "Address: X" out of notes. Future PR migrates
+  // those readers to prefer these fields and drops the notes mirror.
+  address             String?
+  unit                String?
+  meetingType         MeetingType?
+  duration            JobDuration?
+  // One-way drive time from HOME_ADDRESS captured at booking creation via
+  // lookupDriveDistance. Required by the late-cancel auto-invoice travel
+  // line so cancelling within the travel window can be billed without a
+  // re-lookup. Null on legacy rows and on remote bookings.
+  travelMinsAtBooking Int?
+
+  // Rate / promo snapshot at booking creation. Honoured at invoice time
+  // (and rendered into the confirmation email) so a customer who booked
+  // during a promo keeps that price even if the promo expires before the
+  // appointment. Denormalised so the snapshot survives Promo deletion.
+  promoIdAtBooking              String?
+  promoTitleAtBooking           String?
+  promoFlatHourlyRateAtBooking  Float?
+  promoPercentDiscountAtBooking Float?
+  baseRateAtBooking             Float?
+  complexRateAtBooking          Float?
+  travelRatePerHourAtBooking    Float?
+
+  // Cancellation state stamped by /api/booking/cancel (customer path) and
+  // the admin booking cancel UI (operator + cancel-for-customer paths).
+  // lateCancellation + travelChargeApplies are derived from the cancel
+  // moment against the policy's cancellation window helpers and gate the
+  // auto-draft cancellation invoice.
+  cancelledAt         DateTime?
+  cancelledBy         CancelledBy?
+  lateCancellation    Boolean      @default(false)
+  travelChargeApplies Boolean      @default(false)
+  noShow              Boolean      @default(false)
+  // NZ public holiday name when the booking falls on a stat day; lets
+  // disputes quote the exact reason for the public-holiday surcharge.
+  publicHolidayName   String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -223,6 +286,10 @@ model TravelBlock {
   travelBackSuppressed        Boolean        @default(false) // True when chaining to next event beats going home
   chainedNextEventId          String? // Identity of next event evaluated for chaining (for change detection)
   chainedNextEventStartAt     DateTime? // Start of that next event (rebuild when it shifts)
+  // True when the admin has flagged this event as "I have the car that day"
+  // (Car-cal override). Cron skips both the calendarEventCache upsert (so the
+  // booking page doesn't block) and the travel-to-home calculation for it.
+  ignored                     Boolean        @default(false)
   createdAt                   DateTime       @default(now())
 
   @@unique([sourceEventId, calendarEmail])
@@ -280,9 +347,19 @@ model RateConfig {
   ratePerHour Float?
   flatRate    Float?
   hourlyDelta Float?
-  unit        String   @default("hour")
-  isDefault   Boolean  @default(false)
-  createdAt   DateTime @default(now())
+  // Percentage uplift modifier (e.g. 0.25 for Public Holiday's +25%).
+  // Applied after hourlyDelta in effectiveHourlyRate so the percentage
+  // acts on the post-modifier base.
+  percentDelta Float?
+  unit         String    @default("hour")
+  isDefault    Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  // Powers the "Rates last updated on {date}" footer on /pricing. Nullable
+  // because legacy rows created before this field existed don't carry the
+  // value - Prisma cannot coerce a missing Mongo field to a non-nullable
+  // DateTime at read time. @updatedAt still stamps every write, so any
+  // operator edit or the seed-handler's migration backfill fills it in.
+  updatedAt    DateTime? @updatedAt
 }
 
 enum InvoiceStatus {
@@ -314,6 +391,12 @@ model Invoice {
   // Promo snapshot at creation time (kept stable if the source promo changes).
   promoTitle       String?
   promoDiscount    Float?
+  // Half-price labour discount applied when the visit couldn't be fixed AND
+  // couldn't be diagnosed (see pricing-policy.ts unsuccessfulWorkCopy).
+  // Audit trail: lets the admin dashboard count how often the half-price
+  // clause was invoked so a pattern of abuse is spottable.
+  unsuccessful     Boolean       @default(false)
+  unsuccessfulDiscount Float?
   status           InvoiceStatus @default(DRAFT)
   notes            String?
   contactId        String?       @db.ObjectId
@@ -451,6 +534,10 @@ model PriceEstimateLog {
   // Address + drive time (step 2 is optional - skipped values stay null).
   address    String?
   travelMins Int?
+
+  // Meeting modality picked in the wizard. Lets disputes confirm whether
+  // the customer was quoted an on-site rate (with travel) or remote.
+  meetingType MeetingType?
 
   // Final price range shown to the user, post-promo.
   hourlyRate Float

@@ -221,17 +221,16 @@ export function TaxonomyManageModal({ token, onClose, onChanged }: Props): React
 }
 
 /**
- * Small list section for one of the taxonomy axes. Each row uses a two-step
- * inline confirmation rather than window.confirm() (Firefox suppresses native
+ * Taxonomy axis list. Two-step inline confirm (Firefox suppresses native
  * confirm dialogs once the user opts out for the origin).
  * @param props - Component props.
  * @param props.title - Section heading (e.g. "Devices").
  * @param props.tags - Tag values to render.
- * @param props.busyKey - Currently-busy `kind:name` key to disable the matching button.
- * @param props.pendingKey - Currently-staged `kind:name` row awaiting confirm.
+ * @param props.busyKey - Currently-busy `kind:name` key.
+ * @param props.pendingKey - `kind:name` staged for confirm.
  * @param props.kind - Whether this section renders devices or categories.
  * @param props.onRequestClear - First click: stage the row for confirmation.
- * @param props.onConfirmClear - Second click: actually fire the delete.
+ * @param props.onConfirmClear - Second click: fire the delete.
  * @param props.onCancelClear - Cancel the pending confirmation.
  * @returns Tag list section.
  */

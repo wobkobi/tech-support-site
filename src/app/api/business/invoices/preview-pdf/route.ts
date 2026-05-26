@@ -11,7 +11,6 @@ interface PreviewPayload {
   issueDate: string;
   dueDate: string;
   lineItems: LineItem[];
-  gst: boolean;
   subtotal: number;
   gstAmount: number;
   total: number;
@@ -49,7 +48,7 @@ export async function POST(request: NextRequest): Promise<Response> {
     issueDate: new Date(body.issueDate),
     dueDate: new Date(body.dueDate),
     lineItems: body.lineItems,
-    gst: body.gst,
+    gst: body.gstAmount > 0,
     subtotal: body.subtotal,
     gstAmount: body.gstAmount,
     total: body.total,

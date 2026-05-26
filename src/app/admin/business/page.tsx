@@ -333,13 +333,14 @@ export default async function BusinessPage({
         rates={rates}
       />
 
-      <div className={cn("flex flex-wrap gap-3")}>
+      {/* Action links - full-width stacked on mobile, side-by-side from sm+. */}
+      <div className={cn("flex flex-col gap-3 sm:flex-row sm:flex-wrap")}>
         {links.map((l) => (
           <Link
             key={l.label}
             href={l.href}
             className={cn(
-              "bg-russian-violet rounded-lg px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90",
+              "bg-russian-violet rounded-lg px-4 py-2 text-center text-sm font-medium text-white transition-opacity hover:opacity-90 sm:w-auto sm:text-left",
             )}
           >
             {l.label}

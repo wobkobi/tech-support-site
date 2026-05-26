@@ -18,22 +18,16 @@ interface Props {
   hourlyRate: RateConfig | null;
   totals: JobTotals;
   activePromo: ActivePromo | null;
-  gst: boolean;
-  onGstChange: (value: boolean) => void;
 }
 
 /**
- * Live job summary card on the right rail of the calculator: time charge,
- * tasks, promo (under labor lines so it's visually attached to what it
- * discounts), parts, travel, subtotal (already net of promo), GST toggle,
- * and the bold final total. Pure display - state lives in the parent.
+ * Right-rail live job summary: time charge, tasks, promo (under labour lines),
+ * parts, travel, subtotal, and the bold final total. Pure display.
  * @param props - Component props.
- * @param props.durationMins - Job duration in minutes (drives the time-charge row visibility).
- * @param props.hourlyRate - Active hourly rate (drives the time-charge row visibility and label).
- * @param props.totals - Output of calcJobTotal: per-bucket subtotals plus subtotal/gst/total.
- * @param props.activePromo - Promo applied to this job, or null when none.
- * @param props.gst - Whether GST is included; checkbox value.
- * @param props.onGstChange - Setter invoked when the GST checkbox toggles.
+ * @param props.durationMins - Job duration; drives time-charge row visibility.
+ * @param props.hourlyRate - Active hourly rate; drives label + row visibility.
+ * @param props.totals - Output of calcJobTotal.
+ * @param props.activePromo - Promo applied to this job, or null.
  * @returns Summary card element.
  */
 export function TotalsPanel({
@@ -41,8 +35,6 @@ export function TotalsPanel({
   hourlyRate,
   totals,
   activePromo,
-  gst,
-  onGstChange,
 }: Props): React.ReactElement {
   return (
     <div className={cn("rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}>
@@ -92,18 +84,12 @@ export function TotalsPanel({
           <span>Subtotal</span>
           <span>{formatNZD(totals.subtotal - totals.promoDiscount)}</span>
         </div>
-        <div className={cn("flex items-center justify-between")}>
-          <label className={cn("flex cursor-pointer items-center gap-2 text-slate-600")}>
-            <input
-              type="checkbox"
-              checked={gst}
-              onChange={(e) => onGstChange(e.target.checked)}
-              className={cn("h-3.5 w-3.5")}
-            />
-            GST (15%)
-          </label>
-          <span className={cn("text-slate-600")}>{formatNZD(totals.gstAmount)}</span>
-        </div>
+        {totals.gstAmount > 0 && (
+          <div className={cn("flex items-center justify-between text-slate-500")}>
+            <span>Includes GST</span>
+            <span>{formatNZD(totals.gstAmount)}</span>
+          </div>
+        )}
         <div
           className={cn(
             "text-russian-violet flex justify-between border-t border-slate-200 pt-2 text-base font-extrabold",

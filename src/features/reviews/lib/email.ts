@@ -16,10 +16,10 @@ import {
   DEFAULT_INVOICE_EMAIL_BODY,
   DEFAULT_VOID_EMAIL_BODY,
 } from "@/features/business/lib/invoice-email-defaults";
+import { cancellationCopy } from "@/features/business/lib/pricing-policy";
 
 /**
- * Escapes HTML special characters so user-supplied values can be safely
- * interpolated into HTML email bodies without breaking layout or injecting markup.
+ * Escapes HTML so user-supplied values can be interpolated into email bodies.
  * @param value - The string to escape.
  * @returns The escaped string.
  */
@@ -33,8 +33,23 @@ function escapeHtml(value: string): string {
 }
 
 /**
- * Renders the standard email signature block (logo, name, role, phone, email,
- * site link, location). Trusted static content; no escaping needed.
+ * Renders a pricing-policy `**…**` copy string as email-safe HTML. Non-marker
+ * segments are HTML-escaped as cheap insurance against future user input.
+ * @param text - Copy string containing zero or more `**…**` segments.
+ * @returns HTML fragment ready to drop into an email body.
+ */
+function renderEmphasisedHtml(text: string): string {
+  return text
+    .split(/(\*\*[^*]+\*\*)/g)
+    .map((part) => {
+      const m = part.match(/^\*\*([^*]+)\*\*$/);
+      return m ? `<strong>${escapeHtml(m[1])}</strong>` : escapeHtml(part);
+    })
+    .join("");
+}
+
+/**
+ * Renders the standard email signature block (logo, name, contact, footer).
  * @param siteUrl - Canonical site URL for the logo link and footer.
  * @returns HTML string for the signature.
  */
@@ -53,7 +68,7 @@ function buildEmailSignature(siteUrl: string): string {
     </div>`;
 }
 
-// Lazy singleton - created on first use so module import never throws in test environments.
+// Lazy singleton so module import never throws when RESEND_API_KEY is unset.
 let _resend: Resend | null = null;
 /**
  * Returns the shared Resend client, initialising it on first call.
@@ -236,16 +251,12 @@ export async function sendOwnerBookingNotification(
 }
 
 /**
- * Sends the customer a booking confirmation email with their appointment
- * details and self-serve change/cancel links. Same template handles a
- * fresh booking confirmation and a reschedule notification - only the
- * heading + intro paragraph + subject differ.
+ * Sends the customer a booking confirmation or reschedule notification.
  * Failures are caught and logged - never throws.
  * @param booking - The booking details.
  * @param options - Optional flags.
- * @param options.kind - "new" (default) confirms a fresh booking; "rescheduled" confirms an edit.
+ * @param options.kind - "new" (default) for a fresh booking; "rescheduled" for an edit.
  * @param options.previousStartAt - Original start time, shown crossed-out when rescheduled.
- * @returns Promise that resolves when the email is sent (or silently fails).
  */
 export async function sendCustomerBookingConfirmation(
   booking: BookingNotificationData,
@@ -306,6 +317,9 @@ export async function sendCustomerBookingConfirmation(
 
     <a href="${editUrl}" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;margin-right:8px">✏️ Change appointment</a>
     <a href="${cancelUrl}" style="display:inline-block;background:#e8e8e8;color:#333;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600">❌ Cancel appointment</a>
+
+    <p style="margin:28px 0 6px;color:#888;font-size:13px;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Cancellation policy</p>
+    <p style="margin:0;color:#444;font-size:13px;line-height:1.6">${renderEmphasisedHtml(cancellationCopy())}</p>
 ${buildEmailSignature(siteUrl)}
   </div>
 </body>
@@ -325,11 +339,8 @@ ${buildEmailSignature(siteUrl)}
 }
 
 /**
- * Sends a short "your appointment is tomorrow" reminder email. Fired by the
- * /api/cron/send-booking-reminders cron when a confirmed booking enters the
- * 24h-out window. Reuses the same change/cancel buttons as the confirmation
- * email so the customer can self-serve without digging through old emails.
- * Failures are caught and logged - never throws.
+ * Sends a "your appointment is tomorrow" reminder. Fired by the
+ * /api/cron/send-booking-reminders cron. Failures are logged - never throws.
  * @param booking - Booking details (same shape as the confirmation helper).
  * @returns True if Resend accepted the message, false on misconfig / failure.
  */
@@ -371,6 +382,9 @@ export async function sendBookingReminderEmail(booking: BookingNotificationData)
 
     <a href="${editUrl}" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;margin-right:8px">✏️ Change appointment</a>
     <a href="${cancelUrl}" style="display:inline-block;background:#e8e8e8;color:#333;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600">❌ Cancel appointment</a>
+
+    <p style="margin:28px 0 6px;color:#888;font-size:13px;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Cancellation policy</p>
+    <p style="margin:0;color:#444;font-size:13px;line-height:1.6">${renderEmphasisedHtml(cancellationCopy())}</p>
 ${buildEmailSignature(siteUrl)}
   </div>
 </body>
@@ -542,29 +556,29 @@ export interface InvoiceEmailData {
   driveWebUrl?: string | null;
 }
 
-/**
- * Renders the invoice email subject + HTML body without sending. Used by the
- * preview modal AND the send route so what the operator previews is exactly
- * what the customer receives.
- * @param args - Render inputs.
- * @param args.invoice - Invoice row fields needed for the body.
- * @param args.reviewUrl - Stable per-contact review URL, or null to omit the review line.
- * @param args.greetingName - Optional operator-typed greeting target. Useful when
- *   the invoice goes to a company but the email goes to a specific person (e.g.
- *   "John" while the invoice header reads "Mars Salt and Sweet Limited").
- * @param args.customBody - Optional operator-typed message that replaces the
- *   default intro paragraph. Multi-line allowed (rendered with `white-space:
- *   pre-wrap` so line breaks are preserved). Falls back to
- *   DEFAULT_INVOICE_EMAIL_BODY when omitted.
- * @returns Subject + escaped HTML body.
- */
-export function buildInvoiceEmail(args: {
+interface BuildInvoiceEmailArgs {
   invoice: InvoiceEmailData;
   reviewUrl: string | null;
   greetingName?: string;
   customBody?: string;
-}): { subject: string; html: string } {
-  const { invoice, reviewUrl, greetingName, customBody } = args;
+}
+
+/**
+ * Renders the invoice email subject + HTML body without sending. Shared by
+ * the preview modal and the send route so the preview matches what's sent.
+ * @param args - Render inputs.
+ * @param args.invoice - Invoice row fields needed for the body.
+ * @param args.reviewUrl - Stable per-contact review URL, or null to omit.
+ * @param args.greetingName - Optional greeting target (e.g. person inside a company).
+ * @param args.customBody - Optional intro replacement (multi-line via pre-wrap).
+ * @returns Subject + escaped HTML body.
+ */
+export function buildInvoiceEmail({
+  invoice,
+  reviewUrl,
+  greetingName,
+  customBody,
+}: BuildInvoiceEmailArgs): { subject: string; html: string } {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz";
   const bodyText = (customBody ?? DEFAULT_INVOICE_EMAIL_BODY).trim();
   // pre-wrap preserves line breaks the operator typed; escape first so the
@@ -624,6 +638,14 @@ export function buildInvoiceEmail(args: {
   return { subject, html };
 }
 
+interface SendInvoiceEmailArgs {
+  invoice: InvoiceEmailData;
+  pdfBytes: Uint8Array;
+  reviewUrl: string | null;
+  greetingName?: string;
+  customBody?: string;
+}
+
 /**
  * Sends the rendered invoice email via Resend with the PDF attached.
  * Failures are caught and logged - never throws.
@@ -631,18 +653,17 @@ export function buildInvoiceEmail(args: {
  * @param args.invoice - Invoice row fields needed for the body.
  * @param args.pdfBytes - Raw PDF bytes returned by `generateInvoicePdf`.
  * @param args.reviewUrl - Stable per-contact review URL, or null to omit the review line.
- * @param args.greetingName - Optional operator-typed greeting target (forwarded to buildInvoiceEmail).
- * @param args.customBody - Optional operator-typed message body that replaces the default intro paragraph.
+ * @param args.greetingName - Optional greeting target (forwarded to buildInvoiceEmail).
+ * @param args.customBody - Optional intro replacement.
  * @returns True if the email was accepted by Resend, false on failure or misconfig.
  */
-export async function sendInvoiceEmail(args: {
-  invoice: InvoiceEmailData;
-  pdfBytes: Uint8Array;
-  reviewUrl: string | null;
-  greetingName?: string;
-  customBody?: string;
-}): Promise<boolean> {
-  const { invoice, pdfBytes, reviewUrl, greetingName, customBody } = args;
+export async function sendInvoiceEmail({
+  invoice,
+  pdfBytes,
+  reviewUrl,
+  greetingName,
+  customBody,
+}: SendInvoiceEmailArgs): Promise<boolean> {
   const from = process.env.EMAIL_FROM;
   if (!from || !process.env.RESEND_API_KEY) {
     console.warn("[email] Resend not configured - skipping invoice email.");
@@ -675,23 +696,26 @@ export async function sendInvoiceEmail(args: {
   }
 }
 
+interface BuildVoidEmailArgs {
+  invoice: InvoiceEmailData;
+  greetingName?: string;
+  customBody?: string;
+}
+
 /**
  * Renders the "your invoice has been voided" email subject + body. Mirrors
  * buildInvoiceEmail but drops the bank-transfer block and review line - voided
  * invoices never request payment or a review.
  * @param args - Render inputs.
- * @param args.invoice - Invoice row fields needed for the body (the issueDate
- *   helps the client identify which email this voids).
+ * @param args.invoice - Invoice row fields needed for the body.
  * @param args.greetingName - Optional operator-typed greeting target.
  * @param args.customBody - Optional override; falls back to DEFAULT_VOID_EMAIL_BODY.
  * @returns Subject + escaped HTML body.
  */
-export function buildVoidEmail(args: {
-  invoice: InvoiceEmailData;
-  greetingName?: string;
-  customBody?: string;
-}): { subject: string; html: string } {
-  const { invoice, greetingName, customBody } = args;
+export function buildVoidEmail({ invoice, greetingName, customBody }: BuildVoidEmailArgs): {
+  subject: string;
+  html: string;
+} {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz";
   const bodyText = (customBody ?? DEFAULT_VOID_EMAIL_BODY).trim();
   const safeBody = escapeHtml(bodyText || DEFAULT_VOID_EMAIL_BODY);
@@ -729,25 +753,30 @@ export function buildVoidEmail(args: {
   return { subject, html };
 }
 
-/**
- * Sends the void notification email via Resend with the VOID-stamped PDF
- * attached. Mirrors sendInvoiceEmail's error handling - logs and returns
- * false on failure rather than throwing, so the caller (void endpoint) can
- * report `notified: false` without rolling back the status change.
- * @param args - Send inputs.
- * @param args.invoice - Invoice row fields needed for the body.
- * @param args.pdfBytes - Raw PDF bytes (already VOID-stamped via generateInvoicePdf on the VOIDED row).
- * @param args.greetingName - Optional operator-typed greeting target.
- * @param args.customBody - Optional operator-typed body override.
- * @returns True if Resend accepted the email, false otherwise.
- */
-export async function sendVoidNotification(args: {
+interface SendVoidNotificationArgs {
   invoice: InvoiceEmailData;
   pdfBytes: Uint8Array;
   greetingName?: string;
   customBody?: string;
-}): Promise<boolean> {
-  const { invoice, pdfBytes, greetingName, customBody } = args;
+}
+
+/**
+ * Sends the void notification with the VOID-stamped PDF attached.
+ * Logs + returns false on failure rather than throwing so the void endpoint
+ * can report `notified: false` without rolling back the status change.
+ * @param args - Send inputs.
+ * @param args.invoice - Invoice row fields needed for the body.
+ * @param args.pdfBytes - PDF bytes (already VOID-stamped).
+ * @param args.greetingName - Optional greeting target.
+ * @param args.customBody - Optional intro replacement.
+ * @returns True if Resend accepted the email, false otherwise.
+ */
+export async function sendVoidNotification({
+  invoice,
+  pdfBytes,
+  greetingName,
+  customBody,
+}: SendVoidNotificationArgs): Promise<boolean> {
   const from = process.env.EMAIL_FROM;
   if (!from || !process.env.RESEND_API_KEY) {
     console.warn("[email] Resend not configured - skipping void notification.");

@@ -32,6 +32,8 @@ export default async function AdminTravelPage({
   const { token } = await searchParams;
   const t = requireAdminToken(token);
 
+  const carCalId = process.env.CAR_CALENDAR_ID ?? process.env.WORK_CALENDAR_ID;
+
   const travelBlocks = await prisma.travelBlock.findMany({
     orderBy: { eventStartAt: "asc" },
     select: {
@@ -51,6 +53,8 @@ export default async function AdminTravelPage({
       customOrigin: true,
       detectedOrigin: true,
       destination: true,
+      travelBackSuppressed: true,
+      ignored: true,
       createdAt: true,
     },
   });
@@ -92,12 +96,15 @@ export default async function AdminTravelPage({
     afterExpiresAt: b.afterEventId
       ? (travelCacheMap.get(b.afterEventId)?.toISOString() ?? null)
       : null,
+    travelBackSuppressed: b.travelBackSuppressed,
+    ignored: b.ignored,
+    isCarEvent: carCalId ? b.calendarEmail === carCalId : false,
     createdAt: b.createdAt.toISOString(),
   }));
 
   const calendarLabels: Record<string, string> = {};
   if (process.env.BOOKING_CALENDAR_ID) calendarLabels[process.env.BOOKING_CALENDAR_ID] = "Bookings";
-  if (process.env.WORK_CALENDAR_ID) calendarLabels[process.env.WORK_CALENDAR_ID] = "Work";
+  if (carCalId) calendarLabels[carCalId] = "Car";
   if (process.env.PERSONAL_CALENDAR_ID)
     calendarLabels[process.env.PERSONAL_CALENDAR_ID] = "Personal";
 

@@ -3,7 +3,7 @@ export interface RateConfig {
   label: string;
   /** Set on base hourly rates (e.g. Standard $65/hr). Null on modifiers and flat rates. */
   ratePerHour: number | null;
-  /** Set on flat rates (e.g. Travel $1.20/km). Null on hourly bases and modifiers. */
+  /** Set on flat per-unit rates (e.g. legacy Travel $1.20/km row before the time-based switch). Null on hourly bases and modifiers. */
   flatRate: number | null;
   /** Set on modifier rates (signed $/hr delta, e.g. -10 for At home). Null on bases and flat rates. */
   hourlyDelta: number | null;
@@ -29,6 +29,7 @@ export interface Invoice {
   issueDate: string;
   dueDate: string;
   lineItems: LineItem[];
+  /** @deprecated Legacy boolean kept for storage shape. The engine derives GST mode from GST_REGISTERED in pricing-policy.ts; renderers gate on `gstAmount > 0`. */
   gst: boolean;
   subtotal: number;
   gstAmount: number;
@@ -37,6 +38,10 @@ export interface Invoice {
   promoTitle?: string | null;
   /** Dollar discount applied to the labor subtotal at creation time. */
   promoDiscount?: number | null;
+  /** Operator ticked the unsuccessful-work checkbox: half off labour (parts + travel unaffected). */
+  unsuccessful?: boolean;
+  /** Computed labour-half discount, persisted for audit + PDF rendering. */
+  unsuccessfulDiscount?: number | null;
   status: InvoiceStatus;
   notes: string | null;
   contactId: string | null;
@@ -120,44 +125,43 @@ export interface PartLine {
 }
 
 /**
- * One work session within a multi-session job. Sessions are time-only
- * containers; tasks/parts stay job-level for v1. When sessions.length === 1
- * the calculator UI and emitted invoice line items look identical to the
- * pre-multi-session behaviour.
+ * One travel charge in the calculator. The invoice always lumps every entry
+ * into a single "Travel" line; the per-entry label only appears in the
+ * calculator UI to help the operator track what each amount represents.
  */
-export interface JobSession {
-  /** Display label like "Session 1"; operator-editable when multi-session. */
+export interface TravelEntry {
+  /** Operator-facing label (e.g. "Parking", "76 Riversdale Rd"). Not shown on the invoice. */
   label: string;
-  /** Optional ISO YYYY-MM-DD date. Null when the operator hasn't set one (single-day default). */
-  date?: string | null;
-  /** HH:MM start time. */
-  startTime: string;
-  /** HH:MM end time. */
-  endTime: string;
-  /** Manual duration override per session (e.g. when gaps exist inside a single session). */
-  durationMins?: number | null;
-  /** True when this session was a separate trip and should bill its own travel line. */
-  includeTravel: boolean;
+  /** Cost in NZD. */
+  cost: number;
+  /** True when this entry was created by the address lookup; lets re-lookup replace it. */
+  isAuto?: boolean;
 }
 
 export interface JobCalculation {
-  /** Aggregate first-session start (derived from sessions). */
+  /** HH:MM start time of the job. */
   startTime: string;
-  /** Aggregate last-session end (derived from sessions). */
+  /** HH:MM end time of the job. */
   endTime: string;
-  /** Aggregate total billable minutes summed across all sessions. */
+  /** Total billable minutes (operator override OR derived from start/end). */
   durationMins: number;
   hourlyRate: RateConfig | null;
   tasks: TaskLine[];
   parts: PartLine[];
-  /** Per-trip travel cost (NOT total). Total = travelCost × count(sessions where includeTravel). */
-  travelCost: number | null;
+  /** Every travel charge for this job; summed into a single "Travel" invoice line. */
+  travelEntries: TravelEntry[];
   notes: string;
+  /** @deprecated Ignored by calcJobTotal; GST mode comes from GST_REGISTERED in pricing-policy.ts. Pass `false`. */
   gst: boolean;
+  /**
+   * Operator-set flag: when true, calcJobTotal halves the labour portion
+   * (time charge + hourly tasks) per the published unsuccessful-work
+   * policy. Travel and parts are not discounted. Auditable on the saved
+   * invoice via Invoice.unsuccessful + Invoice.unsuccessfulDiscount.
+   */
+  unsuccessful?: boolean;
   clientName: string;
   clientEmail: string;
-  /** Always at least one session. Single-session jobs keep the legacy invoice shape. */
-  sessions: JobSession[];
 }
 
 export interface ParseJobRequest {
@@ -185,22 +189,14 @@ export interface ParseJobResponse {
   statedDistanceKm: number | null;
   noTravelCharge: boolean;
   travel?: TravelInfo;
-  /** Per-session ranges extracted server-side. Always has at least one entry when start/end could be resolved. */
-  sessions?: ParsedSession[];
+  /** Operator-stated time ranges (one per HH:MM-HH:MM segment). Empty when no ranges detected. */
+  ranges?: ParsedRange[];
 }
 
-/**
- * One parsed time range from the AI input. Dates are populated only when the
- * server can confidently extract an ISO date from the line - we never invent
- * a year. The hydrator wraps a flat single-range result into one ParsedSession
- * if the route emits sessions: [].
- */
-export interface ParsedSession {
-  label?: string | null;
-  date?: string | null;
+/** One time range pulled out of the operator's free-text input. */
+export interface ParsedRange {
   startTime: string;
   endTime: string;
-  durationMins?: number | null;
 }
 
 export interface ParsedTaskLine {

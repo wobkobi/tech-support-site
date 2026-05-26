@@ -27,14 +27,10 @@ interface Props {
 }
 
 /**
- * Mirrors the user's "Tax Planner (NZ Sole Trader)" sheet on the dashboard:
- * income/expense/profit summary, profit-based set-asides (income tax, ACC,
- * KiwiSaver), weekly/monthly savings targets, and a GST roll-up. Shows only
- * the targets - the "paid" actuals from the Payment log are deliberately
- * omitted so the panel reads as "what should be in your tax account".
- *
- * Defaults to the parent page's selected scope. Server component - no
- * interactivity.
+ * "Tax Planner (NZ Sole Trader)" dashboard panel: income/expense/profit summary,
+ * profit-based set-asides (income tax, ACC, KiwiSaver), weekly/monthly targets,
+ * GST roll-up. Targets only; the Payment log "paid" actuals are omitted so the
+ * panel reads as "what should be in your tax account". Server component.
  * @param props - Component props.
  * @param props.fyLabel - Display label for the period.
  * @param props.income - Period income.

@@ -32,6 +32,8 @@ import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
 import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-create";
 import { toE164NZ, isValidPhone } from "@/shared/lib/normalise-phone";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
+import { getActivePromo } from "@/features/business/lib/promos";
+import { lookupDriveDistance } from "@/features/business/lib/travel-distance";
 
 interface BookingRequestPayload {
   dateKey: string;
@@ -46,6 +48,14 @@ interface BookingRequestPayload {
   notes: string;
   /** Honeypot field - real users never fill this; bots usually do. */
   website?: string;
+  /**
+   * Client-generated UUID; one per form mount. Logged for traceability so a
+   * retried request after a flaky network can be correlated with the original.
+   * The DB unique constraint on `activeSlotKey` is what actually prevents a
+   * double-booking; this is just observability + a hook for future replay-safe
+   * idempotency.
+   */
+  idempotencyKey?: string;
 }
 
 /**
@@ -72,7 +82,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       meetingType,
       notes,
       website,
+      idempotencyKey,
     } = body;
+
+    if (idempotencyKey) {
+      console.log(`[booking/request] idempotencyKey=${idempotencyKey}`);
+    }
 
     // Normalise + validate phone up front so a malformed number is rejected
     // before any of the calendar / DB work runs.
@@ -95,7 +110,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     const payloadCheck = validateBookingPayloadFields(
-      { name, email, notes, dateKey, timeOfDay, duration, meetingType, address },
+      { name, email, notes, dateKey, timeOfDay, duration, meetingType, address, phone },
       { requireEmail: true },
     );
     if (!payloadCheck.valid) {
@@ -222,6 +237,44 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
+    // Snapshot rates + active promo + one-way travel time so the quoted
+    // price survives later admin rate edits / promo expiry. Consumed by the
+    // late-cancellation invoice helper + future "open invoice from booking".
+    // Best-effort: failures degrade to null rather than blocking the booking.
+    const [rates, activePromo] = await Promise.all([
+      prisma.rateConfig.findMany().catch((err) => {
+        console.warn("[booking/request] RateConfig snapshot fetch failed:", err);
+        return [] as Awaited<ReturnType<typeof prisma.rateConfig.findMany>>;
+      }),
+      getActivePromo().catch((err) => {
+        console.warn("[booking/request] active promo fetch failed:", err);
+        return null;
+      }),
+    ]);
+    const baseRow = rates.find((r) => r.ratePerHour !== null && r.isDefault) ?? null;
+    const complexRow = rates.find((r) => r.label === "Complex") ?? null;
+    const travelRow = rates.find((r) => r.unit === "travel-hour") ?? null;
+    const baseRateAtBooking = baseRow?.ratePerHour ?? null;
+    const complexRateAtBooking =
+      baseRateAtBooking !== null && complexRow?.hourlyDelta != null
+        ? Math.round((baseRateAtBooking + complexRow.hourlyDelta) * 100) / 100
+        : null;
+    const travelRatePerHourAtBooking = travelRow?.ratePerHour ?? null;
+
+    // One-way drive time for in-person bookings; lets the late-cancel
+    // handler bill travel without a re-lookup. Non-blocking on failure.
+    let travelMinsAtBooking: number | null = null;
+    if (meetingType === "in-person" && address && address.trim()) {
+      try {
+        const drive = await lookupDriveDistance(address.trim());
+        if (drive.status === "ok") {
+          travelMinsAtBooking = drive.data.durationMins;
+        }
+      } catch (err) {
+        console.warn("[booking/request] travel-time snapshot failed:", err);
+      }
+    }
+
     // Create booking
     try {
       const booking = await prisma.booking.create({
@@ -239,6 +292,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           activeSlotKey: startAt.toISOString(), // Unique constraint for double-booking prevention
           bufferBeforeMin: 0,
           bufferAfterMin: BOOKING_CONFIG.bookingBufferAfterMin,
+          // Structured fields; notes text above is dual-written for legacy
+          // admin code that still regex-parses "Address: X" out of it.
+          address: address?.trim() || null,
+          meetingType: meetingType === "in-person" ? "in_person" : "remote",
+          duration,
+          travelMinsAtBooking,
+          // Rate snapshot locks in the quoted price against later admin edits.
+          baseRateAtBooking,
+          complexRateAtBooking,
+          travelRatePerHourAtBooking,
+          // Promo snapshot denormalised - survives Promo deletion before service.
+          promoIdAtBooking: activePromo?.id ?? null,
+          promoTitleAtBooking: activePromo?.title ?? null,
+          promoFlatHourlyRateAtBooking: activePromo?.flatHourlyRate ?? null,
+          promoPercentDiscountAtBooking: activePromo?.percentDiscount ?? null,
         },
       });
 
