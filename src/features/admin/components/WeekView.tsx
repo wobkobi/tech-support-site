@@ -7,40 +7,34 @@
  * slot is clicked.
  */
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import type React from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  FaChevronLeft,
-  FaChevronRight,
-  FaCalendarDay,
-  FaBan,
-  FaCircleCheck,
-} from "react-icons/fa6";
+import { FaChevronLeft, FaChevronRight, FaCalendarDay } from "react-icons/fa6";
 import { cn } from "@/shared/lib/cn";
 import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 import { ManualBookingModal } from "@/features/admin/components/ManualBookingModal";
+import { BlockDayButton } from "@/features/admin/components/BlockDayButton";
+import {
+  KIND_STYLES,
+  LegendDot,
+  NZ_TZ,
+  formatHour,
+  formatTimeRange,
+  type WeekEvent,
+  type WeekViewKind,
+} from "@/features/admin/lib/schedule-types";
 
-export type WeekViewKind = "booking" | "car" | "personal" | "travel";
-
-export interface WeekEvent {
-  id: string;
-  kind: WeekViewKind;
-  title: string;
-  startAt: string;
-  endAt: string;
-  location: string | null;
-  isAllDay: boolean;
-}
+export type { WeekEvent, WeekViewKind };
 
 interface WeekViewProps {
   token: string;
-  weekStartIso: string;
-  prevWeekKey: string;
-  nextWeekKey: string;
+  /** ISO of Monday-NZ-midnight for the initial week (state takes over after mount). */
+  initialWeekStartIso: string;
+  /** All day keys in the buffered 21-day window (prev + current + next week). */
+  bufferedDayKeys: string[];
   events: WeekEvent[];
-  /** Map of NZ-local YYYY-MM-DD > holiday name for days falling inside the visible week. */
+  /** Map of NZ-local YYYY-MM-DD > holiday name for days falling inside the buffer. */
   holidaysByDateKey: Record<string, string>;
 }
 
@@ -49,40 +43,72 @@ const DAY_END_HOUR = 22;
 const PX_PER_MINUTE = 1.1;
 const DAY_HOURS = DAY_END_HOUR - DAY_START_HOUR;
 const DAY_HEIGHT_PX = DAY_HOURS * 60 * PX_PER_MINUTE;
-const NZ_TZ = "Pacific/Auckland";
-
-const KIND_STYLES: Record<WeekViewKind, string> = {
-  booking: "bg-russian-violet/90 text-white border-russian-violet ring-1 ring-white/10",
-  car: "bg-red-100 text-red-900 border-red-300",
-  personal: "bg-slate-200 text-slate-700 border-slate-300",
-  travel: "bg-amber-100 text-amber-900 border-amber-300",
-};
 
 /**
  * Renders the week schedule grid and the manual-booking modal trigger.
  * @param props - Component props.
  * @param props.token - Admin token forwarded to the modal POST + week nav links.
- * @param props.weekStartIso - ISO timestamp of Monday-NZ-midnight for the displayed week.
- * @param props.prevWeekKey - YYYY-MM-DD for the previous week's nav link.
- * @param props.nextWeekKey - YYYY-MM-DD for the next week's nav link.
- * @param props.events - Events to render, already filtered to the visible window.
+ * @param props.initialWeekStartIso - ISO of Monday-NZ-midnight for the initial week.
+ * @param props.bufferedDayKeys - Day keys in the buffered 21-day window.
+ * @param props.events - Events to render across the buffered window.
  * @param props.holidaysByDateKey - NZ-local YYYY-MM-DD > holiday name lookup.
  * @returns Week view element.
  */
 export function WeekView({
   token,
-  weekStartIso,
-  prevWeekKey,
-  nextWeekKey,
+  initialWeekStartIso,
+  bufferedDayKeys,
   events,
   holidaysByDateKey,
 }: WeekViewProps): React.ReactElement {
   const router = useRouter();
+  const [weekStartIso, setWeekStartIso] = useState(initialWeekStartIso);
   const [modalStartAt, setModalStartAt] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  // useTransition keeps the current grid visible while the server rebuilds
+  // the buffer around a week that falls outside the current 21-day window.
+  const [isPending, startTransition] = useTransition();
 
   const todayNzKey = useMemo(() => formatNzDateKey(new Date()), []);
-  const todayWeekKey = useMemo(() => computeMondayNzKey(new Date()), []);
+
+  // Prev/Next/Today Monday keys derived from current state. Used by the nav
+  // chevrons and the "Today" button.
+  const { prevWeekKey, nextWeekKey, todayWeekKey } = useMemo(() => {
+    const ws = new Date(weekStartIso);
+    return {
+      prevWeekKey: formatNzDateKey(new Date(ws.getTime() - 7 * 86_400_000)),
+      nextWeekKey: formatNzDateKey(new Date(ws.getTime() + 7 * 86_400_000)),
+      todayWeekKey: computeMondayNzKey(new Date()),
+    };
+  }, [weekStartIso]);
+
+  /**
+   * Navigates to a different week. Stays client-side when the target Monday
+   * is inside the buffered window (instant + URL mirrored); otherwise fires
+   * router.push so the server can rebuild the buffer.
+   * @param weekStartKey - NZ Monday-YYYY-MM-DD to navigate to.
+   */
+  function goToWeek(weekStartKey: string): void {
+    if (!bufferedDayKeys.includes(weekStartKey)) {
+      const params = new URLSearchParams({ token, weekStart: weekStartKey });
+      startTransition(() => {
+        router.push(`/admin/schedule?${params.toString()}`);
+      });
+      return;
+    }
+    // Convert the NZ Monday key to a UTC ISO that represents NZ midnight
+    // (same shape as initialWeekStartIso so the days memo math stays consistent).
+    const [y, m, d] = weekStartKey.split("-").map(Number);
+    const offset = getPacificAucklandOffset(y, m, d);
+    const iso = new Date(Date.UTC(y, m - 1, d, -offset, 0, 0)).toISOString();
+    setWeekStartIso(iso);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.set("weekStart", weekStartKey);
+      url.searchParams.delete("day");
+      window.history.replaceState(null, "", url.toString());
+    }
+  }
 
   const days = useMemo(() => {
     const weekStart = new Date(weekStartIso);
@@ -174,7 +200,7 @@ export function WeekView({
   }
 
   return (
-    <>
+    <div className={cn("transition-opacity", isPending && "opacity-60")}>
       <div className={cn("mb-6 flex flex-wrap items-end justify-between gap-3")}>
         <div>
           <h1 className={cn("text-russian-violet text-2xl font-extrabold")}>Schedule</h1>
@@ -183,33 +209,36 @@ export function WeekView({
           </p>
         </div>
         <div className={cn("flex items-center gap-2")}>
-          <Link
-            href={`/admin/schedule?token=${encodeURIComponent(token)}&weekStart=${prevWeekKey}`}
+          <button
+            type="button"
+            onClick={() => goToWeek(prevWeekKey)}
             aria-label="Previous week"
             className={cn(
-              "inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
+              "inline-flex h-11 w-11 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 sm:h-9 sm:w-9",
             )}
           >
             <FaChevronLeft />
-          </Link>
-          <Link
-            href={`/admin/schedule?token=${encodeURIComponent(token)}&weekStart=${todayWeekKey}`}
+          </button>
+          <button
+            type="button"
+            onClick={() => goToWeek(todayWeekKey)}
             className={cn(
-              "inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50",
+              "inline-flex h-11 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 sm:h-9",
             )}
           >
             <FaCalendarDay />
             Today
-          </Link>
-          <Link
-            href={`/admin/schedule?token=${encodeURIComponent(token)}&weekStart=${nextWeekKey}`}
+          </button>
+          <button
+            type="button"
+            onClick={() => goToWeek(nextWeekKey)}
             aria-label="Next week"
             className={cn(
-              "inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
+              "inline-flex h-11 w-11 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 sm:h-9 sm:w-9",
             )}
           >
             <FaChevronRight />
-          </Link>
+          </button>
         </div>
       </div>
 
@@ -345,104 +374,7 @@ export function WeekView({
           onClose={() => setModalStartAt(null)}
         />
       )}
-    </>
-  );
-}
-
-interface BlockDayButtonProps {
-  token: string;
-  dateKey: string;
-  busyEventId: string | null;
-  hasBookings: boolean;
-  busyAction: string | null;
-  onPending: (dateKey: string | null) => void;
-  onChanged: () => void;
-}
-
-/**
- * Day-header button toggling an all-day "Busy" event on the booking calendar.
- * Disabled when timed bookings exist on the day (they'd slip through otherwise).
- * @param props - Component props.
- * @param props.token - Admin token forwarded as x-admin-secret.
- * @param props.dateKey - NZ YYYY-MM-DD for the target day.
- * @param props.busyEventId - Existing all-day event id, or null.
- * @param props.hasBookings - True when timed bookings exist on the day.
- * @param props.busyAction - Date key currently submitting.
- * @param props.onPending - Sets the in-flight dateKey.
- * @param props.onChanged - Called after a successful change.
- * @returns Block/Unblock button element.
- */
-function BlockDayButton({
-  token,
-  dateKey,
-  busyEventId,
-  hasBookings,
-  busyAction,
-  onPending,
-  onChanged,
-}: BlockDayButtonProps): React.ReactElement {
-  const isBlocked = busyEventId != null;
-  const disabled = busyAction != null || (!isBlocked && hasBookings);
-  const label = isBlocked
-    ? "Unblock day"
-    : hasBookings
-      ? "Day has bookings"
-      : "Block day with a Busy event";
-
-  /**
-   * Sends the block/unblock request and refreshes the parent on success.
-   */
-  async function onClick(): Promise<void> {
-    if (disabled) return;
-    const ok = window.confirm(
-      isBlocked ? "Unblock this day?" : "Block this whole day with a Busy event?",
-    );
-    if (!ok) return;
-    onPending(dateKey);
-    try {
-      const res = isBlocked
-        ? await fetch(`/api/admin/blocked-days/${encodeURIComponent(busyEventId!)}`, {
-            method: "DELETE",
-            headers: { "x-admin-secret": token },
-          })
-        : await fetch("/api/admin/blocked-days", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "x-admin-secret": token },
-            body: JSON.stringify({ dateKey }),
-          });
-      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
-      if (!res.ok || data.ok !== true) {
-        window.alert(data.error ?? "Failed to update blocked day.");
-      } else {
-        onChanged();
-      }
-    } catch (err) {
-      console.error("[BlockDayButton] request failed", err);
-      window.alert("Network error - try again.");
-    } finally {
-      onPending(null);
-    }
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      aria-label={label}
-      title={label}
-      className={cn(
-        "inline-flex h-6 w-6 items-center justify-center rounded text-slate-400 transition-colors",
-        "hover:bg-slate-200 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-40",
-        isBlocked && "text-red-500 hover:bg-red-100 hover:text-red-700",
-      )}
-    >
-      {isBlocked ? (
-        <FaCircleCheck className={cn("h-3 w-3")} />
-      ) : (
-        <FaBan className={cn("h-3 w-3")} />
-      )}
-    </button>
+    </div>
   );
 }
 
@@ -512,39 +444,6 @@ function DayColumn({ day, onClick }: DayColumnProps): React.ReactElement {
   );
 }
 
-interface LegendDotProps {
-  kind: WeekViewKind;
-  label: string;
-}
-
-/**
- * Small coloured swatch + label used in the schedule legend.
- * @param props - Component props.
- * @param props.kind - Calendar kind controlling the swatch colour.
- * @param props.label - Visible legend text.
- * @returns Legend dot element.
- */
-function LegendDot({ kind, label }: LegendDotProps): React.ReactElement {
-  return (
-    <span className={cn("inline-flex items-center gap-1.5")}>
-      <span className={cn("h-3 w-3 rounded-sm border", KIND_STYLES[kind])} />
-      {label}
-    </span>
-  );
-}
-
-/**
- * Formats an hour in 24h numeric form (0-23) as a 12h label with am/pm.
- * @param hour - Hour-of-day 0-23.
- * @returns Display label like "9am", "12pm", "5pm".
- */
-function formatHour(hour: number): string {
-  if (hour === 0) return "12am";
-  if (hour === 12) return "12pm";
-  if (hour < 12) return `${hour}am`;
-  return `${hour - 12}pm`;
-}
-
 /**
  * Returns the NZ wall-clock minute-of-day for an ISO timestamp. Used to position
  * event blocks vertically within their day column.
@@ -564,22 +463,6 @@ function minuteOfDay(iso: string): number {
 }
 
 /**
- * Builds a short "9:00am - 10:30am" range label from two ISO timestamps.
- * @param startIso - ISO 8601 timestamp of the range start.
- * @param endIso - ISO 8601 timestamp of the range end.
- * @returns Range label in NZ time.
- */
-function formatTimeRange(startIso: string, endIso: string): string {
-  const fmt = new Intl.DateTimeFormat("en-NZ", {
-    timeZone: NZ_TZ,
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
-  return `${fmt.format(new Date(startIso))} - ${fmt.format(new Date(endIso))}`;
-}
-
-/**
  * Formats a Date as a NZ-local YYYY-MM-DD key for bucketing events by day.
  * @param date - Date to format.
  * @returns Date key in YYYY-MM-DD form.
@@ -595,16 +478,19 @@ function formatNzDateKey(date: Date): string {
 
 /**
  * Returns the YYYY-MM-DD key for the Monday of the NZ week containing the
- * given date - the "today" jump target for the week nav.
+ * given date - the "today" jump target for the week nav. Pure UTC date-part
+ * math so DST + offset edges can't shift the result.
  * @param date - Reference date.
  * @returns Monday-of-week date key.
  */
 function computeMondayNzKey(date: Date): string {
   const nzKey = formatNzDateKey(date);
   const [y, m, d] = nzKey.split("-").map(Number);
-  const noon = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
-  const dow = noon.getUTCDay();
-  const back = (dow + 6) % 7;
-  const mondayUtc = new Date(Date.UTC(y, m - 1, d - back, 12, 0, 0));
-  return formatNzDateKey(mondayUtc);
+  const utc = new Date(Date.UTC(y, m - 1, d));
+  const back = (utc.getUTCDay() + 6) % 7;
+  const monday = new Date(Date.UTC(y, m - 1, d - back));
+  const my = monday.getUTCFullYear();
+  const mm = String(monday.getUTCMonth() + 1).padStart(2, "0");
+  const md = String(monday.getUTCDate()).padStart(2, "0");
+  return `${my}-${mm}-${md}`;
 }

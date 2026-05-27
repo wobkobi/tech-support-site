@@ -145,7 +145,94 @@ export function InvoicesListView({ token }: { token: string }): React.ReactEleme
         </div>
       </div>
 
-      <div className={cn("overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm")}>
+      {/* Mobile card list - below lg the table is hard to read; stack each row
+          as a tap-to-open card with the same status select inline. */}
+      <div className={cn("space-y-2 lg:hidden")}>
+        {loading ? (
+          <p
+            className={cn(
+              "rounded-xl border border-slate-200 bg-white px-5 py-6 text-sm text-slate-400 shadow-sm",
+            )}
+          >
+            Loading...
+          </p>
+        ) : invoices.length === 0 ? (
+          <p
+            className={cn(
+              "rounded-xl border border-slate-200 bg-white px-5 py-6 text-sm text-slate-400 shadow-sm",
+            )}
+          >
+            No invoices yet.
+          </p>
+        ) : (
+          invoices.map((inv) => (
+            <div
+              key={inv.id}
+              className={cn(
+                "rounded-xl border border-slate-200 bg-white p-3 shadow-sm",
+                "hover:border-russian-violet/30 transition-colors",
+              )}
+            >
+              <div className={cn("flex items-center justify-between gap-2")}>
+                <Link
+                  href={`/admin/business/invoices/${inv.id}?token=${encodeURIComponent(token)}`}
+                  className={cn("font-mono text-xs font-semibold text-slate-700")}
+                >
+                  {inv.number}
+                </Link>
+                <select
+                  value={inv.status}
+                  onChange={(e) => updateStatus(inv.id, e.target.value as InvoiceStatus)}
+                  className={cn(
+                    "cursor-pointer rounded-full border-0 px-2 py-1 text-xs font-semibold",
+                    STATUS_COLORS[inv.status],
+                  )}
+                >
+                  <option value="DRAFT">Draft</option>
+                  <option value="SENT">Sent</option>
+                  <option value="PAID">Paid</option>
+                  <option value="VOIDED">Voided</option>
+                </select>
+              </div>
+              <Link
+                href={`/admin/business/invoices/${inv.id}?token=${encodeURIComponent(token)}`}
+                className={cn("mt-1 block text-sm font-medium text-slate-700")}
+              >
+                {inv.clientName}
+              </Link>
+              <div
+                className={cn(
+                  "mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs",
+                )}
+              >
+                <span className={cn("text-slate-500")}>
+                  {new Date(inv.issueDate).toLocaleDateString("en-NZ")}
+                </span>
+                <span className={cn("font-semibold text-slate-700")}>{formatNZD(inv.total)}</span>
+                {inv.driveWebUrl ? (
+                  <a
+                    href={inv.driveWebUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={cn(
+                      "ml-auto inline-flex h-8 items-center text-blue-500 hover:text-blue-700",
+                    )}
+                  >
+                    PDF ↗
+                  </a>
+                ) : null}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Desktop table - unchanged column set; hidden below lg. */}
+      <div
+        className={cn(
+          "hidden overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm lg:block",
+        )}
+      >
         {loading ? (
           <p className={cn("px-5 py-6 text-sm text-slate-400")}>Loading...</p>
         ) : invoices.length === 0 ? (

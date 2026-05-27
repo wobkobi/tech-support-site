@@ -261,8 +261,72 @@ export function ExpensesView({ token }: { token: string }): React.ReactElement {
         </button>
       </form>
 
-      {/* Table */}
-      <div className={cn("overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm")}>
+      {/* Mobile card list - stacks each entry; below lg the table overflows. */}
+      <div className={cn("space-y-2 lg:hidden")}>
+        {loading ? (
+          <p
+            className={cn(
+              "rounded-xl border border-slate-200 bg-white px-5 py-6 text-sm text-slate-400 shadow-sm",
+            )}
+          >
+            Loading...
+          </p>
+        ) : entries.length === 0 ? (
+          <p
+            className={cn(
+              "rounded-xl border border-slate-200 bg-white px-5 py-6 text-sm text-slate-400 shadow-sm",
+            )}
+          >
+            No expense entries yet.
+          </p>
+        ) : (
+          entries.map((e) => (
+            <div
+              key={e.id}
+              className={cn("rounded-xl border border-slate-200 bg-white p-3 shadow-sm")}
+            >
+              <div className={cn("flex items-start justify-between gap-2")}>
+                <div className={cn("min-w-0 flex-1")}>
+                  <p className={cn("truncate text-sm font-medium text-slate-700")}>{e.supplier}</p>
+                  <p className={cn("truncate text-xs text-slate-500")}>{e.category}</p>
+                </div>
+                <div className={cn("shrink-0 text-right")}>
+                  <p className={cn("text-sm font-semibold text-slate-700")}>
+                    {formatNZD(e.amountExcl)}
+                  </p>
+                  <p className={cn("text-[11px] text-slate-400")}>
+                    {formatNZD(e.amountIncl)} incl.
+                  </p>
+                </div>
+              </div>
+              <div
+                className={cn(
+                  "mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs",
+                )}
+              >
+                <span className={cn("text-slate-500")}>
+                  {new Date(e.date).toLocaleDateString("en-NZ")}
+                </span>
+                <button
+                  onClick={() => handleDelete(e.id)}
+                  className={cn(
+                    "ml-auto inline-flex h-8 items-center text-red-400 hover:text-red-600",
+                  )}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Desktop table */}
+      <div
+        className={cn(
+          "hidden overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm lg:block",
+        )}
+      >
         {loading ? (
           <p className={cn("px-5 py-6 text-sm text-slate-400")}>Loading...</p>
         ) : entries.length === 0 ? (

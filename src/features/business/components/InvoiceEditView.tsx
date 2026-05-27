@@ -124,7 +124,7 @@ export function InvoiceEditView({ invoice, token }: InvoiceEditViewProps): React
       {/* Client */}
       <div className={cn("rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}>
         <h2 className={cn("mb-4 text-sm font-semibold text-slate-700")}>Client</h2>
-        <div className={cn("grid grid-cols-2 gap-4")}>
+        <div className={cn("grid grid-cols-1 gap-4 sm:grid-cols-2")}>
           <div>
             <label className={labelCls}>Name</label>
             <input
@@ -188,7 +188,79 @@ export function InvoiceEditView({ invoice, token }: InvoiceEditViewProps): React
       {/* Line items */}
       <div className={cn("rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}>
         <h2 className={cn("mb-4 text-sm font-semibold text-slate-700")}>Line items</h2>
-        <table className={cn("w-full text-sm")}>
+
+        {/* Mobile: stacked cards per line item so the description gets full
+            width and qty/price sit side-by-side instead of squeezing four
+            columns into 375px. */}
+        <div className={cn("space-y-3 lg:hidden")}>
+          {form.lineItems.map((item, idx) => (
+            <div key={idx} className={cn("rounded-lg border border-slate-200 bg-slate-50/30 p-3")}>
+              <div className={cn("flex items-center justify-between gap-2")}>
+                <span className={cn("text-xs font-semibold text-slate-500")}>Item {idx + 1}</span>
+                <button
+                  onClick={() =>
+                    setForm((p) => ({
+                      ...p,
+                      lineItems: p.lineItems.filter((_, i) => i !== idx),
+                    }))
+                  }
+                  className={cn(
+                    "inline-flex h-8 w-8 items-center justify-center text-slate-400 hover:text-red-500",
+                  )}
+                  aria-label="Remove line item"
+                >
+                  ×
+                </button>
+              </div>
+              <label className={cn("mt-2 block")}>
+                <span className={labelCls}>Description</span>
+                <input
+                  className={inputCls}
+                  value={item.description}
+                  onChange={(e) => updateLine(idx, "description", e.target.value)}
+                  placeholder="Description"
+                />
+              </label>
+              <div className={cn("mt-2 grid grid-cols-2 gap-2")}>
+                <label>
+                  <span className={labelCls}>Qty</span>
+                  <input
+                    className={cn(inputCls, "text-right")}
+                    type="number"
+                    min={0}
+                    step={0.25}
+                    value={item.qty}
+                    onChange={(e) => updateLine(idx, "qty", parseFloat(e.target.value) || 0)}
+                  />
+                </label>
+                <label>
+                  <span className={labelCls}>Unit price</span>
+                  <input
+                    className={cn(inputCls, "text-right")}
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={item.unitPrice}
+                    onChange={(e) => updateLine(idx, "unitPrice", parseFloat(e.target.value) || 0)}
+                  />
+                </label>
+              </div>
+              <div
+                className={cn(
+                  "mt-2 flex items-center justify-between border-t border-slate-200 pt-2 text-sm",
+                )}
+              >
+                <span className={cn("text-slate-400")}>Total</span>
+                <span className={cn("font-semibold text-slate-700")}>
+                  {formatNZD(item.lineTotal)}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Desktop table - unchanged shape; hidden below lg. */}
+        <table className={cn("hidden w-full text-sm lg:table")}>
           <thead>
             <tr className={cn("border-b border-slate-100")}>
               <th className={cn("pb-2 text-left text-xs font-semibold text-slate-400")}>

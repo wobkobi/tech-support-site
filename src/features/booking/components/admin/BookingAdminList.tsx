@@ -301,7 +301,9 @@ export function BookingAdminList({
 
           return (
             <div key={b.id} className={cn("rounded-xl border border-slate-200 bg-white p-4")}>
-              <div className={cn("flex items-start justify-between gap-3")}>
+              <div
+                className={cn("flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between")}
+              >
                 <div className={cn("flex min-w-0 flex-col gap-1")}>
                   <div className={cn("flex min-w-0 flex-wrap items-center gap-2")}>
                     <span className={cn("text-russian-violet min-w-0 truncate font-semibold")}>
@@ -323,7 +325,7 @@ export function BookingAdminList({
                   </span>
                 </div>
 
-                <div className={cn("flex shrink-0 gap-2")}>
+                <div className={cn("flex flex-wrap gap-2 sm:shrink-0")}>
                   {b.name.toLowerCase().includes("test") && (
                     <button
                       onClick={() => {

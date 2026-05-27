@@ -441,110 +441,210 @@ export function SubscriptionsView({ token }: { token: string }): React.ReactElem
       ) : subs.length === 0 ? (
         <p className={cn("text-sm text-slate-500")}>No subscriptions yet.</p>
       ) : (
-        <div
-          className={cn("overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm")}
-        >
-          <table className={cn("w-full text-sm")}>
-            <thead>
-              <tr className={cn("border-b border-slate-100 bg-slate-50 text-left")}>
-                <th className={cn("px-4 py-3 font-semibold text-slate-600")}>Description</th>
-                <th className={cn("px-4 py-3 font-semibold text-slate-600")}>Supplier</th>
-                <th className={cn("px-4 py-3 font-semibold text-slate-600")}>Amount</th>
-                <th className={cn("px-4 py-3 font-semibold text-slate-600")}>Frequency</th>
-                <th className={cn("px-4 py-3 font-semibold text-slate-600")}>Next due</th>
-                <th className={cn("px-4 py-3 font-semibold text-slate-600")}>Active</th>
-                <th className={cn("px-4 py-3 font-semibold text-slate-600")}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {subs.map((sub) => {
-                const overdue = sub.isActive && isOverdue(sub.nextDue);
-                const dueToday = sub.isActive && isDueToday(sub.nextDue);
-                return (
-                  <tr
-                    key={sub.id}
-                    className={cn(
-                      "border-b border-slate-100 last:border-0",
-                      overdue ? "bg-amber-50" : dueToday ? "bg-amber-50/50" : "",
-                    )}
-                  >
-                    <td className={cn("px-4 py-3 font-medium text-slate-800")}>
-                      {sub.description}
-                      {sub.notes && (
-                        <span className={cn("ml-1 text-xs text-slate-400")}>({sub.notes})</span>
-                      )}
-                    </td>
-                    <td className={cn("px-4 py-3 text-slate-600")}>{sub.supplier}</td>
-                    <td className={cn("px-4 py-3 text-slate-800")}>{formatNZD(sub.amountIncl)}</td>
-                    <td className={cn("px-4 py-3 capitalize text-slate-600")}>{sub.frequency}</td>
-                    <td
+        <>
+          {/* Mobile card list - the desktop table is too wide for phones with
+              seven columns including the action buttons. */}
+          <div className={cn("space-y-2 lg:hidden")}>
+            {subs.map((sub) => {
+              const overdue = sub.isActive && isOverdue(sub.nextDue);
+              const dueToday = sub.isActive && isDueToday(sub.nextDue);
+              return (
+                <div
+                  key={sub.id}
+                  className={cn(
+                    "rounded-xl border border-slate-200 bg-white p-3 shadow-sm",
+                    overdue ? "border-amber-300 bg-amber-50" : dueToday ? "bg-amber-50/50" : "",
+                  )}
+                >
+                  <div className={cn("flex items-start justify-between gap-2")}>
+                    <div className={cn("min-w-0 flex-1")}>
+                      <p className={cn("truncate text-sm font-semibold text-slate-800")}>
+                        {sub.description}
+                      </p>
+                      <p className={cn("truncate text-xs text-slate-500")}>{sub.supplier}</p>
+                    </div>
+                    <p className={cn("shrink-0 text-sm font-semibold text-slate-800")}>
+                      {formatNZD(sub.amountIncl)}
+                    </p>
+                  </div>
+                  <div className={cn("mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs")}>
+                    <span className={cn("capitalize text-slate-500")}>{sub.frequency}</span>
+                    <span
                       className={cn(
-                        "px-4 py-3",
                         overdue
                           ? "font-semibold text-amber-700"
                           : dueToday
                             ? "font-semibold text-amber-600"
-                            : "text-slate-600",
+                            : "text-slate-500",
                       )}
                     >
-                      {formatNextDue(sub.nextDue)}
-                      {overdue && <span className={cn("ml-1 text-xs")}>(overdue)</span>}
-                    </td>
-                    <td className={cn("px-4 py-3")}>
-                      <button
-                        onClick={() => {
-                          void handleToggleActive(sub);
-                        }}
+                      Due {formatNextDue(sub.nextDue)}
+                      {overdue && " (overdue)"}
+                    </span>
+                    <button
+                      onClick={() => {
+                        void handleToggleActive(sub);
+                      }}
+                      className={cn(
+                        "ml-auto rounded-full px-2 py-0.5 text-xs font-medium",
+                        sub.isActive
+                          ? "bg-green-100 text-green-700"
+                          : "bg-slate-100 text-slate-500",
+                      )}
+                    >
+                      {sub.isActive ? "Active" : "Paused"}
+                    </button>
+                  </div>
+                  {sub.notes && (
+                    <p className={cn("mt-1 truncate text-xs text-slate-400")}>{sub.notes}</p>
+                  )}
+                  <div className={cn("mt-2 flex flex-wrap gap-2")}>
+                    <button
+                      onClick={() => {
+                        void handleRecord(sub);
+                      }}
+                      disabled={recording === sub.id}
+                      className={cn(
+                        "rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50",
+                      )}
+                    >
+                      {recording === sub.id ? "Recording..." : "Record"}
+                    </button>
+                    <button
+                      onClick={() => startEdit(sub)}
+                      className={cn(
+                        "rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50",
+                      )}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => {
+                        void handleDelete(sub);
+                      }}
+                      disabled={deleting === sub.id}
+                      className={cn(
+                        "rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50",
+                      )}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Desktop table */}
+          <div
+            className={cn(
+              "hidden overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm lg:block",
+            )}
+          >
+            <table className={cn("w-full text-sm")}>
+              <thead>
+                <tr className={cn("border-b border-slate-100 bg-slate-50 text-left")}>
+                  <th className={cn("px-4 py-3 font-semibold text-slate-600")}>Description</th>
+                  <th className={cn("px-4 py-3 font-semibold text-slate-600")}>Supplier</th>
+                  <th className={cn("px-4 py-3 font-semibold text-slate-600")}>Amount</th>
+                  <th className={cn("px-4 py-3 font-semibold text-slate-600")}>Frequency</th>
+                  <th className={cn("px-4 py-3 font-semibold text-slate-600")}>Next due</th>
+                  <th className={cn("px-4 py-3 font-semibold text-slate-600")}>Active</th>
+                  <th className={cn("px-4 py-3 font-semibold text-slate-600")}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {subs.map((sub) => {
+                  const overdue = sub.isActive && isOverdue(sub.nextDue);
+                  const dueToday = sub.isActive && isDueToday(sub.nextDue);
+                  return (
+                    <tr
+                      key={sub.id}
+                      className={cn(
+                        "border-b border-slate-100 last:border-0",
+                        overdue ? "bg-amber-50" : dueToday ? "bg-amber-50/50" : "",
+                      )}
+                    >
+                      <td className={cn("px-4 py-3 font-medium text-slate-800")}>
+                        {sub.description}
+                        {sub.notes && (
+                          <span className={cn("ml-1 text-xs text-slate-400")}>({sub.notes})</span>
+                        )}
+                      </td>
+                      <td className={cn("px-4 py-3 text-slate-600")}>{sub.supplier}</td>
+                      <td className={cn("px-4 py-3 text-slate-800")}>
+                        {formatNZD(sub.amountIncl)}
+                      </td>
+                      <td className={cn("px-4 py-3 capitalize text-slate-600")}>{sub.frequency}</td>
+                      <td
                         className={cn(
-                          "rounded-full px-2 py-0.5 text-xs font-medium",
-                          sub.isActive
-                            ? "bg-green-100 text-green-700"
-                            : "bg-slate-100 text-slate-500",
+                          "px-4 py-3",
+                          overdue
+                            ? "font-semibold text-amber-700"
+                            : dueToday
+                              ? "font-semibold text-amber-600"
+                              : "text-slate-600",
                         )}
                       >
-                        {sub.isActive ? "Active" : "Paused"}
-                      </button>
-                    </td>
-                    <td className={cn("px-4 py-3")}>
-                      <div className={cn("flex gap-2")}>
+                        {formatNextDue(sub.nextDue)}
+                        {overdue && <span className={cn("ml-1 text-xs")}>(overdue)</span>}
+                      </td>
+                      <td className={cn("px-4 py-3")}>
                         <button
                           onClick={() => {
-                            void handleRecord(sub);
+                            void handleToggleActive(sub);
                           }}
-                          disabled={recording === sub.id}
                           className={cn(
-                            "rounded-lg bg-green-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50",
+                            "rounded-full px-2 py-0.5 text-xs font-medium",
+                            sub.isActive
+                              ? "bg-green-100 text-green-700"
+                              : "bg-slate-100 text-slate-500",
                           )}
                         >
-                          {recording === sub.id ? "Recording..." : "Record"}
+                          {sub.isActive ? "Active" : "Paused"}
                         </button>
-                        <button
-                          onClick={() => startEdit(sub)}
-                          className={cn(
-                            "rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50",
-                          )}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => {
-                            void handleDelete(sub);
-                          }}
-                          disabled={deleting === sub.id}
-                          className={cn(
-                            "rounded-lg border border-red-200 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50",
-                          )}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                      </td>
+                      <td className={cn("px-4 py-3")}>
+                        <div className={cn("flex gap-2")}>
+                          <button
+                            onClick={() => {
+                              void handleRecord(sub);
+                            }}
+                            disabled={recording === sub.id}
+                            className={cn(
+                              "rounded-lg bg-green-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50",
+                            )}
+                          >
+                            {recording === sub.id ? "Recording..." : "Record"}
+                          </button>
+                          <button
+                            onClick={() => startEdit(sub)}
+                            className={cn(
+                              "rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50",
+                            )}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => {
+                              void handleDelete(sub);
+                            }}
+                            disabled={deleting === sub.id}
+                            className={cn(
+                              "rounded-lg border border-red-200 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50",
+                            )}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   );
