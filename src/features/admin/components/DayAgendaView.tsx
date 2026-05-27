@@ -20,14 +20,56 @@ import { cn } from "@/shared/lib/cn";
 import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 import { ManualBookingModal } from "@/features/admin/components/ManualBookingModal";
 import { BlockDayButton } from "@/features/admin/components/BlockDayButton";
+import { EventActionSheet } from "@/features/admin/components/EventActionSheet";
 import {
   KIND_BAR_BG,
   KIND_STYLES,
   LegendDot,
   NZ_TZ,
   formatTimeRange,
+  mondayOf,
   type WeekEvent,
 } from "@/features/admin/lib/schedule-types";
+
+/**
+ * Formats a positive minute count as "Xh Ym free" / "Xh free" / "Ym free".
+ * @param minutes - Gap length in minutes.
+ * @returns Display label.
+ */
+function formatGap(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h > 0 && m > 0) return `${h}h ${m}m free`;
+  if (h > 0) return `${h}h free`;
+  return `${m}m free`;
+}
+
+/**
+ * NZ YYYY-MM-DD for a day offset from a starting NZ date key. Pure UTC math
+ * to avoid DST + offset edges.
+ * @param dayKey - Starting NZ date key.
+ * @param delta - Days to add (negative for earlier days).
+ * @returns Resulting NZ date key.
+ */
+function shiftDayKey(dayKey: string, delta: number): string {
+  const [y, m, d] = dayKey.split("-").map(Number);
+  const shifted = new Date(Date.UTC(y, m - 1, d + delta));
+  const sy = shifted.getUTCFullYear();
+  const sm = String(shifted.getUTCMonth() + 1).padStart(2, "0");
+  const sd = String(shifted.getUTCDate()).padStart(2, "0");
+  return `${sy}-${sm}-${sd}`;
+}
+
+/** Minimum gap between consecutive bookings to render a "free" label. */
+const MIN_GAP_MINUTES = 30;
+
+/** Tailwind pill colours per booking status - mirrors BookingAdminList. */
+const BOOKING_STATUS_CHIP: Record<"held" | "confirmed" | "cancelled" | "completed", string> = {
+  confirmed: "bg-moonstone-600/20 text-moonstone-600",
+  held: "bg-yellow-500/20 text-yellow-600",
+  cancelled: "bg-red-500/20 text-red-500",
+  completed: "bg-green-500/20 text-green-600",
+};
 
 interface DayAgendaViewProps {
   token: string;
@@ -71,12 +113,22 @@ export function DayAgendaView({
   const [selectedDayKey, setSelectedDayKey] = useState(initialDayKey);
   const [modalStartAt, setModalStartAt] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
+  const [actionSheetEvent, setActionSheetEvent] = useState<WeekEvent | null>(null);
   // useTransition keeps the current view interactive while the next week
   // is being fetched, so crossing the week boundary doesn't blank the UI.
   const [isPending, startTransition] = useTransition();
   const dateInputRef = useRef<HTMLInputElement>(null);
 
   const swipeStart = useRef<{ x: number; y: number; t: number } | null>(null);
+  // Long-press infrastructure: timer + start position + "fired" flag so the
+  // subsequent click doesn't also trigger the tap-to-expand toggle.
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressStart = useRef<{ x: number; y: number } | null>(null);
+  const longPressFired = useRef<boolean>(false);
+
+  const LONG_PRESS_MS = 500;
+  const LONG_PRESS_MOVE_THRESHOLD = 10;
 
   const [yy, mm, dd] = selectedDayKey.split("-").map(Number);
   const offset = getPacificAucklandOffset(yy, mm, dd);
@@ -113,47 +165,93 @@ export function DayAgendaView({
     };
   }, [yy, mm, dd, offset]);
 
+  // Day-key formatter shared across the per-day bucketing and the week-strip
+  // count below. Constructing once is cheaper than per-event.
+  const dayKeyFmt = useMemo(
+    () =>
+      new Intl.DateTimeFormat("en-CA", {
+        timeZone: NZ_TZ,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }),
+    [],
+  );
+
   // Filter the week's events down to the selected day. All-day events are
   // start-inclusive / end-exclusive so multi-day Busy blocks show on each
-  // overlapping day key.
-  const { timedEvents, allDayEvents } = useMemo(() => {
+  // overlapping day key. Timed events are sorted by start instant + then
+  // interleaved with "free" gap markers between consecutive bookings.
+  const { agendaItems, timedEvents, allDayEvents } = useMemo(() => {
     const timed: WeekEvent[] = [];
     const allDay: WeekEvent[] = [];
     for (const ev of events) {
       if (ev.isAllDay) {
-        const startKey = new Intl.DateTimeFormat("en-CA", {
-          timeZone: NZ_TZ,
-          year: "numeric",
-          month: "2-digit",
-          day: "2-digit",
-        }).format(new Date(ev.startAt));
-        const endKey = new Intl.DateTimeFormat("en-CA", {
-          timeZone: NZ_TZ,
-          year: "numeric",
-          month: "2-digit",
-          day: "2-digit",
-        }).format(new Date(ev.endAt));
+        const startKey = dayKeyFmt.format(new Date(ev.startAt));
+        const endKey = dayKeyFmt.format(new Date(ev.endAt));
         if (selectedDayKey >= startKey && selectedDayKey < endKey) allDay.push(ev);
       } else {
-        const key = new Intl.DateTimeFormat("en-CA", {
-          timeZone: NZ_TZ,
-          year: "numeric",
-          month: "2-digit",
-          day: "2-digit",
-        }).format(new Date(ev.startAt));
+        const key = dayKeyFmt.format(new Date(ev.startAt));
         if (key === selectedDayKey) timed.push(ev);
       }
     }
     // Compare parsed timestamps - lexical sort breaks when mixing Google's
     // `+12:00`-offset strings with travel blocks' UTC `Z` ISO output.
     timed.sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
-    return { timedEvents: timed, allDayEvents: allDay };
-  }, [events, selectedDayKey]);
+
+    // Interleave free-time gap markers between consecutive bookings. Only
+    // booking>booking gaps get a label - the operator's free-slot view
+    // shouldn't be confused by travel or personal events that already imply
+    // unavailability.
+    type AgendaItem = { type: "event"; ev: WeekEvent } | { type: "gap"; minutes: number };
+    const items: AgendaItem[] = [];
+    for (let i = 0; i < timed.length; i++) {
+      const cur = timed[i];
+      items.push({ type: "event", ev: cur });
+      const next = timed[i + 1];
+      if (!next) continue;
+      if (cur.kind !== "booking" || next.kind !== "booking") continue;
+      const gapMs = new Date(next.startAt).getTime() - new Date(cur.endAt).getTime();
+      const gapMin = Math.round(gapMs / 60_000);
+      if (gapMin >= MIN_GAP_MINUTES) items.push({ type: "gap", minutes: gapMin });
+    }
+
+    return { agendaItems: items, timedEvents: timed, allDayEvents: allDay };
+  }, [events, selectedDayKey, dayKeyFmt]);
 
   const holidayName = holidaysByDateKey[selectedDayKey] ?? null;
   const busyEvent = allDayEvents.find((e) => e.kind === "booking");
   const isToday = selectedDayKey === todayKey;
   const hasBookings = timedEvents.some((e) => e.kind === "booking");
+  const bookingCount = timedEvents.filter((e) => e.kind === "booking").length;
+
+  // 7-day strip data: the Monday-to-Sunday week containing the selected day,
+  // with a booking count per day. Booking count drives the dot indicators
+  // and is also a useful aggregate for the at-a-glance read.
+  const weekDays = useMemo(() => {
+    const mondayKey = mondayOf(selectedDayKey);
+    return Array.from({ length: 7 }, (_, i) => {
+      const dayKey = shiftDayKey(mondayKey, i);
+      const [y, m, d] = dayKey.split("-").map(Number);
+      const ofs = getPacificAucklandOffset(y, m, d);
+      const noon = new Date(Date.UTC(y, m - 1, d, 12 - ofs, 0, 0));
+      const weekday = new Intl.DateTimeFormat("en-NZ", {
+        timeZone: NZ_TZ,
+        weekday: "narrow",
+      }).format(noon);
+      const dayOfMonth = new Intl.DateTimeFormat("en-NZ", {
+        timeZone: NZ_TZ,
+        day: "numeric",
+      }).format(noon);
+      // Count timed bookings whose NZ start-day matches this strip cell.
+      let count = 0;
+      for (const ev of events) {
+        if (ev.kind !== "booking" || ev.isAllDay) continue;
+        if (dayKeyFmt.format(new Date(ev.startAt)) === dayKey) count++;
+      }
+      return { key: dayKey, weekday, dayOfMonth, count };
+    });
+  }, [selectedDayKey, events, dayKeyFmt]);
 
   /**
    * Navigates to a new day. Stays client-side when the day is inside the
@@ -261,6 +359,61 @@ export function DayAgendaView({
   }
 
   /**
+   * Starts the long-press timer on a booking card. Clears any prior timer so
+   * a rapid second touch doesn't double-fire.
+   * @param e - Pointer event from the card.
+   * @param ev - The week-event the card represents.
+   */
+  function onCardPointerDown(e: React.PointerEvent<HTMLDivElement>, ev: WeekEvent): void {
+    longPressStart.current = { x: e.clientX, y: e.clientY };
+    longPressFired.current = false;
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+    longPressTimer.current = setTimeout(() => {
+      longPressFired.current = true;
+      setActionSheetEvent(ev);
+    }, LONG_PRESS_MS);
+  }
+
+  /**
+   * Cancels the long-press if the finger drifts more than the threshold -
+   * keeps swipes from accidentally triggering the action sheet.
+   * @param e - Pointer event.
+   */
+  function onCardPointerMove(e: React.PointerEvent<HTMLDivElement>): void {
+    const start = longPressStart.current;
+    if (!start || !longPressTimer.current) return;
+    const dx = Math.abs(e.clientX - start.x);
+    const dy = Math.abs(e.clientY - start.y);
+    if (dx > LONG_PRESS_MOVE_THRESHOLD || dy > LONG_PRESS_MOVE_THRESHOLD) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  }
+
+  /** Clears the long-press timer; called from pointerup/cancel/leave. */
+  function clearLongPress(): void {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+    longPressStart.current = null;
+  }
+
+  /**
+   * Toggles the inline expanded view for a booking card. Skipped when the
+   * preceding pointer interaction fired a long-press so the action sheet
+   * doesn't get immediately closed by the tap-to-expand toggle.
+   * @param eventId - WeekEvent.id.
+   */
+  function handleCardClick(eventId: string): void {
+    if (longPressFired.current) {
+      longPressFired.current = false;
+      return;
+    }
+    setExpandedEventId((cur) => (cur === eventId ? null : eventId));
+  }
+
+  /**
    * Computes a sensible default start time for the manual-booking modal: the
    * next half-hour when the day is today, or 9am NZ otherwise.
    */
@@ -304,79 +457,148 @@ export function DayAgendaView({
         </div>
       </div>
 
+      {/* Sticky header band - mini week strip + day-picker bar pinned to the
+          top of the viewport while the events list scrolls under them. The
+          band sits at `top-14` to clear the mobile hamburger button (AdminPageLayout
+          uses pt-16 / 64px), and `-mx-4` / `-mx-6` so the slate-50 background
+          covers the page edges as content scrolls behind. */}
       <div
         data-no-swipe
         onPointerDown={stopPointer}
         onPointerUp={stopPointer}
         className={cn(
-          "mb-4 flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-2 py-2 shadow-sm",
+          "sticky top-14 z-10 -mx-4 mb-4 bg-slate-50 px-4 pb-2 pt-1 sm:top-8 sm:-mx-6 sm:px-6",
         )}
       >
-        <button
-          type="button"
-          onClick={handlePrev}
-          aria-label="Previous day"
+        {/* Mini 7-day strip - visible week containing the selected day. Dots
+            indicate booking count per day (capped at 4). Compact so it
+            reads as glance-only; primary nav stays in the picker below. */}
+        <div className={cn("mb-3 grid grid-cols-7 gap-1")}>
+          {weekDays.map((wd) => {
+            const isSelected = wd.key === selectedDayKey;
+            const isTodayCell = wd.key === todayKey;
+            const dotCount = Math.min(wd.count, 4);
+            return (
+              <button
+                key={wd.key}
+                type="button"
+                onClick={() => goToDay(wd.key)}
+                aria-label={`${wd.weekday} ${wd.dayOfMonth}${wd.count > 0 ? `, ${wd.count} booking${wd.count === 1 ? "" : "s"}` : ""}`}
+                aria-current={isSelected ? "date" : undefined}
+                className={cn(
+                  "flex h-10 flex-col items-center justify-center rounded-md border transition-colors",
+                  isSelected
+                    ? "bg-russian-violet border-russian-violet text-white"
+                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
+                  !isSelected && isTodayCell && "ring-russian-violet/40 ring-2 ring-inset",
+                )}
+              >
+                <span className={cn("text-[9px] font-medium uppercase opacity-70")}>
+                  {wd.weekday}
+                </span>
+                <span className={cn("text-xs font-bold leading-tight")}>{wd.dayOfMonth}</span>
+                <span className={cn("mt-0.5 flex h-1 items-center gap-0.5")} aria-hidden>
+                  {dotCount > 0
+                    ? Array.from({ length: dotCount }).map((_, i) => (
+                        <span
+                          key={i}
+                          className={cn(
+                            "h-1 w-1 rounded-full",
+                            isSelected ? "bg-white/80" : "bg-russian-violet",
+                          )}
+                        />
+                      ))
+                    : null}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Day-picker bar. Generous spacing between the chevrons and the
+            central label/today chip so finger-fat taps don't go wrong. */}
+        <div
           className={cn(
-            "inline-flex h-11 w-11 items-center justify-center rounded-md text-slate-600 hover:bg-slate-50",
+            "flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-2 py-2 shadow-sm",
           )}
         >
-          <FaChevronLeft />
-        </button>
-        <div className={cn("flex min-w-0 flex-col items-center text-center")}>
           <button
             type="button"
-            onClick={openDatePicker}
-            aria-label="Pick a date"
+            onClick={handlePrev}
+            aria-label="Previous day"
             className={cn(
-              "inline-flex max-w-full items-center gap-1.5 rounded-md px-2 py-0.5 text-base font-bold hover:bg-slate-50",
-              isToday ? "text-russian-violet" : "text-slate-800",
+              "inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-50",
             )}
           >
-            <span className={cn("truncate")}>{dayLabel}</span>
-            <FaRegCalendar className={cn("h-3.5 w-3.5 shrink-0 text-slate-400")} aria-hidden />
+            <FaChevronLeft className={cn("h-5 w-5")} />
           </button>
-          {!isToday && (
+          <div className={cn("flex min-w-0 flex-col items-center gap-1 text-center")}>
             <button
               type="button"
-              onClick={handleToday}
+              onClick={openDatePicker}
+              aria-label="Pick a date"
               className={cn(
-                "mt-0.5 inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-700",
+                "inline-flex h-9 max-w-full items-center gap-1.5 rounded-md px-3 text-base font-bold hover:bg-slate-50",
+                isToday ? "text-russian-violet" : "text-slate-800",
               )}
             >
-              <FaCalendarDay className={cn("h-3 w-3")} />
-              Jump to today
+              <span className={cn("truncate")}>{dayLabel}</span>
+              <FaRegCalendar className={cn("h-4 w-4 shrink-0 text-slate-400")} aria-hidden />
             </button>
-          )}
-          {isToday && (
-            <div
-              className={cn(
-                "mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400",
+            <div className={cn("flex flex-wrap items-center justify-center gap-2 text-xs")}>
+              {bookingCount > 0 && (
+                <span
+                  className={cn(
+                    "bg-russian-violet/10 text-russian-violet inline-flex h-7 items-center rounded-full px-2.5 font-semibold",
+                  )}
+                >
+                  {bookingCount} booking{bookingCount === 1 ? "" : "s"}
+                </span>
               )}
-            >
-              Today
+              {!isToday && (
+                <button
+                  type="button"
+                  onClick={handleToday}
+                  className={cn(
+                    "inline-flex h-8 items-center gap-1 rounded-full border border-slate-200 bg-white px-3 font-medium text-slate-600 hover:bg-slate-50",
+                  )}
+                >
+                  <FaCalendarDay className={cn("h-3 w-3")} />
+                  Today
+                </button>
+              )}
+              {isToday && (
+                <span
+                  className={cn(
+                    "inline-flex h-7 items-center rounded-full bg-slate-100 px-2.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500",
+                  )}
+                >
+                  Today
+                </span>
+              )}
             </div>
-          )}
+          </div>
+          <button
+            type="button"
+            onClick={handleNext}
+            aria-label="Next day"
+            className={cn(
+              "inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-50",
+            )}
+          >
+            <FaChevronRight className={cn("h-5 w-5")} />
+          </button>
+          {/* Hidden native date input - opened via showPicker() from the day-label button. */}
+          <input
+            ref={dateInputRef}
+            type="date"
+            value={selectedDayKey}
+            onChange={handleDateChange}
+            className={cn("sr-only")}
+            tabIndex={-1}
+            aria-hidden
+          />
         </div>
-        <button
-          type="button"
-          onClick={handleNext}
-          aria-label="Next day"
-          className={cn(
-            "inline-flex h-11 w-11 items-center justify-center rounded-md text-slate-600 hover:bg-slate-50",
-          )}
-        >
-          <FaChevronRight />
-        </button>
-        {/* Hidden native date input - opened via showPicker() from the day-label button. */}
-        <input
-          ref={dateInputRef}
-          type="date"
-          value={selectedDayKey}
-          onChange={handleDateChange}
-          className={cn("sr-only")}
-          tabIndex={-1}
-          aria-hidden
-        />
       </div>
 
       {holidayName && (
@@ -425,8 +647,8 @@ export function DayAgendaView({
         </div>
       )}
 
-      <div className={cn("flex flex-col gap-2")}>
-        {timedEvents.length === 0 ? (
+      <div className={cn("flex flex-col gap-3")}>
+        {agendaItems.length === 0 ? (
           <p
             className={cn(
               "rounded-md border border-dashed border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-400",
@@ -435,28 +657,135 @@ export function DayAgendaView({
             No timed events on this day.
           </p>
         ) : (
-          timedEvents.map((ev) => (
-            <div
-              key={ev.id}
-              data-no-swipe
-              className={cn(
-                "flex overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm",
-              )}
-            >
-              <div className={cn("w-1.5 shrink-0", KIND_BAR_BG[ev.kind])} />
-              <div className={cn("min-w-0 flex-1 px-3 py-2")}>
-                <div className={cn("text-xs font-semibold text-slate-500")}>
-                  {formatTimeRange(ev.startAt, ev.endAt)}
+          agendaItems.map((item, idx) => {
+            if (item.type === "gap") {
+              return (
+                <div
+                  key={`gap-${idx}`}
+                  className={cn(
+                    "flex items-center gap-2 px-2 text-[11px] font-medium uppercase tracking-wide text-slate-400",
+                  )}
+                  aria-hidden
+                >
+                  <span className={cn("h-px flex-1 bg-slate-200")} />
+                  {formatGap(item.minutes)}
+                  <span className={cn("h-px flex-1 bg-slate-200")} />
                 </div>
-                <div className={cn("truncate text-sm font-semibold text-slate-800")}>
-                  {ev.title}
-                </div>
-                {ev.location && (
-                  <div className={cn("truncate text-xs text-slate-500")}>{ev.location}</div>
+              );
+            }
+            const ev = item.ev;
+            const isInteractive = ev.kind === "booking" && Boolean(ev.booking);
+            const isExpanded = expandedEventId === ev.id;
+            return (
+              <div
+                key={ev.id}
+                data-no-swipe
+                onPointerDown={isInteractive ? (e) => onCardPointerDown(e, ev) : undefined}
+                onPointerMove={isInteractive ? onCardPointerMove : undefined}
+                onPointerUp={isInteractive ? clearLongPress : undefined}
+                onPointerCancel={isInteractive ? clearLongPress : undefined}
+                onPointerLeave={isInteractive ? clearLongPress : undefined}
+                onClick={isInteractive ? () => handleCardClick(ev.id) : undefined}
+                role={isInteractive ? "button" : undefined}
+                tabIndex={isInteractive ? 0 : undefined}
+                aria-expanded={isInteractive ? isExpanded : undefined}
+                className={cn(
+                  "flex overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm",
+                  isInteractive && "cursor-pointer transition-colors hover:bg-slate-50",
                 )}
+              >
+                <div className={cn("w-1.5 shrink-0", KIND_BAR_BG[ev.kind])} />
+                <div className={cn("min-w-0 flex-1 px-3 py-2")}>
+                  <div className={cn("flex items-center justify-between gap-2")}>
+                    <div className={cn("text-xs font-semibold text-slate-500")}>
+                      {formatTimeRange(ev.startAt, ev.endAt)}
+                    </div>
+                    {ev.booking && (
+                      <span
+                        className={cn(
+                          "rounded-full px-2 py-0.5 text-[10px] font-medium",
+                          BOOKING_STATUS_CHIP[ev.booking.status],
+                        )}
+                      >
+                        {ev.booking.status}
+                      </span>
+                    )}
+                  </div>
+                  <div className={cn("truncate text-sm font-semibold text-slate-800")}>
+                    {ev.title}
+                  </div>
+                  {ev.location && (
+                    <div className={cn("truncate text-xs text-slate-500")}>{ev.location}</div>
+                  )}
+                  {isExpanded && ev.booking && (
+                    <div
+                      className={cn(
+                        "mt-3 flex flex-col gap-3 border-t border-slate-100 pt-3 text-sm",
+                      )}
+                    >
+                      <div className={cn("flex flex-wrap gap-2")}>
+                        {ev.booking.phone && (
+                          <a
+                            href={`tel:${ev.booking.phone}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className={cn(
+                              "bg-russian-violet/10 text-russian-violet hover:bg-russian-violet/20 inline-flex h-10 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold",
+                            )}
+                          >
+                            Call {ev.booking.phone}
+                          </a>
+                        )}
+                        <a
+                          href={`mailto:${ev.booking.email}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className={cn(
+                            "bg-russian-violet/10 text-russian-violet hover:bg-russian-violet/20 inline-flex h-10 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold",
+                          )}
+                        >
+                          Email
+                        </a>
+                        {ev.booking.address && (
+                          <a
+                            href={`https://maps.google.com/?q=${encodeURIComponent(
+                              ev.booking.address,
+                            )}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className={cn(
+                              "bg-russian-violet/10 text-russian-violet hover:bg-russian-violet/20 inline-flex h-10 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold",
+                            )}
+                          >
+                            Open in Maps
+                          </a>
+                        )}
+                      </div>
+                      {ev.booking.address && (
+                        <div className={cn("text-xs text-slate-500")}>
+                          <span className={cn("text-slate-400")}>Address: </span>
+                          {ev.booking.address}
+                        </div>
+                      )}
+                      {ev.booking.notes && (
+                        <div className={cn("whitespace-pre-wrap text-xs text-slate-600")}>
+                          <span className={cn("text-slate-400")}>Notes: </span>
+                          {ev.booking.notes}
+                        </div>
+                      )}
+                      <div
+                        className={cn(
+                          "mt-1 flex items-center justify-between gap-2 text-[10px] text-slate-400",
+                        )}
+                      >
+                        <span className={cn("font-mono")}>#{ev.booking.id}</span>
+                        <span className={cn("italic")}>Hold to edit</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 
@@ -465,7 +794,7 @@ export function DayAgendaView({
         onClick={handleAddBooking}
         data-no-swipe
         className={cn(
-          "bg-russian-violet mt-4 inline-flex h-11 w-full items-center justify-center rounded-md px-4 text-sm font-semibold text-white hover:opacity-90",
+          "bg-russian-violet mt-6 inline-flex h-12 w-full items-center justify-center rounded-lg px-4 text-sm font-semibold text-white hover:opacity-90",
         )}
       >
         Add booking on this day
@@ -483,6 +812,15 @@ export function DayAgendaView({
           token={token}
           startAtIso={modalStartAt}
           onClose={() => setModalStartAt(null)}
+        />
+      )}
+
+      {actionSheetEvent?.booking && (
+        <EventActionSheet
+          event={actionSheetEvent as WeekEvent & { booking: NonNullable<WeekEvent["booking"]> }}
+          token={token}
+          onChanged={() => router.refresh()}
+          onClose={() => setActionSheetEvent(null)}
         />
       )}
     </div>

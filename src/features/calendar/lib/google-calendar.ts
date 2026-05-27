@@ -5,8 +5,17 @@
  */
 
 import { google } from "googleapis";
+import { unstable_cache } from "next/cache";
 
 import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
+
+/**
+ * Cache tag invalidated by routes that mutate bookings or blocked days so the
+ * schedule page picks up changes within one render cycle. Stays separate
+ * from the underlying `fetchAllCalendarEvents` so non-schedule callers (the
+ * booking-slot availability check, etc.) can keep doing live reads.
+ */
+export const SCHEDULE_CALENDAR_TAG = "schedule-calendar-events";
 
 /**
  * The calendar where new booking events are created.
@@ -331,3 +340,20 @@ export async function createTravelBlockEvent(params: {
 
   return { eventId: response.data.id };
 }
+
+/**
+ * Cached wrapper around `fetchAllCalendarEvents` for the admin schedule page.
+ * 60-second TTL with revalidation on booking/blocked-day mutations via
+ * `SCHEDULE_CALENDAR_TAG`. Takes ISO strings (not Date objects) so the cache
+ * key is deterministically serialisable.
+ * @param startIso - ISO 8601 start of range.
+ * @param endIso - ISO 8601 end of range.
+ * @returns Cached array of calendar events.
+ */
+export const getCachedScheduleEvents = unstable_cache(
+  async (startIso: string, endIso: string): Promise<CalendarEvent[]> => {
+    return fetchAllCalendarEvents(new Date(startIso), new Date(endIso));
+  },
+  ["schedule-calendar-events"],
+  { tags: [SCHEDULE_CALENDAR_TAG], revalidate: 60 },
+);

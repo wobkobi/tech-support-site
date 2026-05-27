@@ -4,11 +4,11 @@ import type React from "react";
 import { prisma } from "@/shared/lib/prisma";
 import { requireAdminToken } from "@/shared/lib/auth";
 import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
-import { fetchAllCalendarEvents } from "@/features/calendar/lib/google-calendar";
+import { getCachedScheduleEvents } from "@/features/calendar/lib/google-calendar";
 import { addDays, resolveWeekStart, toNZDateKey } from "@/features/admin/lib/week";
 import { WeekView } from "@/features/admin/components/WeekView";
 import { DayAgendaView } from "@/features/admin/components/DayAgendaView";
-import type { WeekEvent, WeekViewKind } from "@/features/admin/lib/schedule-types";
+import { mondayOf, type WeekEvent, type WeekViewKind } from "@/features/admin/lib/schedule-types";
 import { lookupPublicHoliday } from "@/features/business/lib/pricing-policy.server";
 
 export const dynamic = "force-dynamic";
@@ -27,23 +27,6 @@ export const metadata: Metadata = {
 const BUFFER_WEEKS = 3;
 const BUFFER_DAYS_BEFORE = BUFFER_WEEKS * 7;
 const BUFFER_DAYS_AFTER = (BUFFER_WEEKS + 1) * 7;
-
-/**
- * Returns the Monday-of-week NZ date key for any NZ YYYY-MM-DD. Pure UTC
- * date-part math so DST + offset edges can't shift the result.
- * @param dayKey - NZ YYYY-MM-DD.
- * @returns Monday-of-week YYYY-MM-DD.
- */
-function mondayOf(dayKey: string): string {
-  const [y, m, d] = dayKey.split("-").map(Number);
-  const utc = new Date(Date.UTC(y, m - 1, d));
-  const back = (utc.getUTCDay() + 6) % 7;
-  const monday = new Date(Date.UTC(y, m - 1, d - back));
-  const my = monday.getUTCFullYear();
-  const mm2 = String(monday.getUTCMonth() + 1).padStart(2, "0");
-  const md = String(monday.getUTCDate()).padStart(2, "0");
-  return `${my}-${mm2}-${md}`;
-}
 
 /**
  * Admin week schedule page. Renders a 7-day grid showing booking, work, personal,
@@ -83,7 +66,9 @@ export default async function AdminSchedulePage({
   // side. Travel blocks queried separately because synthetic cache entries
   // don't carry their parent context.
   const [rawEvents, travelBlocks] = await Promise.all([
-    fetchAllCalendarEvents(bufferStartDate, bufferEndDate).catch(() => []),
+    getCachedScheduleEvents(bufferStartDate.toISOString(), bufferEndDate.toISOString()).catch(
+      () => [],
+    ),
     prisma.travelBlock.findMany({
       where: {
         eventStartAt: { lt: bufferEndDate },
@@ -119,13 +104,41 @@ export default async function AdminSchedulePage({
     return "personal";
   }
 
+  // Enrich booking-kind events with their Booking row so the day agenda can
+  // expand to show customer details + drive quick-action mutations from the
+  // card. Only joined for calendar events that came from the booking
+  // calendar; travel/personal/car events have no matching row.
+  const bookingCalEventIds = rawEvents
+    .filter((e) => e.calendarEmail === bookingCalId)
+    .map((e) => e.id);
+  const bookings =
+    bookingCalEventIds.length > 0
+      ? await prisma.booking.findMany({
+          where: { calendarEventId: { in: bookingCalEventIds } },
+          select: {
+            id: true,
+            calendarEventId: true,
+            cancelToken: true,
+            name: true,
+            email: true,
+            phone: true,
+            address: true,
+            notes: true,
+            status: true,
+          },
+        })
+      : [];
+  const bookingByCalId = new Map(bookings.map((b) => [b.calendarEventId, b]));
+
   const events: WeekEvent[] = [];
 
   for (const e of rawEvents) {
     const durationMs = new Date(e.end).getTime() - new Date(e.start).getTime();
+    const kind = kindForCalendar(e.calendarEmail);
+    const matchedBooking = kind === "booking" ? bookingByCalId.get(e.id) : null;
     events.push({
       id: e.id,
-      kind: kindForCalendar(e.calendarEmail),
+      kind,
       title: e.summary ?? "(no title)",
       startAt: e.start,
       endAt: e.end,
@@ -133,6 +146,18 @@ export default async function AdminSchedulePage({
       // fetchAllCalendarEvents converts all-day Google events to 24h timed events
       // spanning NZ midnight > midnight; treat anything >= 23h as a banner item.
       isAllDay: durationMs >= 23 * 60 * 60 * 1000,
+      booking: matchedBooking
+        ? {
+            id: matchedBooking.id,
+            cancelToken: matchedBooking.cancelToken,
+            name: matchedBooking.name,
+            email: matchedBooking.email,
+            phone: matchedBooking.phone,
+            address: matchedBooking.address,
+            notes: matchedBooking.notes,
+            status: matchedBooking.status,
+          }
+        : undefined,
     });
   }
 

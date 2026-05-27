@@ -8,6 +8,7 @@
 
 import { type NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
+import { revalidateTag } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
@@ -19,6 +20,7 @@ import {
 import {
   createBookingEvent,
   fetchAllCalendarEvents,
+  SCHEDULE_CALENDAR_TAG,
 } from "@/features/calendar/lib/google-calendar";
 import { sendCustomerBookingConfirmation } from "@/features/reviews/lib/email";
 import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
@@ -216,6 +218,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       });
     }
 
+    revalidateTag(SCHEDULE_CALENDAR_TAG, {});
     return NextResponse.json({ ok: true, bookingId: booking.id });
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {

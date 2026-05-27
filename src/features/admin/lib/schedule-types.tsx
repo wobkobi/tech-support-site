@@ -12,6 +12,25 @@ export const NZ_TZ = "Pacific/Auckland";
 
 export type WeekViewKind = "booking" | "car" | "personal" | "travel";
 
+export type BookingStatus = "held" | "confirmed" | "cancelled" | "completed";
+
+/**
+ * Booking-row fields joined to a calendar event by `calendarEventId`. Present
+ * only on events where `kind === "booking"` and a matching Booking row was
+ * found. Drives the tap-to-expand details + long-press quick actions in the
+ * mobile day agenda.
+ */
+export interface WeekEventBooking {
+  id: string;
+  cancelToken: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  address: string | null;
+  notes: string | null;
+  status: BookingStatus;
+}
+
 export interface WeekEvent {
   id: string;
   kind: WeekViewKind;
@@ -20,6 +39,26 @@ export interface WeekEvent {
   endAt: string;
   location: string | null;
   isAllDay: boolean;
+  /** Populated for `kind === "booking"` events. Optional otherwise. */
+  booking?: WeekEventBooking;
+}
+
+/**
+ * Returns the YYYY-MM-DD key for the Monday of the NZ week containing the
+ * given NZ date key. Pure UTC date-part math so DST + offset edges can't
+ * shift the result.
+ * @param dayKey - Any NZ YYYY-MM-DD.
+ * @returns Monday-of-week NZ date key.
+ */
+export function mondayOf(dayKey: string): string {
+  const [y, m, d] = dayKey.split("-").map(Number);
+  const utc = new Date(Date.UTC(y, m - 1, d));
+  const back = (utc.getUTCDay() + 6) % 7;
+  const monday = new Date(Date.UTC(y, m - 1, d - back));
+  const my = monday.getUTCFullYear();
+  const mm = String(monday.getUTCMonth() + 1).padStart(2, "0");
+  const md = String(monday.getUTCDate()).padStart(2, "0");
+  return `${my}-${mm}-${md}`;
 }
 
 /** Tailwind classes per event kind. Keep colours in sync with the legend. */
