@@ -7,8 +7,14 @@
  */
 
 import "server-only";
+import Holidays from "date-holidays";
 import { prisma } from "@/shared/lib/prisma";
-import { PUBLIC_HOLIDAY_UPLIFT } from "@/features/business/lib/pricing-policy";
+import {
+  PUBLIC_HOLIDAY_UPLIFT,
+  NZ_REGION,
+  HOME_REGION,
+  nzDateKey,
+} from "@/features/business/lib/pricing-policy";
 
 /** One labour modifier as rendered on the pricing page accordion. */
 export interface PublicModifier {
@@ -108,4 +114,80 @@ export async function getPublicPricing(): Promise<PublicPricing> {
     modifiers,
     ratesUpdatedAt,
   };
+}
+
+// Cached Holidays instances. The nationwide instance covers all public
+// holidays; the Auckland instance is queried separately for the regional
+// anniversary day. date-holidays computes algorithmically, so the same
+// instance is reused for every year.
+const hdNz = new Holidays("NZ");
+const hdAuckland = new Holidays("NZ", "AUK");
+
+/**
+ * Returns the `date-holidays` match for an NZ-local YYYY-MM-DD, or null.
+ * Checks the nationwide instance first; falls back to the Auckland-regional
+ * instance for the anniversary day. Only `type: "public"` entries count.
+ * @param key - NZ-local YYYY-MM-DD date string.
+ * @returns `{ name, region }` or null.
+ */
+/**
+ * Scans a `date-holidays` result list for an entry matching the given NZ-local
+ * date key. Only `type: "public"` entries count.
+ * @param list - List of holidays for one year from a `Holidays` instance.
+ * @param key - NZ-local YYYY-MM-DD date string.
+ * @param region - Region label to tag the match with.
+ * @returns `{ name, region }` or null.
+ */
+function matchInHolidayList(
+  list: ReturnType<typeof hdNz.getHolidays>,
+  key: string,
+  region: string,
+): { name: string; region: string } | null {
+  for (const h of list) {
+    if (h.type !== "public") continue;
+    if (typeof h.date === "string" && h.date.slice(0, 10) === key) {
+      return { name: h.name, region };
+    }
+  }
+  return null;
+}
+
+/**
+ * Returns the `date-holidays` match for an NZ-local YYYY-MM-DD, or null.
+ * Checks the nationwide instance first; falls back to the Auckland-regional
+ * instance for the anniversary day.
+ * @param key - NZ-local YYYY-MM-DD date string.
+ * @returns `{ name, region }` or null.
+ */
+function holidayFromPackage(key: string): { name: string; region: string } | null {
+  const [year] = key.split("-");
+  const yearInt = parseInt(year, 10);
+  return (
+    matchInHolidayList(hdNz.getHolidays(yearInt), key, NZ_REGION) ??
+    matchInHolidayList(hdAuckland.getHolidays(yearInt), key, HOME_REGION)
+  );
+}
+
+/**
+ * Looks up the public holiday occurring on the given date (NZ-local). Reads
+ * the `PublicHoliday` table first; falls back to algorithmic computation via
+ * `date-holidays` when no row matches or the table is unreachable. Only
+ * nationwide ("NZ") and the operator's home region are returned.
+ * @param d - Booking timestamp (UTC); compared against the NZ-local date key.
+ * @returns `{ name, region }` of the holiday, or null.
+ */
+export async function lookupPublicHoliday(
+  d: Date,
+): Promise<{ name: string; region: string } | null> {
+  const key = nzDateKey(d);
+  try {
+    const row = await prisma.publicHoliday.findFirst({
+      where: { date: key, region: { in: [NZ_REGION, HOME_REGION] } },
+      orderBy: { region: "asc" },
+    });
+    if (row) return { name: row.name, region: row.region };
+  } catch (err) {
+    console.warn("[pricing-policy] PublicHoliday lookup failed; using fallback:", err);
+  }
+  return holidayFromPackage(key);
 }

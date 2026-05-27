@@ -40,6 +40,8 @@ interface WeekViewProps {
   prevWeekKey: string;
   nextWeekKey: string;
   events: WeekEvent[];
+  /** Map of NZ-local YYYY-MM-DD > holiday name for days falling inside the visible week. */
+  holidaysByDateKey: Record<string, string>;
 }
 
 const DAY_START_HOUR = 6;
@@ -64,6 +66,7 @@ const KIND_STYLES: Record<WeekViewKind, string> = {
  * @param props.prevWeekKey - YYYY-MM-DD for the previous week's nav link.
  * @param props.nextWeekKey - YYYY-MM-DD for the next week's nav link.
  * @param props.events - Events to render, already filtered to the visible window.
+ * @param props.holidaysByDateKey - NZ-local YYYY-MM-DD > holiday name lookup.
  * @returns Week view element.
  */
 export function WeekView({
@@ -72,6 +75,7 @@ export function WeekView({
   prevWeekKey,
   nextWeekKey,
   events,
+  holidaysByDateKey,
 }: WeekViewProps): React.ReactElement {
   const router = useRouter();
   const [modalStartAt, setModalStartAt] = useState<string | null>(null);
@@ -218,6 +222,7 @@ export function WeekView({
               const isToday = day.key === todayNzKey;
               const busyEvent = day.allDayEvents.find((e) => e.kind === "booking");
               const hasBookings = day.timedEvents.some((e) => e.kind === "booking");
+              const holidayName = holidaysByDateKey[day.key];
               return (
                 <div
                   key={day.key}
@@ -226,6 +231,16 @@ export function WeekView({
                     isToday && "bg-russian-violet/5",
                   )}
                 >
+                  {holidayName && (
+                    <div
+                      className={cn(
+                        "mb-1 truncate text-[10px] font-semibold uppercase tracking-wide text-amber-700",
+                      )}
+                      title={holidayName}
+                    >
+                      {holidayName}
+                    </div>
+                  )}
                   <div
                     className={cn("text-xs font-semibold uppercase tracking-wide text-slate-500")}
                   >

@@ -7,6 +7,7 @@ import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
 import { fetchAllCalendarEvents } from "@/features/calendar/lib/google-calendar";
 import { addDays, resolveWeekStart, toNZDateKey } from "@/features/admin/lib/week";
 import { WeekView, type WeekEvent, type WeekViewKind } from "@/features/admin/components/WeekView";
+import { lookupPublicHoliday } from "@/features/business/lib/pricing-policy.server";
 
 export const dynamic = "force-dynamic";
 
@@ -126,6 +127,17 @@ export default async function AdminSchedulePage({
   const prevWeekKey = toNZDateKey(addDays(weekStartDate, -7));
   const nextWeekKey = toNZDateKey(addDays(weekStartDate, 7));
 
+  // Resolve a holiday entry per visible day. lookupPublicHoliday reads the DB
+  // first then falls back to the date-holidays package, so this works even
+  // when the refresh cron hasn't run.
+  const holidaysByDateKey: Record<string, string> = {};
+  for (let i = 0; i < 7; i++) {
+    const day = addDays(weekStartDate, i);
+    const dayKey = toNZDateKey(day);
+    const holiday = await lookupPublicHoliday(day).catch(() => null);
+    if (holiday) holidaysByDateKey[dayKey] = holiday.name;
+  }
+
   return (
     <AdminPageLayout token={t} current="schedule">
       <WeekView
@@ -134,6 +146,7 @@ export default async function AdminSchedulePage({
         prevWeekKey={prevWeekKey}
         nextWeekKey={nextWeekKey}
         events={events}
+        holidaysByDateKey={holidaysByDateKey}
       />
     </AdminPageLayout>
   );

@@ -35,6 +35,7 @@ import { toE164NZ, isValidPhone } from "@/shared/lib/normalise-phone";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 import { getActivePromo } from "@/features/business/lib/promos";
 import { lookupDriveDistance } from "@/features/business/lib/travel-distance";
+import { lookupPublicHoliday } from "@/features/business/lib/pricing-policy.server";
 
 interface BookingRequestPayload {
   dateKey: string;
@@ -276,6 +277,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     }
 
+    // Stamp the public holiday name when the booking date is a stat day so
+    // disputes can quote the exact holiday that drove the uplift.
+    const holiday = await lookupPublicHoliday(startAt).catch((err) => {
+      console.warn("[booking/request] public-holiday lookup failed:", err);
+      return null;
+    });
+    const publicHolidayName = holiday?.name ?? null;
+
     // Create booking
     try {
       const booking = await prisma.booking.create({
@@ -310,6 +319,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           promoTitleAtBooking: activePromo?.title ?? null,
           promoFlatHourlyRateAtBooking: activePromo?.flatHourlyRate ?? null,
           promoPercentDiscountAtBooking: activePromo?.percentDiscount ?? null,
+          publicHolidayName,
         },
       });
 

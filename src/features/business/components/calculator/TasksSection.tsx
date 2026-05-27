@@ -259,8 +259,15 @@ export function TasksSection({
                   </select>
                   {modifierRates.map((m) => {
                     const active = task.modifierIds?.includes(m.id) ?? false;
-                    const delta = m.hourlyDelta ?? 0;
-                    const sign = delta < 0 ? "-" : "+";
+                    let chipLabel: string;
+                    if (m.percentDelta !== null) {
+                      const pct = Math.round(m.percentDelta * 100);
+                      chipLabel = `${m.label} ${pct >= 0 ? "+" : ""}${pct}%`;
+                    } else {
+                      const delta = m.hourlyDelta ?? 0;
+                      const sign = delta < 0 ? "-" : "+";
+                      chipLabel = `${m.label} ${sign}$${Math.abs(delta)}`;
+                    }
                     return (
                       <button
                         key={m.id}
@@ -274,7 +281,7 @@ export function TasksSection({
                             : "border-slate-200 bg-white text-slate-500 hover:border-slate-300",
                         )}
                       >
-                        {m.label} {sign}${Math.abs(delta)}
+                        {chipLabel}
                       </button>
                     );
                   })}

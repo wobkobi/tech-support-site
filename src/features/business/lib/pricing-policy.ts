@@ -37,6 +37,30 @@ export const BILLING_INCREMENT_MINS = 15;
 /** Multiplier applied to labour on NZ public holidays. Travel and parts are not uplifted. */
 export const PUBLIC_HOLIDAY_UPLIFT = 0.25;
 
+/** Region label for nationwide NZ public holidays in the PublicHoliday table. */
+export const NZ_REGION = "NZ";
+/** Region for the operator's regional anniversary day (also charged the uplift). */
+export const HOME_REGION = "Auckland";
+
+/**
+ * Formats a Date as a Pacific/Auckland-local YYYY-MM-DD so booking timestamps
+ * match the `PublicHoliday.date` strings (always NZ-local).
+ * @param d - Date instance to format.
+ * @returns ISO-style date string in NZ-local time.
+ */
+export function nzDateKey(d: Date): string {
+  const parts = new Intl.DateTimeFormat("en-NZ", {
+    timeZone: "Pacific/Auckland",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(d);
+  const year = parts.find((p) => p.type === "year")?.value ?? "";
+  const month = parts.find((p) => p.type === "month")?.value ?? "";
+  const day = parts.find((p) => p.type === "day")?.value ?? "";
+  return `${year}-${month}-${day}`;
+}
+
 export interface CancellationPolicy {
   /** Cancellations made more than this many hours before the booking are free. */
   freeNoticeHours: number;

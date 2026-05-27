@@ -7,6 +7,8 @@ export interface RateConfig {
   flatRate: number | null;
   /** Set on modifier rates (signed $/hr delta, e.g. -10 for At home). Null on bases and flat rates. */
   hourlyDelta: number | null;
+  /** Set on percent modifiers (e.g. 0.25 for Public Holiday +25%). Multiplies the post-delta rate. */
+  percentDelta: number | null;
   unit: string;
   isDefault: boolean;
   createdAt: string;

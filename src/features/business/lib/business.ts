@@ -320,11 +320,13 @@ export function matchRateById(rates: RateConfig[], id: string | null): RateConfi
 }
 
 /**
- * Computes the effective hourly rate for a task by adding modifier deltas to
- * a base rate. E.g. Standard ($65) + At home (-$10) = $55.
+ * Computes the effective hourly rate for a task by composing the base rate
+ * with its modifiers. Sums `hourlyDelta` first, then multiplies by any
+ * `percentDelta` (e.g. Public Holiday +25%) so the uplift acts on the
+ * post-modifier base. E.g. Standard ($65) + At home (-$10) = $55.
  * @param rates - All rate configurations (used to look up by ID).
  * @param baseRateId - Base rate ID (must point to a rate with ratePerHour set).
- * @param modifierIds - Modifier rate IDs (each must point to a rate with hourlyDelta set).
+ * @param modifierIds - Modifier rate IDs.
  * @returns Effective $/hr, or 0 when the base rate isn't found / lacks ratePerHour.
  */
 export function effectiveHourlyRate(
@@ -336,11 +338,10 @@ export function effectiveHourlyRate(
   const base = rates.find((r) => r.id === baseRateId);
   if (!base || base.ratePerHour === null) return 0;
   const ids = modifierIds ?? [];
-  const sumDelta = ids.reduce((s, id) => {
-    const mod = rates.find((r) => r.id === id);
-    return s + (mod?.hourlyDelta ?? 0);
-  }, 0);
-  return Math.round((base.ratePerHour + sumDelta) * 100) / 100;
+  const mods = ids.map((id) => rates.find((r) => r.id === id)).filter((m): m is RateConfig => !!m);
+  const sumDelta = mods.reduce((s, m) => s + (m.hourlyDelta ?? 0), 0);
+  const percentFactor = mods.reduce((f, m) => f * (1 + (m.percentDelta ?? 0)), 1);
+  return Math.round((base.ratePerHour + sumDelta) * percentFactor * 100) / 100;
 }
 
 /**

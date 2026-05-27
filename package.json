@@ -1,6 +1,6 @@
 {
   "name": "tech-support-site",
-  "version": "1.64.9",
+  "version": "1.65.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -23,6 +23,7 @@
     "@vercel/speed-insights": "^2.0.0",
     "autoprefixer": "^10.5.0",
     "clsx": "^2.1.1",
+    "date-holidays": "^3.30.2",
     "googleapis": "^172.0.0",
     "next": "^16.2.6",
     "openai": "^6.39.0",

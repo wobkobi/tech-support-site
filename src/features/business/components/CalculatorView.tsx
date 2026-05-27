@@ -292,10 +292,11 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
   // Base hourly rates (e.g. Standard $65/hr) — used for the top-level Time
   // selector and as the per-task base rate.
   const baseRates = rates.filter((r) => r.ratePerHour !== null);
-  // Modifier rates (signed $/hr deltas like At home -$10, Complex +$20) —
-  // toggled per task to shift the effective rate.
+  // Modifier rates — either signed $/hr deltas (At home -$10, Complex +$20)
+  // or percent uplifts (Public Holiday +25%). Toggled per task to shift the
+  // effective rate.
   const modifierRates = rates
-    .filter((r) => r.hourlyDelta !== null)
+    .filter((r) => r.hourlyDelta !== null || r.percentDelta !== null)
     .sort((a, b) => a.label.localeCompare(b.label));
   const flatRates = rates.filter((r) => r.flatRate !== null);
 
@@ -776,13 +777,15 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
    * @param r - The rate configuration to edit.
    */
   function handleStartEdit(r: RateConfig): void {
+    const isModifier = r.hourlyDelta !== null || r.percentDelta !== null;
     const type: "hourly" | "modifier" | "flat" =
-      r.ratePerHour !== null ? "hourly" : r.hourlyDelta !== null ? "modifier" : "flat";
+      r.ratePerHour !== null ? "hourly" : isModifier ? "modifier" : "flat";
+    const modifierAmount = r.percentDelta !== null ? r.percentDelta * 100 : r.hourlyDelta;
     setEditingRateId(r.id);
     setRateForm({
       label: r.label,
       type,
-      amount: String(r.ratePerHour ?? r.hourlyDelta ?? r.flatRate ?? ""),
+      amount: String(r.ratePerHour ?? modifierAmount ?? r.flatRate ?? ""),
       unit: r.unit,
       isDefault: r.isDefault,
     });
