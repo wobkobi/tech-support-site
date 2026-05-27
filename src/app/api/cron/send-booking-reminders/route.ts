@@ -46,6 +46,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         startAt: true,
         endAt: true,
         cancelToken: true,
+        promoTitleAtBooking: true,
       },
     });
 
@@ -63,6 +64,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           startAt: b.startAt,
           endAt: b.endAt,
           cancelToken: b.cancelToken,
+          promoTitleAtBooking: b.promoTitleAtBooking,
         });
         // Only stamp sent-at after Resend accepts the send. Stamping before
         // would silently drop the reminder forever on a transient hiccup,

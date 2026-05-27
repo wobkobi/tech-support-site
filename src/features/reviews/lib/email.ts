@@ -176,6 +176,8 @@ export interface BookingNotificationData {
   endAt: Date;
   /** Cancel token for the cancel link */
   cancelToken: string;
+  /** Promo title snapshotted at booking time, or null when none was active. */
+  promoTitleAtBooking?: string | null;
 }
 
 /**
@@ -293,6 +295,9 @@ export async function sendCustomerBookingConfirmation(
     kind === "rescheduled" && previous
       ? `<p style="margin:0 0 20px;color:#888;font-size:13px"><s>${escapeHtml(previous)}</s></p>`
       : "";
+  const promoLine = booking.promoTitleAtBooking
+    ? `<div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;padding:12px 16px;margin-bottom:16px"><p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#0c0a3e">🏷 Rate locked in: ${escapeHtml(booking.promoTitleAtBooking)}</p><p style="margin:0;font-size:13px;color:#444;line-height:1.5">This rate applies to your appointment even if the offer ends before your visit.</p></div>`
+    : "";
 
   const html = `
 <!DOCTYPE html>
@@ -306,6 +311,8 @@ export async function sendCustomerBookingConfirmation(
     <p style="margin:0 0 8px;color:#888;font-size:13px;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Your appointment</p>
     <p style="margin:0 0 4px;font-size:16px;font-weight:600;color:#0c0a3e">${start}</p>
     ${previousLine}
+
+    ${promoLine}
 
     <div style="background:#f6f7f8;border-radius:8px;padding:16px;margin-bottom:24px">
       <p style="margin:0;font-size:14px;color:#444;line-height:1.6">${notesHtml}</p>
@@ -359,6 +366,9 @@ export async function sendBookingReminderEmail(booking: BookingNotificationData)
   const cancelUrl = `${siteUrl}/booking/cancel?token=${encodeURIComponent(booking.cancelToken)}`;
   const editUrl = `${siteUrl}/booking/edit?token=${encodeURIComponent(booking.cancelToken)}`;
   const notesHtml = escapeHtml(booking.notes).replace(/\n/g, "<br>");
+  const promoLine = booking.promoTitleAtBooking
+    ? `<div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;padding:12px 16px;margin-bottom:16px"><p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#0c0a3e">🏷 Rate locked in: ${escapeHtml(booking.promoTitleAtBooking)}</p><p style="margin:0;font-size:13px;color:#444;line-height:1.5">This rate applies to your appointment even if the offer ends before your visit.</p></div>`
+    : "";
 
   const html = `
 <!DOCTYPE html>
@@ -371,6 +381,8 @@ export async function sendBookingReminderEmail(booking: BookingNotificationData)
 
     <p style="margin:0 0 8px;color:#888;font-size:13px;text-transform:uppercase;letter-spacing:.05em;font-weight:600">When</p>
     <p style="margin:0 0 20px;font-size:16px;font-weight:600;color:#0c0a3e">${start}</p>
+
+    ${promoLine}
 
     <div style="background:#f6f7f8;border-radius:8px;padding:16px;margin-bottom:24px">
       <p style="margin:0;font-size:14px;color:#444;line-height:1.6">${notesHtml}</p>

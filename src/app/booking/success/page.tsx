@@ -7,8 +7,9 @@
 import type React from "react";
 import { cn } from "@/shared/lib/cn";
 import { Button } from "@/shared/components/Button";
-import { FaCircleCheck, FaHouse, FaPenToSquare } from "react-icons/fa6";
+import { FaCircleCheck, FaHouse, FaPenToSquare, FaTag } from "react-icons/fa6";
 import { cancellationCopy } from "@/features/business/lib/pricing-policy";
+import { prisma } from "@/shared/lib/prisma";
 
 const CARD = "border-seasalt-400/60 bg-seasalt-800 rounded-xl border p-5 shadow-sm sm:p-6";
 
@@ -40,6 +41,19 @@ export default async function BookingSuccessPage({
   const params = await searchParams;
   const tokenValue = params.cancelToken;
   const cancelToken = Array.isArray(tokenValue) ? tokenValue[0] : tokenValue;
+
+  // Surface the snapshotted promo title so customers see the rate is locked
+  // even if the offer expires before service.
+  const booking = cancelToken
+    ? await prisma.booking
+        .findFirst({
+          where: { cancelToken },
+          select: { promoTitleAtBooking: true },
+        })
+        .catch(() => null)
+    : null;
+  const promoTitle = booking?.promoTitleAtBooking ?? null;
+
   return (
     <main className={cn("relative min-h-dvh overflow-hidden")}>
       {/* Backdrop */}
@@ -128,6 +142,24 @@ export default async function BookingSuccessPage({
                 <li>I'll send you a review link after your appointment</li>
               </ol>
             </section>
+
+            {promoTitle && (
+              <section
+                className={cn(
+                  "border-mustard-400 bg-mustard-900 flex items-start gap-3 rounded-xl border p-5 shadow-sm sm:p-6",
+                )}
+              >
+                <FaTag className={cn("text-russian-violet mt-1 h-5 w-5 shrink-0")} aria-hidden />
+                <div>
+                  <h2 className={cn("text-russian-violet mb-1 text-base font-bold sm:text-lg")}>
+                    Rate locked in: {promoTitle}
+                  </h2>
+                  <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
+                    This rate applies to your appointment even if the offer ends before your visit.
+                  </p>
+                </div>
+              </section>
+            )}
 
             <section className={cn(CARD)}>
               <h2 className={cn("text-russian-violet mb-2 text-lg font-bold sm:text-xl")}>

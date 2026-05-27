@@ -212,6 +212,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         startAt: booking.startAt,
         endAt: booking.endAt,
         cancelToken: booking.cancelToken,
+        promoTitleAtBooking: booking.promoTitleAtBooking,
       });
     }
 

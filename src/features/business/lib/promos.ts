@@ -51,6 +51,58 @@ export const getActivePromo = unstable_cache(
   { tags: [ACTIVE_PROMO_TAG], revalidate: 60 },
 );
 
+/** Promo snapshot fields stored on a Booking, plus its createdAt. */
+export interface BookingPromoSnapshot {
+  promoIdAtBooking?: string | null;
+  promoTitleAtBooking?: string | null;
+  promoFlatHourlyRateAtBooking?: number | null;
+  promoPercentDiscountAtBooking?: number | null;
+  createdAt: Date;
+}
+
+/**
+ * Resolves the promo in force for a booking. Prefers the booking's snapshot
+ * fields; falls back to a `createdAt` lookup against `Promo.startAt`/`endAt`
+ * when no snapshot is present.
+ * @param booking - Snapshot fields + createdAt.
+ * @returns Resolved promo or null.
+ */
+export async function resolvePromoForBooking(
+  booking: BookingPromoSnapshot,
+): Promise<ActivePromo | null> {
+  if (booking.promoIdAtBooking && booking.promoTitleAtBooking) {
+    return {
+      id: booking.promoIdAtBooking,
+      title: booking.promoTitleAtBooking,
+      description: null,
+      startAt: booking.createdAt.toISOString(),
+      endAt: booking.createdAt.toISOString(),
+      flatHourlyRate: booking.promoFlatHourlyRateAtBooking ?? null,
+      percentDiscount: booking.promoPercentDiscountAtBooking ?? null,
+    };
+  }
+  const row = await prisma.promo
+    .findFirst({
+      where: {
+        isActive: true,
+        startAt: { lte: booking.createdAt },
+        endAt: { gt: booking.createdAt },
+      },
+      orderBy: { createdAt: "desc" },
+    })
+    .catch(() => null);
+  if (!row) return null;
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    startAt: row.startAt.toISOString(),
+    endAt: row.endAt.toISOString(),
+    flatHourlyRate: row.flatHourlyRate,
+    percentDiscount: row.percentDiscount,
+  };
+}
+
 /**
  * Applies a promo to one hourly rate. Flat overrides (capped at original); percent multiplies.
  * @param rate - Pre-promo $/hr.

@@ -6,6 +6,20 @@
 
 import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 
+/**
+ * Splits an NZ-style apartment-prefixed address ("12/160 Kepa Road Orakei")
+ * into unit + street-and-rest. The unit prefix is 1-4 digits with an optional
+ * letter suffix (e.g. "12", "12A") followed by "/". Returns unit="" otherwise.
+ * @param addr - Address string, possibly with a unit prefix.
+ * @returns `unit` (may be empty) and `rest` (street + suburb).
+ */
+export function splitUnitFromAddress(addr: string): { unit: string; rest: string } {
+  const trimmed = addr.replace(/\s+/g, " ").trim();
+  const m = trimmed.match(/^(\d{1,4}[A-Za-z]?)\/(.+)$/);
+  if (!m) return { unit: "", rest: trimmed };
+  return { unit: m[1], rest: m[2].trim() };
+}
+
 export const BOOKING_CONFIG = {
   timeZone: "Pacific/Auckland",
   maxAdvanceDays: 14,

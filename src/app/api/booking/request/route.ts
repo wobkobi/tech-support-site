@@ -12,6 +12,7 @@ import {
   validateBookingRequest,
   validateBookingPayloadFields,
   TIME_OF_DAY_OPTIONS,
+  splitUnitFromAddress,
   type TimeOfDay,
   type StartMinute,
   type JobDuration,
@@ -292,9 +293,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           activeSlotKey: startAt.toISOString(), // Unique constraint for double-booking prevention
           bufferBeforeMin: 0,
           bufferAfterMin: BOOKING_CONFIG.bookingBufferAfterMin,
-          // Structured fields; notes text above is dual-written for legacy
-          // admin code that still regex-parses "Address: X" out of it.
-          address: address?.trim() || null,
+          // Notes text above stays dual-written for regex-parsing admin code.
+          // Split unit off the address so apartment numbers can be filtered
+          // without re-parsing.
+          address: address?.trim() ? splitUnitFromAddress(address.trim()).rest : null,
+          unit: address?.trim() ? splitUnitFromAddress(address.trim()).unit || null : null,
           meetingType: meetingType === "in-person" ? "in_person" : "remote",
           duration,
           travelMinsAtBooking,
@@ -346,6 +349,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           startAt: booking.startAt,
           endAt: booking.endAt,
           cancelToken: booking.cancelToken,
+          promoTitleAtBooking: booking.promoTitleAtBooking,
         }),
       ]);
 
