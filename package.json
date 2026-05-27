@@ -18,7 +18,7 @@
     "smoke": "dotenv -e .env.local -- tsx scripts/smoke-test.ts"
   },
   "dependencies": {
-    "@swc/helpers": "^0.5.22",
+    "@swc/helpers": "^0.5.23",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
     "autoprefixer": "^10.5.0",
