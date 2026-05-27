@@ -241,21 +241,25 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     if (!parsed.noTravelCharge && parsed.statedDistanceKm && parsed.statedDistanceKm > 0) {
+      // Operator stated round-trip km but no time. Halve back to a one-way
+      // figure so downstream consumers (calcTravelCharge) get the contract
+      // they expect; durationMins stays 0 here because we have no time signal.
       parsed.travel = {
-        distanceKm: parsed.statedDistanceKm,
+        distanceKmOneWay: Math.round((parsed.statedDistanceKm / 2) * 10) / 10,
         durationMins: 0,
         destination: parsed.destination ?? undefined,
       };
     } else if (!parsed.noTravelCharge && parsed.destination) {
-      // No stated distance - look up one-way distance via Google Distance Matrix
-      // and double it for the round trip charge. Direct call into the helper
-      // instead of a self-fetch so this works without NEXT_PUBLIC_BASE_URL set
-      // and doesn't burn the public route's rate-limit budget.
+      // Look up one-way distance via Google Distance Matrix and pass through
+      // unchanged - calcTravelCharge doubles internally for the round-trip
+      // charge. Direct call into the helper instead of a self-fetch so this
+      // works without NEXT_PUBLIC_BASE_URL set and doesn't burn the public
+      // route's rate-limit budget.
       const lookup = await lookupDriveDistance(parsed.destination);
       if (lookup.status === "ok" && lookup.data.distanceKm > 0) {
         parsed.travel = {
-          distanceKm: Math.round(lookup.data.distanceKm * 2 * 10) / 10,
-          durationMins: lookup.data.durationMins * 2,
+          distanceKmOneWay: lookup.data.distanceKm,
+          durationMins: lookup.data.durationMins,
           destination: parsed.destination,
         };
       }
@@ -345,10 +349,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     }
 
-    // Safety net: scale every task proportionally so the sum matches the
-    // billable hours total. Previous behaviour dumped the entire gap onto the
-    // single largest task, which produced lopsided distributions like
-    // Setup=2.33h, Config=0.75h, Website=0.5h for a 3.58h window.
+    // Safety net: scale floating (non-pinned) tasks proportionally so the sum
+    // matches the billable hours total. Tasks the AI flagged `isExplicit`
+    // carry an operator-stated duration and pass through untouched - only the
+    // floating set absorbs the gap. When every task is pinned, fall back to
+    // scaling everyone equally so we still hit the target.
     if (
       parsed.tasks?.length > 0 &&
       typeof parsed.durationMins === "number" &&
@@ -360,28 +365,42 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       const sumQty = parsed.tasks.reduce((s, t) => s + (t.qty || 0), 0);
       const diff = Math.round((targetHours - sumQty) * 100) / 100;
       if (sumQty > 0 && Math.abs(diff) >= 0.25) {
-        const multiplier = targetHours / sumQty;
-        parsed.tasks = parsed.tasks.map((t) => ({
-          ...t,
-          qty: Math.max(0.25, Math.round(t.qty * multiplier * 100) / 100),
-        }));
-        // Park any rounding remainder on the largest task so the sum lands
-        // exactly on targetHours (otherwise we leak a few cents on the invoice).
+        const pinnedSum = parsed.tasks
+          .filter((t) => t.isExplicit)
+          .reduce((s, t) => s + (t.qty || 0), 0);
+        const floatingTargets = targetHours - pinnedSum;
+        const floatingSum = sumQty - pinnedSum;
+        const canScaleFloating = floatingSum > 0 && floatingTargets > 0;
+        const multiplier = canScaleFloating ? floatingTargets / floatingSum : targetHours / sumQty;
+        parsed.tasks = parsed.tasks.map((t) => {
+          if (canScaleFloating && t.isExplicit) return t;
+          return {
+            ...t,
+            qty: Math.max(0.25, Math.round(t.qty * multiplier * 100) / 100),
+          };
+        });
+        // Park any rounding remainder on the largest floating task (or the
+        // largest task overall when nothing is floating) so the sum lands
+        // exactly on targetHours.
         const adjustedSum = parsed.tasks.reduce((s, t) => s + t.qty, 0);
         const drift = Math.round((targetHours - adjustedSum) * 100) / 100;
         if (drift !== 0) {
-          const largestIdx = parsed.tasks.reduce(
-            (maxI, t, i, arr) => (t.qty > arr[maxI].qty ? i : maxI),
-            0,
-          );
-          parsed.tasks[largestIdx] = {
-            ...parsed.tasks[largestIdx],
-            qty: Math.max(0.25, Math.round((parsed.tasks[largestIdx].qty + drift) * 100) / 100),
-          };
+          const driftable = canScaleFloating
+            ? parsed.tasks.map((t, i) => ({ t, i })).filter(({ t }) => !t.isExplicit)
+            : parsed.tasks.map((t, i) => ({ t, i }));
+          if (driftable.length > 0) {
+            const largest = driftable.reduce((max, cur) => (cur.t.qty > max.t.qty ? cur : max));
+            parsed.tasks[largest.i] = {
+              ...parsed.tasks[largest.i],
+              qty: Math.max(0.25, Math.round((parsed.tasks[largest.i].qty + drift) * 100) / 100),
+            };
+          }
         }
         parsed.warnings = [
           ...(parsed.warnings ?? []),
-          `Rebalanced task quantities proportionally to match the ${targetHours}h total.`,
+          canScaleFloating
+            ? `Rebalanced floating task quantities to match the ${targetHours}h total (pinned tasks preserved).`
+            : `Rebalanced every task proportionally to match the ${targetHours}h total.`,
         ];
       }
     }

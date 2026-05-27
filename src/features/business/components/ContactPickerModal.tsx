@@ -5,37 +5,12 @@ import type React from "react";
 import { FaCaretUp, FaCaretDown } from "react-icons/fa6";
 import { cn } from "@/shared/lib/cn";
 import type { GoogleContact } from "@/features/business/types/business";
+import { filterContacts } from "@/features/contacts/lib/contact-search";
 
 interface ContactPickerModalProps {
   token: string;
   onSelect: (contact: GoogleContact) => void;
   onClose: () => void;
-}
-
-/**
- * Ranks a contact against a single search token. Lower scores rank first.
- * Returns Infinity when no field matches (caller filters those out).
- * @param c - Contact to rank.
- * @param token - Lowercased search token.
- * @returns Numeric score (lower = better match) or Infinity.
- */
-function scoreContactToken(c: GoogleContact, token: string): number {
-  const fields: { value: string; weight: number }[] = [
-    { value: c.name?.toLowerCase() ?? "", weight: 0 }, // name matches rank highest
-    { value: c.email?.toLowerCase() ?? "", weight: 100 },
-    { value: c.company?.toLowerCase() ?? "", weight: 200 },
-    { value: c.phone?.toLowerCase() ?? "", weight: 300 },
-  ];
-  let best = Infinity;
-  for (const { value, weight } of fields) {
-    if (!value) continue;
-    if (value === token)
-      best = Math.min(best, weight); // exact = best in field
-    else if (value.startsWith(token))
-      best = Math.min(best, weight + 1); // prefix
-    else if (value.includes(token)) best = Math.min(best, weight + 2); // substring
-  }
-  return best;
 }
 
 /**
@@ -71,32 +46,7 @@ export function ContactPickerModal({
       .finally(() => setLoading(false));
   }, [token]);
 
-  // Token-split + scored filter: every space-separated token must match SOME
-  // field (name/email/company/phone). Results sort by best total score so
-  // exact-name + prefix matches surface first.
-  const filtered = useMemo(() => {
-    const tokens = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
-    if (tokens.length === 0) {
-      return [...contacts].sort((a, b) =>
-        (a.name || a.email || "").localeCompare(b.name || b.email || ""),
-      );
-    }
-    const scored: { contact: GoogleContact; score: number }[] = [];
-    for (const c of contacts) {
-      let total = 0;
-      let allMatch = true;
-      for (const t of tokens) {
-        const s = scoreContactToken(c, t);
-        if (s === Infinity) {
-          allMatch = false;
-          break;
-        }
-        total += s;
-      }
-      if (allMatch) scored.push({ contact: c, score: total });
-    }
-    return scored.sort((a, b) => a.score - b.score).map((s) => s.contact);
-  }, [contacts, query]);
+  const filtered = useMemo(() => filterContacts(contacts, query), [contacts, query]);
 
   // Clamp highlight to valid range without setState-in-effect.
   const highlight = Math.min(rawHighlight, Math.max(0, filtered.length - 1));

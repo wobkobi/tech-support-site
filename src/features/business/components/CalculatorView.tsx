@@ -19,7 +19,6 @@ import {
 import { calcTravelCharge } from "@/features/business/lib/pricing-policy";
 import { BUSINESS_PAYMENT_TERMS_DAYS } from "@/shared/lib/business-identity";
 import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
-import { ContactPickerModal } from "@/features/business/components/ContactPickerModal";
 import { AddToContactsModal } from "@/features/business/components/AddToContactsModal";
 import { ParseConfidenceBanner } from "@/features/business/components/ParseConfidenceBanner";
 import { TaxonomyManageModal } from "@/features/business/components/TaxonomyManageModal";
@@ -189,7 +188,7 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
   const [lookingUpTravel, setLookingUpTravel] = useState(false);
   const addressInputRef = useRef<HTMLInputElement>(null);
 
-  const [showContactPicker, setShowContactPicker] = useState(false);
+  const [contacts, setContacts] = useState<GoogleContact[]>([]);
   const [savingIncome, setSavingIncome] = useState(false);
   const [incomeToast, setIncomeToast] = useState<string | null>(null);
 
@@ -260,11 +259,15 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
       fetch("/api/promos/active")
         .then((r) => r.json())
         .catch(() => ({ ok: false, promo: null })),
+      fetch("/api/business/contacts", { headers: { "X-Admin-Secret": token } })
+        .then((r) => r.json())
+        .catch(() => ({ ok: false, contacts: [] })),
     ]).then(
-      ([ratesData, templatesData, promoData]: [
+      ([ratesData, templatesData, promoData, contactsData]: [
         { ok: boolean; rates: RateConfig[] },
         { ok: boolean; templates: TaskTemplate[] },
         { ok: boolean; promo: ActivePromo | null },
+        { ok: boolean; contacts: GoogleContact[] },
       ]) => {
         setTimeRanges([{ startTime: now, endTime: addHour(now) }]);
         if (ratesData.ok) {
@@ -274,6 +277,7 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
         }
         if (templatesData.ok) setTaskTemplates(templatesData.templates);
         setActivePromo(promoData.promo ?? null);
+        if (contactsData.ok) setContacts(contactsData.contacts);
       },
     );
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -423,6 +427,7 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
         action,
         details,
         isShort: t.isShort ?? false,
+        isExplicit: t.isExplicit ?? false,
       };
     });
     const parsedParts = result.parts.map((p) => ({ description: p.description, cost: p.cost }));
@@ -437,7 +442,17 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
         rateList.find((r) => r.unit === "travel-hour" && r.ratePerHour !== null)?.ratePerHour ?? 40;
       const cost = calcTravelCharge(result.travel.durationMins, travelRatePerHour);
       const label = result.destination?.trim() || `${result.travel.durationMins} min drive`;
-      setTravelEntries((prev) => [{ label, cost, isAuto: true }, ...prev.filter((e) => !e.isAuto)]);
+      setTravelEntries((prev) => [
+        {
+          label,
+          cost,
+          isAuto: true,
+          destination: result.destination ?? label,
+          durationMinsOneWay: result.travel?.durationMins,
+          distanceKmOneWay: result.travel?.distanceKmOneWay,
+        },
+        ...prev.filter((e) => !e.isAuto),
+      ]);
     } else {
       // No drive time from the parse (remote work or geocode-to-origin): drop
       // any stale auto entry, leave manual entries alone.
@@ -761,7 +776,14 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
         const cost = calcTravelCharge(d.durationMins, travelRatePerHour);
         const label = jobAddress.trim() || `${d.durationMins} min drive`;
         setTravelEntries((prev) => [
-          { label, cost, isAuto: true },
+          {
+            label,
+            cost,
+            isAuto: true,
+            destination: jobAddress.trim() || label,
+            durationMinsOneWay: d.durationMins,
+            distanceKmOneWay: d.distanceKm,
+          },
           ...prev.filter((e) => !e.isAuto),
         ]);
       }
@@ -972,22 +994,6 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
 
   return (
     <>
-      {showContactPicker && (
-        <ContactPickerModal
-          token={token}
-          onSelect={(c: GoogleContact) => {
-            const company = c.company?.trim() || null;
-            setClientName(c.name);
-            setClientEmail(c.email);
-            setPickedContactName(c.name);
-            setPickedContactCompany(company);
-            setPickedContactGoogleId(c.id || null);
-            setAddressModeState("name");
-          }}
-          onClose={() => setShowContactPicker(false)}
-        />
-      )}
-
       {pendingInvoiceId && (
         <AddToContactsModal
           token={token}
@@ -1187,6 +1193,10 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
             onTravelEntriesChange={setTravelEntries}
             lookingUpTravel={lookingUpTravel}
             onLookup={() => void handleTravelLookup()}
+            travelRatePerHour={
+              rates.find((r) => r.unit === "travel-hour" && r.ratePerHour !== null)?.ratePerHour ??
+              40
+            }
           />
 
           {/* Tasks - inline warning when hourly task minutes drift from the
@@ -1250,7 +1260,24 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
             pickedContactCompany={pickedContactCompany}
             addressMode={addressMode}
             onAddressModeChange={setAddressMode}
-            onPickContact={() => setShowContactPicker(true)}
+            contacts={contacts}
+            onSelectContact={(c) => {
+              const company = c.company?.trim() || null;
+              setClientName(c.name);
+              setClientEmail(c.email);
+              setPickedContactName(c.name);
+              setPickedContactCompany(company);
+              setPickedContactGoogleId(c.id || null);
+              setAddressMode("name");
+            }}
+            onClearContact={() => {
+              setPickedContactName(null);
+              setPickedContactCompany(null);
+              setPickedContactGoogleId(null);
+              setAddressMode("custom");
+              setClientName("");
+              setClientEmail("");
+            }}
           />
 
           {/* Half off labour when ticked (couldn't fix AND couldn't diagnose). */}

@@ -76,6 +76,46 @@ export const CANCELLATION: CancellationPolicy = {
   callOutFee: 30,
 };
 
+export interface TravelChargeBreakdown {
+  /** Raw round-trip cost before any rounding or floor: (oneWayMins/60) * 2 * ratePerHour. */
+  rawCost: number;
+  /** rawCost snapped to the nearest $5. */
+  roundedCost: number;
+  /** Final billed cost after the MIN_TRAVEL_CHARGE floor is applied. */
+  finalCost: number;
+  /** True when finalCost was lifted up to MIN_TRAVEL_CHARGE. */
+  minimumApplied: boolean;
+}
+
+/**
+ * Step-by-step travel-charge math. Single source of truth for both
+ * {@link calcTravelCharge} and the operator-side breakdown display, so the
+ * displayed math always matches what's billed.
+ *
+ * Pass ONE-WAY travelMins; this doubles internally to produce the round-trip
+ * charge. Returns zeros for no travel (remote, or geocoded to origin).
+ * @param travelMins - One-way drive time in minutes (from `lookupDriveDistance`).
+ * @param travelRatePerHour - Travel hourly rate, sourced from the `Travel` RateConfig.
+ * @returns Per-step breakdown of the round-trip charge.
+ */
+export function breakdownTravelCharge(
+  travelMins: number,
+  travelRatePerHour: number,
+): TravelChargeBreakdown {
+  if (travelMins <= 0 || travelRatePerHour <= 0) {
+    return { rawCost: 0, roundedCost: 0, finalCost: 0, minimumApplied: false };
+  }
+  const rawCost = Math.round((travelMins / 60) * 2 * travelRatePerHour * 100) / 100;
+  const roundedCost = Math.round(rawCost / 5) * 5;
+  const finalCost = Math.max(MIN_TRAVEL_CHARGE, roundedCost);
+  return {
+    rawCost,
+    roundedCost,
+    finalCost,
+    minimumApplied: roundedCost < MIN_TRAVEL_CHARGE,
+  };
+}
+
 /**
  * Round-trip travel charge. Doubles one-way drive time, snaps to $5, and
  * floors at MIN_TRAVEL_CHARGE. Returns 0 for no travel (remote, or geocoded
@@ -88,10 +128,7 @@ export const CANCELLATION: CancellationPolicy = {
  * @returns Charge in NZD (whole dollars after $5 rounding), or 0 when no travel.
  */
 export function calcTravelCharge(travelMins: number, travelRatePerHour: number): number {
-  if (travelMins <= 0 || travelRatePerHour <= 0) return 0;
-  const raw = (travelMins / 60) * 2 * travelRatePerHour;
-  const roundedToFive = Math.round(raw / 5) * 5;
-  return Math.max(MIN_TRAVEL_CHARGE, roundedToFive);
+  return breakdownTravelCharge(travelMins, travelRatePerHour).finalCost;
 }
 
 /**

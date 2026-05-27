@@ -119,6 +119,8 @@ export interface TaskLine {
   details?: string | null;
   /** AI-flagged "short" task ("quickly", "briefly", one-shot actions). Pinned at 15 min by the rebalance helper so non-short tasks absorb the correction. */
   isShort?: boolean;
+  /** AI-flagged task with an operator-stated explicit duration. Pinned at the parser-emitted qty by the rebalance helper, so only floating tasks absorb any window mismatch. */
+  isExplicit?: boolean;
 }
 
 export interface PartLine {
@@ -138,6 +140,12 @@ export interface TravelEntry {
   cost: number;
   /** True when this entry was created by the address lookup; lets re-lookup replace it. */
   isAuto?: boolean;
+  /** Destination text shown in the operator-side breakdown (auto entries only). */
+  destination?: string;
+  /** One-way drive time in minutes from the address lookup (auto entries only). */
+  durationMinsOneWay?: number;
+  /** One-way drive distance in km from the address lookup (auto entries only). */
+  distanceKmOneWay?: number;
 }
 
 export interface JobCalculation {
@@ -218,6 +226,8 @@ export interface ParsedTaskLine {
   details?: string | null;
   /** True when the AI placed this task in the SHORT set (one-shot, quickly, briefly, etc.). */
   isShort?: boolean;
+  /** True when the AI pinned this task to an operator-stated explicit duration. Pinned tasks are skipped by the post-parse safety-net rebalance. */
+  isExplicit?: boolean;
 }
 
 export interface ParsedPartLine {
@@ -261,7 +271,9 @@ export interface SheetCounterResponse {
 }
 
 export interface TravelInfo {
-  distanceKm: number;
+  /** One-way drive distance in km from the address lookup. */
+  distanceKmOneWay: number;
+  /** One-way drive time in minutes; calcTravelCharge doubles internally to produce the round-trip charge. */
   durationMins: number;
   destination?: string;
 }

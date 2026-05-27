@@ -160,13 +160,14 @@ const SHORT_TASK_MINUTES = 15;
 
 /**
  * Collapses task lines so their total hourly minutes fit the listed job window.
- * Tasks the AI flagged as `isShort` ("quickly", one-shots, etc.) are pinned at
- * {@link SHORT_TASK_MINUTES}; the remaining non-short tasks scale proportionally
- * to fill what's left of the window, so an over-long primary task absorbs more
- * of the correction than a correctly-sized one. Non-short tasks that would
- * scale below {@link MIN_TASK_MINUTES} are dropped, then the rest rescale.
- * Snaps qty to 5-min increments and parks any rounding remainder on the
- * largest survivor so totals match exactly. Flat-rate tasks pass through.
+ * Pinned tasks (isShort or isExplicit) keep their parser-emitted qty - short
+ * tasks at {@link SHORT_TASK_MINUTES}, explicit tasks at whatever the operator
+ * stated. The remaining floating tasks scale proportionally to fill what's
+ * left of the window, so an over-long primary task absorbs more of the
+ * correction than a correctly-sized one. Floating tasks that would scale
+ * below {@link MIN_TASK_MINUTES} are dropped, then the rest rescale. Snaps
+ * qty to 5-min increments and parks any rounding remainder on the largest
+ * floating survivor so totals match exactly. Flat-rate tasks pass through.
  * @param tasks - Task lines to collapse.
  * @param windowMin - Target window in minutes (`durationMins`).
  * @returns Adjusted task list, count of dropped tasks, and whether any qty was rescaled.
@@ -192,52 +193,62 @@ export function collapseToWindow(
     dropped++;
   }
 
-  let nonShort: TaskLine[] = hourlyIn.filter((t) => !t.isShort);
-  const remainingMin = windowMin - short.length * SHORT_TASK_MINUTES;
+  // Explicit-but-not-short tasks keep their parser-emitted qty. Drop them
+  // (newest first) only if the remaining window can't accommodate them.
+  const explicit: TaskLine[] = hourlyIn.filter((t) => t.isExplicit && !t.isShort);
+  const shortMin = short.length * SHORT_TASK_MINUTES;
+  while (explicit.length > 0 && shortMin + sumTaskMinutes(explicit) > windowMin) {
+    explicit.pop();
+    dropped++;
+  }
+  const pinnedMin = shortMin + sumTaskMinutes(explicit);
 
-  if (nonShort.length === 0) {
-    return { tasks: [...short, ...flat], dropped, rescaled: true };
+  let floating: TaskLine[] = hourlyIn.filter((t) => !t.isShort && !t.isExplicit);
+  const remainingMin = windowMin - pinnedMin;
+
+  if (floating.length === 0) {
+    return { tasks: [...short, ...explicit, ...flat], dropped, rescaled: true };
   }
 
   if (remainingMin <= 0) {
-    // Short tasks already cover the whole window; drop every non-short.
-    dropped += nonShort.length;
-    return { tasks: [...short, ...flat], dropped, rescaled: true };
+    // Pinned tasks already cover the whole window; drop every floating one.
+    dropped += floating.length;
+    return { tasks: [...short, ...explicit, ...flat], dropped, rescaled: true };
   }
 
-  // Scale non-short proportionally to fill remainingMin; drop tasks that
+  // Scale floating tasks proportionally to fill remainingMin; drop tasks that
   // would land below MIN_TASK_MINUTES and rescale until everything fits.
-  while (nonShort.length > 0) {
-    const sum = sumTaskMinutes(nonShort);
+  while (floating.length > 0) {
+    const sum = sumTaskMinutes(floating);
     if (sum <= remainingMin) break;
     const multiplier = remainingMin / sum;
-    const scaled = nonShort.map((t) => ({ task: t, scaledMin: t.qty * 60 * multiplier }));
+    const scaled = floating.map((t) => ({ task: t, scaledMin: t.qty * 60 * multiplier }));
     const tooSmall = scaled.filter((s) => s.scaledMin < MIN_TASK_MINUTES);
     if (tooSmall.length === 0) {
-      nonShort = scaled.map((s) => withMinutes(s.task, snapMinutes(s.scaledMin)));
+      floating = scaled.map((s) => withMinutes(s.task, snapMinutes(s.scaledMin)));
       break;
     }
     scaled.sort((a, b) => a.scaledMin - b.scaledMin);
     const removed = scaled[0].task;
-    nonShort = nonShort.filter((t) => t !== removed);
+    floating = floating.filter((t) => t !== removed);
     dropped++;
   }
 
-  // Park rounding remainder on the largest non-short survivor so totals match.
-  const combined = [...short, ...nonShort];
+  // Park rounding remainder on the largest floating survivor so totals match.
+  const combined = [...short, ...explicit, ...floating];
   if (combined.length > 0) {
     const error = windowMin - sumTaskMinutes(combined);
-    if (error !== 0 && nonShort.length > 0) {
+    if (error !== 0 && floating.length > 0) {
       let biggestIdx = 0;
-      for (let i = 1; i < nonShort.length; i++) {
-        if (nonShort[i].qty > nonShort[biggestIdx].qty) biggestIdx = i;
+      for (let i = 1; i < floating.length; i++) {
+        if (floating[i].qty > floating[biggestIdx].qty) biggestIdx = i;
       }
-      const adjustedMin = Math.max(MIN_TASK_MINUTES, nonShort[biggestIdx].qty * 60 + error);
-      nonShort[biggestIdx] = withMinutes(nonShort[biggestIdx], adjustedMin);
+      const adjustedMin = Math.max(MIN_TASK_MINUTES, floating[biggestIdx].qty * 60 + error);
+      floating[biggestIdx] = withMinutes(floating[biggestIdx], adjustedMin);
     }
   }
 
-  return { tasks: [...short, ...nonShort, ...flat], dropped, rescaled: true };
+  return { tasks: [...short, ...explicit, ...floating, ...flat], dropped, rescaled: true };
 }
 
 /**
