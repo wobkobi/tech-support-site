@@ -1268,7 +1268,10 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
               setPickedContactName(c.name);
               setPickedContactCompany(company);
               setPickedContactGoogleId(c.id || null);
-              setAddressMode("name");
+              // Bypass the setAddressMode wrapper - it reads pickedContactName
+              // from this same render's closure (still null), which would flip
+              // the mode to "custom". We just set the name explicitly above.
+              setAddressModeState("name");
             }}
             onClearContact={() => {
               setPickedContactName(null);

@@ -28,11 +28,11 @@ export const GST_RATE = 0.15;
  */
 export const GST_REGISTERED = false;
 
-/** 15-minute floor; matches BILLING_INCREMENT_MINS so floor + round don't double-snap. */
+/** Minimum charge once any billable work happens; 15 is a multiple of BILLING_INCREMENT_MINS so the floor + round don't double-snap. */
 export const MIN_BILLABLE_MINS = 15;
 
-/** Round-up step for billable time; mirrors billableMins in business.ts. */
-export const BILLING_INCREMENT_MINS = 15;
+/** Round-to-nearest step for billable time; mirrors billableMins in business.ts. */
+export const BILLING_INCREMENT_MINS = 5;
 
 /** Multiplier applied to labour on NZ public holidays. Travel and parts are not uplifted. */
 export const PUBLIC_HOLIDAY_UPLIFT = 0.25;
@@ -156,7 +156,7 @@ export function isWithinTravelWindow(bookingStart: Date, now: Date = new Date())
 }
 
 /**
- * Applies the 15-minute floor then rounds up to the next 15-minute increment.
+ * Applies the 15-minute floor then rounds to the nearest 5-minute increment.
  * 0 stays 0 (no work, no charge) so a placeholder job does not invent time.
  * @param rawMins - Actual worked minutes.
  * @returns Billable minutes after the floor.

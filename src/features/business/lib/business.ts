@@ -5,7 +5,11 @@ import type {
   TaskLine,
   TravelEntry,
 } from "@/features/business/types/business";
-import { GST_REGISTERED, GST_RATE } from "@/features/business/lib/pricing-policy";
+import {
+  BILLING_INCREMENT_MINS,
+  GST_REGISTERED,
+  GST_RATE,
+} from "@/features/business/lib/pricing-policy";
 import { formatDateSlash } from "@/shared/lib/date-format";
 
 /**
@@ -103,13 +107,15 @@ export function nextInvoiceNumber(
 }
 
 /**
- * Rounds a duration up to the nearest 15-minute billing increment.
+ * Rounds a duration to the nearest BILLING_INCREMENT_MINS slot. Symmetric
+ * rounding so customers are never bumped a full slot for a single minute of
+ * overage; the operator gives back as often as they collect.
  * @param mins - Actual duration in minutes
- * @returns Billable duration rounded up to nearest 15 min
+ * @returns Billable duration rounded to the nearest billing increment
  */
 export function billableMins(mins: number): number {
   if (mins <= 0) return 0;
-  return Math.ceil(mins / 15) * 15;
+  return Math.round(mins / BILLING_INCREMENT_MINS) * BILLING_INCREMENT_MINS;
 }
 
 /**
