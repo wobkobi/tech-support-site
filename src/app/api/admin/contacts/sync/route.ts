@@ -32,9 +32,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: true, importedCount, syncedCount });
   } catch (error) {
     console.error("[api/admin/contacts/sync] Error:", error);
-    return NextResponse.json(
-      { ok: false, error: error instanceof Error ? error.message : "Unknown error" },
-      { status: 500 },
-    );
+    // Generic message to the client; the OAuth / Google API detail goes only
+    // to the server log so a transient Google failure can't leak the shape of
+    // the credentials or the integration internals.
+    return NextResponse.json({ ok: false, error: "Contact sync failed." }, { status: 500 });
   }
 }

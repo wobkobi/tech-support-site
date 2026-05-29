@@ -7,6 +7,7 @@
 import { timingSafeEqual } from "crypto";
 import { NextRequest } from "next/server";
 import { notFound } from "next/navigation";
+import { getClientIp } from "@/shared/lib/rate-limit";
 
 /**
  * Validates a token against ADMIN_SECRET using constant-time comparison.
@@ -33,13 +34,67 @@ export function requireAdminToken(token: string | undefined): string {
   return token!;
 }
 
+// Per-IP failed-auth bucket. Only counts admin requests with a wrong/missing
+// X-Admin-Secret header so the operator's legitimate (successful) traffic
+// never hits the limit. When an IP exceeds the threshold within the window,
+// subsequent isAdminRequest calls from that IP fast-fail (return false
+// without running timingSafeEqual) until the window expires.
+interface AuthFailBucket {
+  count: number;
+  resetAt: number;
+}
+const authFailBuckets = new Map<string, AuthFailBucket>();
+const AUTH_FAIL_LIMIT = 30;
+const AUTH_FAIL_WINDOW_MS = 60_000;
+const AUTH_FAIL_MAX_BUCKETS = 1_000;
+
+/**
+ * Returns true when the given IP is currently over its failed-auth budget.
+ * Read-only check; does not increment.
+ * @param ip - Client IP from `getClientIp`.
+ * @returns Whether to fast-fail this request.
+ */
+function isOverAuthFailLimit(ip: string): boolean {
+  const b = authFailBuckets.get(ip);
+  if (!b || b.resetAt <= Date.now()) return false;
+  return b.count > AUTH_FAIL_LIMIT;
+}
+
+/**
+ * Records one failed admin-auth attempt against the IP's bucket. Also runs an
+ * opportunistic eviction pass so a burst of unique IPs can't leak memory.
+ * @param ip - Client IP from `getClientIp`.
+ */
+function recordAuthFail(ip: string): void {
+  const now = Date.now();
+  let b = authFailBuckets.get(ip);
+  if (!b || b.resetAt <= now) {
+    b = { count: 0, resetAt: now + AUTH_FAIL_WINDOW_MS };
+    authFailBuckets.set(ip, b);
+  }
+  b.count++;
+  if (authFailBuckets.size > AUTH_FAIL_MAX_BUCKETS) {
+    for (const [k, v] of authFailBuckets) {
+      if (v.resetAt <= now) authFailBuckets.delete(k);
+    }
+  }
+}
+
 /**
  * Checks if a request has valid admin credentials via X-Admin-Secret header.
+ * Failed attempts are rate-limited per-IP - after 30 failures in a minute,
+ * further checks from that IP fast-fail without running the constant-time
+ * comparison. Successful attempts never count, so the operator's legitimate
+ * traffic is unaffected.
  * @param req - The incoming request.
  * @returns True if the request has valid admin credentials.
  */
 export function isAdminRequest(req: NextRequest): boolean {
-  return isValidAdminToken(req.headers.get("x-admin-secret"));
+  const ip = getClientIp(req);
+  if (isOverAuthFailLimit(ip)) return false;
+  const ok = isValidAdminToken(req.headers.get("x-admin-secret"));
+  if (!ok) recordAuthFail(ip);
+  return ok;
 }
 
 /**
