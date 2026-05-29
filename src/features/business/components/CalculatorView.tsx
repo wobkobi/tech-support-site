@@ -101,6 +101,123 @@ function jobStartIsoFromTime(hhmm: string): string | null {
 }
 
 /**
+ * localStorage key for the calculator draft. Bump the version suffix when
+ * CalculatorDraft fields change so stale shapes can't crash the form.
+ */
+const DRAFT_KEY = "calculator-draft-v1";
+
+/**
+ * Subset of CalculatorView state worth persisting across refreshes. Excludes
+ * server-fetched data (rates, taskTemplates, contacts, activePromo), UI flags
+ * (showParts, showRates etc), loading state, and the AI-parse session.
+ */
+interface CalculatorDraft {
+  v: 1;
+  savedAt: number;
+  timeRanges: ParsedRange[];
+  durationMinsOverride: number | null;
+  hourlyRateId: string | null;
+  travelEntries: TravelEntry[];
+  jobAddress: string;
+  tasks: TaskLine[];
+  parts: PartLine[];
+  notes: string;
+  clientName: string;
+  clientEmail: string;
+  pickedContactName: string | null;
+  pickedContactCompany: string | null;
+  pickedContactGoogleId: string | null;
+  addressMode: "name" | "company" | "custom";
+  unsuccessful: boolean;
+}
+
+/**
+ * True when the draft has at least one field the operator clearly typed or
+ * picked - used to decide whether to show the "Draft restored" toast.
+ * Auto-seeded values (time slots, default hourly rate) on their own aren't
+ * worth surfacing as a restore notification.
+ * @param d - Parsed draft.
+ * @returns Whether the draft is worth announcing on restore.
+ */
+function isMeaningfulDraft(d: CalculatorDraft): boolean {
+  return (
+    d.tasks.length > 0 ||
+    d.parts.length > 0 ||
+    d.travelEntries.length > 0 ||
+    d.notes.trim().length > 0 ||
+    d.clientName.trim().length > 0 ||
+    d.clientEmail.trim().length > 0 ||
+    d.jobAddress.trim().length > 0 ||
+    d.pickedContactName !== null ||
+    d.pickedContactCompany !== null ||
+    d.unsuccessful ||
+    d.durationMinsOverride !== null
+  );
+}
+
+/**
+ * Reads the saved draft from localStorage. Returns null when no draft exists,
+ * the JSON is corrupt, or the schema version doesn't match (so old shapes are
+ * ignored after a bump rather than crashing the form).
+ * @returns Parsed draft, or null.
+ */
+function loadDraft(): CalculatorDraft | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as CalculatorDraft;
+    if (parsed?.v !== 1) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Writes the draft to localStorage with a fresh savedAt timestamp. Failures
+ * (quota, private mode etc) are swallowed so persistence never blocks editing.
+ * @param draft - Form-state fields to persist (savedAt + v are added here).
+ */
+function saveDraft(draft: Omit<CalculatorDraft, "v" | "savedAt">): void {
+  if (typeof window === "undefined") return;
+  try {
+    const payload: CalculatorDraft = { v: 1, savedAt: Date.now(), ...draft };
+    window.localStorage.setItem(DRAFT_KEY, JSON.stringify(payload));
+  } catch {
+    /* QuotaExceeded or private mode - silently degrade */
+  }
+}
+
+/** Drops the saved draft so the next mount starts clean. */
+function clearDraft(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(DRAFT_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * Renders a "X min ago" label given a stable now timestamp. Used by the
+ * draft-restored toast.
+ * @param savedAt - When the draft was saved.
+ * @param now - Reference now (captured once at mount to keep render pure).
+ * @returns Display label.
+ */
+function timeAgo(savedAt: number, now: number): string {
+  const seconds = Math.max(0, Math.floor((now - savedAt) / 1000));
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hr ago`;
+  const days = Math.floor(hours / 24);
+  return `${days} day${days === 1 ? "" : "s"} ago`;
+}
+
+/**
  * Builds an empty hourly task line seeded with the default base rate (e.g.
  * Standard $65/hr) and no modifiers. The operator picks the device + action
  * after adding the row, and toggles modifier chips to adjust the effective
@@ -139,35 +256,67 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
   const router = useRouter();
   const headers = { "X-Admin-Secret": token };
 
+  // Lazy-read the saved draft once at mount. Non-meaningful drafts (just the
+  // auto-seeded "now" times from a previous session, nothing the operator
+  // typed) are treated as "no draft" - that way a refresh after a Clear gets
+  // fresh times instead of restoring stale 5-min-old timestamps.
+  const initialDraft = useMemo(() => {
+    const d = loadDraft();
+    if (!d) return null;
+    if (!isMeaningfulDraft(d)) return null;
+    return d;
+  }, []);
+  // Captured once to keep timeAgo() pure for the toast label.
+  const [mountedAt] = useState(() => Date.now());
+  const [draftRestoredAt, setDraftRestoredAt] = useState<number | null>(
+    initialDraft?.savedAt ?? null,
+  );
+
   const [rates, setRates] = useState<RateConfig[]>([]);
   const [taskTemplates, setTaskTemplates] = useState<TaskTemplate[]>([]);
   // Multiple time slots all lump into one billable duration. AI parse populates
   // one slot per detected HH:MM-HH:MM segment; operators can add/remove rows
   // via the Time card. No labels, dates, or per-slot travel - it's all flat.
-  const [timeRanges, setTimeRanges] = useState<ParsedRange[]>([{ startTime: "", endTime: "" }]);
+  const [timeRanges, setTimeRanges] = useState<ParsedRange[]>(
+    () => initialDraft?.timeRanges ?? [{ startTime: "", endTime: "" }],
+  );
   // Operator override; null means "derive from sum of slots". Lets gaps inside
   // a single slot (lunch, etc.) be billed manually.
-  const [durationMinsOverride, setDurationMinsOverride] = useState<number | null>(null);
+  const [durationMinsOverride, setDurationMinsOverride] = useState<number | null>(
+    () => initialDraft?.durationMinsOverride ?? null,
+  );
   // Every travel charge (auto-lookup + any manual entries) lumped together.
   // jobToLineItems sums them into a single "Travel" invoice line.
-  const [travelEntries, setTravelEntries] = useState<TravelEntry[]>([]);
-  const [hourlyRateId, setHourlyRateId] = useState<string | null>(null);
-  const [tasks, setTasks] = useState<TaskLine[]>([]);
-  const [parts, setParts] = useState<PartLine[]>([]);
+  const [travelEntries, setTravelEntries] = useState<TravelEntry[]>(
+    () => initialDraft?.travelEntries ?? [],
+  );
+  const [hourlyRateId, setHourlyRateId] = useState<string | null>(
+    () => initialDraft?.hourlyRateId ?? null,
+  );
+  const [tasks, setTasks] = useState<TaskLine[]>(() => initialDraft?.tasks ?? []);
+  const [parts, setParts] = useState<PartLine[]>(() => initialDraft?.parts ?? []);
   const [showParts, setShowParts] = useState(false);
   const [showTaxonomyModal, setShowTaxonomyModal] = useState(false);
-  const [notes, setNotes] = useState("");
+  const [notes, setNotes] = useState(() => initialDraft?.notes ?? "");
   // Half off labour when ticked (per pricing-policy.unsuccessfulWorkCopy).
-  const [unsuccessful, setUnsuccessful] = useState(false);
-  const [clientName, setClientName] = useState("");
-  const [clientEmail, setClientEmail] = useState("");
+  const [unsuccessful, setUnsuccessful] = useState(() => initialDraft?.unsuccessful ?? false);
+  const [clientName, setClientName] = useState(() => initialDraft?.clientName ?? "");
+  const [clientEmail, setClientEmail] = useState(() => initialDraft?.clientEmail ?? "");
   // Address-to state mirrors the InvoiceBuilder's segmented control so the
   // operator picks Name/Company/Custom once and the choice rides through to
   // the invoice without re-picking.
-  const [pickedContactName, setPickedContactName] = useState<string | null>(null);
-  const [pickedContactCompany, setPickedContactCompany] = useState<string | null>(null);
-  const [pickedContactGoogleId, setPickedContactGoogleId] = useState<string | null>(null);
-  const [addressMode, setAddressModeState] = useState<"name" | "company" | "custom">("custom");
+  const [pickedContactName, setPickedContactName] = useState<string | null>(
+    () => initialDraft?.pickedContactName ?? null,
+  );
+  const [pickedContactCompany, setPickedContactCompany] = useState<string | null>(
+    () => initialDraft?.pickedContactCompany ?? null,
+  );
+  const [pickedContactGoogleId, setPickedContactGoogleId] = useState<string | null>(
+    () => initialDraft?.pickedContactGoogleId ?? null,
+  );
+  const [addressMode, setAddressModeState] = useState<"name" | "company" | "custom">(
+    () => initialDraft?.addressMode ?? "custom",
+  );
   // Direct-save (Save invoice) state. pendingInvoiceId is set after a
   // successful POST so handleAddContactClose can PATCH `contactId` once the
   // modal returns the new Contact's id, then navigate to the detail page.
@@ -184,7 +333,7 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
   const [clarifyQuestions, setClarifyQuestions] = useState<ParseJobQuestion[]>([]);
   const [clarifyAnswers, setClarifyAnswers] = useState<Record<string, string>>({});
 
-  const [jobAddress, setJobAddress] = useState("");
+  const [jobAddress, setJobAddress] = useState(() => initialDraft?.jobAddress ?? "");
   const [lookingUpTravel, setLookingUpTravel] = useState(false);
   const addressInputRef = useRef<HTMLInputElement>(null);
 
@@ -269,11 +418,17 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
         { ok: boolean; promo: ActivePromo | null },
         { ok: boolean; contacts: GoogleContact[] },
       ]) => {
-        setTimeRanges([{ startTime: now, endTime: addHour(now) }]);
+        // Skip the "now" + default-rate seeding when a draft was restored on
+        // mount - the draft's values are the source of truth in that case.
+        if (!initialDraft) {
+          setTimeRanges([{ startTime: now, endTime: addHour(now) }]);
+        }
         if (ratesData.ok) {
           setRates(ratesData.rates);
-          const def = ratesData.rates.find((r) => r.isDefault);
-          if (def) setHourlyRateId(def.id);
+          if (!initialDraft) {
+            const def = ratesData.rates.find((r) => r.isDefault);
+            if (def) setHourlyRateId(def.id);
+          }
         }
         if (templatesData.ok) setTaskTemplates(templatesData.templates);
         setActivePromo(promoData.promo ?? null);
@@ -281,6 +436,54 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
       },
     );
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Debounced draft writer. Any change to a persisted form field schedules a
+  // write 500ms later; rapid edits coalesce into one localStorage hit.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      saveDraft({
+        timeRanges,
+        durationMinsOverride,
+        hourlyRateId,
+        travelEntries,
+        jobAddress,
+        tasks,
+        parts,
+        notes,
+        clientName,
+        clientEmail,
+        pickedContactName,
+        pickedContactCompany,
+        pickedContactGoogleId,
+        addressMode,
+        unsuccessful,
+      });
+    }, 500);
+    return () => clearTimeout(t);
+  }, [
+    timeRanges,
+    durationMinsOverride,
+    hourlyRateId,
+    travelEntries,
+    jobAddress,
+    tasks,
+    parts,
+    notes,
+    clientName,
+    clientEmail,
+    pickedContactName,
+    pickedContactCompany,
+    pickedContactGoogleId,
+    addressMode,
+    unsuccessful,
+  ]);
+
+  // Auto-dismiss the "Draft restored" toast 8s after it appears.
+  useEffect(() => {
+    if (draftRestoredAt == null) return;
+    const t = setTimeout(() => setDraftRestoredAt(null), 8000);
+    return () => clearTimeout(t);
+  }, [draftRestoredAt]);
 
   const sumRangesMin = timeRanges.reduce((s, r) => s + timeDiffMins(r.startTime, r.endTime), 0);
   const durationMins = durationMinsOverride != null ? durationMinsOverride : sumRangesMin;
@@ -618,7 +821,41 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
         // Best-effort backfill; the invoice still saves without the FK.
       }
     }
+    clearDraft();
     router.push(`/admin/business/invoices/${invoiceId}?token=${encodeURIComponent(token)}`);
+  }
+
+  /**
+   * Resets every persisted form field back to its mount-time default and
+   * drops the saved draft. Single source of truth for "start fresh", shared
+   * by the manual Clear button, the income-save success path, and the
+   * Discard link on the draft-restored toast.
+   */
+  function resetFormState(): void {
+    const now = nowTime();
+    setTimeRanges([{ startTime: now, endTime: addHour(now) }]);
+    setDurationMinsOverride(null);
+    setHourlyRateId(rates.find((r) => r.isDefault)?.id ?? null);
+    setTravelEntries([]);
+    setJobAddress("");
+    setTasks([]);
+    setParts([]);
+    setNotes("");
+    setClientName("");
+    setClientEmail("");
+    setPickedContactName(null);
+    setPickedContactCompany(null);
+    setPickedContactGoogleId(null);
+    setAddressModeState("custom");
+    setUnsuccessful(false);
+    // Non-persisted parse-session state, but still part of "starting fresh".
+    setAiInput("");
+    setParseResult(null);
+    setHasParsed(false);
+    setClarifyQuestions([]);
+    setClarifyAnswers({});
+    setDraftRestoredAt(null);
+    clearDraft();
   }
 
   /**
@@ -698,6 +935,10 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
           // Fall through to navigate.
         }
       }
+      // Drop the saved draft so the calculator starts blank next time the
+      // operator opens it (mirrors the AddToContactsModal-gated path: the
+      // backfill handler in handleAddContactClose ALSO clears the draft).
+      clearDraft();
       router.push(`/admin/business/invoices/${invoiceId}?token=${encodeURIComponent(token)}`);
     } catch (err) {
       setSaveInvoiceError(err instanceof Error ? err.message : "Could not save invoice");
@@ -727,20 +968,7 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
     if (d.ok) {
       setIncomeToast("Income entry saved.");
       setTimeout(() => setIncomeToast(null), 3000);
-      const now = nowTime();
-      setTimeRanges([{ startTime: now, endTime: addHour(now) }]);
-      setDurationMinsOverride(null);
-      setTravelEntries([]);
-      setTasks([]);
-      setParts([]);
-      setNotes("");
-      setClientName("");
-      setClientEmail("");
-      setAiInput("");
-      setParseResult(null);
-      setHasParsed(false);
-      setClarifyQuestions([]);
-      setClarifyAnswers({});
+      resetFormState();
     }
     setSavingIncome(false);
   }
@@ -1315,6 +1543,22 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
 
           {/* Actions */}
           <div className={cn("space-y-2")}>
+            {draftRestoredAt !== null && (
+              <div
+                className={cn(
+                  "flex items-center justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-800",
+                )}
+              >
+                <span>Draft restored - last edited {timeAgo(draftRestoredAt, mountedAt)}.</span>
+                <button
+                  type="button"
+                  onClick={resetFormState}
+                  className={cn("font-semibold text-blue-700 hover:underline")}
+                >
+                  Discard
+                </button>
+              </div>
+            )}
             {incomeToast && (
               <div
                 className={cn(
@@ -1364,24 +1608,7 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
               {savingIncome ? "Saving..." : "Save as income entry"}
             </button>
             <button
-              onClick={() => {
-                const now = nowTime();
-                setTimeRanges([{ startTime: now, endTime: addHour(now) }]);
-                setDurationMinsOverride(null);
-                setTravelEntries([]);
-                setTasks([]);
-                setParts([]);
-                setNotes("");
-                setClientName("");
-                setClientEmail("");
-                setAiInput("");
-                setParseResult(null);
-                setHasParsed(false);
-                setJobAddress("");
-                setClarifyQuestions([]);
-                setClarifyAnswers({});
-                setUnsuccessful(false);
-              }}
+              onClick={resetFormState}
               className={cn(
                 "w-full rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-500 hover:bg-slate-50",
               )}
