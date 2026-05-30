@@ -39,20 +39,16 @@ export interface LinkHistoryEntry {
 
 interface ReviewLinkHistoryTableProps {
   entries: LinkHistoryEntry[];
-  /** Admin token for API calls */
-  token: string;
 }
 
 /**
  * Renders the review link history table with inline editing for manual and legacy entries.
  * @param props - Component props.
  * @param props.entries - History rows to display.
- * @param props.token - Admin token.
  * @returns History table element.
  */
 export function ReviewLinkHistoryTable({
   entries: initialEntries,
-  token,
 }: ReviewLinkHistoryTableProps): React.ReactElement {
   const [entries, setEntries] = useState(initialEntries);
   const [query, setQuery] = useState("");
@@ -113,7 +109,7 @@ export function ReviewLinkHistoryTable({
     try {
       const res = await fetch(`/api/admin/contacts/${entry.id}/clear-review-link`, {
         method: "POST",
-        headers: { "X-Admin-Secret": token },
+        headers: {},
       });
       const data = (await res.json()) as { ok?: boolean; error?: string };
       if (!res.ok) throw new Error(data.error ?? "Request failed");
@@ -140,7 +136,7 @@ export function ReviewLinkHistoryTable({
       // (customerRef / reviewId only) are read-only.
       const res = await fetch(`/api/admin/contacts/${entry.id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", "X-Admin-Secret": token },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: editEmail,
           phone: editPhoneInput,

@@ -26,8 +26,6 @@ interface DeleteResponse {
 }
 
 interface Props {
-  /** Admin token for the X-Admin-Secret header. */
-  token: string;
   /** Called when the user dismisses the modal. */
   onClose: () => void;
   /** Called after a tag is cleared so the parent can refresh its template list. */
@@ -39,13 +37,12 @@ interface Props {
  * with a per-row "clear" button. Clicking clear sets that tag to null on every
  * task row currently using it - the tasks remain, just untagged.
  * @param props - Component props.
- * @param props.token - Admin token forwarded as X-Admin-Secret.
  * @param props.onClose - Dismiss handler.
  * @param props.onChanged - Optional callback fired after a successful delete.
  * @returns Modal element.
  */
-export function TaxonomyManageModal({ token, onClose, onChanged }: Props): React.ReactElement {
-  const headers: Record<string, string> = { "X-Admin-Secret": token };
+export function TaxonomyManageModal({ onClose, onChanged }: Props): React.ReactElement {
+  const headers: Record<string, string> = {};
 
   const [devices, setDevices] = useState<string[]>([]);
   const [actions, setActions] = useState<string[]>([]);

@@ -19,8 +19,6 @@ import type React from "react";
 interface ReviewCardProps {
   /** Review data */
   row: ReviewRow;
-  /** Admin token for API calls */
-  token: string;
   /** Callback when review is approved */
   onApprove?: () => void;
   /** Callback when review approval is revoked */
@@ -33,7 +31,6 @@ interface ReviewCardProps {
  * A single review card with action buttons.
  * @param props - Component props.
  * @param props.row - Review data.
- * @param props.token - Admin token for API calls.
  * @param props.onApprove - Callback when review is approved.
  * @param props.onRevoke - Callback when review approval is revoked.
  * @param props.onDelete - Callback when review is deleted.
@@ -41,7 +38,6 @@ interface ReviewCardProps {
  */
 export function ReviewCard({
   row,
-  token,
   onApprove,
   onRevoke,
   onDelete,
@@ -79,7 +75,7 @@ export function ReviewCard({
     try {
       const res = await fetch(`/api/admin/reviews/${row.id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", "X-Admin-Secret": token },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action }),
       });
       if (!res.ok) throw new Error("Request failed");
@@ -102,7 +98,7 @@ export function ReviewCard({
     try {
       const res = await fetch(`/api/admin/reviews/${row.id}`, {
         method: "DELETE",
-        headers: { "X-Admin-Secret": token },
+        headers: {},
       });
       if (!res.ok) throw new Error("Request failed");
       onDelete();

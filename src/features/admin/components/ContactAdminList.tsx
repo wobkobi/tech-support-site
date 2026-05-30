@@ -377,15 +377,12 @@ const PAGE_LOAD_TIME = Date.now();
  * Synced contacts are grouped in a collapsible section below.
  * @param props - Component props.
  * @param props.contacts - Contact rows to display.
- * @param props.token - Admin token for authenticated PATCH calls.
  * @returns Contact list element.
  */
 export function ContactAdminList({
   contacts: initialContacts,
-  token,
 }: {
   contacts: ContactRow[];
-  token: string;
 }): React.ReactElement {
   const [contacts, setContacts] = useState<ContactRow[]>(initialContacts);
   useEffect(() => {
@@ -483,7 +480,7 @@ export function ContactAdminList({
   async function exportContacts(): Promise<void> {
     try {
       const res = await fetch("/api/admin/contacts/export", {
-        headers: { "X-Admin-Secret": token },
+        headers: {},
       });
       if (!res.ok) {
         console.error("[ContactAdminList] Export failed:", res.status);
@@ -514,7 +511,7 @@ export function ContactAdminList({
     try {
       const res = await fetch(`/api/admin/contacts/${id}/sync-google`, {
         method: "POST",
-        headers: { "X-Admin-Secret": token },
+        headers: {},
       });
       const data = (await res.json()) as { ok: boolean; error?: string };
       if (data.ok) {
@@ -555,7 +552,6 @@ export function ContactAdminList({
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "X-Admin-Secret": token,
         },
         body: JSON.stringify(editValues),
       });

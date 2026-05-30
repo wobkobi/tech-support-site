@@ -10,7 +10,7 @@ import type { GoogleContact } from "@/features/business/types/business";
  * @returns JSON with contacts array (name, email, phone, company)
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

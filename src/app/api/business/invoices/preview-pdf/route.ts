@@ -29,7 +29,7 @@ interface PreviewPayload {
  * @returns The rendered PDF as application/pdf with a download header.
  */
 export async function POST(request: NextRequest): Promise<Response> {
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

@@ -28,7 +28,6 @@ import {
 export type { WeekEvent, WeekViewKind };
 
 interface WeekViewProps {
-  token: string;
   /** ISO of Monday-NZ-midnight for the initial week (state takes over after mount). */
   initialWeekStartIso: string;
   /** All day keys in the buffered 21-day window (prev + current + next week). */
@@ -47,7 +46,6 @@ const DAY_HEIGHT_PX = DAY_HOURS * 60 * PX_PER_MINUTE;
 /**
  * Renders the week schedule grid and the manual-booking modal trigger.
  * @param props - Component props.
- * @param props.token - Admin token forwarded to the modal POST + week nav links.
  * @param props.initialWeekStartIso - ISO of Monday-NZ-midnight for the initial week.
  * @param props.bufferedDayKeys - Day keys in the buffered 21-day window.
  * @param props.events - Events to render across the buffered window.
@@ -55,7 +53,6 @@ const DAY_HEIGHT_PX = DAY_HOURS * 60 * PX_PER_MINUTE;
  * @returns Week view element.
  */
 export function WeekView({
-  token,
   initialWeekStartIso,
   bufferedDayKeys,
   events,
@@ -90,7 +87,7 @@ export function WeekView({
    */
   function goToWeek(weekStartKey: string): void {
     if (!bufferedDayKeys.includes(weekStartKey)) {
-      const params = new URLSearchParams({ token, weekStart: weekStartKey });
+      const params = new URLSearchParams({ weekStart: weekStartKey });
       startTransition(() => {
         router.push(`/admin/schedule?${params.toString()}`);
       });
@@ -285,7 +282,6 @@ export function WeekView({
                       {day.subLabel}
                     </div>
                     <BlockDayButton
-                      token={token}
                       dateKey={day.key}
                       busyEventId={busyEvent?.id ?? null}
                       hasBookings={hasBookings}
@@ -368,11 +364,7 @@ export function WeekView({
       </div>
 
       {modalStartAt && (
-        <ManualBookingModal
-          token={token}
-          startAtIso={modalStartAt}
-          onClose={() => setModalStartAt(null)}
-        />
+        <ManualBookingModal startAtIso={modalStartAt} onClose={() => setModalStartAt(null)} />
       )}
     </div>
   );

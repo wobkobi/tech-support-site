@@ -2,11 +2,15 @@
 /**
  * @file auth.ts
  * @description Shared authentication utilities for admin routes and pages.
+ * Browser sessions go through a signed cookie (see `admin-session.ts`);
+ * scripts + cron still pass the header so curl / cron-job.org keep working.
  */
 
 import { timingSafeEqual } from "crypto";
+import { cookies } from "next/headers";
 import { NextRequest } from "next/server";
-import { notFound } from "next/navigation";
+import { redirect } from "next/navigation";
+import { ADMIN_SESSION_COOKIE, verifySessionCookieValue } from "@/shared/lib/admin-session";
 import { getClientIp } from "@/shared/lib/rate-limit";
 
 /**
@@ -22,16 +26,6 @@ export function isValidAdminToken(token: string | null | undefined): boolean {
   } catch {
     return false;
   }
-}
-
-/**
- * Validates the admin token from page searchParams, calling notFound() if invalid.
- * @param token - Token string from URL search params (may be undefined)
- * @returns The validated token string
- */
-export function requireAdminToken(token: string | undefined): string {
-  if (!isValidAdminToken(token ?? null)) notFound();
-  return token!;
 }
 
 // Per-IP failed-auth bucket. Only counts admin requests with a wrong/missing
@@ -81,20 +75,40 @@ function recordAuthFail(ip: string): void {
 }
 
 /**
- * Checks if a request has valid admin credentials via X-Admin-Secret header.
+ * Checks if a request has valid admin credentials. Accepts either the signed
+ * session cookie (browser path) or the X-Admin-Secret header (scripts / cron).
  * Failed attempts are rate-limited per-IP - after 30 failures in a minute,
- * further checks from that IP fast-fail without running the constant-time
- * comparison. Successful attempts never count, so the operator's legitimate
- * traffic is unaffected.
+ * further checks from that IP fast-fail without running the comparison.
+ * Successful attempts never count, so the operator's legitimate traffic is
+ * unaffected.
  * @param req - The incoming request.
  * @returns True if the request has valid admin credentials.
  */
-export function isAdminRequest(req: NextRequest): boolean {
+export async function isAdminRequest(req: NextRequest): Promise<boolean> {
   const ip = getClientIp(req);
   if (isOverAuthFailLimit(ip)) return false;
+  // Session cookie is the primary browser-driven path; check it first so the
+  // header path is only consulted for explicit script / cron callers.
+  const cookieValue = req.cookies.get(ADMIN_SESSION_COOKIE)?.value ?? null;
+  if (cookieValue && (await verifySessionCookieValue(cookieValue))) return true;
   const ok = isValidAdminToken(req.headers.get("x-admin-secret"));
   if (!ok) recordAuthFail(ip);
   return ok;
+}
+
+/**
+ * Server-component / server-action gate. Reads the admin session cookie via
+ * `next/headers` and redirects to `/admin/login?next=...` when missing or
+ * invalid. Defence-in-depth alongside the proxy guard - keeps individual
+ * pages safe even if the proxy matcher misses something.
+ * @param redirectPath - Path to land back on after login (defaults to `/admin`).
+ */
+export async function requireAdminAuth(redirectPath = "/admin"): Promise<void> {
+  const store = await cookies();
+  const value = store.get(ADMIN_SESSION_COOKIE)?.value ?? null;
+  const ok = await verifySessionCookieValue(value);
+  if (ok) return;
+  redirect(`/admin/login?next=${encodeURIComponent(redirectPath)}`);
 }
 
 /**

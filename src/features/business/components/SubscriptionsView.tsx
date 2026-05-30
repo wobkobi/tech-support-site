@@ -74,11 +74,9 @@ function isDueToday(nextDue: string): boolean {
 
 /**
  * Subscriptions manager - list, add, edit, record payment, delete.
- * @param root0 - Props
- * @param root0.token - Admin token
  * @returns Subscriptions view element.
  */
-export function SubscriptionsView({ token }: { token: string }): React.ReactElement {
+export function SubscriptionsView(): React.ReactElement {
   const [subs, setSubs] = useState<Subscription[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -97,15 +95,13 @@ export function SubscriptionsView({ token }: { token: string }): React.ReactElem
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/business/subscriptions", {
-        headers: { "x-admin-secret": token },
-      });
+      const res = await fetch("/api/business/subscriptions");
       const data = (await res.json()) as { ok: boolean; subscriptions: Subscription[] };
       if (data.ok) setSubs(data.subscriptions);
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, []);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -151,7 +147,7 @@ export function SubscriptionsView({ token }: { token: string }): React.ReactElem
       const method = editId ? "PATCH" : "POST";
       const res = await fetch(url, {
         method,
-        headers: { "x-admin-secret": token, "content-type": "application/json" },
+        headers: { "content-type": "application/json" },
         body: JSON.stringify({
           ...form,
           amountIncl: parseFloat(form.amountIncl),
@@ -180,7 +176,7 @@ export function SubscriptionsView({ token }: { token: string }): React.ReactElem
     try {
       const res = await fetch(`/api/business/subscriptions/${sub.id}/record`, {
         method: "POST",
-        headers: { "x-admin-secret": token },
+        headers: {},
       });
       const data = (await res.json()) as {
         ok: boolean;
@@ -208,7 +204,7 @@ export function SubscriptionsView({ token }: { token: string }): React.ReactElem
   async function handleToggleActive(sub: Subscription): Promise<void> {
     await fetch(`/api/business/subscriptions/${sub.id}`, {
       method: "PATCH",
-      headers: { "x-admin-secret": token, "content-type": "application/json" },
+      headers: { "content-type": "application/json" },
       body: JSON.stringify({ isActive: !sub.isActive }),
     });
     await load();
@@ -224,7 +220,7 @@ export function SubscriptionsView({ token }: { token: string }): React.ReactElem
     try {
       await fetch(`/api/business/subscriptions/${sub.id}`, {
         method: "DELETE",
-        headers: { "x-admin-secret": token },
+        headers: {},
       });
       showToast("Deleted.");
       await load();

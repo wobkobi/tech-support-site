@@ -2,7 +2,7 @@
 import type { Metadata } from "next";
 import type React from "react";
 import { prisma } from "@/shared/lib/prisma";
-import { requireAdminToken } from "@/shared/lib/auth";
+import { requireAdminAuth } from "@/shared/lib/auth";
 import { cn } from "@/shared/lib/cn";
 import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
 import {
@@ -19,17 +19,10 @@ export const metadata: Metadata = {
 
 /**
  * Admin bookings page listing all bookings with status filters.
- * @param root0 - Page props.
- * @param root0.searchParams - URL search parameters (contains token).
  * @returns Bookings page element.
  */
-export default async function AdminBookingsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ token?: string }>;
-}): Promise<React.ReactElement> {
-  const { token } = await searchParams;
-  const t = requireAdminToken(token);
+export default async function AdminBookingsPage(): Promise<React.ReactElement> {
+  await requireAdminAuth();
 
   // Soft cap to prevent unbounded scans as the booking history grows.
   // Swap for cursor pagination if more than the most recent 1000 bookings ever needs to be visible.
@@ -86,7 +79,7 @@ export default async function AdminBookingsPage({
   ];
 
   return (
-    <AdminPageLayout token={t} current="bookings">
+    <AdminPageLayout current="bookings">
       <div className={cn("mb-6 flex flex-wrap items-center justify-between gap-4")}>
         <h1 className={cn("text-russian-violet text-2xl font-extrabold")}>Bookings</h1>
         <div className={cn("flex flex-wrap gap-2")}>
@@ -102,7 +95,7 @@ export default async function AdminBookingsPage({
       </div>
 
       <div className={cn("rounded-xl border border-slate-200 bg-white p-6 shadow-sm")}>
-        <BookingAdminList bookings={bookingRows} token={t} />
+        <BookingAdminList bookings={bookingRows} />
       </div>
     </AdminPageLayout>
   );

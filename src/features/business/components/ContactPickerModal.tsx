@@ -8,7 +8,6 @@ import type { GoogleContact } from "@/features/business/types/business";
 import { filterContacts } from "@/features/contacts/lib/contact-search";
 
 interface ContactPickerModalProps {
-  token: string;
   onSelect: (contact: GoogleContact) => void;
   onClose: () => void;
 }
@@ -16,13 +15,11 @@ interface ContactPickerModalProps {
 /**
  * Modal dialog for searching and selecting a Google contact.
  * @param props - Component props
- * @param props.token - Admin auth token for the contacts API
  * @param props.onSelect - Callback fired when a contact is chosen
  * @param props.onClose - Callback fired when the modal is dismissed
  * @returns Contact picker modal element
  */
 export function ContactPickerModal({
-  token,
   onSelect,
   onClose,
 }: ContactPickerModalProps): React.ReactElement {
@@ -36,7 +33,7 @@ export function ContactPickerModal({
 
   useEffect(() => {
     inputRef.current?.focus();
-    fetch("/api/business/contacts", { headers: { "X-Admin-Secret": token } })
+    fetch("/api/business/contacts")
       .then((r) => r.json())
       .then((d) => {
         if (d.ok) setContacts(d.contacts);
@@ -44,7 +41,7 @@ export function ContactPickerModal({
       })
       .catch(() => setError("Could not load contacts."))
       .finally(() => setLoading(false));
-  }, [token]);
+  }, []);
 
   const filtered = useMemo(() => filterContacts(contacts, query), [contacts, query]);
 

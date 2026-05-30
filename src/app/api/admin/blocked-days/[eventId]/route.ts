@@ -22,7 +22,7 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ eventId: string }> },
 ): Promise<NextResponse> {
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 

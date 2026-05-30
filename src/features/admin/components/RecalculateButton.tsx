@@ -5,17 +5,11 @@ import type React from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/shared/lib/cn";
 
-interface RecalculateButtonProps {
-  token: string;
-}
-
 /**
  * Client button that triggers the travel time recalculation API and shows the result.
- * @param props - Component props.
- * @param props.token - Admin token for the API request.
  * @returns Recalculate button element.
  */
-export function RecalculateButton({ token }: RecalculateButtonProps): React.ReactElement {
+export function RecalculateButton(): React.ReactElement {
   const router = useRouter();
   const [recalculating, setRecalculating] = useState(false);
   const [result, setResult] = useState<string | null>(null);
@@ -26,7 +20,7 @@ export function RecalculateButton({ token }: RecalculateButtonProps): React.Reac
     try {
       const res = await fetch("/api/admin/travel/recalculate", {
         method: "POST",
-        headers: { "X-Admin-Secret": token },
+        headers: {},
       });
       const data = (await res.json()) as { ok: boolean; cachedCount?: number; error?: string };
       if (data.ok) {
@@ -40,7 +34,7 @@ export function RecalculateButton({ token }: RecalculateButtonProps): React.Reac
     } finally {
       setRecalculating(false);
     }
-  }, [token, router]);
+  }, [router]);
 
   return (
     <div className={cn("flex flex-wrap items-center gap-3")}>

@@ -30,7 +30,6 @@ interface ContactSuggestion {
 }
 
 interface ManualBookingModalProps {
-  token: string;
   startAtIso: string;
   onClose: () => void;
 }
@@ -38,13 +37,11 @@ interface ManualBookingModalProps {
 /**
  * Modal form for manual booking creation from the admin schedule grid.
  * @param props - Component props.
- * @param props.token - Admin token forwarded as x-admin-secret header.
  * @param props.startAtIso - Prefilled start time (ISO 8601) derived from the clicked slot.
  * @param props.onClose - Called when the modal should close (cancel or success).
  * @returns Modal element.
  */
 export function ManualBookingModal({
-  token,
   startAtIso,
   onClose,
 }: ManualBookingModalProps): React.ReactElement {
@@ -78,7 +75,7 @@ export function ManualBookingModal({
     async function loadContacts(): Promise<void> {
       try {
         const res = await fetch("/api/admin/contacts", {
-          headers: { "x-admin-secret": token },
+          headers: {},
         });
         if (!res.ok) return;
         const data = (await res.json()) as { ok?: boolean; contacts?: ContactSuggestion[] };
@@ -88,7 +85,7 @@ export function ManualBookingModal({
       }
     }
     void loadContacts();
-  }, [token]);
+  }, []);
 
   useEffect(() => {
     /**
@@ -135,7 +132,6 @@ export function ManualBookingModal({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-secret": token,
         },
         body: JSON.stringify({
           name: name.trim(),

@@ -101,8 +101,6 @@ interface TravelBlockAdminListProps {
   blocks: TravelBlockRow[];
   /** Map of raw calendar ID to a friendly display name */
   calendarLabels?: Record<string, string>;
-  /** Admin token for API calls */
-  token: string;
 }
 
 /**
@@ -110,13 +108,11 @@ interface TravelBlockAdminListProps {
  * @param props - Component props.
  * @param props.blocks - Travel block rows.
  * @param props.calendarLabels - Map of raw calendar ID to a friendly display name.
- * @param props.token - Admin token for API calls.
  * @returns Travel block list element.
  */
 export function TravelBlockAdminList({
   blocks: initial,
   calendarLabels = {},
-  token,
 }: TravelBlockAdminListProps): React.ReactElement {
   const [blocks, setBlocks] = useState<TravelBlockRow[]>(initial);
   useEffect(() => {
@@ -137,7 +133,7 @@ export function TravelBlockAdminList({
     try {
       const res = await fetch(`/api/admin/travel/${id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", "x-admin-secret": token },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ transportMode: mode }),
       });
       if (!res.ok) return;
@@ -171,7 +167,7 @@ export function TravelBlockAdminList({
     try {
       const res = await fetch(`/api/admin/travel/${id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", "x-admin-secret": token },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ignored: next }),
       });
       if (!res.ok) return;
@@ -191,7 +187,7 @@ export function TravelBlockAdminList({
     try {
       const res = await fetch(`/api/admin/travel/${id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", "x-admin-secret": token },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ customOrigin }),
       });
       if (!res.ok) return;

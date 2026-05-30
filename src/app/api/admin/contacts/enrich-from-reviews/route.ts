@@ -37,7 +37,7 @@ export interface ConflictEntry {
  * @returns JSON with enrichedCount and conflicts array.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/shared/lib/cn";
 import {
   FaGaugeHigh,
@@ -22,6 +22,7 @@ import {
   FaBars,
   FaXmark,
   FaArrowUpRightFromSquare,
+  FaArrowRightFromBracket,
   FaMagnifyingGlassDollar,
 } from "react-icons/fa6";
 
@@ -141,7 +142,6 @@ const SETTINGS_NAV_ITEM: NavItem = {
 };
 
 interface AdminSidebarProps {
-  token: string;
   current: AdminPage;
 }
 
@@ -150,14 +150,15 @@ interface AdminSidebarProps {
  * all times. Below `lg` it collapses behind a hamburger button and slides in
  * as a drawer over a backdrop, so phone-width admin pages get the full
  * viewport for content. The drawer auto-closes when the user navigates to a
- * different route.
+ * different route. Auth is carried by the admin session cookie - no token
+ * threading through hrefs.
  * @param props - Component props.
- * @param props.token - Admin token forwarded to nav link query strings.
  * @param props.current - Identifies which page is currently active (highlighted in the nav).
  * @returns Sidebar element with mobile drawer behaviour.
  */
-export function AdminSidebar({ token, current }: AdminSidebarProps): React.ReactElement {
+export function AdminSidebar({ current }: AdminSidebarProps): React.ReactElement {
   const pathname = usePathname();
+  const router = useRouter();
   // Pairing the drawer state with the pathname auto-closes it on navigation
   // without a setState-in-effect (which the React lint rule rejects).
   const [state, setState] = useState<{ open: boolean; pathname: string }>({
@@ -172,6 +173,24 @@ export function AdminSidebar({ token, current }: AdminSidebarProps): React.React
    * @returns void
    */
   const setOpen = (next: boolean): void => setState({ open: next, pathname });
+
+  /**
+   * Signs the operator out by clearing the session cookie on the server, then
+   * navigates to /admin/login. Errors are swallowed - the cookie either
+   * clears or the redirect itself ends the session client-side.
+   */
+  async function handleSignOut(): Promise<void> {
+    try {
+      await fetch("/api/admin/logout", {
+        method: "POST",
+        credentials: "same-origin",
+      });
+    } catch {
+      /* ignore - redirect still happens */
+    }
+    router.push("/admin/login");
+    router.refresh();
+  }
 
   return (
     <>
@@ -232,7 +251,7 @@ export function AdminSidebar({ token, current }: AdminSidebarProps): React.React
           {NAV_ITEMS.map(({ page, label, icon, path }) => (
             <Link
               key={page}
-              href={`${path}?token=${encodeURIComponent(token)}`}
+              href={path}
               onClick={() => setOpen(false)}
               className={cn(
                 "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
@@ -256,7 +275,7 @@ export function AdminSidebar({ token, current }: AdminSidebarProps): React.React
           {BUSINESS_NAV_ITEMS.map(({ page, label, icon, path }) => (
             <Link
               key={page}
-              href={`${path}?token=${encodeURIComponent(token)}`}
+              href={path}
               onClick={() => setOpen(false)}
               className={cn(
                 "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
@@ -275,7 +294,7 @@ export function AdminSidebar({ token, current }: AdminSidebarProps): React.React
           {[PROMOS_NAV_ITEM, SETTINGS_NAV_ITEM].map(({ page, label, icon, path }) => (
             <Link
               key={page}
-              href={`${path}?token=${encodeURIComponent(token)}`}
+              href={path}
               onClick={() => setOpen(false)}
               className={cn(
                 "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
@@ -290,8 +309,8 @@ export function AdminSidebar({ token, current }: AdminSidebarProps): React.React
           ))}
         </nav>
 
-        {/* Footer - link back to the public site. */}
-        <div className={cn("border-t border-white/10 px-3 py-3")}>
+        {/* Footer - link back to the public site + sign-out trigger. */}
+        <div className={cn("flex flex-col gap-1 border-t border-white/10 px-3 py-3")}>
           <Link
             href="/"
             onClick={() => setOpen(false)}
@@ -302,6 +321,16 @@ export function AdminSidebar({ token, current }: AdminSidebarProps): React.React
             <FaArrowUpRightFromSquare className={cn("shrink-0")} />
             Back to site
           </Link>
+          <button
+            type="button"
+            onClick={() => void handleSignOut()}
+            className={cn(
+              "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-white/60 transition-colors hover:bg-white/10 hover:text-white/90",
+            )}
+          >
+            <FaArrowRightFromBracket className={cn("shrink-0")} />
+            Sign out
+          </button>
         </div>
       </aside>
     </>

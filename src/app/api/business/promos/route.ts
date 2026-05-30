@@ -43,7 +43,7 @@ function validatePromo(body: PromoBody): string | null {
  * @returns JSON with promos array.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const promos = await prisma.promo.findMany({ orderBy: { startAt: "desc" } });
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
  * @returns JSON with the created promo.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const body = (await request.json()) as PromoBody;

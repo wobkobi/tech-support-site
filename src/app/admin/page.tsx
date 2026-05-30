@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import type React from "react";
 import Link from "next/link";
 import { prisma } from "@/shared/lib/prisma";
-import { requireAdminToken } from "@/shared/lib/auth";
+import { requireAdminAuth } from "@/shared/lib/auth";
 import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
 import { DashboardQuickActions } from "@/features/admin/components/DashboardQuickActions";
 import { toE164NZ } from "@/shared/lib/normalise-phone";
@@ -21,17 +21,10 @@ export const metadata: Metadata = {
 
 /**
  * Admin dashboard page showing stat cards and live data panels.
- * @param root0 - Page props.
- * @param root0.searchParams - URL search parameters (contains token).
  * @returns Dashboard page element.
  */
-export default async function AdminPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ token?: string }>;
-}): Promise<React.ReactElement> {
-  const { token } = await searchParams;
-  const t = requireAdminToken(token);
+export default async function AdminPage(): Promise<React.ReactElement> {
+  await requireAdminAuth("/admin");
 
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -223,56 +216,56 @@ export default async function AdminPage({
     {
       label: "Revenue this month",
       value: formatNZD(monthRevenue),
-      href: `/admin/business?token=${encodeURIComponent(t)}`,
+      href: `/admin/business`,
       urgent: false,
     },
     {
       label: "Outstanding",
       value: formatNZD(outstandingTotal),
       sub: `${outstandingInvoices.length} invoice${outstandingInvoices.length === 1 ? "" : "s"}${overdueInvoices.length > 0 ? `, ${overdueInvoices.length} overdue` : ""}`,
-      href: `/admin/business/invoices?token=${encodeURIComponent(t)}`,
+      href: `/admin/business/invoices`,
       urgent: overdueInvoices.length > 0,
     },
     {
       label: "Pending reviews",
       value: pendingCount,
-      href: `/admin/reviews?token=${encodeURIComponent(t)}`,
+      href: `/admin/reviews`,
       urgent: pendingCount > 0,
     },
     {
       label: "Approved reviews",
       value: approvedCount,
-      href: `/admin/reviews?token=${encodeURIComponent(t)}`,
+      href: `/admin/reviews`,
       urgent: false,
     },
     {
       label: "Confirmed bookings",
       value: confirmedCount,
-      href: `/admin/bookings?token=${encodeURIComponent(t)}`,
+      href: `/admin/bookings`,
       urgent: false,
     },
     {
       label: "Held bookings",
       value: heldCount,
-      href: `/admin/bookings?token=${encodeURIComponent(t)}`,
+      href: `/admin/bookings`,
       urgent: heldCount > 0,
     },
     {
       label: "Total contacts",
       value: contactCount,
-      href: `/admin/contacts?token=${encodeURIComponent(t)}`,
+      href: `/admin/contacts`,
       urgent: false,
     },
     {
       label: "Unsynced",
       value: unsyncedCount,
-      href: `/admin/contacts?token=${encodeURIComponent(t)}`,
+      href: `/admin/contacts`,
       urgent: unsyncedCount > 0,
     },
   ] as { label: string; value: number | string; sub?: string; href: string; urgent: boolean }[];
 
   return (
-    <AdminPageLayout token={t} current="dashboard">
+    <AdminPageLayout current="dashboard">
       <h1 className={cn("text-russian-violet mb-6 text-2xl font-extrabold")}>Dashboard</h1>
 
       {/* Today's snapshot - pinned at the top so the morning glance is instant. */}
@@ -312,7 +305,6 @@ export default async function AdminPage({
       </div>
 
       <DashboardQuickActions
-        token={t}
         pastConfirmedBookings={pastConfirmedBookings.map((b) => ({
           id: b.id,
           name: b.name,
@@ -355,7 +347,7 @@ export default async function AdminPage({
           >
             <h2 className={cn("text-sm font-semibold text-slate-700")}>Upcoming bookings</h2>
             <Link
-              href={`/admin/bookings?token=${encodeURIComponent(t)}`}
+              href={`/admin/bookings`}
               className={cn(
                 "hover:text-russian-violet inline-flex items-center gap-1 text-xs text-slate-400",
               )}
@@ -406,7 +398,7 @@ export default async function AdminPage({
               )}
             </h2>
             <Link
-              href={`/admin/reviews?token=${encodeURIComponent(t)}`}
+              href={`/admin/reviews`}
               className={cn(
                 "hover:text-russian-violet inline-flex items-center gap-1 text-xs text-slate-400",
               )}
@@ -493,7 +485,7 @@ export default async function AdminPage({
           >
             <h2 className={cn("text-sm font-semibold text-slate-700")}>System status</h2>
             <Link
-              href={`/admin/settings?token=${encodeURIComponent(t)}`}
+              href={`/admin/settings`}
               className={cn(
                 "hover:text-russian-violet inline-flex items-center gap-1 text-xs text-slate-400",
               )}

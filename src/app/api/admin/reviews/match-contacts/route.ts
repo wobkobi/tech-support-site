@@ -20,7 +20,7 @@ import { toE164NZ, normalisePhone } from "@/shared/lib/normalise-phone";
  * @returns JSON with { ok: true, matchedCount } on success, or error.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

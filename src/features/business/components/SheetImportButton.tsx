@@ -27,11 +27,9 @@ interface ImportResult {
 
 /**
  * Button that previews then imports Cashbook and Expenses rows from Google Sheets.
- * @param root0 - Props
- * @param root0.token - Admin token
  * @returns Import widget element.
  */
-export function SheetImportButton({ token }: { token: string }): React.ReactElement {
+export function SheetImportButton(): React.ReactElement {
   const [preview, setPreview] = useState<ImportResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState<ImportResult | null>(null);
@@ -45,7 +43,7 @@ export function SheetImportButton({ token }: { token: string }): React.ReactElem
     setError(null);
     try {
       const res = await fetch("/api/business/sheets/import", {
-        headers: { "x-admin-secret": token },
+        headers: {},
       });
       if (!res.ok) throw new Error("Sheet read failed");
       const data = (await res.json()) as ImportResult;
@@ -64,7 +62,7 @@ export function SheetImportButton({ token }: { token: string }): React.ReactElem
     try {
       const res = await fetch("/api/business/sheets/import", {
         method: "POST",
-        headers: { "x-admin-secret": token },
+        headers: {},
       });
       if (!res.ok) throw new Error("Import failed");
       const data = (await res.json()) as ImportResult;

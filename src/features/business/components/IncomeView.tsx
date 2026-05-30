@@ -9,11 +9,9 @@ import type { IncomeEntry } from "@/features/business/types/business";
 
 /**
  * Client component for recording and displaying income entries.
- * @param props - Component props
- * @param props.token - Admin auth token
  * @returns Income view element
  */
-export function IncomeView({ token }: { token: string }): React.ReactElement {
+export function IncomeView(): React.ReactElement {
   const [entries, setEntries] = useState<IncomeEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({
@@ -27,7 +25,7 @@ export function IncomeView({ token }: { token: string }): React.ReactElement {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const headers = { "X-Admin-Secret": token };
+  const headers = {};
 
   useEffect(() => {
     fetch("/api/business/income", { headers })

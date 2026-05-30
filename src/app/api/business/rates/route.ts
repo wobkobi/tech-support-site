@@ -73,7 +73,7 @@ const DEFAULTS = [
  * @returns JSON with rates array
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -116,7 +116,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
  * @returns JSON with the created rate
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -153,7 +153,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
  * @returns JSON with the freshly-seeded rates array
  */
 export async function DELETE(request: NextRequest): Promise<NextResponse> {
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   await prisma.rateConfig.deleteMany({});

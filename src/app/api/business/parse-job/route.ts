@@ -150,7 +150,7 @@ function findTemplateByTags<T extends { device: string | null; action: string | 
  * @returns JSON with structured ParseJobResponse or a 422 error
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

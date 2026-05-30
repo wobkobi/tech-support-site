@@ -17,7 +17,7 @@ import { isAdminRequest } from "@/shared/lib/auth";
  * @returns JSON { ok, exists }.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

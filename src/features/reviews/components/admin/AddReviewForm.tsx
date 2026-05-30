@@ -15,8 +15,6 @@ import type React from "react";
  * Props for AddReviewForm component.
  */
 interface AddReviewFormProps {
-  /** Admin token for API calls */
-  token: string;
   /** Callback with the new review row when added */
   onAdded: (row: ReviewRow) => void;
 }
@@ -24,11 +22,10 @@ interface AddReviewFormProps {
 /**
  * Form for manually adding a past client review.
  * @param props - Component props.
- * @param props.token - Admin token for API calls.
  * @param props.onAdded - Callback with the new review row when added.
  * @returns Add review form element.
  */
-export function AddReviewForm({ token, onAdded }: AddReviewFormProps): React.ReactElement {
+export function AddReviewForm({ onAdded }: AddReviewFormProps): React.ReactElement {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
   const [firstName, setFirstName] = useState("");
@@ -49,7 +46,7 @@ export function AddReviewForm({ token, onAdded }: AddReviewFormProps): React.Rea
     try {
       const res = await fetch("/api/admin/reviews", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-Admin-Secret": token },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text, firstName, lastName, isAnonymous }),
       });
       const data = (await res.json()) as { ok?: boolean; review?: ReviewRow; error?: string };

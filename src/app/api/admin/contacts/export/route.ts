@@ -41,7 +41,7 @@ function splitName(fullName: string): { first: string; last: string } {
  * @returns CSV file response.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

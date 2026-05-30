@@ -35,7 +35,7 @@ function parseNotes(notes: string | null): { phone: string | null; address: stri
  * @returns JSON with upserted count.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

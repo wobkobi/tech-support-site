@@ -34,8 +34,6 @@ export interface ContactSuggestion {
  * Props for SendReviewLinkForm component.
  */
 interface SendReviewLinkFormProps {
-  /** Admin token for API calls */
-  token: string;
   /** Contacts that have never received a review link, shown in a pre-fill dropdown */
   contactSuggestions?: ContactSuggestion[];
   /** Start the form expanded without needing to click the toggle */
@@ -46,13 +44,11 @@ interface SendReviewLinkFormProps {
  * Form for sending a review link to a past client via email or generating SMS text.
  * Email mode shows a rendered preview before sending.
  * @param props - Component props.
- * @param props.token - Admin token for API calls.
  * @param props.contactSuggestions - Contacts that have never received a review link, shown in a pre-fill dropdown.
  * @param props.defaultOpen - Start the form expanded. Defaults to false.
  * @returns Send review link form element.
  */
 export function SendReviewLinkForm({
-  token,
   contactSuggestions = [],
   defaultOpen = false,
 }: SendReviewLinkFormProps): React.ReactElement {
@@ -101,7 +97,7 @@ export function SendReviewLinkForm({
     try {
       const res = await fetch("/api/admin/preview-review-email", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-Admin-Secret": token },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
       });
       const data = (await res.json()) as { ok?: boolean; html?: string; error?: string };
@@ -124,7 +120,7 @@ export function SendReviewLinkForm({
     try {
       const res = await fetch("/api/admin/send-review-link", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-Admin-Secret": token },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, email, mode: "email" }),
       });
       const data = (await res.json()) as {
@@ -163,7 +159,7 @@ export function SendReviewLinkForm({
     try {
       const res = await fetch("/api/admin/send-review-link", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-Admin-Secret": token },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, phone: phoneInput, mode: "sms" }),
       });
       const data = (await res.json()) as {

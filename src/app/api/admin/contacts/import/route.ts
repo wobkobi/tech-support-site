@@ -16,7 +16,7 @@ import { importFromGoogleContacts } from "@/features/contacts/lib/google-contact
  * @returns JSON with importedCount on success, or error on failure.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

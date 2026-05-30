@@ -358,7 +358,7 @@ async function downloadAndParse(fileId: string): Promise<{ data: ParsedInvoiceDa
  * @returns JSON with counts of created, updated, skipped, and errored records.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

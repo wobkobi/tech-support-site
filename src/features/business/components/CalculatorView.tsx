@@ -248,13 +248,11 @@ function emptyTask(rates: RateConfig[]): TaskLine {
 /**
  * Interactive job calculator that lets an admin build a job quote using AI parsing, time tracking,
  * tasks, parts, and client details, then save it as income or convert it to an invoice.
- * @param props - Component props.
- * @param props.token - The admin authentication token used for API requests.
  * @returns The rendered calculator view element.
  */
-export function CalculatorView({ token }: { token: string }): React.ReactElement {
+export function CalculatorView(): React.ReactElement {
   const router = useRouter();
-  const headers = { "X-Admin-Secret": token };
+  const headers = {};
 
   // Lazy-read the saved draft once at mount. Non-meaningful drafts (just the
   // auto-seeded "now" times from a previous session, nothing the operator
@@ -408,7 +406,7 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
       fetch("/api/promos/active")
         .then((r) => r.json())
         .catch(() => ({ ok: false, promo: null })),
-      fetch("/api/business/contacts", { headers: { "X-Admin-Secret": token } })
+      fetch("/api/business/contacts", { headers: {} })
         .then((r) => r.json())
         .catch(() => ({ ok: false, contacts: [] })),
     ]).then(
@@ -822,7 +820,7 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
       }
     }
     clearDraft();
-    router.push(`/admin/business/invoices/${invoiceId}?token=${encodeURIComponent(token)}`);
+    router.push(`/admin/business/invoices/${invoiceId}`);
   }
 
   /**
@@ -939,7 +937,7 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
       // operator opens it (mirrors the AddToContactsModal-gated path: the
       // backfill handler in handleAddContactClose ALSO clears the draft).
       clearDraft();
-      router.push(`/admin/business/invoices/${invoiceId}?token=${encodeURIComponent(token)}`);
+      router.push(`/admin/business/invoices/${invoiceId}`);
     } catch (err) {
       setSaveInvoiceError(err instanceof Error ? err.message : "Could not save invoice");
       setSavingInvoice(false);
@@ -1224,7 +1222,6 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
     <>
       {pendingInvoiceId && (
         <AddToContactsModal
-          token={token}
           name={clientName}
           email={clientEmail}
           googleContactId={pickedContactGoogleId}
@@ -1234,7 +1231,6 @@ export function CalculatorView({ token }: { token: string }): React.ReactElement
 
       {showTaxonomyModal && (
         <TaxonomyManageModal
-          token={token}
           onClose={() => setShowTaxonomyModal(false)}
           onChanged={() => {
             // Re-fetch templates so the picker dropdown reflects cleared tags.

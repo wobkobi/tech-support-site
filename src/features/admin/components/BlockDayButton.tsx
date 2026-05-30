@@ -12,7 +12,6 @@ import { FaBan, FaCircleCheck } from "react-icons/fa6";
 import { cn } from "@/shared/lib/cn";
 
 export interface BlockDayButtonProps {
-  token: string;
   dateKey: string;
   busyEventId: string | null;
   hasBookings: boolean;
@@ -27,7 +26,6 @@ export interface BlockDayButtonProps {
  * Block/unblock-day toggle. Disabled when timed bookings exist on the day so
  * customers can't slip through a Busy banner.
  * @param props - Component props.
- * @param props.token - Admin token forwarded as x-admin-secret.
  * @param props.dateKey - NZ YYYY-MM-DD for the target day.
  * @param props.busyEventId - Existing all-day event id, or null.
  * @param props.hasBookings - True when timed bookings exist on the day.
@@ -38,7 +36,6 @@ export interface BlockDayButtonProps {
  * @returns Block/Unblock button element.
  */
 export function BlockDayButton({
-  token,
   dateKey,
   busyEventId,
   hasBookings,
@@ -67,11 +64,11 @@ export function BlockDayButton({
       const res = isBlocked
         ? await fetch(`/api/admin/blocked-days/${encodeURIComponent(busyEventId!)}`, {
             method: "DELETE",
-            headers: { "x-admin-secret": token },
+            headers: {},
           })
         : await fetch("/api/admin/blocked-days", {
             method: "POST",
-            headers: { "Content-Type": "application/json", "x-admin-secret": token },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ dateKey }),
           });
       const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };

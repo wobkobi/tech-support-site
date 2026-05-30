@@ -46,15 +46,12 @@ const STATUS_COLORS: Record<string, string> = {
  * Admin booking list with filter, inline edit, status change, and cancel.
  * @param props - Component props.
  * @param props.bookings - Initial booking rows from the server.
- * @param props.token - Admin token for API calls.
  * @returns Booking admin list element.
  */
 export function BookingAdminList({
   bookings: initial,
-  token,
 }: {
   bookings: AdminBookingRow[];
-  token: string;
 }): React.ReactElement {
   const [bookings, setBookings] = useState<AdminBookingRow[]>(initial);
   const [filter, setFilter] = useState<StatusFilter>("confirmed");
@@ -118,7 +115,7 @@ export function BookingAdminList({
     try {
       const res = await fetch(`/api/admin/bookings/${id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", "x-admin-secret": token },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
       if (!res.ok) {
@@ -211,7 +208,7 @@ export function BookingAdminList({
     try {
       const res = await fetch(`/api/admin/bookings/${id}`, {
         method: "DELETE",
-        headers: { "x-admin-secret": token },
+        headers: {},
       });
       if (!res.ok) {
         const data = (await res.json()) as { error?: string };
@@ -235,7 +232,7 @@ export function BookingAdminList({
     try {
       const res = await fetch(`/api/admin/bookings/${id}/resend-review`, {
         method: "POST",
-        headers: { "x-admin-secret": token },
+        headers: {},
       });
       if (!res.ok) {
         const data = (await res.json()) as { error?: string };

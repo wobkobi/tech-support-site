@@ -2,7 +2,7 @@
 import type { Metadata } from "next";
 import type React from "react";
 import { prisma } from "@/shared/lib/prisma";
-import { requireAdminToken } from "@/shared/lib/auth";
+import { requireAdminAuth } from "@/shared/lib/auth";
 import { toE164NZ } from "@/shared/lib/normalise-phone";
 import { cn } from "@/shared/lib/cn";
 import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
@@ -19,17 +19,10 @@ export const metadata: Metadata = {
 
 /**
  * Admin reviews page for approving/revoking reviews and sending review links.
- * @param root0 - Page props.
- * @param root0.searchParams - URL search parameters (contains token).
  * @returns Reviews management page element.
  */
-export default async function AdminReviewsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ token?: string }>;
-}): Promise<React.ReactElement> {
-  const { token } = await searchParams;
-  const t = requireAdminToken(token);
+export default async function AdminReviewsPage(): Promise<React.ReactElement> {
+  await requireAdminAuth();
 
   // Soft caps to prevent unbounded scans as data grows. The page joins these
   // sets to build a unified link history; if the most recent 1000 ever stops
@@ -215,7 +208,7 @@ export default async function AdminReviewsPage({
   ].sort((a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime());
 
   return (
-    <AdminPageLayout token={t} current="reviews">
+    <AdminPageLayout current="reviews">
       <h1 className={cn("text-russian-violet mb-6 text-2xl font-extrabold")}>
         Reviews
         {pending.length > 0 && (
@@ -238,7 +231,6 @@ export default async function AdminReviewsPage({
             <ReviewApprovalList
               pending={pending}
               approved={approved}
-              token={t}
               contacts={contacts}
               showSendForm={false}
             />
@@ -250,13 +242,13 @@ export default async function AdminReviewsPage({
             <h2 className={cn("text-russian-violet mb-4 text-sm font-semibold")}>
               Send a review link
             </h2>
-            <SendReviewLinkForm token={t} contactSuggestions={contactSuggestions} />
+            <SendReviewLinkForm contactSuggestions={contactSuggestions} />
           </div>
 
           {linkHistory.length > 0 && (
             <div className={cn("rounded-xl border border-slate-200 bg-white p-6 shadow-sm")}>
               <h2 className={cn("text-russian-violet mb-4 text-sm font-semibold")}>Link history</h2>
-              <ReviewLinkHistoryTable entries={linkHistory} token={t} />
+              <ReviewLinkHistoryTable entries={linkHistory} />
             </div>
           )}
         </div>

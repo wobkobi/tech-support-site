@@ -36,19 +36,16 @@ function toDateInput(d: Date | string): string {
 
 interface InvoiceEditViewProps {
   invoice: Invoice;
-  token: string;
 }
 
 /**
  * Edit form for an existing invoice.
  * @param props - Component props
  * @param props.invoice - Invoice data to edit
- * @param props.token - Admin auth token
  * @returns Invoice edit form element
  */
-export function InvoiceEditView({ invoice, token }: InvoiceEditViewProps): React.ReactElement {
+export function InvoiceEditView({ invoice }: InvoiceEditViewProps): React.ReactElement {
   const router = useRouter();
-  const headers = { "X-Admin-Secret": token };
 
   const [form, setForm] = useState<FormState>({
     clientName: invoice.clientName,
@@ -82,7 +79,7 @@ export function InvoiceEditView({ invoice, token }: InvoiceEditViewProps): React
     setError(null);
     const res = await fetch(`/api/business/invoices/${invoice.id}`, {
       method: "PATCH",
-      headers: { ...headers, "content-type": "application/json" },
+      headers: { "content-type": "application/json" },
       body: JSON.stringify({
         clientName: form.clientName,
         clientEmail: form.clientEmail,
@@ -95,7 +92,7 @@ export function InvoiceEditView({ invoice, token }: InvoiceEditViewProps): React
     });
     const d = await res.json();
     if (d.ok) {
-      router.push(`/admin/business/invoices/${invoice.id}?token=${encodeURIComponent(token)}`);
+      router.push(`/admin/business/invoices/${invoice.id}`);
     } else {
       setError(d.error ?? "Failed to save");
       setSaving(false);
@@ -370,9 +367,7 @@ export function InvoiceEditView({ invoice, token }: InvoiceEditViewProps): React
       {/* Actions */}
       <div className={cn("flex gap-3")}>
         <button
-          onClick={() =>
-            router.push(`/admin/business/invoices/${invoice.id}?token=${encodeURIComponent(token)}`)
-          }
+          onClick={() => router.push(`/admin/business/invoices/${invoice.id}`)}
           className={cn(
             "rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50",
           )}

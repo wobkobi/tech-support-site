@@ -8,7 +8,7 @@ import { getInvoiceCounter, setInvoiceCounter } from "@/features/business/lib/go
  * @returns JSON with lastNumber, nextNumber, yearCode, nextFormatted, and prefix
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
  * @returns JSON confirmation with the written count
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {

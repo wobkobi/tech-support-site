@@ -24,8 +24,6 @@ interface EventActionSheetProps {
    * opening the sheet when `ev.kind === "booking"` and `ev.booking` exists.
    */
   event: WeekEvent & { booking: WeekEventBooking };
-  /** Admin token forwarded as x-admin-secret on every request. */
-  token: string;
   /** Called after a successful mutation - parent should refresh data. */
   onChanged: () => void;
   /** Closes the sheet without changing anything. */
@@ -40,14 +38,12 @@ type ToastState = { msg: string; kind: "ok" | "warn" } | null;
  * stay behaviourally identical.
  * @param props - Component props.
  * @param props.event - Event with attached booking data.
- * @param props.token - Admin token.
  * @param props.onChanged - Parent callback after a successful mutation.
  * @param props.onClose - Closes the sheet.
  * @returns Action sheet element.
  */
 export function EventActionSheet({
   event,
-  token,
   onChanged,
   onClose,
 }: EventActionSheetProps): React.ReactElement {
@@ -87,7 +83,7 @@ export function EventActionSheet({
     try {
       const res = await fetch(`/api/admin/bookings/${booking.id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", "x-admin-secret": token },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
       if (!res.ok) {
@@ -159,7 +155,7 @@ export function EventActionSheet({
     try {
       const res = await fetch(`/api/admin/bookings/${booking.id}/resend-review`, {
         method: "POST",
-        headers: { "x-admin-secret": token },
+        headers: {},
       });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
@@ -184,7 +180,7 @@ export function EventActionSheet({
     try {
       const res = await fetch(`/api/admin/bookings/${booking.id}`, {
         method: "DELETE",
-        headers: { "x-admin-secret": token },
+        headers: {},
       });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };

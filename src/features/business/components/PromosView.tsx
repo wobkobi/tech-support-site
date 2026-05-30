@@ -146,8 +146,6 @@ function findOverlaps(promos: PromoRow[]): Set<string> {
 }
 
 interface Props {
-  /** Admin token for X-Admin-Secret header. */
-  token: string;
   /** Initial server-fetched promo list. */
   initial: PromoRow[];
 }
@@ -155,12 +153,11 @@ interface Props {
 /**
  * Promos manager - list, add, edit, toggle, delete.
  * @param props - Component props.
- * @param props.token - Admin token (X-Admin-Secret).
  * @param props.initial - Initial promo list.
  * @returns Promos view element.
  */
-export function PromosView({ token, initial }: Props): React.ReactElement {
-  const headers: Record<string, string> = { "X-Admin-Secret": token };
+export function PromosView({ initial }: Props): React.ReactElement {
+  const headers: Record<string, string> = {};
 
   const [promos, setPromos] = useState<PromoRow[]>(initial);
   const [form, setForm] = useState<FormState>(emptyForm);

@@ -19,7 +19,7 @@ import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-crea
  * @returns JSON with contacts array.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
  * @returns JSON { ok, created, contact }.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

@@ -72,7 +72,6 @@ const BOOKING_STATUS_CHIP: Record<"held" | "confirmed" | "cancelled" | "complete
 };
 
 interface DayAgendaViewProps {
-  token: string;
   /** NZ YYYY-MM-DD for the day to show on mount. */
   initialDayKey: string;
   /** NZ YYYY-MM-DD for "today" - drives the "Jump to today" + new-booking defaults. */
@@ -93,7 +92,6 @@ const SWIPE_MAX_MS = 500;
  * day-stepping within the fetched week is instant (no server round-trip);
  * crossing the week boundary calls router.push to refetch the next week.
  * @param props - Component props.
- * @param props.token - Admin token forwarded to the modal POST + block-day calls.
  * @param props.initialDayKey - NZ YYYY-MM-DD for the day to show on mount.
  * @param props.todayKey - NZ YYYY-MM-DD for "today".
  * @param props.bufferedDayKeys - Day keys in the buffered 21-day window.
@@ -102,7 +100,6 @@ const SWIPE_MAX_MS = 500;
  * @returns Day agenda element.
  */
 export function DayAgendaView({
-  token,
   initialDayKey,
   todayKey,
   bufferedDayKeys,
@@ -265,7 +262,7 @@ export function DayAgendaView({
       // Day falls outside the prefetched 21-day window - bounce through the
       // server so it rebuilds the buffer around the new day. useTransition
       // keeps the old day visible (dimmed) while the fetch happens.
-      const params = new URLSearchParams({ token, day: newDayKey });
+      const params = new URLSearchParams({ day: newDayKey });
       startTransition(() => {
         router.push(`/admin/schedule?${params.toString()}`);
       });
@@ -613,7 +610,6 @@ export function DayAgendaView({
 
       <div data-no-swipe className={cn("mb-4")}>
         <BlockDayButton
-          token={token}
           dateKey={selectedDayKey}
           busyEventId={busyEvent?.id ?? null}
           hasBookings={hasBookings}
@@ -808,17 +804,12 @@ export function DayAgendaView({
       </div>
 
       {modalStartAt && (
-        <ManualBookingModal
-          token={token}
-          startAtIso={modalStartAt}
-          onClose={() => setModalStartAt(null)}
-        />
+        <ManualBookingModal startAtIso={modalStartAt} onClose={() => setModalStartAt(null)} />
       )}
 
       {actionSheetEvent?.booking && (
         <EventActionSheet
           event={actionSheetEvent as WeekEvent & { booking: NonNullable<WeekEvent["booking"]> }}
-          token={token}
           onChanged={() => router.refresh()}
           onClose={() => setActionSheetEvent(null)}
         />

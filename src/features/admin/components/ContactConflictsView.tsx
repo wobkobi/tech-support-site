@@ -29,8 +29,6 @@ export interface ConflictRow {
 interface ContactConflictsViewProps {
   /** Initial unresolved conflicts loaded server-side. */
   initial: ConflictRow[];
-  /** Admin token for the resolve POSTs. */
-  token: string;
 }
 
 /**
@@ -39,13 +37,9 @@ interface ContactConflictsViewProps {
  * of the list as soon as the API call succeeds.
  * @param props - Component props.
  * @param props.initial - Server-loaded conflicts.
- * @param props.token - Admin token.
  * @returns Conflicts view element.
  */
-export function ContactConflictsView({
-  initial,
-  token,
-}: ContactConflictsViewProps): React.ReactElement {
+export function ContactConflictsView({ initial }: ContactConflictsViewProps): React.ReactElement {
   const [rows, setRows] = useState(initial);
   const [resolving, setResolving] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -62,7 +56,7 @@ export function ContactConflictsView({
     try {
       const res = await fetch(`/api/admin/contacts/conflicts/${id}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-Admin-Secret": token },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ winner }),
       });
       const d = (await res.json()) as { ok: true } | { error: string };
@@ -86,7 +80,7 @@ export function ContactConflictsView({
           All contact fields are in sync between the site and Google Contacts.
         </p>
         <Link
-          href={`/admin/contacts?token=${encodeURIComponent(token)}`}
+          href={`/admin/contacts`}
           className={cn(
             "mt-4 inline-flex items-center gap-1 text-sm font-semibold text-slate-600 hover:underline",
           )}
@@ -101,7 +95,7 @@ export function ContactConflictsView({
   return (
     <div className={cn("flex flex-col gap-4")}>
       <Link
-        href={`/admin/contacts?token=${encodeURIComponent(token)}`}
+        href={`/admin/contacts`}
         className={cn(
           "inline-flex w-fit items-center gap-1 text-sm font-semibold text-slate-600 hover:underline",
         )}

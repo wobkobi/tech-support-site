@@ -18,17 +18,15 @@ const STATUS_COLORS: Record<InvoiceStatus, string> = {
 
 /**
  * Client component listing all invoices with inline status controls.
- * @param props - Component props
- * @param props.token - Admin auth token
  * @returns Invoices list element
  */
-export function InvoicesListView({ token }: { token: string }): React.ReactElement {
+export function InvoicesListView(): React.ReactElement {
   const router = useRouter();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [syncToast, setSyncToast] = useState<string | null>(null);
-  const headers = { "X-Admin-Secret": token };
+  const headers = {};
 
   useEffect(() => {
     fetch("/api/business/invoices", { headers })
@@ -135,7 +133,7 @@ export function InvoicesListView({ token }: { token: string }): React.ReactEleme
             {syncing ? "Syncing..." : "Sync Drive"}
           </button>
           <Link
-            href={`/admin/business/calculator?token=${encodeURIComponent(token)}`}
+            href={`/admin/business/calculator`}
             className={cn(
               "bg-russian-violet rounded-lg px-4 py-2 text-sm font-medium text-white hover:opacity-90",
             )}
@@ -175,7 +173,7 @@ export function InvoicesListView({ token }: { token: string }): React.ReactEleme
             >
               <div className={cn("flex items-center justify-between gap-2")}>
                 <Link
-                  href={`/admin/business/invoices/${inv.id}?token=${encodeURIComponent(token)}`}
+                  href={`/admin/business/invoices/${inv.id}`}
                   className={cn("font-mono text-xs font-semibold text-slate-700")}
                 >
                   {inv.number}
@@ -195,7 +193,7 @@ export function InvoicesListView({ token }: { token: string }): React.ReactEleme
                 </select>
               </div>
               <Link
-                href={`/admin/business/invoices/${inv.id}?token=${encodeURIComponent(token)}`}
+                href={`/admin/business/invoices/${inv.id}`}
                 className={cn("mt-1 block text-sm font-medium text-slate-700")}
               >
                 {inv.clientName}
@@ -255,11 +253,7 @@ export function InvoicesListView({ token }: { token: string }): React.ReactEleme
               {invoices.map((inv) => (
                 <tr
                   key={inv.id}
-                  onClick={() =>
-                    router.push(
-                      `/admin/business/invoices/${inv.id}?token=${encodeURIComponent(token)}`,
-                    )
-                  }
+                  onClick={() => router.push(`/admin/business/invoices/${inv.id}`)}
                   className={cn("cursor-pointer hover:bg-slate-50")}
                 >
                   <td className={cn("px-4 py-3 font-mono text-xs font-semibold text-slate-700")}>
@@ -303,7 +297,7 @@ export function InvoicesListView({ token }: { token: string }): React.ReactEleme
                   </td>
                   <td className={cn("px-4 py-3")}>
                     <Link
-                      href={`/admin/business/invoices/${inv.id}?token=${encodeURIComponent(token)}`}
+                      href={`/admin/business/invoices/${inv.id}`}
                       onClick={(e) => e.stopPropagation()}
                       className={cn(
                         "inline-flex items-center gap-1 text-xs text-slate-400 hover:text-slate-700",

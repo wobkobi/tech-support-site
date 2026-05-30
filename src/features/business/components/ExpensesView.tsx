@@ -9,11 +9,9 @@ import type { ExpenseEntry } from "@/features/business/types/business";
 
 /**
  * Client component for recording and displaying expense entries.
- * @param props - Component props
- * @param props.token - Admin auth token
  * @returns Expenses view element
  */
-export function ExpensesView({ token }: { token: string }): React.ReactElement {
+export function ExpensesView(): React.ReactElement {
   const [entries, setEntries] = useState<ExpenseEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({
@@ -30,7 +28,7 @@ export function ExpensesView({ token }: { token: string }): React.ReactElement {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const headers = { "X-Admin-Secret": token };
+  const headers = {};
 
   useEffect(() => {
     fetch("/api/business/expenses", { headers })

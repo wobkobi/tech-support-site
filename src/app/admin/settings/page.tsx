@@ -2,7 +2,7 @@
 import type { Metadata } from "next";
 import type React from "react";
 import Link from "next/link";
-import { requireAdminToken } from "@/shared/lib/auth";
+import { requireAdminAuth } from "@/shared/lib/auth";
 import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
 import { cn } from "@/shared/lib/cn";
 import {
@@ -21,17 +21,10 @@ export const metadata: Metadata = {
 
 /**
  * Admin settings index - env summary + shortcuts to in-app settings screens.
- * @param root0 - Page props.
- * @param root0.searchParams - URL search params (contains token).
  * @returns Settings page element.
  */
-export default async function SettingsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ token?: string }>;
-}): Promise<React.ReactElement> {
-  const { token } = await searchParams;
-  const t = requireAdminToken(token);
+export default async function SettingsPage(): Promise<React.ReactElement> {
+  await requireAdminAuth();
 
   // Read-only env summary - shows whether configured, never the secret value.
   const envItems: { label: string; value: string; configured: boolean }[] = [
@@ -73,24 +66,24 @@ export default async function SettingsPage({
       label: "Rates",
       description:
         "Standard hourly + modifier deltas (Complex, At home, Remote) and flat rates like Travel.",
-      href: `/admin/business/calculator?token=${encodeURIComponent(t)}`,
+      href: `/admin/business/calculator`,
     },
     {
       label: "Task taxonomy",
       description:
         "Devices + actions used to compose invoice line items. Managed inside the Calculator.",
-      href: `/admin/business/calculator?token=${encodeURIComponent(t)}`,
+      href: `/admin/business/calculator`,
     },
     {
       label: "Subscriptions",
       description:
         "Recurring expenses that auto-record on schedule (hosting, SaaS, software, etc.).",
-      href: `/admin/business/expenses?token=${encodeURIComponent(t)}`,
+      href: `/admin/business/expenses`,
     },
   ];
 
   return (
-    <AdminPageLayout token={t} current="settings">
+    <AdminPageLayout current="settings">
       <h1 className={cn("text-russian-violet mb-6 text-2xl font-extrabold")}>Settings</h1>
 
       <p className={cn("mb-6 text-sm text-slate-500")}>

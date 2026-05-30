@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import type React from "react";
 import Image from "next/image";
 import { notFound } from "next/navigation";
-import { requireAdminToken } from "@/shared/lib/auth";
+import { requireAdminAuth } from "@/shared/lib/auth";
 import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
 import { prisma } from "@/shared/lib/prisma";
 import { formatNZD } from "@/features/business/lib/business";
@@ -27,38 +27,30 @@ export const metadata: Metadata = {
  * View page for a single saved invoice.
  * @param root0 - Page props
  * @param root0.params - Route params containing the invoice ID
- * @param root0.searchParams - URL search parameters containing the admin token
  * @returns Invoice view page element
  */
 export default async function InvoiceViewPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ token?: string }>;
 }): Promise<React.ReactElement> {
-  const [{ token }, { id }] = await Promise.all([searchParams, params]);
-  const t = requireAdminToken(token);
+  const { id } = await params;
+  await requireAdminAuth();
 
   const invoice = await prisma.invoice.findUnique({ where: { id } });
   if (!invoice) notFound();
 
   return (
-    <AdminPageLayout
-      token={t}
-      current="business-invoices"
-      contentClassName="mx-auto max-w-3xl px-6 py-8"
-    >
+    <AdminPageLayout current="business-invoices" contentClassName="mx-auto max-w-3xl px-6 py-8">
       {/* Actions bar */}
       <InvoiceActions
-        backHref={`/admin/business/invoices?token=${encodeURIComponent(t)}`}
+        backHref={`/admin/business/invoices`}
         driveWebUrl={invoice.driveWebUrl}
         invoiceId={invoice.id}
         invoiceNumber={invoice.number}
         clientName={invoice.clientName}
         clientEmail={invoice.clientEmail}
         status={invoice.status}
-        token={t}
       />
 
       {/* Invoice preview - mirrors the trimmed PDF layout. */}

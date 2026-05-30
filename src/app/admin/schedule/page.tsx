@@ -2,7 +2,7 @@
 import type { Metadata } from "next";
 import type React from "react";
 import { prisma } from "@/shared/lib/prisma";
-import { requireAdminToken } from "@/shared/lib/auth";
+import { requireAdminAuth } from "@/shared/lib/auth";
 import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
 import { getCachedScheduleEvents } from "@/features/calendar/lib/google-calendar";
 import { addDays, resolveWeekStart, toNZDateKey } from "@/features/admin/lib/week";
@@ -33,16 +33,16 @@ const BUFFER_DAYS_AFTER = (BUFFER_WEEKS + 1) * 7;
  * and travel events for the requested week. Empty slots are clickable to create a
  * manual booking from the modal.
  * @param root0 - Page props.
- * @param root0.searchParams - URL params with token and optional weekStart=YYYY-MM-DD.
+ * @param root0.searchParams - URL params: optional `?weekStart=YYYY-MM-DD` + `?day=YYYY-MM-DD`.
  * @returns Schedule page element.
  */
 export default async function AdminSchedulePage({
   searchParams,
 }: {
-  searchParams: Promise<{ token?: string; weekStart?: string; day?: string }>;
+  searchParams: Promise<{ weekStart?: string; day?: string }>;
 }): Promise<React.ReactElement> {
-  const { token, weekStart, day } = await searchParams;
-  const t = requireAdminToken(token);
+  await requireAdminAuth("/admin/schedule");
+  const { weekStart, day } = await searchParams;
 
   const now = new Date();
   // Prefer ?day=YYYY-MM-DD when set so the buffered fetch centres on the
@@ -223,14 +223,13 @@ export default async function AdminSchedulePage({
         : dayKeysInWeek[0];
 
   return (
-    <AdminPageLayout token={t} current="schedule">
+    <AdminPageLayout current="schedule">
       <div className={"lg:hidden"}>
         {/* Key on weekStartKey so a cross-buffer navigation reseeds the client
             state with the new initialDayKey - useState would otherwise keep
             the old selected day after the URL changes. */}
         <DayAgendaView
           key={weekStartKey}
-          token={t}
           initialDayKey={initialDayKey}
           todayKey={todayKey}
           bufferedDayKeys={bufferedDayKeys}
@@ -243,7 +242,6 @@ export default async function AdminSchedulePage({
             built a fresh buffer around a new week. */}
         <WeekView
           key={weekStartKey}
-          token={t}
           initialWeekStartIso={weekStartDate.toISOString()}
           bufferedDayKeys={bufferedDayKeys}
           events={events}
