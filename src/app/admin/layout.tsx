@@ -2,14 +2,12 @@
 /**
  * @file layout.tsx
  * @description Admin route segment layout. Sets `Referrer-Policy: no-referrer`
- * so no admin path leaks to external services via the Referer header when
- * the operator clicks through to Google Drive PDFs, Maps links inside
- * expanded booking cards, the "Back to site" link, etc. Originally added to
- * protect the URL-embedded admin token; now redundant for that purpose
- * (cookie-session auth, no token in URL) but kept as defence-in-depth so
- * customer/booking tokens in nested links (cancelToken, reviewToken) also
- * don't leak. Pure metadata wrapper; doesn't render a sidebar or shell -
- * those live in AdminPageLayout per-page.
+ * so per-record customer tokens embedded in admin-rendered links
+ * (`cancelToken`, `reviewToken`) don't leak via the Referer header when the
+ * operator clicks through to external services - Google Drive PDFs, Maps
+ * links inside expanded booking cards, the "Back to site" link, etc. Pure
+ * metadata wrapper; doesn't render a sidebar or shell - those live in
+ * AdminPageLayout per-page.
  */
 
 import type { Metadata } from "next";

@@ -200,7 +200,7 @@ function clearDraft(): void {
 }
 
 /**
- * Renders a "X min ago" label given a stable now timestamp. Used by the
+ * Renders a "X min ago" label given a stable now timestamp for the
  * draft-restored toast.
  * @param savedAt - When the draft was saved.
  * @param now - Reference now (captured once at mount to keep render pure).
@@ -494,10 +494,10 @@ export function CalculatorView(): React.ReactElement {
   const aggregateStart = sortedRanges[0]?.startTime ?? "";
   const aggregateEnd = sortedRanges[sortedRanges.length - 1]?.endTime ?? "";
   const hourlyRate = matchRateById(rates, hourlyRateId);
-  // Base hourly rates (e.g. Standard $65/hr) — used for the top-level Time
+  // Base hourly rates (e.g. Standard $65/hr) used for the top-level Time
   // selector and as the per-task base rate.
   const baseRates = rates.filter((r) => r.ratePerHour !== null);
-  // Modifier rates — either signed $/hr deltas (At home -$10, Complex +$20)
+  // Modifier rates: either signed $/hr deltas (At home -$10, Complex +$20)
   // or percent uplifts (Public Holiday +25%). Toggled per task to shift the
   // effective rate.
   const modifierRates = rates

@@ -147,8 +147,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
 /**
  * DELETE /api/business/rates - Wipes every rate row and reseeds the defaults
- * (Standard base + modifier set + Travel flat rate). Used by the "Reset rates"
- * button in the Calculator's Manage rates panel after the rate-model rework.
+ * (Standard base + modifier set + Travel flat rate).
  * @param request - Incoming Next.js request
  * @returns JSON with the freshly-seeded rates array
  */

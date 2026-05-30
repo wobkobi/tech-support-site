@@ -5,8 +5,8 @@ import { isAdminRequest } from "@/shared/lib/auth";
 /**
  * DELETE /api/business/task-templates/actions/[name]
  * Removes the action tag from every TaskTemplate currently labelled with
- * `name` (sets `action: null`). Mirrors the devices endpoint - clears the
- * tag, leaves the row intact, lets the next parse-job retag.
+ * `name` (sets `action: null`). Clears the tag, leaves the row intact, lets
+ * the next parse-job retag.
  * @param request - Incoming Next.js request.
  * @param root0 - Route context.
  * @param root0.params - Promise resolving to the route param object.

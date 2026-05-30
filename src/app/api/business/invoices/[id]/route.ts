@@ -41,7 +41,7 @@ function validateTransition(current: InvoiceStatus, next: InvoiceStatus): string
 /**
  * Re-uploads the invoice's PDF to Drive (replacing the existing file in place when
  * `driveFileId` is set, otherwise creating a fresh one) and persists any new IDs
- * on the invoice record. Failures are logged but never thrown — Drive is a
+ * on the invoice record. Failures are logged but never thrown - Drive is a
  * non-critical archive sync.
  * @param invoiceId - Invoice DB id (used for the post-upload patch).
  */

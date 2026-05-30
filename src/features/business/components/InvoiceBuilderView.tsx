@@ -57,8 +57,8 @@ function emptyLine(): LineItem {
 
 /**
  * Pre-populated invoice payload used when the builder runs in edit mode for a
- * DRAFT invoice. Mirrors the Prisma row shape after Date columns are stringified
- * to YYYY-MM-DD for the form inputs.
+ * DRAFT invoice. Matches the Prisma row shape after Date columns are
+ * stringified to YYYY-MM-DD for the form inputs.
  */
 export interface InvoiceBuilderEditPayload {
   id: string;

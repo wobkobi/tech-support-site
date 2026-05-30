@@ -72,7 +72,7 @@ const PAGE_OVERRIDES: Record<string, { name?: string; ignoreErrors?: string[] }>
 };
 
 /**
- * Discovered URL paths to skip — internal-only surfaces, or routes that crash
+ * Discovered URL paths to skip - internal-only surfaces, or routes that crash
  * without sample data the test can't fabricate. Dynamic routes (`[id]`) and
  * collisions are already filtered automatically; this is for everything else.
  */
@@ -444,7 +444,7 @@ function printTable(results: PageResult[]): void {
 
     // Auto-discover every page.tsx under src/app; route groups stripped,
     // dynamic segments skipped, admin routes split out. New pages get tested
-    // automatically — no manual list to maintain.
+    // automatically - no manual list to maintain.
     const { publicPages, adminPages } = discoverPages();
 
     // Admin pages are only included when ADMIN_SECRET is set; the secret rides

@@ -50,9 +50,9 @@ export default async function AdminPriceEstimatesPage({
   const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-  // By default the admin page hides rows logged from `npm run dev` so my own
-  // test submissions don't pollute the audit view. The ?showDev=1 toggle in
-  // the header flips this for when I do want to inspect them.
+  // Hide rows logged from `npm run dev` by default so local test submissions
+  // don't pollute the audit view. The ?showDev=1 toggle in the header flips
+  // this when inspecting them is wanted.
   const envFilter: Prisma.PriceEstimateLogWhereInput = includeDev
     ? {}
     : { environment: AppEnvironment.production };

@@ -433,7 +433,7 @@ export interface ReviewRequestData {
 
 /**
  * Sends a review request email to a customer shortly after their appointment.
- * Used by the cron job (30 min after visit). Failures are caught and logged - never throws.
+ * Failures are caught and logged - never throws.
  * @param booking - Booking details for the customer.
  * @returns Promise that resolves when the email is sent (or silently fails).
  */

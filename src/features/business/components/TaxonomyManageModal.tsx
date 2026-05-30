@@ -119,7 +119,7 @@ export function TaxonomyManageModal({ onClose, onChanged }: Props): React.ReactE
 
   /**
    * Clears a tag from every task tagged with it. Caller must have confirmed
-   * via the inline two-step (no window.confirm — Firefox suppresses it).
+   * via the inline two-step (no window.confirm, Firefox suppresses it).
    * @param kind - Whether to clear a device or an action.
    * @param name - The tag value to clear.
    */

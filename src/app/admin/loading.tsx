@@ -13,9 +13,8 @@ function Bone({ className }: { className?: string }): React.ReactElement {
 }
 
 /**
- * Loading UI for every /admin/* route. Mirrors the layout shape every admin
- * page now shares: heading + action bar + a card list (the card-on-mobile,
- * table-on-desktop pattern the data views all converged on).
+ * Loading UI for every /admin/* route. Heading + action bar + a card list
+ * (the card-on-mobile, table-on-desktop pattern the data views use).
  * @returns Skeleton element.
  */
 export default function AdminLoading(): React.ReactElement {

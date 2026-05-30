@@ -306,9 +306,8 @@ export function minsToHoursLabel(mins: number): string {
 
 /**
  * Composes the line-item description from device + action + optional details.
- * Mirrors the operator-facing preview in the Calculator and the persisted
- * description on TaskTemplate, so AI-generated and operator-entered tasks all
- * read identically on the invoice.
+ * Single source of truth so AI-generated and operator-entered tasks all read
+ * identically on the invoice and in the calculator preview.
  * @param device - Device tag (e.g. "Phone").
  * @param action - Action tag (e.g. "Setup").
  * @param details - Optional free-text qualifier appended after " - ".

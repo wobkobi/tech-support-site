@@ -115,7 +115,7 @@ export async function PATCH(
 
   const updated = await prisma.booking.update({ where: { id }, data });
 
-  // Mirrors the customer-side cancel flow - same draft for on-behalf + no-show.
+  // Same cancellation draft applies to on-behalf and no-show paths.
   if (
     updated.lateCancellation &&
     updated.cancelledBy === "customer" &&

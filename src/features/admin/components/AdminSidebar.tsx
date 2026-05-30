@@ -194,7 +194,7 @@ export function AdminSidebar({ current }: AdminSidebarProps): React.ReactElement
 
   return (
     <>
-      {/* Mobile hamburger — only rendered below lg. Sits over page content. */}
+      {/* Mobile hamburger - only rendered below lg. Sits over page content. */}
       <button
         type="button"
         onClick={() => setOpen(true)}
@@ -207,7 +207,7 @@ export function AdminSidebar({ current }: AdminSidebarProps): React.ReactElement
         <FaBars className={cn("text-base")} />
       </button>
 
-      {/* Mobile backdrop — visible only when drawer is open. */}
+      {/* Mobile backdrop - visible only when drawer is open. */}
       <div
         onClick={() => setOpen(false)}
         aria-hidden
@@ -233,7 +233,7 @@ export function AdminSidebar({ current }: AdminSidebarProps): React.ReactElement
             </p>
             <p className={cn("mt-0.5 text-sm font-bold text-white")}>To The Point</p>
           </div>
-          {/* Close button — only rendered below lg. */}
+          {/* Close button - only rendered below lg. */}
           <button
             type="button"
             onClick={() => setOpen(false)}

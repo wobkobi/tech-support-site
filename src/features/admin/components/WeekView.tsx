@@ -68,7 +68,7 @@ export function WeekView({
 
   const todayNzKey = useMemo(() => formatNzDateKey(new Date()), []);
 
-  // Prev/Next/Today Monday keys derived from current state. Used by the nav
+  // Prev/Next/Today Monday keys derived from current state for the nav
   // chevrons and the "Today" button.
   const { prevWeekKey, nextWeekKey, todayWeekKey } = useMemo(() => {
     const ws = new Date(weekStartIso);
