@@ -17,6 +17,7 @@ import {
   SUB_SLOT_MINUTES,
   BOOKING_FIELD_LIMITS,
   validateEmail,
+  splitUnitFromAddress,
   type BookableDay,
   type TimeOfDay,
   type StartMinute,
@@ -57,24 +58,6 @@ export interface BookingFormInitialValues {
   meetingType: "in-person" | "remote" | "";
   address: string;
   notes: string;
-}
-
-/**
- * Splits an NZ-style apartment-prefixed address ("12/160 Kepa Road Orakei")
- * into its unit number and the street-and-rest. Returns unit="" when no unit
- * prefix is detected. Matches 1-4 digits with an optional letter suffix
- * (e.g. "12", "12A") followed by "/" and at least one more char.
- * @param addr - Saved address string, possibly with a unit prefix.
- * @returns Object with `unit` (may be empty) and `rest` (the street + suburb).
- */
-function splitUnitFromAddress(addr: string): { unit: string; rest: string } {
-  // Collapse runs of whitespace to single spaces so addresses that were
-  // captured with stray double spaces (Google Maps autocomplete sometimes
-  // returns "Kepa  Road" with two spaces) display cleanly in the form.
-  const trimmed = addr.replace(/\s+/g, " ").trim();
-  const m = trimmed.match(/^(\d{1,4}[A-Za-z]?)\/(.+)$/);
-  if (!m) return { unit: "", rest: trimmed };
-  return { unit: m[1], rest: m[2].trim() };
 }
 
 /**

@@ -46,15 +46,12 @@ const STATUS_COLORS: Record<string, string> = {
  * Admin booking list with filter, inline edit, status change, and cancel.
  * @param props - Component props.
  * @param props.bookings - Initial booking rows from the server.
- * @param props.token - Admin token for API calls.
  * @returns Booking admin list element.
  */
 export function BookingAdminList({
   bookings: initial,
-  token,
 }: {
   bookings: AdminBookingRow[];
-  token: string;
 }): React.ReactElement {
   const [bookings, setBookings] = useState<AdminBookingRow[]>(initial);
   const [filter, setFilter] = useState<StatusFilter>("confirmed");
@@ -118,7 +115,7 @@ export function BookingAdminList({
     try {
       const res = await fetch(`/api/admin/bookings/${id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", "x-admin-secret": token },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
       if (!res.ok) {
@@ -211,7 +208,7 @@ export function BookingAdminList({
     try {
       const res = await fetch(`/api/admin/bookings/${id}`, {
         method: "DELETE",
-        headers: { "x-admin-secret": token },
+        headers: {},
       });
       if (!res.ok) {
         const data = (await res.json()) as { error?: string };
@@ -235,7 +232,7 @@ export function BookingAdminList({
     try {
       const res = await fetch(`/api/admin/bookings/${id}/resend-review`, {
         method: "POST",
-        headers: { "x-admin-secret": token },
+        headers: {},
       });
       if (!res.ok) {
         const data = (await res.json()) as { error?: string };
@@ -301,7 +298,9 @@ export function BookingAdminList({
 
           return (
             <div key={b.id} className={cn("rounded-xl border border-slate-200 bg-white p-4")}>
-              <div className={cn("flex items-start justify-between gap-3")}>
+              <div
+                className={cn("flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between")}
+              >
                 <div className={cn("flex min-w-0 flex-col gap-1")}>
                   <div className={cn("flex min-w-0 flex-wrap items-center gap-2")}>
                     <span className={cn("text-russian-violet min-w-0 truncate font-semibold")}>
@@ -323,7 +322,7 @@ export function BookingAdminList({
                   </span>
                 </div>
 
-                <div className={cn("flex shrink-0 gap-2")}>
+                <div className={cn("flex flex-wrap gap-2 sm:shrink-0")}>
                   {b.name.toLowerCase().includes("test") && (
                     <button
                       onClick={() => {

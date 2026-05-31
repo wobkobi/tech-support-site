@@ -2,7 +2,7 @@
 import type { Metadata } from "next";
 import type React from "react";
 import { prisma } from "@/shared/lib/prisma";
-import { requireAdminToken } from "@/shared/lib/auth";
+import { requireAdminAuth } from "@/shared/lib/auth";
 import { cn } from "@/shared/lib/cn";
 import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
 import {
@@ -20,17 +20,10 @@ export const metadata: Metadata = {
 
 /**
  * Admin travel blocks page showing computed travel time blocks and recalculate action.
- * @param root0 - Page props.
- * @param root0.searchParams - URL search parameters (contains token).
  * @returns Travel blocks page element.
  */
-export default async function AdminTravelPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ token?: string }>;
-}): Promise<React.ReactElement> {
-  const { token } = await searchParams;
-  const t = requireAdminToken(token);
+export default async function AdminTravelPage(): Promise<React.ReactElement> {
+  await requireAdminAuth();
 
   const carCalId = process.env.CAR_CALENDAR_ID ?? process.env.WORK_CALENDAR_ID;
 
@@ -109,7 +102,7 @@ export default async function AdminTravelPage({
     calendarLabels[process.env.PERSONAL_CALENDAR_ID] = "Personal";
 
   return (
-    <AdminPageLayout token={t} current="travel">
+    <AdminPageLayout current="travel">
       <h1 className={cn("text-russian-violet mb-6 text-2xl font-extrabold")}>Travel blocks</h1>
 
       <div className={cn("rounded-xl border border-slate-200 bg-white p-6 shadow-sm")}>
@@ -118,9 +111,9 @@ export default async function AdminTravelPage({
             Travel time blocks computed for calendar events with a location. Refreshed every 15
             minutes by the cron job.
           </p>
-          <RecalculateButton token={t} />
+          <RecalculateButton />
         </div>
-        <TravelBlockAdminList blocks={travelBlockRows} calendarLabels={calendarLabels} token={t} />
+        <TravelBlockAdminList blocks={travelBlockRows} calendarLabels={calendarLabels} />
       </div>
     </AdminPageLayout>
   );

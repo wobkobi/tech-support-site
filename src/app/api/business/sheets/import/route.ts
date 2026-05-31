@@ -8,7 +8,7 @@ import { runSheetsImport } from "@/features/business/lib/sheets-import";
  * @returns JSON with counts of rows that would be imported or skipped.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
  * @returns JSON with counts of rows imported, skipped, and any row errors.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {

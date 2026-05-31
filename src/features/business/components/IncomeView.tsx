@@ -9,11 +9,9 @@ import type { IncomeEntry } from "@/features/business/types/business";
 
 /**
  * Client component for recording and displaying income entries.
- * @param props - Component props
- * @param props.token - Admin auth token
  * @returns Income view element
  */
-export function IncomeView({ token }: { token: string }): React.ReactElement {
+export function IncomeView(): React.ReactElement {
   const [entries, setEntries] = useState<IncomeEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({
@@ -27,7 +25,7 @@ export function IncomeView({ token }: { token: string }): React.ReactElement {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const headers = { "X-Admin-Secret": token };
+  const headers = {};
 
   useEffect(() => {
     fetch("/api/business/income", { headers })
@@ -203,8 +201,69 @@ export function IncomeView({ token }: { token: string }): React.ReactElement {
         </button>
       </form>
 
-      {/* Table */}
-      <div className={cn("overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm")}>
+      {/* Mobile card list - stacks each entry so the date/amount/description
+          stay readable below ~640px where the table would overflow. */}
+      <div className={cn("space-y-2 lg:hidden")}>
+        {loading ? (
+          <p
+            className={cn(
+              "rounded-xl border border-slate-200 bg-white px-5 py-6 text-sm text-slate-400 shadow-sm",
+            )}
+          >
+            Loading...
+          </p>
+        ) : entries.length === 0 ? (
+          <p
+            className={cn(
+              "rounded-xl border border-slate-200 bg-white px-5 py-6 text-sm text-slate-400 shadow-sm",
+            )}
+          >
+            No income entries yet.
+          </p>
+        ) : (
+          entries.map((e) => (
+            <div
+              key={e.id}
+              className={cn("rounded-xl border border-slate-200 bg-white p-3 shadow-sm")}
+            >
+              <div className={cn("flex items-start justify-between gap-2")}>
+                <div className={cn("min-w-0 flex-1")}>
+                  <p className={cn("truncate text-sm font-medium text-slate-700")}>{e.customer}</p>
+                  <p className={cn("truncate text-xs text-slate-500")}>{e.description}</p>
+                </div>
+                <p className={cn("shrink-0 text-sm font-semibold text-green-600")}>
+                  {formatNZD(e.amount)}
+                </p>
+              </div>
+              <div
+                className={cn(
+                  "mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs",
+                )}
+              >
+                <span className={cn("text-slate-500")}>
+                  {new Date(e.date).toLocaleDateString("en-NZ")}
+                </span>
+                <span className={cn("text-slate-400")}>{e.method}</span>
+                <button
+                  onClick={() => handleDelete(e.id)}
+                  className={cn(
+                    "ml-auto inline-flex h-8 items-center text-red-400 hover:text-red-600",
+                  )}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Desktop table */}
+      <div
+        className={cn(
+          "hidden overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm lg:block",
+        )}
+      >
         {loading ? (
           <p className={cn("px-5 py-6 text-sm text-slate-400")}>Loading...</p>
         ) : entries.length === 0 ? (

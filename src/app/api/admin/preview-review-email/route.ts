@@ -16,7 +16,7 @@ import { isAdminRequest } from "@/shared/lib/auth";
  * @returns JSON response with `{ html }`.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 

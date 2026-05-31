@@ -7,9 +7,13 @@
  */
 
 import { type NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
-import { createBlockedDayEvent } from "@/features/calendar/lib/google-calendar";
+import {
+  createBlockedDayEvent,
+  SCHEDULE_CALENDAR_TAG,
+} from "@/features/calendar/lib/google-calendar";
 import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 
 interface BlockedDayPayload {
@@ -25,7 +29,7 @@ interface BlockedDayPayload {
  * @returns JSON with the new event id or an error.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
@@ -61,6 +65,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       dateKey,
       summary: body.summary?.trim() || "Busy",
     });
+    revalidateTag(SCHEDULE_CALENDAR_TAG, {});
     return NextResponse.json({ ok: true, eventId });
   } catch (err) {
     console.error("[admin/blocked-days] Create failed:", err);

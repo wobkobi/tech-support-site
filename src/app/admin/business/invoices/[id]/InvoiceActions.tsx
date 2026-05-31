@@ -21,7 +21,6 @@ interface InvoiceActionsProps {
   clientName: string;
   clientEmail: string;
   status: string;
-  token: string;
 }
 
 /**
@@ -34,7 +33,6 @@ interface InvoiceActionsProps {
  * @param props.clientName - Used in the "add to contacts" link in the send modal.
  * @param props.clientEmail - Recipient; "Send" is disabled when empty.
  * @param props.status - Drives the "Sent" indicator.
- * @param props.token - Admin token forwarded as X-Admin-Secret.
  * @returns Invoice actions element with modal.
  */
 export function InvoiceActions({
@@ -45,7 +43,6 @@ export function InvoiceActions({
   clientName,
   clientEmail,
   status,
-  token,
 }: InvoiceActionsProps): React.ReactElement {
   const router = useRouter();
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -95,7 +92,7 @@ export function InvoiceActions({
   // entry warning when the voided invoice had been marked PAID.
   const [voidToast, setVoidToast] = useState<string | null>(null);
 
-  const headers = { "X-Admin-Secret": token, "Content-Type": "application/json" };
+  const headers = { "Content-Type": "application/json" };
   const alreadySent = currentStatus === "SENT" || sentAt !== null;
   const isPaid = currentStatus === "PAID";
   const isDraft = currentStatus === "DRAFT";
@@ -914,7 +911,6 @@ export function InvoiceActions({
 
       {showAddContact && (
         <AddToContactsModal
-          token={token}
           name={clientName}
           email={clientEmail}
           onClose={() => {

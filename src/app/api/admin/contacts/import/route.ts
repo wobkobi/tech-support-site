@@ -16,7 +16,7 @@ import { importFromGoogleContacts } from "@/features/contacts/lib/google-contact
  * @returns JSON with importedCount on success, or error on failure.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -25,12 +25,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: true, importedCount });
   } catch (error) {
     console.error("[api/admin/contacts/import] Error:", error);
-    return NextResponse.json(
-      {
-        ok: false,
-        error: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 },
-    );
+    // Generic message to the client; the OAuth / Google API detail goes only
+    // to the server log so a transient Google failure can't leak credential
+    // shape or integration internals.
+    return NextResponse.json({ ok: false, error: "Contact import failed." }, { status: 500 });
   }
 }

@@ -28,14 +28,38 @@ export const GST_RATE = 0.15;
  */
 export const GST_REGISTERED = false;
 
-/** 15-minute floor; matches BILLING_INCREMENT_MINS so floor + round don't double-snap. */
+/** Minimum charge once any billable work happens; 15 is a multiple of BILLING_INCREMENT_MINS so the floor + round don't double-snap. */
 export const MIN_BILLABLE_MINS = 15;
 
-/** Round-up step for billable time; mirrors billableMins in business.ts. */
-export const BILLING_INCREMENT_MINS = 15;
+/** Round-to-nearest step for billable time; mirrors billableMins in business.ts. */
+export const BILLING_INCREMENT_MINS = 5;
 
 /** Multiplier applied to labour on NZ public holidays. Travel and parts are not uplifted. */
 export const PUBLIC_HOLIDAY_UPLIFT = 0.25;
+
+/** Region label for nationwide NZ public holidays in the PublicHoliday table. */
+export const NZ_REGION = "NZ";
+/** Region for the operator's regional anniversary day (also charged the uplift). */
+export const HOME_REGION = "Auckland";
+
+/**
+ * Formats a Date as a Pacific/Auckland-local YYYY-MM-DD so booking timestamps
+ * match the `PublicHoliday.date` strings (always NZ-local).
+ * @param d - Date instance to format.
+ * @returns ISO-style date string in NZ-local time.
+ */
+export function nzDateKey(d: Date): string {
+  const parts = new Intl.DateTimeFormat("en-NZ", {
+    timeZone: "Pacific/Auckland",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(d);
+  const year = parts.find((p) => p.type === "year")?.value ?? "";
+  const month = parts.find((p) => p.type === "month")?.value ?? "";
+  const day = parts.find((p) => p.type === "day")?.value ?? "";
+  return `${year}-${month}-${day}`;
+}
 
 export interface CancellationPolicy {
   /** Cancellations made more than this many hours before the booking are free. */
@@ -52,6 +76,46 @@ export const CANCELLATION: CancellationPolicy = {
   callOutFee: 30,
 };
 
+export interface TravelChargeBreakdown {
+  /** Raw round-trip cost before any rounding or floor: (oneWayMins/60) * 2 * ratePerHour. */
+  rawCost: number;
+  /** rawCost snapped to the nearest $5. */
+  roundedCost: number;
+  /** Final billed cost after the MIN_TRAVEL_CHARGE floor is applied. */
+  finalCost: number;
+  /** True when finalCost was lifted up to MIN_TRAVEL_CHARGE. */
+  minimumApplied: boolean;
+}
+
+/**
+ * Step-by-step travel-charge math. Single source of truth for both
+ * {@link calcTravelCharge} and the operator-side breakdown display, so the
+ * displayed math always matches what's billed.
+ *
+ * Pass ONE-WAY travelMins; this doubles internally to produce the round-trip
+ * charge. Returns zeros for no travel (remote, or geocoded to origin).
+ * @param travelMins - One-way drive time in minutes (from `lookupDriveDistance`).
+ * @param travelRatePerHour - Travel hourly rate, sourced from the `Travel` RateConfig.
+ * @returns Per-step breakdown of the round-trip charge.
+ */
+export function breakdownTravelCharge(
+  travelMins: number,
+  travelRatePerHour: number,
+): TravelChargeBreakdown {
+  if (travelMins <= 0 || travelRatePerHour <= 0) {
+    return { rawCost: 0, roundedCost: 0, finalCost: 0, minimumApplied: false };
+  }
+  const rawCost = Math.round((travelMins / 60) * 2 * travelRatePerHour * 100) / 100;
+  const roundedCost = Math.round(rawCost / 5) * 5;
+  const finalCost = Math.max(MIN_TRAVEL_CHARGE, roundedCost);
+  return {
+    rawCost,
+    roundedCost,
+    finalCost,
+    minimumApplied: roundedCost < MIN_TRAVEL_CHARGE,
+  };
+}
+
 /**
  * Round-trip travel charge. Doubles one-way drive time, snaps to $5, and
  * floors at MIN_TRAVEL_CHARGE. Returns 0 for no travel (remote, or geocoded
@@ -64,10 +128,7 @@ export const CANCELLATION: CancellationPolicy = {
  * @returns Charge in NZD (whole dollars after $5 rounding), or 0 when no travel.
  */
 export function calcTravelCharge(travelMins: number, travelRatePerHour: number): number {
-  if (travelMins <= 0 || travelRatePerHour <= 0) return 0;
-  const raw = (travelMins / 60) * 2 * travelRatePerHour;
-  const roundedToFive = Math.round(raw / 5) * 5;
-  return Math.max(MIN_TRAVEL_CHARGE, roundedToFive);
+  return breakdownTravelCharge(travelMins, travelRatePerHour).finalCost;
 }
 
 /**
@@ -95,7 +156,7 @@ export function isWithinTravelWindow(bookingStart: Date, now: Date = new Date())
 }
 
 /**
- * Applies the 15-minute floor then rounds up to the next 15-minute increment.
+ * Applies the 15-minute floor then rounds to the nearest 5-minute increment.
  * 0 stays 0 (no work, no charge) so a placeholder job does not invent time.
  * @param rawMins - Actual worked minutes.
  * @returns Billable minutes after the floor.

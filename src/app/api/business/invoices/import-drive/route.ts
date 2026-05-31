@@ -63,7 +63,7 @@ function decodePdfString(s: string): string {
 /**
  * Normalises font-artifact capitalisation in a single word.
  * Google Sheets PDFs sometimes encode runs so that an interior letter decodes
- * as uppercase when the surrounding letters are lowercase — e.g. "BIll".
+ * as uppercase when the surrounding letters are lowercase, e.g. "BIll".
  * Detection: an uppercase letter that both (a) is preceded by an uppercase
  * letter and (b) is followed by a lowercase letter.  Only title-case the word
  * when that pattern is found; all-caps acronyms (e.g. "HELP") are left alone.
@@ -131,7 +131,7 @@ function extractPdfText(buffer: Buffer): string {
       const decompressed = inflateSync(Buffer.from(raw, "binary")).toString("latin1");
       texts.push(...extractTextOps(decompressed));
     } catch {
-      // not a deflate stream — skip
+      // not a deflate stream, skip
     }
   }
 
@@ -183,7 +183,7 @@ function parseLegacyInvoiceText(text: string): ParsedInvoiceData {
     if (!e.includes("tothepoint.co.nz") && e !== "client@example.com") clientEmail = e;
   }
 
-  // Pure template labels — never real names.
+  // Pure template labels, never real names.
   const LABEL_LOWER = new Set([
     "to",
     "due",
@@ -246,7 +246,7 @@ function parseLegacyInvoiceText(text: string): ParsedInvoiceData {
     }
   }
 
-  // Secondary: stop-word regex — works when no email anchor is available.
+  // Secondary: stop-word regex, works when no email anchor is available.
   if (!clientName && billToPos >= 0) {
     const m = text.match(
       /bill\s+to\s+(.+?)(?=\s+(?:due\s+)?date\b|\s+email\b|\s+phone\b|\s+from\b)/i,
@@ -263,7 +263,7 @@ function parseLegacyInvoiceText(text: string): ParsedInvoiceData {
     }
   }
 
-  // Tertiary: column-by-column PDF ordering — email is extracted before the "Bill To" label.
+  // Tertiary: column-by-column PDF ordering, email is extracted before the "Bill To" label.
   // In this layout the client name sits immediately before the email in the text stream.
   if (!clientName && clientEmail) {
     const emailPos = text.indexOf(clientEmail);
@@ -358,7 +358,7 @@ async function downloadAndParse(fileId: string): Promise<{ data: ParsedInvoiceDa
  * @returns JSON with counts of created, updated, skipped, and errored records.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

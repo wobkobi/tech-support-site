@@ -4,7 +4,7 @@ import type React from "react";
 import Link from "next/link";
 import { prisma } from "@/shared/lib/prisma";
 import { AppEnvironment, type Prisma } from "@prisma/client";
-import { requireAdminToken } from "@/shared/lib/auth";
+import { requireAdminAuth } from "@/shared/lib/auth";
 import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
 import { cn } from "@/shared/lib/cn";
 import { formatDateTimeShort } from "@/shared/lib/date-format";
@@ -33,16 +33,16 @@ function formatMins(mins: number): string {
  * with the raw description, AI interpretation, per-task split, and the price
  * range shown to the user. Cleaned up automatically after 30 days.
  * @param root0 - Page props.
- * @param root0.searchParams - URL search parameters (carries the admin token).
+ * @param root0.searchParams - URL params with optional `?showDev=1` to include dev/test entries.
  * @returns Price estimates admin page element.
  */
 export default async function AdminPriceEstimatesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ token?: string; showDev?: string }>;
+  searchParams: Promise<{ showDev?: string }>;
 }): Promise<React.ReactElement> {
-  const { token, showDev } = await searchParams;
-  const t = requireAdminToken(token);
+  await requireAdminAuth("/admin/price-estimates");
+  const { showDev } = await searchParams;
   const includeDev = showDev === "1";
 
   const now = new Date();
@@ -50,9 +50,9 @@ export default async function AdminPriceEstimatesPage({
   const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-  // By default the admin page hides rows logged from `npm run dev` so my own
-  // test submissions don't pollute the audit view. The ?showDev=1 toggle in
-  // the header flips this for when I do want to inspect them.
+  // Hide rows logged from `npm run dev` by default so local test submissions
+  // don't pollute the audit view. The ?showDev=1 toggle in the header flips
+  // this when inspecting them is wanted.
   const envFilter: Prisma.PriceEstimateLogWhereInput = includeDev
     ? {}
     : { environment: AppEnvironment.production };
@@ -80,12 +80,10 @@ export default async function AdminPriceEstimatesPage({
     { label: "Last 30 days", value: monthCount },
   ];
 
-  const toggleHref = includeDev
-    ? `/admin/price-estimates?token=${encodeURIComponent(t)}`
-    : `/admin/price-estimates?token=${encodeURIComponent(t)}&showDev=1`;
+  const toggleHref = includeDev ? `/admin/price-estimates` : `/admin/price-estimates?showDev=1`;
 
   return (
-    <AdminPageLayout token={t} current="price-estimates">
+    <AdminPageLayout current="price-estimates">
       <div className={cn("mb-6 flex flex-wrap items-center justify-between gap-4")}>
         <div>
           <h1 className={cn("text-russian-violet text-2xl font-extrabold")}>Price estimates</h1>

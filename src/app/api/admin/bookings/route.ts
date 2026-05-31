@@ -8,6 +8,7 @@
 
 import { type NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
+import { revalidateTag } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
@@ -19,6 +20,7 @@ import {
 import {
   createBookingEvent,
   fetchAllCalendarEvents,
+  SCHEDULE_CALENDAR_TAG,
 } from "@/features/calendar/lib/google-calendar";
 import { sendCustomerBookingConfirmation } from "@/features/reviews/lib/email";
 import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
@@ -44,7 +46,7 @@ interface AdminBookingPayload {
  * @returns JSON with the new booking id or an error.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
@@ -212,9 +214,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         startAt: booking.startAt,
         endAt: booking.endAt,
         cancelToken: booking.cancelToken,
+        promoTitleAtBooking: booking.promoTitleAtBooking,
       });
     }
 
+    revalidateTag(SCHEDULE_CALENDAR_TAG, {});
     return NextResponse.json({ ok: true, bookingId: booking.id });
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {

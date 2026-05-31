@@ -298,6 +298,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           startAt,
           endAt,
           cancelToken: booking.cancelToken,
+          promoTitleAtBooking: booking.promoTitleAtBooking,
         },
         { kind: "rescheduled", previousStartAt },
       ),

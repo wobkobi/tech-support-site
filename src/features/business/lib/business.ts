@@ -5,7 +5,11 @@ import type {
   TaskLine,
   TravelEntry,
 } from "@/features/business/types/business";
-import { GST_REGISTERED, GST_RATE } from "@/features/business/lib/pricing-policy";
+import {
+  BILLING_INCREMENT_MINS,
+  GST_REGISTERED,
+  GST_RATE,
+} from "@/features/business/lib/pricing-policy";
 import { formatDateSlash } from "@/shared/lib/date-format";
 
 /**
@@ -103,13 +107,15 @@ export function nextInvoiceNumber(
 }
 
 /**
- * Rounds a duration up to the nearest 15-minute billing increment.
+ * Rounds a duration to the nearest BILLING_INCREMENT_MINS slot. Symmetric
+ * rounding so customers are never bumped a full slot for a single minute of
+ * overage; the operator gives back as often as they collect.
  * @param mins - Actual duration in minutes
- * @returns Billable duration rounded up to nearest 15 min
+ * @returns Billable duration rounded to the nearest billing increment
  */
 export function billableMins(mins: number): number {
   if (mins <= 0) return 0;
-  return Math.ceil(mins / 15) * 15;
+  return Math.round(mins / BILLING_INCREMENT_MINS) * BILLING_INCREMENT_MINS;
 }
 
 /**
@@ -160,13 +166,14 @@ const SHORT_TASK_MINUTES = 15;
 
 /**
  * Collapses task lines so their total hourly minutes fit the listed job window.
- * Tasks the AI flagged as `isShort` ("quickly", one-shots, etc.) are pinned at
- * {@link SHORT_TASK_MINUTES}; the remaining non-short tasks scale proportionally
- * to fill what's left of the window, so an over-long primary task absorbs more
- * of the correction than a correctly-sized one. Non-short tasks that would
- * scale below {@link MIN_TASK_MINUTES} are dropped, then the rest rescale.
- * Snaps qty to 5-min increments and parks any rounding remainder on the
- * largest survivor so totals match exactly. Flat-rate tasks pass through.
+ * Pinned tasks (isShort or isExplicit) keep their parser-emitted qty - short
+ * tasks at {@link SHORT_TASK_MINUTES}, explicit tasks at whatever the operator
+ * stated. The remaining floating tasks scale proportionally to fill what's
+ * left of the window, so an over-long primary task absorbs more of the
+ * correction than a correctly-sized one. Floating tasks that would scale
+ * below {@link MIN_TASK_MINUTES} are dropped, then the rest rescale. Snaps
+ * qty to 5-min increments and parks any rounding remainder on the largest
+ * floating survivor so totals match exactly. Flat-rate tasks pass through.
  * @param tasks - Task lines to collapse.
  * @param windowMin - Target window in minutes (`durationMins`).
  * @returns Adjusted task list, count of dropped tasks, and whether any qty was rescaled.
@@ -192,52 +199,62 @@ export function collapseToWindow(
     dropped++;
   }
 
-  let nonShort: TaskLine[] = hourlyIn.filter((t) => !t.isShort);
-  const remainingMin = windowMin - short.length * SHORT_TASK_MINUTES;
+  // Explicit-but-not-short tasks keep their parser-emitted qty. Drop them
+  // (newest first) only if the remaining window can't accommodate them.
+  const explicit: TaskLine[] = hourlyIn.filter((t) => t.isExplicit && !t.isShort);
+  const shortMin = short.length * SHORT_TASK_MINUTES;
+  while (explicit.length > 0 && shortMin + sumTaskMinutes(explicit) > windowMin) {
+    explicit.pop();
+    dropped++;
+  }
+  const pinnedMin = shortMin + sumTaskMinutes(explicit);
 
-  if (nonShort.length === 0) {
-    return { tasks: [...short, ...flat], dropped, rescaled: true };
+  let floating: TaskLine[] = hourlyIn.filter((t) => !t.isShort && !t.isExplicit);
+  const remainingMin = windowMin - pinnedMin;
+
+  if (floating.length === 0) {
+    return { tasks: [...short, ...explicit, ...flat], dropped, rescaled: true };
   }
 
   if (remainingMin <= 0) {
-    // Short tasks already cover the whole window; drop every non-short.
-    dropped += nonShort.length;
-    return { tasks: [...short, ...flat], dropped, rescaled: true };
+    // Pinned tasks already cover the whole window; drop every floating one.
+    dropped += floating.length;
+    return { tasks: [...short, ...explicit, ...flat], dropped, rescaled: true };
   }
 
-  // Scale non-short proportionally to fill remainingMin; drop tasks that
+  // Scale floating tasks proportionally to fill remainingMin; drop tasks that
   // would land below MIN_TASK_MINUTES and rescale until everything fits.
-  while (nonShort.length > 0) {
-    const sum = sumTaskMinutes(nonShort);
+  while (floating.length > 0) {
+    const sum = sumTaskMinutes(floating);
     if (sum <= remainingMin) break;
     const multiplier = remainingMin / sum;
-    const scaled = nonShort.map((t) => ({ task: t, scaledMin: t.qty * 60 * multiplier }));
+    const scaled = floating.map((t) => ({ task: t, scaledMin: t.qty * 60 * multiplier }));
     const tooSmall = scaled.filter((s) => s.scaledMin < MIN_TASK_MINUTES);
     if (tooSmall.length === 0) {
-      nonShort = scaled.map((s) => withMinutes(s.task, snapMinutes(s.scaledMin)));
+      floating = scaled.map((s) => withMinutes(s.task, snapMinutes(s.scaledMin)));
       break;
     }
     scaled.sort((a, b) => a.scaledMin - b.scaledMin);
     const removed = scaled[0].task;
-    nonShort = nonShort.filter((t) => t !== removed);
+    floating = floating.filter((t) => t !== removed);
     dropped++;
   }
 
-  // Park rounding remainder on the largest non-short survivor so totals match.
-  const combined = [...short, ...nonShort];
+  // Park rounding remainder on the largest floating survivor so totals match.
+  const combined = [...short, ...explicit, ...floating];
   if (combined.length > 0) {
     const error = windowMin - sumTaskMinutes(combined);
-    if (error !== 0 && nonShort.length > 0) {
+    if (error !== 0 && floating.length > 0) {
       let biggestIdx = 0;
-      for (let i = 1; i < nonShort.length; i++) {
-        if (nonShort[i].qty > nonShort[biggestIdx].qty) biggestIdx = i;
+      for (let i = 1; i < floating.length; i++) {
+        if (floating[i].qty > floating[biggestIdx].qty) biggestIdx = i;
       }
-      const adjustedMin = Math.max(MIN_TASK_MINUTES, nonShort[biggestIdx].qty * 60 + error);
-      nonShort[biggestIdx] = withMinutes(nonShort[biggestIdx], adjustedMin);
+      const adjustedMin = Math.max(MIN_TASK_MINUTES, floating[biggestIdx].qty * 60 + error);
+      floating[biggestIdx] = withMinutes(floating[biggestIdx], adjustedMin);
     }
   }
 
-  return { tasks: [...short, ...nonShort, ...flat], dropped, rescaled: true };
+  return { tasks: [...short, ...explicit, ...floating, ...flat], dropped, rescaled: true };
 }
 
 /**
@@ -289,9 +306,8 @@ export function minsToHoursLabel(mins: number): string {
 
 /**
  * Composes the line-item description from device + action + optional details.
- * Mirrors the operator-facing preview in the Calculator and the persisted
- * description on TaskTemplate, so AI-generated and operator-entered tasks all
- * read identically on the invoice.
+ * Single source of truth so AI-generated and operator-entered tasks all read
+ * identically on the invoice and in the calculator preview.
  * @param device - Device tag (e.g. "Phone").
  * @param action - Action tag (e.g. "Setup").
  * @param details - Optional free-text qualifier appended after " - ".
@@ -320,11 +336,13 @@ export function matchRateById(rates: RateConfig[], id: string | null): RateConfi
 }
 
 /**
- * Computes the effective hourly rate for a task by adding modifier deltas to
- * a base rate. E.g. Standard ($65) + At home (-$10) = $55.
+ * Computes the effective hourly rate for a task by composing the base rate
+ * with its modifiers. Sums `hourlyDelta` first, then multiplies by any
+ * `percentDelta` (e.g. Public Holiday +25%) so the uplift acts on the
+ * post-modifier base. E.g. Standard ($65) + At home (-$10) = $55.
  * @param rates - All rate configurations (used to look up by ID).
  * @param baseRateId - Base rate ID (must point to a rate with ratePerHour set).
- * @param modifierIds - Modifier rate IDs (each must point to a rate with hourlyDelta set).
+ * @param modifierIds - Modifier rate IDs.
  * @returns Effective $/hr, or 0 when the base rate isn't found / lacks ratePerHour.
  */
 export function effectiveHourlyRate(
@@ -336,11 +354,10 @@ export function effectiveHourlyRate(
   const base = rates.find((r) => r.id === baseRateId);
   if (!base || base.ratePerHour === null) return 0;
   const ids = modifierIds ?? [];
-  const sumDelta = ids.reduce((s, id) => {
-    const mod = rates.find((r) => r.id === id);
-    return s + (mod?.hourlyDelta ?? 0);
-  }, 0);
-  return Math.round((base.ratePerHour + sumDelta) * 100) / 100;
+  const mods = ids.map((id) => rates.find((r) => r.id === id)).filter((m): m is RateConfig => !!m);
+  const sumDelta = mods.reduce((s, m) => s + (m.hourlyDelta ?? 0), 0);
+  const percentFactor = mods.reduce((f, m) => f * (1 + (m.percentDelta ?? 0)), 1);
+  return Math.round((base.ratePerHour + sumDelta) * percentFactor * 100) / 100;
 }
 
 /**

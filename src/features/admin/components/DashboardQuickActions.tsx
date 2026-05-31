@@ -36,8 +36,6 @@ export interface PastBookingRow {
  * Props for DashboardQuickActions.
  */
 interface DashboardQuickActionsProps {
-  /** Admin token for API calls */
-  token: string;
   /** Confirmed bookings with a start time in the past */
   pastConfirmedBookings: PastBookingRow[];
   /** Contacts that have never received a review link */
@@ -47,13 +45,11 @@ interface DashboardQuickActionsProps {
 /**
  * Quick-action panels for the admin dashboard.
  * @param props - Component props.
- * @param props.token - Admin token.
  * @param props.pastConfirmedBookings - Past confirmed bookings awaiting completion.
  * @param props.contactSuggestions - Contacts that have never received a review link.
  * @returns Dashboard quick actions element.
  */
 export function DashboardQuickActions({
-  token,
   pastConfirmedBookings: initial,
   contactSuggestions,
 }: DashboardQuickActionsProps): React.ReactElement {
@@ -74,7 +70,7 @@ export function DashboardQuickActions({
     try {
       const patchRes = await fetch(`/api/admin/bookings/${id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", "x-admin-secret": token },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "completed" }),
       });
       if (!patchRes.ok) {
@@ -115,7 +111,7 @@ export function DashboardQuickActions({
       {/* Send review link */}
       <div className={cn("rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}>
         <h2 className={cn("mb-4 text-sm font-semibold text-slate-700")}>Send review link</h2>
-        <SendReviewLinkForm token={token} contactSuggestions={contactSuggestions} defaultOpen />
+        <SendReviewLinkForm contactSuggestions={contactSuggestions} defaultOpen />
       </div>
 
       {/* Complete events */}

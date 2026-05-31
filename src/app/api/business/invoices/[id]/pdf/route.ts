@@ -18,7 +18,7 @@ export async function GET(
   request: NextRequest,
   ctx: { params: Promise<{ id: string }> },
 ): Promise<Response> {
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

@@ -73,7 +73,59 @@ export function RateConfigPanel({
           {resettingRates ? "Resetting..." : "Reset to defaults"}
         </button>
       </div>
-      <table className={cn("mb-4 w-full text-xs")}>
+      {/* Mobile: stacked rate cards - five columns are too dense for phones. */}
+      <div className={cn("mb-4 space-y-2 lg:hidden")}>
+        {rates.map((r) => (
+          <div
+            key={r.id}
+            className={cn(
+              "rounded-lg border border-slate-200 p-3",
+              editingRateId === r.id ? "bg-russian-violet/5" : "bg-white",
+            )}
+          >
+            <div className={cn("flex items-start justify-between gap-2")}>
+              <div className={cn("min-w-0 flex-1")}>
+                <p className={cn("flex items-center gap-1.5 text-sm font-semibold text-slate-700")}>
+                  <span className={cn("truncate")}>{r.label}</span>
+                  {r.isDefault && (
+                    <FaCheck
+                      className={cn("h-3 w-3 shrink-0 text-emerald-600")}
+                      aria-label="Default"
+                    />
+                  )}
+                </p>
+                <p className={cn("text-xs text-slate-500")}>
+                  {r.ratePerHour !== null
+                    ? `$${r.ratePerHour}/hr`
+                    : r.hourlyDelta !== null
+                      ? `${r.hourlyDelta < 0 ? "-" : "+"}$${Math.abs(r.hourlyDelta)}/hr`
+                      : r.flatRate !== null
+                        ? `$${r.flatRate}`
+                        : "-"}
+                  {r.unit && <span className={cn("ml-2 text-slate-400")}>{r.unit}</span>}
+                </p>
+              </div>
+              <div className={cn("flex shrink-0 gap-2 text-xs")}>
+                <button
+                  onClick={() => onStartEdit(r)}
+                  className={cn("inline-flex h-8 items-center text-slate-500 hover:text-slate-700")}
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={() => onDeleteRate(r.id)}
+                  className={cn("inline-flex h-8 items-center text-red-400 hover:text-red-600")}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop table */}
+      <table className={cn("mb-4 hidden w-full text-xs lg:table")}>
         <thead>
           <tr className={cn("border-b border-slate-100")}>
             {["Label", "Rate", "Unit", "Default", ""].map((h) => (

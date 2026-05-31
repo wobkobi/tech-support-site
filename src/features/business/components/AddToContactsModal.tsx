@@ -17,8 +17,6 @@ import { cn } from "@/shared/lib/cn";
  * Props for AddToContactsModal.
  */
 export interface AddToContactsModalProps {
-  /** Admin token for API calls. */
-  token: string;
   /** Client name to seed the new Contact row with. */
   name: string;
   /** Client email - dedup key on the server. */
@@ -40,7 +38,6 @@ export interface AddToContactsModalProps {
  * Confirmation popup: "{name} isn't in your contacts yet - add them?".
  * On Yes, POSTs to /api/admin/contacts and closes once the request settles.
  * @param props - Component props.
- * @param props.token - Admin token for API calls.
  * @param props.name - Client name to seed the new Contact row with.
  * @param props.email - Client email; the dedup key on the server.
  * @param props.phone - Optional phone number (E.164 or local format).
@@ -49,7 +46,6 @@ export interface AddToContactsModalProps {
  * @returns Modal element.
  */
 export function AddToContactsModal({
-  token,
   name,
   email,
   phone,
@@ -83,7 +79,7 @@ export function AddToContactsModal({
     try {
       const res = await fetch("/api/admin/contacts", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-Admin-Secret": token },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, email, phone, googleContactId }),
       });
       if (!res.ok) {

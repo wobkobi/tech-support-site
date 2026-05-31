@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import type React from "react";
 import Link from "next/link";
 import { prisma } from "@/shared/lib/prisma";
-import { requireAdminToken } from "@/shared/lib/auth";
+import { requireAdminAuth } from "@/shared/lib/auth";
 import { cn } from "@/shared/lib/cn";
 import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
 import { ContactsAdminView } from "@/features/admin/components/ContactsAdminView";
@@ -18,17 +18,10 @@ export const metadata: Metadata = {
 
 /**
  * Admin contacts hub page. Runs autoMaintain on load then renders the contacts list.
- * @param root0 - Page props.
- * @param root0.searchParams - URL search parameters (contains token).
  * @returns Contacts hub page element.
  */
-export default async function AdminContactsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ token?: string }>;
-}): Promise<React.ReactElement> {
-  const { token } = await searchParams;
-  const t = requireAdminToken(token);
+export default async function AdminContactsPage(): Promise<React.ReactElement> {
+  await requireAdminAuth();
 
   const initialConflicts = await autoMaintain(prisma);
 
@@ -98,7 +91,7 @@ export default async function AdminContactsPage({
   }));
 
   return (
-    <AdminPageLayout token={t} current="contacts">
+    <AdminPageLayout current="contacts">
       <h1 className={cn("text-russian-violet mb-6 text-2xl font-extrabold")}>
         Contacts
         <span className={cn("ml-3 text-lg font-semibold text-slate-400")}>
@@ -107,7 +100,7 @@ export default async function AdminContactsPage({
       </h1>
       {pendingConflictsCount > 0 && (
         <Link
-          href={`/admin/contacts/conflicts?token=${encodeURIComponent(t)}`}
+          href={`/admin/contacts/conflicts`}
           className={cn(
             "mb-4 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 hover:bg-amber-100",
           )}
@@ -120,7 +113,7 @@ export default async function AdminContactsPage({
           <span className={cn("font-semibold")}>Review &amp; resolve →</span>
         </Link>
       )}
-      <ContactsAdminView initialConflicts={initialConflicts} contacts={contactRows} token={t} />
+      <ContactsAdminView initialConflicts={initialConflicts} contacts={contactRows} />
     </AdminPageLayout>
   );
 }

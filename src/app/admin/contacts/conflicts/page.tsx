@@ -2,7 +2,7 @@
 import type { Metadata } from "next";
 import type React from "react";
 import { prisma } from "@/shared/lib/prisma";
-import { requireAdminToken } from "@/shared/lib/auth";
+import { requireAdminAuth } from "@/shared/lib/auth";
 import { cn } from "@/shared/lib/cn";
 import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
 import {
@@ -20,17 +20,10 @@ export const metadata: Metadata = {
 /**
  * Admin page listing pending Google Contacts sync conflicts and letting the
  * operator pick which side wins per row.
- * @param root0 - Page props.
- * @param root0.searchParams - URL search parameters (contains token).
  * @returns Conflicts page element.
  */
-export default async function AdminContactConflictsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ token?: string }>;
-}): Promise<React.ReactElement> {
-  const { token } = await searchParams;
-  const t = requireAdminToken(token);
+export default async function AdminContactConflictsPage(): Promise<React.ReactElement> {
+  await requireAdminAuth();
 
   const conflicts = await prisma.contactConflict.findMany({
     where: { resolvedAt: null },
@@ -60,13 +53,13 @@ export default async function AdminContactConflictsPage({
   }));
 
   return (
-    <AdminPageLayout token={t} current="contacts">
+    <AdminPageLayout current="contacts">
       <h1 className={cn("text-russian-violet mb-2 text-2xl font-extrabold")}>Contact conflicts</h1>
       <p className={cn("mb-6 text-sm text-slate-500")}>
         Fields where the site DB and Google Contacts both changed since the last sync. Pick which
         value should win - the chosen value is written to both sides and the conflict is closed.
       </p>
-      <ContactConflictsView initial={rows} token={t} />
+      <ContactConflictsView initial={rows} />
     </AdminPageLayout>
   );
 }

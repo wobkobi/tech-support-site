@@ -274,6 +274,11 @@ export const BACKDROP_VARIANTS: BackdropVariant[] = [
   // WebP fallback for iOS 15 / older Safari (iPhone 7 etc.) - no AVIF support
   // there. Higher quality since the audience that hits this is small.
   { name: "backdrop-blur", width: 2560, quality: 90, format: "webp" },
+  // JPEG fallback for the static old-browser page (public/legacy.html). High
+  // Sierra Safari and other ancient browsers decode neither AVIF nor WebP, so
+  // the fallback page needs a universally-decodable backdrop. Smaller width +
+  // lower quality since it is heavily blurred and serves low-spec devices.
+  { name: "backdrop-blur", width: 1920, quality: 80, format: "jpeg" },
 ];
 
 /* ---------- QR Code Specs ---------- */

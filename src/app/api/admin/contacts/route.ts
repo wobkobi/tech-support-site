@@ -19,7 +19,7 @@ import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-crea
  * @returns JSON with contacts array.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -41,13 +41,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 /**
  * POST /api/admin/contacts
  * Find-or-creates a Contact by email. On create, fires a best-effort sync to
- * Google Contacts. Used by the "Add to contacts?" popup that appears after a
- * calculator handoff or invoice save when the client isn't in the DB yet.
+ * Google Contacts.
  * @param request - Incoming request with { name, email, phone?, address?, googleContactId? }.
  * @returns JSON { ok, created, contact }.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

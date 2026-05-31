@@ -15,7 +15,7 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ name: string }> },
 ): Promise<NextResponse> {
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

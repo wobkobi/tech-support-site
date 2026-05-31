@@ -10,7 +10,6 @@ import type { ConflictEntry } from "@/app/api/admin/contacts/enrich-from-reviews
 interface ContactsAdminViewProps {
   initialConflicts: ConflictEntry[];
   contacts: ContactRow[];
-  token: string;
 }
 
 /**
@@ -18,13 +17,11 @@ interface ContactsAdminViewProps {
  * @param props - Component props.
  * @param props.initialConflicts - Conflicts pre-computed by autoMaintain on page load.
  * @param props.contacts - All contact rows to display.
- * @param props.token - Admin token for API calls.
  * @returns Contacts admin view element.
  */
 export function ContactsAdminView({
   initialConflicts,
   contacts,
-  token,
 }: ContactsAdminViewProps): React.ReactElement {
   const router = useRouter();
   const [conflicts, setConflicts] = useState<ConflictEntry[]>(initialConflicts);
@@ -42,7 +39,7 @@ export function ContactsAdminView({
     try {
       const res = await fetch("/api/admin/contacts/sync", {
         method: "POST",
-        headers: { "X-Admin-Secret": token },
+        headers: {},
       });
       const data = (await res.json()) as {
         ok: boolean;
@@ -63,7 +60,7 @@ export function ContactsAdminView({
     } finally {
       setSyncing(false);
     }
-  }, [token, router]);
+  }, [router]);
 
   const resolveConflict = useCallback(
     async (conflict: ConflictEntry, chosenName: string | null, chosenPhone: string | null) => {
@@ -77,7 +74,7 @@ export function ContactsAdminView({
       try {
         await fetch("/api/admin/contacts/resolve-conflict", {
           method: "POST",
-          headers: { "X-Admin-Secret": token, "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         });
         router.refresh();
@@ -86,7 +83,7 @@ export function ContactsAdminView({
       }
       setConflicts((prev) => prev.filter((c) => c.sourceId !== conflict.sourceId));
     },
-    [token, router],
+    [router],
   );
 
   const skipConflict = useCallback((sourceId: string) => {
@@ -215,7 +212,7 @@ export function ContactsAdminView({
 
         {/* Contact list */}
         <div className={cn("rounded-xl border border-slate-200 bg-white p-6 shadow-sm")}>
-          <ContactAdminList contacts={contacts} token={token} />
+          <ContactAdminList contacts={contacts} />
         </div>
       </div>
       {/* end left column */}

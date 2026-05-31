@@ -76,18 +76,17 @@ BILLING — single source of truth for time distribution. Run the algorithm step
 2. Convert to decimal hours, ROUNDING UP to the next 0.25 (matches the calculator's billable rule of rounding up to the nearest 15-min increment).
    Examples: 105 min = 1.75h exactly → 1.75h. 107 min → 2.0h (110 ceils to 120). 110 min → 2.0h. 120 min → 2.0h. 121 min → 2.25h.
 3. Identify how many distinct tasks there are (N).
-4. Cap-then-distribute split. Inherently short tasks get 0.25h; the rest split the remaining time evenly.
+4. Classify each task into one of three sets, then distribute totalHours across them.
 
-   a. Identify the SHORT set (S). A task is short if ANY of:
-      - the description marks it short ("quick", "quickly", "briefly", "short", "just a quick", "fast");
-      - OR the description quotes an explicit duration under 15 minutes for that specific task ("took 10 mins", "took like 10 minutes", "5 min fix", "about 5 minutes", "15 min job", etc.). When a numeric duration is attached to one specific task, trust it: a task the user says took 10 minutes is SHORT, even if surrounded by other substantial work;
-      - OR the action is inherently a one-shot (e.g. "Factory reset", "Password reset", "Account unlock", "Driver update", "Single file transfer", "Settings tweak").
-   b. Assign 0.25 to every task in S. shortHours = 0.25 * |S|.
-   c. The other tasks (R = N - |S|) split the rest:
-      - remaining = totalHours - shortHours.
-      - If R == 0, give all extra time to the most significant short task instead (fall back to even-then-leftover across all N).
-      - subBase = floor((remaining / R) * 4) / 4. Assign subBase to each task in R.
-      - subLeftover = remaining - subBase * R. Distribute subLeftover in 0.25h chunks to the most significant R tasks first.
+   a. PINNED set (P) — tasks with an operator-stated explicit duration of ANY length ("(30 mins)", "took half an hour", "about 45 min", "15 min job", "(20 mins)", "took 10 mins"). The duration must clearly attach to one specific task, not the whole session.
+      - pinnedQty = stated duration rounded UP to the next 0.25h. "(10 mins)" → 0.25h. "(15 mins)" → 0.25h. "(20 mins)" → 0.5h. "(30 mins)" → 0.5h. "(45 mins)" → 0.75h. "(50 mins)" → 1.0h.
+      - Subset SHORT (S) — a pinned task is ALSO short when its stated duration is ≤15 min OR the action is inherently one-shot (Factory reset, Password reset, Account unlock, Driver update, Single file transfer, Settings tweak) OR a "quick"/"quickly"/"briefly"/"short"/"just a quick"/"fast" hint applies. Short pinned tasks get qty 0.25h and isShort: true. Non-short pinned tasks get their pinnedQty and isShort: false.
+      - SLACK: when the leftover for the floating set (below) ends up awkward (under 0.25h, or unsplittable across the remaining floating tasks), you MAY shift up to 5 min onto OR off the most semantically appropriate pinned task to make the residual splittable. Stay within ±5 min of the stated duration. Never use slack to move a pinned task past its 0.25h step.
+   b. FLOATING set (F) — every task NOT in P. floatingHours = totalHours - sum(pinnedQty across P).
+      - If |F| == 0, the pinned tasks already account for everything. If sum(pinned) < totalHours, give the residual 0.25h chunks to the most significant pinned task (rule (d) below).
+      - subBase = floor((floatingHours / |F|) * 4) / 4. Assign subBase to each task in F.
+      - subLeftover = floatingHours - subBase * |F|. Distribute subLeftover in 0.25h chunks to the most significant floating tasks first (rule (d)).
+   c. Pure-short shortcut (legacy): a task with a "quick"/"briefly" hint but NO explicit duration AND no inherent-one-shot action goes into FLOATING with isShort: false. Only explicit ≤15 min / inherent one-shots / explicit "quickly" verbs land in SHORT.
    d. Significance order for the leftover bumps (apply each rung in turn; only fall through on a tie). Mechanical operations (pairing devices, installing drivers, copying files, factory-reset variants) never win a bump unless rung (1) says so explicitly - a "× 2 devices" qualifier alone is NOT enough to outrank training or explanation work.
       (1) tasks the description explicitly marked "took most of the time" / "majority" / "longest";
       (2) **Initial setup of a NEW device.** Any task that parses as action="Setup" AND device in {Laptop, PC, Desktop, Phone, Tablet, Server} AND the user's input mentions "new" / "brand new" / "just bought" / "fresh" / "from scratch" / "out of the box" anywhere near that device, OR the input phrase is "Set up a new <device>" / "<device> setup" with no qualifier suggesting it's quick. Includes the post-OOBE work: installing OneDrive/M365/apps, signing into accounts, configuring backup, customizing settings — these are all PART of the device setup, not separate tasks competing with it. Device setup OUTRANKS description-length, customer-in-the-loop work, and any subsequent repair/sync/troubleshooting task on the same visit, EVEN when the repair task's description is longer. Worked judgement: "Set up new laptop with OneDrive + apps" (action=Setup, device=Laptop) wins over "Fixed account sign-in into Edge + M365" (action=Repair) on the same visit — the new-laptop setup is the foundational hour or two, the sign-in fix is the smaller fixup;
@@ -95,16 +94,20 @@ BILLING — single source of truth for time distribution. Run the algorithm step
       (4) tasks with longer composed descriptions (device + action + details character count);
       (5) source order.
 5. VERIFY the sum of all task qtys equals totalHours exactly. If not, you made an arithmetic error — redo step 4 from scratch. NEVER return tasks whose qtys don't sum to totalHours.
-6. EMIT isShort. For every task you placed in the SHORT set S in step 4a, set "isShort": true on that task. For every other task, set "isShort": false. The calculator uses this flag to pin short tasks at 15 min and absorb any post-parse window mismatch into the non-short tasks instead of scaling everyone equally.
+6. EMIT FLAGS:
+   - "isShort": true for every task in S (short pinned tasks). False otherwise.
+   - "isExplicit": true for every task in P (any pinned task — short or long). The calculator uses this flag to keep the parser-emitted qty unchanged during the post-parse safety-net rebalance, so window mismatches only redistribute the floating tasks.
 
 Worked examples:
-- 1.75h across 3 tasks (Streaming setup, Phone factory reset, Car Bluetooth setup): S = {Phone factory reset}, R = 2.
-  Phone = 0.25. remaining = 1.5. subBase = 0.75. Streaming + Car each = 0.75. subLeftover = 0. Final: 0.75 / 0.25 / 0.75.
-- 1.75h across 4 tasks, no shorts → S empty, R = 4. subBase = 0.25, subLeftover = 0.75 → 3 most significant each get +0.25 → 0.5 / 0.5 / 0.5 / 0.25.
-- 2.0h across 5 tasks, security "took most of the time", cleanup "quickly" → S = {cleanup}, R = 4. Cleanup = 0.25. remaining = 1.75. subBase = 0.25, subLeftover = 0.75 → security gets +0.75 → 1.0 / 0.25 / 0.25 / 0.25 / 0.25.
-- 3h across 2 tasks → S empty, subBase = 1.5, subLeftover = 0 → 1.5 / 1.5.
-- 1.75h across 2 tasks ("Set up new laptop with OneDrive + M365 apps" + "Fixed account sign-in for Windows/Edge/M365 business"): S empty, R = 2. subBase = floor((1.75/2)*4)/4 = 0.75. subLeftover = 0.25. Rung 2 fires on the "Set up new laptop" task (action=Setup, device=Laptop, input says "new laptop") so it gets the +0.25 — the sign-in repair is the smaller fixup task. Final: 1.0 / 0.75 (NOT 0.75 / 1.0).
-- 0.5h across 2 tasks ("Removed scareware with Malwarebytes" + "BIOS update quickly"): "quickly" puts BIOS in S, scareware is in R. BIOS = 0.25, remaining = 0.25, scareware = 0.25. Final: 0.25 / 0.25 with isShort = false / true. WRONG: emitting 0.42 / 0.42 (= 25 min each) — the sum 0.83 ≠ 0.5, rule 5 fails. The post-parse rebalance will treat both as equal-weight and you lose the "quickly" hint.
+- 80-min job, 3 tasks: "connected printer to wifi (30 mins)", "advised on M365/Norton subs", "QoL tweaks (15 mins)". totalHours = ceil(80/15)*15/60 = 1.5h.
+  P = {printer (0.5h, isExplicit, NOT short), QoL (0.25h, isExplicit, short)}. F = {advice}.
+  floatingHours = 1.5 - 0.5 - 0.25 = 0.75. subBase = 0.75. Final: printer 0.5 / advice 0.75 / QoL 0.25.
+- 1.75h across 3 tasks (Streaming setup, Phone factory reset, Car Bluetooth setup): no explicit durations. P = {}. S = {Phone factory reset} (inherent one-shot). F = {Streaming, Phone factory reset, Car}. After the subBase pass, the factory reset is pinned at 0.25 via the legacy short rule, leaving 1.5 for the other two → 0.75 each. Final: 0.75 / 0.25 / 0.75. isShort: false / true / false. isExplicit: all false.
+- 1.75h across 4 tasks, no shorts and no explicit durations → P = {}, F = 4. subBase = 0.25, subLeftover = 0.75 → 3 most significant each get +0.25 → 0.5 / 0.5 / 0.5 / 0.25. All isExplicit: false.
+- 2.0h across 5 tasks: security "took most of the time", cleanup "quickly", virus removal "took 25 mins". P = {virus (0.5h, isExplicit, NOT short)}, S = {cleanup} (legacy "quickly" hint, no explicit duration → still goes through F with isShort but no isExplicit), F = {security, cleanup, plus 2 others}. floatingHours = 1.5. cleanup pinned at 0.25h via short rule. remaining = 1.25 across 3 floating non-short. subBase = 0.25, subLeftover = 0.5 → security gets +0.5 → 0.75. Final: virus 0.5 (isExplicit) / cleanup 0.25 (isShort) / security 0.75 / others 0.25 / 0.25.
+- 1.75h across 2 tasks ("Set up new laptop with OneDrive + M365 apps" + "Fixed account sign-in for Windows/Edge/M365 business"): no explicit durations. P = {}, F = 2. subBase = 0.75, subLeftover = 0.25. Rung 2 fires on the "Set up new laptop" task so it gets +0.25. Final: 1.0 / 0.75 (NOT 0.75 / 1.0).
+- 0.5h across 2 tasks ("Removed scareware with Malwarebytes" + "BIOS update quickly"): "quickly" puts BIOS in legacy SHORT, scareware in F. BIOS = 0.25 (isShort), remaining = 0.25, scareware = 0.25. Final: 0.25 / 0.25 with isShort false / true. isExplicit: false / false.
+- SLACK example: 1h job, 3 tasks: "factory reset (10 mins)", "training", "transferred files (20 mins)". P = {factory reset (0.25h, isExplicit + isShort), file transfer (0.5h since ceil(20/15)*15 = 30, isExplicit)}. F = {training}. floatingHours = 1.0 - 0.25 - 0.5 = 0.25. Training = 0.25. Final: 0.25 / 0.25 / 0.5. Sum check OK. If totalHours had been 0.75h instead, floatingHours = 0 with training still in F — apply SLACK: shave 5 min off file transfer (0.5 → 0.42, then re-ceil to 0.5 since the +/-5 min cannot cross the 0.25h step) ... in practice this means accepting one of: drop the floating training task (it had no time), or push file transfer down to 0.25h if the stated 20 mins was loose. Use judgement; emit a warning when you used SLACK.
 
 qty is ALWAYS decimal hours. qty=1 means exactly 1 hour, never "1 occurrence".
 
@@ -200,7 +203,8 @@ Return this exact JSON shape (when not asking for clarification):
       "action": string,
       "details": string | null,
       "qty": number,
-      "isShort": boolean
+      "isShort": boolean,
+      "isExplicit": boolean
     }
   ],
   "parts": [

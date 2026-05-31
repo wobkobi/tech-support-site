@@ -34,8 +34,6 @@ interface ReviewApprovalListProps {
   pending: ReviewRow[];
   /** Already-approved reviews */
   approved: ReviewRow[];
-  /** Admin token for API calls */
-  token: string;
   /** Contacts available for linking to reviews */
   contacts: ContactPickerEntry[];
   /** Whether to show the SendReviewLinkForm at the top. Defaults to true. */
@@ -48,7 +46,6 @@ interface ReviewApprovalListProps {
  * @param props - Component props.
  * @param props.pending - Reviews awaiting approval.
  * @param props.approved - Already-approved reviews.
- * @param props.token - Admin token.
  * @param props.contacts - Contacts available for linking.
  * @param props.showSendForm - Whether to show the SendReviewLinkForm at the top. Defaults to true.
  * @returns Review approval list element.
@@ -56,7 +53,6 @@ interface ReviewApprovalListProps {
 export function ReviewApprovalList({
   pending: initialPending,
   approved: initialApproved,
-  token,
   contacts,
   showSendForm = true,
 }: ReviewApprovalListProps): React.ReactElement {
@@ -125,7 +121,6 @@ export function ReviewApprovalList({
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "X-Admin-Secret": token,
         },
         body: JSON.stringify({ contactId }),
       });
@@ -220,7 +215,7 @@ export function ReviewApprovalList({
   return (
     <div className={cn("flex flex-col gap-8")}>
       {/* Send review link to past client */}
-      {showSendForm && <SendReviewLinkForm token={token} />}
+      {showSendForm && <SendReviewLinkForm />}
 
       {/* Search */}
       <input
@@ -257,7 +252,6 @@ export function ReviewApprovalList({
               <div key={row.id} className={cn("flex flex-col gap-1")}>
                 <ReviewCard
                   row={row}
-                  token={token}
                   onApprove={() => handleApprove(row.id)}
                   onDelete={() => handleDelete(row.id)}
                 />
@@ -294,7 +288,6 @@ export function ReviewApprovalList({
               <div key={row.id} className={cn("flex flex-col gap-1")}>
                 <ReviewCard
                   row={row}
-                  token={token}
                   onRevoke={() => handleRevoke(row.id)}
                   onDelete={() => handleDelete(row.id)}
                 />

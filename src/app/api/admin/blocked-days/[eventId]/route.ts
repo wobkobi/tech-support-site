@@ -6,8 +6,9 @@
  */
 
 import { type NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { isAdminRequest } from "@/shared/lib/auth";
-import { deleteBookingEvent } from "@/features/calendar/lib/google-calendar";
+import { deleteBookingEvent, SCHEDULE_CALENDAR_TAG } from "@/features/calendar/lib/google-calendar";
 
 /**
  * DELETE /api/admin/blocked-days/[eventId]
@@ -21,7 +22,7 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ eventId: string }> },
 ): Promise<NextResponse> {
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
@@ -32,6 +33,7 @@ export async function DELETE(
 
   try {
     await deleteBookingEvent({ eventId });
+    revalidateTag(SCHEDULE_CALENDAR_TAG, {});
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("[admin/blocked-days/[eventId]] Delete failed:", err);

@@ -20,7 +20,7 @@ export async function POST(
   request: NextRequest,
   ctx: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -110,7 +110,7 @@ export async function POST(
   });
 
   // Sync the freshly-sent PDF to Drive so the archive matches what the client received.
-  // Failures are logged but don't fail the request — the email is the critical path.
+  // Failures are logged but don't fail the request - the email is the critical path.
   try {
     const yearCode = extractYearCode(invoice.number);
     const drive = await uploadInvoicePdf(

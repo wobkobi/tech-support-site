@@ -10,7 +10,7 @@ import { aggregateByFinancialYear } from "@/features/business/lib/financial-year
  * @returns JSON with summary object and financialYears array (most recent first)
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

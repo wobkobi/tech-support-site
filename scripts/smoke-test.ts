@@ -36,6 +36,8 @@ interface PageSpec {
   name: string;
   /** Console error substrings to ignore for this page (expected errors). */
   ignoreErrors?: string[];
+  /** When true, attach the X-Admin-Secret header for puppeteer requests. */
+  isAdmin?: boolean;
 }
 
 /* --------------------------------------------------------------- constants */
@@ -70,14 +72,16 @@ const PAGE_OVERRIDES: Record<string, { name?: string; ignoreErrors?: string[] }>
 };
 
 /**
- * Discovered URL paths to skip — internal-only surfaces, or routes that crash
+ * Discovered URL paths to skip - internal-only surfaces, or routes that crash
  * without sample data the test can't fabricate. Dynamic routes (`[id]`) and
  * collisions are already filtered automatically; this is for everything else.
  */
 const SKIP_PATHS: ReadonlySet<string> = new Set([]);
 
 /**
- * Path prefixes considered admin (token gets appended at request time).
+ * Path prefixes considered admin. Marked specs get the X-Admin-Secret header
+ * attached at request time (session cookie + URL token were both replaced by
+ * the cookie-auth migration; the header path is what scripts/cron still use).
  */
 const ADMIN_PREFIXES: ReadonlyArray<string> = ["/admin"];
 
@@ -290,6 +294,14 @@ async function checkPage(browser: Browser, baseUrl: string, spec: PageSpec): Pro
   const page = await browser.newPage();
 
   try {
+    // Admin pages: the proxy redirects unauthenticated /admin/* to /admin/login,
+    // so attach the X-Admin-Secret header (still accepted by isAdminRequest
+    // alongside the cookie path) before navigation.
+    if (spec.isAdmin) {
+      const secret = process.env.ADMIN_SECRET;
+      if (secret) await page.setExtraHTTPHeaders({ "x-admin-secret": secret });
+    }
+
     // Track 4xx/5xx responses by URL so we can filter known-missing local endpoints
     page.on("response", (response) => {
       const status = response.status();
@@ -432,40 +444,35 @@ function printTable(results: PageResult[]): void {
 
     // Auto-discover every page.tsx under src/app; route groups stripped,
     // dynamic segments skipped, admin routes split out. New pages get tested
-    // automatically — no manual list to maintain.
+    // automatically - no manual list to maintain.
     const { publicPages, adminPages } = discoverPages();
 
-    // Admin pages are only included when ADMIN_SECRET is set; the token gets
-    // appended to each path. Without the secret every admin page would 404
-    // via requireAdminToken, so we skip them gracefully.
+    // Admin pages are only included when ADMIN_SECRET is set; the secret rides
+    // along as the X-Admin-Secret header (attached inside checkPage). Without
+    // the secret the proxy redirects every admin page to /admin/login, which
+    // would just measure the login page repeatedly - skip them instead.
     const adminToken = process.env.ADMIN_SECRET;
-    const adminPagesWithToken: PageSpec[] = adminToken
-      ? adminPages.map((spec) => ({
-          ...spec,
-          path: `${spec.path}?token=${encodeURIComponent(adminToken)}`,
-        }))
+    const adminPagesAuthed: PageSpec[] = adminToken
+      ? adminPages.map((spec) => ({ ...spec, isAdmin: true }))
       : [];
     if (!adminToken && adminPages.length > 0) {
       console.log(`  (ADMIN_SECRET not set - skipping ${adminPages.length} admin pages)\n`);
     }
 
-    const allPages = [...publicPages, ...adminPagesWithToken];
+    const allPages = [...publicPages, ...adminPagesAuthed];
     console.log(`Checking ${allPages.length} pages…\n`);
 
     const results: PageResult[] = [];
 
     for (const spec of allPages) {
-      // Strip token query for the loading + result line - the admin paths
-      // include the secret, which is both noisy and a leak risk in CI logs.
-      const displayPath = spec.path.replace(/\?token=[^&]*/, "");
-      process.stdout.write(`  Loading ${displayPath}…`);
+      process.stdout.write(`  Loading ${spec.path}…`);
       const result = await checkPage(browser, baseUrl, spec);
       results.push(result);
       const icon = result.status === "pass" ? "✓" : "✗";
       // \x1b[2K clears the entire line so the new (shorter) line doesn't leave
       // fragments of the longer "Loading..." message behind.
       process.stdout.write(
-        `\r\x1b[2K  ${icon} ${displayPath.padEnd(40)} ${result.ttfbMs ?? "-"}ms TTFB\n`,
+        `\r\x1b[2K  ${icon} ${spec.path.padEnd(40)} ${result.ttfbMs ?? "-"}ms TTFB\n`,
       );
     }
 

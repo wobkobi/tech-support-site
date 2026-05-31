@@ -31,7 +31,7 @@ export async function PATCH(
   request: NextRequest,
   params: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

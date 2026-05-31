@@ -2,7 +2,7 @@
 import type { Metadata } from "next";
 import type React from "react";
 import Link from "next/link";
-import { requireAdminToken } from "@/shared/lib/auth";
+import { requireAdminAuth } from "@/shared/lib/auth";
 import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
 import { cn } from "@/shared/lib/cn";
 import { prisma } from "@/shared/lib/prisma";
@@ -113,17 +113,17 @@ function filterByScope<T extends { date: string }>(
  * tax planner, and the bottom-of-page invoice/income/expense links. Past-FY
  * scopes hide the "This month" cards since the current calendar month falls
  * outside the FY window.
- * @param root0 - Page props
- * @param root0.searchParams - URL search parameters containing the admin token and optional `fy` scope.
- * @returns Business dashboard element
+ * @param root0 - Page props.
+ * @param root0.searchParams - URL search params (`?fy=` scope + optional `?refresh=1` cache-bust).
+ * @returns Business dashboard element.
  */
 export default async function BusinessPage({
   searchParams,
 }: {
-  searchParams: Promise<{ token?: string; fy?: string; refresh?: string }>;
+  searchParams: Promise<{ fy?: string; refresh?: string }>;
 }): Promise<React.ReactElement> {
-  const { token, fy: fyParam, refresh } = await searchParams;
-  const t = requireAdminToken(token);
+  await requireAdminAuth("/admin/business");
+  const { fy: fyParam, refresh } = await searchParams;
 
   // ?refresh=1 invalidates every cached scope so the next render hits the live
   // Google APIs. Useful when the operator edits the Sheet directly and wants
@@ -261,18 +261,18 @@ export default async function BusinessPage({
    * @returns Relative URL.
    */
   function tabHref(tabKey: string): string {
-    return `/admin/business?token=${encodeURIComponent(t)}&${SCOPE_PARAM}=${encodeURIComponent(tabKey)}`;
+    return `/admin/business?${SCOPE_PARAM}=${encodeURIComponent(tabKey)}`;
   }
 
   const links = [
-    { label: "Income", href: `/admin/business/income?token=${encodeURIComponent(t)}` },
-    { label: "Expenses", href: `/admin/business/expenses?token=${encodeURIComponent(t)}` },
-    { label: "Invoices", href: `/admin/business/invoices?token=${encodeURIComponent(t)}` },
-    { label: "Calculator", href: `/admin/business/calculator?token=${encodeURIComponent(t)}` },
+    { label: "Income", href: `/admin/business/income` },
+    { label: "Expenses", href: `/admin/business/expenses` },
+    { label: "Invoices", href: `/admin/business/invoices` },
+    { label: "Calculator", href: `/admin/business/calculator` },
   ];
 
   return (
-    <AdminPageLayout token={t} current="business">
+    <AdminPageLayout current="business">
       <h1 className={cn("text-russian-violet mb-6 text-2xl font-extrabold")}>Business</h1>
 
       {/* FY scope selector */}
@@ -312,7 +312,6 @@ export default async function BusinessPage({
       </div>
 
       <BusinessDashboardCards
-        token={t}
         scope={{
           label: scope.label,
           isAllTime: scope.isAllTime,
@@ -348,7 +347,7 @@ export default async function BusinessPage({
         ))}
       </div>
 
-      <SheetImportButton token={t} />
+      <SheetImportButton />
     </AdminPageLayout>
   );
 }

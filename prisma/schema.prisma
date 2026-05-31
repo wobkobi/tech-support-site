@@ -463,6 +463,22 @@ model Setting {
   updatedAt DateTime @updatedAt
 }
 
+// NZ public holiday occurrences. Region distinguishes nationwide holidays
+// ("NZ") from regional ones (e.g. "Auckland" for Auckland Anniversary Day).
+// A monthly refresh job populates this table; manual updates are fine too.
+model PublicHoliday {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  // ISO YYYY-MM-DD, treated as the NZ-local date of the holiday.
+  date      String
+  name      String
+  // "NZ" for nationwide, region name for regional anniversaries.
+  region    String
+  updatedAt DateTime @updatedAt
+
+  @@unique([date, region])
+  @@index([date])
+}
+
 model TaskTemplate {
   id           String   @id @default(auto()) @map("_id") @db.ObjectId
   description  String

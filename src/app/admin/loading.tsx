@@ -13,7 +13,8 @@ function Bone({ className }: { className?: string }): React.ReactElement {
 }
 
 /**
- * Loading UI for every /admin/* route.
+ * Loading UI for every /admin/* route. Heading + action bar + a card list
+ * (the card-on-mobile, table-on-desktop pattern the data views use).
  * @returns Skeleton element.
  */
 export default function AdminLoading(): React.ReactElement {
@@ -40,32 +41,49 @@ export default function AdminLoading(): React.ReactElement {
         </div>
       </aside>
 
-      {/* Content skeleton. */}
-      <div className={cn("flex-1 bg-slate-50 lg:ml-0")}>
+      {/* Content skeleton. Padding mirrors AdminPageLayout's
+          `px-4 pb-8 pt-16 sm:px-6 sm:pt-8 lg:pt-8` so the mobile hamburger
+          is cleared and the skeleton doesn't jump on hydration. */}
+      <div className={cn("flex-1 bg-slate-50")}>
         <div className={cn("px-4 pb-8 pt-16 sm:px-6 sm:pt-8 lg:pt-8")}>
-          <Bone className={cn("mb-6 h-8 w-36")} />
+          {/* Page heading. */}
+          <div className={cn("mb-6 flex flex-wrap items-center justify-between gap-3")}>
+            <div>
+              <Bone className={cn("mb-2 h-7 w-36")} />
+              <Bone className={cn("h-3 w-48 opacity-60")} />
+            </div>
+            <Bone className={cn("h-9 w-28")} />
+          </div>
 
-          {/* Stat cards. */}
-          <div className={cn("mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4")}>
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div
-                key={i}
-                className={cn("rounded-xl border border-slate-200 bg-white p-4 shadow-sm")}
-              >
-                <Bone className={cn("mb-2 h-7 w-12")} />
-                <Bone className={cn("h-3 w-20 opacity-60")} />
-              </div>
+          {/* Filter chips / action bar. */}
+          <div className={cn("mb-4 flex flex-wrap gap-2")}>
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Bone key={i} className={cn("h-8 w-20")} />
             ))}
           </div>
 
-          {/* Generic panel placeholder. */}
-          <div className={cn("rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}>
-            <Bone className={cn("mb-4 h-5 w-32")} />
-            <div className={cn("space-y-3")}>
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Bone key={i} className={cn("h-12")} />
-              ))}
-            </div>
+          {/* Card list - mirrors the responsive card pattern every admin
+              data view uses below lg (Bookings, Income, Expenses, Invoices,
+              Subscriptions, Travel, etc). */}
+          <div className={cn("space-y-2")}>
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div
+                key={i}
+                className={cn("rounded-xl border border-slate-200 bg-white p-3 shadow-sm")}
+              >
+                <div className={cn("flex items-start justify-between gap-3")}>
+                  <div className={cn("min-w-0 flex-1")}>
+                    <Bone className={cn("mb-2 h-4 w-40 max-w-full")} />
+                    <Bone className={cn("h-3 w-24 opacity-60")} />
+                  </div>
+                  <Bone className={cn("h-6 w-16 shrink-0")} />
+                </div>
+                <div className={cn("mt-3 flex flex-wrap items-center gap-3")}>
+                  <Bone className={cn("h-3 w-20 opacity-60")} />
+                  <Bone className={cn("h-3 w-16 opacity-60")} />
+                </div>
+              </div>
+            ))}
           </div>
 
           <span className={cn("sr-only")}>Loading admin page...</span>

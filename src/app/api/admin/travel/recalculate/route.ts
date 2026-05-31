@@ -17,7 +17,7 @@ import { refreshCalendarCache } from "@/features/calendar/lib/calendar-cache";
  * @returns JSON with ok and cachedCount, or an error response.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

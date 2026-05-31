@@ -5,9 +5,10 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
-import { deleteBookingEvent } from "@/features/calendar/lib/google-calendar";
+import { deleteBookingEvent, SCHEDULE_CALENDAR_TAG } from "@/features/calendar/lib/google-calendar";
 import { toE164NZ } from "@/shared/lib/normalise-phone";
 import { sendCustomerReviewRequest } from "@/features/reviews/lib/email";
 import {
@@ -45,7 +46,7 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -114,7 +115,7 @@ export async function PATCH(
 
   const updated = await prisma.booking.update({ where: { id }, data });
 
-  // Mirrors the customer-side cancel flow - same draft for on-behalf + no-show.
+  // Same cancellation draft applies to on-behalf and no-show paths.
   if (
     updated.lateCancellation &&
     updated.cancelledBy === "customer" &&
@@ -183,6 +184,7 @@ export async function PATCH(
     }
   }
 
+  revalidateTag(SCHEDULE_CALENDAR_TAG, {});
   return NextResponse.json({ ok: true, reviewSent });
 }
 
@@ -199,7 +201,7 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -220,5 +222,6 @@ export async function DELETE(
 
   await prisma.booking.delete({ where: { id } });
 
+  revalidateTag(SCHEDULE_CALENDAR_TAG, {});
   return NextResponse.json({ ok: true });
 }

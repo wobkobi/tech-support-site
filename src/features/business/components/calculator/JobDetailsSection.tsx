@@ -49,6 +49,11 @@ export function JobDetailsSection({
   baseRates,
 }: Props): React.ReactElement {
   const sumRangesMin = timeRanges.reduce((s, r) => s + timeDiffMins(r.startTime, r.endTime), 0);
+  // Mirror TotalsPanel's "Time" row visibility - only flag the rounded "billed"
+  // figure when the duration is actually being charged. With no rate selected
+  // (or a zero rate) durationMins is just bookkeeping, so the hint is noise.
+  const selectedRate = baseRates.find((r) => r.id === hourlyRateId);
+  const chargingDuration = selectedRate?.ratePerHour != null && selectedRate.ratePerHour > 0;
 
   /**
    * Updates one slot's start or end time. Clears any duration override so the
@@ -154,7 +159,7 @@ export function JobDetailsSection({
         />
         <p className={cn("mt-1 text-xs text-slate-400")}>
           {minsToHoursLabel(durationMins)}
-          {billableMins(durationMins) !== durationMins && (
+          {chargingDuration && billableMins(durationMins) !== durationMins && (
             <span className={cn("ml-1 inline-flex items-center gap-1 text-slate-300")}>
               <FaCaretRight className={cn("h-3 w-3")} aria-hidden />
               {minsToHoursLabel(billableMins(durationMins))} billed

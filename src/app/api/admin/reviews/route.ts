@@ -11,13 +11,13 @@ import { reviewTextError } from "@/features/reviews/lib/validation";
 
 /**
  * POST /api/admin/reviews
- * Creates a new review, pre-approved. Used by admin to add past client reviews.
+ * Creates a new pre-approved review (operator path for past client reviews).
  * Authenticated via X-Admin-Secret header.
  * @param request - Incoming request.
  * @returns JSON with the created review.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

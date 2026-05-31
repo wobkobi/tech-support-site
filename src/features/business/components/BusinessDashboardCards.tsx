@@ -60,7 +60,6 @@ export interface DashboardScope {
 }
 
 interface Props {
-  token: string;
   scope: DashboardScope;
   income: IncomeRow[];
   expenses: ExpenseRow[];
@@ -137,7 +136,6 @@ function sumExpense(rows: ExpenseRow[], field: "amountExcl" | "gstAmount"): numb
 /**
  * Overview stat cards. Each card opens a BreakdownModal explaining the value.
  * @param props - Component props.
- * @param props.token - Admin token used by the inner breakdown modal.
  * @param props.scope - Current "this month" / "this FY" selection.
  * @param props.income - Income rows in scope.
  * @param props.expenses - Expense rows in scope.
@@ -147,7 +145,6 @@ function sumExpense(rows: ExpenseRow[], field: "amountExcl" | "gstAmount"): numb
  * @returns Cards section.
  */
 export function BusinessDashboardCards({
-  token,
   scope,
   income,
   expenses,
@@ -167,7 +164,7 @@ export function BusinessDashboardCards({
   const monthIncome = inRange(income, monthStartISO, monthEndISO);
   const monthExpenses = inRange(expenses, monthStartISO, monthEndISO);
 
-  const tokenSuffix = `?token=${encodeURIComponent(token)}`;
+  const tokenSuffix = ``;
   const showThisMonthCards = scope.isAllTime || scope.isCurrentFy;
   // Card titles read more naturally as "Income" / "Expenses" inside an FY
   // scope, but stay as "Total income" / "Total expenses" in the all-time view.

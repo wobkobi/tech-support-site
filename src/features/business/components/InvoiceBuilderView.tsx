@@ -57,8 +57,8 @@ function emptyLine(): LineItem {
 
 /**
  * Pre-populated invoice payload used when the builder runs in edit mode for a
- * DRAFT invoice. Mirrors the Prisma row shape after Date columns are stringified
- * to YYYY-MM-DD for the form inputs.
+ * DRAFT invoice. Matches the Prisma row shape after Date columns are
+ * stringified to YYYY-MM-DD for the form inputs.
  */
 export interface InvoiceBuilderEditPayload {
   id: string;
@@ -76,22 +76,19 @@ export interface InvoiceBuilderEditPayload {
 /**
  * Invoice builder view with a live preview panel.
  * @param props - Component props
- * @param props.token - Admin auth token used for API requests
  * @param props.editInvoice - When set, the builder runs in edit mode: form is
  *   pre-populated from this payload, the next-invoice-number prefetch is
  *   skipped, and Save PATCHes the existing row instead of creating a new one.
  * @returns Invoice builder element
  */
 export function InvoiceBuilderView({
-  token,
   editInvoice,
 }: {
-  token: string;
   editInvoice?: InvoiceBuilderEditPayload;
 }): React.ReactElement {
   const router = useRouter();
   const params = useSearchParams();
-  const headers = { "X-Admin-Secret": token };
+  const headers = {};
   const isEditing = Boolean(editInvoice);
 
   const [form, setForm] = useState<FormState>(() => {
@@ -238,7 +235,7 @@ export function InvoiceBuilderView({
           // Fail-quiet: just navigate.
         }
       }
-      router.push(`/admin/business/invoices/${targetId}?token=${encodeURIComponent(token)}`);
+      router.push(`/admin/business/invoices/${targetId}`);
     } else {
       setError(d.error ?? "Failed to save");
       setSaving(false);
@@ -249,7 +246,7 @@ export function InvoiceBuilderView({
   function handleAddContactClose(): void {
     const id = pendingNavId;
     setPendingNavId(null);
-    if (id) router.push(`/admin/business/invoices/${id}?token=${encodeURIComponent(token)}`);
+    if (id) router.push(`/admin/business/invoices/${id}`);
   }
 
   /**
@@ -336,7 +333,6 @@ export function InvoiceBuilderView({
     <>
       {showContactPicker && (
         <ContactPickerModal
-          token={token}
           onSelect={handleContactSelect}
           onClose={() => setShowContactPicker(false)}
         />
@@ -344,7 +340,6 @@ export function InvoiceBuilderView({
 
       {pendingNavId && (
         <AddToContactsModal
-          token={token}
           name={form.clientName}
           email={form.clientEmail}
           googleContactId={form.pickedContactGoogleId}
