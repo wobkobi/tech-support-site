@@ -10,6 +10,7 @@ import { FrostedSection, PageShell, CARD } from "@/shared/components/PageLayout"
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
 import { Button } from "@/shared/components/Button";
 import { cn } from "@/shared/lib/cn";
+import { getSiteUrl } from "@/shared/lib/site-url";
 
 export const metadata: Metadata = {
   title: "Tech Support Services - Computers, Wi-Fi, Phones & More",
@@ -119,7 +120,7 @@ const serviceAreas: ReadonlyArray<ServiceArea> = [
   },
 ];
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz";
+const siteUrl = getSiteUrl();
 
 /**
  * Services page component

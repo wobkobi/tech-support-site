@@ -5,8 +5,9 @@
  */
 
 import type { MetadataRoute } from "next";
+import { getSiteUrl } from "@/shared/lib/site-url";
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz";
+const siteUrl = getSiteUrl();
 
 /**
  * Generate sitemap entries for all public, indexable routes.

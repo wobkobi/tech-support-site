@@ -11,6 +11,7 @@ import { Exo } from "next/font/google";
 import "./globals.css";
 import { NavBar } from "@/shared/components/NavBar";
 import { PromoBanner } from "@/shared/components/PromoBanner";
+import { getSiteUrl } from "@/shared/lib/site-url";
 
 const exo = Exo({
   subsets: ["latin"],
@@ -19,7 +20,7 @@ const exo = Exo({
   variable: "--font-geist-sans",
 });
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz";
+const siteUrl = getSiteUrl();
 
 // Runs synchronously during HTML parse, before paint. Old browsers (macOS High
 // Sierra Safari, Windows 7 Chrome/Firefox, old Android/iOS) cannot render the

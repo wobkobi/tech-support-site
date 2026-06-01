@@ -11,6 +11,7 @@ import {
   BUSINESS_PAYMENT_TERMS_DAYS,
 } from "@/shared/lib/business-identity";
 import { formatDateTimeLong, formatDateShort } from "@/shared/lib/date-format";
+import { getSiteUrl } from "@/shared/lib/site-url";
 import { formatNZD } from "@/features/business/lib/business";
 import {
   DEFAULT_INVOICE_EMAIL_BODY,
@@ -106,7 +107,7 @@ export interface ReviewNotificationData {
 export async function sendOwnerReviewNotification(review: ReviewNotificationData): Promise<void> {
   const adminEmail = process.env.ADMIN_EMAIL;
   const from = process.env.EMAIL_FROM;
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz";
+  const siteUrl = getSiteUrl();
 
   if (!adminEmail || !from || !process.env.RESEND_API_KEY) {
     console.warn("[email] Resend not configured - skipping owner notification.");
@@ -265,7 +266,7 @@ export async function sendCustomerBookingConfirmation(
   options?: { kind?: "new" | "rescheduled"; previousStartAt?: Date },
 ): Promise<void> {
   const from = process.env.EMAIL_FROM;
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz";
+  const siteUrl = getSiteUrl();
 
   if (!from || !process.env.RESEND_API_KEY) {
     console.warn("[email] Resend not configured - skipping customer booking confirmation.");
@@ -353,7 +354,7 @@ ${buildEmailSignature(siteUrl)}
  */
 export async function sendBookingReminderEmail(booking: BookingNotificationData): Promise<boolean> {
   const from = process.env.EMAIL_FROM;
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz";
+  const siteUrl = getSiteUrl();
 
   if (!from || !process.env.RESEND_API_KEY) {
     console.warn("[email] Resend not configured - skipping booking reminder email.");
@@ -439,10 +440,7 @@ export interface ReviewRequestData {
  */
 export async function sendCustomerReviewRequest(booking: ReviewRequestData): Promise<void> {
   const from = process.env.EMAIL_FROM;
-  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz").replace(
-    /\/$/,
-    "",
-  );
+  const siteUrl = getSiteUrl();
 
   if (!from || !process.env.RESEND_API_KEY) {
     console.warn("[email] Resend not configured - skipping customer review request.");
@@ -491,10 +489,7 @@ ${buildEmailSignature(siteUrl)}
  * @returns HTML string ready to send.
  */
 export function buildPastClientReviewEmailHtml(firstName: string, reviewUrl: string): string {
-  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz").replace(
-    /\/$/,
-    "",
-  );
+  const siteUrl = getSiteUrl();
   const safeFirstName = escapeHtml(firstName);
   return `
 <!DOCTYPE html>
@@ -524,10 +519,7 @@ ${buildEmailSignature(siteUrl)}
  */
 export async function sendPastClientReviewRequest(booking: ReviewRequestData): Promise<void> {
   const from = process.env.EMAIL_FROM;
-  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz").replace(
-    /\/$/,
-    "",
-  );
+  const siteUrl = getSiteUrl();
 
   if (!from || !process.env.RESEND_API_KEY) {
     console.warn("[email] Resend not configured - skipping past client review request.");
@@ -591,7 +583,7 @@ export function buildInvoiceEmail({
   greetingName,
   customBody,
 }: BuildInvoiceEmailArgs): { subject: string; html: string } {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz";
+  const siteUrl = getSiteUrl();
   const bodyText = (customBody ?? DEFAULT_INVOICE_EMAIL_BODY).trim();
   // pre-wrap preserves line breaks the operator typed; escape first so the
   // body can never inject markup.
@@ -728,7 +720,7 @@ export function buildVoidEmail({ invoice, greetingName, customBody }: BuildVoidE
   subject: string;
   html: string;
 } {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz";
+  const siteUrl = getSiteUrl();
   const bodyText = (customBody ?? DEFAULT_VOID_EMAIL_BODY).trim();
   const safeBody = escapeHtml(bodyText || DEFAULT_VOID_EMAIL_BODY);
   const trimmedOverride = greetingName?.trim();

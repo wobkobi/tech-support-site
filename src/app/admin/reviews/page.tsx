@@ -5,6 +5,7 @@ import { prisma } from "@/shared/lib/prisma";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { toE164NZ } from "@/shared/lib/normalise-phone";
 import { cn } from "@/shared/lib/cn";
+import { getSiteUrl } from "@/shared/lib/site-url";
 import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
 import { ReviewApprovalList } from "@/features/reviews/components/admin/ReviewApprovalList";
 import { ReviewLinkHistoryTable } from "@/features/reviews/components/admin/ReviewLinkHistoryTable";
@@ -121,10 +122,7 @@ export default async function AdminReviewsPage(): Promise<React.ReactElement> {
     })
     .map((c) => ({ id: c.id, name: c.name, email: c.email, phone: c.phone, address: c.address }));
 
-  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz").replace(
-    /\/$/,
-    "",
-  );
+  const siteUrl = getSiteUrl();
 
   const knownTokens = new Set<string>([
     ...sentBookings.map((b) => b.reviewToken),

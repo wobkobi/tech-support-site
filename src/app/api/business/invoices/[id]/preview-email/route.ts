@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
+import { getSiteUrl } from "@/shared/lib/site-url";
 import { buildInvoiceEmail } from "@/features/reviews/lib/email";
 import { getInvoiceReviewEligibility } from "@/features/business/lib/contact-review-token";
 
@@ -43,7 +44,7 @@ export async function POST(
   const includeReviewOverride =
     typeof body.includeReview === "boolean" ? body.includeReview : undefined;
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz";
+  const siteUrl = getSiteUrl();
   const eligibility = await getInvoiceReviewEligibility({
     contactId: invoice.contactId,
     clientEmail: invoice.clientEmail,
