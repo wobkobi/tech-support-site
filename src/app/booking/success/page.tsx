@@ -9,6 +9,7 @@ import { cn } from "@/shared/lib/cn";
 import { Button } from "@/shared/components/Button";
 import { FaCircleCheck, FaHouse, FaPenToSquare, FaTag } from "react-icons/fa6";
 import { cancellationCopy } from "@/features/business/lib/pricing-policy";
+import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { prisma } from "@/shared/lib/prisma";
 
 const CARD = "border-seasalt-400/60 bg-seasalt-800 rounded-xl border p-5 shadow-sm sm:p-6";
@@ -53,6 +54,7 @@ export default async function BookingSuccessPage({
         .catch(() => null)
     : null;
   const promoTitle = booking?.promoTitleAtBooking ?? null;
+  const { CANCELLATION } = await getPolicy();
 
   return (
     <main className={cn("relative min-h-dvh overflow-hidden")}>
@@ -166,7 +168,7 @@ export default async function BookingSuccessPage({
                 Cancellation policy
               </h2>
               <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
-                {renderEmphasised(cancellationCopy())}
+                {renderEmphasised(cancellationCopy(CANCELLATION))}
               </p>
             </section>
           </div>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { calcInvoiceTotals } from "@/features/business/lib/business";
+import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { extractYearCode, generateInvoicePdf } from "@/features/business/lib/invoice-pdf";
 import { uploadInvoicePdf } from "@/features/business/lib/google-drive";
 import type { InvoiceStatus } from "@prisma/client";
@@ -138,10 +139,11 @@ export async function PATCH(
       const err = validateTransition(current.status, status as InvoiceStatus);
       if (err) return NextResponse.json({ error: err }, { status: 409 });
     }
-    // GST mode is driven by GST_REGISTERED in pricing-policy.ts; the request
-    // body no longer carries gst. gstAmount may be non-zero in the future
-    // when the flag flips, stays 0 today.
-    const { subtotal, gstAmount, total } = calcInvoiceTotals(lineItems ?? []);
+    // GST mode is driven by the live pricing settings (gstRegistered); the
+    // request body no longer carries gst. gstAmount is non-zero once that flag
+    // is on, stays 0 today.
+    const { GST_REGISTERED } = await getPolicy();
+    const { subtotal, gstAmount, total } = calcInvoiceTotals(lineItems ?? [], 0, GST_REGISTERED);
     const statusPatch = status !== undefined ? statusDataFor(status as InvoiceStatus) : {};
     const invoice = await prisma.invoice.update({
       where: { id },

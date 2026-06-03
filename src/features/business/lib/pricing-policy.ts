@@ -6,10 +6,11 @@
  * time, GST mode, plus the copy shared by the pricing page, booking
  * confirmation emails, and the FAQ.
  *
- * Designed to migrate later to a DB-backed Setting table without rewriting
- * call sites: every consumer reads `(await getPolicy()).X` or one of the
- * copy generators, so swapping the sync constants for a `prisma.setting`
- * query is a single-file change. Keep this module client-safe (no Prisma).
+ * The constants here are the DEFAULTS. The live, settings-backed values are
+ * resolved by `getPolicy()` in `pricing-policy.server.ts`; server consumers
+ * read `(await getPolicy()).X` and client consumers receive resolved values as
+ * props. The copy generators take their figures as arguments so the rendered
+ * text always matches the live policy. Keep this module client-safe (no Prisma).
  */
 
 import { MIN_TRAVEL_CHARGE, billableMins } from "@/features/business/lib/business";
@@ -132,15 +133,20 @@ export function calcTravelCharge(travelMins: number, travelRatePerHour: number):
 }
 
 /**
- * True when cancelling now would trigger the $30 call-out fee. Compared
- * against server clock so a skewed client cannot argue around the boundary.
+ * True when cancelling now would trigger the call-out fee. Compared against
+ * server clock so a skewed client cannot argue around the boundary.
  * @param bookingStart - The booking's startAt.
  * @param now - Reference time (defaults to current time).
+ * @param freeNoticeHours - Live free-notice window (defaults to the constant).
  * @returns True when the booking is less than freeNoticeHours away.
  */
-export function isWithinCancellationWindow(bookingStart: Date, now: Date = new Date()): boolean {
+export function isWithinCancellationWindow(
+  bookingStart: Date,
+  now: Date = new Date(),
+  freeNoticeHours: number = CANCELLATION.freeNoticeHours,
+): boolean {
   const msUntil = bookingStart.getTime() - now.getTime();
-  return msUntil < CANCELLATION.freeNoticeHours * 60 * 60 * 1000;
+  return msUntil < freeNoticeHours * 60 * 60 * 1000;
 }
 
 /**
@@ -148,11 +154,16 @@ export function isWithinCancellationWindow(bookingStart: Date, now: Date = new D
  * call-out fee (the assumed-driving window).
  * @param bookingStart - The booking's startAt.
  * @param now - Reference time (defaults to current time).
+ * @param travelChargeHours - Live travel-charge window (defaults to the constant).
  * @returns True when the booking is less than travelChargeHours away.
  */
-export function isWithinTravelWindow(bookingStart: Date, now: Date = new Date()): boolean {
+export function isWithinTravelWindow(
+  bookingStart: Date,
+  now: Date = new Date(),
+  travelChargeHours: number = CANCELLATION.travelChargeHours,
+): boolean {
   const msUntil = bookingStart.getTime() - now.getTime();
-  return msUntil < CANCELLATION.travelChargeHours * 60 * 60 * 1000;
+  return msUntil < travelChargeHours * 60 * 60 * 1000;
 }
 
 /**
@@ -204,25 +215,34 @@ export function unsuccessfulWorkCopy(): string {
  * Travel-policy text. Caller passes the live Travel rate so the page always
  * quotes the figure the operator is actually billing.
  * @param travelRatePerHour - Current Travel rate from the RateConfig row.
+ * @param minTravelCharge - Live minimum travel charge (defaults to the constant).
  * @returns Copy describing the travel charge model.
  */
-export function travelCopy(travelRatePerHour: number): string {
+export function travelCopy(
+  travelRatePerHour: number,
+  minTravelCharge: number = MIN_TRAVEL_CHARGE,
+): string {
   return (
     `Travel is **one round trip** billed at **$${travelRatePerHour}/h** - a separate, ` +
     `lower rate than labour. ` +
-    `**Minimum $${MIN_TRAVEL_CHARGE}** when there is any travel at all. ` +
+    `**Minimum $${minTravelCharge}** when there is any travel at all. ` +
     `If a job runs long and needs a second visit, **that second trip is on me**.`
   );
 }
 
 /**
  * Minimum-charge text used on the pricing page accordion.
+ * @param minBillableMins - Live minimum billable time (defaults to the constant).
+ * @param billingIncrementMins - Live rounding increment (defaults to the constant).
  * @returns Copy describing the minimum billable time.
  */
-export function minimumsCopy(): string {
+export function minimumsCopy(
+  minBillableMins: number = MIN_BILLABLE_MINS,
+  billingIncrementMins: number = BILLING_INCREMENT_MINS,
+): string {
   return (
-    `**${MIN_BILLABLE_MINS} minutes minimum** on anything billable, then ` +
-    `**${BILLING_INCREMENT_MINS}-minute increments** after that. ` +
+    `**${minBillableMins} minutes minimum** on anything billable, then ` +
+    `**${billingIncrementMins}-minute increments** after that. ` +
     `Quick calls and emails stay **free** - a "remote session" is when I log in ` +
     `and start working on your machine.`
   );
@@ -251,6 +271,14 @@ export function gstCopy(registered: boolean = GST_REGISTERED): string {
     : "**Not GST registered.** The price you see is the price you pay.";
 }
 
+/**
+ * Bundle of every policy value. The constants in this module are the DEFAULTS;
+ * the live, settings-backed values are resolved by `getPolicy()` in
+ * `pricing-policy.server.ts`. Defined as a type (not an eager const) so this
+ * client-safe module never reads its cross-module constants at evaluation time -
+ * `MIN_TRAVEL_CHARGE` comes from business.ts, which imports back from here, so an
+ * eager read would hit the circular-import temporal dead zone.
+ */
 export interface Policy {
   GST_REGISTERED: boolean;
   GST_RATE: number;
@@ -259,22 +287,4 @@ export interface Policy {
   BILLING_INCREMENT_MINS: number;
   PUBLIC_HOLIDAY_UPLIFT: number;
   CANCELLATION: CancellationPolicy;
-}
-
-/**
- * Forward-looking accessor that bundles every policy value. Async so a
- * future swap to a `prisma.setting.findMany()` backing doesn't break
- * consumers - they `(await getPolicy()).CANCELLATION.callOutFee` already.
- * @returns Current policy values.
- */
-export async function getPolicy(): Promise<Policy> {
-  return {
-    GST_REGISTERED,
-    GST_RATE,
-    MIN_TRAVEL_CHARGE,
-    MIN_BILLABLE_MINS,
-    BILLING_INCREMENT_MINS,
-    PUBLIC_HOLIDAY_UPLIFT,
-    CANCELLATION,
-  };
 }

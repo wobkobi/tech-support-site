@@ -22,9 +22,16 @@ import { formatDateShort } from "@/shared/lib/date-format";
 
 const CARD = "border-seasalt-400/60 bg-seasalt-800 rounded-xl border p-5 shadow-sm sm:p-6";
 
+/** Live cancellation figures handed down from the cancel-info API. */
+interface CancellationInfo {
+  freeNoticeHours: number;
+  travelChargeHours: number;
+  callOutFee: number;
+}
+
 type LoadState =
   | { kind: "loading" }
-  | { kind: "ready"; startAt: Date }
+  | { kind: "ready"; startAt: Date; policy: CancellationInfo }
   | { kind: "alreadyCancelled" }
   | { kind: "error"; message: string };
 
@@ -35,16 +42,23 @@ type SubmitState =
   | { kind: "error"; message: string };
 
 /**
- * Pre-cancellation fee banner. Green = no fee, amber = $30 callout,
- * red = $30 + round-trip travel.
+ * Pre-cancellation fee banner. Green = no fee, amber = call-out fee,
+ * red = call-out fee + round-trip travel. Figures come from the live policy.
  * @param props - Component props.
  * @param props.startAt - Booking start time.
+ * @param props.policy - Live cancellation figures from the cancel-info API.
  * @returns Banner element for the current cancellation timing.
  */
-function FeeBanner({ startAt }: { startAt: Date }): React.ReactElement {
+function FeeBanner({
+  startAt,
+  policy,
+}: {
+  startAt: Date;
+  policy: CancellationInfo;
+}): React.ReactElement {
   const now = new Date();
-  const inTravel = isWithinTravelWindow(startAt, now);
-  const inCancel = isWithinCancellationWindow(startAt, now);
+  const inTravel = isWithinTravelWindow(startAt, now, policy.travelChargeHours);
+  const inCancel = isWithinCancellationWindow(startAt, now, policy.freeNoticeHours);
   if (inTravel) {
     return (
       <div
@@ -53,9 +67,9 @@ function FeeBanner({ startAt }: { startAt: Date }): React.ReactElement {
           "border-coquelicot-500/60 bg-coquelicot-50 text-rich-black rounded-lg border-2 p-4 text-sm sm:text-base",
         )}
       >
-        <strong>${CANCELLATION.callOutFee} call-out fee plus round-trip travel</strong> will apply -
-        we're inside the {CANCELLATION.travelChargeHours}-hour window when I would normally be on
-        the way to you. Please call or text me directly if anything has changed.
+        <strong>${policy.callOutFee} call-out fee plus round-trip travel</strong> will apply - we're
+        inside the {policy.travelChargeHours}-hour window when I would normally be on the way to
+        you. Please call or text me directly if anything has changed.
       </div>
     );
   }
@@ -67,8 +81,8 @@ function FeeBanner({ startAt }: { startAt: Date }): React.ReactElement {
           "border-mustard-500/60 bg-mustard-900/40 text-rich-black rounded-lg border-2 p-4 text-sm sm:text-base",
         )}
       >
-        <strong>${CANCELLATION.callOutFee} call-out fee</strong> will apply - you're inside the{" "}
-        {CANCELLATION.freeNoticeHours}-hour cancellation window.
+        <strong>${policy.callOutFee} call-out fee</strong> will apply - you're inside the{" "}
+        {policy.freeNoticeHours}-hour cancellation window.
       </div>
     );
   }
@@ -112,6 +126,7 @@ function CancelContent(): React.ReactElement {
           ok?: boolean;
           startAt?: string;
           status?: string;
+          cancellation?: CancellationInfo;
           error?: string;
         };
         if (cancelled) return;
@@ -123,7 +138,11 @@ function CancelContent(): React.ReactElement {
           setLoad({ kind: "alreadyCancelled" });
           return;
         }
-        setLoad({ kind: "ready", startAt: new Date(data.startAt) });
+        setLoad({
+          kind: "ready",
+          startAt: new Date(data.startAt),
+          policy: data.cancellation ?? CANCELLATION,
+        });
       } catch {
         if (cancelled) return;
         setLoad({ kind: "error", message: "Network error." });
@@ -212,7 +231,7 @@ function CancelContent(): React.ReactElement {
                     You're about to cancel your appointment for{" "}
                     <strong>{formatDateShort(load.startAt)}</strong>.
                   </p>
-                  <FeeBanner startAt={load.startAt} />
+                  <FeeBanner startAt={load.startAt} policy={load.policy} />
                   {submit.kind === "error" && (
                     <p className={cn("text-coquelicot-500 text-sm")}>{submit.message}</p>
                   )}

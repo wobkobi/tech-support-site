@@ -10,11 +10,33 @@ import "server-only";
 import Holidays from "date-holidays";
 import { prisma } from "@/shared/lib/prisma";
 import {
+  GST_RATE,
   PUBLIC_HOLIDAY_UPLIFT,
   NZ_REGION,
   HOME_REGION,
   nzDateKey,
+  type Policy,
 } from "@/features/business/lib/pricing-policy";
+import { getSettings } from "@/shared/lib/settings/get-settings";
+
+/**
+ * Live policy bundle, resolved from the settings panel (defaults + DB override).
+ * Server-only because it reads the settings store; client code receives the
+ * resolved values as props. `GST_RATE` stays a legislated constant.
+ * @returns The current policy values the operator has configured.
+ */
+export async function getPolicy(): Promise<Policy> {
+  const { pricing } = await getSettings();
+  return {
+    GST_REGISTERED: pricing.gstRegistered,
+    GST_RATE,
+    MIN_TRAVEL_CHARGE: pricing.minTravelCharge,
+    MIN_BILLABLE_MINS: pricing.minBillableMins,
+    BILLING_INCREMENT_MINS: pricing.billingIncrementMins,
+    PUBLIC_HOLIDAY_UPLIFT: pricing.publicHolidayUplift,
+    CANCELLATION: pricing.cancellation,
+  };
+}
 
 /** One labour modifier as rendered on the pricing page accordion. */
 export interface PublicModifier {

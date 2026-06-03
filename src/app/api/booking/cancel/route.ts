@@ -15,6 +15,7 @@ import {
   isWithinCancellationWindow,
   isWithinTravelWindow,
 } from "@/features/business/lib/pricing-policy";
+import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { createDraftCancellationInvoice } from "@/features/business/lib/cancellation-invoice";
 
 interface CancelPayload {
@@ -44,10 +45,18 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: false, error: "Booking not found." }, { status: 404 });
   }
 
+  // Hand the live cancellation policy to the client so the fee banner quotes
+  // the figures actually charged, not the bundled defaults.
+  const { CANCELLATION } = await getPolicy();
   return NextResponse.json({
     ok: true,
     startAt: booking.startAt.toISOString(),
     status: booking.status,
+    cancellation: {
+      freeNoticeHours: CANCELLATION.freeNoticeHours,
+      travelChargeHours: CANCELLATION.travelChargeHours,
+      callOutFee: CANCELLATION.callOutFee,
+    },
   });
 }
 
@@ -93,8 +102,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Server clock decides the fee flags so a skewed client can't move the boundary.
     const now = new Date();
-    const lateCancellation = isWithinCancellationWindow(booking.startAt, now);
-    const travelChargeApplies = isWithinTravelWindow(booking.startAt, now);
+    const { CANCELLATION } = await getPolicy();
+    const lateCancellation = isWithinCancellationWindow(
+      booking.startAt,
+      now,
+      CANCELLATION.freeNoticeHours,
+    );
+    const travelChargeApplies = isWithinTravelWindow(
+      booking.startAt,
+      now,
+      CANCELLATION.travelChargeHours,
+    );
 
     const updated = await prisma.booking.update({
       where: { id: booking.id },

@@ -14,7 +14,7 @@ import Link from "next/link";
 import { FrostedSection, PageShell, CARD, SOFT_CARD } from "@/shared/components/PageLayout";
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
 import { cn } from "@/shared/lib/cn";
-import { getPublicPricing } from "@/features/business/lib/pricing-policy.server";
+import { getPolicy, getPublicPricing } from "@/features/business/lib/pricing-policy.server";
 import {
   cancellationCopy,
   unsuccessfulWorkCopy,
@@ -79,10 +79,10 @@ function renderEmphasised(text: string): React.ReactNode[] {
  * @returns FAQ page element.
  */
 export default async function FaqPage(): Promise<React.ReactElement> {
-  const pricing = await getPublicPricing();
-  const cancellationText = cancellationCopy();
+  const [pricing, policy] = await Promise.all([getPublicPricing(), getPolicy()]);
+  const cancellationText = cancellationCopy(policy.CANCELLATION);
   const unsuccessfulText = unsuccessfulWorkCopy();
-  const gstText = gstCopy();
+  const gstText = gstCopy(policy.GST_REGISTERED);
 
   const faqItems: ReadonlyArray<FaqItem> = [
     {

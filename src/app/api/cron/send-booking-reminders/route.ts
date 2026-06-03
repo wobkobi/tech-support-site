@@ -14,7 +14,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { sendBookingReminderEmail } from "@/features/reviews/lib/email";
 import { isCronAuthorized } from "@/shared/lib/auth";
-import { CANCELLATION } from "@/features/business/lib/pricing-policy";
+import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 
 /**
  * GET /api/cron/send-booking-reminders
@@ -28,6 +28,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   try {
     const now = new Date();
+    const { CANCELLATION } = await getPolicy();
     const lowerHours = CANCELLATION.freeNoticeHours + 1;
     const fromTime = new Date(now.getTime() + lowerHours * 60 * 60 * 1000);
     const in25h = new Date(now.getTime() + 25 * 60 * 60 * 1000);

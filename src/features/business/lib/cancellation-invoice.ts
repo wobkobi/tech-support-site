@@ -9,7 +9,8 @@
 
 import type { Booking } from "@prisma/client";
 import { prisma } from "@/shared/lib/prisma";
-import { CANCELLATION, calcTravelCharge } from "@/features/business/lib/pricing-policy";
+import { calcTravelCharge } from "@/features/business/lib/pricing-policy";
+import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { calcInvoiceTotals } from "@/features/business/lib/business";
 import {
   getNextInvoiceNumber,
@@ -41,6 +42,7 @@ export async function createDraftCancellationInvoice(
   options: DraftCancellationInvoiceOptions,
 ): Promise<void> {
   const reason = options.reason ?? "late-cancellation";
+  const { CANCELLATION, GST_REGISTERED } = await getPolicy();
   const headline =
     reason === "no-show"
       ? `No-show fee - ${formatDateShort(booking.startAt)}`
@@ -93,7 +95,7 @@ export async function createDraftCancellationInvoice(
 
   // Shared numbering avoids unique-constraint collisions with the admin flow.
   const { number, sheetNextCount } = await getNextInvoiceNumber();
-  const { subtotal, gstAmount, total } = calcInvoiceTotals(lineItems, 0);
+  const { subtotal, gstAmount, total } = calcInvoiceTotals(lineItems, 0, GST_REGISTERED);
   const now = new Date();
 
   let contactId: string | null = null;

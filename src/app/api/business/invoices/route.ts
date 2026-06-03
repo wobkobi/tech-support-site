@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { calcInvoiceTotals } from "@/features/business/lib/business";
+import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { generateInvoicePdf, extractYearCode } from "@/features/business/lib/invoice-pdf";
 import { uploadInvoicePdf } from "@/features/business/lib/google-drive";
 import {
@@ -80,15 +81,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const discount = typeof promoDiscount === "number" && promoDiscount > 0 ? promoDiscount : 0;
   const unsuccessfulDiscountValue =
     typeof unsuccessfulDiscount === "number" && unsuccessfulDiscount > 0 ? unsuccessfulDiscount : 0;
-  // GST mode is driven by GST_REGISTERED in pricing-policy.ts; the request
-  // body no longer carries gst. gstAmount may be non-zero in the future when
-  // the flag flips, stays 0 today. Promo + unsuccessful both reduce the
-  // taxable amount before GST (per IRD treatment of price reductions); they
-  // sum into a single discount argument for calcInvoiceTotals, then get
-  // persisted as separate audit fields on the row.
+  // GST mode is driven by the live pricing settings (gstRegistered); the request
+  // body no longer carries gst. gstAmount is non-zero once that flag is on,
+  // stays 0 today. Promo + unsuccessful both reduce the taxable amount before
+  // GST (per IRD treatment of price reductions); they sum into a single discount
+  // argument for calcInvoiceTotals, then get persisted as separate audit fields.
+  const { GST_REGISTERED } = await getPolicy();
   const { subtotal, gstAmount, total } = calcInvoiceTotals(
     lineItems,
     discount + unsuccessfulDiscountValue,
+    GST_REGISTERED,
   );
 
   const invoice = await prisma.invoice.create({

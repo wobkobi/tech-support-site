@@ -70,16 +70,18 @@ export function formatUTCDDMMYYYY(date: Date): string {
  * before GST is computed, matching IRD's price-reduction treatment.
  * @param lineItems - Array of line items with qty and unit price.
  * @param promoDiscount - Optional dollar discount (e.g. from a promo snapshot).
+ * @param gstRegistered - Live GST-registration flag (defaults to the constant).
  * @returns Subtotal (gross), GST amount, and total (post-discount, post-GST).
  */
 export function calcInvoiceTotals(
   lineItems: { qty: number; unitPrice: number }[],
   promoDiscount = 0,
+  gstRegistered: boolean = GST_REGISTERED,
 ): { subtotal: number; gstAmount: number; total: number } {
   const subtotal =
     Math.round(lineItems.reduce((sum, item) => sum + item.qty * item.unitPrice, 0) * 100) / 100;
   const taxableAmount = Math.max(0, Math.round((subtotal - promoDiscount) * 100) / 100);
-  const gstAmount = GST_REGISTERED ? calcGstFromInclusive(taxableAmount, GST_RATE) : 0;
+  const gstAmount = gstRegistered ? calcGstFromInclusive(taxableAmount, GST_RATE) : 0;
   return {
     subtotal,
     gstAmount,
