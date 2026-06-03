@@ -1,0 +1,123 @@
+// src/shared/lib/settings/field-meta.ts
+/**
+ * @file field-meta.ts
+ * @description UI metadata for the settings panel - the plain-English title,
+ * description, unit, and (for optional rules) the "what happens when it's off"
+ * note shown above each field. Kept here, beside the defaults and validators,
+ * so the help text and the rules never drift apart. Authored per group as each
+ * tab is built; `GROUP_META` covers all groups so the tab bar can render.
+ */
+
+import type { SettingsGroup } from "@/shared/lib/settings/types";
+
+/** Display metadata for one editable field, keyed by its dotted path in a group. */
+export interface FieldMeta {
+  /** Short human title shown as the field label. */
+  title: string;
+  /** One-line plain-English explanation of what the field controls. */
+  description: string;
+  /** Unit suffix shown next to the input (e.g. "hours", "$", "minutes"). */
+  unit?: string;
+  /** What happens when the field is blank/0 (only for optional "off"-able rules). */
+  off?: string;
+}
+
+/** Title + section blurb for each settings group (drives the tab bar + headers). */
+export const GROUP_META: Record<SettingsGroup, { title: string; blurb: string }> = {
+  availability: {
+    title: "Availability & booking",
+    blurb: "Weekly hours, booking window, buffers, and the master booking switch.",
+  },
+  pricing: {
+    title: "Pricing & cancellation",
+    blurb: "Cancellation policy, minimum charges, public-holiday surcharge, and GST status.",
+  },
+  identity: {
+    title: "Business identity",
+    blurb: "Contact details, base address, payment terms, GST number, and bank account.",
+  },
+  tax: {
+    title: "Tax planner",
+    blurb: "Income-tax, ACC and KiwiSaver reserve rates plus weekly transfer amounts.",
+  },
+  comms: {
+    title: "Comms & automation",
+    blurb: "Which emails send, when reminders fire, and how long logs are kept.",
+  },
+  holds: {
+    title: "Booking form & holds",
+    blurb: "Hold expiry and the job-description length limits.",
+  },
+  scheduling: {
+    title: "Scheduling & travel buffers",
+    blurb: "Advanced travel-block heuristics. Leave these unless you know you need them.",
+  },
+  reviews: {
+    title: "Reviews & reputation",
+    blurb: "Homepage review count, auto-approval, the review link, and request pacing.",
+  },
+};
+
+/** Field metadata for the pricing group, keyed by dotted path. */
+export const PRICING_FIELD_META: Record<string, FieldMeta> = {
+  gstRegistered: {
+    title: "GST registered",
+    description:
+      "Turn on once you cross the $60k GST threshold. Invoices then show a GST breakdown. Requires a GST number to be set.",
+  },
+  minBillableMins: {
+    title: "Minimum billable time",
+    description: "The smallest amount of time any billable work is charged at.",
+    unit: "minutes",
+    off: "Set 0 for no minimum - bill the exact time worked.",
+  },
+  billingIncrementMins: {
+    title: "Billing increment",
+    description:
+      "Billable time is rounded to the nearest step of this size. Shared with the job calculator.",
+    unit: "minutes",
+  },
+  publicHolidayUplift: {
+    title: "Public-holiday surcharge",
+    description:
+      "Extra added to labour on NZ public holidays (25 = +25%). Travel and parts are unchanged.",
+    unit: "%",
+    off: "Set 0 to charge normal rates on public holidays.",
+  },
+  minTravelCharge: {
+    title: "Minimum travel charge",
+    description:
+      "The floor applied whenever there is any travel, so short trips don't bill an awkward few dollars.",
+    unit: "$",
+    off: "Set 0 for no floor - bill the exact travel time.",
+  },
+  "cancellation.freeNoticeHours": {
+    title: "Free-cancellation window",
+    description: "Cancellations made more than this many hours before the appointment are free.",
+    unit: "hours",
+  },
+  "cancellation.travelChargeHours": {
+    title: "Travel-charge window",
+    description:
+      "Cancelling within this many hours also bills round-trip travel (you'd already be on the way).",
+    unit: "hours",
+  },
+  "cancellation.callOutFee": {
+    title: "Call-out fee",
+    description: "Flat fee charged when a cancellation lands inside the free-cancellation window.",
+    unit: "$",
+  },
+  "reschedule.cutoffHours": {
+    title: "Reschedule cutoff",
+    description: "Customers can't reschedule within this many hours of the appointment.",
+    unit: "hours",
+    off: "Set 0 to allow rescheduling right up to the appointment.",
+  },
+  "reschedule.maxReschedules": {
+    title: "Max reschedules",
+    description:
+      "How many times one booking may be moved before it has to be cancelled and rebooked.",
+    unit: "times",
+    off: "Leave blank for no limit.",
+  },
+};
