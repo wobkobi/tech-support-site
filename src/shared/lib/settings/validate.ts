@@ -12,6 +12,7 @@
 
 import type {
   AvailabilitySettings,
+  CommsSettings,
   PricingSettings,
   Settings,
   SettingsGroup,
@@ -146,9 +147,28 @@ function validatePricing(p: PricingSettings): FieldError[] {
 }
 
 /**
+ * Validates the comms group's shape + bounds.
+ * @param c - Proposed comms settings.
+ * @returns List of field errors (empty when valid).
+ */
+function validateComms(c: CommsSettings): FieldError[] {
+  const errors: FieldError[] = [];
+  for (const key of ["notifyConfirmation", "notifyReminder", "notifyReviewRequest"] as const) {
+    if (typeof c[key] !== "boolean") errors.push({ field: key, message: "Must be on or off." });
+  }
+  if (!inRange(c.reminderLeadHours, 1, 168))
+    errors.push({ field: "reminderLeadHours", message: "Must be 1-168 hours." });
+  if (!nonNeg(c.reviewEmailDelayMins))
+    errors.push({ field: "reviewEmailDelayMins", message: "Must be 0 or more minutes." });
+  if (!inRange(c.priceEstimateRetentionDays, 1, 3650))
+    errors.push({ field: "priceEstimateRetentionDays", message: "Must be 1-3650 days." });
+  return errors;
+}
+
+/**
  * Validates one settings group's payload. Groups without a dedicated validator
- * yet fall through as valid (read-side clamping still guards them); availability
- * and pricing - the highest-blast-radius groups - are validated in full.
+ * yet fall through as valid (read-side clamping still guards them); the
+ * highest-blast-radius groups are validated in full.
  * @param group - Which group is being saved.
  * @param value - Proposed value for that group.
  * @returns Field errors (empty when valid).
@@ -159,6 +179,8 @@ export function validateGroup<G extends SettingsGroup>(group: G, value: Settings
       return validateAvailability(value as AvailabilitySettings);
     case "pricing":
       return validatePricing(value as PricingSettings);
+    case "comms":
+      return validateComms(value as CommsSettings);
     default:
       return [];
   }
@@ -173,7 +195,7 @@ export function validateGroup<G extends SettingsGroup>(group: G, value: Settings
  */
 export function checkGuardrails(s: Settings): GuardrailIssue[] {
   const issues: GuardrailIssue[] = [];
-  const { availability: a, pricing: p, identity } = s;
+  const { availability: a, pricing: p, identity, comms } = s;
   const shortestJob = Math.min(a.durations.short, a.durations.long);
   const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -237,6 +259,15 @@ export function checkGuardrails(s: Settings): GuardrailIssue[] {
       level: "warn",
       message:
         "Reschedule cutoff is later than the free-cancellation window, so customers can cancel free but not reschedule. Double-check that's intended.",
+    });
+  }
+
+  // The reminder window runs from (free-notice + 1h) up to the lead time; if the
+  // lead time isn't beyond that lower bound, no reminder could ever send.
+  if (comms.notifyReminder && comms.reminderLeadHours <= p.cancellation.freeNoticeHours + 1) {
+    issues.push({
+      level: "block",
+      message: `Reminder lead time (${comms.reminderLeadHours}h) must be more than the free-cancellation window + 1h (${p.cancellation.freeNoticeHours + 1}h), otherwise reminders would never send.`,
     });
   }
 

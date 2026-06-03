@@ -8,8 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { isCronAuthorized } from "@/shared/lib/auth";
-
-const RETENTION_DAYS = 30;
+import { getSettings } from "@/shared/lib/settings/get-settings";
 
 /**
  * GET /api/cron/purge-price-estimates
@@ -23,7 +22,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    const cutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000);
+    const { comms } = await getSettings();
+    const cutoff = new Date(Date.now() - comms.priceEstimateRetentionDays * 24 * 60 * 60 * 1000);
     const result = await prisma.priceEstimateLog.deleteMany({
       where: { createdAt: { lt: cutoff } },
     });

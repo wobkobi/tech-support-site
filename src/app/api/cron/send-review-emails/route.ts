@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { sendCustomerReviewRequest } from "@/features/reviews/lib/email";
 import { isCronAuthorized } from "@/shared/lib/auth";
+import { getSettings } from "@/shared/lib/settings/get-settings";
 
 /**
  * GET /api/cron/send-review-emails
@@ -23,11 +24,16 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   try {
+    const { comms } = await getSettings();
+    if (!comms.notifyReviewRequest) {
+      return NextResponse.json({ ok: true, skipped: "review requests disabled", sent: 0 });
+    }
+
     const now = new Date();
-    const thirtyMinutesAgo = new Date(now.getTime() - 30 * 60 * 1000);
+    const delayAgo = new Date(now.getTime() - comms.reviewEmailDelayMins * 60 * 1000);
 
     // Find bookings that:
-    // 1. Ended at least 30 minutes ago (appointment is definitely over)
+    // 1. Ended at least the configured delay ago (appointment is definitely over)
     // 2. Are confirmed or completed
     // 3. Haven't had review email sent yet
     //
@@ -39,7 +45,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const bookingsToEmail = await prisma.booking.findMany({
       where: {
         endAt: {
-          lte: thirtyMinutesAgo,
+          lte: delayAgo,
         },
         status: { in: ["confirmed", "completed"] },
         OR: [{ reviewSentAt: null }, { reviewSentAt: { isSet: false } }],

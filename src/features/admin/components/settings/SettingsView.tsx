@@ -13,11 +13,13 @@ import { cn } from "@/shared/lib/cn";
 import { GROUP_META } from "@/shared/lib/settings/field-meta";
 import type {
   AvailabilitySettings,
+  CommsSettings,
   PricingSettings,
   SettingsGroup,
 } from "@/shared/lib/settings/types";
 import { PricingTab } from "@/features/admin/components/settings/PricingTab";
 import { AvailabilityTab } from "@/features/admin/components/settings/AvailabilityTab";
+import { CommsTab } from "@/features/admin/components/settings/CommsTab";
 
 /** Tab order shown in the settings bar. */
 const TAB_ORDER: SettingsGroup[] = [
@@ -32,13 +34,19 @@ const TAB_ORDER: SettingsGroup[] = [
 ];
 
 /** Groups with a working editor; the rest render the placeholder. */
-const IMPLEMENTED: ReadonlySet<SettingsGroup> = new Set<SettingsGroup>(["availability", "pricing"]);
+const IMPLEMENTED: ReadonlySet<SettingsGroup> = new Set<SettingsGroup>([
+  "availability",
+  "pricing",
+  "comms",
+]);
 
 interface Props {
   availability: AvailabilitySettings;
   availabilityDefaults: AvailabilitySettings;
   pricing: PricingSettings;
   pricingDefaults: PricingSettings;
+  comms: CommsSettings;
+  commsDefaults: CommsSettings;
 }
 
 /**
@@ -48,6 +56,8 @@ interface Props {
  * @param props.availabilityDefaults - Code default availability settings.
  * @param props.pricing - Resolved current pricing settings.
  * @param props.pricingDefaults - Code default pricing settings.
+ * @param props.comms - Resolved current comms settings.
+ * @param props.commsDefaults - Code default comms settings.
  * @returns Settings view element.
  */
 export function SettingsView({
@@ -55,6 +65,8 @@ export function SettingsView({
   availabilityDefaults,
   pricing,
   pricingDefaults,
+  comms,
+  commsDefaults,
 }: Props): React.ReactElement {
   const [active, setActive] = useState<SettingsGroup>("availability");
   const meta = GROUP_META[active];
@@ -93,6 +105,8 @@ export function SettingsView({
             <AvailabilityTab initial={availability} defaults={availabilityDefaults} />
           ) : active === "pricing" ? (
             <PricingTab initial={pricing} defaults={pricingDefaults} />
+          ) : active === "comms" ? (
+            <CommsTab initial={comms} defaults={commsDefaults} />
           ) : (
             <p className={cn("py-8 text-center text-sm text-slate-400")}>
               This section is still managed in code - its editor is coming in a later step.

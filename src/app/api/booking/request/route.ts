@@ -17,6 +17,7 @@ import {
   type ExistingBooking,
 } from "@/features/booking/lib/booking";
 import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
+import { getSettings } from "@/shared/lib/settings/get-settings";
 import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 import {
   createBookingEvent,
@@ -340,7 +341,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
       // Send confirmation emails before returning so Vercel doesn't kill the
       // function before the Resend requests complete. Both functions catch all
-      // errors internally and never throw.
+      // errors internally and never throw. The owner alert always fires; the
+      // customer confirmation honours the notifyConfirmation setting.
+      const { comms } = await getSettings();
       await Promise.all([
         sendOwnerBookingNotification({
           id: booking.id,
@@ -351,16 +354,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           endAt: booking.endAt,
           cancelToken: booking.cancelToken,
         }),
-        sendCustomerBookingConfirmation({
-          id: booking.id,
-          name: booking.name,
-          email: booking.email,
-          notes: booking.notes ?? "",
-          startAt: booking.startAt,
-          endAt: booking.endAt,
-          cancelToken: booking.cancelToken,
-          promoTitleAtBooking: booking.promoTitleAtBooking,
-        }),
+        ...(comms.notifyConfirmation
+          ? [
+              sendCustomerBookingConfirmation({
+                id: booking.id,
+                name: booking.name,
+                email: booking.email,
+                notes: booking.notes ?? "",
+                startAt: booking.startAt,
+                endAt: booking.endAt,
+                cancelToken: booking.cancelToken,
+                promoTitleAtBooking: booking.promoTitleAtBooking,
+              }),
+            ]
+          : []),
       ]);
 
       return NextResponse.json({

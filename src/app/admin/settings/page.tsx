@@ -37,6 +37,8 @@ export default async function SettingsPage(): Promise<React.ReactElement> {
         availabilityDefaults={DEFAULT_SETTINGS.availability}
         pricing={settings.pricing}
         pricingDefaults={DEFAULT_SETTINGS.pricing}
+        comms={settings.comms}
+        commsDefaults={DEFAULT_SETTINGS.comms}
       />
     </AdminPageLayout>
   );

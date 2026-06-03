@@ -120,6 +120,37 @@ export const AVAILABILITY_FIELD_META: Record<string, FieldMeta> = {
   },
 };
 
+/** Field metadata for the comms group, keyed by field name. */
+export const COMMS_FIELD_META: Record<string, FieldMeta> = {
+  notifyConfirmation: {
+    title: "Booking confirmation email",
+    description: "Send the customer a confirmation email when they book.",
+  },
+  notifyReminder: {
+    title: "Appointment reminder email",
+    description: "Send the customer a reminder the day before their appointment.",
+  },
+  notifyReviewRequest: {
+    title: "Review-request email",
+    description: "Email the customer a review request a little after the job finishes.",
+  },
+  reminderLeadHours: {
+    title: "Reminder lead time",
+    description: "Send the reminder once the appointment is within this many hours.",
+    unit: "hours",
+  },
+  reviewEmailDelayMins: {
+    title: "Review-request delay",
+    description: "Wait this long after a job ends before sending the review request.",
+    unit: "minutes",
+  },
+  priceEstimateRetentionDays: {
+    title: "Estimate-log retention",
+    description: "Delete public price-estimate logs older than this many days.",
+    unit: "days",
+  },
+};
+
 /** Field metadata for the pricing group, keyed by dotted path. */
 export const PRICING_FIELD_META: Record<string, FieldMeta> = {
   gstRegistered: {
