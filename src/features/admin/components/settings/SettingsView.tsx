@@ -14,6 +14,7 @@ import { GROUP_META } from "@/shared/lib/settings/field-meta";
 import type {
   AvailabilitySettings,
   CommsSettings,
+  HoldsSettings,
   PricingSettings,
   ReviewsSettings,
   SettingsGroup,
@@ -22,6 +23,7 @@ import { PricingTab } from "@/features/admin/components/settings/PricingTab";
 import { AvailabilityTab } from "@/features/admin/components/settings/AvailabilityTab";
 import { CommsTab } from "@/features/admin/components/settings/CommsTab";
 import { ReviewsTab } from "@/features/admin/components/settings/ReviewsTab";
+import { HoldsTab } from "@/features/admin/components/settings/HoldsTab";
 
 /** Tab order shown in the settings bar. */
 const TAB_ORDER: SettingsGroup[] = [
@@ -41,6 +43,7 @@ const IMPLEMENTED: ReadonlySet<SettingsGroup> = new Set<SettingsGroup>([
   "pricing",
   "comms",
   "reviews",
+  "holds",
 ]);
 
 interface Props {
@@ -52,6 +55,8 @@ interface Props {
   commsDefaults: CommsSettings;
   reviews: ReviewsSettings;
   reviewsDefaults: ReviewsSettings;
+  holds: HoldsSettings;
+  holdsDefaults: HoldsSettings;
 }
 
 /**
@@ -65,6 +70,8 @@ interface Props {
  * @param props.commsDefaults - Code default comms settings.
  * @param props.reviews - Resolved current reviews settings.
  * @param props.reviewsDefaults - Code default reviews settings.
+ * @param props.holds - Resolved current holds settings.
+ * @param props.holdsDefaults - Code default holds settings.
  * @returns Settings view element.
  */
 export function SettingsView({
@@ -76,6 +83,8 @@ export function SettingsView({
   commsDefaults,
   reviews,
   reviewsDefaults,
+  holds,
+  holdsDefaults,
 }: Props): React.ReactElement {
   const [active, setActive] = useState<SettingsGroup>("availability");
   const meta = GROUP_META[active];
@@ -118,6 +127,8 @@ export function SettingsView({
             <CommsTab initial={comms} defaults={commsDefaults} />
           ) : active === "reviews" ? (
             <ReviewsTab initial={reviews} defaults={reviewsDefaults} />
+          ) : active === "holds" ? (
+            <HoldsTab initial={holds} defaults={holdsDefaults} />
           ) : (
             <p className={cn("py-8 text-center text-sm text-slate-400")}>
               This section is still managed in code - its editor is coming in a later step.

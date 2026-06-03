@@ -13,6 +13,7 @@
 import type {
   AvailabilitySettings,
   CommsSettings,
+  HoldsSettings,
   PricingSettings,
   ReviewsSettings,
   Settings,
@@ -183,6 +184,18 @@ function validateReviews(r: ReviewsSettings): FieldError[] {
 }
 
 /**
+ * Validates the booking form & holds group's shape + bounds.
+ * @param h - Proposed holds settings.
+ * @returns List of field errors (empty when valid).
+ */
+function validateHolds(h: HoldsSettings): FieldError[] {
+  const errors: FieldError[] = [];
+  if (!inRange(h.holdExpirationMinutes, 1, 240))
+    errors.push({ field: "holdExpirationMinutes", message: "Must be 1-240 minutes." });
+  return errors;
+}
+
+/**
  * Validates one settings group's payload. Groups without a dedicated validator
  * yet fall through as valid (read-side clamping still guards them); the
  * highest-blast-radius groups are validated in full.
@@ -200,6 +213,8 @@ export function validateGroup<G extends SettingsGroup>(group: G, value: Settings
       return validateComms(value as CommsSettings);
     case "reviews":
       return validateReviews(value as ReviewsSettings);
+    case "holds":
+      return validateHolds(value as HoldsSettings);
     default:
       return [];
   }

@@ -103,11 +103,9 @@ export const DEFAULT_SETTINGS: Settings = {
     priceEstimateRetentionDays: 30,
   },
 
-  // Source: booking/hold route + BOOKING_FIELD_LIMITS in booking.ts.
+  // Source: booking/hold route. (Notes-length limits stay code consts in booking.ts.)
   holds: {
     holdExpirationMinutes: 15,
-    notesMaxLength: 2000,
-    notesMinLength: 10,
   },
 
   // Source: calendar-cache.ts travel-block heuristics.

@@ -170,6 +170,16 @@ export const REVIEWS_FIELD_META: Record<string, FieldMeta> = {
   },
 };
 
+/** Field metadata for the booking form & holds group, keyed by field name. */
+export const HOLDS_FIELD_META: Record<string, FieldMeta> = {
+  holdExpirationMinutes: {
+    title: "Hold expiry",
+    description:
+      "How long a slot stays reserved while a customer finishes booking, before it's released for others.",
+    unit: "minutes",
+  },
+};
+
 /** Field metadata for the pricing group, keyed by dotted path. */
 export const PRICING_FIELD_META: Record<string, FieldMeta> = {
   gstRegistered: {

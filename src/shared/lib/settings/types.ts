@@ -136,10 +136,6 @@ export interface CommsSettings {
 export interface HoldsSettings {
   /** How long a provisional slot hold lasts (minutes). */
   holdExpirationMinutes: number;
-  /** Max length of the job-notes field (characters). */
-  notesMaxLength: number;
-  /** Min length of the job-notes field (characters). */
-  notesMinLength: number;
 }
 
 export interface SchedulingSettings {
