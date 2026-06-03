@@ -58,6 +58,68 @@ export const GROUP_META: Record<SettingsGroup, { title: string; blurb: string }>
   },
 };
 
+/** Field metadata for the availability group's scalar fields, keyed by dotted path. */
+export const AVAILABILITY_FIELD_META: Record<string, FieldMeta> = {
+  acceptingBookings: {
+    title: "Accepting online bookings",
+    description:
+      "Master switch. Turn off to pause the public booking page (e.g. when you're away).",
+  },
+  closedMessage: {
+    title: "Paused message",
+    description: "Shown on the booking page while online booking is paused.",
+  },
+  maxAdvanceDays: {
+    title: "Booking window",
+    description: "How many days ahead a customer can book.",
+    unit: "days",
+  },
+  minHoursNotice: {
+    title: "Minimum notice",
+    description: "How far in advance a customer must book.",
+    unit: "hours",
+    off: "Set 0 to allow booking right up to the current time.",
+  },
+  sameDayCutoffHour: {
+    title: "Same-day cutoff",
+    description: "After this hour (24-hour clock) same-day booking closes for the rest of the day.",
+    unit: "hour 0-23",
+    off: "Leave blank for no same-day cutoff.",
+  },
+  bufferMin: {
+    title: "Calendar buffer",
+    description: "Gap kept clear around your existing calendar events when offering slots.",
+    unit: "minutes",
+  },
+  bookingBufferAfterMin: {
+    title: "After-booking buffer",
+    description: "Time blocked after each booking ends, in case a job runs long.",
+    unit: "minutes",
+  },
+  "durations.short": {
+    title: "Standard job length",
+    description: "Length of a standard (short) appointment.",
+    unit: "minutes",
+  },
+  "durations.long": {
+    title: "Extended job length",
+    description: "Length of an extended (long) appointment.",
+    unit: "minutes",
+  },
+  maxJobsPerDay: {
+    title: "Max jobs per day",
+    description: "Stop offering slots on a day once this many bookings already exist.",
+    unit: "jobs",
+    off: "Set 0 or leave blank for no daily limit.",
+  },
+  maxBillableHoursPerDay: {
+    title: "Max hours per day",
+    description: "Stop offering slots on a day once this many booked hours already exist.",
+    unit: "hours",
+    off: "Set 0 or leave blank for no daily limit.",
+  },
+};
+
 /** Field metadata for the pricing group, keyed by dotted path. */
 export const PRICING_FIELD_META: Record<string, FieldMeta> = {
   gstRegistered: {

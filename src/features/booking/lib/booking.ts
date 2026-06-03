@@ -5,6 +5,7 @@
  */
 
 import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
+import type { AvailabilitySettings } from "@/shared/lib/settings/types";
 
 /**
  * Splits an NZ-style apartment-prefixed address ("12/160 Kepa Road Orakei")
@@ -76,11 +77,70 @@ export const TIME_OF_DAY_OPTIONS: ReadonlyArray<TimeOfDayOption> = [
   { value: "6pm", label: "6pm", startHour: 18, endHour: 19 },
 ] as const;
 
-export type TimeOfDay = (typeof TIME_OF_DAY_OPTIONS)[number]["value"];
+// Slot values are hour labels ("10am" ... "8pm"), generated per day from the
+// operator's schedule, so the type is a plain string rather than a fixed enum.
+export type TimeOfDay = string;
 
-// 15-minute sub-slot offsets within each hour
+// Default 15-minute sub-slot offsets within each hour. The live offsets come
+// from the availability settings; this constant is the default + edit-page shape.
 export const SUB_SLOT_MINUTES = [0, 15, 30, 45] as const;
-export type StartMinute = (typeof SUB_SLOT_MINUTES)[number];
+export type StartMinute = number;
+
+/**
+ * Resolved config the slot engine runs on: the operator's editable availability
+ * settings plus the structural timezone. Built by server callers from
+ * `getSettings()` and `BOOKING_CONFIG.timeZone`.
+ */
+export type AvailabilityConfig = AvailabilitySettings & { timeZone: string };
+
+/**
+ * Formats an hour-of-day (0-23) as a slot label like "10am", "12pm", "8pm".
+ * @param hour - Hour of day, 0-23.
+ * @returns Lowercase am/pm label.
+ */
+export function hourLabel(hour: number): string {
+  if (hour === 0) return "12am";
+  if (hour === 12) return "12pm";
+  return hour < 12 ? `${hour}am` : `${hour - 12}pm`;
+}
+
+/**
+ * Parses a slot label produced by {@link hourLabel} back to an hour-of-day.
+ * @param label - Slot label such as "10am" or "6pm".
+ * @returns Hour 0-23, or null when unparseable.
+ */
+export function parseHourLabel(label: string): number | null {
+  const m = /^(\d{1,2})(am|pm)$/.exec(label.trim().toLowerCase());
+  if (!m) return null;
+  const n = Number(m[1]);
+  if (n < 1 || n > 12) return null;
+  if (m[2] === "am") return n === 12 ? 0 : n;
+  return n === 12 ? 12 : n + 12;
+}
+
+/**
+ * Offered start hours for one weekday window: hourly from open up to the last
+ * hour where the longest job still ends by close, skipping any start hour that
+ * sits inside a midday break.
+ * @param window - The day's open/close/break window.
+ * @param window.open - Earliest start hour (0-23).
+ * @param window.close - Latest end hour (1-24).
+ * @param window.break - Optional midday break, or null for one continuous window.
+ * @param longestDurationMins - Longest selectable job length, in minutes.
+ * @returns Sorted list of start hours (empty when no job can fit).
+ */
+export function startHoursForDay(
+  window: { open: number; close: number; break: { start: number; end: number } | null },
+  longestDurationMins: number,
+): number[] {
+  const lastStart = window.close - Math.ceil(longestDurationMins / 60);
+  const hours: number[] = [];
+  for (let h = window.open; h <= lastStart; h++) {
+    if (window.break && h >= window.break.start && h < window.break.end) continue;
+    hours.push(h);
+  }
+  return hours;
+}
 
 export interface SubSlot {
   minute: StartMinute;
@@ -187,7 +247,7 @@ export function buildAvailableDays(
   existingBookings: ExistingBooking[],
   calendarEvents: Array<{ id: string; start: string; end: string }>,
   now: Date,
-  config: typeof BOOKING_CONFIG,
+  config: AvailabilityConfig,
 ): BuildAvailableDaysResult {
   const days: BookableDay[] = [];
   let sameDayClosed = false;
@@ -244,75 +304,101 @@ export function buildAvailableDays(
     // Get dynamic UTC offset once per day (handles NZDT/NZST)
     const utcOffset = getPacificAucklandOffset(year, month, day);
 
-    for (const slot of TIME_OF_DAY_OPTIONS) {
-      const slotHour = slot.startHour;
+    const window = config.schedule[dayOfWeek];
+    const shortMins = config.durations.short;
+    const longMins = config.durations.long;
 
-      const subSlots: SubSlot[] = [];
+    // A day yields no slots when it's switched off or its daily cap is reached.
+    const dayBookings = existingBookings.filter(
+      (b) => b.startAt.toLocaleDateString("en-CA", { timeZone: config.timeZone }) === dateKey,
+    );
+    const jobsCapHit = !!config.maxJobsPerDay && dayBookings.length >= config.maxJobsPerDay;
+    const hoursCapHit =
+      !!config.maxBillableHoursPerDay &&
+      dayBookings.reduce((sum, b) => sum + (b.endAt.getTime() - b.startAt.getTime()) / 60000, 0) >=
+        config.maxBillableHoursPerDay * 60;
 
-      for (const minute of SUB_SLOT_MINUTES) {
-        const slotTotalMinutes = slotHour * 60 + minute;
+    if (window?.enabled === true && !jobsCapHit && !hoursCapHit) {
+      const closeMins = window.close * 60;
+      const breakStartMins = window.break ? window.break.start * 60 : null;
+      const breakEndMins = window.break ? window.break.end * 60 : null;
 
-        // Bounds check: job must finish by workEndHour
-        const shortInBounds = slotTotalMinutes + 60 <= config.workEndHour * 60;
-        const longInBounds = slotTotalMinutes + 120 <= config.workEndHour * 60;
+      /**
+       * True when a job [startMins, endMins) finishes by close and doesn't
+       * straddle the midday break (must sit entirely before or after it).
+       * @param startMins - Job start, minutes from NZ midnight.
+       * @param endMins - Job end, minutes from NZ midnight.
+       * @returns Whether the job fits the day's window.
+       */
+      const fits = (startMins: number, endMins: number): boolean => {
+        if (endMins > closeMins) return false;
+        if (breakStartMins !== null && breakEndMins !== null) {
+          if (startMins < breakEndMins && endMins > breakStartMins) return false;
+        }
+        return true;
+      };
 
-        const subStart = new Date(Date.UTC(year, month - 1, day, slotHour - utcOffset, minute, 0));
+      for (const slotHour of startHoursForDay(window, longMins)) {
+        const subSlots: SubSlot[] = [];
 
-        let subAvailableShort =
-          shortInBounds &&
-          isSlotFree(
-            subStart,
-            new Date(subStart.getTime() + 60 * 60 * 1000),
-            existingBookings,
-            calendarEvents,
-            config.bufferMin,
+        for (const minute of config.subSlotMinutes) {
+          const slotTotalMinutes = slotHour * 60 + minute;
+          const subStart = new Date(
+            Date.UTC(year, month - 1, day, slotHour - utcOffset, minute, 0),
           );
 
-        let subAvailableLong =
-          longInBounds &&
-          isSlotFree(
-            subStart,
-            new Date(subStart.getTime() + 120 * 60 * 1000),
-            existingBookings,
-            calendarEvents,
-            config.bufferMin,
-          );
+          let subAvailableShort =
+            fits(slotTotalMinutes, slotTotalMinutes + shortMins) &&
+            isSlotFree(
+              subStart,
+              new Date(subStart.getTime() + shortMins * 60 * 1000),
+              existingBookings,
+              calendarEvents,
+              config.bufferMin,
+            );
 
-        // Apply time-based rules for today
-        if (isToday) {
-          const minutesUntilSubSlot = (slotHour - currentHourNZ) * 60 + minute - currentMinuteNZ;
+          let subAvailableLong =
+            fits(slotTotalMinutes, slotTotalMinutes + longMins) &&
+            isSlotFree(
+              subStart,
+              new Date(subStart.getTime() + longMins * 60 * 1000),
+              existingBookings,
+              calendarEvents,
+              config.bufferMin,
+            );
 
-          // 2-hour minimum notice
-          if (minutesUntilSubSlot < config.minHoursNotice * 60) {
-            subAvailableShort = false;
-            subAvailableLong = false;
+          // Apply time-based rules for today.
+          if (isToday) {
+            const minutesUntilSubSlot = (slotHour - currentHourNZ) * 60 + minute - currentMinuteNZ;
+            if (minutesUntilSubSlot < config.minHoursNotice * 60) {
+              subAvailableShort = false;
+              subAvailableLong = false;
+            }
+            if (config.sameDayCutoffHour !== null && currentHourNZ >= config.sameDayCutoffHour) {
+              subAvailableShort = false;
+              subAvailableLong = false;
+            }
           }
 
-          // 6pm same-day cutoff
-          if (currentHourNZ >= config.sameDayCutoffHour) {
-            subAvailableShort = false;
-            subAvailableLong = false;
-          }
+          subSlots.push({
+            minute,
+            availableShort: subAvailableShort,
+            availableLong: subAvailableLong,
+          });
         }
 
-        subSlots.push({
-          minute,
-          availableShort: subAvailableShort,
-          availableLong: subAvailableLong,
+        const availableShort = subSlots.some((s) => s.availableShort);
+        const availableLong = subSlots.some((s) => s.availableLong);
+
+        timeWindows.push({
+          value: hourLabel(slotHour),
+          label: hourLabel(slotHour),
+          startHour: slotHour,
+          availableShort,
+          availableLong,
+          subSlots,
         });
       }
-
-      const availableShort = subSlots.some((s) => s.availableShort);
-      const availableLong = subSlots.some((s) => s.availableLong);
-
-      timeWindows.push({
-        value: slot.value,
-        label: slot.label,
-        startHour: slotHour,
-        availableShort,
-        availableLong,
-        subSlots,
-      });
     }
 
     const hasAnySlots = timeWindows.some((w) => w.availableShort || w.availableLong);
@@ -359,7 +445,7 @@ export function validateBookingRequest(
   existingBookings: ExistingBooking[],
   calendarEvents: Array<{ id: string; start: string; end: string }>,
   now: Date,
-  config: typeof BOOKING_CONFIG,
+  config: AvailabilityConfig,
 ): { valid: boolean; error?: string } {
   const [year, month, day] = dateKey.split("-").map(Number);
   if (!year || !month || !day) {
@@ -386,18 +472,33 @@ export function validateBookingRequest(
     };
   }
 
-  const slot = TIME_OF_DAY_OPTIONS.find((t) => t.value === timeOfDay);
-  if (!slot) {
+  const window = config.schedule[selectedDate.getUTCDay()];
+  if (!window?.enabled) {
+    return { valid: false, error: "That day isn't available for bookings" };
+  }
+
+  const startHour = parseHourLabel(timeOfDay);
+  if (startHour === null) {
     return { valid: false, error: "Invalid time slot" };
+  }
+
+  const durationMinutes = duration === "short" ? config.durations.short : config.durations.long;
+
+  // The job must start no earlier than open, finish by close, and not straddle
+  // a midday break.
+  const startMins = startHour * 60 + startMinute;
+  const endMins = startMins + durationMinutes;
+  const inBreak = window.break
+    ? startMins < window.break.end * 60 && endMins > window.break.start * 60
+    : false;
+  if (startHour < window.open || endMins > window.close * 60 || inBreak) {
+    return { valid: false, error: "That time isn't within the day's hours" };
   }
 
   // Get dynamic UTC offset for this date (handles NZDT/NZST)
   const utcOffset = getPacificAucklandOffset(year, month, day);
 
-  const durationMinutes = duration === "short" ? 60 : 120;
-  const slotStart = new Date(
-    Date.UTC(year, month - 1, day, slot.startHour - utcOffset, startMinute, 0),
-  );
+  const slotStart = new Date(Date.UTC(year, month - 1, day, startHour - utcOffset, startMinute, 0));
   const slotEnd = new Date(slotStart.getTime() + durationMinutes * 60 * 1000);
 
   if (slotStart < now) {

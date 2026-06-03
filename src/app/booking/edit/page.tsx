@@ -8,7 +8,6 @@ import type React from "react";
 import { notFound } from "next/navigation";
 import { cn } from "@/shared/lib/cn";
 import {
-  BOOKING_CONFIG,
   DURATION_OPTIONS,
   TIME_OF_DAY_OPTIONS,
   SUB_SLOT_MINUTES,
@@ -19,6 +18,7 @@ import {
   type TimeOfDay,
   type StartMinute,
 } from "@/features/booking/lib/booking";
+import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
 import { prisma } from "@/shared/lib/prisma";
 import { fetchAllCalendarEvents } from "@/features/calendar/lib/google-calendar";
 import BookingForm, {
@@ -96,7 +96,8 @@ function parseBookingNotes(raw: string | null): {
  */
 async function getAvailableDays(excludeBookingId: string): Promise<BookableDay[]> {
   const now = new Date();
-  const maxDate = new Date(now.getTime() + BOOKING_CONFIG.maxAdvanceDays * 24 * 60 * 60 * 1000);
+  const { config } = await getAvailabilityConfig();
+  const maxDate = new Date(now.getTime() + config.maxAdvanceDays * 24 * 60 * 60 * 1000);
 
   const [existingBookings, cachedEvents] = await Promise.all([
     prisma.booking.findMany({
@@ -138,7 +139,7 @@ async function getAvailableDays(excludeBookingId: string): Promise<BookableDay[]
     bufferAfterMin: b.bufferAfterMin,
   }));
 
-  return buildAvailableDays(existing, calendarEvents, now, BOOKING_CONFIG).days;
+  return buildAvailableDays(existing, calendarEvents, now, config).days;
 }
 
 /**

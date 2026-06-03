@@ -32,7 +32,12 @@ export default async function SettingsPage(): Promise<React.ReactElement> {
         Change the values your site runs on without editing code. Each field explains what it does;
         edits go live as soon as you save.
       </p>
-      <SettingsView pricing={settings.pricing} pricingDefaults={DEFAULT_SETTINGS.pricing} />
+      <SettingsView
+        availability={settings.availability}
+        availabilityDefaults={DEFAULT_SETTINGS.availability}
+        pricing={settings.pricing}
+        pricingDefaults={DEFAULT_SETTINGS.pricing}
+      />
     </AdminPageLayout>
   );
 }

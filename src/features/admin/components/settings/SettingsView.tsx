@@ -11,8 +11,13 @@ import { useState } from "react";
 import type React from "react";
 import { cn } from "@/shared/lib/cn";
 import { GROUP_META } from "@/shared/lib/settings/field-meta";
-import type { PricingSettings, SettingsGroup } from "@/shared/lib/settings/types";
+import type {
+  AvailabilitySettings,
+  PricingSettings,
+  SettingsGroup,
+} from "@/shared/lib/settings/types";
 import { PricingTab } from "@/features/admin/components/settings/PricingTab";
+import { AvailabilityTab } from "@/features/admin/components/settings/AvailabilityTab";
 
 /** Tab order shown in the settings bar. */
 const TAB_ORDER: SettingsGroup[] = [
@@ -27,9 +32,11 @@ const TAB_ORDER: SettingsGroup[] = [
 ];
 
 /** Groups with a working editor; the rest render the placeholder. */
-const IMPLEMENTED: ReadonlySet<SettingsGroup> = new Set<SettingsGroup>(["pricing"]);
+const IMPLEMENTED: ReadonlySet<SettingsGroup> = new Set<SettingsGroup>(["availability", "pricing"]);
 
 interface Props {
+  availability: AvailabilitySettings;
+  availabilityDefaults: AvailabilitySettings;
   pricing: PricingSettings;
   pricingDefaults: PricingSettings;
 }
@@ -37,12 +44,19 @@ interface Props {
 /**
  * Settings tab bar + active editor.
  * @param props - Component props.
+ * @param props.availability - Resolved current availability settings.
+ * @param props.availabilityDefaults - Code default availability settings.
  * @param props.pricing - Resolved current pricing settings.
  * @param props.pricingDefaults - Code default pricing settings.
  * @returns Settings view element.
  */
-export function SettingsView({ pricing, pricingDefaults }: Props): React.ReactElement {
-  const [active, setActive] = useState<SettingsGroup>("pricing");
+export function SettingsView({
+  availability,
+  availabilityDefaults,
+  pricing,
+  pricingDefaults,
+}: Props): React.ReactElement {
+  const [active, setActive] = useState<SettingsGroup>("availability");
   const meta = GROUP_META[active];
 
   return (
@@ -75,7 +89,9 @@ export function SettingsView({ pricing, pricingDefaults }: Props): React.ReactEl
         <h2 className={cn("text-russian-violet text-lg font-bold")}>{meta.title}</h2>
         <p className={cn("mt-1 text-sm text-slate-500")}>{meta.blurb}</p>
         <div className={cn("mt-4")}>
-          {active === "pricing" ? (
+          {active === "availability" ? (
+            <AvailabilityTab initial={availability} defaults={availabilityDefaults} />
+          ) : active === "pricing" ? (
             <PricingTab initial={pricing} defaults={pricingDefaults} />
           ) : (
             <p className={cn("py-8 text-center text-sm text-slate-400")}>

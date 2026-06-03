@@ -11,6 +11,7 @@ import {
   buildAvailableDays,
   type ExistingBooking,
 } from "@/features/booking/lib/booking";
+import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 
 /**
@@ -58,9 +59,20 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   try {
     const now = new Date();
-    const maxDate = new Date(
-      now.getTime() + (BOOKING_CONFIG.maxAdvanceDays + 1) * 24 * 60 * 60 * 1000,
-    );
+    const { config, acceptingBookings, closedMessage } = await getAvailabilityConfig();
+
+    // Master switch: when paused, return no days + the operator's message.
+    if (!acceptingBookings) {
+      return NextResponse.json({
+        days: [],
+        sameDayClosed: false,
+        timeZone: config.timeZone,
+        acceptingBookings: false,
+        closedMessage,
+      });
+    }
+
+    const maxDate = new Date(now.getTime() + (config.maxAdvanceDays + 1) * 24 * 60 * 60 * 1000);
 
     // Get existing bookings from database
     const existingBookings = await prisma.booking.findMany({
@@ -94,13 +106,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       existingForSlots,
       calendarEvents,
       now,
-      BOOKING_CONFIG,
+      config,
     );
 
     return NextResponse.json({
       days,
       sameDayClosed,
-      timeZone: BOOKING_CONFIG.timeZone,
+      timeZone: config.timeZone,
+      acceptingBookings: true,
     });
   } catch (error) {
     console.error("[booking/days] Error:", error);
