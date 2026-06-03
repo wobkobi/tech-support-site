@@ -151,6 +151,25 @@ export const COMMS_FIELD_META: Record<string, FieldMeta> = {
   },
 };
 
+/** Field metadata for the reviews group, keyed by field name. */
+export const REVIEWS_FIELD_META: Record<string, FieldMeta> = {
+  homepageFeaturedCount: {
+    title: "Featured reviews on homepage",
+    description: "How many approved reviews show on the home page.",
+    unit: "reviews",
+  },
+  autoApproveVerified: {
+    title: "Auto-approve verified reviews",
+    description:
+      "When on, a review left through a genuine booking/contact link is published immediately instead of waiting for your approval. Unverified reviews always wait.",
+  },
+  invoiceReviewCooldownDays: {
+    title: "Review-request cooldown",
+    description: "Minimum days before the same customer is asked for a review again.",
+    unit: "days",
+  },
+};
+
 /** Field metadata for the pricing group, keyed by dotted path. */
 export const PRICING_FIELD_META: Record<string, FieldMeta> = {
   gstRegistered: {

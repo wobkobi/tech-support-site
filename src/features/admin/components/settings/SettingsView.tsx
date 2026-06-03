@@ -15,11 +15,13 @@ import type {
   AvailabilitySettings,
   CommsSettings,
   PricingSettings,
+  ReviewsSettings,
   SettingsGroup,
 } from "@/shared/lib/settings/types";
 import { PricingTab } from "@/features/admin/components/settings/PricingTab";
 import { AvailabilityTab } from "@/features/admin/components/settings/AvailabilityTab";
 import { CommsTab } from "@/features/admin/components/settings/CommsTab";
+import { ReviewsTab } from "@/features/admin/components/settings/ReviewsTab";
 
 /** Tab order shown in the settings bar. */
 const TAB_ORDER: SettingsGroup[] = [
@@ -38,6 +40,7 @@ const IMPLEMENTED: ReadonlySet<SettingsGroup> = new Set<SettingsGroup>([
   "availability",
   "pricing",
   "comms",
+  "reviews",
 ]);
 
 interface Props {
@@ -47,6 +50,8 @@ interface Props {
   pricingDefaults: PricingSettings;
   comms: CommsSettings;
   commsDefaults: CommsSettings;
+  reviews: ReviewsSettings;
+  reviewsDefaults: ReviewsSettings;
 }
 
 /**
@@ -58,6 +63,8 @@ interface Props {
  * @param props.pricingDefaults - Code default pricing settings.
  * @param props.comms - Resolved current comms settings.
  * @param props.commsDefaults - Code default comms settings.
+ * @param props.reviews - Resolved current reviews settings.
+ * @param props.reviewsDefaults - Code default reviews settings.
  * @returns Settings view element.
  */
 export function SettingsView({
@@ -67,6 +74,8 @@ export function SettingsView({
   pricingDefaults,
   comms,
   commsDefaults,
+  reviews,
+  reviewsDefaults,
 }: Props): React.ReactElement {
   const [active, setActive] = useState<SettingsGroup>("availability");
   const meta = GROUP_META[active];
@@ -107,6 +116,8 @@ export function SettingsView({
             <PricingTab initial={pricing} defaults={pricingDefaults} />
           ) : active === "comms" ? (
             <CommsTab initial={comms} defaults={commsDefaults} />
+          ) : active === "reviews" ? (
+            <ReviewsTab initial={reviews} defaults={reviewsDefaults} />
           ) : (
             <p className={cn("py-8 text-center text-sm text-slate-400")}>
               This section is still managed in code - its editor is coming in a later step.

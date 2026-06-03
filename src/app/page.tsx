@@ -12,6 +12,7 @@ import { Button } from "@/shared/components/Button";
 import { cn } from "@/shared/lib/cn";
 import { unstable_cache } from "next/cache";
 import { prisma } from "@/shared/lib/prisma";
+import { getSettings } from "@/shared/lib/settings/get-settings";
 import Image from "next/image";
 import {
   FaCalendarCheck,
@@ -44,13 +45,15 @@ export const revalidate = 86400;
  * Caching the query separately from the page means repeated ISR regenerations
  * within the TTL window skip the DB round-trip entirely.
  */
+// Cache a generous pool; the home page slices it to the operator's configured
+// featured count so changing that count takes effect without busting this cache.
 const getApprovedReviews = unstable_cache(
   async () =>
     prisma.review.findMany({
       orderBy: { createdAt: "desc" },
       select: { id: true, text: true, firstName: true, lastName: true, isAnonymous: true },
       where: { status: "approved" },
-      take: 20,
+      take: 50,
     }),
   ["home-approved-reviews"],
   { tags: ["reviews"], revalidate: 86400 },
@@ -85,7 +88,11 @@ const CARD = cn(
  * @returns Home page element
  */
 export default async function Home(): Promise<React.ReactElement> {
-  const rows = await getApprovedReviews().catch(() => []);
+  const [allRows, settings] = await Promise.all([
+    getApprovedReviews().catch(() => []),
+    getSettings(),
+  ]);
+  const rows = allRows.slice(0, settings.reviews.homepageFeaturedCount);
 
   const items: ReviewItem[] = rows.map((r) => ({
     id: r.id,

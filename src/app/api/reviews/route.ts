@@ -5,12 +5,13 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { prisma as prismaClient } from "@/shared/lib/prisma";
 import { sendOwnerReviewNotification } from "@/features/reviews/lib/email";
 import { normalisePhone } from "@/shared/lib/normalise-phone";
 import { reviewTextError } from "@/features/reviews/lib/validation";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
+import { getSettings } from "@/shared/lib/settings/get-settings";
 
 /**
  * Factory for reviews API handlers, allows dependency injection of Prisma client.
@@ -151,6 +152,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     }
 
+    // Token-verified reviews auto-approve only when the operator opts in;
+    // otherwise everything starts pending for manual approval.
+    const { reviews: reviewSettings } = await getSettings();
+    const status = verified && reviewSettings.autoApproveVerified ? "approved" : "pending";
+
     const review = await prisma.review.create({
       data: {
         text,
@@ -161,14 +167,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         bookingId,
         customerRef,
         contactId: autoContactId,
-        status: "pending", // All reviews start as pending
+        status,
       },
     });
 
-    // ✅ Trigger on-demand revalidation of review pages
-    // Next users who visit /reviews or /review will see fresh data
+    // Trigger on-demand revalidation of review surfaces. An auto-approved review
+    // should also appear on the home page (tag-cached), so bust that tag too.
     revalidatePath("/reviews");
     revalidatePath("/review");
+    if (status === "approved") revalidateTag("reviews", {});
 
     // Notify the owner - fire-and-forget, never blocks the response
     void sendOwnerReviewNotification(review);

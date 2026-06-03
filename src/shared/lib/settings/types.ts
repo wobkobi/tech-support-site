@@ -156,10 +156,8 @@ export interface SchedulingSettings {
 export interface ReviewsSettings {
   /** How many approved reviews feature on the home page. */
   homepageFeaturedCount: number;
-  /** Reviews at/above this star rating auto-approve. null = always manual. */
-  autoApproveThreshold: number | null;
-  /** Public "leave a review" URL used in emails + CTAs. */
-  googleReviewLink: string;
+  /** When true, reviews verified via a booking/contact token auto-approve. */
+  autoApproveVerified: boolean;
   /** Minimum days between review-request emails to one contact. */
   invoiceReviewCooldownDays: number;
 }

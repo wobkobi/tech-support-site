@@ -118,11 +118,11 @@ export const DEFAULT_SETTINGS: Settings = {
     smartOriginLookaheadHours: 4,
   },
 
-  // Source: page.tsx getApprovedReviews (take 20) + contact-review-token.ts.
+  // Source: page.tsx getApprovedReviews (take 20) + reviews POST + contact-review-token.ts.
   reviews: {
     homepageFeaturedCount: 20,
-    autoApproveThreshold: null,
-    googleReviewLink: "https://www.google.com/search?q=To+The+Point+Tech+Auckland",
+    // false preserves today's behaviour: every review starts as pending.
+    autoApproveVerified: false,
     invoiceReviewCooldownDays: 30,
   },
 };

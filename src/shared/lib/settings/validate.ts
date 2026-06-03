@@ -14,6 +14,7 @@ import type {
   AvailabilitySettings,
   CommsSettings,
   PricingSettings,
+  ReviewsSettings,
   Settings,
   SettingsGroup,
 } from "@/shared/lib/settings/types";
@@ -166,6 +167,22 @@ function validateComms(c: CommsSettings): FieldError[] {
 }
 
 /**
+ * Validates the reviews group's shape + bounds.
+ * @param r - Proposed reviews settings.
+ * @returns List of field errors (empty when valid).
+ */
+function validateReviews(r: ReviewsSettings): FieldError[] {
+  const errors: FieldError[] = [];
+  if (!inRange(r.homepageFeaturedCount, 0, 50))
+    errors.push({ field: "homepageFeaturedCount", message: "Must be 0-50 reviews." });
+  if (typeof r.autoApproveVerified !== "boolean")
+    errors.push({ field: "autoApproveVerified", message: "Must be on or off." });
+  if (!inRange(r.invoiceReviewCooldownDays, 1, 3650))
+    errors.push({ field: "invoiceReviewCooldownDays", message: "Must be 1-3650 days." });
+  return errors;
+}
+
+/**
  * Validates one settings group's payload. Groups without a dedicated validator
  * yet fall through as valid (read-side clamping still guards them); the
  * highest-blast-radius groups are validated in full.
@@ -181,6 +198,8 @@ export function validateGroup<G extends SettingsGroup>(group: G, value: Settings
       return validatePricing(value as PricingSettings);
     case "comms":
       return validateComms(value as CommsSettings);
+    case "reviews":
+      return validateReviews(value as ReviewsSettings);
     default:
       return [];
   }
