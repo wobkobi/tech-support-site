@@ -11,6 +11,7 @@ import { FaCircleCheck, FaHouse, FaPenToSquare, FaTag } from "react-icons/fa6";
 import { cancellationCopy } from "@/features/business/lib/pricing-policy";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { prisma } from "@/shared/lib/prisma";
+import { BookingConversion } from "./BookingConversion";
 
 const CARD = "border-seasalt-400/60 bg-seasalt-800 rounded-xl border p-5 shadow-sm sm:p-6";
 
@@ -58,6 +59,7 @@ export default async function BookingSuccessPage({
 
   return (
     <main className={cn("relative min-h-dvh overflow-hidden")}>
+      <BookingConversion />
       {/* Backdrop */}
       <div className={cn("pointer-events-none absolute inset-0 -z-10 overflow-hidden")}>
         <picture>
