@@ -8,7 +8,7 @@
  * by every settings tab so the save/validation flow stays consistent.
  */
 
-import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type React from "react";
 import type { Settings, SettingsGroup } from "@/shared/lib/settings/types";
 import { checkGuardrails, type FieldError } from "@/shared/lib/settings/validate";
@@ -83,6 +83,21 @@ export function useSettingsForm<G extends SettingsGroup>(
   );
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
+
+  // Warn before a full-page unload (reload / close / external nav) with unsaved
+  // edits. In-app tab switches keep the draft in state, so they don't lose work.
+  useEffect(() => {
+    if (!dirty) return;
+    /**
+     * Triggers the browser's native unsaved-changes prompt.
+     * @param e - The beforeunload event.
+     */
+    const handler = (e: BeforeUnloadEvent): void => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [dirty]);
 
   const save = useCallback(
     async (confirmWarnings = false): Promise<boolean> => {

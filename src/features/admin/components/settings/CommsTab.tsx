@@ -109,7 +109,18 @@ export function CommsTab({ initial, defaults }: Props): React.ReactElement {
       <div className={cn("mt-6 flex items-center gap-3")}>
         <button
           type="button"
-          onClick={() => void form.save()}
+          onClick={() => {
+            if (
+              !draft.notifyConfirmation &&
+              !draft.notifyReminder &&
+              !draft.notifyReviewRequest &&
+              !confirm(
+                "Turn off all customer emails? Customers won't get booking confirmations, reminders, or review requests.",
+              )
+            )
+              return;
+            void form.save();
+          }}
           disabled={!dirty || saving}
           className={cn(
             "bg-russian-violet rounded-lg px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50",

@@ -214,7 +214,17 @@ export function PricingTab({ initial, defaults }: Props): React.ReactElement {
       <div className={cn("mt-6 flex items-center gap-3")}>
         <button
           type="button"
-          onClick={() => void form.save()}
+          onClick={() => {
+            if (
+              draft.gstRegistered &&
+              !initial.gstRegistered &&
+              !confirm(
+                "Turn on GST registration? Invoices will then show a GST breakdown - set your GST number in Business identity first.",
+              )
+            )
+              return;
+            void form.save();
+          }}
           disabled={!dirty || saving}
           className={cn(
             "bg-russian-violet rounded-lg px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50",
