@@ -17,6 +17,7 @@ import type {
   IdentitySettings,
   PricingSettings,
   ReviewsSettings,
+  SchedulingSettings,
   Settings,
   SettingsGroup,
   TaxSettings,
@@ -240,6 +241,28 @@ function validateTax(t: TaxSettings): FieldError[] {
 }
 
 /**
+ * Validates the scheduling group's shape + bounds. All are non-negative
+ * minute/hour buffers; 0 disables the rule each one gates.
+ * @param s - Proposed scheduling settings.
+ * @returns List of field errors (empty when valid).
+ */
+function validateScheduling(s: SchedulingSettings): FieldError[] {
+  const errors: FieldError[] = [];
+  if (!nonNeg(s.travelRoundBufferMin))
+    errors.push({ field: "travelRoundBufferMin", message: "Must be 0 or more minutes." });
+  if (!nonNeg(s.minHomeDwellMin))
+    errors.push({
+      field: "minHomeDwellMin",
+      message: "Must be 0 or more minutes (0 = never suppress travel-back).",
+    });
+  if (!nonNeg(s.travelBackDepartureBufferMin))
+    errors.push({ field: "travelBackDepartureBufferMin", message: "Must be 0 or more minutes." });
+  if (!inRange(s.smartOriginLookaheadHours, 0, 24))
+    errors.push({ field: "smartOriginLookaheadHours", message: "Must be 0-24 hours." });
+  return errors;
+}
+
+/**
  * Validates one settings group's payload. Groups without a dedicated validator
  * yet fall through as valid (read-side clamping still guards them); the
  * highest-blast-radius groups are validated in full.
@@ -263,6 +286,8 @@ export function validateGroup<G extends SettingsGroup>(group: G, value: Settings
       return validateIdentity(value as IdentitySettings);
     case "tax":
       return validateTax(value as TaxSettings);
+    case "scheduling":
+      return validateScheduling(value as SchedulingSettings);
     default:
       return [];
   }

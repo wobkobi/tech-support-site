@@ -277,6 +277,38 @@ export const TAX_FIELD_META: Record<string, FieldMeta> = {
   },
 };
 
+/** Field metadata for the advanced scheduling group, keyed by dotted path. */
+export const SCHEDULING_FIELD_META: Record<string, FieldMeta> = {
+  travelRoundBufferMin: {
+    title: "Travel rounding buffer",
+    description:
+      "Extra minutes added to each travel block before rounding up, to absorb job overrun and traffic.",
+    unit: "minutes",
+    off: "Set 0 to block only the raw estimated travel time.",
+  },
+  minHomeDwellMin: {
+    title: "Minimum home dwell",
+    description:
+      "If returning home then leaving again leaves less than this gap, the travel-back block is skipped (you'd stay out).",
+    unit: "minutes",
+    off: "Set 0 to always create a travel-back block.",
+  },
+  travelBackDepartureBufferMin: {
+    title: "Travel-back departure buffer",
+    description:
+      "Wind-down time after a booking ends before the travel-back block starts, so you're not rushed out the door.",
+    unit: "minutes",
+    off: "Set 0 to depart immediately when the booking ends.",
+  },
+  smartOriginLookaheadHours: {
+    title: "Smart-origin lookahead",
+    description:
+      "How far back to look for a preceding event to measure travel from, instead of always from home base.",
+    unit: "hours",
+    off: "Set 0 to always measure travel from the home base.",
+  },
+};
+
 /** Field metadata for the pricing group, keyed by dotted path. */
 export const PRICING_FIELD_META: Record<string, FieldMeta> = {
   gstRegistered: {

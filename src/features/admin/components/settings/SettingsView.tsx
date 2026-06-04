@@ -18,6 +18,7 @@ import type {
   IdentitySettings,
   PricingSettings,
   ReviewsSettings,
+  SchedulingSettings,
   SettingsGroup,
   TaxSettings,
 } from "@/shared/lib/settings/types";
@@ -28,6 +29,7 @@ import { ReviewsTab } from "@/features/admin/components/settings/ReviewsTab";
 import { HoldsTab } from "@/features/admin/components/settings/HoldsTab";
 import { IdentityTab } from "@/features/admin/components/settings/IdentityTab";
 import { TaxTab } from "@/features/admin/components/settings/TaxTab";
+import { SchedulingTab } from "@/features/admin/components/settings/SchedulingTab";
 
 /** Tab order shown in the settings bar. */
 const TAB_ORDER: SettingsGroup[] = [
@@ -50,6 +52,7 @@ const IMPLEMENTED: ReadonlySet<SettingsGroup> = new Set<SettingsGroup>([
   "comms",
   "reviews",
   "holds",
+  "scheduling",
 ]);
 
 interface Props {
@@ -67,6 +70,8 @@ interface Props {
   identityDefaults: IdentitySettings;
   tax: TaxSettings;
   taxDefaults: TaxSettings;
+  scheduling: SchedulingSettings;
+  schedulingDefaults: SchedulingSettings;
 }
 
 /**
@@ -86,6 +91,8 @@ interface Props {
  * @param props.identityDefaults - Code default identity settings.
  * @param props.tax - Resolved current tax settings.
  * @param props.taxDefaults - Code default tax settings.
+ * @param props.scheduling - Resolved current scheduling settings.
+ * @param props.schedulingDefaults - Code default scheduling settings.
  * @returns Settings view element.
  */
 export function SettingsView({
@@ -103,6 +110,8 @@ export function SettingsView({
   identityDefaults,
   tax,
   taxDefaults,
+  scheduling,
+  schedulingDefaults,
 }: Props): React.ReactElement {
   const [active, setActive] = useState<SettingsGroup>("availability");
   const meta = GROUP_META[active];
@@ -151,6 +160,8 @@ export function SettingsView({
             <HoldsTab initial={holds} defaults={holdsDefaults} />
           ) : active === "tax" ? (
             <TaxTab initial={tax} defaults={taxDefaults} />
+          ) : active === "scheduling" ? (
+            <SchedulingTab initial={scheduling} defaults={schedulingDefaults} />
           ) : (
             <p className={cn("py-8 text-center text-sm text-slate-400")}>
               This section is still managed in code - its editor is coming in a later step.

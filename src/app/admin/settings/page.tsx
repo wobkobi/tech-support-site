@@ -47,6 +47,8 @@ export default async function SettingsPage(): Promise<React.ReactElement> {
         identityDefaults={DEFAULT_SETTINGS.identity}
         tax={settings.tax}
         taxDefaults={DEFAULT_SETTINGS.tax}
+        scheduling={settings.scheduling}
+        schedulingDefaults={DEFAULT_SETTINGS.scheduling}
       />
     </AdminPageLayout>
   );
