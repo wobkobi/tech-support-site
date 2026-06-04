@@ -10,7 +10,6 @@ import {
   getBookingCalendarId,
   type CalendarEvent,
 } from "@/features/calendar/lib/google-calendar";
-import { BOOKING_CONFIG } from "@/features/booking/lib/booking";
 import { calculateTravelMinutes, type TransportMode } from "@/features/calendar/lib/travel-time";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 
@@ -125,10 +124,12 @@ export function findNextChainedEvent(
  */
 export async function refreshCalendarCache(): Promise<RefreshResult> {
   const now = new Date();
-  const maxDate = new Date(now.getTime() + BOOKING_CONFIG.maxAdvanceDays * 24 * 60 * 60 * 1000);
 
-  // Advanced travel-engine buffers (defaults preserve the previous constants).
+  // Live settings: the booking horizon + advanced travel-engine buffers.
   const settings = await getSettings();
+  const maxDate = new Date(
+    now.getTime() + settings.availability.maxAdvanceDays * 24 * 60 * 60 * 1000,
+  );
   const scheduling = settings.scheduling;
   /**
    * Rounds raw travel minutes using the live travel-round buffer.
