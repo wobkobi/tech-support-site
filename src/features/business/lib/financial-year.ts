@@ -92,12 +92,14 @@ export interface FinancialYearTotals {
  * @param income - Income entries with `amount` and `date`.
  * @param expenses - Expense entries with `amountExcl`, `gstAmount`, and `date`.
  * @param now - "Today"; defaults to the current time.
+ * @param incomeTaxRate - Income-tax provision rate (fraction); defaults to 0.2.
  * @returns Per-FY totals, most recent first.
  */
 export function aggregateByFinancialYear(
   income: ReadonlyArray<{ amount: number; date: Date }>,
   expenses: ReadonlyArray<{ amountExcl: number; gstAmount: number; date: Date }>,
   now: Date = new Date(),
+  incomeTaxRate: number = 0.2,
 ): FinancialYearTotals[] {
   return listFinancialYears(now).map((fy) => {
     const fyIncome = income.filter((e) => e.date >= fy.start && e.date < fy.end);
@@ -112,9 +114,10 @@ export function aggregateByFinancialYear(
       expensesExcl: totalExpensesExcl,
       gstClaimable: totalGstClaimable,
       profit: Math.round(profit * 100) / 100,
-      // 20% income-tax provision is on PROFIT, not raw income (matches the NZ
-      // sole-trader Tax Planner sheet). Negative profit yields zero reserve.
-      taxReserve: Math.round(Math.max(0, profit * 0.2) * 100) / 100,
+      // Income-tax provision is on PROFIT, not raw income (matches the NZ
+      // sole-trader Tax Planner sheet); the rate comes from the tax settings.
+      // Negative profit yields zero reserve.
+      taxReserve: Math.round(Math.max(0, profit * incomeTaxRate) * 100) / 100,
       incomeCount: fyIncome.length,
       expenseCount: fyExpenses.length,
     };

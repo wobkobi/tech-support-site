@@ -19,6 +19,7 @@ import type {
   PricingSettings,
   ReviewsSettings,
   SettingsGroup,
+  TaxSettings,
 } from "@/shared/lib/settings/types";
 import { PricingTab } from "@/features/admin/components/settings/PricingTab";
 import { AvailabilityTab } from "@/features/admin/components/settings/AvailabilityTab";
@@ -26,6 +27,7 @@ import { CommsTab } from "@/features/admin/components/settings/CommsTab";
 import { ReviewsTab } from "@/features/admin/components/settings/ReviewsTab";
 import { HoldsTab } from "@/features/admin/components/settings/HoldsTab";
 import { IdentityTab } from "@/features/admin/components/settings/IdentityTab";
+import { TaxTab } from "@/features/admin/components/settings/TaxTab";
 
 /** Tab order shown in the settings bar. */
 const TAB_ORDER: SettingsGroup[] = [
@@ -44,6 +46,7 @@ const IMPLEMENTED: ReadonlySet<SettingsGroup> = new Set<SettingsGroup>([
   "availability",
   "pricing",
   "identity",
+  "tax",
   "comms",
   "reviews",
   "holds",
@@ -62,6 +65,8 @@ interface Props {
   holdsDefaults: HoldsSettings;
   identity: IdentitySettings;
   identityDefaults: IdentitySettings;
+  tax: TaxSettings;
+  taxDefaults: TaxSettings;
 }
 
 /**
@@ -79,6 +84,8 @@ interface Props {
  * @param props.holdsDefaults - Code default holds settings.
  * @param props.identity - Resolved current identity settings.
  * @param props.identityDefaults - Code default identity settings.
+ * @param props.tax - Resolved current tax settings.
+ * @param props.taxDefaults - Code default tax settings.
  * @returns Settings view element.
  */
 export function SettingsView({
@@ -94,6 +101,8 @@ export function SettingsView({
   holdsDefaults,
   identity,
   identityDefaults,
+  tax,
+  taxDefaults,
 }: Props): React.ReactElement {
   const [active, setActive] = useState<SettingsGroup>("availability");
   const meta = GROUP_META[active];
@@ -140,6 +149,8 @@ export function SettingsView({
             <ReviewsTab initial={reviews} defaults={reviewsDefaults} />
           ) : active === "holds" ? (
             <HoldsTab initial={holds} defaults={holdsDefaults} />
+          ) : active === "tax" ? (
+            <TaxTab initial={tax} defaults={taxDefaults} />
           ) : (
             <p className={cn("py-8 text-center text-sm text-slate-400")}>
               This section is still managed in code - its editor is coming in a later step.

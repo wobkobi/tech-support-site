@@ -250,6 +250,33 @@ export const HOLDS_FIELD_META: Record<string, FieldMeta> = {
   },
 };
 
+/** Field metadata for the tax-planner group, keyed by dotted path. */
+export const TAX_FIELD_META: Record<string, FieldMeta> = {
+  incomeTax: {
+    title: "Income-tax reserve rate",
+    description:
+      "Fraction of profit set aside for income tax (0.2 = 20%). Used by the dashboard planner; a per-FY workbook rate, when present, still takes precedence.",
+  },
+  acc: {
+    title: "ACC levy rate",
+    description: "Fraction of profit reserved for the ACC levy (0.0146 = 1.46%).",
+  },
+  kiwiSaver: {
+    title: "KiwiSaver rate",
+    description: "Voluntary KiwiSaver contribution as a fraction of profit (0.12 = 12%).",
+  },
+  weeklyKiwiSaver: {
+    title: "Weekly KiwiSaver transfer",
+    description: "The amount moved to KiwiSaver each week, shown on the planner's savings target.",
+    unit: "$",
+  },
+  weeklyTax: {
+    title: "Weekly tax transfer",
+    description: "The amount moved to the tax account each week, shown on the planner.",
+    unit: "$",
+  },
+};
+
 /** Field metadata for the pricing group, keyed by dotted path. */
 export const PRICING_FIELD_META: Record<string, FieldMeta> = {
   gstRegistered: {

@@ -13,6 +13,7 @@ import { getFySheetIdForDate } from "@/features/business/lib/sheets-sync";
 import { listSpreadsheetsInFolder } from "@/features/business/lib/google-drive";
 import { readPlannerConfig } from "@/features/business/lib/tax-settings";
 import { DEFAULT_TAX_RATES, type TaxRates } from "@/features/business/lib/tax-planner";
+import { getSettings } from "@/shared/lib/settings/get-settings";
 import {
   readCachedTaxSnapshot,
   writeCachedTaxSnapshot,
@@ -204,9 +205,17 @@ export default async function BusinessPage({
   const scopedExpensesTotal = expenses.reduce((s, r) => s + r.amountExcl, 0);
   const scopedGstTotal = expenses.reduce((s, r) => s + r.gstAmount, 0);
 
-  // Pull the per-FY rates from the workbook's SETTINGS tab. Cached per scope
-  // since the Drive/Sheets reads cost 3-5s on a miss.
-  let rates: TaxRates = DEFAULT_TAX_RATES;
+  // Pull the per-FY rates from the workbook's SETTINGS tab. The sheet stays
+  // authoritative; the live tax settings are the fallback for any cell it
+  // doesn't fill (and the source when there's no workbook at all). Cached per
+  // scope since the Drive/Sheets reads cost 3-5s on a miss.
+  const taxSettings = (await getSettings()).tax;
+  let rates: TaxRates = {
+    incomeTax: taxSettings.incomeTax,
+    acc: taxSettings.acc,
+    kiwiSaver: taxSettings.kiwiSaver,
+    gstOutOfInclusive: DEFAULT_TAX_RATES.gstOutOfInclusive,
+  };
 
   const cached = forceRefresh ? null : await readCachedTaxSnapshot(scope.key);
   if (cached) {
@@ -227,7 +236,7 @@ export default async function BusinessPage({
       }
 
       if (configSpreadsheetId) {
-        const config = await readPlannerConfig(configSpreadsheetId);
+        const config = await readPlannerConfig(configSpreadsheetId, taxSettings);
         if (config) {
           rates = config.rates;
         }

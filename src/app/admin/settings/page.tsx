@@ -45,6 +45,8 @@ export default async function SettingsPage(): Promise<React.ReactElement> {
         holdsDefaults={DEFAULT_SETTINGS.holds}
         identity={settings.identity}
         identityDefaults={DEFAULT_SETTINGS.identity}
+        tax={settings.tax}
+        taxDefaults={DEFAULT_SETTINGS.tax}
       />
     </AdminPageLayout>
   );

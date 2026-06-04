@@ -19,6 +19,7 @@ import type {
   ReviewsSettings,
   Settings,
   SettingsGroup,
+  TaxSettings,
 } from "@/shared/lib/settings/types";
 
 /** A single rejected field plus the reason, surfaced inline by the form. */
@@ -219,6 +220,26 @@ function validateHolds(h: HoldsSettings): FieldError[] {
 }
 
 /**
+ * Validates the tax-planner group's shape + bounds. Rates are fractions
+ * (0.2 = 20%); weekly transfer amounts are non-negative dollar figures.
+ * @param t - Proposed tax settings.
+ * @returns List of field errors (empty when valid).
+ */
+function validateTax(t: TaxSettings): FieldError[] {
+  const errors: FieldError[] = [];
+  if (!inRange(t.incomeTax, 0, 1))
+    errors.push({ field: "incomeTax", message: "Must be a fraction 0-1 (e.g. 0.2 = 20%)." });
+  if (!inRange(t.acc, 0, 1))
+    errors.push({ field: "acc", message: "Must be a fraction 0-1 (e.g. 0.0146 = 1.46%)." });
+  if (!inRange(t.kiwiSaver, 0, 1))
+    errors.push({ field: "kiwiSaver", message: "Must be a fraction 0-1 (e.g. 0.12 = 12%)." });
+  if (!nonNeg(t.weeklyKiwiSaver))
+    errors.push({ field: "weeklyKiwiSaver", message: "Must be 0 or more." });
+  if (!nonNeg(t.weeklyTax)) errors.push({ field: "weeklyTax", message: "Must be 0 or more." });
+  return errors;
+}
+
+/**
  * Validates one settings group's payload. Groups without a dedicated validator
  * yet fall through as valid (read-side clamping still guards them); the
  * highest-blast-radius groups are validated in full.
@@ -240,6 +261,8 @@ export function validateGroup<G extends SettingsGroup>(group: G, value: Settings
       return validateHolds(value as HoldsSettings);
     case "identity":
       return validateIdentity(value as IdentitySettings);
+    case "tax":
+      return validateTax(value as TaxSettings);
     default:
       return [];
   }
