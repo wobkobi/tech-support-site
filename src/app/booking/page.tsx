@@ -137,6 +137,7 @@ async function getAvailableDays(): Promise<{
   sameDayClosed: boolean;
   acceptingBookings: boolean;
   closedMessage: string;
+  durations: { short: number; long: number };
 }> {
   const now = new Date();
   const { config, acceptingBookings, closedMessage } = await getAvailabilityConfig();
@@ -149,6 +150,7 @@ async function getAvailableDays(): Promise<{
       sameDayClosed: false,
       acceptingBookings: false,
       closedMessage,
+      durations: config.durations,
     };
   }
 
@@ -186,6 +188,7 @@ async function getAvailableDays(): Promise<{
     sameDayClosed: built.sameDayClosed,
     acceptingBookings: true,
     closedMessage,
+    durations: config.durations,
   };
 }
 
@@ -201,7 +204,7 @@ const SKELETON_BLOCK = cn("bg-seasalt-900/40 rounded-lg");
  * @returns Booking form or an unavailable banner.
  */
 async function BookingFormIsland(): Promise<React.ReactElement> {
-  const { days, degraded, sameDayClosed, acceptingBookings, closedMessage } =
+  const { days, degraded, sameDayClosed, acceptingBookings, closedMessage, durations } =
     await getAvailableDays();
   if (!acceptingBookings) {
     return (
@@ -247,7 +250,7 @@ async function BookingFormIsland(): Promise<React.ReactElement> {
           </p>
         </div>
       )}
-      <BookingForm availableDays={days} />
+      <BookingForm availableDays={days} durations={durations} />
     </div>
   );
 }

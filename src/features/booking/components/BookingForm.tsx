@@ -13,7 +13,6 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/shared/components/Button";
 import { cn } from "@/shared/lib/cn";
 import {
-  DURATION_OPTIONS,
   SUB_SLOT_MINUTES,
   BOOKING_FIELD_LIMITS,
   validateEmail,
@@ -32,6 +31,19 @@ import AddressAutocomplete from "@/features/booking/components/AddressAutocomple
 const DRAFT_KEY = "booking-draft-v2";
 /** Soft warning kicks in this many chars before the notes hard cap. */
 const NOTES_WARN_GAP = 50;
+
+/**
+ * Formats a job duration in minutes as a short label ("1 hour", "2 hours", "90 min").
+ * @param mins - Duration in minutes.
+ * @returns Human label.
+ */
+function durationText(mins: number): string {
+  if (mins % 60 === 0) {
+    const h = mins / 60;
+    return `${h} hour${h === 1 ? "" : "s"}`;
+  }
+  return `${mins} min`;
+}
 
 interface BookingDraft {
   duration: JobDuration;
@@ -76,6 +88,8 @@ function combineUnitAndAddress(unit: string, rest: string): string {
 
 export interface BookingFormProps {
   availableDays: BookableDay[];
+  /** Live job durations (minutes) from availability settings; drives the picker labels. */
+  durations: { short: number; long: number };
   cancelToken?: string;
   initialValues?: BookingFormInitialValues;
 }
@@ -84,17 +98,34 @@ export interface BookingFormProps {
  * Booking form component with duration selection
  * @param props - Component props
  * @param props.availableDays - Array of available booking days
+ * @param props.durations - Live job durations (minutes) for the picker labels.
  * @param props.cancelToken - Cancel token for edit mode; omit for new bookings
  * @param props.initialValues - Pre-filled values for edit mode
  * @returns Booking form element
  */
 export default function BookingForm({
   availableDays,
+  durations,
   cancelToken,
   initialValues,
 }: BookingFormProps): React.ReactElement {
   const router = useRouter();
   const isEditMode = Boolean(cancelToken);
+
+  // Duration choices built from the live settings; labels reflect the operator's
+  // configured short/long lengths. Descriptions stay as fixed copy.
+  const durationOptions: { value: JobDuration; label: string; description: string }[] = [
+    {
+      value: "short",
+      label: `Standard (${durationText(durations.short)})`,
+      description: "Most common appointment length",
+    },
+    {
+      value: "long",
+      label: `Extended (${durationText(durations.long)})`,
+      description: "For complex issues or multiple tasks",
+    },
+  ];
 
   // Form state. `selectedDateKey` is stored instead of the full BookableDay
   // object so that when `availableDays` changes (e.g. after router.refresh on
@@ -643,7 +674,7 @@ export default function BookingForm({
             How long do you need? <span className={cn("text-coquelicot-500")}>*</span>
           </label>
           <div className={cn("grid gap-3 sm:grid-cols-2")}>
-            {DURATION_OPTIONS.map((opt) => (
+            {durationOptions.map((opt) => (
               <button
                 key={opt.value}
                 type="button"
@@ -1217,7 +1248,7 @@ export default function BookingForm({
         const timeLabel = activeWindow
           ? subSlotLabel(activeWindow.startHour, selectedMinute)
           : null;
-        const durationLabel = DURATION_OPTIONS.find((d) => d.value === duration)?.label ?? null;
+        const durationLabel = durationOptions.find((d) => d.value === duration)?.label ?? null;
         const combinedAddress =
           meetingType === "in-person" ? combineUnitAndAddress(unit, address) : "";
         return (

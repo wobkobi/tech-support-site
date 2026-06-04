@@ -201,6 +201,7 @@ export default async function EditBookingPage({
   };
 
   const availableDays = await getAvailableDays(booking.id);
+  const { config: availabilityConfig } = await getAvailabilityConfig();
 
   // Ensure the current booking's day appears even if it has no other slots
   const hasCurrentDay = availableDays.some((d) => d.dateKey === dateKey);
@@ -265,6 +266,7 @@ export default async function EditBookingPage({
           <section className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}>
             <BookingForm
               availableDays={availableDays}
+              durations={availabilityConfig.durations}
               cancelToken={cancelToken}
               initialValues={initialValues}
             />
