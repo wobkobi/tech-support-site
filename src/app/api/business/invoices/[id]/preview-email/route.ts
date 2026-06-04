@@ -57,7 +57,7 @@ export async function POST(
   const reviewUrl =
     includeReview && "reviewUrl" in eligibility ? (eligibility.reviewUrl ?? null) : null;
 
-  const { subject, html } = buildInvoiceEmail({
+  const { subject, html } = await buildInvoiceEmail({
     invoice: {
       number: invoice.number,
       clientName: invoice.clientName,

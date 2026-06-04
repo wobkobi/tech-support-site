@@ -5,11 +5,7 @@
  */
 
 import { Resend } from "resend";
-import {
-  BUSINESS,
-  BUSINESS_BANK_ACCOUNT,
-  BUSINESS_PAYMENT_TERMS_DAYS,
-} from "@/shared/lib/business-identity";
+import { getIdentity } from "@/shared/lib/business-identity.server";
 import { formatDateTimeLong, formatDateShort } from "@/shared/lib/date-format";
 import { getSiteUrl } from "@/shared/lib/site-url";
 import { formatNZD } from "@/features/business/lib/business";
@@ -50,22 +46,24 @@ function renderEmphasisedHtml(text: string): string {
 }
 
 /**
- * Renders the standard email signature block (logo, name, contact, footer).
+ * Renders the standard email signature block (logo, name, contact, footer)
+ * from the live business identity.
  * @param siteUrl - Canonical site URL for the logo link and footer.
  * @returns HTML string for the signature.
  */
-function buildEmailSignature(siteUrl: string): string {
+async function buildEmailSignature(siteUrl: string): Promise<string> {
+  const identity = await getIdentity();
   return `
     <div style="margin:32px 0 0;padding-top:24px;border-top:1px solid #e8e8e8">
       <a href="${siteUrl}" style="display:inline-block;margin-bottom:12px">
-        <img src="${siteUrl}/assets/email-signature-400x135.png" alt="${BUSINESS.company} Tech" width="200" style="display:block;border:0;height:auto" />
+        <img src="${siteUrl}/assets/email-signature-400x135.png" alt="${identity.company} Tech" width="200" style="display:block;border:0;height:auto" />
       </a>
-      <p style="margin:0 0 2px;font-size:14px;font-weight:600;color:#0c0a3e">${BUSINESS.name}</p>
+      <p style="margin:0 0 2px;font-size:14px;font-weight:600;color:#0c0a3e">${identity.name}</p>
       <p style="margin:0 0 10px;font-size:13px;color:#666">Owner &amp; Technician</p>
-      <p style="margin:0 0 4px;font-size:13px;color:#555">📞 <a href="${BUSINESS.phoneTel}" style="color:#555;text-decoration:none">${BUSINESS.phone}</a></p>
-      <p style="margin:0 0 4px;font-size:13px;color:#555">✉️ <a href="mailto:${BUSINESS.email}" style="color:#43bccd;text-decoration:none">${BUSINESS.email}</a></p>
+      <p style="margin:0 0 4px;font-size:13px;color:#555">📞 <a href="${identity.phoneTel}" style="color:#555;text-decoration:none">${identity.phone}</a></p>
+      <p style="margin:0 0 4px;font-size:13px;color:#555">✉️ <a href="mailto:${identity.email}" style="color:#43bccd;text-decoration:none">${identity.email}</a></p>
       <p style="margin:0 0 4px;font-size:13px;color:#555">🌐 <a href="${siteUrl}" style="color:#43bccd;text-decoration:none">${siteUrl.replace(/^https?:\/\//, "")}</a></p>
-      <p style="margin:0;font-size:12px;color:#999">${BUSINESS.location}</p>
+      <p style="margin:0;font-size:12px;color:#999">${identity.location}</p>
     </div>`;
 }
 
@@ -328,7 +326,7 @@ export async function sendCustomerBookingConfirmation(
 
     <p style="margin:28px 0 6px;color:#888;font-size:13px;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Cancellation policy</p>
     <p style="margin:0;color:#444;font-size:13px;line-height:1.6">${renderEmphasisedHtml(cancellationCopy())}</p>
-${buildEmailSignature(siteUrl)}
+${await buildEmailSignature(siteUrl)}
   </div>
 </body>
 </html>`;
@@ -398,7 +396,7 @@ export async function sendBookingReminderEmail(booking: BookingNotificationData)
 
     <p style="margin:28px 0 6px;color:#888;font-size:13px;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Cancellation policy</p>
     <p style="margin:0;color:#444;font-size:13px;line-height:1.6">${renderEmphasisedHtml(cancellationCopy())}</p>
-${buildEmailSignature(siteUrl)}
+${await buildEmailSignature(siteUrl)}
   </div>
 </body>
 </html>`;
@@ -447,6 +445,7 @@ export async function sendCustomerReviewRequest(booking: ReviewRequestData): Pro
     return;
   }
 
+  const identity = await getIdentity();
   const reviewUrl = `${siteUrl}/review?token=${encodeURIComponent(booking.reviewToken)}`;
   const firstName = booking.name.split(" ")[0];
   const safeFirstName = escapeHtml(firstName);
@@ -463,8 +462,8 @@ export async function sendCustomerReviewRequest(booking: ReviewRequestData): Pro
     <p style="margin:0 0 24px;color:#444;line-height:1.6">It only takes a minute - and honest feedback is always welcome.</p>
     <a href="${reviewUrl}" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:15px">Share your experience</a>
 
-    <p style="margin:28px 0 20px;color:#444;font-size:14px;line-height:1.6">Thanks again for choosing ${BUSINESS.company} Tech. If you ever need a hand with anything else, don't hesitate to get in touch.</p>
-${buildEmailSignature(siteUrl)}
+    <p style="margin:28px 0 20px;color:#444;font-size:14px;line-height:1.6">Thanks again for choosing ${identity.company} Tech. If you ever need a hand with anything else, don't hesitate to get in touch.</p>
+${await buildEmailSignature(siteUrl)}
   </div>
 </body>
 </html>`;
@@ -488,8 +487,12 @@ ${buildEmailSignature(siteUrl)}
  * @param reviewUrl - The personalised review link URL.
  * @returns HTML string ready to send.
  */
-export function buildPastClientReviewEmailHtml(firstName: string, reviewUrl: string): string {
+export async function buildPastClientReviewEmailHtml(
+  firstName: string,
+  reviewUrl: string,
+): Promise<string> {
   const siteUrl = getSiteUrl();
+  const identity = await getIdentity();
   const safeFirstName = escapeHtml(firstName);
   return `
 <!DOCTYPE html>
@@ -498,13 +501,13 @@ export function buildPastClientReviewEmailHtml(firstName: string, reviewUrl: str
 <body style="font-family:system-ui,sans-serif;background:#f6f7f8;margin:0;padding:24px">
   <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
     <h2 style="margin:0 0 12px;color:#0c0a3e;font-size:20px">Hi ${safeFirstName},</h2>
-    <p style="margin:0 0 12px;color:#444;line-height:1.6">It's ${BUSINESS.name.split(" ")[0]} from ${BUSINESS.company} Tech - thanks again for letting me help you out!</p>
+    <p style="margin:0 0 12px;color:#444;line-height:1.6">It's ${identity.name.split(" ")[0]} from ${identity.company} Tech - thanks again for letting me help you out!</p>
     <p style="margin:0 0 12px;color:#444;line-height:1.6">If you have a spare moment, a quick review would mean a lot - it really helps other people find reliable local tech support.</p>
     <p style="margin:0 0 24px;color:#444;line-height:1.6">No pressure at all, but if you're happy to, I'd really appreciate it.</p>
     <a href="${reviewUrl}" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:15px">Leave a review</a>
 
     <p style="margin:28px 0 20px;color:#444;font-size:14px;line-height:1.6">If you ever need a hand with anything else, don't hesitate to get in touch.</p>
-${buildEmailSignature(siteUrl)}
+${await buildEmailSignature(siteUrl)}
   </div>
 </body>
 </html>`;
@@ -528,7 +531,7 @@ export async function sendPastClientReviewRequest(booking: ReviewRequestData): P
 
   const reviewUrl = `${siteUrl}/review?token=${encodeURIComponent(booking.reviewToken)}`;
   const firstName = booking.name.split(" ")[0];
-  const html = buildPastClientReviewEmailHtml(firstName, reviewUrl);
+  const html = await buildPastClientReviewEmailHtml(firstName, reviewUrl);
 
   try {
     await getResend().emails.send({
@@ -577,13 +580,14 @@ interface BuildInvoiceEmailArgs {
  * @param args.customBody - Optional intro replacement (multi-line via pre-wrap).
  * @returns Subject + escaped HTML body.
  */
-export function buildInvoiceEmail({
+export async function buildInvoiceEmail({
   invoice,
   reviewUrl,
   greetingName,
   customBody,
-}: BuildInvoiceEmailArgs): { subject: string; html: string } {
+}: BuildInvoiceEmailArgs): Promise<{ subject: string; html: string }> {
   const siteUrl = getSiteUrl();
+  const identity = await getIdentity();
   const bodyText = (customBody ?? DEFAULT_INVOICE_EMAIL_BODY).trim();
   // pre-wrap preserves line breaks the operator typed; escape first so the
   // body can never inject markup.
@@ -605,7 +609,7 @@ export function buildInvoiceEmail({
     ? `<p style="margin:24px 0 0;font-size:14px;color:#555">If you've got a moment, I'd love to hear how it went: <a href="${escapeHtml(reviewUrl)}" style="color:#43bccd">share your experience</a>. Quick and anonymous if you prefer.</p>`
     : "";
 
-  const subject = `Your invoice from ${BUSINESS.company} (${invoice.number})`;
+  const subject = `Your invoice from ${identity.company} (${invoice.number})`;
   const html = `<!doctype html>
 <html lang="en">
 <head><meta charset="utf-8" /></head>
@@ -618,15 +622,15 @@ export function buildInvoiceEmail({
     <div style="margin:0 0 16px;padding:12px 16px;background:#f3f4f6;border-radius:8px;font-size:14px;color:#333">
       <p style="margin:0 0 4px"><strong>Invoice:</strong> ${safeNumber}</p>
       <p style="margin:0 0 4px"><strong>Total:</strong> ${totalLabel}</p>
-      <p style="margin:0"><strong>Due:</strong> ${dueDate} (${BUSINESS_PAYMENT_TERMS_DAYS} days from issue)</p>
+      <p style="margin:0"><strong>Due:</strong> ${dueDate} (${identity.paymentTermsDays} days from issue)</p>
     </div>
 
     ${driveLink}
 
     <p style="margin:0 0 8px;font-size:14px;color:#333"><strong>Bank transfer:</strong></p>
     <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#333">
-      Payee: ${escapeHtml(BUSINESS.name)}<br />
-      Account: <strong>${escapeHtml(BUSINESS_BANK_ACCOUNT)}</strong><br />
+      Payee: ${escapeHtml(identity.name)}<br />
+      Account: <strong>${escapeHtml(identity.bankAccount)}</strong><br />
       Reference: <strong>${safeNumber}</strong>
     </p>
 
@@ -634,7 +638,7 @@ export function buildInvoiceEmail({
 
     ${reviewLine}
 
-    ${buildEmailSignature(siteUrl)}
+    ${await buildEmailSignature(siteUrl)}
   </div>
 </body>
 </html>`;
@@ -678,7 +682,12 @@ export async function sendInvoiceEmail({
     return false;
   }
 
-  const { subject, html } = buildInvoiceEmail({ invoice, reviewUrl, greetingName, customBody });
+  const { subject, html } = await buildInvoiceEmail({
+    invoice,
+    reviewUrl,
+    greetingName,
+    customBody,
+  });
   try {
     await getResend().emails.send({
       from,
@@ -716,10 +725,14 @@ interface BuildVoidEmailArgs {
  * @param args.customBody - Optional override; falls back to DEFAULT_VOID_EMAIL_BODY.
  * @returns Subject + escaped HTML body.
  */
-export function buildVoidEmail({ invoice, greetingName, customBody }: BuildVoidEmailArgs): {
+export async function buildVoidEmail({
+  invoice,
+  greetingName,
+  customBody,
+}: BuildVoidEmailArgs): Promise<{
   subject: string;
   html: string;
-} {
+}> {
   const siteUrl = getSiteUrl();
   const bodyText = (customBody ?? DEFAULT_VOID_EMAIL_BODY).trim();
   const safeBody = escapeHtml(bodyText || DEFAULT_VOID_EMAIL_BODY);
@@ -749,7 +762,7 @@ export function buildVoidEmail({ invoice, greetingName, customBody }: BuildVoidE
 
     <p style="margin:0;font-size:14px;color:#333">Any questions, just reply.</p>
 
-    ${buildEmailSignature(siteUrl)}
+    ${await buildEmailSignature(siteUrl)}
   </div>
 </body>
 </html>`;
@@ -793,7 +806,7 @@ export async function sendVoidNotification({
     return false;
   }
 
-  const { subject, html } = buildVoidEmail({ invoice, greetingName, customBody });
+  const { subject, html } = await buildVoidEmail({ invoice, greetingName, customBody });
   try {
     // Resend SDK v3+ returns { data, error } instead of throwing on API-level
     // failures (invalid sender, rate limit, etc.). Check error explicitly so

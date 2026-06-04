@@ -34,7 +34,7 @@ export async function POST(
   const greetingName = typeof body.greetingName === "string" ? body.greetingName : undefined;
   const customBody = typeof body.customBody === "string" ? body.customBody : undefined;
 
-  const { subject, html } = buildVoidEmail({
+  const { subject, html } = await buildVoidEmail({
     invoice: {
       number: invoice.number,
       clientName: invoice.clientName,

@@ -29,7 +29,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     const firstName = name.trim().split(" ")[0];
-    const html = buildPastClientReviewEmailHtml(firstName, "#preview");
+    const html = await buildPastClientReviewEmailHtml(firstName, "#preview");
 
     return NextResponse.json({ ok: true, html });
   } catch (error) {
