@@ -13,6 +13,7 @@ import { NavBar } from "@/shared/components/NavBar";
 import { PromoBanner } from "@/shared/components/PromoBanner";
 import { getSiteUrl } from "@/shared/lib/site-url";
 import { getSettings } from "@/shared/lib/settings/get-settings";
+import { getPublicPricing } from "@/features/business/lib/pricing-policy.server";
 
 const exo = Exo({
   subsets: ["latin"],
@@ -157,8 +158,12 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>): Promise<React.ReactElement> {
-  // Live identity + weekly hours so the JSON-LD never drifts from the settings.
+  // Live identity + weekly hours + rates so the JSON-LD never drifts from the
+  // settings or the rate config.
   const { availability, identity } = await getSettings();
+  const pricing = await getPublicPricing();
+  // schema.org telephone, derived from the editable tel: link (strip the scheme).
+  const telephone = identity.phoneTel.replace(/^tel:/, "");
   const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
   const openingHoursSpecification = [1, 2, 3, 4, 5, 6, 0]
     .filter((d) => availability.schedule[d]?.enabled)
@@ -225,9 +230,9 @@ export default async function RootLayout({
     description:
       "Friendly computer and IT support across Auckland. On-site and remote help with PCs, Macs, Wi-Fi, phones, printers, smart TVs, and small-business IT. Same-day, evening and weekend appointments.",
     slogan: "Clear explanations, no jargon, solutions that actually work.",
-    telephone: "+64-21-297-1237",
+    telephone,
     email: identity.email,
-    founder: { "@type": "Person", name: "Harrison Raynes" },
+    founder: { "@type": "Person", name: identity.name },
     address: {
       "@type": "PostalAddress",
       addressLocality: identity.baseAddress.locality,
@@ -261,14 +266,14 @@ export default async function RootLayout({
     contactPoint: [
       {
         "@type": "ContactPoint",
-        telephone: "+64-21-297-1237",
+        telephone,
         email: identity.email,
         contactType: "customer support",
         areaServed: "NZ",
         availableLanguage: ["English"],
       },
     ],
-    priceRange: "NZ$65 - NZ$85 per hour",
+    priceRange: `NZ$${pricing.baseRate} - NZ$${pricing.complexRate} per hour`,
     paymentAccepted: ["Cash", "Bank Transfer"],
     currenciesAccepted: "NZD",
     knowsAbout: [
@@ -357,7 +362,7 @@ export default async function RootLayout({
         priceCurrency: "NZD",
         priceSpecification: {
           "@type": "UnitPriceSpecification",
-          price: 65,
+          price: pricing.baseRate,
           priceCurrency: "NZD",
           unitCode: "HUR",
         },
