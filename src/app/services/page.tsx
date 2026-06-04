@@ -11,6 +11,7 @@ import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
 import { Button } from "@/shared/components/Button";
 import { cn } from "@/shared/lib/cn";
 import { getSiteUrl } from "@/shared/lib/site-url";
+import { getPublicPricing } from "@/features/business/lib/pricing-policy.server";
 
 export const metadata: Metadata = {
   title: "Tech Support Services - Computers, Wi-Fi, Phones & More",
@@ -126,7 +127,8 @@ const siteUrl = getSiteUrl();
  * Services page component
  * @returns Services page element
  */
-export default function ServicesPage(): React.ReactElement {
+export default async function ServicesPage(): Promise<React.ReactElement> {
+  const pricing = await getPublicPricing();
   const servicesJsonLd = {
     "@context": "https://schema.org",
     "@type": "ItemList",
@@ -146,7 +148,7 @@ export default function ServicesPage(): React.ReactElement {
           priceCurrency: "NZD",
           priceSpecification: {
             "@type": "UnitPriceSpecification",
-            price: 65,
+            price: pricing.baseRate,
             priceCurrency: "NZD",
             unitCode: "HUR",
           },
