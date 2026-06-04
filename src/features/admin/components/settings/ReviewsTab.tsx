@@ -13,6 +13,7 @@ import { REVIEWS_FIELD_META } from "@/shared/lib/settings/field-meta";
 import type { ReviewsSettings } from "@/shared/lib/settings/types";
 import { NumberField, ToggleField } from "@/features/admin/components/settings/SettingsFields";
 import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
+import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
 
 interface Props {
   initial: ReviewsSettings;
@@ -108,6 +109,8 @@ export function ReviewsTab({ initial, defaults }: Props): React.ReactElement {
           <span className={cn("text-sm font-medium text-emerald-600")}>Saved</span>
         )}
       </div>
+
+      <SettingsHistory group="reviews" onRestore={(v: ReviewsSettings) => setDraft(v)} />
     </div>
   );
 }

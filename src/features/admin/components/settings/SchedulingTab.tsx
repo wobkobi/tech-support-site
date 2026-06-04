@@ -14,6 +14,7 @@ import { SCHEDULING_FIELD_META } from "@/shared/lib/settings/field-meta";
 import type { SchedulingSettings } from "@/shared/lib/settings/types";
 import { NumberField } from "@/features/admin/components/settings/SettingsFields";
 import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
+import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
 
 interface Props {
   initial: SchedulingSettings;
@@ -126,6 +127,8 @@ export function SchedulingTab({ initial, defaults }: Props): React.ReactElement 
           <span className={cn("text-sm font-medium text-emerald-600")}>Saved</span>
         )}
       </div>
+
+      <SettingsHistory group="scheduling" onRestore={(v: SchedulingSettings) => setDraft(v)} />
     </div>
   );
 }

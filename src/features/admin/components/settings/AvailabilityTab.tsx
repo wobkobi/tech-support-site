@@ -20,6 +20,7 @@ import {
   FieldShell,
 } from "@/features/admin/components/settings/SettingsFields";
 import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
+import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
 
 interface Props {
   initial: AvailabilitySettings;
@@ -401,6 +402,8 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
           <span className={cn("text-sm font-medium text-emerald-600")}>Saved</span>
         )}
       </div>
+
+      <SettingsHistory group="availability" onRestore={(v: AvailabilitySettings) => setDraft(v)} />
     </div>
   );
 }

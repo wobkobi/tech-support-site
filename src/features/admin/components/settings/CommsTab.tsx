@@ -14,6 +14,7 @@ import { COMMS_FIELD_META } from "@/shared/lib/settings/field-meta";
 import type { CommsSettings } from "@/shared/lib/settings/types";
 import { NumberField, ToggleField } from "@/features/admin/components/settings/SettingsFields";
 import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
+import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
 
 interface Props {
   initial: CommsSettings;
@@ -131,6 +132,8 @@ export function CommsTab({ initial, defaults }: Props): React.ReactElement {
           <span className={cn("text-sm font-medium text-emerald-600")}>Saved</span>
         )}
       </div>
+
+      <SettingsHistory group="comms" onRestore={(v: CommsSettings) => setDraft(v)} />
     </div>
   );
 }
