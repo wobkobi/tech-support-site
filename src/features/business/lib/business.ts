@@ -434,13 +434,6 @@ export interface JobPricing {
   billingIncrementMins: number;
 }
 
-/** Code-default pricing used when calcJobTotal isn't given live values. */
-const DEFAULT_JOB_PRICING: JobPricing = {
-  gstRegistered: GST_REGISTERED,
-  minTravelCharge: MIN_TRAVEL_CHARGE,
-  billingIncrementMins: BILLING_INCREMENT_MINS,
-};
-
 /**
  * Promo discount on a job's labor only (time charge + hourly tasks).
  * @param job - Job calculation.
@@ -500,7 +493,13 @@ export function computeJobPromoDiscount(
 export function calcJobTotal(
   job: JobCalculation,
   promo: JobPromo | null = null,
-  pricing: JobPricing = DEFAULT_JOB_PRICING,
+  // Default built lazily (call-time, not module-eval) so reading the consts
+  // here can't trip the business.ts <-> pricing-policy.ts circular-import TDZ.
+  pricing: JobPricing = {
+    gstRegistered: GST_REGISTERED,
+    minTravelCharge: MIN_TRAVEL_CHARGE,
+    billingIncrementMins: BILLING_INCREMENT_MINS,
+  },
 ): {
   timeCharge: number;
   tasksTotal: number;
