@@ -353,7 +353,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
   const [showRates, setShowRates] = useState(false);
   const [rateForm, setRateForm] = useState({
     label: "",
-    type: "hourly" as "flat" | "hourly" | "modifier",
+    type: "hourly" as "flat" | "hourly" | "modifier" | "percent",
     amount: "",
     unit: "hour",
     isDefault: false,
@@ -1046,9 +1046,14 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
    * @param r - The rate configuration to edit.
    */
   function handleStartEdit(r: RateConfig): void {
-    const isModifier = r.hourlyDelta !== null || r.percentDelta !== null;
-    const type: "hourly" | "modifier" | "flat" =
-      r.ratePerHour !== null ? "hourly" : isModifier ? "modifier" : "flat";
+    const type: "hourly" | "modifier" | "flat" | "percent" =
+      r.ratePerHour !== null
+        ? "hourly"
+        : r.percentDelta !== null
+          ? "percent"
+          : r.hourlyDelta !== null
+            ? "modifier"
+            : "flat";
     const modifierAmount = r.percentDelta !== null ? r.percentDelta * 100 : r.hourlyDelta;
     setEditingRateId(r.id);
     setRateForm({
@@ -1171,7 +1176,10 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
       ratePerHour: rateForm.type === "hourly" ? amount : null,
       flatRate: rateForm.type === "flat" ? amount : null,
       hourlyDelta: rateForm.type === "modifier" ? amount : null,
-      unit: rateForm.type === "modifier" ? "modifier" : rateForm.unit,
+      // Percent modifiers store a fraction (25 entered -> 0.25).
+      percentDelta: rateForm.type === "percent" ? amount / 100 : null,
+      unit:
+        rateForm.type === "modifier" || rateForm.type === "percent" ? "modifier" : rateForm.unit,
       isDefault: rateForm.type === "hourly" ? rateForm.isDefault : false,
     };
 

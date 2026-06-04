@@ -5,7 +5,7 @@ import { FaCheck } from "react-icons/fa6";
 import { cn } from "@/shared/lib/cn";
 import type { RateConfig } from "@/features/business/types/business";
 
-type RateType = "flat" | "hourly" | "modifier";
+type RateType = "flat" | "hourly" | "modifier" | "percent";
 
 export interface RateFormState {
   label: string;
@@ -101,7 +101,9 @@ export function RateConfigPanel({
                       ? `${r.hourlyDelta < 0 ? "-" : "+"}$${Math.abs(r.hourlyDelta)}/hr`
                       : r.flatRate !== null
                         ? `$${r.flatRate}`
-                        : "-"}
+                        : r.percentDelta !== null
+                          ? `${r.percentDelta < 0 ? "-" : "+"}${Math.round(r.percentDelta * 100)}%`
+                          : "-"}
                   {r.unit && <span className={cn("ml-2 text-slate-400")}>{r.unit}</span>}
                 </p>
               </div>
@@ -146,7 +148,9 @@ export function RateConfigPanel({
                     ? `${r.hourlyDelta < 0 ? "-" : "+"}$${Math.abs(r.hourlyDelta)}/hr`
                     : r.flatRate !== null
                       ? `$${r.flatRate}`
-                      : "-"}
+                      : r.percentDelta !== null
+                        ? `${r.percentDelta < 0 ? "-" : "+"}${Math.round(r.percentDelta * 100)}%`
+                        : "-"}
               </td>
               <td className={cn("py-1.5 text-slate-400")}>{r.unit}</td>
               <td className={cn("py-1.5")}>
@@ -197,17 +201,24 @@ export function RateConfigPanel({
           )}
         >
           <option value="hourly">Hourly base</option>
-          <option value="modifier">Modifier (+/-)</option>
+          <option value="modifier">Modifier ($)</option>
+          <option value="percent">Modifier (%)</option>
           <option value="flat">Flat</option>
         </select>
         <input
           type="number"
-          placeholder={form.type === "modifier" ? "Delta (+/-)" : "Amount"}
+          placeholder={
+            form.type === "modifier"
+              ? "Delta $ (+/-)"
+              : form.type === "percent"
+                ? "Percent (+/-)"
+                : "Amount"
+          }
           required
           step="0.01"
-          // Modifier rates carry a signed delta added to the base $/hr
-          // (e.g. -10 for At home). Flat and hourly rates must be >= 0.
-          min={form.type === "modifier" ? undefined : 0}
+          // Modifier rates carry a signed delta ($ or %) applied to the base
+          // (e.g. -10 for At home, +25 for a holiday). Flat/hourly must be >= 0.
+          min={form.type === "modifier" || form.type === "percent" ? undefined : 0}
           value={form.amount}
           onChange={(e) => onFormChange((p) => ({ ...p, amount: e.target.value }))}
           className={cn(
