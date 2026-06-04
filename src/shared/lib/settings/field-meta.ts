@@ -372,3 +372,15 @@ export const PRICING_FIELD_META: Record<string, FieldMeta> = {
     off: "Leave blank for no limit.",
   },
 };
+
+/** Per-group field metadata, keyed by group - powers the settings search. */
+export const FIELD_META_BY_GROUP: Record<SettingsGroup, Record<string, FieldMeta>> = {
+  availability: AVAILABILITY_FIELD_META,
+  pricing: PRICING_FIELD_META,
+  identity: IDENTITY_FIELD_META,
+  tax: TAX_FIELD_META,
+  comms: COMMS_FIELD_META,
+  holds: HOLDS_FIELD_META,
+  scheduling: SCHEDULING_FIELD_META,
+  reviews: REVIEWS_FIELD_META,
+};

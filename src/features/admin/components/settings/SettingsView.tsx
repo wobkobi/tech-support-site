@@ -7,7 +7,7 @@
  * built show a placeholder noting they're still managed in code.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type React from "react";
 import { cn } from "@/shared/lib/cn";
 import { GROUP_META } from "@/shared/lib/settings/field-meta";
@@ -30,6 +30,7 @@ import { HoldsTab } from "@/features/admin/components/settings/HoldsTab";
 import { IdentityTab } from "@/features/admin/components/settings/IdentityTab";
 import { TaxTab } from "@/features/admin/components/settings/TaxTab";
 import { SchedulingTab } from "@/features/admin/components/settings/SchedulingTab";
+import { SettingsSearch } from "@/features/admin/components/settings/SettingsSearch";
 
 /** Tab order shown in the settings bar. */
 const TAB_ORDER: SettingsGroup[] = [
@@ -114,10 +115,38 @@ export function SettingsView({
   schedulingDefaults,
 }: Props): React.ReactElement {
   const [active, setActive] = useState<SettingsGroup>("availability");
+  const [focusTarget, setFocusTarget] = useState<{ id: string; nonce: number } | null>(null);
   const meta = GROUP_META[active];
+
+  /**
+   * Jumps to a field from search: switches to its tab and queues a focus.
+   * @param group - Target settings group.
+   * @param fieldKey - Field id to focus once the tab has rendered.
+   */
+  const handleJump = (group: SettingsGroup, fieldKey: string): void => {
+    setActive(group);
+    setFocusTarget({ id: fieldKey, nonce: Date.now() });
+  };
+
+  // After a search jump, scroll the target field into view + focus it once the
+  // (possibly just-switched) tab has rendered. Field id === meta key for most
+  // fields; nested keys gracefully fall back to just the tab switch.
+  useEffect(() => {
+    if (!focusTarget) return;
+    const t = setTimeout(() => {
+      const el = document.getElementById(focusTarget.id);
+      if (el) {
+        el.scrollIntoView({ block: "center", behavior: "smooth" });
+        el.focus();
+      }
+    }, 60);
+    return () => clearTimeout(t);
+  }, [focusTarget]);
 
   return (
     <div>
+      <SettingsSearch onJump={handleJump} />
+
       {/* Tab bar - horizontally scrollable on phones. */}
       <div className={cn("mb-6 flex gap-1 overflow-x-auto border-b border-slate-200")}>
         {TAB_ORDER.map((group) => {
