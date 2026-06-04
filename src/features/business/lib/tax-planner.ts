@@ -13,9 +13,9 @@
 
 /**
  * Re-exported from pricing-policy.ts so the planner and the invoice engine
- * share one source of truth for GST registration. Flip the flag in
- * pricing-policy.ts when registered (and set the BUSINESS_GST_NUMBER env var
- * alongside it - the invoice header keys on the env var).
+ * share one source of truth for GST registration. The live value comes from
+ * the pricing settings (gstRegistered); set the GST number in the identity
+ * settings alongside it - the invoice header keys on that.
  */
 export { GST_REGISTERED } from "@/features/business/lib/pricing-policy";
 

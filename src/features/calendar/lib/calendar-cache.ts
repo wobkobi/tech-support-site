@@ -128,7 +128,8 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
   const maxDate = new Date(now.getTime() + BOOKING_CONFIG.maxAdvanceDays * 24 * 60 * 60 * 1000);
 
   // Advanced travel-engine buffers (defaults preserve the previous constants).
-  const scheduling = (await getSettings()).scheduling;
+  const settings = await getSettings();
+  const scheduling = settings.scheduling;
   /**
    * Rounds raw travel minutes using the live travel-round buffer.
    * @param raw - Raw travel minutes.
@@ -220,10 +221,11 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
     `[refreshCalendarCache] Cached ${upsertPromises.length} events (${ignoredKeys.size} ignored), deleted ${deleteResult.count} expired entries`,
   );
 
-  // Travel Block Management
-  const homeAddress = process.env.HOME_ADDRESS;
+  // Travel Block Management. Origin is the unified base address (settings),
+  // falling back to the HOME_ADDRESS env until that var is retired.
+  const homeAddress = settings.identity.baseAddress.line || process.env.HOME_ADDRESS;
   if (!homeAddress) {
-    console.warn("[refreshCalendarCache] HOME_ADDRESS not set - skipping travel blocks");
+    console.warn("[refreshCalendarCache] No base address set - skipping travel blocks");
     return { cachedCount: rawEvents.length, deletedCount: deleteResult.count };
   }
 

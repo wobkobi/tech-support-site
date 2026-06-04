@@ -24,8 +24,9 @@ export const GST_RATE = 0.15;
  * When false (today) every invoice prints with no GST line. When flipped to
  * true (future, once registration crosses the $60k threshold) displayed
  * rates are treated as GST-inclusive; the invoice shows an "Includes GST of
- * $X" line via back-calc. Flip this single flag and also set the
- * BUSINESS_GST_NUMBER env var so the invoice header switches to "TAX INVOICE".
+ * $X" line via back-calc. The live flag comes from the pricing settings; set
+ * the GST number in the identity settings so the invoice header switches to
+ * "TAX INVOICE".
  */
 export const GST_REGISTERED = false;
 
