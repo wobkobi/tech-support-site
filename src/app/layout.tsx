@@ -12,6 +12,7 @@ import "./globals.css";
 import { NavBar } from "@/shared/components/NavBar";
 import { PromoBanner } from "@/shared/components/PromoBanner";
 import { getSiteUrl } from "@/shared/lib/site-url";
+import { getSettings } from "@/shared/lib/settings/get-settings";
 
 const exo = Exo({
   subsets: ["latin"],
@@ -151,11 +152,22 @@ export const viewport: Viewport = {
  * @param props.children - Content to render inside the layout.
  * @returns The RootLayout wrapper element.
  */
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
-}>): React.ReactElement {
+}>): Promise<React.ReactElement> {
+  // Live identity + weekly hours so the JSON-LD never drifts from the settings.
+  const { availability, identity } = await getSettings();
+  const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const openingHoursSpecification = [1, 2, 3, 4, 5, 6, 0]
+    .filter((d) => availability.schedule[d]?.enabled)
+    .map((d) => ({
+      "@type": "OpeningHoursSpecification",
+      dayOfWeek: dayNames[d],
+      opens: `${String(availability.schedule[d].open).padStart(2, "0")}:00`,
+      closes: `${String(availability.schedule[d].close).padStart(2, "0")}:00`,
+    }));
   const servedSuburbs = [
     "Auckland Central",
     "Auckland CBD",
@@ -214,19 +226,19 @@ export default function RootLayout({
       "Friendly computer and IT support across Auckland. On-site and remote help with PCs, Macs, Wi-Fi, phones, printers, smart TVs, and small-business IT. Same-day, evening and weekend appointments.",
     slogan: "Clear explanations, no jargon, solutions that actually work.",
     telephone: "+64-21-297-1237",
-    email: "harrison@tothepoint.co.nz",
+    email: identity.email,
     founder: { "@type": "Person", name: "Harrison Raynes" },
     address: {
       "@type": "PostalAddress",
-      addressLocality: "Point Chevalier",
+      addressLocality: identity.baseAddress.locality,
       addressRegion: "Auckland",
-      postalCode: "1022",
+      postalCode: identity.baseAddress.postcode,
       addressCountry: "NZ",
     },
     geo: {
       "@type": "GeoCoordinates",
-      latitude: -36.8717,
-      longitude: 174.7185,
+      latitude: identity.baseAddress.lat ?? -36.8717,
+      longitude: identity.baseAddress.lng ?? 174.7185,
     },
     areaServed: [
       {
@@ -245,19 +257,12 @@ export default function RootLayout({
       geoMidpoint: { "@type": "GeoCoordinates", latitude: -36.8717, longitude: 174.7185 },
       geoRadius: "15000",
     },
-    openingHoursSpecification: [
-      {
-        "@type": "OpeningHoursSpecification",
-        dayOfWeek: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
-        opens: "10:00",
-        closes: "18:00",
-      },
-    ],
+    openingHoursSpecification,
     contactPoint: [
       {
         "@type": "ContactPoint",
         telephone: "+64-21-297-1237",
-        email: "harrison@tothepoint.co.nz",
+        email: identity.email,
         contactType: "customer support",
         areaServed: "NZ",
         availableLanguage: ["English"],
