@@ -1,0 +1,13 @@
+// scripts/tsconfig.json
+// Standalone programme for the one-off Node scripts (run via tsx). They live
+// outside the app's tsconfig `include`, so this config gives them their own
+// type-checking context with the Node globals (`process`, etc.) loaded. The
+// app build is unaffected - `next build` and the root `tsc` still use
+// ../tsconfig.json, which excludes this folder.
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": ["**/*.ts"]
+}

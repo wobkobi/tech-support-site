@@ -1,6 +1,6 @@
 {
   "name": "tech-support-site",
-  "version": "1.85.0",
+  "version": "1.86.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -15,7 +15,8 @@
     "build:icons": "tsx scripts/build-icons/index.ts",
     "build:poster": "npx tsx scripts/export-poster-screenshot.ts",
     "build:all": "npm run build:icons && npm run build",
-    "smoke": "dotenv -e .env.local -- tsx scripts/smoke-test.ts"
+    "smoke": "dotenv -e .env.local -- tsx scripts/smoke-test.ts",
+    "settings:seed": "dotenv -e .env.local -- tsx scripts/seed-settings.ts"
   },
   "dependencies": {
     "@swc/helpers": "^0.5.23",
