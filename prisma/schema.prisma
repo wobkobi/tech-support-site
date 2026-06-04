@@ -109,6 +109,10 @@ model Booking {
   bufferBeforeMin Int @default(0)
   bufferAfterMin  Int @default(0)
 
+  // How many times this booking has been rescheduled via /booking/edit; gates
+  // the optional max-reschedules pricing setting.
+  rescheduleCount Int @default(0)
+
   // Booking lifecycle state and hold expiry.
   status        BookingStatus @default(confirmed)
   holdExpiresAt DateTime?

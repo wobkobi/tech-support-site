@@ -16,6 +16,7 @@ import {
   type ExistingBooking,
 } from "@/features/booking/lib/booking";
 import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
+import { getSettings } from "@/shared/lib/settings/get-settings";
 import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 import {
   createBookingEvent,
@@ -94,6 +95,34 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     const now = new Date();
+
+    // Reschedule policy gate (cutoff + max-reschedules) from the live pricing
+    // settings. 0 / null means the rule is off.
+    const { reschedule } = (await getSettings()).pricing;
+    const hoursUntilStart = (booking.startAt.getTime() - now.getTime()) / 3_600_000;
+    if (reschedule.cutoffHours > 0 && hoursUntilStart < reschedule.cutoffHours) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `Bookings can't be changed within ${reschedule.cutoffHours} hours of the appointment. Please call or text me and I'll sort it.`,
+        },
+        { status: 400 },
+      );
+    }
+    if (
+      reschedule.maxReschedules !== null &&
+      booking.rescheduleCount >= reschedule.maxReschedules
+    ) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "This booking has already been changed the maximum number of times. Please call or text me to reschedule.",
+        },
+        { status: 400 },
+      );
+    }
+
     // Editing an existing booking stays open even when new-booking intake is
     // paused; only the day's schedule + windows gate the new time.
     const { config } = await getAvailabilityConfig();
@@ -233,6 +262,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           calendarEventId,
           activeSlotKey: startAt.toISOString(),
           bufferAfterMin: config.bookingBufferAfterMin,
+          rescheduleCount: { increment: 1 },
           ...(phoneE164 !== undefined ? { phone: phoneE164 } : {}),
         },
       });
