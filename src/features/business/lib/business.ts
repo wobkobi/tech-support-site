@@ -162,7 +162,10 @@ export function hourlyTaskMinutes(tasks: TaskLine[]): number {
 
 /** Minimum minutes a task can shrink to before it's dropped as descriptive noise. */
 const MIN_TASK_MINUTES = 5;
-/** Rounding granularity for task qty after rebalancing (5-min steps). */
+// Rounding granularity for AI-parsed task qty after rebalancing. Mirrors the
+// pricing billing increment's default (5) but stays an independent literal: it
+// is an internal AI-parse detail, and referencing BILLING_INCREMENT_MINS here
+// would re-introduce the business.ts <-> pricing-policy.ts circular-import TDZ.
 const TASK_QTY_SNAP_MIN = 5;
 /** Minutes every isShort task is pinned to. Matches the AI's 0.25h SHORT-set assignment. */
 const SHORT_TASK_MINUTES = 15;
