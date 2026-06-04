@@ -17,7 +17,7 @@ import {
   todayISO,
 } from "@/features/business/lib/business";
 import { calcTravelCharge } from "@/features/business/lib/pricing-policy";
-import { BUSINESS_PAYMENT_TERMS_DAYS } from "@/shared/lib/business-identity";
+import type { IdentitySettings } from "@/shared/lib/settings/types";
 import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 import { AddToContactsModal } from "@/features/business/components/AddToContactsModal";
 import { ParseConfidenceBanner } from "@/features/business/components/ParseConfidenceBanner";
@@ -245,12 +245,19 @@ function emptyTask(rates: RateConfig[]): TaskLine {
   };
 }
 
+interface CalculatorViewProps {
+  /** Live business identity, threaded into the invoice preview. */
+  identity: IdentitySettings;
+}
+
 /**
  * Interactive job calculator that lets an admin build a job quote using AI parsing, time tracking,
  * tasks, parts, and client details, then save it as income or convert it to an invoice.
+ * @param props - Component props.
+ * @param props.identity - Live business identity for the invoice preview.
  * @returns The rendered calculator view element.
  */
-export function CalculatorView(): React.ReactElement {
+export function CalculatorView({ identity }: CalculatorViewProps): React.ReactElement {
   const router = useRouter();
   const headers = {};
 
@@ -1616,11 +1623,12 @@ export function CalculatorView(): React.ReactElement {
           {/* Invoice preview - below the CTAs so the Save invoice button is
               always reachable without scrolling past the full A4 render. */}
           <InvoicePreviewPanel
+            identity={identity}
             number="DRAFT"
             clientName={clientName}
             clientEmail={clientEmail}
             issueDate={todayISO()}
-            dueDate={addDaysISO(BUSINESS_PAYMENT_TERMS_DAYS)}
+            dueDate={addDaysISO(identity.paymentTermsDays)}
             lineItems={previewLineItems}
             notes={notes}
             unsuccessfulDiscount={totals.unsuccessfulDiscount}

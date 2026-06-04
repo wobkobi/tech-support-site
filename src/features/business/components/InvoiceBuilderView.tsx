@@ -10,7 +10,7 @@ import { AddToContactsModal } from "@/features/business/components/AddToContacts
 import { InvoicePreviewPanel } from "@/features/business/components/InvoicePreviewPanel";
 import { EmailInput } from "@/shared/components/EmailInput";
 import type { LineItem, GoogleContact } from "@/features/business/types/business";
-import { BUSINESS_PAYMENT_TERMS_DAYS } from "@/shared/lib/business-identity";
+import type { IdentitySettings } from "@/shared/lib/settings/types";
 
 /**
  * Returns a date string (YYYY-MM-DD) for the date that is n days from today.
@@ -76,14 +76,17 @@ export interface InvoiceBuilderEditPayload {
 /**
  * Invoice builder view with a live preview panel.
  * @param props - Component props
+ * @param props.identity - Live business identity for the preview + default due date.
  * @param props.editInvoice - When set, the builder runs in edit mode: form is
  *   pre-populated from this payload, the next-invoice-number prefetch is
  *   skipped, and Save PATCHes the existing row instead of creating a new one.
  * @returns Invoice builder element
  */
 export function InvoiceBuilderView({
+  identity,
   editInvoice,
 }: {
+  identity: IdentitySettings;
   editInvoice?: InvoiceBuilderEditPayload;
 }): React.ReactElement {
   const router = useRouter();
@@ -136,7 +139,7 @@ export function InvoiceBuilderView({
     return {
       number: "",
       issueDate: todayISO(),
-      dueDate: inDays(BUSINESS_PAYMENT_TERMS_DAYS),
+      dueDate: inDays(identity.paymentTermsDays),
       clientName,
       clientEmail,
       lineItems: clientName || clientEmail || rawItems ? lineItems : [emptyLine()],
@@ -584,6 +587,7 @@ export function InvoiceBuilderView({
             Extracted into InvoicePreviewPanel so the calculator's right
             column can share the exact same layout. */}
         <InvoicePreviewPanel
+          identity={identity}
           number={form.number || "DRAFT"}
           clientName={form.clientName}
           clientEmail={form.clientEmail}
