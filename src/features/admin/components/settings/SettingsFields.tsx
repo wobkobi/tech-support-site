@@ -9,6 +9,7 @@
  */
 
 import type React from "react";
+import { useState } from "react";
 import { cn } from "@/shared/lib/cn";
 import type { FieldMeta } from "@/shared/lib/settings/field-meta";
 
@@ -130,6 +131,93 @@ export function NumberField({
         />
         {meta.unit && <span className={cn("text-sm text-slate-500")}>{meta.unit}</span>}
       </div>
+    </FieldShell>
+  );
+}
+
+interface TextFieldProps {
+  id: string;
+  meta: FieldMeta;
+  value: string;
+  onChange: (value: string) => void;
+  /** Mask the value with a reveal toggle (bank account, GST number). */
+  secret?: boolean;
+  /** Render a multi-line textarea instead of a single-line input. */
+  multiline?: boolean;
+  /** HTML input type for single-line fields. */
+  type?: "text" | "email" | "tel" | "url" | "date";
+  placeholder?: string;
+  error?: string;
+  customised?: boolean;
+}
+
+/**
+ * Text settings input. Supports masked secrets (with a show/hide toggle) and a
+ * multi-line variant.
+ * @param props - Component props.
+ * @param props.id - Input id.
+ * @param props.meta - Field metadata.
+ * @param props.value - Current text value.
+ * @param props.onChange - Called with the new text.
+ * @param props.secret - Whether to mask the value behind a reveal toggle.
+ * @param props.multiline - Whether to render a textarea.
+ * @param props.type - HTML input type for single-line fields.
+ * @param props.placeholder - Input placeholder.
+ * @param props.error - Inline validation error.
+ * @param props.customised - Whether the value differs from default.
+ * @returns Text field element.
+ */
+export function TextField({
+  id,
+  meta,
+  value,
+  onChange,
+  secret,
+  multiline,
+  type,
+  placeholder,
+  error,
+  customised,
+}: TextFieldProps): React.ReactElement {
+  const [revealed, setRevealed] = useState(false);
+  const inputClass = cn(
+    "focus:ring-russian-violet/30 w-full rounded-lg border px-3 py-2.5 text-base focus:outline-none focus:ring-2",
+    error ? "border-red-400" : "border-slate-300",
+  );
+  return (
+    <FieldShell id={id} meta={meta} error={error} customised={customised}>
+      {multiline ? (
+        <textarea
+          id={id}
+          value={value}
+          rows={2}
+          placeholder={placeholder}
+          onChange={(e) => onChange(e.target.value)}
+          className={inputClass}
+        />
+      ) : (
+        <div className={cn("flex items-center gap-2")}>
+          <input
+            id={id}
+            type={secret && !revealed ? "password" : (type ?? "text")}
+            value={value}
+            placeholder={placeholder}
+            onChange={(e) => onChange(e.target.value)}
+            className={inputClass}
+          />
+          {secret && (
+            <button
+              type="button"
+              onClick={() => setRevealed((r) => !r)}
+              className={cn(
+                "shrink-0 rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-600 hover:bg-slate-50",
+              )}
+            >
+              {revealed ? "Hide" : "Show"}
+            </button>
+          )}
+        </div>
+      )}
     </FieldShell>
   );
 }

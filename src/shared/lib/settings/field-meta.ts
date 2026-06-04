@@ -170,6 +170,76 @@ export const REVIEWS_FIELD_META: Record<string, FieldMeta> = {
   },
 };
 
+/** Field metadata for the business identity group, keyed by dotted path. */
+export const IDENTITY_FIELD_META: Record<string, FieldMeta> = {
+  name: { title: "Operator name", description: "Your name, shown in emails and on invoices." },
+  company: {
+    title: "Business name",
+    description: "Trading name shown across the site and invoices.",
+  },
+  email: { title: "Contact email", description: "Customer-facing email address." },
+  phone: {
+    title: "Phone (display)",
+    description: "Phone number as shown to customers, e.g. 021 297 1237.",
+  },
+  phoneTel: {
+    title: "Phone (tel: link)",
+    description: "Phone for click-to-call links, e.g. tel:+64212971237.",
+  },
+  website: { title: "Website", description: "Public website, no scheme (e.g. tothepoint.co.nz)." },
+  location: {
+    title: "Location",
+    description: "Locality shown in email signatures (e.g. Auckland, New Zealand).",
+  },
+  "baseAddress.line": {
+    title: "Base address",
+    description: "Your home/base street address - the origin every travel charge is measured from.",
+  },
+  "baseAddress.locality": {
+    title: "Suburb / locality",
+    description: "Suburb used in the business address.",
+  },
+  "baseAddress.postcode": {
+    title: "Postcode",
+    description: "Postcode used in the business address.",
+  },
+  "baseAddress.lat": {
+    title: "Latitude",
+    description: "Map latitude for the business location (SEO).",
+  },
+  "baseAddress.lng": {
+    title: "Longitude",
+    description: "Map longitude for the business location (SEO).",
+  },
+  paymentTermsDays: {
+    title: "Payment terms",
+    description: "Days from issue until an invoice is due.",
+    unit: "days",
+  },
+  startDateIso: {
+    title: "Business start date",
+    description:
+      "When the business started operating; used to label the first (partial) financial year.",
+  },
+  gstNumber: {
+    title: "GST number",
+    description:
+      "Your IRD GST number. Shown on tax invoices once GST-registered. Leave blank if not registered.",
+  },
+  bankAccount: {
+    title: "Bank account",
+    description: "Account number shown on invoices for payment.",
+  },
+  invoicePrefix: {
+    title: "Invoice prefix",
+    description: "Prefix for invoice numbers (e.g. TTP in TTP-2627-0001).",
+  },
+  homeRegion: {
+    title: "Home region",
+    description: "Your region for the regional anniversary public holiday (e.g. Auckland).",
+  },
+};
+
 /** Field metadata for the booking form & holds group, keyed by field name. */
 export const HOLDS_FIELD_META: Record<string, FieldMeta> = {
   holdExpirationMinutes: {

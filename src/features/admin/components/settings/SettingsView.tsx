@@ -15,6 +15,7 @@ import type {
   AvailabilitySettings,
   CommsSettings,
   HoldsSettings,
+  IdentitySettings,
   PricingSettings,
   ReviewsSettings,
   SettingsGroup,
@@ -24,6 +25,7 @@ import { AvailabilityTab } from "@/features/admin/components/settings/Availabili
 import { CommsTab } from "@/features/admin/components/settings/CommsTab";
 import { ReviewsTab } from "@/features/admin/components/settings/ReviewsTab";
 import { HoldsTab } from "@/features/admin/components/settings/HoldsTab";
+import { IdentityTab } from "@/features/admin/components/settings/IdentityTab";
 
 /** Tab order shown in the settings bar. */
 const TAB_ORDER: SettingsGroup[] = [
@@ -41,6 +43,7 @@ const TAB_ORDER: SettingsGroup[] = [
 const IMPLEMENTED: ReadonlySet<SettingsGroup> = new Set<SettingsGroup>([
   "availability",
   "pricing",
+  "identity",
   "comms",
   "reviews",
   "holds",
@@ -57,6 +60,8 @@ interface Props {
   reviewsDefaults: ReviewsSettings;
   holds: HoldsSettings;
   holdsDefaults: HoldsSettings;
+  identity: IdentitySettings;
+  identityDefaults: IdentitySettings;
 }
 
 /**
@@ -72,6 +77,8 @@ interface Props {
  * @param props.reviewsDefaults - Code default reviews settings.
  * @param props.holds - Resolved current holds settings.
  * @param props.holdsDefaults - Code default holds settings.
+ * @param props.identity - Resolved current identity settings.
+ * @param props.identityDefaults - Code default identity settings.
  * @returns Settings view element.
  */
 export function SettingsView({
@@ -85,6 +92,8 @@ export function SettingsView({
   reviewsDefaults,
   holds,
   holdsDefaults,
+  identity,
+  identityDefaults,
 }: Props): React.ReactElement {
   const [active, setActive] = useState<SettingsGroup>("availability");
   const meta = GROUP_META[active];
@@ -123,6 +132,8 @@ export function SettingsView({
             <AvailabilityTab initial={availability} defaults={availabilityDefaults} />
           ) : active === "pricing" ? (
             <PricingTab initial={pricing} defaults={pricingDefaults} />
+          ) : active === "identity" ? (
+            <IdentityTab initial={identity} defaults={identityDefaults} />
           ) : active === "comms" ? (
             <CommsTab initial={comms} defaults={commsDefaults} />
           ) : active === "reviews" ? (

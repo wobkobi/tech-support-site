@@ -14,6 +14,7 @@ import type {
   AvailabilitySettings,
   CommsSettings,
   HoldsSettings,
+  IdentitySettings,
   PricingSettings,
   ReviewsSettings,
   Settings,
@@ -184,6 +185,28 @@ function validateReviews(r: ReviewsSettings): FieldError[] {
 }
 
 /**
+ * Validates the business identity group's shape + bounds.
+ * @param i - Proposed identity settings.
+ * @returns List of field errors (empty when valid).
+ */
+function validateIdentity(i: IdentitySettings): FieldError[] {
+  const errors: FieldError[] = [];
+  if (!i.name.trim()) errors.push({ field: "name", message: "Operator name is required." });
+  if (!i.company.trim()) errors.push({ field: "company", message: "Business name is required." });
+  if (!i.email.includes("@"))
+    errors.push({ field: "email", message: "Enter a valid email address." });
+  if (!nonNeg(i.paymentTermsDays))
+    errors.push({ field: "paymentTermsDays", message: "Must be 0 or more days." });
+  if (!i.invoicePrefix.trim())
+    errors.push({ field: "invoicePrefix", message: "Invoice prefix is required." });
+  if (i.baseAddress.lat !== null && !inRange(i.baseAddress.lat, -90, 90))
+    errors.push({ field: "baseAddress.lat", message: "Latitude must be -90 to 90." });
+  if (i.baseAddress.lng !== null && !inRange(i.baseAddress.lng, -180, 180))
+    errors.push({ field: "baseAddress.lng", message: "Longitude must be -180 to 180." });
+  return errors;
+}
+
+/**
  * Validates the booking form & holds group's shape + bounds.
  * @param h - Proposed holds settings.
  * @returns List of field errors (empty when valid).
@@ -215,6 +238,8 @@ export function validateGroup<G extends SettingsGroup>(group: G, value: Settings
       return validateReviews(value as ReviewsSettings);
     case "holds":
       return validateHolds(value as HoldsSettings);
+    case "identity":
+      return validateIdentity(value as IdentitySettings);
     default:
       return [];
   }
