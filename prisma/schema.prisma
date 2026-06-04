@@ -463,6 +463,19 @@ model Setting {
   updatedAt DateTime @updatedAt
 }
 
+// Append-only history of settings-group writes, backing the admin audit log
+// and one-click revert. One row per saveSettingsGroup call where the value
+// actually changed. `oldValue` is null on the first write for a group.
+model SettingAudit {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  group     String
+  oldValue  String?
+  newValue  String
+  changedAt DateTime @default(now())
+
+  @@index([group, changedAt])
+}
+
 // NZ public holiday occurrences. Region distinguishes nationwide holidays
 // ("NZ") from regional ones (e.g. "Auckland" for Auckland Anniversary Day).
 // A monthly refresh job populates this table; manual updates are fine too.
