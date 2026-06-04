@@ -9,7 +9,7 @@ import {
   getNextInvoiceNumber,
   writeBackInvoiceCounter,
 } from "@/features/business/lib/invoice-numbering";
-import { BUSINESS_PAYMENT_TERMS_DAYS } from "@/shared/lib/business-identity";
+import { getIdentity } from "@/shared/lib/business-identity.server";
 
 /**
  * GET /api/business/invoices - Returns all invoices ordered by creation date descending.
@@ -73,9 +73,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // doesn't need to send them. Operators using the "Edit details first" route
   // can still override either via the InvoiceBuilderView form fields.
   const issueDateValue = issueDate ? new Date(issueDate) : new Date();
+  const identity = await getIdentity();
   const dueDateValue = dueDate
     ? new Date(dueDate)
-    : new Date(Date.now() + BUSINESS_PAYMENT_TERMS_DAYS * 24 * 60 * 60 * 1000);
+    : new Date(Date.now() + identity.paymentTermsDays * 24 * 60 * 60 * 1000);
 
   const { number, sheetNextCount, sheetSyncWarning } = await getNextInvoiceNumber();
   const discount = typeof promoDiscount === "number" && promoDiscount > 0 ? promoDiscount : 0;

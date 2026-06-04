@@ -18,7 +18,7 @@ import {
 } from "@/features/business/lib/invoice-numbering";
 import { lookupDriveDistance } from "@/features/business/lib/travel-distance";
 import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-create";
-import { BUSINESS_PAYMENT_TERMS_DAYS } from "@/shared/lib/business-identity";
+import { getIdentity } from "@/shared/lib/business-identity.server";
 import { formatDateShort } from "@/shared/lib/date-format";
 import type { LineItem } from "@/features/business/types/business";
 
@@ -121,7 +121,9 @@ export async function createDraftCancellationInvoice(
       clientName: booking.name,
       clientEmail: booking.email,
       issueDate: now,
-      dueDate: new Date(now.getTime() + BUSINESS_PAYMENT_TERMS_DAYS * 24 * 60 * 60 * 1000),
+      dueDate: new Date(
+        now.getTime() + (await getIdentity()).paymentTermsDays * 24 * 60 * 60 * 1000,
+      ),
       lineItems,
       gst: gstAmount > 0,
       subtotal,
