@@ -9,7 +9,8 @@
 
 import type { Booking } from "@prisma/client";
 import { prisma } from "@/shared/lib/prisma";
-import { CANCELLATION, calcTravelCharge } from "@/features/business/lib/pricing-policy";
+import { calcTravelCharge } from "@/features/business/lib/pricing-policy";
+import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { calcInvoiceTotals } from "@/features/business/lib/business";
 import {
   getNextInvoiceNumber,
@@ -17,7 +18,7 @@ import {
 } from "@/features/business/lib/invoice-numbering";
 import { lookupDriveDistance } from "@/features/business/lib/travel-distance";
 import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-create";
-import { BUSINESS_PAYMENT_TERMS_DAYS } from "@/shared/lib/business-identity";
+import { getIdentity } from "@/shared/lib/business-identity.server";
 import { formatDateShort } from "@/shared/lib/date-format";
 import type { LineItem } from "@/features/business/types/business";
 
@@ -41,6 +42,7 @@ export async function createDraftCancellationInvoice(
   options: DraftCancellationInvoiceOptions,
 ): Promise<void> {
   const reason = options.reason ?? "late-cancellation";
+  const { CANCELLATION, GST_REGISTERED, MIN_TRAVEL_CHARGE } = await getPolicy();
   const headline =
     reason === "no-show"
       ? `No-show fee - ${formatDateShort(booking.startAt)}`
@@ -79,7 +81,7 @@ export async function createDraftCancellationInvoice(
         });
         travelRatePerHour = travelRow?.ratePerHour ?? 40;
       }
-      const travelCost = calcTravelCharge(travelMins, travelRatePerHour);
+      const travelCost = calcTravelCharge(travelMins, travelRatePerHour, MIN_TRAVEL_CHARGE);
       if (travelCost > 0) {
         lineItems.push({
           description: "Cancellation travel (round-trip)",
@@ -93,7 +95,7 @@ export async function createDraftCancellationInvoice(
 
   // Shared numbering avoids unique-constraint collisions with the admin flow.
   const { number, sheetNextCount } = await getNextInvoiceNumber();
-  const { subtotal, gstAmount, total } = calcInvoiceTotals(lineItems, 0);
+  const { subtotal, gstAmount, total } = calcInvoiceTotals(lineItems, 0, GST_REGISTERED);
   const now = new Date();
 
   let contactId: string | null = null;
@@ -119,7 +121,9 @@ export async function createDraftCancellationInvoice(
       clientName: booking.name,
       clientEmail: booking.email,
       issueDate: now,
-      dueDate: new Date(now.getTime() + BUSINESS_PAYMENT_TERMS_DAYS * 24 * 60 * 60 * 1000),
+      dueDate: new Date(
+        now.getTime() + (await getIdentity()).paymentTermsDays * 24 * 60 * 60 * 1000,
+      ),
       lineItems,
       gst: gstAmount > 0,
       subtotal,

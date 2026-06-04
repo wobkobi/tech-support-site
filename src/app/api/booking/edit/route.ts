@@ -7,16 +7,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import {
-  BOOKING_CONFIG,
-  DURATION_OPTIONS,
   validateBookingRequest,
   validateBookingPayloadFields,
-  TIME_OF_DAY_OPTIONS,
+  parseHourLabel,
   type TimeOfDay,
   type StartMinute,
   type JobDuration,
   type ExistingBooking,
 } from "@/features/booking/lib/booking";
+import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
+import { getSettings } from "@/shared/lib/settings/get-settings";
 import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 import {
   createBookingEvent,
@@ -95,7 +95,38 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     const now = new Date();
-    const maxDate = new Date(now.getTime() + BOOKING_CONFIG.maxAdvanceDays * 24 * 60 * 60 * 1000);
+
+    // Reschedule policy gate (cutoff + max-reschedules) from the live pricing
+    // settings. 0 / null means the rule is off.
+    const { reschedule } = (await getSettings()).pricing;
+    const hoursUntilStart = (booking.startAt.getTime() - now.getTime()) / 3_600_000;
+    if (reschedule.cutoffHours > 0 && hoursUntilStart < reschedule.cutoffHours) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `Bookings can't be changed within ${reschedule.cutoffHours} hours of the appointment. Please call or text me and I'll sort it.`,
+        },
+        { status: 400 },
+      );
+    }
+    if (
+      reschedule.maxReschedules !== null &&
+      booking.rescheduleCount >= reschedule.maxReschedules
+    ) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "This booking has already been changed the maximum number of times. Please call or text me to reschedule.",
+        },
+        { status: 400 },
+      );
+    }
+
+    // Editing an existing booking stays open even when new-booking intake is
+    // paused; only the day's schedule + windows gate the new time.
+    const { config } = await getAvailabilityConfig();
+    const maxDate = new Date(now.getTime() + config.maxAdvanceDays * 24 * 60 * 60 * 1000);
 
     // Get existing bookings, excluding the one being edited
     const existingBookings = await prisma.booking.findMany({
@@ -140,34 +171,34 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       existingForValidation,
       calendarEvents,
       now,
-      BOOKING_CONFIG,
+      config,
     );
 
     if (!validation.valid) {
       return NextResponse.json({ ok: false, error: validation.error }, { status: 400 });
     }
 
-    // Calculate new times
-    const slot = TIME_OF_DAY_OPTIONS.find((t) => t.value === timeOfDay);
-    const durationOption = DURATION_OPTIONS.find((d) => d.value === duration);
-    if (!slot || !durationOption) {
+    // Resolve the new slot from the validated hour label + live durations.
+    const startHour = parseHourLabel(timeOfDay);
+    if (startHour === null) {
       return NextResponse.json({ ok: false, error: "Invalid time or duration." }, { status: 400 });
     }
+    const durationMinutes = duration === "short" ? config.durations.short : config.durations.long;
+    const durationLabel = `${duration === "short" ? "Standard" : "Extended"} (${durationMinutes} min)`;
+    const cleanDurationLabel = `${duration === "short" ? "Standard" : "Extended"} ${durationMinutes} min`;
 
     const [year, month, day] = dateKey.split("-").map(Number);
     const utcOffset = getPacificAucklandOffset(year, month, day);
-    const startAt = new Date(
-      Date.UTC(year, month - 1, day, slot.startHour - utcOffset, startMinute, 0),
-    );
-    const endAt = new Date(startAt.getTime() + durationOption.durationMinutes * 60 * 1000);
+    const startAt = new Date(Date.UTC(year, month - 1, day, startHour - utcOffset, startMinute, 0));
+    const endAt = new Date(startAt.getTime() + durationMinutes * 60 * 1000);
 
     // Build updated notes
     let bookingNotes = `${notes.trim()}\n\n`;
     const timeLabel =
       startMinute === 0
-        ? slot.label
-        : slot.label.replace(/(am|pm)$/i, `:${String(startMinute).padStart(2, "0")}$1`);
-    bookingNotes += `[${timeLabel} - ${durationOption.label}]\n`;
+        ? timeOfDay
+        : timeOfDay.replace(/(am|pm)$/i, `:${String(startMinute).padStart(2, "0")}$1`);
+    bookingNotes += `[${timeLabel} - ${durationLabel}]\n`;
     bookingNotes += `Meeting type: ${meetingType === "in-person" ? "In-person" : "Remote"}\n`;
     if (meetingType === "in-person" && address) {
       bookingNotes += `Address: ${address.trim()}\n`;
@@ -195,17 +226,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Create new calendar event
     let calendarEventId: string | null = null;
     try {
-      const cleanDurationLabel = durationOption.label
-        .replace(/[()]/g, "")
-        .replace(/\s+/g, " ")
-        .trim();
       const summary = `Tech Support: ${name.trim()} - ${cleanDurationLabel}`;
       const calendarResult = await createBookingEvent({
         summary,
         description: bookingNotes,
         startAt,
         endAt,
-        timeZone: BOOKING_CONFIG.timeZone,
+        timeZone: config.timeZone,
         attendeeEmail: booking.email,
         attendeeName: name.trim(),
         location: meetingType === "in-person" && address ? address.trim() : undefined,
@@ -234,7 +261,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           endAt,
           calendarEventId,
           activeSlotKey: startAt.toISOString(),
-          bufferAfterMin: BOOKING_CONFIG.bookingBufferAfterMin,
+          bufferAfterMin: config.bookingBufferAfterMin,
+          rescheduleCount: { increment: 1 },
           ...(phoneE164 !== undefined ? { phone: phoneE164 } : {}),
         },
       });

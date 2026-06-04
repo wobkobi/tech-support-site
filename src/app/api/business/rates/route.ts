@@ -121,7 +121,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   const body = await request.json();
-  const { label, ratePerHour, flatRate, hourlyDelta, unit, isDefault } = body;
+  const { label, ratePerHour, flatRate, hourlyDelta, percentDelta, unit, isDefault } = body;
 
   if (!label || typeof label !== "string") {
     return NextResponse.json({ error: "label is required" }, { status: 400 });
@@ -137,6 +137,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       ratePerHour: ratePerHour ?? null,
       flatRate: flatRate ?? null,
       hourlyDelta: hourlyDelta ?? null,
+      percentDelta: percentDelta ?? null,
       unit: unit ?? "hour",
       isDefault: isDefault ?? false,
     },

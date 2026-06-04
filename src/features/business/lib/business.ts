@@ -70,16 +70,18 @@ export function formatUTCDDMMYYYY(date: Date): string {
  * before GST is computed, matching IRD's price-reduction treatment.
  * @param lineItems - Array of line items with qty and unit price.
  * @param promoDiscount - Optional dollar discount (e.g. from a promo snapshot).
+ * @param gstRegistered - Live GST-registration flag (defaults to the constant).
  * @returns Subtotal (gross), GST amount, and total (post-discount, post-GST).
  */
 export function calcInvoiceTotals(
   lineItems: { qty: number; unitPrice: number }[],
   promoDiscount = 0,
+  gstRegistered: boolean = GST_REGISTERED,
 ): { subtotal: number; gstAmount: number; total: number } {
   const subtotal =
     Math.round(lineItems.reduce((sum, item) => sum + item.qty * item.unitPrice, 0) * 100) / 100;
   const taxableAmount = Math.max(0, Math.round((subtotal - promoDiscount) * 100) / 100);
-  const gstAmount = GST_REGISTERED ? calcGstFromInclusive(taxableAmount, GST_RATE) : 0;
+  const gstAmount = gstRegistered ? calcGstFromInclusive(taxableAmount, GST_RATE) : 0;
   return {
     subtotal,
     gstAmount,
@@ -111,11 +113,12 @@ export function nextInvoiceNumber(
  * rounding so customers are never bumped a full slot for a single minute of
  * overage; the operator gives back as often as they collect.
  * @param mins - Actual duration in minutes
+ * @param incrementMins - Billing increment (live pricing setting); defaults to the code const.
  * @returns Billable duration rounded to the nearest billing increment
  */
-export function billableMins(mins: number): number {
+export function billableMins(mins: number, incrementMins: number = BILLING_INCREMENT_MINS): number {
   if (mins <= 0) return 0;
-  return Math.round(mins / BILLING_INCREMENT_MINS) * BILLING_INCREMENT_MINS;
+  return Math.round(mins / incrementMins) * incrementMins;
 }
 
 /**
@@ -159,7 +162,10 @@ export function hourlyTaskMinutes(tasks: TaskLine[]): number {
 
 /** Minimum minutes a task can shrink to before it's dropped as descriptive noise. */
 const MIN_TASK_MINUTES = 5;
-/** Rounding granularity for task qty after rebalancing (5-min steps). */
+// Rounding granularity for AI-parsed task qty after rebalancing. Mirrors the
+// pricing billing increment's default (5) but stays an independent literal: it
+// is an internal AI-parse detail, and referencing BILLING_INCREMENT_MINS here
+// would re-introduce the business.ts <-> pricing-policy.ts circular-import TDZ.
 const TASK_QTY_SNAP_MIN = 5;
 /** Minutes every isShort task is pinned to. Matches the AI's 0.25h SHORT-set assignment. */
 const SHORT_TASK_MINUTES = 15;
@@ -365,13 +371,17 @@ export function effectiveHourlyRate(
  * Emits one Labour row (when hours + rate are set), one row per task, one row
  * per part, and a single Travel row summed from `travelEntries`.
  * @param job - Job calculation with time, tasks, parts.
+ * @param incrementMins - Billing increment (live pricing setting); defaults to the code const.
  * @returns Array of line items ready for an invoice.
  */
-export function jobToLineItems(job: JobCalculation): LineItem[] {
+export function jobToLineItems(
+  job: JobCalculation,
+  incrementMins: number = BILLING_INCREMENT_MINS,
+): LineItem[] {
   const items: LineItem[] = [];
 
   if (job.durationMins > 0 && job.hourlyRate) {
-    const billed = billableMins(job.durationMins);
+    const billed = billableMins(job.durationMins, incrementMins);
     const hours = billed / 60;
     const rate = job.hourlyRate.ratePerHour ?? 0;
     const lineTotal = Math.round(hours * rate * 100) / 100;
@@ -420,13 +430,25 @@ export interface JobPromo {
   percentDiscount: number | null;
 }
 
+/** Live pricing values threaded into calcJobTotal; defaults are the code consts. */
+export interface JobPricing {
+  gstRegistered: boolean;
+  minTravelCharge: number;
+  billingIncrementMins: number;
+}
+
 /**
  * Promo discount on a job's labor only (time charge + hourly tasks).
  * @param job - Job calculation.
  * @param promo - Active promo or null.
+ * @param incrementMins - Billing increment (live pricing setting); defaults to the code const.
  * @returns Discount in dollars.
  */
-export function computeJobPromoDiscount(job: JobCalculation, promo: JobPromo | null): number {
+export function computeJobPromoDiscount(
+  job: JobCalculation,
+  promo: JobPromo | null,
+  incrementMins: number = BILLING_INCREMENT_MINS,
+): number {
   if (!promo) return 0;
 
   // A task is hourly if either: it has a baseRateId set (new rate model),
@@ -436,7 +458,7 @@ export function computeJobPromoDiscount(job: JobCalculation, promo: JobPromo | n
   const hourlyTasksTotal = hourlyTasks.reduce((s, t) => s + t.qty * t.unitPrice, 0);
   const hourlyTasksHours = hourlyTasks.reduce((s, t) => s + t.qty, 0);
 
-  const billed = billableMins(job.durationMins);
+  const billed = billableMins(job.durationMins, incrementMins);
   const timeHours = billed / 60;
   const timeCharge = Math.round(timeHours * (job.hourlyRate?.ratePerHour ?? 0) * 100) / 100;
 
@@ -468,11 +490,19 @@ export function computeJobPromoDiscount(job: JobCalculation, promo: JobPromo | n
  * auto entry contributed - manual-only travel passes through unchanged.
  * @param job - Job calculation with time, tasks, and parts.
  * @param promo - Optional active promo to apply.
+ * @param pricing - Live pricing (GST, min travel, billing increment); defaults to the code consts.
  * @returns Cost breakdown with promo + unsuccessful discounts split out.
  */
 export function calcJobTotal(
   job: JobCalculation,
   promo: JobPromo | null = null,
+  // Default built lazily (call-time, not module-eval) so reading the consts
+  // here can't trip the business.ts <-> pricing-policy.ts circular-import TDZ.
+  pricing: JobPricing = {
+    gstRegistered: GST_REGISTERED,
+    minTravelCharge: MIN_TRAVEL_CHARGE,
+    billingIncrementMins: BILLING_INCREMENT_MINS,
+  },
 ): {
   timeCharge: number;
   tasksTotal: number;
@@ -484,7 +514,7 @@ export function calcJobTotal(
   gstAmount: number;
   total: number;
 } {
-  const billed = billableMins(job.durationMins);
+  const billed = billableMins(job.durationMins, pricing.billingIncrementMins);
   const hours = billed / 60;
   const rate = job.hourlyRate?.ratePerHour ?? 0;
   const timeCharge = Math.round(hours * rate * 100) / 100;
@@ -494,11 +524,11 @@ export function calcJobTotal(
   // Auto entries trigger the floor; manual-only entries (parking, etc.) don't.
   const hasAutoEntry = job.travelEntries.some((e) => e.isAuto && e.cost > 0);
   const travelTotal =
-    hasAutoEntry && rawTravelTotal > 0 && rawTravelTotal < MIN_TRAVEL_CHARGE
-      ? MIN_TRAVEL_CHARGE
+    hasAutoEntry && rawTravelTotal > 0 && rawTravelTotal < pricing.minTravelCharge
+      ? pricing.minTravelCharge
       : rawTravelTotal;
   const subtotal = Math.round((timeCharge + tasksTotal + partsTotal + travelTotal) * 100) / 100;
-  const promoDiscount = computeJobPromoDiscount(job, promo);
+  const promoDiscount = computeJobPromoDiscount(job, promo, pricing.billingIncrementMins);
   let unsuccessfulDiscount = 0;
   if (job.unsuccessful) {
     const hourlyTasksTotal = job.tasks
@@ -509,7 +539,7 @@ export function calcJobTotal(
   }
   // GST applied to the discounted amount per NZ IRD price-reduction treatment.
   const taxableAmount = Math.round((subtotal - promoDiscount - unsuccessfulDiscount) * 100) / 100;
-  const gstAmount = GST_REGISTERED ? calcGstFromInclusive(taxableAmount, GST_RATE) : 0;
+  const gstAmount = pricing.gstRegistered ? calcGstFromInclusive(taxableAmount, GST_RATE) : 0;
   return {
     timeCharge,
     tasksTotal,

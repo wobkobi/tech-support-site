@@ -11,7 +11,7 @@ import {
   summariseForBanner,
   type ActivePromo,
 } from "@/features/business/lib/promos";
-import { calcTravelCharge, MIN_BILLABLE_MINS } from "@/features/business/lib/pricing-policy";
+import { calcTravelCharge } from "@/features/business/lib/pricing-policy";
 
 const SOFT_CARD = cn(
   "border-seasalt-400/80 bg-seasalt-900/60 rounded-xl border p-3 text-base sm:p-4 sm:text-lg",
@@ -42,12 +42,22 @@ function formatDuration(mins: number): string {
   return m === 0 ? `About ${hourStr}` : `About ${hourStr} ${m} min`;
 }
 
+interface Props {
+  /** Minimum billable minutes (live pricing setting); floors the estimate. */
+  minBillableMins: number;
+  /** Travel floor (live pricing setting) for the travel estimate. */
+  minTravelCharge: number;
+}
+
 /**
  * Multi-step wizard that gathers a job description, location, and meeting type,
  * uses the AI duration estimator to predict job length, and shows a price range.
+ * @param props - Component props.
+ * @param props.minBillableMins - Minimum billable minutes used to floor the estimate.
+ * @param props.minTravelCharge - Travel floor for the travel estimate.
  * @returns The rendered wizard.
  */
-export function PricingWizard(): React.ReactElement {
+export function PricingWizard({ minBillableMins, minTravelCharge }: Props): React.ReactElement {
   const [rates, setRates] = useState<PublicRate[]>([]);
   const [activePromo, setActivePromo] = useState<ActivePromo | null>(null);
   const [loading, setLoading] = useState(true);
@@ -178,7 +188,7 @@ export function PricingWizard(): React.ReactElement {
 
     // Floor short jobs to the published billable minimum. ±25% spread with a
     // $20 minimum bucket keeps the high end defensible per published policy.
-    const effectiveMins = Math.max(MIN_BILLABLE_MINS, estimatedMins);
+    const effectiveMins = Math.max(minBillableMins, estimatedMins);
 
     /**
      * Builds a ±25% price range rounded to the nearest $5 with a $20 min spread.
@@ -196,7 +206,7 @@ export function PricingWizard(): React.ReactElement {
     // Travel uses the dedicated Travel rate (never promo-discounted, never
     // labour-rate). Routes through calcTravelCharge so the floor + round-trip
     // doubling match the calculator and invoice exactly.
-    const travel = calcTravelCharge(travelMins, travelRatePerHour);
+    const travel = calcTravelCharge(travelMins, travelRatePerHour, minTravelCharge);
 
     /**
      * Visit total (floor applied) plus flat travel surcharge.

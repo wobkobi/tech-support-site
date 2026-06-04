@@ -16,6 +16,7 @@
 
 import { getSheetsClient } from "@/features/business/lib/google-sheets";
 import { DEFAULT_TAX_RATES, type TaxRates } from "@/features/business/lib/tax-planner";
+import type { TaxSettings } from "@/shared/lib/settings/types";
 
 /** Combined planner configuration for one workbook. */
 export interface PlannerConfig {
@@ -78,10 +79,17 @@ function parseDateCell(raw: unknown): Date | null {
  * Performs two batched reads:
  * 1. Fixed cells: B13-B15 (rates) and B22-B23 (weekly amounts)
  * 2. Whole `A:B` range to scan for the auto-transfer start date label
+ *
+ * The sheet stays authoritative for any cell it fills; `fallback` (the live tax
+ * settings) supplies the value when a cell is empty/unreadable.
  * @param spreadsheetId - The Google Sheet file ID.
+ * @param fallback - Live tax settings used when a sheet cell is blank.
  * @returns Parsed config, or null on any failure.
  */
-export async function readPlannerConfig(spreadsheetId: string): Promise<PlannerConfig | null> {
+export async function readPlannerConfig(
+  spreadsheetId: string,
+  fallback: TaxSettings,
+): Promise<PlannerConfig | null> {
   const sheets = getSheetsClient();
   let res;
   try {
@@ -125,13 +133,14 @@ export async function readPlannerConfig(spreadsheetId: string): Promise<PlannerC
 
   return {
     rates: {
-      incomeTax: toFraction(incomeTax) ?? DEFAULT_TAX_RATES.incomeTax,
-      acc: toFraction(acc) ?? DEFAULT_TAX_RATES.acc,
-      kiwiSaver: toFraction(kiwiSaver) ?? DEFAULT_TAX_RATES.kiwiSaver,
+      incomeTax: toFraction(incomeTax) ?? fallback.incomeTax,
+      acc: toFraction(acc) ?? fallback.acc,
+      kiwiSaver: toFraction(kiwiSaver) ?? fallback.kiwiSaver,
+      // GST output ratio is a legislated NZ constant, never operator-tunable.
       gstOutOfInclusive: DEFAULT_TAX_RATES.gstOutOfInclusive,
     },
-    weeklyKiwiSaver: weeklyKiwiSaver ?? 0,
-    weeklyTax: weeklyTax ?? 0,
+    weeklyKiwiSaver: weeklyKiwiSaver ?? fallback.weeklyKiwiSaver,
+    weeklyTax: weeklyTax ?? fallback.weeklyTax,
     transferStartDate,
   };
 }

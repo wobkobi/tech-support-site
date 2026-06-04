@@ -6,6 +6,7 @@
 
 import { randomUUID } from "crypto";
 import { prisma } from "@/shared/lib/prisma";
+import { getSettings } from "@/shared/lib/settings/get-settings";
 
 /**
  * Returns the contact's stable review token, creating + persisting one on first call.
@@ -80,9 +81,6 @@ export async function resolveInvoiceReviewUrl({
   return null;
 }
 
-/** Days between review requests we'll allow the invoice flow to send. */
-export const INVOICE_REVIEW_COOLDOWN_DAYS = 30;
-
 /**
  * Result of `getInvoiceReviewEligibility`. Drives the "Include review link"
  * checkbox state in the invoice send modal.
@@ -120,6 +118,8 @@ export async function getInvoiceReviewEligibility({
     return { canSend: false, reason: "no-contact" };
   }
 
+  const cooldownDays = (await getSettings()).reviews.invoiceReviewCooldownDays;
+
   // Pull the token out of the URL for the customerRef cross-check (Review
   // rows submitted via a magic link store the token in `customerRef`).
   const tokenFromUrl = (() => {
@@ -152,7 +152,7 @@ export async function getInvoiceReviewEligibility({
 
   const trimmedEmail = clientEmail?.trim();
   if (trimmedEmail) {
-    const cooldownStart = new Date(Date.now() - INVOICE_REVIEW_COOLDOWN_DAYS * 24 * 60 * 60 * 1000);
+    const cooldownStart = new Date(Date.now() - cooldownDays * 24 * 60 * 60 * 1000);
     try {
       // Three sources of "was asked recently":
       // - Booking.reviewSentAt (cron auto-send + admin "mark complete" + manual resend)
@@ -193,9 +193,7 @@ export async function getInvoiceReviewEligibility({
       const lastSent = candidates.sort((a, b) => b.getTime() - a.getTime())[0];
 
       if (lastSent) {
-        const nextAllowed = new Date(
-          lastSent.getTime() + INVOICE_REVIEW_COOLDOWN_DAYS * 24 * 60 * 60 * 1000,
-        );
+        const nextAllowed = new Date(lastSent.getTime() + cooldownDays * 24 * 60 * 60 * 1000);
         return {
           canSend: false,
           reason: "sent-recently",

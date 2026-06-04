@@ -22,6 +22,8 @@ interface Props {
   hourlyRateId: string | null;
   onHourlyRateIdChange: (id: string | null) => void;
   baseRates: RateConfig[];
+  /** Billing increment (live pricing setting) used for the "billed" rounding hint. */
+  billingIncrementMins: number;
 }
 
 /**
@@ -36,6 +38,7 @@ interface Props {
  * @param props.hourlyRateId - Selected base hourly rate id.
  * @param props.onHourlyRateIdChange - Picks a different base hourly rate.
  * @param props.baseRates - Available base hourly rates.
+ * @param props.billingIncrementMins - Billing increment (live pricing setting).
  * @returns Time/rate card element.
  */
 export function JobDetailsSection({
@@ -47,6 +50,7 @@ export function JobDetailsSection({
   hourlyRateId,
   onHourlyRateIdChange,
   baseRates,
+  billingIncrementMins,
 }: Props): React.ReactElement {
   const sumRangesMin = timeRanges.reduce((s, r) => s + timeDiffMins(r.startTime, r.endTime), 0);
   // Mirror TotalsPanel's "Time" row visibility - only flag the rounded "billed"
@@ -159,12 +163,13 @@ export function JobDetailsSection({
         />
         <p className={cn("mt-1 text-xs text-slate-400")}>
           {minsToHoursLabel(durationMins)}
-          {chargingDuration && billableMins(durationMins) !== durationMins && (
-            <span className={cn("ml-1 inline-flex items-center gap-1 text-slate-300")}>
-              <FaCaretRight className={cn("h-3 w-3")} aria-hidden />
-              {minsToHoursLabel(billableMins(durationMins))} billed
-            </span>
-          )}
+          {chargingDuration &&
+            billableMins(durationMins, billingIncrementMins) !== durationMins && (
+              <span className={cn("ml-1 inline-flex items-center gap-1 text-slate-300")}>
+                <FaCaretRight className={cn("h-3 w-3")} aria-hidden />
+                {minsToHoursLabel(billableMins(durationMins, billingIncrementMins))} billed
+              </span>
+            )}
           {durationMinsOverride != null &&
             durationMinsOverride !== sumRangesMin &&
             sumRangesMin > 0 && (

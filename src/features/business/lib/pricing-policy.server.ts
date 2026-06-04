@@ -10,11 +10,33 @@ import "server-only";
 import Holidays from "date-holidays";
 import { prisma } from "@/shared/lib/prisma";
 import {
+  GST_RATE,
   PUBLIC_HOLIDAY_UPLIFT,
   NZ_REGION,
   HOME_REGION,
   nzDateKey,
+  type Policy,
 } from "@/features/business/lib/pricing-policy";
+import { getSettings } from "@/shared/lib/settings/get-settings";
+
+/**
+ * Live policy bundle, resolved from the settings panel (defaults + DB override).
+ * Server-only because it reads the settings store; client code receives the
+ * resolved values as props. `GST_RATE` stays a legislated constant.
+ * @returns The current policy values the operator has configured.
+ */
+export async function getPolicy(): Promise<Policy> {
+  const { pricing } = await getSettings();
+  return {
+    GST_REGISTERED: pricing.gstRegistered,
+    GST_RATE,
+    MIN_TRAVEL_CHARGE: pricing.minTravelCharge,
+    MIN_BILLABLE_MINS: pricing.minBillableMins,
+    BILLING_INCREMENT_MINS: pricing.billingIncrementMins,
+    PUBLIC_HOLIDAY_UPLIFT: pricing.publicHolidayUplift,
+    CANCELLATION: pricing.cancellation,
+  };
+}
 
 /** One labour modifier as rendered on the pricing page accordion. */
 export interface PublicModifier {
@@ -49,6 +71,10 @@ const MODIFIER_DESCRIPTIONS: Record<string, string> = {
   "Public Holiday": "Applied automatically on NZ public holidays.",
 };
 
+/** Fallback rates when no matching RateConfig row exists (mirror the seed defaults). */
+const FALLBACK_BASE_RATE = 65;
+const FALLBACK_TRAVEL_RATE = 40;
+
 /**
  * Public pricing snapshot for the pricing + FAQ pages. Reads RateConfig
  * directly so the render takes one Prisma round-trip. Falls back to
@@ -61,13 +87,14 @@ export async function getPublicPricing(): Promise<PublicPricing> {
   const baseRate =
     rows.find((r) => r.ratePerHour !== null && r.isDefault)?.ratePerHour ??
     rows.find((r) => r.ratePerHour !== null && r.unit === "hour")?.ratePerHour ??
-    65;
+    FALLBACK_BASE_RATE;
 
   const complexDelta = rows.find((r) => r.label === "Complex")?.hourlyDelta ?? 0;
   const complexRate = Math.round((baseRate + complexDelta) * 100) / 100;
 
   const travelRatePerHour =
-    rows.find((r) => r.unit === "travel-hour" && r.ratePerHour !== null)?.ratePerHour ?? 40;
+    rows.find((r) => r.unit === "travel-hour" && r.ratePerHour !== null)?.ratePerHour ??
+    FALLBACK_TRAVEL_RATE;
 
   // Public Holiday uses percentDelta; the rest use hourlyDelta.
   const modifiers: PublicModifier[] = [];

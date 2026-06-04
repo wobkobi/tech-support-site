@@ -13,6 +13,7 @@ import { prisma } from "@/shared/lib/prisma";
 import { ReviewLinkMode } from "@prisma/client";
 import { sendPastClientReviewRequest } from "@/features/reviews/lib/email";
 import { isAdminRequest } from "@/shared/lib/auth";
+import { getSiteUrl } from "@/shared/lib/site-url";
 import { toE164NZ, isValidPhone } from "@/shared/lib/normalise-phone";
 import {
   findOrCreateContactByEmail,
@@ -48,10 +49,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ ok: false, error: "Valid email is required." }, { status: 400 });
     }
 
-    const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://tothepoint.co.nz").replace(
-      /\/$/,
-      "",
-    );
+    const siteUrl = getSiteUrl();
 
     // Land the Contact first so we know who we're talking to.
     const normalisedEmail = mode === "email" ? email!.trim().toLowerCase() : null;

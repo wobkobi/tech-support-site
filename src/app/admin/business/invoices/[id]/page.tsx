@@ -8,12 +8,7 @@ import { prisma } from "@/shared/lib/prisma";
 import { formatNZD } from "@/features/business/lib/business";
 import { formatDateShort } from "@/shared/lib/date-format";
 import { cn } from "@/shared/lib/cn";
-import {
-  BUSINESS,
-  BUSINESS_BANK_ACCOUNT,
-  BUSINESS_GST_NUMBER,
-  BUSINESS_PAYMENT_TERMS_DAYS,
-} from "@/shared/lib/business-identity";
+import { getIdentity } from "@/shared/lib/business-identity.server";
 import { InvoiceActions } from "./InvoiceActions";
 
 export const dynamic = "force-dynamic";
@@ -39,6 +34,8 @@ export default async function InvoiceViewPage({
 
   const invoice = await prisma.invoice.findUnique({ where: { id } });
   if (!invoice) notFound();
+
+  const identity = await getIdentity();
 
   return (
     <AdminPageLayout current="business-invoices" contentClassName="mx-auto max-w-3xl px-6 py-8">
@@ -71,7 +68,7 @@ export default async function InvoiceViewPage({
           />
           <div className={cn("text-right")}>
             <p className={cn("text-russian-violet text-2xl font-extrabold leading-none")}>
-              {BUSINESS_GST_NUMBER ? "TAX INVOICE" : "INVOICE"}
+              {identity.gstNumber ? "TAX INVOICE" : "INVOICE"}
             </p>
             <p className={cn("mt-2 font-mono text-sm font-semibold text-slate-700")}>
               {invoice.number}
@@ -95,8 +92,8 @@ export default async function InvoiceViewPage({
                 Voided {formatDateShort(invoice.voidedAt)}
               </p>
             )}
-            {BUSINESS_GST_NUMBER && (
-              <p className={cn("mt-1 text-xs text-slate-500")}>GST# {BUSINESS_GST_NUMBER}</p>
+            {identity.gstNumber && (
+              <p className={cn("mt-1 text-xs text-slate-500")}>GST# {identity.gstNumber}</p>
             )}
           </div>
         </div>
@@ -198,11 +195,11 @@ export default async function InvoiceViewPage({
           )}
         >
           <p className={cn("text-russian-violet mb-1 text-sm font-bold")}>Bank transfer</p>
-          <p>Payee: {BUSINESS.name}</p>
-          <p className={cn("font-semibold text-slate-700")}>Account: {BUSINESS_BANK_ACCOUNT}</p>
+          <p>Payee: {identity.name}</p>
+          <p className={cn("font-semibold text-slate-700")}>Account: {identity.bankAccount}</p>
           <p className={cn("font-semibold text-slate-700")}>Reference: {invoice.number}</p>
           <p>
-            Due within {BUSINESS_PAYMENT_TERMS_DAYS} days of issue (by{" "}
+            Due within {identity.paymentTermsDays} days of issue (by{" "}
             {formatDateShort(invoice.dueDate)}).
           </p>
         </div>
@@ -214,8 +211,8 @@ export default async function InvoiceViewPage({
         <div
           className={cn("mt-8 border-t border-slate-200 pt-3 text-center text-xs text-slate-500")}
         >
-          {BUSINESS.email} &nbsp;·&nbsp; {BUSINESS.phone} &nbsp;·&nbsp; {BUSINESS.website}
-          &nbsp;·&nbsp; {BUSINESS.location}
+          {identity.email} &nbsp;·&nbsp; {identity.phone} &nbsp;·&nbsp; {identity.website}
+          &nbsp;·&nbsp; {identity.location}
         </div>
       </div>
     </AdminPageLayout>

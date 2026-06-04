@@ -7,14 +7,11 @@ import { cn } from "@/shared/lib/cn";
 import { calcInvoiceTotals, formatNZD } from "@/features/business/lib/business";
 import { formatDateShort } from "@/shared/lib/date-format";
 import type { LineItem } from "@/features/business/types/business";
-import {
-  BUSINESS,
-  BUSINESS_BANK_ACCOUNT,
-  BUSINESS_GST_NUMBER,
-  BUSINESS_PAYMENT_TERMS_DAYS,
-} from "@/shared/lib/business-identity";
+import type { IdentitySettings } from "@/shared/lib/settings/types";
 
 interface Props {
+  /** Live business identity (name, contact, bank account, GST#, payment terms). */
+  identity: IdentitySettings;
   /** Invoice number to display. Use "DRAFT" for unsaved invoices. */
   number: string;
   clientName: string;
@@ -36,6 +33,7 @@ interface Props {
  * Live A4-styled invoice preview. Mirrors invoice-pdf.ts so the operator sees
  * the same layout the customer will receive. Pure presentational.
  * @param props - Component props.
+ * @param props.identity - Live business identity for the header/payment/footer.
  * @param props.number - Invoice number to display ("DRAFT" for unsaved).
  * @param props.clientName - Client name shown on the invoice header.
  * @param props.clientEmail - Client email shown on the invoice header.
@@ -49,6 +47,7 @@ interface Props {
  * @returns Invoice preview element.
  */
 function InvoicePreviewPanelImpl({
+  identity,
   number,
   clientName,
   clientEmail,
@@ -85,7 +84,7 @@ function InvoicePreviewPanelImpl({
           />
           <div className={cn("text-right")}>
             <p className={cn("text-russian-violet text-2xl font-extrabold leading-none")}>
-              {BUSINESS_GST_NUMBER ? "TAX INVOICE" : "INVOICE"}
+              {identity.gstNumber ? "TAX INVOICE" : "INVOICE"}
             </p>
             <p className={cn("mt-2 font-mono text-sm text-slate-700")}>
               {number || "TTP-XXXX-0000"}
@@ -93,8 +92,8 @@ function InvoicePreviewPanelImpl({
             {number === "DRAFT" && (
               <p className={cn("mt-1 text-[11px] font-bold uppercase text-slate-400")}>DRAFT</p>
             )}
-            {BUSINESS_GST_NUMBER && (
-              <p className={cn("mt-1 text-[11px] text-slate-500")}>GST# {BUSINESS_GST_NUMBER}</p>
+            {identity.gstNumber && (
+              <p className={cn("mt-1 text-[11px] text-slate-500")}>GST# {identity.gstNumber}</p>
             )}
           </div>
         </div>
@@ -222,13 +221,13 @@ function InvoicePreviewPanelImpl({
           className={cn("mb-4 space-y-1 rounded-lg border border-slate-200 px-3 py-3 text-[11px]")}
         >
           <p className={cn("text-russian-violet text-xs font-bold")}>Bank transfer</p>
-          <p className={cn("text-slate-500")}>Payee: {BUSINESS.name}</p>
-          <p className={cn("font-semibold text-slate-700")}>Account: {BUSINESS_BANK_ACCOUNT}</p>
+          <p className={cn("text-slate-500")}>Payee: {identity.name}</p>
+          <p className={cn("font-semibold text-slate-700")}>Account: {identity.bankAccount}</p>
           <p className={cn("font-semibold text-slate-700")}>
             Reference: {number || "[invoice number]"}
           </p>
           <p className={cn("text-slate-500")}>
-            Due within {BUSINESS_PAYMENT_TERMS_DAYS} days of issue
+            Due within {identity.paymentTermsDays} days of issue
             {dueDate ? ` (by ${formatDateShort(dueDate)}).` : "."}
           </p>
         </div>
@@ -241,8 +240,8 @@ function InvoicePreviewPanelImpl({
             "mt-auto border-t border-slate-200 pt-3 text-center text-[10px] text-slate-500",
           )}
         >
-          {BUSINESS.email} &nbsp;·&nbsp; {BUSINESS.phone} &nbsp;·&nbsp; {BUSINESS.website}
-          &nbsp;·&nbsp; {BUSINESS.location}
+          {identity.email} &nbsp;·&nbsp; {identity.phone} &nbsp;·&nbsp; {identity.website}
+          &nbsp;·&nbsp; {identity.location}
         </div>
       </div>
     </div>

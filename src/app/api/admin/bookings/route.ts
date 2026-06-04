@@ -17,6 +17,7 @@ import {
   BOOKING_FIELD_LIMITS,
   validateEmail,
 } from "@/features/booking/lib/booking";
+import { getSettings } from "@/shared/lib/settings/get-settings";
 import {
   createBookingEvent,
   fetchAllCalendarEvents,
@@ -174,6 +175,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 
+  const { availability } = await getSettings();
   try {
     const booking = await prisma.booking.create({
       data: {
@@ -189,7 +191,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         calendarEventId,
         activeSlotKey: startAt.toISOString(),
         bufferBeforeMin: 0,
-        bufferAfterMin: BOOKING_CONFIG.bookingBufferAfterMin,
+        bufferAfterMin: availability.bookingBufferAfterMin,
       },
     });
 

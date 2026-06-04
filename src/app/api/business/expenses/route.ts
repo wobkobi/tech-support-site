@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { parseAmount, parseRate } from "@/features/business/lib/validation";
+import { GST_RATE } from "@/features/business/lib/pricing-policy";
 
 /**
  * GET /api/business/expenses - Returns all expense entries ordered by date descending.
@@ -40,7 +41,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
   }
 
-  const rate = gstRate === undefined ? 0.15 : parseRate(gstRate);
+  const rate = gstRate === undefined ? GST_RATE : parseRate(gstRate);
   if (rate === null) {
     return NextResponse.json({ error: "Invalid GST rate" }, { status: 400 });
   }

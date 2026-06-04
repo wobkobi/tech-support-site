@@ -7,15 +7,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/shared/lib/prisma";
-import { BOOKING_CONFIG } from "@/features/booking/lib/booking";
+import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
+import { getSettings } from "@/shared/lib/settings/get-settings";
 import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 import { createBookingEvent } from "@/features/calendar/lib/google-calendar";
 import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
 import { toE164NZ } from "@/shared/lib/normalise-phone";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
-
-const HOLD_EXPIRATION_MINUTES = 15;
 
 /**
  * Request payload for creating a booking.
@@ -90,6 +89,14 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreateBoo
     }
 
     const now = new Date();
+    const { config, acceptingBookings } = await getAvailabilityConfig();
+    if (!acceptingBookings) {
+      return NextResponse.json(
+        { ok: false, error: "Online booking is currently paused." },
+        { status: 400 },
+      );
+    }
+    const { holds } = await getSettings();
 
     // Parse date and time
     const [year, month, day] = dateKey.split("-").map(Number);
@@ -119,7 +126,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreateBoo
     }
 
     const cancelToken = randomUUID();
-    const holdExpiresAt = new Date(now.getTime() + HOLD_EXPIRATION_MINUTES * 60 * 1000);
+    const holdExpiresAt = new Date(now.getTime() + holds.holdExpirationMinutes * 60 * 1000);
 
     // Build notes with meeting details
     let bookingNotes = `Meeting type: ${meetingType === "in-person" ? "In-person" : "Remote"}\n`;
@@ -144,8 +151,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreateBoo
           cancelToken,
           holdExpiresAt,
           activeSlotKey: startAt.toISOString(), // Unique constraint for double-booking prevention
-          bufferBeforeMin: BOOKING_CONFIG.bufferMin,
-          bufferAfterMin: BOOKING_CONFIG.bufferMin,
+          bufferBeforeMin: config.bufferMin,
+          bufferAfterMin: config.bufferMin,
         },
       });
 
@@ -157,7 +164,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreateBoo
           description: bookingNotes,
           startAt,
           endAt,
-          timeZone: BOOKING_CONFIG.timeZone,
+          timeZone: config.timeZone,
           attendeeEmail: email.trim().toLowerCase(),
           attendeeName: name.trim(),
           location: meetingType === "in-person" && address ? address.trim() : undefined,

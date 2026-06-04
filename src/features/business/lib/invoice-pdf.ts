@@ -2,12 +2,8 @@ import { PDFDocument, PDFFont, PDFPage, rgb, StandardFonts, degrees } from "pdf-
 import path from "path";
 import { readFileSync } from "fs";
 import type { Invoice } from "@/features/business/types/business";
-import {
-  BUSINESS,
-  BUSINESS_BANK_ACCOUNT,
-  BUSINESS_GST_NUMBER,
-  BUSINESS_PAYMENT_TERMS_DAYS,
-} from "@/shared/lib/business-identity";
+import { getIdentity } from "@/shared/lib/business-identity.server";
+import type { IdentitySettings } from "@/shared/lib/settings/types";
 import { formatDateShort } from "@/shared/lib/date-format";
 
 // Colours mirror the web's Tailwind palette so the PDF reads as the same document.
@@ -34,6 +30,7 @@ interface PdfCtx {
   page: PDFPage;
   font: PDFFont;
   bold: PDFFont;
+  identity: IdentitySettings;
 }
 
 interface LogoPath {
@@ -176,7 +173,7 @@ function drawHeader(ctx: PdfCtx, invoice: Invoice, logoPaths: LogoPath[]): numbe
 
   const rightX = MARGIN + CONTENT_W;
   // IRD requires "Tax invoice" wording when GST-registered.
-  const invTitle = BUSINESS_GST_NUMBER ? "TAX INVOICE" : "INVOICE";
+  const invTitle = ctx.identity.gstNumber ? "TAX INVOICE" : "INVOICE";
   let rightY = HEADER_TOP - 20;
   ctx.page.drawText(invTitle, {
     x: rightX - ctx.bold.widthOfTextAtSize(invTitle, 20),
@@ -209,9 +206,9 @@ function drawHeader(ctx: PdfCtx, invoice: Invoice, logoPaths: LogoPath[]): numbe
     font: ctx.bold,
     color: statusColor,
   });
-  if (BUSINESS_GST_NUMBER) {
+  if (ctx.identity.gstNumber) {
     rightY -= 15;
-    const gstLine = `GST# ${BUSINESS_GST_NUMBER}`;
+    const gstLine = `GST# ${ctx.identity.gstNumber}`;
     ctx.page.drawText(gstLine, {
       x: rightX - ctx.font.widthOfTextAtSize(gstLine, 10),
       y: rightY,
@@ -472,9 +469,9 @@ function drawTotalsBlock(ctx: PdfCtx, invoice: Invoice, y: number): number {
   if (invoice.gstAmount > 0) {
     drawRow("Includes GST", fmt(invoice.gstAmount));
     // IRD requires a GST number on the header when an invoice carries GST.
-    if (!BUSINESS_GST_NUMBER) {
+    if (!ctx.identity.gstNumber) {
       console.warn(
-        "[invoice-pdf] Invoice has GST but BUSINESS_GST_NUMBER env var is unset; the header will read 'INVOICE' instead of 'TAX INVOICE'.",
+        "[invoice-pdf] Invoice has GST but no GST number is set in settings; the header will read 'INVOICE' instead of 'TAX INVOICE'.",
       );
     }
   }
@@ -526,7 +523,7 @@ function drawPaymentCallout(ctx: PdfCtx, invoice: Invoice, y: number): number {
     color: BRAND,
   });
   by -= 22;
-  ctx.page.drawText(`Payee: ${BUSINESS.name}`, {
+  ctx.page.drawText(`Payee: ${ctx.identity.name}`, {
     x: MARGIN + BOX_PAD_X,
     y: by,
     size: 12,
@@ -534,7 +531,7 @@ function drawPaymentCallout(ctx: PdfCtx, invoice: Invoice, y: number): number {
     color: DARK,
   });
   by -= lineH;
-  ctx.page.drawText(`Account: ${BUSINESS_BANK_ACCOUNT}`, {
+  ctx.page.drawText(`Account: ${ctx.identity.bankAccount}`, {
     x: MARGIN + BOX_PAD_X,
     y: by,
     size: 13,
@@ -551,7 +548,7 @@ function drawPaymentCallout(ctx: PdfCtx, invoice: Invoice, y: number): number {
   });
   by -= lineH;
   ctx.page.drawText(
-    `Due within ${BUSINESS_PAYMENT_TERMS_DAYS} days of issue (by ${formatDateShort(invoice.dueDate)}).`,
+    `Due within ${ctx.identity.paymentTermsDays} days of issue (by ${formatDateShort(invoice.dueDate)}).`,
     {
       x: MARGIN + BOX_PAD_X,
       y: by,
@@ -594,7 +591,7 @@ function drawFooter(ctx: PdfCtx): void {
     thickness: 0.5,
     color: LIGHT,
   });
-  const footerLine = `${BUSINESS.email}  ·  ${BUSINESS.phone}  ·  ${BUSINESS.website}  ·  ${BUSINESS.location}`;
+  const footerLine = `${ctx.identity.email}  ·  ${ctx.identity.phone}  ·  ${ctx.identity.website}  ·  ${ctx.identity.location}`;
   const footerSize = 9;
   const footerW = ctx.font.widthOfTextAtSize(footerLine, footerSize);
   ctx.page.drawText(footerLine, {
@@ -619,7 +616,8 @@ export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
   const page = pdfDoc.addPage([PAGE_W, PAGE_H]);
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  const ctx: PdfCtx = { page, font, bold };
+  const identity = await getIdentity();
+  const ctx: PdfCtx = { page, font, bold, identity };
   const logoPaths = parseWordmarkPaths();
 
   drawStatusWatermark(ctx, invoice);

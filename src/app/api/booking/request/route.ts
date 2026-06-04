@@ -7,17 +7,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import {
-  BOOKING_CONFIG,
-  DURATION_OPTIONS,
   validateBookingRequest,
   validateBookingPayloadFields,
-  TIME_OF_DAY_OPTIONS,
+  parseHourLabel,
   splitUnitFromAddress,
   type TimeOfDay,
   type StartMinute,
   type JobDuration,
   type ExistingBooking,
 } from "@/features/booking/lib/booking";
+import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
+import { getSettings } from "@/shared/lib/settings/get-settings";
 import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 import {
   createBookingEvent,
@@ -120,7 +120,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     const now = new Date();
-    const maxDate = new Date(now.getTime() + BOOKING_CONFIG.maxAdvanceDays * 24 * 60 * 60 * 1000);
+    const { config, acceptingBookings } = await getAvailabilityConfig();
+    if (!acceptingBookings) {
+      return NextResponse.json(
+        { ok: false, error: "Online booking is currently paused." },
+        { status: 400 },
+      );
+    }
+    const maxDate = new Date(now.getTime() + config.maxAdvanceDays * 24 * 60 * 60 * 1000);
 
     // Get existing bookings
     const existingBookings = await prisma.booking.findMany({
@@ -167,25 +174,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       existingForValidation,
       calendarEvents,
       now,
-      BOOKING_CONFIG,
+      config,
     );
 
     if (!validation.valid) {
       return NextResponse.json({ ok: false, error: validation.error }, { status: 400 });
     }
 
-    // Get time details
-    const slot = TIME_OF_DAY_OPTIONS.find((t) => t.value === timeOfDay);
-    const durationOption = DURATION_OPTIONS.find((d) => d.value === duration);
-
-    if (!slot || !durationOption) {
+    // Resolve the slot from the (already-validated) hour label + live durations.
+    const startHour = parseHourLabel(timeOfDay);
+    if (startHour === null) {
       return NextResponse.json({ ok: false, error: "Invalid time or duration" }, { status: 400 });
     }
+    const durationMinutes = duration === "short" ? config.durations.short : config.durations.long;
 
     // Calculate start/end times
     const [year, month, day] = dateKey.split("-").map(Number);
-    const startHour = slot.startHour;
-    const durationMinutes = durationOption.durationMinutes;
 
     // Get dynamic UTC offset for this date (handles NZDT/NZST)
     const utcOffset = getPacificAucklandOffset(year, month, day);
@@ -199,9 +203,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     let bookingNotes = `${notes.trim()}\n\n`;
     const timeLabel =
       startMinute === 0
-        ? slot.label
-        : slot.label.replace(/(am|pm)$/i, `:${String(startMinute).padStart(2, "0")}$1`);
-    bookingNotes += `[${timeLabel} - ${durationOption.label}]\n`;
+        ? timeOfDay
+        : timeOfDay.replace(/(am|pm)$/i, `:${String(startMinute).padStart(2, "0")}$1`);
+    const durationLabel = `${duration === "short" ? "Standard" : "Extended"} (${durationMinutes} min)`;
+    bookingNotes += `[${timeLabel} - ${durationLabel}]\n`;
     bookingNotes += `Meeting type: ${meetingType === "in-person" ? "In-person" : "Remote"}\n`;
     if (meetingType === "in-person" && address) {
       bookingNotes += `Address: ${address.trim()}\n`;
@@ -209,18 +214,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Create calendar event
     let calendarEventId: string | null = null;
     try {
-      // Remove parentheses from duration label for summary to avoid double brackets
-      const cleanDurationLabel = durationOption.label
-        .replace(/[()]/g, "")
-        .replace(/\s+/g, " ")
-        .trim();
+      const cleanDurationLabel = `${duration === "short" ? "Standard" : "Extended"} ${durationMinutes} min`;
       const summary = `Tech Support: ${name.trim()} - ${cleanDurationLabel}`;
       const calendarResult = await createBookingEvent({
         summary,
         description: bookingNotes,
         startAt,
         endAt,
-        timeZone: BOOKING_CONFIG.timeZone,
+        timeZone: config.timeZone,
         attendeeEmail: email.trim().toLowerCase(),
         attendeeName: name.trim(),
         location: meetingType === "in-person" && address ? address.trim() : undefined,
@@ -301,7 +302,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           calendarEventId,
           activeSlotKey: startAt.toISOString(), // Unique constraint for double-booking prevention
           bufferBeforeMin: 0,
-          bufferAfterMin: BOOKING_CONFIG.bookingBufferAfterMin,
+          bufferAfterMin: config.bookingBufferAfterMin,
           // Notes text above stays dual-written for regex-parsing admin code.
           // Split unit off the address so apartment numbers can be filtered
           // without re-parsing.
@@ -340,7 +341,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
       // Send confirmation emails before returning so Vercel doesn't kill the
       // function before the Resend requests complete. Both functions catch all
-      // errors internally and never throw.
+      // errors internally and never throw. The owner alert always fires; the
+      // customer confirmation honours the notifyConfirmation setting.
+      const { comms } = await getSettings();
       await Promise.all([
         sendOwnerBookingNotification({
           id: booking.id,
@@ -351,16 +354,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           endAt: booking.endAt,
           cancelToken: booking.cancelToken,
         }),
-        sendCustomerBookingConfirmation({
-          id: booking.id,
-          name: booking.name,
-          email: booking.email,
-          notes: booking.notes ?? "",
-          startAt: booking.startAt,
-          endAt: booking.endAt,
-          cancelToken: booking.cancelToken,
-          promoTitleAtBooking: booking.promoTitleAtBooking,
-        }),
+        ...(comms.notifyConfirmation
+          ? [
+              sendCustomerBookingConfirmation({
+                id: booking.id,
+                name: booking.name,
+                email: booking.email,
+                notes: booking.notes ?? "",
+                startAt: booking.startAt,
+                endAt: booking.endAt,
+                cancelToken: booking.cancelToken,
+                promoTitleAtBooking: booking.promoTitleAtBooking,
+              }),
+            ]
+          : []),
       ]);
 
       return NextResponse.json({

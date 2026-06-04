@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { aggregateByFinancialYear } from "@/features/business/lib/financial-year";
+import { getSettings } from "@/shared/lib/settings/get-settings";
+import { getIdentity } from "@/shared/lib/business-identity.server";
 
 /**
  * GET /api/business/summary - Returns aggregated income, expense, profit, and tax reserve stats,
@@ -35,7 +37,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     .filter((e) => e.date >= monthStart && e.date < monthEnd)
     .reduce((s, e) => s + e.amountExcl, 0);
 
-  const fyTotals = aggregateByFinancialYear(incomeEntries, expenseEntries, now);
+  const { incomeTax } = (await getSettings()).tax;
+  const startDate = new Date((await getIdentity()).startDateIso);
+  const fyTotals = aggregateByFinancialYear(
+    incomeEntries,
+    expenseEntries,
+    now,
+    incomeTax,
+    startDate,
+  );
 
   return NextResponse.json({
     ok: true,
@@ -43,7 +53,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       totalIncome,
       totalExpensesExcl,
       totalGstClaimable,
-      taxReserve: Math.round(totalIncome * 0.2 * 100) / 100,
+      taxReserve: Math.round(totalIncome * incomeTax * 100) / 100,
       profit: Math.round((totalIncome - totalExpensesExcl) * 100) / 100,
       currentMonthIncome,
       currentMonthExpenses,

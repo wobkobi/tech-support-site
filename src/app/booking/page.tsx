@@ -13,11 +13,11 @@ import type React from "react";
 import { Suspense } from "react";
 import { cn } from "@/shared/lib/cn";
 import {
-  BOOKING_CONFIG,
   buildAvailableDays,
   type ExistingBooking,
   type BookableDay,
 } from "@/features/booking/lib/booking";
+import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
 import { prisma } from "@/shared/lib/prisma";
 import { fetchAllCalendarEvents } from "@/features/calendar/lib/google-calendar";
 import BookingForm from "@/features/booking/components/BookingForm";
@@ -135,9 +135,26 @@ async function getAvailableDays(): Promise<{
   days: BookableDay[];
   degraded: boolean;
   sameDayClosed: boolean;
+  acceptingBookings: boolean;
+  closedMessage: string;
+  durations: { short: number; long: number };
 }> {
   const now = new Date();
-  const maxDate = new Date(now.getTime() + BOOKING_CONFIG.maxAdvanceDays * 24 * 60 * 60 * 1000);
+  const { config, acceptingBookings, closedMessage } = await getAvailabilityConfig();
+
+  // Master switch: when paused, skip the slot build and surface the message.
+  if (!acceptingBookings) {
+    return {
+      days: [],
+      degraded: false,
+      sameDayClosed: false,
+      acceptingBookings: false,
+      closedMessage,
+      durations: config.durations,
+    };
+  }
+
+  const maxDate = new Date(now.getTime() + config.maxAdvanceDays * 24 * 60 * 60 * 1000);
 
   const [existingBookings, calendar] = await Promise.all([
     prisma.booking.findMany({
@@ -164,11 +181,14 @@ async function getAvailableDays(): Promise<{
     bufferAfterMin: b.bufferAfterMin,
   }));
 
-  const built = buildAvailableDays(existingForSlots, calendar.events, now, BOOKING_CONFIG);
+  const built = buildAvailableDays(existingForSlots, calendar.events, now, config);
   return {
     days: built.days,
     degraded: calendar.degraded,
     sameDayClosed: built.sameDayClosed,
+    acceptingBookings: true,
+    closedMessage,
+    durations: config.durations,
   };
 }
 
@@ -184,7 +204,21 @@ const SKELETON_BLOCK = cn("bg-seasalt-900/40 rounded-lg");
  * @returns Booking form or an unavailable banner.
  */
 async function BookingFormIsland(): Promise<React.ReactElement> {
-  const { days, degraded, sameDayClosed } = await getAvailableDays();
+  const { days, degraded, sameDayClosed, acceptingBookings, closedMessage, durations } =
+    await getAvailableDays();
+  if (!acceptingBookings) {
+    return (
+      <div
+        role="status"
+        className={cn(
+          "border-mustard-500/60 bg-mustard-900/40 text-rich-black flex flex-col gap-2 rounded-lg border-2 p-5",
+        )}
+      >
+        <p className={cn("text-base font-semibold")}>Online booking is paused</p>
+        <p className={cn("text-sm sm:text-base")}>{closedMessage}</p>
+      </div>
+    );
+  }
   if (degraded) {
     return (
       <div
@@ -216,7 +250,7 @@ async function BookingFormIsland(): Promise<React.ReactElement> {
           </p>
         </div>
       )}
-      <BookingForm availableDays={days} />
+      <BookingForm availableDays={days} durations={durations} />
     </div>
   );
 }

@@ -18,7 +18,7 @@ import {
   getActivePromo,
   summariseForBanner,
 } from "@/features/business/lib/promos";
-import { getPublicPricing } from "@/features/business/lib/pricing-policy.server";
+import { getPolicy, getPublicPricing } from "@/features/business/lib/pricing-policy.server";
 import {
   cancellationCopy,
   travelCopy,
@@ -97,7 +97,11 @@ const ACCORDION_BODY = cn(
  * @returns Pricing page element.
  */
 export default async function PricingPage(): Promise<React.ReactElement> {
-  const [promo, pricing] = await Promise.all([getActivePromo(), getPublicPricing()]);
+  const [promo, pricing, policy] = await Promise.all([
+    getActivePromo(),
+    getPublicPricing(),
+    getPolicy(),
+  ]);
   const baseRate = pricing.baseRate;
   const complexRate = pricing.complexRate;
   return (
@@ -377,7 +381,9 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                   />
                 </summary>
                 <div className={ACCORDION_BODY}>
-                  {renderEmphasised(travelCopy(pricing.travelRatePerHour))}
+                  {renderEmphasised(
+                    travelCopy(pricing.travelRatePerHour, policy.MIN_TRAVEL_CHARGE),
+                  )}
                 </div>
               </details>
 
@@ -389,7 +395,11 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                     aria-hidden
                   />
                 </summary>
-                <div className={ACCORDION_BODY}>{renderEmphasised(minimumsCopy())}</div>
+                <div className={ACCORDION_BODY}>
+                  {renderEmphasised(
+                    minimumsCopy(policy.MIN_BILLABLE_MINS, policy.BILLING_INCREMENT_MINS),
+                  )}
+                </div>
               </details>
 
               <details className={ACCORDION_DETAILS}>
@@ -400,7 +410,9 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                     aria-hidden
                   />
                 </summary>
-                <div className={ACCORDION_BODY}>{renderEmphasised(cancellationCopy())}</div>
+                <div className={ACCORDION_BODY}>
+                  {renderEmphasised(cancellationCopy(policy.CANCELLATION))}
+                </div>
               </details>
 
               <details className={ACCORDION_DETAILS}>
@@ -422,7 +434,9 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                     aria-hidden
                   />
                 </summary>
-                <div className={ACCORDION_BODY}>{renderEmphasised(publicHolidayCopy())}</div>
+                <div className={ACCORDION_BODY}>
+                  {renderEmphasised(publicHolidayCopy(policy.PUBLIC_HOLIDAY_UPLIFT))}
+                </div>
               </details>
 
               <details className={ACCORDION_DETAILS}>
@@ -433,7 +447,9 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                     aria-hidden
                   />
                 </summary>
-                <div className={ACCORDION_BODY}>{renderEmphasised(gstCopy())}</div>
+                <div className={ACCORDION_BODY}>
+                  {renderEmphasised(gstCopy(policy.GST_REGISTERED))}
+                </div>
               </details>
             </div>
           </section>
@@ -467,7 +483,10 @@ export default async function PricingPage(): Promise<React.ReactElement> {
             <p className={cn("text-rich-black/70 mb-5 text-sm sm:text-base")}>
               Answer a few quick questions to get a price range. No commitment required.
             </p>
-            <PricingWizard />
+            <PricingWizard
+              minBillableMins={policy.MIN_BILLABLE_MINS}
+              minTravelCharge={policy.MIN_TRAVEL_CHARGE}
+            />
           </section>
 
           {pricing.ratesUpdatedAt && (

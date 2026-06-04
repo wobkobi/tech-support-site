@@ -4,7 +4,7 @@ import type React from "react";
 import type { RefObject } from "react";
 import { cn } from "@/shared/lib/cn";
 import { formatNZD, travelEntriesTotal } from "@/features/business/lib/business";
-import { MIN_TRAVEL_CHARGE, breakdownTravelCharge } from "@/features/business/lib/pricing-policy";
+import { breakdownTravelCharge } from "@/features/business/lib/pricing-policy";
 import type { TravelEntry } from "@/features/business/types/business";
 
 interface Props {
@@ -17,6 +17,8 @@ interface Props {
   onLookup: () => void;
   /** Travel-rate $/h sourced from the Travel RateConfig; used for the operator-side breakdown. */
   travelRatePerHour: number;
+  /** Travel floor (live pricing setting) applied to the breakdown + minimum note. */
+  minTravelCharge: number;
 }
 
 /**
@@ -34,6 +36,7 @@ interface Props {
  * @param props.lookingUpTravel - True while a lookup is in flight.
  * @param props.onLookup - "Look up" / Enter handler.
  * @param props.travelRatePerHour - Travel $/h from the Travel RateConfig.
+ * @param props.minTravelCharge - Travel floor (live pricing setting).
  * @returns Travel section element.
  */
 export function TravelSection({
@@ -45,6 +48,7 @@ export function TravelSection({
   lookingUpTravel,
   onLookup,
   travelRatePerHour,
+  minTravelCharge,
 }: Props): React.ReactElement {
   const total = travelEntriesTotal(travelEntries);
 
@@ -114,7 +118,7 @@ export function TravelSection({
             const oneWayMin = entry.durationMinsOneWay ?? 0;
             const roundTripMin = oneWayMin * 2;
             const breakdown = showBreakdown
-              ? breakdownTravelCharge(oneWayMin, travelRatePerHour)
+              ? breakdownTravelCharge(oneWayMin, travelRatePerHour, minTravelCharge)
               : null;
             return (
               <div key={index} className={cn("space-y-1")}>
@@ -197,9 +201,9 @@ export function TravelSection({
                     {breakdown.minimumApplied && (
                       <li>
                         <span className={cn("text-slate-400")}>
-                          {formatNZD(MIN_TRAVEL_CHARGE)} minimum applied
+                          {formatNZD(minTravelCharge)} minimum applied
                         </span>{" "}
-                        (figure was under {formatNZD(MIN_TRAVEL_CHARGE)}).
+                        (figure was under {formatNZD(minTravelCharge)}).
                       </li>
                     )}
                     <li>

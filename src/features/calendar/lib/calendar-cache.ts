@@ -10,53 +10,51 @@ import {
   getBookingCalendarId,
   type CalendarEvent,
 } from "@/features/calendar/lib/google-calendar";
-import { BOOKING_CONFIG } from "@/features/booking/lib/booking";
 import { calculateTravelMinutes, type TransportMode } from "@/features/calendar/lib/travel-time";
+import { getSettings } from "@/shared/lib/settings/get-settings";
 
 interface RefreshResult {
   cachedCount: number;
   deletedCount: number;
 }
 
-// Travel block padding for job overrun + traffic. +10 then ceil to next 5-min
-// gives ~10 min margin always (e.g. 14 > 25, 30 > 40, 60 > 70).
+// Travel block padding rounds up to the next 5-min step after adding the
+// settings travel-round buffer (e.g. with +10: 14 > 25, 30 > 40, 60 > 70).
 const TRAVEL_ROUND_INCREMENT_MIN = 5;
-const TRAVEL_ROUND_BUFFER_MIN = 10;
 
-// Suppress travel-back when the next event is close enough that dwell at home
-// (gap minus current>home minus home>next) falls below MIN_HOME_DWELL_MIN.
+// Forward window for chaining a travel-back leg into the next event's travel-to.
 const RETURN_CHAINING_LOOKAHEAD_MS = 2 * 60 * 60 * 1000;
-const MIN_HOME_DWELL_MIN = 60;
 
 /**
- * Rounds raw Distance Matrix minutes up with a fixed buffer absorbing job
- * overrun and traffic uncertainty.
+ * Rounds raw Distance Matrix minutes up with a buffer absorbing job overrun
+ * and traffic uncertainty.
  * @param raw - Raw travel time in minutes from the Distance Matrix API.
+ * @param bufferMin - Padding added before rounding (scheduling.travelRoundBufferMin).
  * @returns Blocked minutes to write into TravelBlock.roundedMinutes.
  */
-function roundTravelMinutes(raw: number): number {
-  return (
-    Math.ceil((raw + TRAVEL_ROUND_BUFFER_MIN) / TRAVEL_ROUND_INCREMENT_MIN) *
-    TRAVEL_ROUND_INCREMENT_MIN
-  );
+function roundTravelMinutes(raw: number, bufferMin: number): number {
+  return Math.ceil((raw + bufferMin) / TRAVEL_ROUND_INCREMENT_MIN) * TRAVEL_ROUND_INCREMENT_MIN;
 }
 
 /**
  * Finds the best origin address for the travel-to leg of a given event.
- * Looks for a preceding event that ends within 4 hours of the target event's
- * start time and has a resolvable location. Falls back to homeAddress.
+ * Looks for a preceding event that ends within the lookahead window of the
+ * target event's start time and has a resolvable location. Falls back to
+ * homeAddress.
  * @param allEvents - All calendar events in the current window.
  * @param targetEvent - The event being travelled to.
  * @param homeAddress - Fallback home address.
+ * @param lookaheadHours - How far back to look for a preceding event (scheduling.smartOriginLookaheadHours).
  * @returns The best origin address to use.
  */
 export function findSmartOrigin(
   allEvents: CalendarEvent[],
   targetEvent: CalendarEvent,
   homeAddress: string,
+  lookaheadHours: number,
 ): string {
   const targetStart = new Date(targetEvent.start).getTime();
-  const fourHoursMs = 4 * 60 * 60 * 1000;
+  const lookaheadMs = lookaheadHours * 60 * 60 * 1000;
 
   let bestOrigin: string | null = null;
   let bestGap = Infinity;
@@ -67,7 +65,7 @@ export function findSmartOrigin(
     if (!loc) continue;
     const endMs = new Date(e.end).getTime();
     const gap = targetStart - endMs;
-    if (gap >= 0 && gap < fourHoursMs && gap < bestGap) {
+    if (gap >= 0 && gap < lookaheadMs && gap < bestGap) {
       bestOrigin = loc;
       bestGap = gap;
     }
@@ -126,7 +124,20 @@ export function findNextChainedEvent(
  */
 export async function refreshCalendarCache(): Promise<RefreshResult> {
   const now = new Date();
-  const maxDate = new Date(now.getTime() + BOOKING_CONFIG.maxAdvanceDays * 24 * 60 * 60 * 1000);
+
+  // Live settings: the booking horizon + advanced travel-engine buffers.
+  const settings = await getSettings();
+  const maxDate = new Date(
+    now.getTime() + settings.availability.maxAdvanceDays * 24 * 60 * 60 * 1000,
+  );
+  const scheduling = settings.scheduling;
+  /**
+   * Rounds raw travel minutes using the live travel-round buffer.
+   * @param raw - Raw travel minutes.
+   * @returns Buffered + rounded minutes.
+   */
+  const roundTravel = (raw: number): number =>
+    roundTravelMinutes(raw, scheduling.travelRoundBufferMin);
 
   // Fetch fresh calendar events
   let rawEvents: CalendarEvent[] = [];
@@ -211,10 +222,11 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
     `[refreshCalendarCache] Cached ${upsertPromises.length} events (${ignoredKeys.size} ignored), deleted ${deleteResult.count} expired entries`,
   );
 
-  // Travel Block Management
-  const homeAddress = process.env.HOME_ADDRESS;
+  // Travel Block Management. Origin is the unified base address (settings),
+  // falling back to the HOME_ADDRESS env until that var is retired.
+  const homeAddress = settings.identity.baseAddress.line || process.env.HOME_ADDRESS;
   if (!homeAddress) {
-    console.warn("[refreshCalendarCache] HOME_ADDRESS not set - skipping travel blocks");
+    console.warn("[refreshCalendarCache] No base address set - skipping travel blocks");
     return { cachedCount: rawEvents.length, deletedCount: deleteResult.count };
   }
 
@@ -340,10 +352,10 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
     const beforeId = `travel-before:${event.id}`;
     const afterId = `travel-after:${event.id}`;
 
-    // Booking calendar events get a 30-min buffer before departure on the way back
+    // Booking events get a wind-down buffer before departure on the way back.
     const isBookingEvent = event.calendarEmail === bookingCalId;
     const departureForBack = isBookingEvent
-      ? new Date(eventEnd.getTime() + 30 * 60 * 1000)
+      ? new Date(eventEnd.getTime() + scheduling.travelBackDepartureBufferMin * 60 * 1000)
       : eventEnd;
 
     // Detect the best origin: preceding event location within 4 hours, or home.
@@ -352,7 +364,12 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
     // pollute other events' smart-origin or chain candidate searches.
     const detectedOrigin = isCarEvent
       ? homeAddress
-      : findSmartOrigin(travelRelevantEvents, event, homeAddress);
+      : findSmartOrigin(
+          travelRelevantEvents,
+          event,
+          homeAddress,
+          scheduling.smartOriginLookaheadHours,
+        );
     // customOrigin (user override) takes precedence over auto-detection
     const effectiveOrigin = existing?.customOrigin ?? detectedOrigin;
 
@@ -402,13 +419,12 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
         // null means the direction was never successfully calculated - treat as needing retry
         const toOk =
           existing.rawTravelMinutes !== null &&
-          roundTravelMinutes(existing.rawTravelMinutes) === (existing.roundedMinutes ?? -1);
+          roundTravel(existing.rawTravelMinutes) === (existing.roundedMinutes ?? -1);
         // Suppressed travel-back is a steady state - no block exists by design.
         const backOk =
           existing.travelBackSuppressed ||
           (existing.rawTravelBackMinutes !== null &&
-            roundTravelMinutes(existing.rawTravelBackMinutes) ===
-              (existing.roundedBackMinutes ?? -1));
+            roundTravel(existing.rawTravelBackMinutes) === (existing.roundedBackMinutes ?? -1));
 
         if (toOk && backOk) {
           if (isDev) console.log(`[travel] Skipping "${event.summary}" - unchanged`);
@@ -613,7 +629,7 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
       }
     }
 
-    // Suppress travel-back when dwell at home would be under MIN_HOME_DWELL_MIN.
+    // Suppress travel-back when dwell at home would be under the minimum.
     // The next event's travel-to leg (via findSmartOrigin) reserves the gap
     // instead. Car events don't participate in chaining (chained is forced to
     // null upstream), so they always fall through to a real travel-back home.
@@ -626,11 +642,11 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
     ) {
       const gapMin = (currentChainedStart.getTime() - departureForBack.getTime()) / 60_000;
       const dwellMin = gapMin - rawTravelBackMinutes - rawHomeToNextMinutes;
-      if (dwellMin < MIN_HOME_DWELL_MIN) {
+      if (dwellMin < scheduling.minHomeDwellMin) {
         travelBackSuppressed = true;
         if (isDev) {
           console.log(
-            `[travel] Suppressing travel-back for "${event.summary}" - dwell ${Math.round(dwellMin)} min < ${MIN_HOME_DWELL_MIN} min minimum`,
+            `[travel] Suppressing travel-back for "${event.summary}" - dwell ${Math.round(dwellMin)} min < ${scheduling.minHomeDwellMin} min minimum`,
           );
         }
       } else if (isDev) {
@@ -649,7 +665,7 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
     // Write cache-only blocks
     let storedBeforeId: string | null = null;
     if (rawTravelToMinutes !== null) {
-      const roundedTo = roundTravelMinutes(rawTravelToMinutes);
+      const roundedTo = roundTravel(rawTravelToMinutes);
       const travelToStart = new Date(eventStart.getTime() - roundedTo * 60 * 1000);
       if (isDev) {
         console.log(
@@ -682,7 +698,7 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
 
     let storedAfterId: string | null = null;
     if (rawTravelBackMinutes !== null && !travelBackSuppressed) {
-      const roundedBack = roundTravelMinutes(rawTravelBackMinutes);
+      const roundedBack = roundTravel(rawTravelBackMinutes);
       const travelBackEnd = new Date(departureForBack.getTime() + roundedBack * 60 * 1000);
       if (isDev) {
         console.log(
@@ -726,11 +742,10 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
           eventStartAt: eventStart,
           eventEndAt: eventEnd,
           rawTravelMinutes: rawTravelToMinutes,
-          roundedMinutes:
-            rawTravelToMinutes !== null ? roundTravelMinutes(rawTravelToMinutes) : null,
+          roundedMinutes: rawTravelToMinutes !== null ? roundTravel(rawTravelToMinutes) : null,
           rawTravelBackMinutes,
           roundedBackMinutes:
-            rawTravelBackMinutes !== null ? roundTravelMinutes(rawTravelBackMinutes) : null,
+            rawTravelBackMinutes !== null ? roundTravel(rawTravelBackMinutes) : null,
           beforeEventId: storedBeforeId,
           afterEventId: storedAfterId,
           transportMode: persistedMode,

@@ -109,6 +109,10 @@ model Booking {
   bufferBeforeMin Int @default(0)
   bufferAfterMin  Int @default(0)
 
+  // How many times this booking has been rescheduled via /booking/edit; gates
+  // the optional max-reschedules pricing setting.
+  rescheduleCount Int @default(0)
+
   // Booking lifecycle state and hold expiry.
   status        BookingStatus @default(confirmed)
   holdExpiresAt DateTime?
@@ -461,6 +465,19 @@ model Setting {
   key       String   @unique
   value     String
   updatedAt DateTime @updatedAt
+}
+
+// Append-only history of settings-group writes, backing the admin audit log
+// and one-click revert. One row per saveSettingsGroup call where the value
+// actually changed. `oldValue` is null on the first write for a group.
+model SettingAudit {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  group     String
+  oldValue  String?
+  newValue  String
+  changedAt DateTime @default(now())
+
+  @@index([group, changedAt])
 }
 
 // NZ public holiday occurrences. Region distinguishes nationwide holidays

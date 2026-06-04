@@ -12,14 +12,6 @@
  */
 
 /**
- * Re-exported from pricing-policy.ts so the planner and the invoice engine
- * share one source of truth for GST registration. Flip the flag in
- * pricing-policy.ts when registered (and set the BUSINESS_GST_NUMBER env var
- * alongside it - the invoice header keys on the env var).
- */
-export { GST_REGISTERED } from "@/features/business/lib/pricing-policy";
-
-/**
  * Rates used by the planner. The first three come from `SETTINGS!B13:B15`
  * in the per-FY workbook; the GST output ratio is a fixed NZ constant.
  */

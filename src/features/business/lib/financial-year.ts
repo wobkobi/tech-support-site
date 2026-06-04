@@ -6,10 +6,14 @@
  * in Apr 2025 - Mar 2026 belong to "FY 2025-26".
  */
 
-import { BUSINESS_START_DATE } from "@/shared/lib/business-identity";
-
 /** Index of April in JS Date (0 = January). */
 const APRIL = 3;
+
+/**
+ * Code default for the business start date; the live value comes from
+ * `identity.startDateIso`, threaded in by the server-side callers.
+ */
+const DEFAULT_START_DATE = new Date("2025-10-01T00:00:00Z");
 
 /**
  * Computes the start year of the NZ financial year that contains `date`.
@@ -43,13 +47,18 @@ export interface FinancialYear {
  * Returns the NZ financial year that contains `date`.
  * @param date - Any date inside the desired FY.
  * @param now - "Today"; defaults to the current time.
+ * @param startDate - Business start date (for the "(partial)" label).
  * @returns The financial year metadata.
  */
-export function getFinancialYear(date: Date, now: Date = new Date()): FinancialYear {
+export function getFinancialYear(
+  date: Date,
+  now: Date = new Date(),
+  startDate: Date = DEFAULT_START_DATE,
+): FinancialYear {
   const startYear = fyStartYear(date);
   const start = new Date(startYear, APRIL, 1);
   const end = new Date(startYear + 1, APRIL, 1);
-  const businessStartedDuringThisFy = BUSINESS_START_DATE >= start && BUSINESS_START_DATE < end;
+  const businessStartedDuringThisFy = startDate >= start && startDate < end;
   const current = now >= start && now < end;
   const yy = String((startYear + 1) % 100).padStart(2, "0");
   const label = `FY ${startYear}-${yy}${businessStartedDuringThisFy ? " (partial)" : ""}`;
@@ -60,14 +69,18 @@ export function getFinancialYear(date: Date, now: Date = new Date()): FinancialY
  * Lists every FY from the business start date through the current FY,
  * most-recent first.
  * @param now - "Today"; defaults to the current time.
+ * @param startDate - Business start date (the first FY listed).
  * @returns Ordered list of FYs.
  */
-export function listFinancialYears(now: Date = new Date()): FinancialYear[] {
-  const firstStartYear = fyStartYear(BUSINESS_START_DATE);
+export function listFinancialYears(
+  now: Date = new Date(),
+  startDate: Date = DEFAULT_START_DATE,
+): FinancialYear[] {
+  const firstStartYear = fyStartYear(startDate);
   const currentStartYear = fyStartYear(now);
   const fys: FinancialYear[] = [];
   for (let y = currentStartYear; y >= firstStartYear; y--) {
-    fys.push(getFinancialYear(new Date(y, APRIL, 1), now));
+    fys.push(getFinancialYear(new Date(y, APRIL, 1), now, startDate));
   }
   return fys;
 }
@@ -92,14 +105,18 @@ export interface FinancialYearTotals {
  * @param income - Income entries with `amount` and `date`.
  * @param expenses - Expense entries with `amountExcl`, `gstAmount`, and `date`.
  * @param now - "Today"; defaults to the current time.
+ * @param incomeTaxRate - Income-tax provision rate (fraction); defaults to 0.2.
+ * @param startDate - Business start date (for the FY list + partial label).
  * @returns Per-FY totals, most recent first.
  */
 export function aggregateByFinancialYear(
   income: ReadonlyArray<{ amount: number; date: Date }>,
   expenses: ReadonlyArray<{ amountExcl: number; gstAmount: number; date: Date }>,
   now: Date = new Date(),
+  incomeTaxRate: number = 0.2,
+  startDate: Date = DEFAULT_START_DATE,
 ): FinancialYearTotals[] {
-  return listFinancialYears(now).map((fy) => {
+  return listFinancialYears(now, startDate).map((fy) => {
     const fyIncome = income.filter((e) => e.date >= fy.start && e.date < fy.end);
     const fyExpenses = expenses.filter((e) => e.date >= fy.start && e.date < fy.end);
     const totalIncome = fyIncome.reduce((s, e) => s + e.amount, 0);
@@ -112,9 +129,10 @@ export function aggregateByFinancialYear(
       expensesExcl: totalExpensesExcl,
       gstClaimable: totalGstClaimable,
       profit: Math.round(profit * 100) / 100,
-      // 20% income-tax provision is on PROFIT, not raw income (matches the NZ
-      // sole-trader Tax Planner sheet). Negative profit yields zero reserve.
-      taxReserve: Math.round(Math.max(0, profit * 0.2) * 100) / 100,
+      // Income-tax provision is on PROFIT, not raw income (matches the NZ
+      // sole-trader Tax Planner sheet); the rate comes from the tax settings.
+      // Negative profit yields zero reserve.
+      taxReserve: Math.round(Math.max(0, profit * incomeTaxRate) * 100) / 100,
       incomeCount: fyIncome.length,
       expenseCount: fyExpenses.length,
     };

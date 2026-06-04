@@ -15,6 +15,7 @@ import {
   isWithinCancellationWindow,
   isWithinTravelWindow,
 } from "@/features/business/lib/pricing-policy";
+import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { createDraftCancellationInvoice } from "@/features/business/lib/cancellation-invoice";
 
 interface PatchPayload {
@@ -104,8 +105,13 @@ export async function PATCH(
     data.cancelledAt = now;
     // Operator cancels never charge; on-behalf follows customer fee rules.
     data.cancelledBy = onBehalf ? "customer" : "operator";
-    data.lateCancellation = onBehalf ? isWithinCancellationWindow(booking.startAt, now) : false;
-    data.travelChargeApplies = onBehalf ? isWithinTravelWindow(booking.startAt, now) : false;
+    const { CANCELLATION } = await getPolicy();
+    data.lateCancellation = onBehalf
+      ? isWithinCancellationWindow(booking.startAt, now, CANCELLATION.freeNoticeHours)
+      : false;
+    data.travelChargeApplies = onBehalf
+      ? isWithinTravelWindow(booking.startAt, now, CANCELLATION.travelChargeHours)
+      : false;
   } else if (body.status === "completed") {
     data.status = "completed";
     data.activeSlotKey = `released:${id}`;

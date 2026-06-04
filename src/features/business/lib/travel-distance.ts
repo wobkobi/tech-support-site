@@ -9,6 +9,8 @@
  * to skip the travel charge or surface an error.
  */
 
+import { getIdentity } from "@/shared/lib/business-identity.server";
+
 interface DistanceMatrixElement {
   status: string;
   duration: { value: number; text: string };
@@ -59,7 +61,8 @@ export async function lookupDriveDistance(
   destination: string,
   departureTime?: Date,
 ): Promise<DriveDistanceResult> {
-  const origin = process.env.HOME_ADDRESS;
+  // Travel origin is the unified business base address (defaults to HOME_ADDRESS env).
+  const origin = (await getIdentity()).baseAddress.line || process.env.HOME_ADDRESS;
   // Server-only key (no referrer restriction) preferred; falls back to the
   // client key when the split env isn't set up.
   const apiKey = process.env.GOOGLE_MAPS_SERVER_KEY ?? process.env.GOOGLE_MAPS_API_KEY;

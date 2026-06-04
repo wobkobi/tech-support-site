@@ -14,7 +14,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { sendBookingReminderEmail } from "@/features/reviews/lib/email";
 import { isCronAuthorized } from "@/shared/lib/auth";
-import { CANCELLATION } from "@/features/business/lib/pricing-policy";
+import { getPolicy } from "@/features/business/lib/pricing-policy.server";
+import { getSettings } from "@/shared/lib/settings/get-settings";
 
 /**
  * GET /api/cron/send-booking-reminders
@@ -27,15 +28,23 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   try {
+    const { comms } = await getSettings();
+    if (!comms.notifyReminder) {
+      return NextResponse.json({ ok: true, skipped: "reminders disabled", emailsSent: 0 });
+    }
+
     const now = new Date();
+    const { CANCELLATION } = await getPolicy();
+    // Send once the booking is inside the reminder lead window but still far
+    // enough out that free cancellation is possible (lower bound).
     const lowerHours = CANCELLATION.freeNoticeHours + 1;
     const fromTime = new Date(now.getTime() + lowerHours * 60 * 60 * 1000);
-    const in25h = new Date(now.getTime() + 25 * 60 * 60 * 1000);
+    const upperTime = new Date(now.getTime() + comms.reminderLeadHours * 60 * 60 * 1000);
 
     const emailCandidates = await prisma.booking.findMany({
       where: {
         status: "confirmed",
-        startAt: { gt: fromTime, lte: in25h },
+        startAt: { gt: fromTime, lte: upperTime },
         OR: [{ emailReminderSentAt: null }, { emailReminderSentAt: { isSet: false } }],
       },
       select: {
