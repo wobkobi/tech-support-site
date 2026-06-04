@@ -483,7 +483,10 @@ export default async function PricingPage(): Promise<React.ReactElement> {
             <p className={cn("text-rich-black/70 mb-5 text-sm sm:text-base")}>
               Answer a few quick questions to get a price range. No commitment required.
             </p>
-            <PricingWizard />
+            <PricingWizard
+              minBillableMins={policy.MIN_BILLABLE_MINS}
+              minTravelCharge={policy.MIN_TRAVEL_CHARGE}
+            />
           </section>
 
           {pricing.ratesUpdatedAt && (

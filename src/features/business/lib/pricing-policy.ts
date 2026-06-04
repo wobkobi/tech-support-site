@@ -98,23 +98,25 @@ export interface TravelChargeBreakdown {
  * charge. Returns zeros for no travel (remote, or geocoded to origin).
  * @param travelMins - One-way drive time in minutes (from `lookupDriveDistance`).
  * @param travelRatePerHour - Travel hourly rate, sourced from the `Travel` RateConfig.
+ * @param minTravelCharge - Travel floor (live pricing setting); defaults to the code const.
  * @returns Per-step breakdown of the round-trip charge.
  */
 export function breakdownTravelCharge(
   travelMins: number,
   travelRatePerHour: number,
+  minTravelCharge: number = MIN_TRAVEL_CHARGE,
 ): TravelChargeBreakdown {
   if (travelMins <= 0 || travelRatePerHour <= 0) {
     return { rawCost: 0, roundedCost: 0, finalCost: 0, minimumApplied: false };
   }
   const rawCost = Math.round((travelMins / 60) * 2 * travelRatePerHour * 100) / 100;
   const roundedCost = Math.round(rawCost / 5) * 5;
-  const finalCost = Math.max(MIN_TRAVEL_CHARGE, roundedCost);
+  const finalCost = Math.max(minTravelCharge, roundedCost);
   return {
     rawCost,
     roundedCost,
     finalCost,
-    minimumApplied: roundedCost < MIN_TRAVEL_CHARGE,
+    minimumApplied: roundedCost < minTravelCharge,
   };
 }
 
@@ -127,10 +129,15 @@ export function breakdownTravelCharge(
  * minutes would 4x the bill.
  * @param travelMins - One-way drive time in minutes (from `lookupDriveDistance`).
  * @param travelRatePerHour - Travel hourly rate, sourced from the `Travel` RateConfig.
+ * @param minTravelCharge - Travel floor (live pricing setting); defaults to the code const.
  * @returns Charge in NZD (whole dollars after $5 rounding), or 0 when no travel.
  */
-export function calcTravelCharge(travelMins: number, travelRatePerHour: number): number {
-  return breakdownTravelCharge(travelMins, travelRatePerHour).finalCost;
+export function calcTravelCharge(
+  travelMins: number,
+  travelRatePerHour: number,
+  minTravelCharge: number = MIN_TRAVEL_CHARGE,
+): number {
+  return breakdownTravelCharge(travelMins, travelRatePerHour, minTravelCharge).finalCost;
 }
 
 /**

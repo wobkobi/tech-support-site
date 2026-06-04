@@ -214,7 +214,9 @@ export default async function BusinessPage({
   // authoritative; the live tax settings are the fallback for any cell it
   // doesn't fill (and the source when there's no workbook at all). Cached per
   // scope since the Drive/Sheets reads cost 3-5s on a miss.
-  const taxSettings = (await getSettings()).tax;
+  const settings = await getSettings();
+  const taxSettings = settings.tax;
+  const gstRegistered = settings.pricing.gstRegistered;
   let rates: TaxRates = {
     incomeTax: taxSettings.incomeTax,
     acc: taxSettings.acc,
@@ -343,6 +345,7 @@ export default async function BusinessPage({
         income={scopedIncomeTotal}
         expensesExcl={scopedExpensesTotal}
         gstClaimable={scopedGstTotal}
+        gstRegistered={gstRegistered}
         rates={rates}
       />
 

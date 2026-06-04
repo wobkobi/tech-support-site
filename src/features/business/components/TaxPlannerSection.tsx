@@ -4,7 +4,6 @@ import { cn } from "@/shared/lib/cn";
 import { formatNZD } from "@/features/business/lib/business";
 import {
   computeTaxPlan,
-  GST_REGISTERED,
   DEFAULT_TAX_RATES,
   type TaxRates,
 } from "@/features/business/lib/tax-planner";
@@ -18,6 +17,8 @@ interface Props {
   expensesExcl: number;
   /** GST claimable on FY expenses. */
   gstClaimable: number;
+  /** Whether GST is registered (live pricing setting); gates the GST column. */
+  gstRegistered: boolean;
   /**
    * Per-rate overrides for income tax / ACC / KiwiSaver, sourced from the
    * workbook's SETTINGS tab. Falls back to DEFAULT_TAX_RATES when the sheet
@@ -36,6 +37,7 @@ interface Props {
  * @param props.income - Period income.
  * @param props.expensesExcl - Period expenses excluding GST.
  * @param props.gstClaimable - Period GST claimable.
+ * @param props.gstRegistered - Whether GST is registered (gates the GST column).
  * @param props.rates - Per-rate overrides; falls back to DEFAULT_TAX_RATES.
  * @returns The rendered tax planner section.
  */
@@ -44,6 +46,7 @@ export function TaxPlannerSection({
   income,
   expensesExcl,
   gstClaimable,
+  gstRegistered,
   rates = DEFAULT_TAX_RATES,
 }: Props): React.ReactElement {
   const plan = computeTaxPlan(income, expensesExcl, gstClaimable, rates);
@@ -52,7 +55,7 @@ export function TaxPlannerSection({
   const kiwiSaverPct = `${(rates.kiwiSaver * 100).toFixed(0)}%`;
 
   // Tax account total: income tax + ACC, plus GST when registered.
-  const gstToReserve = GST_REGISTERED ? Math.max(0, plan.gst.netToPay) : 0;
+  const gstToReserve = gstRegistered ? Math.max(0, plan.gst.netToPay) : 0;
   const taxAccountTarget = plan.setAsides.incomeTax + plan.setAsides.acc + gstToReserve;
 
   return (
@@ -65,7 +68,7 @@ export function TaxPlannerSection({
       <div
         className={cn(
           "grid grid-cols-1 gap-3",
-          GST_REGISTERED ? "lg:grid-cols-3" : "lg:grid-cols-2",
+          gstRegistered ? "lg:grid-cols-3" : "lg:grid-cols-2",
         )}
       >
         {/* Tax account: income tax + ACC (+ GST when registered). Paid to IRD/ACC. */}
@@ -79,7 +82,7 @@ export function TaxPlannerSection({
             value={formatNZD(plan.setAsides.incomeTax)}
           />
           <PlannerRow label={`ACC (est.) @ ${accPct}`} value={formatNZD(plan.setAsides.acc)} />
-          {GST_REGISTERED && (
+          {gstRegistered && (
             <PlannerRow label="GST to pay" value={formatNZD(Math.max(0, plan.gst.netToPay))} />
           )}
           <PlannerRow label="Tax account total" value={formatNZD(taxAccountTarget)} emphasis />
@@ -116,8 +119,8 @@ export function TaxPlannerSection({
           </p>
         </div>
 
-        {/* GST - hidden until GST_REGISTERED is flipped to true in tax-planner.ts */}
-        {GST_REGISTERED && (
+        {/* GST - hidden until gstRegistered is flipped to true in tax-planner.ts */}
+        {gstRegistered && (
           <div className={cn("rounded-xl border border-slate-200 bg-white p-4 shadow-sm")}>
             <h3
               className={cn("text-russian-violet mb-3 text-sm font-bold uppercase tracking-wide")}

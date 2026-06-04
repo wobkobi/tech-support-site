@@ -15,6 +15,7 @@ import {
   hourlyTaskMinutes,
   timeDiffMins,
   todayISO,
+  type JobPricing,
 } from "@/features/business/lib/business";
 import { calcTravelCharge } from "@/features/business/lib/pricing-policy";
 import type { IdentitySettings } from "@/shared/lib/settings/types";
@@ -248,6 +249,8 @@ function emptyTask(rates: RateConfig[]): TaskLine {
 interface CalculatorViewProps {
   /** Live business identity, threaded into the invoice preview. */
   identity: IdentitySettings;
+  /** Live pricing (GST, min travel, billing increment) for the job calculations. */
+  pricing: JobPricing;
 }
 
 /**
@@ -255,9 +258,10 @@ interface CalculatorViewProps {
  * tasks, parts, and client details, then save it as income or convert it to an invoice.
  * @param props - Component props.
  * @param props.identity - Live business identity for the invoice preview.
+ * @param props.pricing - Live pricing for the job calculations.
  * @returns The rendered calculator view element.
  */
-export function CalculatorView({ identity }: CalculatorViewProps): React.ReactElement {
+export function CalculatorView({ identity, pricing }: CalculatorViewProps): React.ReactElement {
   const router = useRouter();
   const headers = {};
 
@@ -526,12 +530,12 @@ export function CalculatorView({ identity }: CalculatorViewProps): React.ReactEl
     clientName,
     clientEmail,
   };
-  const totals = calcJobTotal(job, !skipPromo ? activePromo : null);
+  const totals = calcJobTotal(job, !skipPromo ? activePromo : null, pricing);
   // Memoise the flattened line items so the preview panel's React.memo can
   // skip re-render when unrelated parent state changes (e.g. typing in the
   // AI input box). Recomputes when any meaningful input shifts.
   const previewLineItems = useMemo(
-    () => jobToLineItems(job),
+    () => jobToLineItems(job, pricing.billingIncrementMins),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       tasks,
@@ -555,134 +559,144 @@ export function CalculatorView({ identity }: CalculatorViewProps): React.ReactEl
    * @param result - The parsed job response returned by the AI.
    * @param rateList - The current list of rate configurations (used for travel rate lookup).
    */
-  const applyParseResult = useCallback((result: ParseJobResponse, rateList: RateConfig[]) => {
-    // Add the auto travel entry when the parser found any drive time. The
-    // $10 floor in calcTravelCharge handles the petty-billing concern - a
-    // 1-min drive still bills $10 because that's the published minimum.
-    const includeTravelDefault = (result.travel?.durationMins ?? 0) > 0;
+  const applyParseResult = useCallback(
+    (result: ParseJobResponse, rateList: RateConfig[]) => {
+      // Add the auto travel entry when the parser found any drive time. The
+      // $10 floor in calcTravelCharge handles the petty-billing concern - a
+      // 1-min drive still bills $10 because that's the published minimum.
+      const includeTravelDefault = (result.travel?.durationMins ?? 0) > 0;
 
-    // Hydrate the time slots. Prefer the per-range list when the parser found
-    // segments; otherwise synthesise one slot from startTime/endTime, or as a
-    // last resort anchor the duration to "now".
-    let parsedWindowMin = 0;
-    if (result.ranges && result.ranges.length > 0) {
-      setTimeRanges(result.ranges.map((r) => ({ startTime: r.startTime, endTime: r.endTime })));
-      const sum = result.ranges.reduce((s, r) => s + timeDiffMins(r.startTime, r.endTime), 0);
-      const aiMin = result.durationMins ?? null;
-      // When the AI-emitted duration differs from the sum (e.g. the operator
-      // typed an explicit total), surface it via the override field.
-      if (aiMin != null && aiMin !== sum) {
-        setDurationMinsOverride(aiMin);
-        parsedWindowMin = aiMin;
-      } else {
+      // Hydrate the time slots. Prefer the per-range list when the parser found
+      // segments; otherwise synthesise one slot from startTime/endTime, or as a
+      // last resort anchor the duration to "now".
+      let parsedWindowMin = 0;
+      if (result.ranges && result.ranges.length > 0) {
+        setTimeRanges(result.ranges.map((r) => ({ startTime: r.startTime, endTime: r.endTime })));
+        const sum = result.ranges.reduce((s, r) => s + timeDiffMins(r.startTime, r.endTime), 0);
+        const aiMin = result.durationMins ?? null;
+        // When the AI-emitted duration differs from the sum (e.g. the operator
+        // typed an explicit total), surface it via the override field.
+        if (aiMin != null && aiMin !== sum) {
+          setDurationMinsOverride(aiMin);
+          parsedWindowMin = aiMin;
+        } else {
+          setDurationMinsOverride(null);
+          parsedWindowMin = sum;
+        }
+      } else if (result.startTime && result.endTime) {
+        setTimeRanges([{ startTime: result.startTime, endTime: result.endTime }]);
+        const wallClockMin = timeDiffMins(result.startTime, result.endTime);
+        const aiMin = result.durationMins ?? null;
+        if (aiMin != null && aiMin !== wallClockMin) {
+          setDurationMinsOverride(aiMin);
+          parsedWindowMin = aiMin;
+        } else {
+          setDurationMinsOverride(null);
+          parsedWindowMin = wallClockMin;
+        }
+      } else if (result.startTime) {
+        const end = nowTime();
+        setTimeRanges([{ startTime: result.startTime, endTime: end }]);
         setDurationMinsOverride(null);
-        parsedWindowMin = sum;
-      }
-    } else if (result.startTime && result.endTime) {
-      setTimeRanges([{ startTime: result.startTime, endTime: result.endTime }]);
-      const wallClockMin = timeDiffMins(result.startTime, result.endTime);
-      const aiMin = result.durationMins ?? null;
-      if (aiMin != null && aiMin !== wallClockMin) {
-        setDurationMinsOverride(aiMin);
-        parsedWindowMin = aiMin;
-      } else {
+        parsedWindowMin = timeDiffMins(result.startTime, end);
+      } else if (result.durationMins !== null) {
+        const now = new Date();
+        const endTotalMins = now.getHours() * 60 + now.getMinutes();
+        const startTotalMins = Math.max(0, endTotalMins - result.durationMins);
+        const sh = Math.floor(startTotalMins / 60);
+        const sm = startTotalMins % 60;
+        setTimeRanges([
+          {
+            startTime: `${String(sh).padStart(2, "0")}:${String(sm).padStart(2, "0")}`,
+            endTime: nowTime(),
+          },
+        ]);
         setDurationMinsOverride(null);
-        parsedWindowMin = wallClockMin;
+        parsedWindowMin = result.durationMins;
       }
-    } else if (result.startTime) {
-      const end = nowTime();
-      setTimeRanges([{ startTime: result.startTime, endTime: end }]);
-      setDurationMinsOverride(null);
-      parsedWindowMin = timeDiffMins(result.startTime, end);
-    } else if (result.durationMins !== null) {
-      const now = new Date();
-      const endTotalMins = now.getHours() * 60 + now.getMinutes();
-      const startTotalMins = Math.max(0, endTotalMins - result.durationMins);
-      const sh = Math.floor(startTotalMins / 60);
-      const sm = startTotalMins % 60;
-      setTimeRanges([
-        {
-          startTime: `${String(sh).padStart(2, "0")}:${String(sm).padStart(2, "0")}`,
-          endTime: nowTime(),
-        },
-      ]);
-      setDurationMinsOverride(null);
-      parsedWindowMin = result.durationMins;
-    }
 
-    setHourlyRateId(result.hourlyRateId);
-    const parsedTasks: TaskLine[] = result.tasks.map((t) => {
-      const device = t.device ?? null;
-      const action = t.action ?? null;
-      const details = t.details?.trim() ? t.details.trim() : null;
-      // Server already composes the description, but compose locally as a
-      // fallback so descriptions stay correct even if an older route shape
-      // sneaks through.
-      const description = composeDescription(device, action, details) || t.description || "";
-      // If baseRateId is set, this is an hourly task (new rate model) - force
-      // rateConfigId to null so the promo math classifies it correctly even
-      // if the AI emitted a stray ID.
-      const isHourly = t.baseRateId != null;
-      return {
-        rateConfigId: isHourly ? null : (t.rateConfigId ?? null),
-        baseRateId: t.baseRateId ?? null,
-        modifierIds: t.modifierIds ?? [],
-        description,
-        qty: t.qty,
-        unitPrice: t.unitPrice,
-        lineTotal: Math.round(t.qty * t.unitPrice * 100) / 100,
-        device,
-        action,
-        details,
-        isShort: t.isShort ?? false,
-        isExplicit: t.isExplicit ?? false,
-      };
-    });
-    const parsedParts = result.parts.map((p) => ({ description: p.description, cost: p.cost }));
+      setHourlyRateId(result.hourlyRateId);
+      const parsedTasks: TaskLine[] = result.tasks.map((t) => {
+        const device = t.device ?? null;
+        const action = t.action ?? null;
+        const details = t.details?.trim() ? t.details.trim() : null;
+        // Server already composes the description, but compose locally as a
+        // fallback so descriptions stay correct even if an older route shape
+        // sneaks through.
+        const description = composeDescription(device, action, details) || t.description || "";
+        // If baseRateId is set, this is an hourly task (new rate model) - force
+        // rateConfigId to null so the promo math classifies it correctly even
+        // if the AI emitted a stray ID.
+        const isHourly = t.baseRateId != null;
+        return {
+          rateConfigId: isHourly ? null : (t.rateConfigId ?? null),
+          baseRateId: t.baseRateId ?? null,
+          modifierIds: t.modifierIds ?? [],
+          description,
+          qty: t.qty,
+          unitPrice: t.unitPrice,
+          lineTotal: Math.round(t.qty * t.unitPrice * 100) / 100,
+          device,
+          action,
+          details,
+          isShort: t.isShort ?? false,
+          isExplicit: t.isExplicit ?? false,
+        };
+      });
+      const parsedParts = result.parts.map((p) => ({ description: p.description, cost: p.cost }));
 
-    // Reparse semantics: the new parse result is the new truth for the auto
-    // travel entry. Manual entries (parking, ferry, etc.) survive a reparse
-    // so the operator doesn't have to re-type them after every AI tweak.
-    setJobAddress(result.destination ?? "");
+      // Reparse semantics: the new parse result is the new truth for the auto
+      // travel entry. Manual entries (parking, ferry, etc.) survive a reparse
+      // so the operator doesn't have to re-type them after every AI tweak.
+      setJobAddress(result.destination ?? "");
 
-    if (result.travel && includeTravelDefault) {
-      const travelRatePerHour =
-        rateList.find((r) => r.unit === "travel-hour" && r.ratePerHour !== null)?.ratePerHour ?? 40;
-      const cost = calcTravelCharge(result.travel.durationMins, travelRatePerHour);
-      const label = result.destination?.trim() || `${result.travel.durationMins} min drive`;
-      setTravelEntries((prev) => [
-        {
-          label,
-          cost,
-          isAuto: true,
-          destination: result.destination ?? label,
-          durationMinsOneWay: result.travel?.durationMins,
-          distanceKmOneWay: result.travel?.distanceKmOneWay,
-        },
-        ...prev.filter((e) => !e.isAuto),
-      ]);
-    } else {
-      // No drive time from the parse (remote work or geocode-to-origin): drop
-      // any stale auto entry, leave manual entries alone.
-      setTravelEntries((prev) => prev.filter((e) => !e.isAuto));
-    }
-    // Rebalance parsed tasks to fit the listed window so an AI over-estimating
-    // a single step doesn't silently over-bill. Tasks scale proportionally so
-    // the over-long ones absorb more of the correction; anything that scales
-    // below the minimum is dropped and the rest rescale.
-    const collapsed = collapseToWindow(parsedTasks, parsedWindowMin);
-    setTasks(collapsed.tasks);
-    if (collapsed.rescaled || collapsed.dropped > 0) {
-      const parts: string[] = ["Rebalanced tasks"];
-      if (collapsed.dropped > 0) {
-        parts.push(`(dropped ${collapsed.dropped} tiny task${collapsed.dropped === 1 ? "" : "s"})`);
+      if (result.travel && includeTravelDefault) {
+        const travelRatePerHour =
+          rateList.find((r) => r.unit === "travel-hour" && r.ratePerHour !== null)?.ratePerHour ??
+          40;
+        const cost = calcTravelCharge(
+          result.travel.durationMins,
+          travelRatePerHour,
+          pricing.minTravelCharge,
+        );
+        const label = result.destination?.trim() || `${result.travel.durationMins} min drive`;
+        setTravelEntries((prev) => [
+          {
+            label,
+            cost,
+            isAuto: true,
+            destination: result.destination ?? label,
+            durationMinsOneWay: result.travel?.durationMins,
+            distanceKmOneWay: result.travel?.distanceKmOneWay,
+          },
+          ...prev.filter((e) => !e.isAuto),
+        ]);
+      } else {
+        // No drive time from the parse (remote work or geocode-to-origin): drop
+        // any stale auto entry, leave manual entries alone.
+        setTravelEntries((prev) => prev.filter((e) => !e.isAuto));
       }
-      setIncomeToast(`${parts.join(" ")} to fit the ${parsedWindowMin}-min window.`);
-      setTimeout(() => setIncomeToast(null), 4000);
-    }
-    setParts(parsedParts);
-    if (result.notes) setNotes(result.notes);
-  }, []);
+      // Rebalance parsed tasks to fit the listed window so an AI over-estimating
+      // a single step doesn't silently over-bill. Tasks scale proportionally so
+      // the over-long ones absorb more of the correction; anything that scales
+      // below the minimum is dropped and the rest rescale.
+      const collapsed = collapseToWindow(parsedTasks, parsedWindowMin);
+      setTasks(collapsed.tasks);
+      if (collapsed.rescaled || collapsed.dropped > 0) {
+        const parts: string[] = ["Rebalanced tasks"];
+        if (collapsed.dropped > 0) {
+          parts.push(
+            `(dropped ${collapsed.dropped} tiny task${collapsed.dropped === 1 ? "" : "s"})`,
+          );
+        }
+        setIncomeToast(`${parts.join(" ")} to fit the ${parsedWindowMin}-min window.`);
+        setTimeout(() => setIncomeToast(null), 4000);
+      }
+      setParts(parsedParts);
+      if (result.notes) setNotes(result.notes);
+    },
+    [pricing.minTravelCharge],
+  );
 
   /**
    * Submits the free-text AI input to the parse-job API and applies the result to the calculator
@@ -890,7 +904,7 @@ export function CalculatorView({ identity }: CalculatorViewProps): React.ReactEl
     setSavingInvoice(true);
     try {
       await saveTaskTemplates(tasks);
-      const lineItems = jobToLineItems(job);
+      const lineItems = jobToLineItems(job, pricing.billingIncrementMins);
       const promoActive = activePromo && !skipPromo && totals.promoDiscount > 0;
       const res = await fetch("/api/business/invoices", {
         method: "POST",
@@ -1006,7 +1020,7 @@ export function CalculatorView({ identity }: CalculatorViewProps): React.ReactEl
           rates.find((r) => r.unit === "travel-hour" && r.ratePerHour !== null)?.ratePerHour ?? 40;
         // calcTravelCharge doubles to round-trip internally and floors at
         // MIN_TRAVEL_CHARGE, so a 1-min drive still bills the $10 minimum.
-        const cost = calcTravelCharge(d.durationMins, travelRatePerHour);
+        const cost = calcTravelCharge(d.durationMins, travelRatePerHour, pricing.minTravelCharge);
         const label = jobAddress.trim() || `${d.durationMins} min drive`;
         setTravelEntries((prev) => [
           {
@@ -1413,6 +1427,7 @@ export function CalculatorView({ identity }: CalculatorViewProps): React.ReactEl
             hourlyRateId={hourlyRateId}
             onHourlyRateIdChange={setHourlyRateId}
             baseRates={baseRates}
+            billingIncrementMins={pricing.billingIncrementMins}
           />
 
           {/* Travel */}
@@ -1428,6 +1443,7 @@ export function CalculatorView({ identity }: CalculatorViewProps): React.ReactEl
               rates.find((r) => r.unit === "travel-hour" && r.ratePerHour !== null)?.ratePerHour ??
               40
             }
+            minTravelCharge={pricing.minTravelCharge}
           />
 
           {/* Tasks - inline warning when hourly task minutes drift from the

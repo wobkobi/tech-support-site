@@ -5,6 +5,7 @@ import { requireAdminAuth } from "@/shared/lib/auth";
 import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
 import { CalculatorView } from "@/features/business/components/CalculatorView";
 import { getIdentity } from "@/shared/lib/business-identity.server";
+import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { cn } from "@/shared/lib/cn";
 
 export const dynamic = "force-dynamic";
@@ -21,12 +22,18 @@ export const metadata: Metadata = {
 export default async function CalculatorPage(): Promise<React.ReactElement> {
   await requireAdminAuth();
   const identity = await getIdentity();
+  const policy = await getPolicy();
+  const pricing = {
+    gstRegistered: policy.GST_REGISTERED,
+    minTravelCharge: policy.MIN_TRAVEL_CHARGE,
+    billingIncrementMins: policy.BILLING_INCREMENT_MINS,
+  };
 
   return (
     <AdminPageLayout current="business-calculator">
       <h1 className={cn("text-russian-violet mb-6 text-2xl font-extrabold")}>Job calculator</h1>
       <Suspense>
-        <CalculatorView identity={identity} />
+        <CalculatorView identity={identity} pricing={pricing} />
       </Suspense>
     </AdminPageLayout>
   );

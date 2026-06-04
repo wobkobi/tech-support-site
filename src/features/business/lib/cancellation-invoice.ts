@@ -42,7 +42,7 @@ export async function createDraftCancellationInvoice(
   options: DraftCancellationInvoiceOptions,
 ): Promise<void> {
   const reason = options.reason ?? "late-cancellation";
-  const { CANCELLATION, GST_REGISTERED } = await getPolicy();
+  const { CANCELLATION, GST_REGISTERED, MIN_TRAVEL_CHARGE } = await getPolicy();
   const headline =
     reason === "no-show"
       ? `No-show fee - ${formatDateShort(booking.startAt)}`
@@ -81,7 +81,7 @@ export async function createDraftCancellationInvoice(
         });
         travelRatePerHour = travelRow?.ratePerHour ?? 40;
       }
-      const travelCost = calcTravelCharge(travelMins, travelRatePerHour);
+      const travelCost = calcTravelCharge(travelMins, travelRatePerHour, MIN_TRAVEL_CHARGE);
       if (travelCost > 0) {
         lineItems.push({
           description: "Cancellation travel (round-trip)",
