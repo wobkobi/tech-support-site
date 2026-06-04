@@ -8,10 +8,17 @@
  * by every settings tab so the save/validation flow stays consistent.
  */
 
-import { useCallback, useState } from "react";
+import { createContext, useCallback, useContext, useMemo, useState } from "react";
 import type React from "react";
 import type { Settings, SettingsGroup } from "@/shared/lib/settings/types";
-import type { FieldError } from "@/shared/lib/settings/validate";
+import { checkGuardrails, type FieldError } from "@/shared/lib/settings/validate";
+
+/**
+ * Full resolved settings, provided by SettingsView so each tab's form can run
+ * the cross-setting guardrails live (against the other groups + its own draft).
+ * Null when no provider is present - the live banner just stays empty then.
+ */
+export const SettingsAllContext = createContext<Settings | null>(null);
 
 export interface SettingsFormApi<G extends SettingsGroup> {
   draft: Settings[G];
@@ -47,9 +54,33 @@ export function useSettingsForm<G extends SettingsGroup>(
   const [draft, setDraft] = useState<Settings[G]>(initial);
   const [saving, setSaving] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [blocks, setBlocks] = useState<string[]>([]);
-  const [warns, setWarns] = useState<string[]>([]);
+  const [serverBlocks, setServerBlocks] = useState<string[]>([]);
+  const [serverWarns, setServerWarns] = useState<string[]>([]);
   const [savedAt, setSavedAt] = useState<number | null>(null);
+
+  // Live cross-setting guardrails: run the same pure check the save route uses,
+  // against the current draft over the other groups, so BLOCK/WARN issues show
+  // as the operator types instead of only after a rejected save.
+  const all = useContext(SettingsAllContext);
+  const live = useMemo(() => {
+    if (!all) return { blocks: [] as string[], warns: [] as string[] };
+    const proposed = { ...all, [group]: draft } as Settings;
+    const issues = checkGuardrails(proposed);
+    return {
+      blocks: issues.filter((i) => i.level === "block").map((i) => i.message),
+      warns: issues.filter((i) => i.level === "warn").map((i) => i.message),
+    };
+  }, [all, group, draft]);
+
+  // Merge live findings with anything the server returned (deduped).
+  const blocks = useMemo(
+    () => [...new Set([...live.blocks, ...serverBlocks])],
+    [live.blocks, serverBlocks],
+  );
+  const warns = useMemo(
+    () => [...new Set([...live.warns, ...serverWarns])],
+    [live.warns, serverWarns],
+  );
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
 
@@ -57,8 +88,8 @@ export function useSettingsForm<G extends SettingsGroup>(
     async (confirmWarnings = false): Promise<boolean> => {
       setSaving(true);
       setFieldErrors({});
-      setBlocks([]);
-      if (!confirmWarnings) setWarns([]);
+      setServerBlocks([]);
+      if (!confirmWarnings) setServerWarns([]);
       try {
         const res = await fetch(`/api/admin/settings/${group}`, {
           method: "PUT",
@@ -68,7 +99,7 @@ export function useSettingsForm<G extends SettingsGroup>(
         });
         if (res.ok) {
           setSavedAt(Date.now());
-          setWarns([]);
+          setServerWarns([]);
           return true;
         }
         const data = (await res.json().catch(() => ({}))) as {
@@ -82,15 +113,15 @@ export function useSettingsForm<G extends SettingsGroup>(
           for (const fe of data.fieldErrors) map[fe.field] = fe.message;
           setFieldErrors(map);
         } else if (res.status === 422) {
-          setBlocks(data.blocks ?? [data.error ?? "Save blocked."]);
+          setServerBlocks(data.blocks ?? [data.error ?? "Save blocked."]);
         } else if (res.status === 409) {
-          setWarns(data.warns ?? []);
+          setServerWarns(data.warns ?? []);
         } else {
-          setBlocks([data.error ?? "Save failed."]);
+          setServerBlocks([data.error ?? "Save failed."]);
         }
         return false;
       } catch {
-        setBlocks(["Network error - please try again."]);
+        setServerBlocks(["Network error - please try again."]);
         return false;
       } finally {
         setSaving(false);

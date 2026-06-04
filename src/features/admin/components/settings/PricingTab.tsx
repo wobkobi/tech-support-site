@@ -16,6 +16,7 @@ import type { PricingSettings } from "@/shared/lib/settings/types";
 import { NumberField, ToggleField } from "@/features/admin/components/settings/SettingsFields";
 import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
 import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
+import { PricingPreview } from "@/features/admin/components/settings/PricingPreview";
 
 interface Props {
   initial: PricingSettings;
@@ -172,6 +173,8 @@ export function PricingTab({ initial, defaults }: Props): React.ReactElement {
           }
         />
       </div>
+
+      <PricingPreview config={draft} />
 
       {/* Guardrail blocks - save was refused. */}
       {blocks.length > 0 && (

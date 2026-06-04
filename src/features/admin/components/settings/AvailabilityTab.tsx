@@ -21,6 +21,7 @@ import {
 } from "@/features/admin/components/settings/SettingsFields";
 import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
 import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
+import { AvailabilityPreview } from "@/features/admin/components/settings/AvailabilityPreview";
 
 interface Props {
   initial: AvailabilitySettings;
@@ -352,6 +353,8 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
           </ul>
         </div>
       )}
+
+      <AvailabilityPreview config={draft} />
 
       {/* Guardrail warnings */}
       {warns.length > 0 && (
