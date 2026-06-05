@@ -9,6 +9,7 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata, Viewport } from "next";
 import { Exo } from "next/font/google";
 import "./globals.css";
+import { GoogleTag } from "@/shared/components/GoogleTag";
 import { NavBar } from "@/shared/components/NavBar";
 import { PromoBanner } from "@/shared/components/PromoBanner";
 import { getSiteUrl } from "@/shared/lib/site-url";
@@ -399,6 +400,7 @@ export default async function RootLayout({
 
         <Analytics />
         <SpeedInsights />
+        <GoogleTag />
         <script
           id="ld-business"
           type="application/ld+json"
