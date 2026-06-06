@@ -879,7 +879,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
 
   /**
    * Direct save: POSTs the calculator state straight to the invoices API and
-   * navigates to the detail page. Bypasses InvoiceBuilderView entirely. Used
+   * navigates to the detail page. Used
    * by the "Save invoice" button - the primary action when the operator is
    * happy with the live preview and doesn't need to override the invoice
    * number / issue date / due date.
@@ -935,9 +935,8 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
         setTimeout(() => setSheetSyncToast(null), 6000);
       }
       const invoiceId = d.invoice.id;
-      // Add-to-contacts gate: same flow as InvoiceBuilderView. Defer nav
-      // until the modal closes so handleAddContactClose can backfill
-      // contactId via PATCH.
+      // Add-to-contacts gate: defer nav until the modal closes so
+      // handleAddContactClose can backfill contactId via PATCH.
       if (clientEmail.trim()) {
         try {
           const checkRes = await fetch(
