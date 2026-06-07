@@ -121,6 +121,8 @@ export interface TaskLine {
   isShort?: boolean;
   /** AI-flagged task with an operator-stated explicit duration. Pinned at the parser-emitted qty by the rebalance helper, so only floating tasks absorb any window mismatch. */
   isExplicit?: boolean;
+  /** Operator-set: this task wasn't finished, so calcJobTotal halves its line per the unsuccessful-work policy. Ignored on flat-rate rows and when the whole-job `unsuccessful` flag is set (which already covers it). */
+  unsuccessful?: boolean;
 }
 
 export interface PartLine {

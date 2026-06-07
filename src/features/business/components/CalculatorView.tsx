@@ -1476,6 +1476,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
             baseRates={baseRates}
             modifierRates={modifierRates}
             flatRates={flatRates}
+            jobUnsuccessful={unsuccessful}
           />
 
           {/* Parts */}

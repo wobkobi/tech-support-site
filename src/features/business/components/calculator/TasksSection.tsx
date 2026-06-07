@@ -23,6 +23,8 @@ interface Props {
   baseRates: RateConfig[];
   modifierRates: RateConfig[];
   flatRates: RateConfig[];
+  /** Whole-job unsuccessful flag; when set it already halves every task, so per-task flags show as subsumed. */
+  jobUnsuccessful: boolean;
 }
 
 /**
@@ -59,6 +61,7 @@ function tagSuggestions(templates: TaskTemplate[], key: "device" | "action"): st
  * @param props.baseRates - Base hourly rates available in the rate dropdown.
  * @param props.modifierRates - Modifier chips shown next to the base dropdown.
  * @param props.flatRates - Flat-rate options used for flat-rate rows.
+ * @param props.jobUnsuccessful - Whole-job unsuccessful flag; dims per-task flags it already covers.
  * @returns Tasks section element.
  */
 export function TasksSection({
@@ -73,6 +76,7 @@ export function TasksSection({
   baseRates,
   modifierRates,
   flatRates,
+  jobUnsuccessful,
 }: Props): React.ReactElement {
   return (
     <div
@@ -285,6 +289,31 @@ export function TasksSection({
                       </button>
                     );
                   })}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onTasksChange((prev) =>
+                        prev.map((t, i) =>
+                          i === idx ? { ...t, unsuccessful: !t.unsuccessful } : t,
+                        ),
+                      )
+                    }
+                    aria-pressed={task.unsuccessful ?? false}
+                    title={
+                      jobUnsuccessful
+                        ? "Whole job is marked unsuccessful, so this task is already half price"
+                        : "Mark this task as not finished (half price)"
+                    }
+                    className={cn(
+                      "rounded-full border px-2 py-1 text-xs font-medium transition-colors",
+                      task.unsuccessful
+                        ? "border-amber-300 bg-amber-50 text-amber-700"
+                        : "border-slate-200 bg-white text-slate-500 hover:border-slate-300",
+                      jobUnsuccessful && "opacity-50",
+                    )}
+                  >
+                    Didn&apos;t finish
+                  </button>
                   <span className={cn("ml-auto text-xs font-semibold text-slate-700")}>
                     = {formatNZD(task.unitPrice)}/hr
                   </span>
