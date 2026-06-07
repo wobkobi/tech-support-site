@@ -28,6 +28,9 @@ import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
 import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-create";
 import { validatePhone } from "@/shared/lib/normalise-phone";
 
+// Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
+export const maxDuration = 60;
+
 interface AdminBookingPayload {
   name?: string;
   email?: string;

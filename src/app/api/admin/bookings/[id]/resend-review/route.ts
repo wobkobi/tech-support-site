@@ -9,6 +9,9 @@ import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { sendCustomerReviewRequest } from "@/features/reviews/lib/email";
 
+// Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
+export const maxDuration = 60;
+
 /**
  * POST /api/admin/bookings/[id]/resend-review
  * Sends (or resends) the review request email for a booking, bypassing the

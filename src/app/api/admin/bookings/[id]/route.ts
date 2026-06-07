@@ -18,6 +18,9 @@ import {
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { createDraftCancellationInvoice } from "@/features/business/lib/cancellation-invoice";
 
+// Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
+export const maxDuration = 60;
+
 interface PatchPayload {
   name?: string;
   email?: string;
