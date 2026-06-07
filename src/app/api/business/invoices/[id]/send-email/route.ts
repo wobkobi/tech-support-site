@@ -8,6 +8,9 @@ import { getInvoiceReviewEligibility } from "@/features/business/lib/contact-rev
 import { extractYearCode, generateInvoicePdf } from "@/features/business/lib/invoice-pdf";
 import { uploadInvoicePdf } from "@/features/business/lib/google-drive";
 
+// Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
+export const maxDuration = 60;
+
 /**
  * POST /api/business/invoices/[id]/send-email
  * Re-generates the invoice PDF, emails it to the client (with the friendly

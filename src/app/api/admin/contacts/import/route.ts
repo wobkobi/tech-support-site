@@ -8,6 +8,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { importFromGoogleContacts } from "@/features/contacts/lib/google-contacts";
 
+// Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
+export const maxDuration = 60;
+
 /**
  * POST /api/admin/contacts/import
  * Imports all contacts from Google Contacts into the local database.

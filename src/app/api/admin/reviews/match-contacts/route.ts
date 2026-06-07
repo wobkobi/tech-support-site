@@ -9,6 +9,9 @@ import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { toE164NZ, normalisePhone } from "@/shared/lib/normalise-phone";
 
+// Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
+export const maxDuration = 60;
+
 /**
  * POST /api/admin/reviews/match-contacts
  * For each review that has a bookingId but no contactId, loads the booking to

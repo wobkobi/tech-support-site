@@ -3,6 +3,9 @@ import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { searchAllInvoicePdfs } from "@/features/business/lib/google-drive";
 
+// Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
+export const maxDuration = 60;
+
 // Matches "Invoice TTP-202627-0006.pdf" or "Invoice TTP-0001.pdf" (skips -old variants)
 const INVOICE_FILE_RE = /^Invoice\s+([A-Z]+-[\d-]+\d)\.pdf$/i;
 

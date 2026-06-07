@@ -11,6 +11,9 @@ import { prisma } from "@/shared/lib/prisma";
 import { isCronAuthorized } from "@/shared/lib/auth";
 import { NZ_REGION, HOME_REGION } from "@/features/business/lib/pricing-policy";
 
+// Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
+export const maxDuration = 60;
+
 const NZ_HOLIDAYS_CALENDAR_ID = "en.new_zealand#holiday@group.v.calendar.google.com";
 
 /**

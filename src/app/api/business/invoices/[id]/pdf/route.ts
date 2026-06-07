@@ -4,6 +4,9 @@ import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { generateInvoicePdf } from "@/features/business/lib/invoice-pdf";
 
+// Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
+export const maxDuration = 60;
+
 /**
  * GET /api/business/invoices/[id]/pdf
  * Re-generates the PDF bytes for a saved invoice and returns them as an

@@ -12,6 +12,9 @@ import {
   syncAllContactsToGoogle,
 } from "@/features/contacts/lib/google-contacts";
 
+// Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
+export const maxDuration = 60;
+
 /**
  * POST /api/admin/contacts/sync
  * Two-way sync: pulls all Google contacts into the local DB, then pushes all local contacts to Google.

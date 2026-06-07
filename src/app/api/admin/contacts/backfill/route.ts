@@ -12,6 +12,9 @@ import { isAdminRequest } from "@/shared/lib/auth";
 import { toE164NZ } from "@/shared/lib/normalise-phone";
 import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-create";
 
+// Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
+export const maxDuration = 60;
+
 /**
  * Parse phone and address from structured booking notes.
  * @param notes - Raw booking notes string.

@@ -8,6 +8,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
 
+// Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
+export const maxDuration = 60;
+
 /**
  * POST /api/admin/contacts/[id]/sync-google
  * Syncs the specified contact to Google Contacts.

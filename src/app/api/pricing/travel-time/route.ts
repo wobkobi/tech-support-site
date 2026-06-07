@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 import { lookupDriveDistance } from "@/features/business/lib/travel-distance";
 
+// Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
+export const maxDuration = 60;
+
 /**
  * POST /api/pricing/travel-time - Drive time from HOME_ADDRESS to destination.
  * Optional `departureTimeIso` enables traffic-aware quoting; malformed/missing
