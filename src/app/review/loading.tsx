@@ -8,16 +8,7 @@
 
 import { PageShell, FrostedSection, CARD } from "@/shared/components/PageLayout";
 import { cn } from "@/shared/lib/cn";
-
-/**
- * Animated skeleton bone used to fill placeholder areas.
- * @param props - Component props.
- * @param props.className - Additional CSS classes for sizing/positioning.
- * @returns Skeleton bone element.
- */
-function Bone({ className }: { className?: string }): React.ReactElement {
-  return <div className={cn("bg-seasalt-400/50 animate-pulse rounded-lg", className)} />;
-}
+import { Bone } from "@/shared/components/Skeleton";
 
 /**
  * Review page loading skeleton shown via React Suspense while DB queries run.
