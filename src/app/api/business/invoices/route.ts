@@ -70,8 +70,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   // Default issue + due dates server-side so the calculator's direct-save path
-  // doesn't need to send them. Operators using the "Edit details first" route
-  // can still override either via the InvoiceBuilderView form fields.
+  // doesn't need to send them. Operators can still override either by sending
+  // explicit issueDate / dueDate values.
   const issueDateValue = issueDate ? new Date(issueDate) : new Date();
   const identity = await getIdentity();
   const dueDateValue = dueDate

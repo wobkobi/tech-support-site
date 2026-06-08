@@ -14,6 +14,9 @@ import {
 import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 
+// Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
+export const maxDuration = 60;
+
 /**
  * Fetches calendar events if the module is available
  * @param now - Start date

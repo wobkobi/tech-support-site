@@ -8,6 +8,9 @@ import {
 } from "@/features/business/lib/business";
 import { getSheetsClient, getSheetId } from "@/features/business/lib/google-sheets";
 
+// Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
+export const maxDuration = 60;
+
 /**
  * GET /api/cron/record-subscriptions
  * Records all active subscriptions due today or earlier (NZ time).

@@ -16,6 +16,9 @@ import { Prisma } from "@prisma/client";
 import { toE164NZ } from "@/shared/lib/normalise-phone";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 
+// Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
+export const maxDuration = 60;
+
 /**
  * Request payload for creating a booking.
  */

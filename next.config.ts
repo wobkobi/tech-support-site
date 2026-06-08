@@ -32,6 +32,8 @@ const cspDev =
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // Drop the X-Powered-By: Next.js header so responses don't advertise the framework/version.
+  poweredByHeader: false,
   output: "standalone",
   typescript: { ignoreBuildErrors: false },
 

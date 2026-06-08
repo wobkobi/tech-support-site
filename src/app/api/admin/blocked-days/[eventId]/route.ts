@@ -10,6 +10,9 @@ import { revalidateTag } from "next/cache";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { deleteBookingEvent, SCHEDULE_CALENDAR_TAG } from "@/features/calendar/lib/google-calendar";
 
+// Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
+export const maxDuration = 60;
+
 /**
  * DELETE /api/admin/blocked-days/[eventId]
  * Removes the named all-day event from the booking calendar.

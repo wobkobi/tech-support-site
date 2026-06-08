@@ -11,6 +11,9 @@ import { sendCustomerReviewRequest } from "@/features/reviews/lib/email";
 import { isCronAuthorized } from "@/shared/lib/auth";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 
+// Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
+export const maxDuration = 60;
+
 /**
  * GET /api/cron/send-review-emails
  * Finds completed appointments from 30 minutes ago and sends review requests.

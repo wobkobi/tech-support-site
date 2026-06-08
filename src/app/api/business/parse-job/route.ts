@@ -15,6 +15,9 @@ import type {
   RateConfig,
 } from "@/features/business/types/business";
 
+// Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
+export const maxDuration = 60;
+
 /** Internal extension that carries the per-range duration (used by the pre-compute hint). */
 interface RangeWithDuration extends ParsedRange {
   durationMins: number;

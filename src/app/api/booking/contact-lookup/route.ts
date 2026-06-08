@@ -10,13 +10,15 @@ import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 
 /**
  * GET /api/booking/contact-lookup?email=<email>
- * Returns name, phone, and address for a known contact email.
+ * Returns name, phone, and address for a known contact email so the booking
+ * form can pre-fill. This exposes PII (phone + address) for any email that is
+ * known, so it is kept on a tight per-IP rate limit to blunt enumeration.
  * Returns 404 (ok: false) if not found - never exposes other contact fields.
  * @param request - Incoming request.
  * @returns JSON with contact fields or not-found response.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  const limited = rateLimitOrReject(request, "contact-lookup", 5, 60_000);
+  const limited = rateLimitOrReject(request, "contact-lookup", 3, 60_000);
   if (limited) return limited;
 
   const email = request.nextUrl.searchParams.get("email")?.trim().toLowerCase();

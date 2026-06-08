@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { runSheetsImport } from "@/features/business/lib/sheets-import";
 
+// Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
+export const maxDuration = 60;
+
 /**
  * GET /api/business/sheets/import - Dry-run preview of what would be imported.
  * @param request - Incoming Next.js request.

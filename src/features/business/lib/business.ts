@@ -122,11 +122,12 @@ export function billableMins(mins: number, incrementMins: number = BILLING_INCRE
 }
 
 /**
- * Minutes between two HH:MM strings on the same day. Empty/invalid inputs
- * collapse to 0 (matches the calculator's pre-existing behaviour). Returns 0
- * for reversed times so a half-typed session doesn't sneak negative minutes
- * into the aggregate. Cross-midnight handling is intentionally not done here -
- * use the duration override for overnight cases.
+ * Minutes between two HH:MM strings, rolling past midnight. Empty/invalid
+ * inputs collapse to 0 (matches the calculator's pre-existing behaviour). An
+ * End earlier than Start is treated as the next day (e.g. 23:40 > 00:10 is 30
+ * min), so overnight slots read straight off the clock without a duration
+ * override. Equal times stay 0 so a half-typed session doesn't sneak a full
+ * day into the aggregate.
  * @param start - HH:MM start.
  * @param end - HH:MM end.
  * @returns Non-negative minute diff, or 0 when inputs are unusable.
@@ -137,7 +138,9 @@ export function timeDiffMins(start: string, end: string): number {
   const [eh, em] = end.split(":").map(Number);
   if ([sh, sm, eh, em].some((n) => Number.isNaN(n))) return 0;
   const diff = eh * 60 + em - (sh * 60 + sm);
-  return diff > 0 ? diff : 0;
+  if (diff > 0) return diff;
+  if (diff < 0) return diff + 24 * 60;
+  return 0;
 }
 
 /**
@@ -483,9 +486,23 @@ export function computeJobPromoDiscount(
 }
 
 /**
+ * Whether a task line counts as labour. Hourly tasks (an explicit base rate, or
+ * no rate config at all) are labour; flat-rate rows like Travel never are, so
+ * they're excluded from the unsuccessful-work discount.
+ * @param task - Task line to classify.
+ * @returns True when the line is hourly labour.
+ */
+function isHourlyTask(task: TaskLine): boolean {
+  return task.baseRateId != null || task.rateConfigId == null;
+}
+
+/**
  * Cost breakdown for a job. Promo discount applies to labour only; travel +
- * parts stay at full price. Unsuccessful-work flag halves the labour
- * portion. GST mode is driven by GST_REGISTERED (see calcInvoiceTotals);
+ * parts stay at full price. The whole-job unsuccessful flag halves the entire
+ * labour portion (time charge + hourly tasks); otherwise per-task `unsuccessful`
+ * flags halve just those hourly task lines, leaving the time charge at full
+ * price. Both fold into the single `unsuccessfulDiscount`. GST mode is driven
+ * by GST_REGISTERED (see calcInvoiceTotals);
  * job.gst is ignored. Travel floor (MIN_TRAVEL_CHARGE) only applies when an
  * auto entry contributed - manual-only travel passes through unchanged.
  * @param job - Job calculation with time, tasks, and parts.
@@ -531,11 +548,20 @@ export function calcJobTotal(
   const promoDiscount = computeJobPromoDiscount(job, promo, pricing.billingIncrementMins);
   let unsuccessfulDiscount = 0;
   if (job.unsuccessful) {
+    // Whole-job flag halves the time charge plus every hourly task; per-task
+    // flags are subsumed here so a task can't be discounted twice.
     const hourlyTasksTotal = job.tasks
-      .filter((t) => t.baseRateId != null || t.rateConfigId == null)
+      .filter(isHourlyTask)
       .reduce((s, t) => s + t.qty * t.unitPrice, 0);
     const labourBase = timeCharge + hourlyTasksTotal;
     unsuccessfulDiscount = Math.round(labourBase * 0.5 * 100) / 100;
+  } else {
+    // Per-task flags halve only the flagged hourly lines; the time charge bills
+    // full because those hours were worked regardless.
+    const flaggedTasksTotal = job.tasks
+      .filter((t) => t.unsuccessful && isHourlyTask(t))
+      .reduce((s, t) => s + t.qty * t.unitPrice, 0);
+    unsuccessfulDiscount = Math.round(flaggedTasksTotal * 0.5 * 100) / 100;
   }
   // GST applied to the discounted amount per NZ IRD price-reduction treatment.
   const taxableAmount = Math.round((subtotal - promoDiscount - unsuccessfulDiscount) * 100) / 100;

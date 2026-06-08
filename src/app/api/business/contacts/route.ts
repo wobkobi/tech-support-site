@@ -4,6 +4,9 @@ import { getOAuth2Client } from "@/features/calendar/lib/google-calendar";
 import { isAdminRequest } from "@/shared/lib/auth";
 import type { GoogleContact } from "@/features/business/types/business";
 
+// Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
+export const maxDuration = 60;
+
 /**
  * GET /api/business/contacts - Returns sanitised Google Contacts for the contact picker.
  * @param request - Incoming Next.js request

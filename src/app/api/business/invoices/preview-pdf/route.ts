@@ -4,6 +4,9 @@ import { isAdminRequest } from "@/shared/lib/auth";
 import { generateInvoicePdf } from "@/features/business/lib/invoice-pdf";
 import type { Invoice, LineItem } from "@/features/business/types/business";
 
+// Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
+export const maxDuration = 60;
+
 interface PreviewPayload {
   number: string;
   clientName: string;

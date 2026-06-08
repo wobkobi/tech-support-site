@@ -9,6 +9,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { refreshCalendarCache } from "@/features/calendar/lib/calendar-cache";
 import { isCronAuthorized } from "@/shared/lib/auth";
 
+// Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
+export const maxDuration = 60;
+
 /**
  * GET /api/cron/refresh-calendar-cache
  * Fetches calendar events and caches them in the database.

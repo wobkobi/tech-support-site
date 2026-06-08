@@ -37,6 +37,9 @@ import { getActivePromo } from "@/features/business/lib/promos";
 import { lookupDriveDistance } from "@/features/business/lib/travel-distance";
 import { lookupPublicHoliday } from "@/features/business/lib/pricing-policy.server";
 
+// Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
+export const maxDuration = 60;
+
 interface BookingRequestPayload {
   dateKey: string;
   timeOfDay: TimeOfDay;

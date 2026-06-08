@@ -17,6 +17,9 @@ import { isCronAuthorized } from "@/shared/lib/auth";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 
+// Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
+export const maxDuration = 60;
+
 /**
  * GET /api/cron/send-booking-reminders
  * @param request - Incoming cron request.

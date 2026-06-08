@@ -7,6 +7,9 @@ import { extractYearCode, generateInvoicePdf } from "@/features/business/lib/inv
 import { uploadInvoicePdf } from "@/features/business/lib/google-drive";
 import type { InvoiceStatus } from "@prisma/client";
 
+// Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
+export const maxDuration = 60;
+
 /**
  * Builds the patch payload for a status change. Stamps `voidedAt` when the
  * target is VOIDED so the audit trail records when the cancellation happened;

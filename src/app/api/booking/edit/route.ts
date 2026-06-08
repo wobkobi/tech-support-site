@@ -32,6 +32,9 @@ import {
 } from "@/features/reviews/lib/email";
 import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
 
+// Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
+export const maxDuration = 60;
+
 interface EditBookingPayload {
   cancelToken: string;
   dateKey: string;
