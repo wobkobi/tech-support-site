@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/shared/lib/prisma";
-import { isAdminRequest } from "@/shared/lib/auth";
 import { aggregateByFinancialYear } from "@/features/business/lib/financial-year";
-import { getSettings } from "@/shared/lib/settings/get-settings";
+import { isAdminRequest } from "@/shared/lib/auth";
 import { getIdentity } from "@/shared/lib/business-identity.server";
+import { prisma } from "@/shared/lib/prisma";
+import { getSettings } from "@/shared/lib/settings/get-settings";
+import { NextRequest, NextResponse } from "next/server";
 
 /**
  * GET /api/business/summary - Returns aggregated income, expense, profit, and tax reserve stats,

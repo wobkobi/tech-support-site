@@ -8,24 +8,24 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import {
-  LOGO_MARK,
-  LOGO_FULL,
-  LOGO_PROFILE,
-  BACKDROP,
-  FAVICON_SPECS,
-  SOCIAL_SPECS,
-  BACKDROP_VARIANTS,
   ADDITIONAL_ASSETS,
+  BACKDROP,
+  BACKDROP_VARIANTS,
+  FAVICON_SPECS,
+  LOGO_FULL,
+  LOGO_MARK,
+  LOGO_PROFILE,
   QR_CODE_SPECS,
+  SOCIAL_SPECS,
 } from "./config.js";
 import {
+  buildAdditionalAssets,
+  buildBackdropVariants,
   buildFavicons,
   buildFaviconSvg,
-  buildSocialImages,
-  buildBackdropVariants,
-  buildAdditionalAssets,
-  buildQRCodes,
   buildManifest,
+  buildQRCodes,
+  buildSocialImages,
 } from "./generators.js";
 
 /* ---------- Preflight Check ---------- */

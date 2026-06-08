@@ -1,13 +1,13 @@
 // src/app/admin/contacts/page.tsx
-import type { Metadata } from "next";
-import type React from "react";
-import Link from "next/link";
-import { prisma } from "@/shared/lib/prisma";
-import { requireAdminAuth } from "@/shared/lib/auth";
-import { cn } from "@/shared/lib/cn";
 import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
 import { ContactsAdminView } from "@/features/admin/components/ContactsAdminView";
 import { autoMaintain } from "@/features/admin/lib/auto-maintain";
+import { requireAdminAuth } from "@/shared/lib/auth";
+import { cn } from "@/shared/lib/cn";
+import { prisma } from "@/shared/lib/prisma";
+import type { Metadata } from "next";
+import Link from "next/link";
+import type React from "react";
 
 export const dynamic = "force-dynamic";
 

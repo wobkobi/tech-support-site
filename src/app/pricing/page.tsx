@@ -6,28 +6,28 @@
  * page, booking emails, and FAQ stay aligned.
  */
 
-import type { Metadata } from "next";
-import type React from "react";
-import Link from "next/link";
-import { FrostedSection, PageShell, CARD, SOFT_CARD } from "@/shared/components/PageLayout";
-import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
-import { cn } from "@/shared/lib/cn";
 import { PricingWizard } from "@/features/business/components/PricingWizard";
+import {
+  cancellationCopy,
+  gstCopy,
+  minimumsCopy,
+  publicHolidayCopy,
+  travelCopy,
+  unsuccessfulWorkCopy,
+} from "@/features/business/lib/pricing-policy";
+import { getPolicy, getPublicPricing } from "@/features/business/lib/pricing-policy.server";
 import {
   applyPromoToHourlyRate,
   getActivePromo,
   summariseForBanner,
 } from "@/features/business/lib/promos";
-import { getPolicy, getPublicPricing } from "@/features/business/lib/pricing-policy.server";
-import {
-  cancellationCopy,
-  travelCopy,
-  minimumsCopy,
-  unsuccessfulWorkCopy,
-  publicHolidayCopy,
-  gstCopy,
-} from "@/features/business/lib/pricing-policy";
+import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
+import { CARD, FrostedSection, PageShell, SOFT_CARD } from "@/shared/components/PageLayout";
+import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
+import type { Metadata } from "next";
+import Link from "next/link";
+import type React from "react";
 import { FaCaretDown, FaCheck } from "react-icons/fa6";
 
 // Admin rate / promo edits must show on next visit.

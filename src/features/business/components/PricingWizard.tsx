@@ -1,17 +1,17 @@
 "use client";
 
-import type React from "react";
-import { useState, useEffect } from "react";
-import Link from "next/link";
-import type { PublicRate, PriceRange } from "@/features/business/types/pricing";
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
-import { cn } from "@/shared/lib/cn";
+import { calcTravelCharge } from "@/features/business/lib/pricing-policy";
 import {
   applyPromoToHourlyRate,
   summariseForBanner,
   type ActivePromo,
 } from "@/features/business/lib/promos";
-import { calcTravelCharge } from "@/features/business/lib/pricing-policy";
+import type { PriceRange, PublicRate } from "@/features/business/types/pricing";
+import { cn } from "@/shared/lib/cn";
+import Link from "next/link";
+import type React from "react";
+import { useEffect, useState } from "react";
 
 const SOFT_CARD = cn(
   "border-seasalt-400/80 bg-seasalt-900/60 rounded-xl border p-3 text-base sm:p-4 sm:text-lg",

@@ -6,10 +6,10 @@
  * Shown while the approved-reviews query runs.
  */
 
-import type React from "react";
-import { cn } from "@/shared/lib/cn";
-import { FrostedSection, PageShell, CARD } from "@/shared/components/PageLayout";
+import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
 import { Bone } from "@/shared/components/Skeleton";
+import { cn } from "@/shared/lib/cn";
+import type React from "react";
 
 /**
  * Reviews route-loading skeleton.

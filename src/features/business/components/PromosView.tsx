@@ -5,12 +5,12 @@
  * @description Admin promo CRUD - form-on-top + table-below + overlap warning.
  */
 
-import { useState } from "react";
-import type React from "react";
-import { cn } from "@/shared/lib/cn";
-import { formatNZD } from "@/features/business/lib/business";
-import { formatDateShort } from "@/shared/lib/date-format";
 import type { PromoRow } from "@/app/admin/promos/page";
+import { formatNZD } from "@/features/business/lib/business";
+import { cn } from "@/shared/lib/cn";
+import { formatDateShort } from "@/shared/lib/date-format";
+import type React from "react";
+import { useState } from "react";
 
 type PromoType = "flat" | "percent";
 

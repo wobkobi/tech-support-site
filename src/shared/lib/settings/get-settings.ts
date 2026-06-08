@@ -9,10 +9,10 @@
  * go live immediately. The 60s revalidate is only a cross-instance safety net.
  */
 
-import { unstable_cache } from "next/cache";
 import { prisma } from "@/shared/lib/prisma";
 import { DEFAULT_SETTINGS } from "@/shared/lib/settings/defaults";
 import type { Settings, SettingsGroup } from "@/shared/lib/settings/types";
+import { unstable_cache } from "next/cache";
 
 /** Cache tag invalidated by `saveSettingsGroup` on every write. */
 export const SETTINGS_TAG = "settings";

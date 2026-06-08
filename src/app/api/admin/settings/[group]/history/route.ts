@@ -7,11 +7,11 @@
  * load a prior version back into the editor for review + re-save.
  */
 
-import { NextRequest, NextResponse } from "next/server";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { DEFAULT_SETTINGS } from "@/shared/lib/settings/defaults";
 import type { SettingsGroup } from "@/shared/lib/settings/types";
+import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 

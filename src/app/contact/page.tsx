@@ -4,13 +4,13 @@
  * @description Contact page: how to get in touch.
  */
 
-import type { Metadata } from "next";
-import type React from "react";
-import { FrostedSection, PageShell, CARD } from "@/shared/components/PageLayout";
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
 import { Button } from "@/shared/components/Button";
+import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
 import { cn } from "@/shared/lib/cn";
-import { FaEnvelope, FaPhone, FaMapLocationDot } from "react-icons/fa6";
+import type { Metadata } from "next";
+import type React from "react";
+import { FaEnvelope, FaMapLocationDot, FaPhone } from "react-icons/fa6";
 
 export const metadata: Metadata = {
   title: "Contact - Local Tech Support in Auckland",

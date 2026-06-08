@@ -7,11 +7,11 @@
  * validation behaviour stays identical even when wording differs.
  */
 
-import { useState } from "react";
-import type React from "react";
-import { cn } from "@/shared/lib/cn";
 import { validateEmail } from "@/features/booking/lib/booking";
+import { cn } from "@/shared/lib/cn";
 import { suggestEmailCorrection } from "@/shared/lib/email-typo-suggestion";
+import type React from "react";
+import { useState } from "react";
 
 interface EmailInputProps {
   id: string;

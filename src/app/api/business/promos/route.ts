@@ -1,9 +1,9 @@
 // src/app/api/business/promos/route.ts
-import { NextRequest, NextResponse } from "next/server";
-import { revalidateTag } from "next/cache";
-import { prisma } from "@/shared/lib/prisma";
-import { isAdminRequest } from "@/shared/lib/auth";
 import { ACTIVE_PROMO_TAG } from "@/features/business/lib/promos";
+import { isAdminRequest } from "@/shared/lib/auth";
+import { prisma } from "@/shared/lib/prisma";
+import { revalidateTag } from "next/cache";
+import { NextRequest, NextResponse } from "next/server";
 
 interface PromoBody {
   title?: string;

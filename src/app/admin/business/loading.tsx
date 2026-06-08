@@ -5,10 +5,10 @@
  * overview stat cards, the tax-planner panel and the action-link row.
  */
 
-import type React from "react";
-import { cn } from "@/shared/lib/cn";
-import { Bone } from "@/shared/components/Skeleton";
 import { AdminSkeletonShell } from "@/features/admin/components/AdminSkeletonShell";
+import { Bone } from "@/shared/components/Skeleton";
+import { cn } from "@/shared/lib/cn";
+import type React from "react";
 
 /**
  * Business dashboard loading skeleton.

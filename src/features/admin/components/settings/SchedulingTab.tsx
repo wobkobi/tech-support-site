@@ -8,13 +8,13 @@
  * - the defaults are sensible and most operators never need to touch these.
  */
 
-import type React from "react";
+import { NumberField } from "@/features/admin/components/settings/SettingsFields";
+import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
+import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
 import { cn } from "@/shared/lib/cn";
 import { SCHEDULING_FIELD_META } from "@/shared/lib/settings/field-meta";
 import type { SchedulingSettings } from "@/shared/lib/settings/types";
-import { NumberField } from "@/features/admin/components/settings/SettingsFields";
-import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
-import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
+import type React from "react";
 
 interface Props {
   initial: SchedulingSettings;

@@ -4,12 +4,12 @@
  * @description About page: background, approach, and who I help.
  */
 
-import type { Metadata } from "next";
-import type React from "react";
-import { FrostedSection, PageShell, CARD } from "@/shared/components/PageLayout";
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
+import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
 import { cn } from "@/shared/lib/cn";
+import type { Metadata } from "next";
 import Link from "next/link";
+import type React from "react";
 
 export const metadata: Metadata = {
   title: "About Harrison Raynes - Local Tech Support in Auckland",

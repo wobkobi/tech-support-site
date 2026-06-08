@@ -1,6 +1,6 @@
-import type React from "react";
 import { AdminSidebar, type AdminPage } from "@/features/admin/components/AdminSidebar";
 import { cn } from "@/shared/lib/cn";
+import type React from "react";
 
 interface AdminPageLayoutProps {
   current: AdminPage;

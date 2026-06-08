@@ -1,15 +1,15 @@
 // src/app/admin/schedule/page.tsx
+import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
+import { DayAgendaView } from "@/features/admin/components/DayAgendaView";
+import { WeekView } from "@/features/admin/components/WeekView";
+import { mondayOf, type WeekEvent, type WeekViewKind } from "@/features/admin/lib/schedule-types";
+import { addDays, resolveWeekStart, toNZDateKey } from "@/features/admin/lib/week";
+import { lookupPublicHoliday } from "@/features/business/lib/pricing-policy.server";
+import { getCachedScheduleEvents } from "@/features/calendar/lib/google-calendar";
+import { requireAdminAuth } from "@/shared/lib/auth";
+import { prisma } from "@/shared/lib/prisma";
 import type { Metadata } from "next";
 import type React from "react";
-import { prisma } from "@/shared/lib/prisma";
-import { requireAdminAuth } from "@/shared/lib/auth";
-import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
-import { getCachedScheduleEvents } from "@/features/calendar/lib/google-calendar";
-import { addDays, resolveWeekStart, toNZDateKey } from "@/features/admin/lib/week";
-import { WeekView } from "@/features/admin/components/WeekView";
-import { DayAgendaView } from "@/features/admin/components/DayAgendaView";
-import { mondayOf, type WeekEvent, type WeekViewKind } from "@/features/admin/lib/schedule-types";
-import { lookupPublicHoliday } from "@/features/business/lib/pricing-policy.server";
 
 export const dynamic = "force-dynamic";
 

@@ -8,10 +8,10 @@
  * by every settings tab so the save/validation flow stays consistent.
  */
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import type React from "react";
 import type { Settings, SettingsGroup } from "@/shared/lib/settings/types";
 import { checkGuardrails, type FieldError } from "@/shared/lib/settings/validate";
+import type React from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
 /**
  * Full resolved settings, provided by SettingsView so each tab's form can run

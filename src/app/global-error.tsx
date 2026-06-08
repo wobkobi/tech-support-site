@@ -6,9 +6,9 @@
 
 "use client";
 
-import type React from "react";
-import Link from "next/link";
 import { cn } from "@/shared/lib/cn";
+import Link from "next/link";
+import type React from "react";
 import { FaArrowRotateRight, FaHouse } from "react-icons/fa6";
 
 /**

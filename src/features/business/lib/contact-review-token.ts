@@ -4,9 +4,9 @@
  * @description Lazy generator for the per-contact review token used in invoice emails.
  */
 
-import { randomUUID } from "crypto";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
+import { randomUUID } from "crypto";
 
 /**
  * Returns the contact's stable review token, creating + persisting one on first call.

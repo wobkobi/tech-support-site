@@ -8,11 +8,11 @@
  * (lastSyncedAt null) lets Google win for any field it has populated.
  */
 
-import { google } from "googleapis";
-import { prisma } from "@/shared/lib/prisma";
 import { getOAuth2Client } from "@/features/calendar/lib/google-calendar";
 import { normalisePhone, toE164NZ } from "@/shared/lib/normalise-phone";
-import { recordContactConflict, clearContactConflict } from "./contact-conflicts";
+import { prisma } from "@/shared/lib/prisma";
+import { google } from "googleapis";
+import { clearContactConflict, recordContactConflict } from "./contact-conflicts";
 
 /**
  * Returns an authenticated Google People API client.

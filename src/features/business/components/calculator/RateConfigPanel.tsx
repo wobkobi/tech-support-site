@@ -1,9 +1,9 @@
 "use client";
 
+import type { RateConfig } from "@/features/business/types/business";
+import { cn } from "@/shared/lib/cn";
 import type React from "react";
 import { FaCheck } from "react-icons/fa6";
-import { cn } from "@/shared/lib/cn";
-import type { RateConfig } from "@/features/business/types/business";
 
 type RateType = "flat" | "hourly" | "modifier" | "percent";
 

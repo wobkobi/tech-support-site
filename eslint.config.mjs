@@ -1,10 +1,10 @@
 // eslint.config.mjs
-import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 import prettier from "eslint-config-prettier/flat";
-import prettierPlugin from "eslint-plugin-prettier/recommended";
 import jsdoc from "eslint-plugin-jsdoc";
+import prettierPlugin from "eslint-plugin-prettier/recommended";
+import { defineConfig, globalIgnores } from "eslint/config";
 import globals from "globals";
 
 export default defineConfig([

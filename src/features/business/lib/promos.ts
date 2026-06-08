@@ -4,8 +4,8 @@
  * @description Active-promo lookup + helpers. Cached 60s; admin writes revalidate.
  */
 
-import { unstable_cache } from "next/cache";
 import { prisma } from "@/shared/lib/prisma";
+import { unstable_cache } from "next/cache";
 
 /** Cache tag invalidated by the promo CRUD routes. */
 export const ACTIVE_PROMO_TAG = "active-promo";

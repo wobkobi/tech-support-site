@@ -1,11 +1,11 @@
 // src/app/admin/promos/page.tsx
-import type { Metadata } from "next";
-import type React from "react";
-import { requireAdminAuth } from "@/shared/lib/auth";
 import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
+import { PromosView } from "@/features/business/components/PromosView";
+import { requireAdminAuth } from "@/shared/lib/auth";
 import { cn } from "@/shared/lib/cn";
 import { prisma } from "@/shared/lib/prisma";
-import { PromosView } from "@/features/business/components/PromosView";
+import type { Metadata } from "next";
+import type React from "react";
 
 export const dynamic = "force-dynamic";
 

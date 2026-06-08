@@ -7,10 +7,10 @@
  * identically. Per-form wording can be customised via errorMessages.
  */
 
-import { useState } from "react";
-import type React from "react";
 import { cn } from "@/shared/lib/cn";
 import { formatNZPhone, validatePhone } from "@/shared/lib/normalise-phone";
+import type React from "react";
+import { useState } from "react";
 
 interface PhoneInputProps {
   id: string;

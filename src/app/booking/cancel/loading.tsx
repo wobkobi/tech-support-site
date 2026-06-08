@@ -7,9 +7,9 @@
  * banner placeholder and the action buttons.
  */
 
-import type React from "react";
-import { cn } from "@/shared/lib/cn";
 import { Bone } from "@/shared/components/Skeleton";
+import { cn } from "@/shared/lib/cn";
+import type React from "react";
 
 const CARD = "border-seasalt-400/60 bg-seasalt-800 rounded-xl border p-5 shadow-sm sm:p-6";
 

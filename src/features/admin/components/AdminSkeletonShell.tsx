@@ -6,9 +6,9 @@
  * admin route-loading file only has to supply its own content bones.
  */
 
-import type React from "react";
-import { cn } from "@/shared/lib/cn";
 import { Bone } from "@/shared/components/Skeleton";
+import { cn } from "@/shared/lib/cn";
+import type React from "react";
 
 /** Props for AdminSkeletonShell. */
 interface AdminSkeletonShellProps {

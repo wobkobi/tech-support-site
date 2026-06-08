@@ -7,8 +7,16 @@
  * built show a placeholder noting they're still managed in code.
  */
 
-import { useEffect, useState } from "react";
-import type React from "react";
+import { AvailabilityTab } from "@/features/admin/components/settings/AvailabilityTab";
+import { CommsTab } from "@/features/admin/components/settings/CommsTab";
+import { HoldsTab } from "@/features/admin/components/settings/HoldsTab";
+import { IdentityTab } from "@/features/admin/components/settings/IdentityTab";
+import { PricingTab } from "@/features/admin/components/settings/PricingTab";
+import { ReviewsTab } from "@/features/admin/components/settings/ReviewsTab";
+import { SchedulingTab } from "@/features/admin/components/settings/SchedulingTab";
+import { SettingsSearch } from "@/features/admin/components/settings/SettingsSearch";
+import { TaxTab } from "@/features/admin/components/settings/TaxTab";
+import { SettingsAllContext } from "@/features/admin/components/settings/useSettingsForm";
 import { cn } from "@/shared/lib/cn";
 import { GROUP_META } from "@/shared/lib/settings/field-meta";
 import type {
@@ -23,16 +31,8 @@ import type {
   SettingsGroup,
   TaxSettings,
 } from "@/shared/lib/settings/types";
-import { PricingTab } from "@/features/admin/components/settings/PricingTab";
-import { AvailabilityTab } from "@/features/admin/components/settings/AvailabilityTab";
-import { CommsTab } from "@/features/admin/components/settings/CommsTab";
-import { ReviewsTab } from "@/features/admin/components/settings/ReviewsTab";
-import { HoldsTab } from "@/features/admin/components/settings/HoldsTab";
-import { IdentityTab } from "@/features/admin/components/settings/IdentityTab";
-import { TaxTab } from "@/features/admin/components/settings/TaxTab";
-import { SchedulingTab } from "@/features/admin/components/settings/SchedulingTab";
-import { SettingsSearch } from "@/features/admin/components/settings/SettingsSearch";
-import { SettingsAllContext } from "@/features/admin/components/settings/useSettingsForm";
+import type React from "react";
+import { useEffect, useState } from "react";
 
 /** Tab order shown in the settings bar. */
 const TAB_ORDER: SettingsGroup[] = [

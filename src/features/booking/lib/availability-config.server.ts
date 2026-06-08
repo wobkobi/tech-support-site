@@ -7,9 +7,9 @@
  * source - the operator's saved availability plus the structural timezone.
  */
 
-import "server-only";
-import { getSettings } from "@/shared/lib/settings/get-settings";
 import { BOOKING_CONFIG, type AvailabilityConfig } from "@/features/booking/lib/booking";
+import { getSettings } from "@/shared/lib/settings/get-settings";
+import "server-only";
 
 /** Resolved availability plus the master "accepting bookings" switch + message. */
 export interface ResolvedAvailability {

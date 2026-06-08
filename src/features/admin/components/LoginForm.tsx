@@ -8,10 +8,10 @@
  * distinguished from a rate-limited one (defence-in-depth).
  */
 
-import { useState } from "react";
-import type React from "react";
-import { useRouter } from "next/navigation";
 import { cn } from "@/shared/lib/cn";
+import { useRouter } from "next/navigation";
+import type React from "react";
+import { useState } from "react";
 
 interface LoginFormProps {
   /** Validated relative path to land on after a successful sign-in. */

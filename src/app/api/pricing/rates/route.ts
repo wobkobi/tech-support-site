@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
+import { NextResponse } from "next/server";
 
 /**
  * GET /api/pricing/rates - Public endpoint returning rate labels and amounts (no auth required).

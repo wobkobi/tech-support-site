@@ -14,12 +14,12 @@
 
 "use client";
 
+import { cn } from "@/shared/lib/cn";
+import { loadPlacesLibrary } from "@/shared/lib/google-maps-loader";
+import useOnVisible from "@/shared/lib/useOnVisible";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { FaTriangleExclamation } from "react-icons/fa6";
-import useOnVisible from "@/shared/lib/useOnVisible";
-import { loadPlacesLibrary } from "@/shared/lib/google-maps-loader";
-import { cn } from "@/shared/lib/cn";
 
 /**
  * Props for AddressAutocomplete component.

@@ -5,8 +5,8 @@
  * required to log out - hitting this endpoint without a session is a no-op.
  */
 
-import { NextResponse } from "next/server";
 import { ADMIN_SESSION_COOKIE } from "@/shared/lib/admin-session";
+import { NextResponse } from "next/server";
 
 /**
  * POST /api/admin/logout

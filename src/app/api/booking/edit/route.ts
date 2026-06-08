@@ -4,33 +4,33 @@
  * @description API route to edit an existing booking by cancel token.
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/shared/lib/prisma";
-import {
-  validateBookingRequest,
-  validateBookingPayloadFields,
-  parseHourLabel,
-  type TimeOfDay,
-  type StartMinute,
-  type JobDuration,
-  type ExistingBooking,
-} from "@/features/booking/lib/booking";
 import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
-import { getSettings } from "@/shared/lib/settings/get-settings";
-import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
+import {
+  parseHourLabel,
+  validateBookingPayloadFields,
+  validateBookingRequest,
+  type ExistingBooking,
+  type JobDuration,
+  type StartMinute,
+  type TimeOfDay,
+} from "@/features/booking/lib/booking";
 import {
   createBookingEvent,
   deleteBookingEvent,
   fetchAllCalendarEvents,
 } from "@/features/calendar/lib/google-calendar";
-import { Prisma } from "@prisma/client";
-import { toE164NZ, isValidPhone } from "@/shared/lib/normalise-phone";
-import { rateLimitOrReject } from "@/shared/lib/rate-limit";
+import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
 import {
   sendCustomerBookingConfirmation,
   sendOwnerBookingNotification,
 } from "@/features/reviews/lib/email";
-import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
+import { isValidPhone, toE164NZ } from "@/shared/lib/normalise-phone";
+import { prisma } from "@/shared/lib/prisma";
+import { rateLimitOrReject } from "@/shared/lib/rate-limit";
+import { getSettings } from "@/shared/lib/settings/get-settings";
+import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
+import { Prisma } from "@prisma/client";
+import { NextRequest, NextResponse } from "next/server";
 
 // Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
 export const maxDuration = 60;

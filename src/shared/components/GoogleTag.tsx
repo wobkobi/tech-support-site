@@ -6,8 +6,8 @@
  */
 
 import Script from "next/script";
-import { useEffect } from "react";
 import type React from "react";
+import { useEffect } from "react";
 
 const GA4_ID = process.env.NEXT_PUBLIC_GA4_ID;
 const ADS_ID = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID;

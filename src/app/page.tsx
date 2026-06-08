@@ -4,20 +4,22 @@
  * @description Main landing page for tech support company.
  */
 
-import type React from "react";
 import Reviews, { type ReviewItem } from "@/features/reviews/components/Reviews";
 import { formatReviewerName } from "@/features/reviews/lib/formatting";
-import { FrostedSection, PageShell } from "@/shared/components/PageLayout";
 import { Button } from "@/shared/components/Button";
+import { FrostedSection, PageShell } from "@/shared/components/PageLayout";
 import { cn } from "@/shared/lib/cn";
-import { unstable_cache } from "next/cache";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
+import { unstable_cache } from "next/cache";
 import Image from "next/image";
+import type React from "react";
+import type { IconType } from "react-icons";
 import {
   FaCalendarCheck,
   FaCircleCheck,
   FaCloud,
+  FaDownload,
   FaEnvelope,
   FaHandshake,
   FaHouse,
@@ -31,10 +33,8 @@ import {
   FaShieldHalved,
   FaToolbox,
   FaTv,
-  FaDownload,
   FaWifi,
 } from "react-icons/fa6";
-import type { IconType } from "react-icons";
 
 // Rely on on-demand revalidation (revalidateReviewPaths fires on every review change).
 // Long fallback avoids waking a cold DB on a fixed timer.

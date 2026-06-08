@@ -8,17 +8,17 @@
 
 "use client";
 
-import type React from "react";
-import { Suspense, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
-import { cn } from "@/shared/lib/cn";
-import { Button } from "@/shared/components/Button";
 import {
   CANCELLATION,
   isWithinCancellationWindow,
   isWithinTravelWindow,
 } from "@/features/business/lib/pricing-policy";
+import { Button } from "@/shared/components/Button";
+import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
+import { useSearchParams } from "next/navigation";
+import type React from "react";
+import { Suspense, useEffect, useState } from "react";
 
 const CARD = "border-seasalt-400/60 bg-seasalt-800 rounded-xl border p-5 shadow-sm sm:p-6";
 

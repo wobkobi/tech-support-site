@@ -1,13 +1,13 @@
 "use client";
 
-import { memo } from "react";
-import type React from "react";
-import Image from "next/image";
-import { cn } from "@/shared/lib/cn";
 import { calcInvoiceTotals, formatNZD } from "@/features/business/lib/business";
-import { formatDateShort } from "@/shared/lib/date-format";
 import type { LineItem } from "@/features/business/types/business";
+import { cn } from "@/shared/lib/cn";
+import { formatDateShort } from "@/shared/lib/date-format";
 import type { IdentitySettings } from "@/shared/lib/settings/types";
+import Image from "next/image";
+import type React from "react";
+import { memo } from "react";
 
 interface Props {
   /** Live business identity (name, contact, bank account, GST#, payment terms). */

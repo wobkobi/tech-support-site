@@ -7,10 +7,10 @@
  * immediately. Callers (the admin API route) validate the payload first.
  */
 
-import { revalidateTag } from "next/cache";
 import { prisma } from "@/shared/lib/prisma";
 import { SETTINGS_KEY_PREFIX, SETTINGS_TAG } from "@/shared/lib/settings/get-settings";
 import type { Settings, SettingsGroup } from "@/shared/lib/settings/types";
+import { revalidateTag } from "next/cache";
 
 /**
  * Persists one group's settings, records the change in the audit log, and

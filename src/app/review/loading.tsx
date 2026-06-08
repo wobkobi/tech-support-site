@@ -6,9 +6,9 @@
  * Turns a 6s FCP into a near-instant render by streaming the shell first.
  */
 
-import { PageShell, FrostedSection, CARD } from "@/shared/components/PageLayout";
-import { cn } from "@/shared/lib/cn";
+import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
 import { Bone } from "@/shared/components/Skeleton";
+import { cn } from "@/shared/lib/cn";
 
 /**
  * Review page loading skeleton shown via React Suspense while DB queries run.

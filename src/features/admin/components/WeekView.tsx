@@ -7,14 +7,8 @@
  * slot is clicked.
  */
 
-import { useMemo, useState, useTransition } from "react";
-import type React from "react";
-import { useRouter } from "next/navigation";
-import { FaChevronLeft, FaChevronRight, FaCalendarDay } from "react-icons/fa6";
-import { cn } from "@/shared/lib/cn";
-import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
-import { ManualBookingModal } from "@/features/admin/components/ManualBookingModal";
 import { BlockDayButton } from "@/features/admin/components/BlockDayButton";
+import { ManualBookingModal } from "@/features/admin/components/ManualBookingModal";
 import {
   KIND_STYLES,
   LegendDot,
@@ -24,6 +18,12 @@ import {
   type WeekEvent,
   type WeekViewKind,
 } from "@/features/admin/lib/schedule-types";
+import { cn } from "@/shared/lib/cn";
+import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
+import { useRouter } from "next/navigation";
+import type React from "react";
+import { useMemo, useState, useTransition } from "react";
+import { FaCalendarDay, FaChevronLeft, FaChevronRight } from "react-icons/fa6";
 
 export type { WeekEvent, WeekViewKind };
 

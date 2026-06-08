@@ -10,12 +10,12 @@
  * fee in a reminder would read as a bait-and-switch.
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/shared/lib/prisma";
+import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { sendBookingReminderEmail } from "@/features/reviews/lib/email";
 import { isCronAuthorized } from "@/shared/lib/auth";
-import { getPolicy } from "@/features/business/lib/pricing-policy.server";
+import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
+import { NextRequest, NextResponse } from "next/server";
 
 // Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
 export const maxDuration = 60;

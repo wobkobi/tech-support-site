@@ -6,14 +6,14 @@
 
 "use client";
 
-import type React from "react";
-import { cn } from "@/shared/lib/cn";
 import { Button } from "@/shared/components/Button";
-import { useId, useState } from "react";
-import { useRouter } from "next/navigation";
-import { formatNZPhone, normalisePhone, validatePhone } from "@/shared/lib/normalise-phone";
 import { EmailInput } from "@/shared/components/EmailInput";
 import { PhoneInput } from "@/shared/components/PhoneInput";
+import { cn } from "@/shared/lib/cn";
+import { formatNZPhone, normalisePhone, validatePhone } from "@/shared/lib/normalise-phone";
+import { useRouter } from "next/navigation";
+import type React from "react";
+import { useId, useState } from "react";
 
 type NameDisplay = "name" | "anonymous";
 

@@ -5,10 +5,10 @@
  * horizontal tab strip and a form card of labelled field rows with a save bar.
  */
 
-import type React from "react";
-import { cn } from "@/shared/lib/cn";
-import { Bone } from "@/shared/components/Skeleton";
 import { AdminSkeletonShell } from "@/features/admin/components/AdminSkeletonShell";
+import { Bone } from "@/shared/components/Skeleton";
+import { cn } from "@/shared/lib/cn";
+import type React from "react";
 
 /**
  * Settings page loading skeleton.

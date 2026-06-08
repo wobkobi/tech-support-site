@@ -9,11 +9,11 @@
  * a revert is just another tracked change.
  */
 
-import { useState } from "react";
-import type React from "react";
 import { cn } from "@/shared/lib/cn";
 import { formatDateTimeLong } from "@/shared/lib/date-format";
 import type { SettingsGroup } from "@/shared/lib/settings/types";
+import type React from "react";
+import { useState } from "react";
 
 /** One history row as returned by the history route. */
 interface HistoryEntry {

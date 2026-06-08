@@ -8,9 +8,9 @@
  * numbers have a concrete meaning before saving.
  */
 
-import type React from "react";
 import { cn } from "@/shared/lib/cn";
 import type { PricingSettings } from "@/shared/lib/settings/types";
+import type React from "react";
 
 interface Props {
   config: PricingSettings;

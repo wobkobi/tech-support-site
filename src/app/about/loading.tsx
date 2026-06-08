@@ -5,10 +5,10 @@
  * approach and "who I help" list cards.
  */
 
-import type React from "react";
-import { cn } from "@/shared/lib/cn";
-import { FrostedSection, PageShell, CARD } from "@/shared/components/PageLayout";
+import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
 import { Bone } from "@/shared/components/Skeleton";
+import { cn } from "@/shared/lib/cn";
+import type React from "react";
 
 /**
  * About route-loading skeleton.

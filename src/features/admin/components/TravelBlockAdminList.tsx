@@ -6,9 +6,9 @@
  * with per-event transport mode selector and custom origin override.
  */
 
-import { useState, useEffect } from "react";
-import type React from "react";
 import { cn } from "@/shared/lib/cn";
+import type React from "react";
+import { useEffect, useState } from "react";
 
 export interface TravelBlockRow {
   id: string;

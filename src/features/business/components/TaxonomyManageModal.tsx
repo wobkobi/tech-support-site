@@ -8,9 +8,9 @@
  * Future parse-job runs will retag them.
  */
 
-import { useEffect, useState } from "react";
-import type React from "react";
 import { cn } from "@/shared/lib/cn";
+import type React from "react";
+import { useEffect, useState } from "react";
 
 interface TaxonomyResponse {
   ok: boolean;

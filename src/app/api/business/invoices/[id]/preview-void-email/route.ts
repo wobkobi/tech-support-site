@@ -1,8 +1,8 @@
 // src/app/api/business/invoices/[id]/preview-void-email/route.ts
-import { NextRequest, NextResponse } from "next/server";
+import { buildVoidEmail } from "@/features/reviews/lib/email";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
-import { buildVoidEmail } from "@/features/reviews/lib/email";
+import { NextRequest, NextResponse } from "next/server";
 
 /**
  * POST /api/business/invoices/[id]/preview-void-email

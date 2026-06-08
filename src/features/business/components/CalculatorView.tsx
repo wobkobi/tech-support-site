@@ -1,49 +1,49 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import type React from "react";
-import { useRouter } from "next/navigation";
-import { cn } from "@/shared/lib/cn";
+import { AddToContactsModal } from "@/features/business/components/AddToContactsModal";
+import { InvoicePreviewPanel } from "@/features/business/components/InvoicePreviewPanel";
+import { ParseConfidenceBanner } from "@/features/business/components/ParseConfidenceBanner";
+import { TaxonomyManageModal } from "@/features/business/components/TaxonomyManageModal";
+import { ClientPickerSection } from "@/features/business/components/calculator/ClientPickerSection";
+import { JobDetailsSection } from "@/features/business/components/calculator/JobDetailsSection";
+import { PartsSection } from "@/features/business/components/calculator/PartsSection";
+import { RateConfigPanel } from "@/features/business/components/calculator/RateConfigPanel";
+import { TasksSection } from "@/features/business/components/calculator/TasksSection";
+import { TravelSection } from "@/features/business/components/calculator/TravelSection";
 import {
-  calcJobTotal,
-  jobToLineItems,
   buildIncomeDescription,
-  matchRateById,
-  effectiveHourlyRate,
-  composeDescription,
+  calcJobTotal,
   collapseToWindow,
+  composeDescription,
+  effectiveHourlyRate,
   hourlyTaskMinutes,
+  jobToLineItems,
+  matchRateById,
   timeDiffMins,
   todayISO,
   type JobPricing,
 } from "@/features/business/lib/business";
 import { calcTravelCharge } from "@/features/business/lib/pricing-policy";
-import type { IdentitySettings } from "@/shared/lib/settings/types";
-import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
-import { AddToContactsModal } from "@/features/business/components/AddToContactsModal";
-import { ParseConfidenceBanner } from "@/features/business/components/ParseConfidenceBanner";
-import { TaxonomyManageModal } from "@/features/business/components/TaxonomyManageModal";
-import { InvoicePreviewPanel } from "@/features/business/components/InvoicePreviewPanel";
-import { PartsSection } from "@/features/business/components/calculator/PartsSection";
-import { TravelSection } from "@/features/business/components/calculator/TravelSection";
-import { ClientPickerSection } from "@/features/business/components/calculator/ClientPickerSection";
-import { TasksSection } from "@/features/business/components/calculator/TasksSection";
-import { RateConfigPanel } from "@/features/business/components/calculator/RateConfigPanel";
-import { JobDetailsSection } from "@/features/business/components/calculator/JobDetailsSection";
-import { loadPlacesLibrary } from "@/shared/lib/google-maps-loader";
 import { summariseForBanner, type ActivePromo } from "@/features/business/lib/promos";
 import type {
+  GoogleContact,
+  JobCalculation,
+  ParseJobQuestion,
+  ParseJobResponse,
+  ParsedRange,
+  PartLine,
   RateConfig,
   TaskLine,
-  PartLine,
-  JobCalculation,
-  ParseJobResponse,
-  ParseJobQuestion,
-  ParsedRange,
-  GoogleContact,
   TaskTemplate,
   TravelEntry,
 } from "@/features/business/types/business";
+import { cn } from "@/shared/lib/cn";
+import { loadPlacesLibrary } from "@/shared/lib/google-maps-loader";
+import type { IdentitySettings } from "@/shared/lib/settings/types";
+import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
+import { useRouter } from "next/navigation";
+import type React from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 /**
  * Returns the YYYY-MM-DD string for today + n days.

@@ -1,10 +1,10 @@
-import { PDFDocument, PDFFont, PDFPage, rgb, StandardFonts, degrees } from "pdf-lib";
-import path from "path";
-import { readFileSync } from "fs";
 import type { Invoice } from "@/features/business/types/business";
 import { getIdentity } from "@/shared/lib/business-identity.server";
-import type { IdentitySettings } from "@/shared/lib/settings/types";
 import { formatDateShort } from "@/shared/lib/date-format";
+import type { IdentitySettings } from "@/shared/lib/settings/types";
+import { readFileSync } from "fs";
+import path from "path";
+import { degrees, PDFDocument, PDFFont, PDFPage, rgb, StandardFonts } from "pdf-lib";
 
 // Colours mirror the web's Tailwind palette so the PDF reads as the same document.
 const BRAND = rgb(12 / 255, 10 / 255, 62 / 255); // russian-violet #0c0a3e

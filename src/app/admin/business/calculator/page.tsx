@@ -1,12 +1,12 @@
+import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
+import { CalculatorView } from "@/features/business/components/CalculatorView";
+import { getPolicy } from "@/features/business/lib/pricing-policy.server";
+import { requireAdminAuth } from "@/shared/lib/auth";
+import { getIdentity } from "@/shared/lib/business-identity.server";
+import { cn } from "@/shared/lib/cn";
 import type { Metadata } from "next";
 import type React from "react";
 import { Suspense } from "react";
-import { requireAdminAuth } from "@/shared/lib/auth";
-import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
-import { CalculatorView } from "@/features/business/components/CalculatorView";
-import { getIdentity } from "@/shared/lib/business-identity.server";
-import { getPolicy } from "@/features/business/lib/pricing-policy.server";
-import { cn } from "@/shared/lib/cn";
 
 export const dynamic = "force-dynamic";
 

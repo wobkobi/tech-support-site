@@ -4,13 +4,13 @@
  * @description Background task to fetch and cache Google Calendar events.
  */
 
-import { prisma } from "@/shared/lib/prisma";
 import {
   fetchAllCalendarEvents,
   getBookingCalendarId,
   type CalendarEvent,
 } from "@/features/calendar/lib/google-calendar";
 import { calculateTravelMinutes, type TransportMode } from "@/features/calendar/lib/travel-time";
+import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 
 interface RefreshResult {

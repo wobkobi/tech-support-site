@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
-import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 import { lookupDriveDistance } from "@/features/business/lib/travel-distance";
+import { rateLimitOrReject } from "@/shared/lib/rate-limit";
+import { NextRequest, NextResponse } from "next/server";
 
 // Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
 export const maxDuration = 60;

@@ -5,11 +5,11 @@
  * Protected by ADMIN_SECRET via constant-time comparison.
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/shared/lib/prisma";
-import { isAdminRequest } from "@/shared/lib/auth";
-import { revalidateReviewPaths } from "@/features/reviews/lib/revalidate";
 import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-create";
+import { revalidateReviewPaths } from "@/features/reviews/lib/revalidate";
+import { isAdminRequest } from "@/shared/lib/auth";
+import { prisma } from "@/shared/lib/prisma";
+import { NextRequest, NextResponse } from "next/server";
 
 /**
  * PATCH /api/admin/reviews/[id] - admin-auth gated.

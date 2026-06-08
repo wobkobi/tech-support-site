@@ -5,10 +5,10 @@
  * underlying Google Calendar event.
  */
 
-import { type NextRequest, NextResponse } from "next/server";
-import { revalidateTag } from "next/cache";
-import { isAdminRequest } from "@/shared/lib/auth";
 import { deleteBookingEvent, SCHEDULE_CALENDAR_TAG } from "@/features/calendar/lib/google-calendar";
+import { isAdminRequest } from "@/shared/lib/auth";
+import { revalidateTag } from "next/cache";
+import { type NextRequest, NextResponse } from "next/server";
 
 // Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
 export const maxDuration = 60;

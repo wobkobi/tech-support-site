@@ -1,6 +1,6 @@
 // src/app/api/promos/active/route.ts
-import { NextResponse } from "next/server";
 import { getActivePromo } from "@/features/business/lib/promos";
+import { NextResponse } from "next/server";
 
 /**
  * GET /api/promos/active - Public, returns the active promo or null.

@@ -7,10 +7,10 @@
  * Run:  npx tsx scripts/reauth-google.ts
  */
 
-import * as readline from "readline";
-import * as fs from "fs";
 import * as dotenv from "dotenv";
+import * as fs from "fs";
 import { google } from "googleapis";
+import * as readline from "readline";
 
 dotenv.config({ path: ".env.local" });
 

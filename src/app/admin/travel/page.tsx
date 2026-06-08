@@ -1,15 +1,15 @@
 // src/app/admin/travel/page.tsx
-import type { Metadata } from "next";
-import type React from "react";
-import { prisma } from "@/shared/lib/prisma";
-import { requireAdminAuth } from "@/shared/lib/auth";
-import { cn } from "@/shared/lib/cn";
 import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
+import { RecalculateButton } from "@/features/admin/components/RecalculateButton";
 import {
   TravelBlockAdminList,
   type TravelBlockRow,
 } from "@/features/admin/components/TravelBlockAdminList";
-import { RecalculateButton } from "@/features/admin/components/RecalculateButton";
+import { requireAdminAuth } from "@/shared/lib/auth";
+import { cn } from "@/shared/lib/cn";
+import { prisma } from "@/shared/lib/prisma";
+import type { Metadata } from "next";
+import type React from "react";
 
 export const dynamic = "force-dynamic";
 

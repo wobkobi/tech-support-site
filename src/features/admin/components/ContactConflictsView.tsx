@@ -8,11 +8,11 @@
  * Google. Once resolved, the row disappears from the list.
  */
 
-import { useState } from "react";
-import type React from "react";
-import { FaCaretLeft } from "react-icons/fa6";
-import Link from "next/link";
 import { cn } from "@/shared/lib/cn";
+import Link from "next/link";
+import type React from "react";
+import { useState } from "react";
+import { FaCaretLeft } from "react-icons/fa6";
 
 /** A single unresolved conflict as returned by the GET endpoint. */
 export interface ConflictRow {

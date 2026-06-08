@@ -5,12 +5,12 @@
  * Imports all Google contacts into the local DB, then pushes all local contacts to Google.
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { isAdminRequest } from "@/shared/lib/auth";
 import {
   importFromGoogleContacts,
   syncAllContactsToGoogle,
 } from "@/features/contacts/lib/google-contacts";
+import { isAdminRequest } from "@/shared/lib/auth";
+import { NextRequest, NextResponse } from "next/server";
 
 // Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
 export const maxDuration = 60;

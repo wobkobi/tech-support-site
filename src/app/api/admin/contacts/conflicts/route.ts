@@ -4,9 +4,9 @@
  * @description Admin endpoint listing pending Google Contacts sync conflicts.
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
+import { prisma } from "@/shared/lib/prisma";
+import { NextRequest, NextResponse } from "next/server";
 
 /**
  * GET /api/admin/contacts/conflicts

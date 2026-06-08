@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
-import { isCronAuthorized } from "@/shared/lib/auth";
 import { runSheetsImport } from "@/features/business/lib/sheets-import";
+import { isCronAuthorized } from "@/shared/lib/auth";
+import { NextRequest, NextResponse } from "next/server";
 
 // Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
 export const maxDuration = 60;

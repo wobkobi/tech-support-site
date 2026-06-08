@@ -8,10 +8,10 @@
  * lastSyncedAt + lastGoogleEtag catch up).
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/shared/lib/prisma";
-import { isAdminRequest } from "@/shared/lib/auth";
 import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
+import { isAdminRequest } from "@/shared/lib/auth";
+import { prisma } from "@/shared/lib/prisma";
+import { NextRequest, NextResponse } from "next/server";
 
 /**
  * POST /api/admin/contacts/conflicts/[id]

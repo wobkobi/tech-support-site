@@ -9,9 +9,9 @@
  * doesn't already exist in the DB.
  */
 
-import { useEffect, useState } from "react";
-import type React from "react";
 import { cn } from "@/shared/lib/cn";
+import type React from "react";
+import { useEffect, useState } from "react";
 
 /**
  * Props for AddToContactsModal.

@@ -10,8 +10,8 @@
  * create pattern below is the canonical replacement.
  */
 
-import type { Contact } from "@prisma/client";
 import { prisma } from "@/shared/lib/prisma";
+import type { Contact } from "@prisma/client";
 
 /**
  * Fields used when creating a Contact. Caller is responsible for any

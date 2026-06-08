@@ -6,10 +6,10 @@
  * root 404, so a missing invoice/record still has the nav to recover from.
  */
 
-import type React from "react";
-import Link from "next/link";
 import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
 import { cn } from "@/shared/lib/cn";
+import Link from "next/link";
+import type React from "react";
 
 /**
  * Admin not-found page.

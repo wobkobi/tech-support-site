@@ -4,11 +4,11 @@
  * @description Admin API route for updating individual contacts.
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/shared/lib/prisma";
-import { isAdminRequest } from "@/shared/lib/auth";
 import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
-import { toE164NZ, normalisePhone, isValidPhone } from "@/shared/lib/normalise-phone";
+import { isAdminRequest } from "@/shared/lib/auth";
+import { isValidPhone, normalisePhone, toE164NZ } from "@/shared/lib/normalise-phone";
+import { prisma } from "@/shared/lib/prisma";
+import { NextRequest, NextResponse } from "next/server";
 
 interface ContactPatchBody {
   name?: string;

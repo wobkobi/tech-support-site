@@ -6,26 +6,26 @@
 
 "use client";
 
-import type React from "react";
-import { useState, useEffect, useRef } from "react";
-import { FaCheck } from "react-icons/fa6";
-import { useRouter } from "next/navigation";
-import { Button } from "@/shared/components/Button";
-import { cn } from "@/shared/lib/cn";
+import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import {
-  SUB_SLOT_MINUTES,
   BOOKING_FIELD_LIMITS,
-  validateEmail,
   splitUnitFromAddress,
+  SUB_SLOT_MINUTES,
+  validateEmail,
   type BookableDay,
-  type TimeOfDay,
-  type StartMinute,
   type JobDuration,
+  type StartMinute,
+  type TimeOfDay,
 } from "@/features/booking/lib/booking";
-import { validatePhone } from "@/shared/lib/normalise-phone";
+import { Button } from "@/shared/components/Button";
 import { EmailInput } from "@/shared/components/EmailInput";
 import { PhoneInput } from "@/shared/components/PhoneInput";
-import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
+import { cn } from "@/shared/lib/cn";
+import { validatePhone } from "@/shared/lib/normalise-phone";
+import { useRouter } from "next/navigation";
+import type React from "react";
+import { useEffect, useRef, useState } from "react";
+import { FaCheck } from "react-icons/fa6";
 
 /** localStorage key for the new-booking draft. Bumped when the shape changes. */
 const DRAFT_KEY = "booking-draft-v2";

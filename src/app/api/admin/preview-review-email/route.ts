@@ -4,9 +4,9 @@
  * @description Admin endpoint that returns the rendered HTML preview for a past-client review email.
  */
 
-import { NextRequest, NextResponse } from "next/server";
 import { buildPastClientReviewEmailHtml } from "@/features/reviews/lib/email";
 import { isAdminRequest } from "@/shared/lib/auth";
+import { NextRequest, NextResponse } from "next/server";
 
 /**
  * POST /api/admin/preview-review-email

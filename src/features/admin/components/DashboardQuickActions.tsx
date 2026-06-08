@@ -6,15 +6,15 @@
  * send a review link to a past client, or mark a completed event and send its review.
  */
 
-import { useState } from "react";
-import type React from "react";
-import { FaCheck } from "react-icons/fa6";
-import { cn } from "@/shared/lib/cn";
 import {
   SendReviewLinkForm,
   type ContactSuggestion,
 } from "@/features/reviews/components/admin/SendReviewLinkForm";
+import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
+import type React from "react";
+import { useState } from "react";
+import { FaCheck } from "react-icons/fa6";
 
 /**
  * A past confirmed booking that is ready to be completed.

@@ -5,10 +5,10 @@
  * Clears stored TravelBlock records so the next cache refresh recomputes fresh travel times.
  */
 
-import { type NextRequest, NextResponse } from "next/server";
+import { refreshCalendarCache } from "@/features/calendar/lib/calendar-cache";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
-import { refreshCalendarCache } from "@/features/calendar/lib/calendar-cache";
+import { type NextRequest, NextResponse } from "next/server";
 
 /**
  * Force-deletes all TravelBlock records and runs a full calendar cache refresh

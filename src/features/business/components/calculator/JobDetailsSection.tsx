@@ -1,15 +1,15 @@
 "use client";
 
-import type React from "react";
-import { FaCaretRight } from "react-icons/fa6";
-import { cn } from "@/shared/lib/cn";
 import {
+  billableMins,
   formatNZD,
   minsToHoursLabel,
-  billableMins,
   timeDiffMins,
 } from "@/features/business/lib/business";
 import type { ParsedRange, RateConfig } from "@/features/business/types/business";
+import { cn } from "@/shared/lib/cn";
+import type React from "react";
+import { FaCaretRight } from "react-icons/fa6";
 
 /** Inline warning shown under a slot whose Start/End look off. */
 interface SlotIssue {

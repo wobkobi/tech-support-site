@@ -7,9 +7,9 @@
  * header, and a full-width labelled button used by the mobile day-agenda view.
  */
 
+import { cn } from "@/shared/lib/cn";
 import type React from "react";
 import { FaBan, FaCircleCheck } from "react-icons/fa6";
-import { cn } from "@/shared/lib/cn";
 
 export interface BlockDayButtonProps {
   dateKey: string;

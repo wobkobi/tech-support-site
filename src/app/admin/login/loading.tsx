@@ -6,9 +6,9 @@
  * login route doesn't flash the operator-panel layout.
  */
 
-import type React from "react";
-import { cn } from "@/shared/lib/cn";
 import { Bone } from "@/shared/components/Skeleton";
+import { cn } from "@/shared/lib/cn";
+import type React from "react";
 
 /**
  * Admin login route-loading skeleton.

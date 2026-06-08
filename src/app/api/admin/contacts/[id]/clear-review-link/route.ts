@@ -7,9 +7,9 @@
  * (replaces the old DELETE /api/admin/review-requests/[id] flow).
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
+import { prisma } from "@/shared/lib/prisma";
+import { NextRequest, NextResponse } from "next/server";
 
 /**
  * POST /api/admin/contacts/[id]/clear-review-link

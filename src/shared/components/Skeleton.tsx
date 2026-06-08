@@ -6,8 +6,8 @@
  * language instead of a blank frame.
  */
 
-import type React from "react";
 import { cn } from "@/shared/lib/cn";
+import type React from "react";
 
 /** Props for Bone. */
 interface BoneProps {

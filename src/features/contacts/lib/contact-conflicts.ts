@@ -8,7 +8,7 @@
  */
 
 import { prisma } from "@/shared/lib/prisma";
-import type { ContactField, ConflictResolution } from "@prisma/client";
+import type { ConflictResolution, ContactField } from "@prisma/client";
 
 // Re-export the Prisma enum types under the names the rest of the codebase
 // uses. The admin-driven resolution endpoint also accepts "auto" via the

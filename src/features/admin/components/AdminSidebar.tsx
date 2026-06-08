@@ -1,29 +1,29 @@
 "use client";
 // src/features/admin/components/AdminSidebar.tsx
-import { useState } from "react";
-import type React from "react";
+import { cn } from "@/shared/lib/cn";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { cn } from "@/shared/lib/cn";
+import type React from "react";
+import { useState } from "react";
 import {
-  FaGaugeHigh,
-  FaStar,
   FaAddressBook,
+  FaArrowRightFromBracket,
+  FaArrowTrendUp,
+  FaArrowUpRightFromSquare,
+  FaBars,
+  FaBriefcase,
+  FaCalculator,
   FaCalendarDays,
   FaCalendarWeek,
-  FaRoute,
-  FaBriefcase,
-  FaArrowTrendUp,
-  FaReceipt,
   FaFileInvoiceDollar,
-  FaCalculator,
-  FaTags,
+  FaGaugeHigh,
   FaGear,
-  FaBars,
-  FaXmark,
-  FaArrowUpRightFromSquare,
-  FaArrowRightFromBracket,
   FaMagnifyingGlassDollar,
+  FaReceipt,
+  FaRoute,
+  FaStar,
+  FaTags,
+  FaXmark,
 } from "react-icons/fa6";
 
 export type AdminPage =

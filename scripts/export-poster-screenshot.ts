@@ -7,8 +7,8 @@
  */
 
 import fs from "fs";
-import puppeteer, { type Browser } from "puppeteer";
 import { PDFDocument, PDFPage, rgb } from "pdf-lib";
+import puppeteer, { type Browser } from "puppeteer";
 
 /* ---------- Types ---------- */
 

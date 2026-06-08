@@ -5,11 +5,11 @@
  * @description Interactive admin component for viewing and editing bookings.
  */
 
-import { useState } from "react";
-import type React from "react";
-import { cn } from "@/shared/lib/cn";
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
+import { cn } from "@/shared/lib/cn";
 import { formatDateTimeShort } from "@/shared/lib/date-format";
+import type React from "react";
+import { useState } from "react";
 
 export interface AdminBookingRow {
   id: string;

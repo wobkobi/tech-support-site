@@ -1,5 +1,5 @@
-import { google } from "googleapis";
 import { getOAuth2Client } from "@/features/calendar/lib/google-calendar";
+import { google } from "googleapis";
 import { Readable } from "stream";
 
 /** Module-level cache to avoid repeat folder lookups per deploy. */

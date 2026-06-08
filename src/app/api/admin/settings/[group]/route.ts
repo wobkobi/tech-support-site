@@ -7,13 +7,13 @@
  * always reject; WARNs reject unless the client confirms.
  */
 
-import { NextRequest, NextResponse } from "next/server";
 import { isAdminRequest } from "@/shared/lib/auth";
+import { DEFAULT_SETTINGS } from "@/shared/lib/settings/defaults";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import { saveSettingsGroup } from "@/shared/lib/settings/set-settings";
-import { checkGuardrails, validateGroup } from "@/shared/lib/settings/validate";
-import { DEFAULT_SETTINGS } from "@/shared/lib/settings/defaults";
 import type { Settings, SettingsGroup } from "@/shared/lib/settings/types";
+import { checkGuardrails, validateGroup } from "@/shared/lib/settings/validate";
+import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 

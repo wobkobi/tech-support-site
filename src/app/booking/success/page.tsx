@@ -4,13 +4,13 @@
  * @description Booking request success page.
  */
 
-import type React from "react";
-import { cn } from "@/shared/lib/cn";
-import { Button } from "@/shared/components/Button";
-import { FaCircleCheck, FaHouse, FaPenToSquare, FaTag } from "react-icons/fa6";
 import { cancellationCopy } from "@/features/business/lib/pricing-policy";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
+import { Button } from "@/shared/components/Button";
+import { cn } from "@/shared/lib/cn";
 import { prisma } from "@/shared/lib/prisma";
+import type React from "react";
+import { FaCircleCheck, FaHouse, FaPenToSquare, FaTag } from "react-icons/fa6";
 import { BookingConversion } from "./BookingConversion";
 
 const CARD = "border-seasalt-400/60 bg-seasalt-800 rounded-xl border p-5 shadow-sm sm:p-6";

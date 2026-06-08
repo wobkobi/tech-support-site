@@ -1,11 +1,11 @@
 "use client";
 // src/features/admin/components/ContactsAdminView.tsx
-import { useState, useCallback } from "react";
-import type React from "react";
-import { useRouter } from "next/navigation";
-import { cn } from "@/shared/lib/cn";
-import { ContactAdminList, type ContactRow } from "./ContactAdminList";
 import type { ConflictEntry } from "@/app/api/admin/contacts/enrich-from-reviews/route";
+import { cn } from "@/shared/lib/cn";
+import { useRouter } from "next/navigation";
+import type React from "react";
+import { useCallback, useState } from "react";
+import { ContactAdminList, type ContactRow } from "./ContactAdminList";
 
 interface ContactsAdminViewProps {
   initialConflicts: ConflictEntry[];
