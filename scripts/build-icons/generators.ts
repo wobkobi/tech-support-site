@@ -4,24 +4,24 @@
  * @description Generator functions for favicons, social images, additional assets, QR codes, and manifests.
  */
 
-import sharp from "sharp";
+import { JSDOM } from "jsdom";
 import fs from "node:fs/promises";
 import { createRequire } from "node:module";
-import { JSDOM } from "jsdom";
 import pngToIco from "png-to-ico";
+import sharp from "sharp";
 import {
-  PALETTE,
-  LOGO_MARK,
-  LOGO_FULL,
-  LOGO_PROFILE,
-  BACKDROP,
-  FAVICON_SPECS,
-  SOCIAL_SPECS,
-  BACKDROP_VARIANTS,
   ADDITIONAL_ASSETS,
+  BACKDROP,
+  BACKDROP_VARIANTS,
+  FAVICON_SPECS,
+  LOGO_FULL,
+  LOGO_MARK,
+  LOGO_PROFILE,
+  PALETTE,
   QR_CODE_SPECS,
+  SOCIAL_SPECS,
 } from "./config.js";
-import { ensureDir, makeFrostedCard, makeCoquelicotSvg } from "./helpers.js";
+import { ensureDir, makeCoquelicotSvg, makeFrostedCard } from "./helpers.js";
 
 // Opaque background colours used by the favicon renderer.
 const BG_LIGHT = { r: 246, g: 247, b: 248, alpha: 1 } as const; // seasalt

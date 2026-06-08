@@ -7,10 +7,10 @@
 
 "use client";
 
-import type React from "react";
-import { FrostedSection, PageShell, CARD } from "@/shared/components/PageLayout";
 import { Button } from "@/shared/components/Button";
+import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
 import { cn } from "@/shared/lib/cn";
+import type React from "react";
 import { FaArrowRotateRight, FaGauge } from "react-icons/fa6";
 
 /**

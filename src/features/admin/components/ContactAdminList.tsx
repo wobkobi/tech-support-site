@@ -8,16 +8,16 @@
  * (already linked to Google Contacts, shown in a collapsible drawer).
  */
 
-import type React from "react";
-import { useState, useEffect } from "react";
-import { cn } from "@/shared/lib/cn";
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
-import { formatReviewerName } from "@/features/reviews/lib/formatting";
-import { validatePhone } from "@/shared/lib/normalise-phone";
 import { validateEmail } from "@/features/booking/lib/booking";
+import { formatReviewerName } from "@/features/reviews/lib/formatting";
 import { EmailInput } from "@/shared/components/EmailInput";
 import { PhoneInput } from "@/shared/components/PhoneInput";
+import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
+import { validatePhone } from "@/shared/lib/normalise-phone";
+import type React from "react";
+import { useEffect, useState } from "react";
 
 export interface ContactRow {
   id: string;

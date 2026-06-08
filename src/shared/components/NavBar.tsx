@@ -6,13 +6,13 @@
 
 "use client";
 
-import type React from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Button } from "@/shared/components/Button";
+import { cn } from "@/shared/lib/cn";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Button } from "@/shared/components/Button";
-import { cn } from "@/shared/lib/cn";
+import type React from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface NavItem {
   label: string;

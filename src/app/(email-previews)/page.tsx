@@ -4,9 +4,9 @@
  * @description Dev-only email preview placeholder so the project compiles.
  */
 
-import type React from "react";
 import { FrostedSection, PageShell } from "@/shared/components/PageLayout";
 import { cn } from "@/shared/lib/cn";
+import type React from "react";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;

@@ -4,16 +4,16 @@
  * @description Shared Resend utility for sending transactional emails.
  */
 
-import { Resend } from "resend";
-import { getIdentity } from "@/shared/lib/business-identity.server";
-import { formatDateTimeLong, formatDateShort } from "@/shared/lib/date-format";
-import { getSiteUrl } from "@/shared/lib/site-url";
 import { formatNZD } from "@/features/business/lib/business";
 import {
   DEFAULT_INVOICE_EMAIL_BODY,
   DEFAULT_VOID_EMAIL_BODY,
 } from "@/features/business/lib/invoice-email-defaults";
 import { cancellationCopy } from "@/features/business/lib/pricing-policy";
+import { getIdentity } from "@/shared/lib/business-identity.server";
+import { formatDateShort, formatDateTimeLong } from "@/shared/lib/date-format";
+import { getSiteUrl } from "@/shared/lib/site-url";
+import { Resend } from "resend";
 
 /**
  * Escapes HTML so user-supplied values can be interpolated into email bodies.

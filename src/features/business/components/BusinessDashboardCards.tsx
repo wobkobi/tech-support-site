@@ -12,16 +12,16 @@
  * month falls outside the FY window and would always show zero.
  */
 
-import { useState } from "react";
-import type React from "react";
-import { cn } from "@/shared/lib/cn";
-import { formatNZD } from "@/features/business/lib/business";
-import { formatDateSlash } from "@/shared/lib/date-format";
 import {
   BreakdownModal,
   type BreakdownData,
   type BreakdownRow,
 } from "@/features/business/components/BreakdownModal";
+import { formatNZD } from "@/features/business/lib/business";
+import { cn } from "@/shared/lib/cn";
+import { formatDateSlash } from "@/shared/lib/date-format";
+import type React from "react";
+import { useState } from "react";
 
 /** Income entry payload passed in from the server component (already scope-filtered). */
 export interface IncomeRow {

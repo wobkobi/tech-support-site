@@ -5,13 +5,13 @@
  * @description Single review card with approve/revoke/delete actions.
  */
 
-import { useState, useRef, useEffect } from "react";
+import { formatReviewerName } from "@/features/reviews/lib/formatting";
 import { SOFT_CARD } from "@/shared/components/PageLayout";
 import { cn } from "@/shared/lib/cn";
-import { type ReviewRow } from "./review-types";
 import { formatDateShort } from "@/shared/lib/date-format";
-import { formatReviewerName } from "@/features/reviews/lib/formatting";
 import type React from "react";
+import { useEffect, useRef, useState } from "react";
+import { type ReviewRow } from "./review-types";
 
 /**
  * Props for ReviewCard component.

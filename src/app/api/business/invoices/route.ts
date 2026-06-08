@@ -1,15 +1,15 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/shared/lib/prisma";
-import { isAdminRequest } from "@/shared/lib/auth";
 import { calcInvoiceTotals } from "@/features/business/lib/business";
-import { getPolicy } from "@/features/business/lib/pricing-policy.server";
-import { generateInvoicePdf, extractYearCode } from "@/features/business/lib/invoice-pdf";
 import { uploadInvoicePdf } from "@/features/business/lib/google-drive";
 import {
   getNextInvoiceNumber,
   writeBackInvoiceCounter,
 } from "@/features/business/lib/invoice-numbering";
+import { extractYearCode, generateInvoicePdf } from "@/features/business/lib/invoice-pdf";
+import { getPolicy } from "@/features/business/lib/pricing-policy.server";
+import { isAdminRequest } from "@/shared/lib/auth";
 import { getIdentity } from "@/shared/lib/business-identity.server";
+import { prisma } from "@/shared/lib/prisma";
+import { NextRequest, NextResponse } from "next/server";
 
 /**
  * GET /api/business/invoices - Returns all invoices ordered by creation date descending.

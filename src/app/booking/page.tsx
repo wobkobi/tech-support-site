@@ -8,21 +8,21 @@
  *   live Google Calendar API.
  */
 
+import BookingForm from "@/features/booking/components/BookingForm";
+import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
+import {
+  buildAvailableDays,
+  type BookableDay,
+  type ExistingBooking,
+} from "@/features/booking/lib/booking";
+import { fetchAllCalendarEvents } from "@/features/calendar/lib/google-calendar";
+import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
+import { CARD, FrostedSection, PageShell, SOFT_CARD } from "@/shared/components/PageLayout";
+import { cn } from "@/shared/lib/cn";
+import { prisma } from "@/shared/lib/prisma";
 import type { Metadata } from "next";
 import type React from "react";
 import { Suspense } from "react";
-import { cn } from "@/shared/lib/cn";
-import {
-  buildAvailableDays,
-  type ExistingBooking,
-  type BookableDay,
-} from "@/features/booking/lib/booking";
-import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
-import { prisma } from "@/shared/lib/prisma";
-import { fetchAllCalendarEvents } from "@/features/calendar/lib/google-calendar";
-import BookingForm from "@/features/booking/components/BookingForm";
-import { FrostedSection, PageShell, CARD, SOFT_CARD } from "@/shared/components/PageLayout";
-import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
 import { FaCalendarCheck, FaClock, FaEnvelopeOpenText, FaListCheck } from "react-icons/fa6";
 
 export const metadata: Metadata = {

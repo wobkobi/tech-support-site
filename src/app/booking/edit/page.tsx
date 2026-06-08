@@ -4,27 +4,27 @@
  * @description Edit an existing booking using the cancel token.
  */
 
-import type React from "react";
-import { notFound } from "next/navigation";
-import { cn } from "@/shared/lib/cn";
-import {
-  DURATION_OPTIONS,
-  TIME_OF_DAY_OPTIONS,
-  SUB_SLOT_MINUTES,
-  buildAvailableDays,
-  type ExistingBooking,
-  type BookableDay,
-  type JobDuration,
-  type TimeOfDay,
-  type StartMinute,
-} from "@/features/booking/lib/booking";
-import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
-import { prisma } from "@/shared/lib/prisma";
-import { fetchAllCalendarEvents } from "@/features/calendar/lib/google-calendar";
 import BookingForm, {
   type BookingFormInitialValues,
 } from "@/features/booking/components/BookingForm";
-import { FrostedSection, PageShell, CARD } from "@/shared/components/PageLayout";
+import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
+import {
+  DURATION_OPTIONS,
+  SUB_SLOT_MINUTES,
+  TIME_OF_DAY_OPTIONS,
+  buildAvailableDays,
+  type BookableDay,
+  type ExistingBooking,
+  type JobDuration,
+  type StartMinute,
+  type TimeOfDay,
+} from "@/features/booking/lib/booking";
+import { fetchAllCalendarEvents } from "@/features/calendar/lib/google-calendar";
+import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
+import { cn } from "@/shared/lib/cn";
+import { prisma } from "@/shared/lib/prisma";
+import { notFound } from "next/navigation";
+import type React from "react";
 
 export const dynamic = "force-dynamic";
 

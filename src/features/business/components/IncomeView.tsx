@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import type React from "react";
-import { cn } from "@/shared/lib/cn";
 import { formatNZD, todayISO } from "@/features/business/lib/business";
 import { INCOME_METHODS } from "@/features/business/lib/constants";
 import type { IncomeEntry } from "@/features/business/types/business";
+import { cn } from "@/shared/lib/cn";
+import type React from "react";
+import { useEffect, useState } from "react";
 
 /**
  * Client component for recording and displaying income entries.

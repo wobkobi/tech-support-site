@@ -1,15 +1,15 @@
 // src/app/admin/page.tsx
-import type { Metadata } from "next";
-import type React from "react";
-import Link from "next/link";
-import { prisma } from "@/shared/lib/prisma";
-import { requireAdminAuth } from "@/shared/lib/auth";
 import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
 import { DashboardQuickActions } from "@/features/admin/components/DashboardQuickActions";
-import { toE164NZ } from "@/shared/lib/normalise-phone";
+import { formatNZD } from "@/features/business/lib/business";
+import { requireAdminAuth } from "@/shared/lib/auth";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort, formatDateTimeShort } from "@/shared/lib/date-format";
-import { formatNZD } from "@/features/business/lib/business";
+import { toE164NZ } from "@/shared/lib/normalise-phone";
+import { prisma } from "@/shared/lib/prisma";
+import type { Metadata } from "next";
+import Link from "next/link";
+import type React from "react";
 import { FaCaretRight } from "react-icons/fa6";
 
 export const dynamic = "force-dynamic";

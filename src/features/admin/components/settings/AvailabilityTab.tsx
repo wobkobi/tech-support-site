@@ -9,19 +9,19 @@
  * job) come back from the API and surface inline.
  */
 
-import type React from "react";
-import { cn } from "@/shared/lib/cn";
-import { AVAILABILITY_FIELD_META } from "@/shared/lib/settings/field-meta";
-import { hourLabel } from "@/features/booking/lib/booking";
-import type { AvailabilitySettings, DayWindow } from "@/shared/lib/settings/types";
+import { AvailabilityPreview } from "@/features/admin/components/settings/AvailabilityPreview";
 import {
+  FieldShell,
   NumberField,
   ToggleField,
-  FieldShell,
 } from "@/features/admin/components/settings/SettingsFields";
-import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
 import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
-import { AvailabilityPreview } from "@/features/admin/components/settings/AvailabilityPreview";
+import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
+import { hourLabel } from "@/features/booking/lib/booking";
+import { cn } from "@/shared/lib/cn";
+import { AVAILABILITY_FIELD_META } from "@/shared/lib/settings/field-meta";
+import type { AvailabilitySettings, DayWindow } from "@/shared/lib/settings/types";
+import type React from "react";
 
 interface Props {
   initial: AvailabilitySettings;

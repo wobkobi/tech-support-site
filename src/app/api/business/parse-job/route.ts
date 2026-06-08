@@ -1,19 +1,19 @@
-import { NextRequest, NextResponse } from "next/server";
-import OpenAI from "openai";
-import { prisma } from "@/shared/lib/prisma";
-import { isAdminRequest } from "@/shared/lib/auth";
+import { composeDescription, effectiveHourlyRate } from "@/features/business/lib/business";
 import {
-  buildParseJobPrompt,
   buildParseJobContext,
+  buildParseJobPrompt,
 } from "@/features/business/lib/prompts/parse-job";
-import { effectiveHourlyRate, composeDescription } from "@/features/business/lib/business";
 import { lookupDriveDistance } from "@/features/business/lib/travel-distance";
 import type {
-  ParseJobResponse,
   ParseJobQuestion,
+  ParseJobResponse,
   ParsedRange,
   RateConfig,
 } from "@/features/business/types/business";
+import { isAdminRequest } from "@/shared/lib/auth";
+import { prisma } from "@/shared/lib/prisma";
+import { NextRequest, NextResponse } from "next/server";
+import OpenAI from "openai";
 
 // Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
 export const maxDuration = 60;

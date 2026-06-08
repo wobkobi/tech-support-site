@@ -9,13 +9,13 @@
  * the DB; the public/invoice/email consumers read these in the follow-up step.
  */
 
-import type React from "react";
+import { NumberField, TextField } from "@/features/admin/components/settings/SettingsFields";
+import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
+import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
 import { cn } from "@/shared/lib/cn";
 import { IDENTITY_FIELD_META } from "@/shared/lib/settings/field-meta";
 import type { BaseAddress, IdentitySettings } from "@/shared/lib/settings/types";
-import { NumberField, TextField } from "@/features/admin/components/settings/SettingsFields";
-import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
-import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
+import type React from "react";
 
 interface Props {
   initial: IdentitySettings;

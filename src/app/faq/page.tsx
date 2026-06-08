@@ -8,18 +8,18 @@
  * never drifts from the /pricing accordion + booking emails.
  */
 
-import type { Metadata } from "next";
-import type React from "react";
-import Link from "next/link";
-import { FrostedSection, PageShell, CARD, SOFT_CARD } from "@/shared/components/PageLayout";
-import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
-import { cn } from "@/shared/lib/cn";
-import { getPolicy, getPublicPricing } from "@/features/business/lib/pricing-policy.server";
 import {
   cancellationCopy,
-  unsuccessfulWorkCopy,
   gstCopy,
+  unsuccessfulWorkCopy,
 } from "@/features/business/lib/pricing-policy";
+import { getPolicy, getPublicPricing } from "@/features/business/lib/pricing-policy.server";
+import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
+import { CARD, FrostedSection, PageShell, SOFT_CARD } from "@/shared/components/PageLayout";
+import { cn } from "@/shared/lib/cn";
+import type { Metadata } from "next";
+import Link from "next/link";
+import type React from "react";
 
 export const metadata: Metadata = {
   title: "FAQ - Tech Support Questions Answered",

@@ -7,17 +7,17 @@
  * the clicked slot and POSTs to the admin booking-create endpoint.
  */
 
-import { useEffect, useRef, useState } from "react";
-import type React from "react";
-import { useRouter } from "next/navigation";
-import { FaXmark } from "react-icons/fa6";
-import { cn } from "@/shared/lib/cn";
-import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
-import { formatNZPhone, validatePhone } from "@/shared/lib/normalise-phone";
 import { validateEmail } from "@/features/booking/lib/booking";
 import { EmailInput } from "@/shared/components/EmailInput";
 import { PhoneInput } from "@/shared/components/PhoneInput";
+import { cn } from "@/shared/lib/cn";
+import { formatNZPhone, validatePhone } from "@/shared/lib/normalise-phone";
+import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
+import { useRouter } from "next/navigation";
+import type React from "react";
+import { useEffect, useRef, useState } from "react";
+import { FaXmark } from "react-icons/fa6";
 
 const NZ_TZ = "Pacific/Auckland";
 

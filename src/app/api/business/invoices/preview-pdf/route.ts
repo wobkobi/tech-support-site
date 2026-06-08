@@ -1,8 +1,8 @@
 // src/app/api/business/invoices/preview-pdf/route.ts
-import { NextRequest, NextResponse } from "next/server";
-import { isAdminRequest } from "@/shared/lib/auth";
 import { generateInvoicePdf } from "@/features/business/lib/invoice-pdf";
 import type { Invoice, LineItem } from "@/features/business/types/business";
+import { isAdminRequest } from "@/shared/lib/auth";
+import { NextRequest, NextResponse } from "next/server";
 
 // Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
 export const maxDuration = 60;

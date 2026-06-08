@@ -6,10 +6,10 @@
  * server component shell; the form is a tiny client component below.
  */
 
-import type { Metadata } from "next";
-import type React from "react";
 import { LoginForm } from "@/features/admin/components/LoginForm";
 import { cn } from "@/shared/lib/cn";
+import type { Metadata } from "next";
+import type React from "react";
 
 export const dynamic = "force-dynamic";
 

@@ -1,3 +1,8 @@
+import {
+  BILLING_INCREMENT_MINS,
+  GST_RATE,
+  GST_REGISTERED,
+} from "@/features/business/lib/pricing-policy";
 import type {
   JobCalculation,
   LineItem,
@@ -5,11 +10,6 @@ import type {
   TaskLine,
   TravelEntry,
 } from "@/features/business/types/business";
-import {
-  BILLING_INCREMENT_MINS,
-  GST_REGISTERED,
-  GST_RATE,
-} from "@/features/business/lib/pricing-policy";
 import { formatDateSlash } from "@/shared/lib/date-format";
 
 /**

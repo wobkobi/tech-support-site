@@ -4,15 +4,15 @@
  * @description Public reviews page showing all approved client reviews.
  */
 
-import type { Metadata } from "next";
-import type React from "react";
-import Link from "next/link";
-import { FrostedSection, PageShell, CARD } from "@/shared/components/PageLayout";
+import { ReviewScrollHandler } from "@/features/reviews/components/ReviewScrollHandler";
+import { formatReviewerName } from "@/features/reviews/lib/formatting";
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
+import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
 import { cn } from "@/shared/lib/cn";
 import { prisma } from "@/shared/lib/prisma";
-import { formatReviewerName } from "@/features/reviews/lib/formatting";
-import { ReviewScrollHandler } from "@/features/reviews/components/ReviewScrollHandler";
+import type { Metadata } from "next";
+import Link from "next/link";
+import type React from "react";
 
 export const metadata: Metadata = {
   title: "Reviews - What Auckland Clients Say About To The Point Tech",

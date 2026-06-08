@@ -4,8 +4,8 @@
  * @description Per-scope cache of tax-planner inputs in the Setting table.
  */
 
-import { prisma } from "@/shared/lib/prisma";
 import type { TaxRates } from "@/features/business/lib/tax-planner";
+import { prisma } from "@/shared/lib/prisma";
 
 /** How long a cached snapshot is fresh (1h trades staleness for fewer API calls). */
 export const TAX_CACHE_TTL_MS = 60 * 60 * 1000;

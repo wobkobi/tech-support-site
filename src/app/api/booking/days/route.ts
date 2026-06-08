@@ -4,15 +4,15 @@
  * @description API route to get available booking days (blocks calendar events and DB bookings).
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/shared/lib/prisma";
+import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
 import {
   BOOKING_CONFIG,
   buildAvailableDays,
   type ExistingBooking,
 } from "@/features/booking/lib/booking";
-import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
+import { prisma } from "@/shared/lib/prisma";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
+import { NextRequest, NextResponse } from "next/server";
 
 // Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
 export const maxDuration = 60;

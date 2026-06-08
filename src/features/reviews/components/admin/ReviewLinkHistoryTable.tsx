@@ -5,13 +5,13 @@
  * @description Table of review link history with inline editing for ReviewRequest entries.
  */
 
-import { useState } from "react";
-import type React from "react";
-import { FaCheck } from "react-icons/fa6";
 import { cn } from "@/shared/lib/cn";
-import { CopyLinkButton } from "./CopyLinkButton";
-import { toE164NZ, formatNZPhone, isValidPhone } from "@/shared/lib/normalise-phone";
 import { formatDateShort } from "@/shared/lib/date-format";
+import { formatNZPhone, isValidPhone, toE164NZ } from "@/shared/lib/normalise-phone";
+import type React from "react";
+import { useState } from "react";
+import { FaCheck } from "react-icons/fa6";
+import { CopyLinkButton } from "./CopyLinkButton";
 
 /**
  * A single row in the review link history table.

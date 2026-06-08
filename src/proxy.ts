@@ -8,8 +8,8 @@
  * belt-and-braces.
  */
 
-import { NextRequest, NextResponse } from "next/server";
 import { ADMIN_SESSION_COOKIE, verifySessionCookieValue } from "@/shared/lib/admin-session";
+import { NextRequest, NextResponse } from "next/server";
 
 const PROTECTED_API_PREFIXES = ["/api/admin/", "/api/business/"];
 const PROTECTED_PAGE_PREFIX = "/admin";

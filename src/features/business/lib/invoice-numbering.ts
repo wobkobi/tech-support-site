@@ -8,9 +8,9 @@
  * Prisma is the fallback when it's not.
  */
 
-import { prisma } from "@/shared/lib/prisma";
 import { nextInvoiceNumber } from "@/features/business/lib/business";
 import { getInvoiceCounter, setInvoiceCounter } from "@/features/business/lib/google-sheets";
+import { prisma } from "@/shared/lib/prisma";
 
 export interface NextInvoiceNumber {
   /** Formatted number ready to drop on the new invoice (e.g. TTP-2627-0042). */

@@ -1,9 +1,9 @@
-import type { Metadata } from "next";
-import type React from "react";
-import { requireAdminAuth } from "@/shared/lib/auth";
 import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
 import { InvoicesListView } from "@/features/business/components/InvoicesListView";
+import { requireAdminAuth } from "@/shared/lib/auth";
 import { cn } from "@/shared/lib/cn";
+import type { Metadata } from "next";
+import type React from "react";
 
 export const dynamic = "force-dynamic";
 

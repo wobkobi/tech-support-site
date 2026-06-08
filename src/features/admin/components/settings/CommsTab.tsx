@@ -8,13 +8,13 @@
  * settings form hook.
  */
 
-import type React from "react";
+import { NumberField, ToggleField } from "@/features/admin/components/settings/SettingsFields";
+import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
+import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
 import { cn } from "@/shared/lib/cn";
 import { COMMS_FIELD_META } from "@/shared/lib/settings/field-meta";
 import type { CommsSettings } from "@/shared/lib/settings/types";
-import { NumberField, ToggleField } from "@/features/admin/components/settings/SettingsFields";
-import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
-import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
+import type React from "react";
 
 interface Props {
   initial: CommsSettings;

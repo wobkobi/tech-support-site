@@ -4,17 +4,17 @@
  * @description Root layout for the App Router. Injects global styles, metadata, and JSON-LD.
  */
 
+import { getPublicPricing } from "@/features/business/lib/pricing-policy.server";
+import { GoogleTag } from "@/shared/components/GoogleTag";
+import { NavBar } from "@/shared/components/NavBar";
+import { PromoBanner } from "@/shared/components/PromoBanner";
+import { getSettings } from "@/shared/lib/settings/get-settings";
+import { getSiteUrl } from "@/shared/lib/site-url";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata, Viewport } from "next";
 import { Exo } from "next/font/google";
 import "./globals.css";
-import { GoogleTag } from "@/shared/components/GoogleTag";
-import { NavBar } from "@/shared/components/NavBar";
-import { PromoBanner } from "@/shared/components/PromoBanner";
-import { getSiteUrl } from "@/shared/lib/site-url";
-import { getSettings } from "@/shared/lib/settings/get-settings";
-import { getPublicPricing } from "@/features/business/lib/pricing-policy.server";
 
 const exo = Exo({
   subsets: ["latin"],

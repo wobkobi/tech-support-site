@@ -6,27 +6,27 @@
  * instead of the public slot model.
  */
 
-import { type NextRequest, NextResponse } from "next/server";
-import { randomUUID } from "crypto";
-import { revalidateTag } from "next/cache";
-import { Prisma } from "@prisma/client";
-import { prisma } from "@/shared/lib/prisma";
-import { isAdminRequest } from "@/shared/lib/auth";
 import {
   BOOKING_CONFIG,
   BOOKING_FIELD_LIMITS,
   validateEmail,
 } from "@/features/booking/lib/booking";
-import { getSettings } from "@/shared/lib/settings/get-settings";
 import {
   createBookingEvent,
   fetchAllCalendarEvents,
   SCHEDULE_CALENDAR_TAG,
 } from "@/features/calendar/lib/google-calendar";
-import { sendCustomerBookingConfirmation } from "@/features/reviews/lib/email";
-import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
 import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-create";
+import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
+import { sendCustomerBookingConfirmation } from "@/features/reviews/lib/email";
+import { isAdminRequest } from "@/shared/lib/auth";
 import { validatePhone } from "@/shared/lib/normalise-phone";
+import { prisma } from "@/shared/lib/prisma";
+import { getSettings } from "@/shared/lib/settings/get-settings";
+import { Prisma } from "@prisma/client";
+import { randomUUID } from "crypto";
+import { revalidateTag } from "next/cache";
+import { type NextRequest, NextResponse } from "next/server";
 
 // Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
 export const maxDuration = 60;

@@ -4,8 +4,8 @@
  * @description Booking system with duration selection (1hr quick jobs vs 2hr standard jobs).
  */
 
-import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 import type { AvailabilitySettings } from "@/shared/lib/settings/types";
+import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 
 /**
  * Splits an NZ-style apartment-prefixed address ("12/160 Kepa Road Orakei")

@@ -9,9 +9,9 @@
  * is behaviour-preserving until the operator saves an override.
  */
 
-import "server-only";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import type { IdentitySettings } from "@/shared/lib/settings/types";
+import "server-only";
 
 /**
  * Resolves the live business identity.

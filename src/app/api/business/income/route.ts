@@ -1,12 +1,12 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/shared/lib/prisma";
-import { isAdminRequest } from "@/shared/lib/auth";
-import { parseAmount } from "@/features/business/lib/validation";
 import {
   appendRowWithSyncId,
   formatDateForSheet,
   getFySheetIdForDate,
 } from "@/features/business/lib/sheets-sync";
+import { parseAmount } from "@/features/business/lib/validation";
+import { isAdminRequest } from "@/shared/lib/auth";
+import { prisma } from "@/shared/lib/prisma";
+import { NextRequest, NextResponse } from "next/server";
 
 /**
  * GET /api/business/income - Returns all income entries ordered by date descending.

@@ -1,12 +1,12 @@
 // src/features/business/components/TaxPlannerSection.tsx
-import type React from "react";
-import { cn } from "@/shared/lib/cn";
 import { formatNZD } from "@/features/business/lib/business";
 import {
   computeTaxPlan,
   DEFAULT_TAX_RATES,
   type TaxRates,
 } from "@/features/business/lib/tax-planner";
+import { cn } from "@/shared/lib/cn";
+import type React from "react";
 
 interface Props {
   /** Display label for the FY being summarised, e.g. "FY 2026-27 (current)". */

@@ -4,14 +4,14 @@
  * @description API routes for reviews with verification support.
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { revalidatePath, revalidateTag } from "next/cache";
-import { prisma as prismaClient } from "@/shared/lib/prisma";
 import { sendOwnerReviewNotification } from "@/features/reviews/lib/email";
-import { normalisePhone } from "@/shared/lib/normalise-phone";
 import { reviewTextError } from "@/features/reviews/lib/validation";
+import { normalisePhone } from "@/shared/lib/normalise-phone";
+import { prisma as prismaClient } from "@/shared/lib/prisma";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 import { getSettings } from "@/shared/lib/settings/get-settings";
+import { revalidatePath, revalidateTag } from "next/cache";
+import { NextRequest, NextResponse } from "next/server";
 
 /**
  * Factory for reviews API handlers, allows dependency injection of Prisma client.

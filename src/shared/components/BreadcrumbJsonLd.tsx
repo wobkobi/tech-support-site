@@ -6,8 +6,8 @@
  *   instead of just the bare URL.
  */
 
-import type React from "react";
 import { getSiteUrl } from "@/shared/lib/site-url";
+import type React from "react";
 
 const siteUrl = getSiteUrl();
 

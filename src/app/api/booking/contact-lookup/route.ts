@@ -4,9 +4,9 @@
  * @description Looks up a contact by email so the booking form can pre-fill name/phone/address.
  */
 
-import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
+import { NextRequest, NextResponse } from "next/server";
 
 /**
  * GET /api/booking/contact-lookup?email=<email>

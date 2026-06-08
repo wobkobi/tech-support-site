@@ -1,9 +1,9 @@
 "use client";
 
-import type React from "react";
-import { FaCheck, FaTriangleExclamation, FaXmark } from "react-icons/fa6";
-import type { IconType } from "react-icons";
 import { cn } from "@/shared/lib/cn";
+import type React from "react";
+import type { IconType } from "react-icons";
+import { FaCheck, FaTriangleExclamation, FaXmark } from "react-icons/fa6";
 
 interface ParseConfidenceBannerProps {
   confidence: "high" | "medium" | "low";

@@ -1,10 +1,10 @@
 "use client";
 
-import type React from "react";
-import { cn } from "@/shared/lib/cn";
-import { formatNZD, composeDescription } from "@/features/business/lib/business";
 import { Combobox } from "@/features/business/components/Combobox";
+import { composeDescription, formatNZD } from "@/features/business/lib/business";
 import type { RateConfig, TaskLine, TaskTemplate } from "@/features/business/types/business";
+import { cn } from "@/shared/lib/cn";
+import type React from "react";
 
 interface Props {
   tasks: TaskLine[];

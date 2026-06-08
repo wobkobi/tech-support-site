@@ -4,12 +4,12 @@
  * @description Admin API for listing and creating contacts.
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/shared/lib/prisma";
+import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-create";
+import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { toE164NZ } from "@/shared/lib/normalise-phone";
-import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
-import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-create";
+import { prisma } from "@/shared/lib/prisma";
+import { NextRequest, NextResponse } from "next/server";
 
 /**
  * GET /api/admin/contacts

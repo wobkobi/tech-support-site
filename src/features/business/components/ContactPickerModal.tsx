@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
-import type React from "react";
-import { FaCaretUp, FaCaretDown } from "react-icons/fa6";
-import { cn } from "@/shared/lib/cn";
 import type { GoogleContact } from "@/features/business/types/business";
 import { filterContacts } from "@/features/contacts/lib/contact-search";
+import { cn } from "@/shared/lib/cn";
+import type React from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { FaCaretDown, FaCaretUp } from "react-icons/fa6";
 
 interface ContactPickerModalProps {
   onSelect: (contact: GoogleContact) => void;

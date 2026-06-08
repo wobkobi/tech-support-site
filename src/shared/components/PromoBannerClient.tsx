@@ -5,13 +5,13 @@
  * @description Banner with 24h dismissal, first-load delay, and navbar offset coordination.
  */
 
-import { useEffect, useRef, useState } from "react";
-import type React from "react";
+import { summariseForBanner, type ActivePromo } from "@/features/business/lib/promos";
+import { cn } from "@/shared/lib/cn";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type React from "react";
+import { useEffect, useRef, useState } from "react";
 import { FaBolt, FaXmark } from "react-icons/fa6";
-import { cn } from "@/shared/lib/cn";
-import { summariseForBanner, type ActivePromo } from "@/features/business/lib/promos";
 
 const PROMO_DISMISSED_KEY = "promo-banner-dismissed-at";
 const PROMO_SEEN_KEY = "promo-banner-seen-at";

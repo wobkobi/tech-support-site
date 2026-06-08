@@ -4,17 +4,17 @@
  * @description API route to create a booking hold with Google Calendar integration.
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
-import { prisma } from "@/shared/lib/prisma";
 import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
+import { createBookingEvent } from "@/features/calendar/lib/google-calendar";
+import { toE164NZ } from "@/shared/lib/normalise-phone";
+import { prisma } from "@/shared/lib/prisma";
+import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
-import { createBookingEvent } from "@/features/calendar/lib/google-calendar";
-import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
-import { toE164NZ } from "@/shared/lib/normalise-phone";
-import { rateLimitOrReject } from "@/shared/lib/rate-limit";
+import { randomUUID } from "crypto";
+import { revalidatePath } from "next/cache";
+import { NextRequest, NextResponse } from "next/server";
 
 // Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
 export const maxDuration = 60;

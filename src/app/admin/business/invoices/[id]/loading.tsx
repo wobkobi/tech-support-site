@@ -6,10 +6,10 @@
  * in the same max-w-3xl column the page uses.
  */
 
-import type React from "react";
-import { cn } from "@/shared/lib/cn";
-import { Bone } from "@/shared/components/Skeleton";
 import { AdminSkeletonShell } from "@/features/admin/components/AdminSkeletonShell";
+import { Bone } from "@/shared/components/Skeleton";
+import { cn } from "@/shared/lib/cn";
+import type React from "react";
 
 /**
  * Invoice detail loading skeleton.

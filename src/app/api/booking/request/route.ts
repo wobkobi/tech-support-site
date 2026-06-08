@@ -4,38 +4,38 @@
  * @description API route with duration support (1hr vs 2hr jobs).
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/shared/lib/prisma";
+import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
 import {
-  validateBookingRequest,
-  validateBookingPayloadFields,
   parseHourLabel,
   splitUnitFromAddress,
-  type TimeOfDay,
-  type StartMinute,
-  type JobDuration,
+  validateBookingPayloadFields,
+  validateBookingRequest,
   type ExistingBooking,
+  type JobDuration,
+  type StartMinute,
+  type TimeOfDay,
 } from "@/features/booking/lib/booking";
-import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
-import { getSettings } from "@/shared/lib/settings/get-settings";
-import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
+import { lookupPublicHoliday } from "@/features/business/lib/pricing-policy.server";
+import { getActivePromo } from "@/features/business/lib/promos";
+import { lookupDriveDistance } from "@/features/business/lib/travel-distance";
 import {
   createBookingEvent,
   fetchAllCalendarEvents,
 } from "@/features/calendar/lib/google-calendar";
-import {
-  sendOwnerBookingNotification,
-  sendCustomerBookingConfirmation,
-} from "@/features/reviews/lib/email";
-import { randomUUID } from "crypto";
-import { Prisma } from "@prisma/client";
-import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
 import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-create";
-import { toE164NZ, isValidPhone } from "@/shared/lib/normalise-phone";
+import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
+import {
+  sendCustomerBookingConfirmation,
+  sendOwnerBookingNotification,
+} from "@/features/reviews/lib/email";
+import { isValidPhone, toE164NZ } from "@/shared/lib/normalise-phone";
+import { prisma } from "@/shared/lib/prisma";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
-import { getActivePromo } from "@/features/business/lib/promos";
-import { lookupDriveDistance } from "@/features/business/lib/travel-distance";
-import { lookupPublicHoliday } from "@/features/business/lib/pricing-policy.server";
+import { getSettings } from "@/shared/lib/settings/get-settings";
+import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
+import { Prisma } from "@prisma/client";
+import { randomUUID } from "crypto";
+import { NextRequest, NextResponse } from "next/server";
 
 // Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
 export const maxDuration = 60;

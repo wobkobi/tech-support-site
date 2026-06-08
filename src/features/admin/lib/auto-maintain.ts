@@ -5,9 +5,9 @@
  * Operations are idempotent and fast when there is nothing to do.
  */
 
-import type { PrismaClient } from "@prisma/client";
-import { toE164NZ, normalisePhone } from "@/shared/lib/normalise-phone";
 import type { ConflictEntry } from "@/app/api/admin/contacts/enrich-from-reviews/route";
+import { normalisePhone, toE164NZ } from "@/shared/lib/normalise-phone";
+import type { PrismaClient } from "@prisma/client";
 
 /**
  * Runs all maintenance tasks in order:

@@ -7,10 +7,10 @@
  * The data-table route loading.tsx files re-export this as their default.
  */
 
-import type React from "react";
-import { cn } from "@/shared/lib/cn";
-import { Bone } from "@/shared/components/Skeleton";
 import { AdminSkeletonShell } from "@/features/admin/components/AdminSkeletonShell";
+import { Bone } from "@/shared/components/Skeleton";
+import { cn } from "@/shared/lib/cn";
+import type React from "react";
 
 /**
  * Admin list-view loading skeleton.

@@ -8,10 +8,10 @@
  * Inputs are sized larger than the app default for the older admin audience.
  */
 
-import type React from "react";
-import { useState } from "react";
 import { cn } from "@/shared/lib/cn";
 import type { FieldMeta } from "@/shared/lib/settings/field-meta";
+import type React from "react";
+import { useState } from "react";
 
 interface FieldShellProps {
   id: string;

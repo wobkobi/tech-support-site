@@ -5,10 +5,10 @@
  * two-column stack of collapsed accordion rows and a next-steps card.
  */
 
-import type React from "react";
-import { cn } from "@/shared/lib/cn";
-import { FrostedSection, PageShell, CARD, SOFT_CARD } from "@/shared/components/PageLayout";
+import { CARD, FrostedSection, PageShell, SOFT_CARD } from "@/shared/components/PageLayout";
 import { Bone } from "@/shared/components/Skeleton";
+import { cn } from "@/shared/lib/cn";
+import type React from "react";
 
 /**
  * FAQ route-loading skeleton.

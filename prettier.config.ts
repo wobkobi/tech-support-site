@@ -3,7 +3,11 @@ import type { Config } from "prettier";
 
 const config: Config = {
   $schema: "https://json.schemastore.org/prettierrc",
-  plugins: ["prettier-plugin-tailwindcss"],
+  plugins: [
+    "prettier-plugin-organize-imports",
+    "prettier-plugin-packagejson",
+    "prettier-plugin-tailwindcss",
+  ],
   tailwindConfig: "./tailwind.config.ts",
 
   printWidth: 100,

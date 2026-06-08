@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
-import { isAdminRequest } from "@/shared/lib/auth";
 import { getInvoiceCounter, setInvoiceCounter } from "@/features/business/lib/google-sheets";
+import { isAdminRequest } from "@/shared/lib/auth";
+import { NextRequest, NextResponse } from "next/server";
 
 // Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
 export const maxDuration = 60;

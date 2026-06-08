@@ -4,8 +4,8 @@
  * @description robots.txt generator. Allows public routes, blocks admin/API/preview.
  */
 
-import type { MetadataRoute } from "next";
 import { getSiteUrl } from "@/shared/lib/site-url";
+import type { MetadataRoute } from "next";
 
 const siteUrl = getSiteUrl();
 

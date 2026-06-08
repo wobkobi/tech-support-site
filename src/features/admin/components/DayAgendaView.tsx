@@ -12,15 +12,9 @@
  * week's calendar events.
  */
 
-import { useMemo, useRef, useState, useTransition } from "react";
-import type React from "react";
-import { useRouter } from "next/navigation";
-import { FaCalendarDay, FaChevronLeft, FaChevronRight, FaRegCalendar } from "react-icons/fa6";
-import { cn } from "@/shared/lib/cn";
-import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
-import { ManualBookingModal } from "@/features/admin/components/ManualBookingModal";
 import { BlockDayButton } from "@/features/admin/components/BlockDayButton";
 import { EventActionSheet } from "@/features/admin/components/EventActionSheet";
+import { ManualBookingModal } from "@/features/admin/components/ManualBookingModal";
 import {
   KIND_BAR_BG,
   KIND_STYLES,
@@ -30,6 +24,12 @@ import {
   mondayOf,
   type WeekEvent,
 } from "@/features/admin/lib/schedule-types";
+import { cn } from "@/shared/lib/cn";
+import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
+import { useRouter } from "next/navigation";
+import type React from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
+import { FaCalendarDay, FaChevronLeft, FaChevronRight, FaRegCalendar } from "react-icons/fa6";
 
 /**
  * Formats a positive minute count as "Xh Ym free" / "Xh free" / "Ym free".

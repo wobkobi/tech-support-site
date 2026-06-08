@@ -6,15 +6,15 @@
  * on the chosen NZ day - personal-calendar events on the day are ignored.
  */
 
-import { type NextRequest, NextResponse } from "next/server";
-import { revalidateTag } from "next/cache";
-import { prisma } from "@/shared/lib/prisma";
-import { isAdminRequest } from "@/shared/lib/auth";
 import {
   createBlockedDayEvent,
   SCHEDULE_CALENDAR_TAG,
 } from "@/features/calendar/lib/google-calendar";
+import { isAdminRequest } from "@/shared/lib/auth";
+import { prisma } from "@/shared/lib/prisma";
 import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
+import { revalidateTag } from "next/cache";
+import { type NextRequest, NextResponse } from "next/server";
 
 // Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
 export const maxDuration = 60;

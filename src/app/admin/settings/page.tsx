@@ -1,12 +1,12 @@
 // src/app/admin/settings/page.tsx
+import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
+import { SettingsView } from "@/features/admin/components/settings/SettingsView";
+import { requireAdminAuth } from "@/shared/lib/auth";
+import { cn } from "@/shared/lib/cn";
+import { DEFAULT_SETTINGS } from "@/shared/lib/settings/defaults";
+import { getSettings } from "@/shared/lib/settings/get-settings";
 import type { Metadata } from "next";
 import type React from "react";
-import { requireAdminAuth } from "@/shared/lib/auth";
-import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
-import { cn } from "@/shared/lib/cn";
-import { getSettings } from "@/shared/lib/settings/get-settings";
-import { DEFAULT_SETTINGS } from "@/shared/lib/settings/defaults";
-import { SettingsView } from "@/features/admin/components/settings/SettingsView";
 
 export const dynamic = "force-dynamic";
 

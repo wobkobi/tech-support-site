@@ -1,8 +1,8 @@
 "use client";
 
-import type React from "react";
-import { cn } from "@/shared/lib/cn";
 import type { PartLine } from "@/features/business/types/business";
+import { cn } from "@/shared/lib/cn";
+import type React from "react";
 
 interface Props {
   parts: PartLine[];

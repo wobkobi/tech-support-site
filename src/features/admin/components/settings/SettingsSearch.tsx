@@ -8,11 +8,11 @@
  * shared field metadata, so search and the editors never drift apart.
  */
 
-import { useMemo, useState } from "react";
-import type React from "react";
 import { cn } from "@/shared/lib/cn";
 import { FIELD_META_BY_GROUP, GROUP_META } from "@/shared/lib/settings/field-meta";
 import type { SettingsGroup } from "@/shared/lib/settings/types";
+import type React from "react";
+import { useMemo, useState } from "react";
 
 /** One searchable field entry. */
 interface SearchItem {

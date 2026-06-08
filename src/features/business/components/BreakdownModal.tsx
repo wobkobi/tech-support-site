@@ -6,12 +6,12 @@
  * listing the entries that summed to it, or by showing the calculation steps.
  */
 
-import { useEffect } from "react";
-import type React from "react";
-import { FaCaretRight } from "react-icons/fa6";
-import Link from "next/link";
-import { cn } from "@/shared/lib/cn";
 import { formatNZD } from "@/features/business/lib/business";
+import { cn } from "@/shared/lib/cn";
+import Link from "next/link";
+import type React from "react";
+import { useEffect } from "react";
+import { FaCaretRight } from "react-icons/fa6";
 
 /**
  * One contributing row in a breakdown that lists entries.

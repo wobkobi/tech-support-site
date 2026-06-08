@@ -4,9 +4,9 @@
  * @description PATCH /api/reviews/[id] - Allows a customer to edit their review (with valid customerRef), resets status to pending.
  */
 
-import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/shared/lib/prisma";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
+import { NextRequest, NextResponse } from "next/server";
 
 /**
  * PATCH /api/reviews/[id] - Allows a customer to edit their review.

@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/shared/lib/prisma";
 import { isAdminRequest } from "@/shared/lib/auth";
+import { prisma } from "@/shared/lib/prisma";
+import { NextRequest, NextResponse } from "next/server";
 
 // Seed shape: one base hourly rate (Standard), modifier rates that shift the
 // effective $/hr (Complex +$20, At home -$10, Remote -$10), a percentage

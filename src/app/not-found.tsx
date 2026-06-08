@@ -6,11 +6,11 @@
 
 "use client";
 
+import { Button } from "@/shared/components/Button";
+import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
+import { cn } from "@/shared/lib/cn";
 import type React from "react";
 import { useState } from "react";
-import { FrostedSection, PageShell, CARD } from "@/shared/components/PageLayout";
-import { Button } from "@/shared/components/Button";
-import { cn } from "@/shared/lib/cn";
 import { FaHouse } from "react-icons/fa6";
 
 const MESSAGES = [

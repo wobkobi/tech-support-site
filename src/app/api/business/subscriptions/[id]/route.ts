@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/shared/lib/prisma";
-import { isAdminRequest } from "@/shared/lib/auth";
 import { VALID_FREQUENCIES } from "@/features/business/lib/constants";
 import { parseAmount, parseRate } from "@/features/business/lib/validation";
+import { isAdminRequest } from "@/shared/lib/auth";
+import { prisma } from "@/shared/lib/prisma";
+import { NextRequest, NextResponse } from "next/server";
 
 /**
  * PATCH /api/business/subscriptions/[id] - Updates a subscription's fields.

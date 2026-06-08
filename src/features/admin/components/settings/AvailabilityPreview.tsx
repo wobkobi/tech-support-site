@@ -9,11 +9,11 @@
  * cutoff, caps) are reflected, not just the raw hours.
  */
 
-import { useMemo } from "react";
-import type React from "react";
-import { cn } from "@/shared/lib/cn";
 import { buildAvailableDays, hourLabel } from "@/features/booking/lib/booking";
+import { cn } from "@/shared/lib/cn";
 import type { AvailabilitySettings } from "@/shared/lib/settings/types";
+import type React from "react";
+import { useMemo } from "react";
 
 /** App timezone; the booking engine is NZ-only. */
 const TIME_ZONE = "Pacific/Auckland";

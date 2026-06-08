@@ -5,14 +5,14 @@
  * @description Form for sending a review link to a past client via email or SMS.
  */
 
-import { useState, useRef } from "react";
-import { cn } from "@/shared/lib/cn";
-import { CopyLinkButton } from "./CopyLinkButton";
-import { formatNZPhone, validatePhone } from "@/shared/lib/normalise-phone";
 import { EmailInput } from "@/shared/components/EmailInput";
 import { PhoneInput } from "@/shared/components/PhoneInput";
+import { cn } from "@/shared/lib/cn";
+import { formatNZPhone, validatePhone } from "@/shared/lib/normalise-phone";
 import type React from "react";
+import { useRef, useState } from "react";
 import { FaCaretLeft } from "react-icons/fa6";
+import { CopyLinkButton } from "./CopyLinkButton";
 
 /**
  * A contact entry used to pre-fill the review link form.
