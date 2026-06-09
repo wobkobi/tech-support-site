@@ -320,6 +320,7 @@ export function TasksSection({
                 </div>
                 <TaskTotalsRow
                   task={task}
+                  spread
                   onQty={(v) => onUpdateTask(idx, "qty", v)}
                   onPrice={(v) => onUpdateTask(idx, "unitPrice", v)}
                   onDelete={() => onTasksChange((p) => p.filter((_, i) => i !== idx))}
@@ -344,13 +345,17 @@ export function TasksSection({
 /**
  * Compact qty + unit-price + total + delete row shared by both flat-rate and
  * device/action task rows. Stacks on mobile (qty/price/total in a 3-up grid
- * with the delete button to the right) and collapses to an inline strip at
- * sm+ so it sits next to the device/action picker.
+ * with the delete button to the right). At sm+ it becomes an inline strip:
+ * compact for flat-rate rows (which sit next to the rate dropdown), or - when
+ * `spread` is set for device/action task rows - full width, with inline
+ * hrs / $/hr hints and the line total + delete pushed to the right edge so the
+ * money lines up under the effective-rate readout above.
  * @param props - Component props.
  * @param props.task - The task line to render controls for.
  * @param props.onQty - Called when the operator edits the hours / qty input.
  * @param props.onPrice - Called when the operator edits the $/unit input.
  * @param props.onDelete - Called when the × button is pressed.
+ * @param props.spread - When true (task rows) the strip fills the row and right-aligns the total; flat-rate rows leave it false to stay compact.
  * @returns Totals strip element.
  */
 function TaskTotalsRow({
@@ -358,17 +363,21 @@ function TaskTotalsRow({
   onQty,
   onPrice,
   onDelete,
+  spread = false,
 }: {
   task: TaskLine;
   onQty: (v: number) => void;
   onPrice: (v: number) => void;
   onDelete: () => void;
+  spread?: boolean;
 }): React.ReactElement {
   return (
     <div
       className={cn(
         "grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_44px] items-center gap-2",
-        "sm:flex sm:flex-none sm:items-center sm:gap-2",
+        spread
+          ? "sm:flex sm:w-full sm:items-center sm:gap-2"
+          : "sm:flex sm:flex-none sm:items-center sm:gap-2",
       )}
     >
       <label className={cn("flex flex-col gap-0.5 sm:contents")}>
@@ -390,11 +399,12 @@ function TaskTotalsRow({
           )}
         />
       </label>
+      {spread && <span className={cn("hidden text-xs text-slate-400 sm:inline")}>hrs</span>}
       <label className={cn("flex flex-col gap-0.5 sm:contents")}>
         <span
           className={cn("text-[10px] font-medium uppercase tracking-wide text-slate-400 sm:hidden")}
         >
-          $/unit
+          {spread ? "$/hr" : "$/unit"}
         </span>
         <input
           type="number"
@@ -409,9 +419,11 @@ function TaskTotalsRow({
           )}
         />
       </label>
+      {spread && <span className={cn("hidden text-xs text-slate-400 sm:inline")}>$/hr</span>}
       <span
         className={cn(
-          "self-end text-right text-sm font-semibold text-slate-700 sm:w-20 sm:text-xs",
+          "self-end text-right text-sm font-semibold text-slate-700 sm:w-24 sm:self-center sm:text-xs",
+          spread && "sm:ml-auto",
         )}
         aria-label="Line total"
       >
@@ -422,7 +434,7 @@ function TaskTotalsRow({
         onClick={onDelete}
         aria-label="Remove task"
         className={cn(
-          "inline-flex h-11 w-11 items-center justify-center rounded-lg text-xl leading-none text-slate-400 hover:bg-red-50 hover:text-red-500 sm:h-auto sm:w-auto sm:rounded-none sm:text-lg sm:hover:bg-transparent",
+          "inline-flex h-11 w-11 items-center justify-center rounded-lg text-xl leading-none text-slate-400 hover:bg-red-50 hover:text-red-500 sm:h-9 sm:w-9 sm:rounded-lg sm:text-lg sm:hover:bg-red-50",
         )}
       >
         ×
