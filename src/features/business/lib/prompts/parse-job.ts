@@ -12,7 +12,7 @@ import type { RateConfig, TaskTemplate } from "@/features/business/types/busines
  * @returns Static system prompt string for the OpenAI API.
  */
 export function buildParseJobPrompt(): string {
-  return `You are a billing assistant for To The Point, a sole-trader tech support business in New Zealand run by Harrison Raynes.
+  return `You are a billing assistant for a sole-trader tech support business in New Zealand. The business name, owner, and location are given in the user-message context.
 
 Read a plain-English job description and return a structured JSON object representing professional invoice line items.
 
@@ -249,12 +249,17 @@ Return this exact JSON shape (when not asking for clarification):
  * @param rates - Current rate configurations.
  * @param templates - Previously used task templates.
  * @param currentTime - Current NZ local time as HH:MM, used for open-ended session end times.
+ * @param identity - Live business identity from settings.
+ * @param identity.company - Business / trading name.
+ * @param identity.name - Sole-trader operator name.
+ * @param identity.location - Business locality (e.g. Auckland, New Zealand).
  * @returns Context string to prepend to the user's job description.
  */
 export function buildParseJobContext(
   rates: RateConfig[],
   templates: TaskTemplate[] = [],
   currentTime?: string,
+  identity?: { company: string; name: string; location: string },
 ): string {
   const templateBlock =
     templates.length > 0
@@ -269,7 +274,10 @@ export function buildParseJobContext(
         )}\n\n`
       : "";
   const timeBlock = currentTime ? `Current NZ local time: ${currentTime}\n\n` : "";
-  return `Current rates:
+  const identityBlock = identity
+    ? `Business: ${identity.company}, sole trader ${identity.name}, based in ${identity.location}.\n\n`
+    : "";
+  return `${identityBlock}Current rates:
 ${JSON.stringify(rates, null, 2)}
 
 ${templateBlock}${timeBlock}--- BEGIN USER DATA ---
