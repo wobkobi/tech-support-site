@@ -110,11 +110,17 @@ const DRAFT_KEY = "calculator-draft-v1";
 /**
  * Subset of CalculatorView state worth persisting across refreshes. Excludes
  * server-fetched data (rates, taskTemplates, contacts, activePromo), UI flags
- * (showParts, showRates etc), loading state, and the AI-parse session.
+ * (showParts, showRates etc), loading state, and the AI-parse results/clarify
+ * session. The "Describe the job" input text itself IS persisted (`aiInput`).
  */
 interface CalculatorDraft {
   v: 1;
   savedAt: number;
+  /**
+   * The "Describe the job" textarea text. Additive field: older v1 drafts saved
+   * before this existed simply lack it and default to "" on load (safe, no bump).
+   */
+  aiInput: string;
   timeRanges: ParsedRange[];
   durationMinsOverride: number | null;
   hourlyRateId: string | null;
@@ -142,6 +148,7 @@ interface CalculatorDraft {
  */
 function isMeaningfulDraft(d: CalculatorDraft): boolean {
   return (
+    (d.aiInput?.trim().length ?? 0) > 0 ||
     d.tasks.length > 0 ||
     d.parts.length > 0 ||
     d.travelEntries.length > 0 ||
@@ -334,7 +341,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
   const [pendingInvoiceId, setPendingInvoiceId] = useState<string | null>(null);
   const [sheetSyncToast, setSheetSyncToast] = useState<string | null>(null);
 
-  const [aiInput, setAiInput] = useState("");
+  const [aiInput, setAiInput] = useState(() => initialDraft?.aiInput ?? "");
   const [parsing, setParsing] = useState(false);
   const [parseResult, setParseResult] = useState<ParseJobResponse | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
@@ -451,6 +458,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
   useEffect(() => {
     const t = setTimeout(() => {
       saveDraft({
+        aiInput,
         timeRanges,
         durationMinsOverride,
         hourlyRateId,
@@ -470,6 +478,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
     }, 500);
     return () => clearTimeout(t);
   }, [
+    aiInput,
     timeRanges,
     durationMinsOverride,
     hourlyRateId,
@@ -867,8 +876,8 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
     setPickedContactGoogleId(null);
     setAddressModeState("custom");
     setUnsuccessful(false);
-    // Non-persisted parse-session state, but still part of "starting fresh".
     setAiInput("");
+    // Non-persisted parse-session results, but still part of "starting fresh".
     setParseResult(null);
     setHasParsed(false);
     setClarifyQuestions([]);
