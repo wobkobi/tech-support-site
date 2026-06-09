@@ -32,6 +32,11 @@ export const GROUP_META: Record<SettingsGroup, { title: string; blurb: string }>
     title: "Pricing & cancellation",
     blurb: "Cancellation policy, minimum charges, public-holiday surcharge, and GST status.",
   },
+  estimator: {
+    title: "Price estimator",
+    blurb:
+      "Task-duration benchmarks the public price estimator uses to gauge how long a job takes.",
+  },
   identity: {
     title: "Business identity",
     blurb: "Contact details, base address, payment terms, GST number, and bank account.",
@@ -373,10 +378,21 @@ export const PRICING_FIELD_META: Record<string, FieldMeta> = {
   },
 };
 
+/** Metadata for the estimator group's single editable field (the benchmark list). */
+export const ESTIMATOR_FIELD_META: Record<string, FieldMeta> = {
+  benchmarks: {
+    title: "Task-duration benchmarks",
+    description:
+      "How long each task takes on its own. The estimator combines these for multi-task visits. Edit a time, add a task, or remove one.",
+    unit: "minutes",
+  },
+};
+
 /** Per-group field metadata, keyed by group - powers the settings search. */
 export const FIELD_META_BY_GROUP: Record<SettingsGroup, Record<string, FieldMeta>> = {
   availability: AVAILABILITY_FIELD_META,
   pricing: PRICING_FIELD_META,
+  estimator: ESTIMATOR_FIELD_META,
   identity: IDENTITY_FIELD_META,
   tax: TAX_FIELD_META,
   comms: COMMS_FIELD_META,

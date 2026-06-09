@@ -37,6 +37,8 @@ export default async function SettingsPage(): Promise<React.ReactElement> {
         availabilityDefaults={DEFAULT_SETTINGS.availability}
         pricing={settings.pricing}
         pricingDefaults={DEFAULT_SETTINGS.pricing}
+        estimator={settings.estimator}
+        estimatorDefaults={DEFAULT_SETTINGS.estimator}
         comms={settings.comms}
         commsDefaults={DEFAULT_SETTINGS.comms}
         reviews={settings.reviews}

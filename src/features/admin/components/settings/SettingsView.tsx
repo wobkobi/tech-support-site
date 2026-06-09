@@ -9,6 +9,7 @@
 
 import { AvailabilityTab } from "@/features/admin/components/settings/AvailabilityTab";
 import { CommsTab } from "@/features/admin/components/settings/CommsTab";
+import { EstimatorTab } from "@/features/admin/components/settings/EstimatorTab";
 import { HoldsTab } from "@/features/admin/components/settings/HoldsTab";
 import { IdentityTab } from "@/features/admin/components/settings/IdentityTab";
 import { PricingTab } from "@/features/admin/components/settings/PricingTab";
@@ -22,6 +23,7 @@ import { GROUP_META } from "@/shared/lib/settings/field-meta";
 import type {
   AvailabilitySettings,
   CommsSettings,
+  EstimatorSettings,
   HoldsSettings,
   IdentitySettings,
   PricingSettings,
@@ -38,6 +40,7 @@ import { useEffect, useState } from "react";
 const TAB_ORDER: SettingsGroup[] = [
   "availability",
   "pricing",
+  "estimator",
   "identity",
   "tax",
   "comms",
@@ -50,6 +53,7 @@ const TAB_ORDER: SettingsGroup[] = [
 const IMPLEMENTED: ReadonlySet<SettingsGroup> = new Set<SettingsGroup>([
   "availability",
   "pricing",
+  "estimator",
   "identity",
   "tax",
   "comms",
@@ -63,6 +67,8 @@ interface Props {
   availabilityDefaults: AvailabilitySettings;
   pricing: PricingSettings;
   pricingDefaults: PricingSettings;
+  estimator: EstimatorSettings;
+  estimatorDefaults: EstimatorSettings;
   comms: CommsSettings;
   commsDefaults: CommsSettings;
   reviews: ReviewsSettings;
@@ -84,6 +90,8 @@ interface Props {
  * @param props.availabilityDefaults - Code default availability settings.
  * @param props.pricing - Resolved current pricing settings.
  * @param props.pricingDefaults - Code default pricing settings.
+ * @param props.estimator - Resolved current estimator settings.
+ * @param props.estimatorDefaults - Code default estimator settings.
  * @param props.comms - Resolved current comms settings.
  * @param props.commsDefaults - Code default comms settings.
  * @param props.reviews - Resolved current reviews settings.
@@ -103,6 +111,8 @@ export function SettingsView({
   availabilityDefaults,
   pricing,
   pricingDefaults,
+  estimator,
+  estimatorDefaults,
   comms,
   commsDefaults,
   reviews,
@@ -149,6 +159,7 @@ export function SettingsView({
   const current: Settings = {
     availability,
     pricing,
+    estimator,
     comms,
     reviews,
     holds,
@@ -194,6 +205,8 @@ export function SettingsView({
               <AvailabilityTab initial={availability} defaults={availabilityDefaults} />
             ) : active === "pricing" ? (
               <PricingTab initial={pricing} defaults={pricingDefaults} />
+            ) : active === "estimator" ? (
+              <EstimatorTab initial={estimator} defaults={estimatorDefaults} />
             ) : active === "identity" ? (
               <IdentityTab initial={identity} defaults={identityDefaults} />
             ) : active === "comms" ? (

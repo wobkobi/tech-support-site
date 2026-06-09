@@ -43,6 +43,16 @@ export function InvoicesListView(): React.ReactElement {
    * @param status - New invoice status
    */
   async function updateStatus(id: string, status: InvoiceStatus): Promise<void> {
+    // Voiding is destructive, so confirm first. This list-side void is a silent
+    // status change - no client notification is sent (use the invoice page for that).
+    if (
+      status === "VOIDED" &&
+      !window.confirm(
+        "Void this invoice? It'll be marked as voided. No notification is emailed from here - open the invoice to notify the client.",
+      )
+    ) {
+      return;
+    }
     const res = await fetch(`/api/business/invoices/${id}`, {
       method: "PATCH",
       headers: { ...headers, "content-type": "application/json" },

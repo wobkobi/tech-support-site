@@ -12,6 +12,7 @@ import type {
 } from "@/features/business/types/business";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
+import { getSettings } from "@/shared/lib/settings/get-settings";
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 
@@ -185,10 +186,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
   try {
-    const [rates, templates] = await Promise.all([
+    const [rates, templates, settings] = await Promise.all([
       prisma.rateConfig.findMany({ orderBy: { label: "asc" } }),
       prisma.taskTemplate.findMany({ orderBy: [{ usageCount: "desc" }, { description: "asc" }] }),
+      getSettings(),
     ]);
+    const { company, name, location } = settings.identity;
 
     const rateDtos = rates.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() }));
     const templateDtos = templates.map((t) => ({
@@ -207,7 +210,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // System prompt is static (cacheable) - all per-call data is appended to
     // the user message via buildParseJobContext.
     const systemPrompt = buildParseJobPrompt();
-    const context = buildParseJobContext(rateDtos, templateDtos, currentTime);
+    const context = buildParseJobContext(rateDtos, templateDtos, currentTime, {
+      company,
+      name,
+      location,
+    });
 
     const precomputed = calcSessionMins(input);
     // Close the untrusted USER DATA block before any server-supplied trusted
