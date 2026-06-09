@@ -58,6 +58,25 @@ export const DEFAULT_SETTINGS: Settings = {
     reschedule: { cutoffHours: 0, maxReschedules: null },
   },
 
+  // Source: the STANDALONE benchmarks hardcoded in the estimate-duration prompt.
+  // Standalone times in minutes; the prompt's stacking rules combine them per visit.
+  estimator: {
+    benchmarks: [
+      { label: "Quick software fix, settings change", mins: 30 },
+      { label: "Virus removal, general tune-up", mins: 60 },
+      { label: "Phone setup (contacts, apps, email)", mins: 60 },
+      { label: "Printer setup", mins: 45 },
+      { label: "Wi-Fi troubleshooting", mins: 45 },
+      { label: "New laptop setup (no data transfer)", mins: 60 },
+      { label: "New laptop setup + data transfer from old laptop", mins: 120 },
+      { label: "Data/file transfer from old device", mins: 120 },
+      { label: "Email / software setup", mins: 45 },
+      { label: "Hardware upgrade (RAM, SSD)", mins: 60 },
+      { label: "Data recovery", mins: 120 },
+      { label: "PC build", mins: 180 },
+    ],
+  },
+
   // Source: business-identity.ts + layout.tsx JSON-LD + HOME_ADDRESS env.
   identity: {
     name: "Harrison Raynes",

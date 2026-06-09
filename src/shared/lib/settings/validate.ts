@@ -13,6 +13,7 @@
 import type {
   AvailabilitySettings,
   CommsSettings,
+  EstimatorSettings,
   HoldsSettings,
   IdentitySettings,
   PricingSettings,
@@ -151,6 +152,53 @@ function validatePricing(p: PricingSettings): FieldError[] {
   return errors;
 }
 
+/** Upper bound on benchmark rows, to keep the estimator prompt a sane size. */
+const MAX_BENCHMARKS = 40;
+
+/**
+ * Validates the estimator group: a list of task-duration benchmarks, each a
+ * non-empty unique label plus a sane minute count.
+ * @param e - Proposed estimator settings.
+ * @returns List of field errors (empty when valid).
+ */
+function validateEstimator(e: EstimatorSettings): FieldError[] {
+  const errors: FieldError[] = [];
+  if (!Array.isArray(e.benchmarks)) {
+    errors.push({ field: "benchmarks", message: "Must be a list of benchmarks." });
+    return errors;
+  }
+  if (e.benchmarks.length === 0)
+    errors.push({ field: "benchmarks", message: "Add at least one benchmark." });
+  if (e.benchmarks.length > MAX_BENCHMARKS)
+    errors.push({
+      field: "benchmarks",
+      message: `Keep it to ${MAX_BENCHMARKS} benchmarks or fewer.`,
+    });
+  const seen = new Set<string>();
+  e.benchmarks.forEach((b, i) => {
+    const label = typeof b?.label === "string" ? b.label.trim() : "";
+    if (!label) {
+      errors.push({ field: `benchmarks.${i}.label`, message: "Label is required." });
+    } else if (label.length > 80) {
+      errors.push({
+        field: `benchmarks.${i}.label`,
+        message: "Keep the label under 80 characters.",
+      });
+    } else {
+      const key = label.toLowerCase();
+      if (seen.has(key))
+        errors.push({
+          field: `benchmarks.${i}.label`,
+          message: "Duplicate label - each must be unique.",
+        });
+      seen.add(key);
+    }
+    if (!inRange(b?.mins, 1, 1440))
+      errors.push({ field: `benchmarks.${i}.mins`, message: "Minutes must be 1-1440." });
+  });
+  return errors;
+}
+
 /**
  * Validates the comms group's shape + bounds.
  * @param c - Proposed comms settings.
@@ -276,6 +324,8 @@ export function validateGroup<G extends SettingsGroup>(group: G, value: Settings
       return validateAvailability(value as AvailabilitySettings);
     case "pricing":
       return validatePricing(value as PricingSettings);
+    case "estimator":
+      return validateEstimator(value as EstimatorSettings);
     case "comms":
       return validateComms(value as CommsSettings);
     case "reviews":

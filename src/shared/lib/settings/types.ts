@@ -108,6 +108,21 @@ export interface IdentitySettings {
   homeRegion: string;
 }
 
+/** One task-duration benchmark: a short label and its standalone minutes. */
+export interface Benchmark {
+  label: string;
+  /** How long this task takes on its own, in minutes. */
+  mins: number;
+}
+
+export interface EstimatorSettings {
+  /**
+   * Standalone task-duration baselines the public price estimator starts from
+   * before the stacking rules combine a multi-task visit. Editable as a list.
+   */
+  benchmarks: Benchmark[];
+}
+
 export interface TaxSettings {
   /** Income-tax reserve rate (fraction). */
   incomeTax: number;
@@ -161,6 +176,7 @@ export interface ReviewsSettings {
 export interface Settings {
   availability: AvailabilitySettings;
   pricing: PricingSettings;
+  estimator: EstimatorSettings;
   identity: IdentitySettings;
   tax: TaxSettings;
   comms: CommsSettings;
