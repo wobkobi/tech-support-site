@@ -15,6 +15,7 @@ interface EstimateTask {
 
 interface EstimateResult {
   estimatedMins: number;
+  confidence: "high" | "medium" | "low";
   explanation: string;
   tasks: EstimateTask[];
 }
@@ -26,6 +27,7 @@ interface EstimateResult {
 const SYSTEM_PROMPT = `You are a tech support time estimator for a solo technician in New Zealand.
 Given a plain-English description of a tech support job, return a JSON object with exactly these fields:
 - "estimatedMins": integer number of minutes for the combined visit (e.g. 60 for 1 hour, 90 for 1.5 hours)
+- "confidence": "high" when the description clearly specifies the task(s) and scope; "medium" when some detail is missing; "low" when it is vague or just a symptom with no diagnosis (e.g. "my PC won't turn on", "it's running slow"). Be honest - a brief or ambiguous description is "low", and that is fine.
 - "explanation": one short friendly sentence explaining your estimate (e.g. "Laptop setup and data transfer typically takes around 2 hours.")
 - "tasks": array of one entry per distinct task, each with "label" (short noun phrase, e.g. "Printer setup") and "mins" (integer minutes that THIS task contributes to the combined visit). The mins MUST sum to estimatedMins.
 
@@ -177,6 +179,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     parsed.tasks = rebalanceTasks(cleanTasks, parsed.estimatedMins, incrementMins);
+
+    // Coerce confidence to a known value; anything unexpected -> "medium".
+    parsed.confidence =
+      parsed.confidence === "high" || parsed.confidence === "low" ? parsed.confidence : "medium";
 
     return NextResponse.json({ ok: true, result: parsed });
   } catch (err) {

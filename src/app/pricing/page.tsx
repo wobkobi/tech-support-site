@@ -6,6 +6,7 @@
  * page, booking emails, and FAQ stay aligned.
  */
 
+import { GetEstimateButton } from "@/features/business/components/GetEstimateButton";
 import { PricingWizard } from "@/features/business/components/PricingWizard";
 import {
   cancellationCopy,
@@ -25,6 +26,7 @@ import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
 import { CARD, FrostedSection, PageShell, SOFT_CARD } from "@/shared/components/PageLayout";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
+import { getSettings } from "@/shared/lib/settings/get-settings";
 import type { Metadata } from "next";
 import Link from "next/link";
 import type React from "react";
@@ -97,10 +99,11 @@ const ACCORDION_BODY = cn(
  * @returns Pricing page element.
  */
 export default async function PricingPage(): Promise<React.ReactElement> {
-  const [promo, pricing, policy] = await Promise.all([
+  const [promo, pricing, policy, settings] = await Promise.all([
     getActivePromo(),
     getPublicPricing(),
     getPolicy(),
+    getSettings(),
   ]);
   const baseRate = pricing.baseRate;
   return (
@@ -175,16 +178,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
               </div>
             )}
 
-            <a
-              href="#estimate-heading"
-              className={cn(
-                "mt-5 inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white",
-                "bg-russian-violet hover:bg-russian-violet/90 transition-colors",
-              )}
-            >
-              Get a rough estimate
-              <FaCaretDown className={cn("h-4 w-4")} aria-hidden />
-            </a>
+            <GetEstimateButton />
 
             <div className={cn("mt-5 space-y-3")}>
               <p className={cn("text-rich-black/90 flex gap-3 text-sm sm:text-base")}>
@@ -444,7 +438,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
           >
             <h2
               id="estimate-heading"
-              className={cn("text-russian-violet mb-1 text-xl font-bold sm:text-2xl")}
+              className={cn("text-russian-violet mb-1 scroll-mt-24 text-xl font-bold sm:text-2xl")}
             >
               Get a rough estimate
             </h2>
@@ -454,6 +448,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
             <PricingWizard
               minBillableMins={policy.MIN_BILLABLE_MINS}
               minTravelCharge={policy.MIN_TRAVEL_CHARGE}
+              estimatorRange={settings.estimator.range}
             />
           </section>
 

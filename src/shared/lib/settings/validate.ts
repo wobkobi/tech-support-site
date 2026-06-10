@@ -196,6 +196,26 @@ function validateEstimator(e: EstimatorSettings): FieldError[] {
     if (!inRange(b?.mins, 1, 1440))
       errors.push({ field: `benchmarks.${i}.mins`, message: "Minutes must be 1-1440." });
   });
+
+  // Confidence-scaled range: each band's factors are fractions, high >= low.
+  const range = e.range;
+  if (!range || typeof range !== "object") {
+    errors.push({ field: "range", message: "Range config is required." });
+  } else {
+    for (const level of ["high", "medium", "low"] as const) {
+      const band = range[level];
+      if (!band || !inRange(band.lowFactor, 0, 5) || !inRange(band.highFactor, 0, 5)) {
+        errors.push({ field: `range.${level}`, message: "Low and high must be 0-500%." });
+      } else if (band.highFactor < band.lowFactor) {
+        errors.push({ field: `range.${level}`, message: "High % must be at least the low %." });
+      }
+    }
+    if (!nonNeg(range.minSpread))
+      errors.push({
+        field: "range.minSpread",
+        message: "Minimum spread must be 0 or more dollars.",
+      });
+  }
   return errors;
 }
 
