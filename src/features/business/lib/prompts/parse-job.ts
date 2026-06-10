@@ -94,8 +94,8 @@ EXAMPLES — multi-task splitting + specific actions + details:
 
 BILLING — single source of truth for time distribution. Run the algorithm step by step.
 1. Determine durationMins (from pre-computed annotation if present, otherwise from the description).
-2. Convert to decimal hours, ROUNDING UP to the next 0.25 (matches the calculator's billable rule of rounding up to the nearest 15-min increment).
-   Examples: 105 min = 1.75h exactly → 1.75h. 107 min → 2.0h (110 ceils to 120). 110 min → 2.0h. 120 min → 2.0h. 121 min → 2.25h.
+2. Convert durationMins to billable minutes using the BILLING line in the context message: round to the NEAREST billing increment, then take the larger of that and the minimum billable time; divide by 60 for totalHours. Distribute totalHours across the tasks on that same increment grid. The 0.25h figures in the examples below assume the default 15-min increment - ALWAYS use the increment + minimum from the context message instead; the examples only illustrate how to apportion time between tasks (which task gets more).
+   Examples at the default settings (5-min increment, 15-min minimum): 23 min → 0.42h. 107 min → 1.75h. 110 min → 1.83h. 8 min → 0.25h (below the minimum).
 3. Identify how many distinct tasks there are (N).
 4. Classify each task into one of three sets, then distribute totalHours across them.
 
@@ -120,7 +120,7 @@ BILLING — single source of truth for time distribution. Run the algorithm step
    - "isExplicit": true for every task in P (any pinned task — short or long). The calculator uses this flag to keep the parser-emitted qty unchanged during the post-parse safety-net rebalance, so window mismatches only redistribute the floating tasks.
 
 Worked examples:
-- 80-min job, 3 tasks: "connected printer to wifi (30 mins)", "advised on M365/Norton subs", "QoL tweaks (15 mins)". totalHours = ceil(80/15)*15/60 = 1.5h.
+- Job with totalHours = 1.5h, 3 tasks: "connected printer to wifi (30 mins)", "advised on M365/Norton subs", "QoL tweaks (15 mins)".
   P = {printer (0.5h, isExplicit, NOT short), QoL (0.25h, isExplicit, short)}. F = {advice}.
   floatingHours = 1.5 - 0.5 - 0.25 = 0.75. subBase = 0.75. Final: printer 0.5 / advice 0.75 / QoL 0.25.
 - 1.75h across 3 tasks (Streaming setup, Phone factory reset, Car Bluetooth setup): no explicit durations. P = {}. S = {Phone factory reset} (inherent one-shot). F = {Streaming, Phone factory reset, Car}. After the subBase pass, the factory reset is pinned at 0.25 via the short rule, leaving 1.5 for the other two → 0.75 each. Final: 0.75 / 0.25 / 0.75. isShort: false / true / false. isExplicit: all false.
@@ -252,6 +252,9 @@ Return this exact JSON shape (when not asking for clarification):
  * @param identity.company - Business / trading name.
  * @param identity.name - Sole-trader operator name.
  * @param identity.location - Business locality (e.g. Auckland, New Zealand).
+ * @param billing - Live billing-rounding settings the BILLING step reads.
+ * @param billing.minBillableMins - Minimum billable time (minutes).
+ * @param billing.incrementMins - Rounding increment (minutes).
  * @returns Context string to prepend to the user's job description.
  */
 export function buildParseJobContext(
@@ -259,6 +262,7 @@ export function buildParseJobContext(
   templates: TaskTemplate[] = [],
   currentTime?: string,
   identity?: { company: string; name: string; location: string },
+  billing?: { minBillableMins: number; incrementMins: number },
 ): string {
   const templateBlock =
     templates.length > 0
@@ -276,9 +280,12 @@ export function buildParseJobContext(
   const identityBlock = identity
     ? `Business: ${identity.company}, sole trader ${identity.name}, based in ${identity.location}.\n\n`
     : "";
+  const billingBlock = billing
+    ? `BILLING: round worked time to the nearest ${billing.incrementMins} min, with a ${billing.minBillableMins} min minimum.\n\n`
+    : "";
   return `${identityBlock}Current rates:
 ${JSON.stringify(rates, null, 2)}
 
-${templateBlock}${timeBlock}--- BEGIN USER DATA ---
+${templateBlock}${billingBlock}${timeBlock}--- BEGIN USER DATA ---
 `;
 }
