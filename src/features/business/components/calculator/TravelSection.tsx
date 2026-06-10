@@ -15,7 +15,7 @@ interface Props {
   onTravelEntriesChange: (entries: TravelEntry[]) => void;
   lookingUpTravel: boolean;
   onLookup: () => void;
-  /** Travel-rate $/h sourced from the Travel RateConfig; used for the operator-side breakdown. */
+  /** Travel-rate $/hr sourced from the Travel RateConfig; used for the operator-side breakdown. */
   travelRatePerHour: number;
   /** Travel floor (live pricing setting) applied to the breakdown + minimum note. */
   minTravelCharge: number;
@@ -35,7 +35,7 @@ interface Props {
  * @param props.onTravelEntriesChange - Replaces the entries array.
  * @param props.lookingUpTravel - True while a lookup is in flight.
  * @param props.onLookup - "Look up" / Enter handler.
- * @param props.travelRatePerHour - Travel $/h from the Travel RateConfig.
+ * @param props.travelRatePerHour - Travel $/hr from the Travel RateConfig.
  * @param props.minTravelCharge - Travel floor (live pricing setting).
  * @returns Travel section element.
  */
@@ -187,7 +187,7 @@ export function TravelSection({
                     </li>
                     <li>
                       <span className={cn("text-slate-400")}>Raw:</span> {roundTripMin} min round
-                      trip @ {formatNZD(travelRatePerHour)}/h ={" "}
+                      trip @ {formatNZD(travelRatePerHour)}/hr ={" "}
                       <span className={cn("text-slate-700")}>{formatNZD(breakdown.rawCost)}</span>
                     </li>
                     {breakdown.roundedCost !== breakdown.rawCost && (

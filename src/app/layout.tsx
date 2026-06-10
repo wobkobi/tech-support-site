@@ -274,7 +274,7 @@ export default async function RootLayout({
         availableLanguage: ["English"],
       },
     ],
-    priceRange: `NZ$${pricing.baseRate} - NZ$${pricing.complexRate} per hour`,
+    priceRange: `NZ$${pricing.baseRate} per hour`,
     paymentAccepted: ["Cash", "Bank Transfer"],
     currenciesAccepted: "NZD",
     knowsAbout: [

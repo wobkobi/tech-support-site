@@ -517,7 +517,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
   // Base hourly rates (e.g. Standard $65/hr) used for the top-level Time
   // selector and as the per-task base rate.
   const baseRates = rates.filter((r) => r.ratePerHour !== null);
-  // Modifier rates: either signed $/hr deltas (At home -$10, Complex +$20)
+  // Modifier rates: either signed $/hr deltas (At home -$10, Remote -$10)
   // or percent uplifts (Public Holiday +25%). Toggled per task to shift the
   // effective rate.
   const modifierRates = rates
@@ -1105,7 +1105,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
   async function handleResetRates(): Promise<void> {
     if (
       !confirm(
-        "Wipe all rates and reseed the defaults (Standard, Complex, At home, Remote, Travel)? Any custom rates you've added will be deleted.",
+        "Wipe all rates and reseed the defaults (Standard, At home, Remote, Public Holiday, Travel)? Any custom rates you've added will be deleted.",
       )
     ) {
       return;

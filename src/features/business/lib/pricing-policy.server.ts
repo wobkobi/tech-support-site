@@ -42,7 +42,7 @@ export async function getPolicy(): Promise<Policy> {
 /** One labour modifier as rendered on the pricing page accordion. */
 export interface PublicModifier {
   label: string;
-  /** Effective $/hr after applying the modifier to the Standard base rate. */
+  /** Effective $/hr after applying the modifier to the base hourly rate. */
   effectiveRate: number;
   /** Customer-facing delta description (e.g. "+$20", "-$10", "+25%"). */
   deltaDescription: string;
@@ -52,10 +52,8 @@ export interface PublicModifier {
 
 /** Shape consumed by the pricing page. Built from the live RateConfig rows. */
 export interface PublicPricing {
-  /** Standard hourly rate (`isDefault: true` row, or first hourly row as fallback). */
+  /** Hourly rate (the `isDefault: true` Standard row, or first hourly row as fallback). */
   baseRate: number;
-  /** Standard rate + Complex modifier delta. */
-  complexRate: number;
   /** Travel hourly rate, used for round-trip drive billing. */
   travelRatePerHour: number;
   /** Customer-facing modifier list rendered in the Modifiers accordion. */
@@ -66,7 +64,6 @@ export interface PublicPricing {
 
 /** Per-label description shown under each modifier on the accordion. */
 const MODIFIER_DESCRIPTIONS: Record<string, string> = {
-  Complex: "Data recovery, hardware repair, PC builds, full system migrations.",
   Remote: "Screen-share session - I log in instead of visiting.",
   "At home": "Residential discount available on request.",
   "Public Holiday": "Applied automatically on NZ public holidays.",
@@ -87,9 +84,6 @@ export async function getPublicPricing(): Promise<PublicPricing> {
     rows.find((r) => r.ratePerHour !== null && r.unit === "hour")?.ratePerHour ??
     FALLBACK_BASE_RATE;
 
-  const complexDelta = rows.find((r) => r.label === "Complex")?.hourlyDelta ?? 0;
-  const complexRate = Math.round((baseRate + complexDelta) * 100) / 100;
-
   const travelRatePerHour =
     rows.find((r) => r.unit === "travel-hour" && r.ratePerHour !== null)?.ratePerHour ??
     FALLBACK_TRAVEL_RATE;
@@ -98,14 +92,7 @@ export async function getPublicPricing(): Promise<PublicPricing> {
   const modifiers: PublicModifier[] = [];
   for (const row of rows) {
     if (row.unit !== "modifier") continue;
-    if (row.label === "Complex" && row.hourlyDelta !== null) {
-      modifiers.push({
-        label: row.label,
-        effectiveRate: Math.round((baseRate + row.hourlyDelta) * 100) / 100,
-        deltaDescription: row.hourlyDelta > 0 ? `+$${row.hourlyDelta}` : `-$${-row.hourlyDelta}`,
-        description: MODIFIER_DESCRIPTIONS[row.label] ?? "",
-      });
-    } else if ((row.label === "Remote" || row.label === "At home") && row.hourlyDelta !== null) {
+    if ((row.label === "Remote" || row.label === "At home") && row.hourlyDelta !== null) {
       modifiers.push({
         label: row.label,
         effectiveRate: Math.round((baseRate + row.hourlyDelta) * 100) / 100,
@@ -138,7 +125,6 @@ export async function getPublicPricing(): Promise<PublicPricing> {
 
   return {
     baseRate,
-    complexRate,
     travelRatePerHour,
     modifiers,
     ratesUpdatedAt,

@@ -147,7 +147,6 @@ The SERVER computes unitPrice from these labels - DO NOT compute it yourself, ju
 Modifier triggers:
 - "At home": WORK was done at Harrison's home, alone, no screen-share. Triggers: phrases that clearly mean Harrison's location, like "I worked from home", "did this at home", "I was at home for this", "took the laptop home". STRONG OVERRIDE: if the description includes a destination address ("Meola Road", "their place", "123 Smith St", a suburb name) OR a travel verb where Harrison is the subject ("drove to", "walked to", "biked to", "took the bus to") → Harrison went to the client. Do NOT apply At home, even if "at home" appears elsewhere in the description (it's almost certainly describing the customer's context, not Harrison's). Add a warning when "at home" was present but overridden.
 - "Remote": client on-screen via screen share. Triggers: "remote", "TeamViewer", "AnyDesk", "screen share", "remote access", "remote desktop", client watching/guiding.
-- "Complex": genuinely complex task. Triggers: data recovery, hardware repair, PC build, PC assembly, full system migration, motherboard-level diagnosis, BIOS work, operating system reinstall paired with recovery.
 - "Research": time spent figuring out / investigating an unfamiliar problem, not direct delivery. Triggers: "researched", "had to look up", "figured out how to", "spent time investigating", "wasn't sure so I read up on", "learned how to", "had to work out", "looked into". Apply to the SPECIFIC task that was research-heavy, not the whole job - if Harrison researched an obscure printer driver for 90 min and then spent 30 min installing it, only the 90-min research task gets Research. Stacks freely with location modifiers (At home, Remote). For job-wide "flat $50 for the research" cases the operator picks a flat-rate row at review - do NOT try to guess flat-vs-hourly, always emit Research as a modifier on the research task.
 
 Customer-context phrases that DO NOT trigger At home (the customer is describing where THEY use the device, not where Harrison worked):
@@ -157,10 +156,10 @@ Customer-context phrases that DO NOT trigger At home (the customer is describing
 - "across multiple devices at home"
 Treat these as descriptive context, not a location signal for billing.
 
-Stacking: combine triggers freely - e.g. on-site regular → []; data recovery at home → ["At home", "Complex"]; research at home → ["At home", "Research"]; remote research → ["Remote", "Research"].
+Stacking: combine triggers freely - e.g. on-site regular → []; research at home → ["At home", "Research"]; remote research → ["Remote", "Research"].
 
 Mixed jobs: different tasks in the same job CAN and SHOULD have different modifier sets if their context differs. Examples:
-- At-home job with both Windows reinstall (At home only) and data recovery (At home + Complex) → task A modifierLabels ["At home"], task B modifierLabels ["At home", "Complex"].
+- At-home job with a Windows reinstall (At home) and an obscure driver Harrison had to research (At home + Research) → task A modifierLabels ["At home"], task B modifierLabels ["At home", "Research"].
 - On-site job where Harrison researched an obscure printer driver before installing it → research task modifierLabels ["Research"], install task modifierLabels [].
 
 If location/rate signals conflict, do NOT silently pick - add a warning describing the conflict and state which you assumed.

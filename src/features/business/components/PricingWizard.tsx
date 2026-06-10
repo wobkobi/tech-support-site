@@ -124,7 +124,6 @@ export function PricingWizard({ minBillableMins, minTravelCharge }: Props): Reac
             ok: boolean;
             result?: {
               estimatedMins: number;
-              category: "standard" | "complex";
               explanation: string;
               tasks: { label: string; mins: number }[];
             };
@@ -150,14 +149,12 @@ export function PricingWizard({ minBillableMins, minTravelCharge }: Props): Reac
     let estimatedMins = 60;
     let fullRate = 65;
     let explanation = "";
-    let category: "standard" | "complex" = "standard";
     let tasks: { label: string; mins: number }[] = [];
 
     if (estimateRes.status === "fulfilled" && estimateRes.value.ok && estimateRes.value.result) {
       const ai = estimateRes.value.result;
       estimatedMins = ai.estimatedMins;
       explanation = ai.explanation;
-      category = ai.category;
       tasks = Array.isArray(ai.tasks) ? ai.tasks : [];
 
       // Mirror effectiveHourlyRate: Standard base + stacked modifier deltas.
@@ -165,18 +162,14 @@ export function PricingWizard({ minBillableMins, minTravelCharge }: Props): Reac
         rates.find((r) => r.ratePerHour !== null && r.isDefault)?.ratePerHour ??
         rates.find((r) => r.ratePerHour !== null)?.ratePerHour ??
         65;
-      const complexDelta =
-        ai.category === "complex"
-          ? (rates.find((r) => r.label === "Complex" && r.hourlyDelta !== null)?.hourlyDelta ?? 0)
-          : 0;
       const remoteDelta =
         meeting === "remote"
           ? (rates.find((r) => r.label === "Remote" && r.hourlyDelta !== null)?.hourlyDelta ?? 0)
           : 0;
-      fullRate = baseStandard + complexDelta + remoteDelta;
+      fullRate = baseStandard + remoteDelta;
     }
 
-    // Travel rate is decoupled from labour; Complex/Remote/promo never touch it.
+    // Travel rate is decoupled from labour; Remote/promo never touch it.
     const travelRatePerHour =
       rates.find((r) => r.unit === "travel-hour" && r.ratePerHour !== null)?.ratePerHour ?? 40;
 
@@ -298,7 +291,6 @@ export function PricingWizard({ minBillableMins, minTravelCharge }: Props): Reac
       body: JSON.stringify({
         description: issueDescription,
         aiEstimatedMins: estimatedMins,
-        aiCategory: category,
         aiExplanation: explanation,
         aiTasks: tasks,
         address: dest || null,

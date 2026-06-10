@@ -152,7 +152,7 @@ export default async function AdminPriceEstimatesPage({
                       {log.aiCategory}
                     </span>
                     <span className={cn("text-slate-500")}>
-                      {formatMins(log.aiEstimatedMins)} at ${log.hourlyRate.toFixed(0)}/h
+                      {formatMins(log.aiEstimatedMins)} at ${log.hourlyRate.toFixed(0)}/hr
                     </span>
                     <span className={cn("text-russian-violet font-bold")}>
                       ${log.priceLow} - ${log.priceHigh}
