@@ -12,7 +12,7 @@ import {
   getNextInvoiceNumber,
   writeBackInvoiceCounter,
 } from "@/features/business/lib/invoice-numbering";
-import { calcTravelCharge } from "@/features/business/lib/pricing-policy";
+import { calcTravelCharge, FALLBACK_TRAVEL_RATE } from "@/features/business/lib/pricing-policy";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { lookupDriveDistance } from "@/features/business/lib/travel-distance";
 import type { LineItem } from "@/features/business/types/business";
@@ -79,7 +79,7 @@ export async function createDraftCancellationInvoice(
         const travelRow = await prisma.rateConfig.findFirst({
           where: { unit: "travel-hour" },
         });
-        travelRatePerHour = travelRow?.ratePerHour ?? 40;
+        travelRatePerHour = travelRow?.ratePerHour ?? FALLBACK_TRAVEL_RATE;
       }
       const travelCost = calcTravelCharge(travelMins, travelRatePerHour, MIN_TRAVEL_CHARGE);
       if (travelCost > 0) {

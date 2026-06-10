@@ -7,11 +7,12 @@
  */
 
 import {
+  FALLBACK_BASE_RATE,
+  FALLBACK_TRAVEL_RATE,
   GST_RATE,
   HOME_REGION,
   NZ_REGION,
   nzDateKey,
-  PUBLIC_HOLIDAY_UPLIFT,
   type Policy,
 } from "@/features/business/lib/pricing-policy";
 import { prisma } from "@/shared/lib/prisma";
@@ -71,10 +72,6 @@ const MODIFIER_DESCRIPTIONS: Record<string, string> = {
   "Public Holiday": "Applied automatically on NZ public holidays.",
 };
 
-/** Fallback rates when no matching RateConfig row exists (mirror the seed defaults). */
-const FALLBACK_BASE_RATE = 65;
-const FALLBACK_TRAVEL_RATE = 40;
-
 /**
  * Public pricing snapshot for the pricing + FAQ pages. Reads RateConfig
  * directly so the render takes one Prisma round-trip. Falls back to
@@ -83,6 +80,7 @@ const FALLBACK_TRAVEL_RATE = 40;
  */
 export async function getPublicPricing(): Promise<PublicPricing> {
   const rows = await prisma.rateConfig.findMany({ orderBy: { label: "asc" } });
+  const { pricing } = await getSettings();
 
   const baseRate =
     rows.find((r) => r.ratePerHour !== null && r.isDefault)?.ratePerHour ??
@@ -114,12 +112,16 @@ export async function getPublicPricing(): Promise<PublicPricing> {
         deltaDescription: row.hourlyDelta > 0 ? `+$${row.hourlyDelta}` : `-$${-row.hourlyDelta}`,
         description: MODIFIER_DESCRIPTIONS[row.label] ?? "",
       });
-    } else if (row.label === "Public Holiday" && row.percentDelta !== null) {
-      const pct = Math.round((row.percentDelta ?? PUBLIC_HOLIDAY_UPLIFT) * 100);
+    } else if (row.label === "Public Holiday") {
+      // Single source: the uplift shown here comes from the pricing settings
+      // (what getPolicy charges), NOT the RateConfig percentDelta - so the
+      // displayed % can never drift from the charged %. The row only needs to
+      // exist to surface the modifier on the accordion.
+      const uplift = pricing.publicHolidayUplift;
+      const pct = Math.round(uplift * 100);
       modifiers.push({
         label: row.label,
-        effectiveRate:
-          Math.round(baseRate * (1 + (row.percentDelta ?? PUBLIC_HOLIDAY_UPLIFT)) * 100) / 100,
+        effectiveRate: Math.round(baseRate * (1 + uplift) * 100) / 100,
         deltaDescription: `+${pct}%`,
         description: MODIFIER_DESCRIPTIONS[row.label] ?? "",
       });

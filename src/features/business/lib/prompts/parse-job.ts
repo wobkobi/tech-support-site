@@ -142,13 +142,13 @@ RATES — base + stacked modifiers (effective $/hr = base + sum of modifier delt
 For each hourly task, set:
 - "baseRateLabel": always "Standard" (the base hourly rate)
 - "modifierLabels": array of modifier labels to apply per the triggers below. Empty array [] if no modifiers.
-The SERVER computes unitPrice from these labels - DO NOT compute it yourself, just pick labels.
+The SERVER computes unitPrice from these labels - DO NOT compute it yourself, just pick labels. The dollar value of each modifier comes from the live rate config above; match by label name, never by any example figure.
 
 Modifier triggers:
-- "At home" (-$10): WORK was done at Harrison's home, alone, no screen-share. Triggers: phrases that clearly mean Harrison's location, like "I worked from home", "did this at home", "I was at home for this", "took the laptop home". STRONG OVERRIDE: if the description includes a destination address ("Meola Road", "their place", "123 Smith St", a suburb name) OR a travel verb where Harrison is the subject ("drove to", "walked to", "biked to", "took the bus to") → Harrison went to the client. Do NOT apply At home, even if "at home" appears elsewhere in the description (it's almost certainly describing the customer's context, not Harrison's). Add a warning when "at home" was present but overridden.
-- "Remote" (-$10): client on-screen via screen share. Triggers: "remote", "TeamViewer", "AnyDesk", "screen share", "remote access", "remote desktop", client watching/guiding.
-- "Complex" (+$20): genuinely complex task. Triggers: data recovery, hardware repair, PC build, PC assembly, full system migration, motherboard-level diagnosis, BIOS work, operating system reinstall paired with recovery.
-- "Research" (-$25): time spent figuring out / investigating an unfamiliar problem, not direct delivery. Triggers: "researched", "had to look up", "figured out how to", "spent time investigating", "wasn't sure so I read up on", "learned how to", "had to work out", "looked into". Apply to the SPECIFIC task that was research-heavy, not the whole job - if Harrison researched an obscure printer driver for 90 min and then spent 30 min installing it, only the 90-min research task gets Research. Stacks freely with location modifiers (At home, Remote). For job-wide "flat $50 for the research" cases the operator picks a flat-rate row at review - do NOT try to guess flat-vs-hourly, always emit Research as a modifier on the research task.
+- "At home": WORK was done at Harrison's home, alone, no screen-share. Triggers: phrases that clearly mean Harrison's location, like "I worked from home", "did this at home", "I was at home for this", "took the laptop home". STRONG OVERRIDE: if the description includes a destination address ("Meola Road", "their place", "123 Smith St", a suburb name) OR a travel verb where Harrison is the subject ("drove to", "walked to", "biked to", "took the bus to") → Harrison went to the client. Do NOT apply At home, even if "at home" appears elsewhere in the description (it's almost certainly describing the customer's context, not Harrison's). Add a warning when "at home" was present but overridden.
+- "Remote": client on-screen via screen share. Triggers: "remote", "TeamViewer", "AnyDesk", "screen share", "remote access", "remote desktop", client watching/guiding.
+- "Complex": genuinely complex task. Triggers: data recovery, hardware repair, PC build, PC assembly, full system migration, motherboard-level diagnosis, BIOS work, operating system reinstall paired with recovery.
+- "Research": time spent figuring out / investigating an unfamiliar problem, not direct delivery. Triggers: "researched", "had to look up", "figured out how to", "spent time investigating", "wasn't sure so I read up on", "learned how to", "had to work out", "looked into". Apply to the SPECIFIC task that was research-heavy, not the whole job - if Harrison researched an obscure printer driver for 90 min and then spent 30 min installing it, only the 90-min research task gets Research. Stacks freely with location modifiers (At home, Remote). For job-wide "flat $50 for the research" cases the operator picks a flat-rate row at review - do NOT try to guess flat-vs-hourly, always emit Research as a modifier on the research task.
 
 Customer-context phrases that DO NOT trigger At home (the customer is describing where THEY use the device, not where Harrison worked):
 - "their Spotify works at home and in the car"
@@ -186,11 +186,11 @@ OTHER RULES:
 - confidence: "high" if all session times are clearly stated. "medium" if some times were estimated. "low" if mostly guessed.
 - warnings[]: Flag anything ambiguous, assumed, or conflicting in plain English.
 - destination: The client's suburb or address if the job was at the client's location (e.g. "Papakura", "123 Smith St Manukau"). Set to null if working from home or doing remote support.
-- statedDistanceKm: If the user explicitly states a travel distance AND traveled by car or vehicle, set this to the total round-trip km as a number (e.g. "traveled 10 km there and back" → 10, "drove 8 km each way" → 16). Set to null if no distance was stated, or if travel was by foot, bicycle, or public transport.
-  - Walking, cycling, or public transport: set statedDistanceKm to null, set noTravelCharge to true, and add a warning: "Traveled by [mode] - no travel charge applied. Verify if this should be charged."
-  - Car/vehicle with stated km: set statedDistanceKm to the round-trip total, noTravelCharge to false.
-  - Car/vehicle without stated km but with a destination: set statedDistanceKm to null, noTravelCharge to false (the route will look it up via API).
-- noTravelCharge: true if the user traveled by foot, bicycle, or public transport (mileage rate does not apply). false for all car/vehicle travel and when travel mode is unspecified.
+- statedDistanceKm: If the user explicitly states a travel distance AND traveled by car/vehicle OR public transport, set this to the total round-trip km as a number (e.g. "traveled 10 km there and back" → 10, "drove 8 km each way" → 16). Set to null if no distance was stated, or if travel was by foot or bicycle.
+  - Walking or cycling: set statedDistanceKm to null, set noTravelCharge to true, and add a warning: "Traveled by [mode] - no travel charge applied (assumed local job). Verify if this should be charged."
+  - Car/vehicle or public transport, with stated km: set statedDistanceKm to the round-trip total, noTravelCharge to false.
+  - Car/vehicle or public transport, without stated km but with a destination: set statedDistanceKm to null, noTravelCharge to false (the route looks up the driving route via API and charges it - travel bills the same regardless of how the operator actually got there).
+- noTravelCharge: true ONLY if the user traveled by foot or bicycle (assumed a local job, no travel charge). false for all car/vehicle and public transport travel, and when travel mode is unspecified.
 - Ignore dates and client names.
 
 CLARIFICATION MODE:
