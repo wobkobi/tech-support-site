@@ -47,7 +47,7 @@ async function hasAdminAccess(request: NextRequest): Promise<boolean> {
 /**
  * Gates `/api/admin/*` and `/api/business/*` (401 on missing/invalid auth)
  * and `/admin/*` (redirect to /admin/login on missing/invalid auth). Public
- * exceptions are listed in `PUBLIC_EXCEPTIONS`.
+ * exceptions are listed in {@link PUBLIC_EXCEPTIONS}.
  * @param request - Incoming Next.js request.
  * @returns A 401 / redirect / next response depending on auth state.
  */

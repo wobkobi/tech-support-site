@@ -2,9 +2,9 @@
 /**
  * @file validate.ts
  * @description Write-path validation for the settings panel. Two layers:
- *   1. `validateGroup` - per-field shape + bounds for one group (rejects garbage
+ *   1. {@link validateGroup} - per-field shape + bounds for one group (rejects garbage
  *      before it is stored).
- *   2. `checkGuardrails` - cross-setting coherence on the full proposed settings,
+ *   2. {@link checkGuardrails} - cross-setting coherence on the full proposed settings,
  *      classified BLOCK (would make bookings/invoices impossible) vs WARN (unusual
  *      but allowed). The same function powers the live-preview banner later.
  * Hand-rolled to match the repo's existing manual-validation convention (no zod).

@@ -1,9 +1,10 @@
 // src/app/loading.tsx
 /**
  * @file loading.tsx
- * @description Streaming skeleton for the home page. Mirrors the hero, trust
- * cards, support grid, about/approach pair and flyer card so the shell renders
- * instantly while the approved-reviews query runs.
+ * @description Streaming skeleton for the home page: hero, trust cards,
+ * support grid, about/approach pair and flyer card. Matches the real page
+ * layout so the swap causes no layout shift once the approved-reviews query
+ * resolves.
  */
 
 import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";

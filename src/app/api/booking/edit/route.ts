@@ -77,7 +77,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ ok: false, error: "Missing cancel token." }, { status: 400 });
     }
 
-    // Find booking
     const booking = await prisma.booking.findFirst({ where: { cancelToken } });
     if (!booking) {
       return NextResponse.json({ ok: false, error: "Booking not found." }, { status: 404 });
@@ -195,7 +194,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const startAt = new Date(Date.UTC(year, month - 1, day, startHour - utcOffset, startMinute, 0));
     const endAt = new Date(startAt.getTime() + durationMinutes * 60 * 1000);
 
-    // Build updated notes
     let bookingNotes = `${notes.trim()}\n\n`;
     const timeLabel =
       startMinute === 0
@@ -217,7 +215,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       bookingNotes += `Phone: ${phoneE164}\n`;
     }
 
-    // Delete old calendar event
+    // Replace the calendar event: delete the old one, then create at the new time.
     if (booking.calendarEventId) {
       try {
         await deleteBookingEvent({ eventId: booking.calendarEventId });
@@ -226,7 +224,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     }
 
-    // Create new calendar event
     let calendarEventId: string | null = null;
     try {
       const summary = `Tech Support: ${name.trim()} - ${cleanDurationLabel}`;
@@ -281,11 +278,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     // Upsert Contact + sync to Google. Best-effort: a failure here must not
-    // fail the edit (the booking + calendar event are already saved). The
-    // Contact's name/phone/address are kept in step with the booking so a
-    // customer who corrects their phone via the edit form sees that propagate
-    // to the contact and (via syncContactToGoogle's bidirectional merge) to
-    // Google Contacts.
+    // fail the edit (the booking + calendar event are already saved). Contact
+    // name/phone/address stay in step with the booking so edit-form
+    // corrections propagate to Google Contacts.
     try {
       const contactEmail = booking.email.toLowerCase();
       const existing = await prisma.contact.findFirst({ where: { email: contactEmail } });

@@ -141,7 +141,7 @@ export default async function AdminPage(): Promise<React.ReactElement> {
         createdAt: true,
       },
     }),
-    // Newest cache row -> calendar freshness for system status.
+    // Newest cache row > calendar freshness for system status.
     prisma.calendarEventCache.findFirst({
       orderBy: { fetchedAt: "desc" },
       select: { fetchedAt: true },
@@ -162,7 +162,7 @@ export default async function AdminPage(): Promise<React.ReactElement> {
     return true;
   });
 
-  // --- Derived KPIs for the new dashboard sections ---
+  // --- Derived KPIs for the dashboard sections ---
   const monthRevenue = monthIncome._sum.amount ?? 0;
   const outstandingTotal = outstandingInvoices.reduce((s, inv) => s + inv.total, 0);
   const overdueInvoices = outstandingInvoices.filter(

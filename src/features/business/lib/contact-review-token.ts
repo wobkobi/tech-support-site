@@ -44,7 +44,7 @@ interface InvoiceReviewLookupArgs {
 /**
  * Resolves a review URL for an invoice. Tries the contactId path first, then
  * falls back to matching the invoice's clientEmail against existing contacts.
- * Pure resolver - no policy decisions. See `getInvoiceReviewEligibility` for
+ * Pure resolver - no policy decisions. See {@link getInvoiceReviewEligibility} for
  * the "should we actually ask this customer right now" check.
  * @param args - Lookup inputs.
  * @param args.contactId - Optional Contact id from the invoice.
@@ -82,7 +82,7 @@ export async function resolveInvoiceReviewUrl({
 }
 
 /**
- * Result of `getInvoiceReviewEligibility`. Drives the "Include review link"
+ * Result of {@link getInvoiceReviewEligibility}. Drives the "Include review link"
  * checkbox state in the invoice send modal.
  */
 export type InvoiceReviewEligibility =

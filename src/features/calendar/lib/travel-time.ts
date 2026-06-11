@@ -28,7 +28,7 @@ function toReliableDeparture(departureTime: Date, now: Date): Date {
 
   const targetDow = departureTime.getUTCDay();
 
-  // Start from tomorrow so we never land on today-already-passed
+  // Start from tomorrow so the candidate never lands on today-already-passed
   const candidate = new Date(now.getTime() + 24 * 60 * 60 * 1000);
   candidate.setUTCHours(departureTime.getUTCHours(), departureTime.getUTCMinutes(), 0, 0);
 
@@ -36,8 +36,8 @@ function toReliableDeparture(departureTime: Date, now: Date): Date {
   const daysToAdd = (targetDow - candidate.getUTCDay() + 7) % 7;
   candidate.setUTCDate(candidate.getUTCDate() + daysToAdd);
 
-  // Safety: if we somehow landed in the past (e.g. time-of-day already passed today),
-  // bump forward a full week
+  // Safety: if the candidate somehow landed in the past (e.g. time-of-day
+  // already passed today), bump forward a full week
   if (candidate.getTime() <= now.getTime() + 60 * 60 * 1000) {
     candidate.setUTCDate(candidate.getUTCDate() + 7);
   }

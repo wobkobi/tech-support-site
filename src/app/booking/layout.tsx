@@ -1,10 +1,10 @@
 // src/app/booking/layout.tsx
 /**
  * @file layout.tsx
- * @description Booking route segment layout. Google Maps is no longer loaded
- *   here - AddressAutocomplete injects the script lazily when the address input
- *   becomes visible (and only for in-person bookings). The preconnect hint
- *   warms the TLS handshake so the lazy injection feels instant when it fires.
+ * @description Booking route segment layout. AddressAutocomplete injects the
+ *   Google Maps script lazily when the address input becomes visible (and only
+ *   for in-person bookings). The preconnect hint warms the TLS handshake so the
+ *   lazy injection feels instant when it fires.
  */
 
 import type React from "react";

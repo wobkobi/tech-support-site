@@ -138,10 +138,10 @@ export async function PATCH(
 
   // When transitioning to "completed", send the review request email if one
   // has not already gone out. updateMany with the null-or-missing guard is
-  // atomic, so we can't race with the /api/cron/send-review-emails cron - if
-  // the cron already claimed the send, our updateMany returns count=0 and we
-  // skip. Same `isSet: false` clause as the cron to handle MongoDB documents
-  // where `reviewSentAt` was never written (pre-schema docs).
+  // atomic, so it cannot race with the /api/cron/send-review-emails cron - if
+  // the cron already claimed the send, the updateMany returns count=0 and the
+  // send is skipped. Same `isSet: false` clause as the cron to handle MongoDB
+  // documents where `reviewSentAt` was never written (pre-schema docs).
   let reviewSent = false;
   if (
     body.status === "completed" &&
@@ -158,8 +158,8 @@ export async function PATCH(
     });
 
     if (claim.count > 0) {
-      // We won the race - sendCustomerReviewRequest never throws (catches its
-      // own errors and logs), so the PATCH response stays successful even if
+      // Claim won - sendCustomerReviewRequest never throws (catches its own
+      // errors and logs), so the PATCH response stays successful even if
       // Resend has a hiccup. Trade-off: a single failed send won't auto-retry.
       await sendCustomerReviewRequest({
         id,

@@ -4,9 +4,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 // Seed shape: one base hourly rate (Standard), modifier rates that shift the
 // effective $/hr (Complex +$20, At home -$10, Remote -$10), a percentage
-// modifier for Public Holiday (+25%), and the Travel flat rate. Replaces
-// the previous mess of fixed rates like "Complex at home" / "Complex work"
-// / "At home" - those are now derived.
+// modifier for Public Holiday (+25%), and the Travel flat rate. Combination
+// rates like "Complex at home" are derived from base + modifiers, not stored.
 const DEFAULTS = [
   {
     label: "Standard",
@@ -83,9 +82,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   if (missing.length > 0) {
     await prisma.rateConfig.createMany({ data: missing });
   }
-  // Passive cleanup: the Student modifier was removed in the "rock solid
-  // pricing" pass. Delete any leftover row on every seed call so production
-  // matches the new DEFAULTS shape without needing a manual migration.
+  // Passive cleanup: the Student modifier is no longer part of DEFAULTS.
+  // Delete any leftover row on every seed call so production matches the
+  // DEFAULTS shape without needing a manual migration.
   await prisma.rateConfig.deleteMany({ where: { label: "Student" } });
 
   // Travel rate migration: legacy rows still carry { flatRate: 1.2, unit: "km" }

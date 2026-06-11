@@ -4,9 +4,9 @@
  * @description Server-only accessor that resolves the full, typed settings:
  * code defaults with DB overrides merged on top, then defensively clamped so a
  * hand-edited bad row can never break the public booking/pricing pages. Cached
- * with the same `unstable_cache` + tag idiom as `getActivePromo` (promos.ts):
- * hot reads hit the data cache, and `saveSettingsGroup` busts the tag so edits
- * go live immediately. The 60s revalidate is only a cross-instance safety net.
+ * via {@link unstable_cache} with a tag: hot reads hit the data cache, and
+ * `saveSettingsGroup` busts the tag so edits go live immediately. The 60s
+ * revalidate is only a cross-instance safety net.
  */
 
 import { prisma } from "@/shared/lib/prisma";
@@ -68,7 +68,7 @@ function clamp(n: number, min: number, max: number, fallback: number): number {
  * @param s - Freshly merged settings (mutated in place).
  * @returns The same settings, clamped.
  */
-function sanitizeSettings(s: Settings): Settings {
+function sanitiseSettings(s: Settings): Settings {
   s.availability.maxAdvanceDays = clamp(
     s.availability.maxAdvanceDays,
     1,
@@ -91,7 +91,7 @@ export function resolveSettings(overrides: Partial<Record<SettingsGroup, unknown
   for (const group of GROUPS) {
     merged[group] = deepMerge(DEFAULT_SETTINGS[group], overrides[group]);
   }
-  return sanitizeSettings(merged as unknown as Settings);
+  return sanitiseSettings(merged as unknown as Settings);
 }
 
 /**
@@ -116,7 +116,8 @@ async function loadSettings(): Promise<Settings> {
 }
 
 /**
- * Cached accessor for the full settings object. Mirrors `getActivePromo`.
+ * Cached accessor for the full settings object; the tag is busted on every
+ * settings write so edits go live immediately.
  * @returns Resolved settings (defaults + DB overrides).
  */
 export const getSettings = unstable_cache(loadSettings, ["settings"], {

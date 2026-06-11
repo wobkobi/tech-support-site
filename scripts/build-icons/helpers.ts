@@ -17,7 +17,7 @@ export async function ensureDir(dir: string): Promise<void> {
 }
 
 /**
- * Create a frosted white card/box SVG centered on the canvas (like the website's cards).
+ * Create a frosted white card/box SVG centred on the canvas (like the website's cards).
  * Matches the website's bg-seasalt-800/60 style (60% opacity #fcfcfc).
  * @param w - Canvas width in pixels.
  * @param h - Canvas height in pixels.
@@ -41,7 +41,7 @@ export function makeFrostedCard(w: number, h: number, logoScale: number): Buffer
 /**
  * Replace Russian Violet with Coquelicot in SVG for dark mode.
  * @param svgBuffer - Original SVG buffer.
- * @returns Modified SVG buffer with coquelicot color.
+ * @returns Modified SVG buffer with coquelicot colour.
  */
 export async function makeCoquelicotSvg(svgBuffer: Buffer): Promise<Buffer> {
   let svgString = svgBuffer.toString("utf-8");

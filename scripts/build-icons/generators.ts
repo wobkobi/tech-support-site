@@ -27,7 +27,7 @@ import { ensureDir, makeCoquelicotSvg, makeFrostedCard } from "./helpers.js";
 const BG_LIGHT = { r: 246, g: 247, b: 248, alpha: 1 } as const; // seasalt
 const BG_DARK = { r: 0, g: 21, b: 20, alpha: 1 } as const; // rich-black
 
-// Dynamic import for CommonJS module
+// qr-code-styling is a CommonJS module; load it via dynamic import.
 const QRCodeStylingModule = await import("qr-code-styling");
 const QRCodeStyling = QRCodeStylingModule.default;
 
@@ -101,7 +101,7 @@ export async function buildFavicons(): Promise<void> {
   }
 
   // Multi-resolution .ico (16/32/48) so the OS picks the sharpest size per
-  // context - a single 32x32 PNG rendered blurry in the Windows taskbar.
+  // context - a single 32x32 PNG renders blurry in the Windows taskbar.
   const ico16 = await sharp(lightSvg).resize(16, 16).png().toBuffer();
   const ico32 = await sharp(lightSvg).resize(32, 32).png().toBuffer();
   const ico48 = await sharp(lightSvg).resize(48, 48).png().toBuffer();
@@ -161,20 +161,17 @@ export async function buildSocialImages(): Promise<void> {
   console.log("📱 Building social images...");
   await ensureDir("public");
 
-  // Read logos used by social specs
   const logoFullBuffer = await fs.readFile(LOGO_FULL);
   const logoProfileBuffer = await fs.readFile(LOGO_PROFILE);
 
   for (const spec of SOCIAL_SPECS) {
     const { name, width, height, blur, logoScale, quality, useMarkLogo } = spec;
 
-    // Create blurred background
     const bg = await sharp(BACKDROP)
       .resize(width, height, { fit: "cover", position: "centre" })
       .blur(blur)
       .toBuffer();
 
-    // Create frosted card box
     const frostedCard = await sharp(makeFrostedCard(width, height, logoScale))
       .resize(width, height)
       .png()
@@ -183,7 +180,6 @@ export async function buildSocialImages(): Promise<void> {
     // Select logo - use profile logo for profile pictures, otherwise use mark or full
     const logoSource = useMarkLogo ? logoProfileBuffer : logoFullBuffer;
 
-    // Resize logo to fit
     const logo = await sharp(logoSource)
       .resize({
         width: Math.round(width * logoScale),
@@ -207,7 +203,7 @@ export async function buildSocialImages(): Promise<void> {
 
 /**
  * Build optimised backdrop variants for site use (e.g. blurred page background).
- * Each variant is resized and compressed according to its spec in BACKDROP_VARIANTS.
+ * Each variant is resized and compressed according to its spec in {@link BACKDROP_VARIANTS}.
  * @returns Promise that resolves when all backdrop variants are generated.
  */
 export async function buildBackdropVariants(): Promise<void> {
@@ -411,7 +407,6 @@ export async function buildQRCodes(): Promise<void> {
         finalPNGBuffer = Buffer.from(arrayBuffer);
       }
 
-      // Save PNG
       await fs.writeFile(outputPathPNG, finalPNGBuffer);
       console.log(`  ✓ ${spec.name}.png (${spec.displayName}) - PNG (2000x2000)`);
 

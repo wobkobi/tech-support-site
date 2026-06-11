@@ -1,7 +1,7 @@
 // scripts/seed-settings.ts
 /**
  * @file seed-settings.ts
- * @description One-shot, idempotent seed for the env->DB business-identity
+ * @description One-shot, idempotent seed for the env > DB business-identity
  * handoff. Creates the `settings:identity` row from the code defaults - which
  * read the current bank-account / GST# / HOME_ADDRESS env vars - ONLY when the
  * row doesn't already exist, so it never clobbers operator edits made in the

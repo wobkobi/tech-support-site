@@ -6,7 +6,7 @@
  * land a Contact row when one doesn't already exist for an email or phone.
  *
  * Email is not `@unique` in the schema (see model Contact in schema.prisma)
- * so we cannot use prisma.contact.upsert directly - the find + conditional
+ * so prisma.contact.upsert cannot be used directly - the find + conditional
  * create pattern below is the canonical replacement.
  */
 

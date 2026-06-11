@@ -146,7 +146,7 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
     console.log(`[refreshCalendarCache] Fetched ${rawEvents.length} calendar events`);
   } catch (error) {
     console.error("[refreshCalendarCache] Failed to fetch calendar events:", error);
-    // Don't throw - we'll just use stale cache if API fails
+    // Don't throw - the stale cache covers the gap when the API fails
     return { cachedCount: 0, deletedCount: 0 };
   }
 
@@ -157,7 +157,7 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
     },
   });
 
-  // Load admin-marked "ignored" TravelBlocks so we know which Car events to
+  // Load admin-marked "ignored" TravelBlocks to know which Car events to
   // skip when populating the calendar cache + travel blocks. An ignored event
   // means "I have access to the car that day" - the booking page should not
   // treat it as a no-car window and no travel-to-home block should fire.
@@ -237,12 +237,10 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
   const isDev = process.env.NODE_ENV === "development";
 
   // Car-calendar entries are the dumb case: always home > event location >
-  // home, no smart-origin lookup, no chaining. The travel-to block reserves
-  // time before the event so a booking can't run too late to leave, and the
-  // travel-back block reserves time after for the return drive. Car events
-  // are also kept out of OTHER events' smart-origin and chaining candidates
-  // so they don't pollute those decisions. Car events still appear in
-  // calendarEventCache so booking is blocked during the event itself.
+  // home, no smart-origin lookup, no chaining. Car events are also kept out
+  // of OTHER events' smart-origin and chaining candidates so they don't
+  // pollute those decisions, but still appear in calendarEventCache so
+  // booking is blocked during the event itself.
   const travelRelevantEvents = carCalId
     ? rawEvents.filter((e) => e.calendarEmail !== carCalId)
     : rawEvents;
@@ -309,8 +307,8 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
     existingBlocks.map((b) => [`${b.sourceEventId}|${b.calendarEmail}`, b]),
   );
   // Stale-cleanup operates on the full event set - Work events have their own
-  // TravelBlocks now (travel-to-home before the event), so we want them kept
-  // when present and cleaned up only when the source event disappears.
+  // TravelBlocks (travel-to-home before the event), so they are kept when
+  // present and cleaned up only when the source event disappears.
   const currentEventKeys = new Set(rawEvents.map((e) => `${e.id}|${e.calendarEmail}`));
 
   // Series-level transport mode preferences (one per recurring event series).
@@ -389,7 +387,7 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
     const currentChainedId = chained?.event.id ?? null;
     const currentChainedStart = chained?.startAt ?? null;
 
-    // Determine whether a rebuild is needed and whether we can reuse raw minutes
+    // Determine whether a rebuild is needed and whether raw minutes can be reused
     let needsRebuild = true;
     let reuseRawToMinutes: number | null = null;
     let reuseRawBackMinutes: number | null = null;
@@ -430,7 +428,7 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
           if (isDev) console.log(`[travel] Skipping "${event.summary}" - unchanged`);
           needsRebuild = false;
         } else {
-          // Rounding formula changed or a direction was never calculated - reuse what we have
+          // Rounding formula changed or a direction was never calculated - reuse the stored raw minutes
           reuseRawToMinutes = existing.rawTravelMinutes;
           reuseRawBackMinutes = existing.rawTravelBackMinutes;
           if (isDev)
@@ -475,7 +473,7 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
       // Upsert cache entries so they are recreated if they expired (30-min TTL)
       // OR if an earlier run failed to write them and left beforeEventId/
       // afterEventId null on the TravelBlock row. The gate is on roundedMinutes
-      // (do we actually have a travel time?) rather than on the stored cache
+      // (whether a travel time actually exists) rather than on the stored cache
       // id, so a one-time upsert failure self-heals on the next refresh.
       let backfilledBeforeId: string | null = null;
       let backfilledAfterId: string | null = null;

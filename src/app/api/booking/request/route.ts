@@ -132,7 +132,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
     const maxDate = new Date(now.getTime() + config.maxAdvanceDays * 24 * 60 * 60 * 1000);
 
-    // Get existing bookings
+    // Only held/confirmed bookings that have not ended yet can conflict.
     const existingBookings = await prisma.booking.findMany({
       where: {
         status: { in: ["held", "confirmed"] },
@@ -155,7 +155,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       bufferAfterMin: b.bufferAfterMin,
     }));
 
-    // Fetch calendar events
+    // Calendar fetch failures are non-fatal; validation proceeds on DB bookings alone.
     let calendarEvents: Array<{ id: string; start: string; end: string }> = [];
     try {
       const rawEvents = await fetchAllCalendarEvents(now, maxDate);
@@ -168,7 +168,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       console.error("[booking/request] Failed to fetch calendar events:", error);
     }
 
-    // Validate with duration
     const validation = validateBookingRequest(
       dateKey,
       timeOfDay,
@@ -191,7 +190,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
     const durationMinutes = duration === "short" ? config.durations.short : config.durations.long;
 
-    // Calculate start/end times
     const [year, month, day] = dateKey.split("-").map(Number);
 
     // Get dynamic UTC offset for this date (handles NZDT/NZST)
@@ -202,7 +200,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const cancelToken = randomUUID();
     const reviewToken = randomUUID();
 
-    // Build notes
     let bookingNotes = `${notes.trim()}\n\n`;
     const timeLabel =
       startMinute === 0
@@ -214,7 +211,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (meetingType === "in-person" && address) {
       bookingNotes += `Address: ${address.trim()}\n`;
     }
-    // Create calendar event
+
     let calendarEventId: string | null = null;
     try {
       const cleanDurationLabel = `${duration === "short" ? "Standard" : "Extended"} ${durationMinutes} min`;
@@ -289,7 +286,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     });
     const publicHolidayName = holiday?.name ?? null;
 
-    // Create booking
     try {
       const booking = await prisma.booking.create({
         data: {

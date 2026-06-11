@@ -5,8 +5,8 @@
  * @description Open-vocabulary text input with a suggestions panel. Type to
  * filter the suggestions; press Enter, click a suggestion, or just keep typing
  * a brand-new value. The dropdown opens on focus and closes on blur, Escape,
- * or outside-click. Used by the Calculator's task picker for both Device and
- * Action so the operator isn't restricted to a fixed enum.
+ * or outside-click. Suggestions guide without restricting, so the operator is
+ * never limited to a fixed enum.
  */
 
 import { cn } from "@/shared/lib/cn";

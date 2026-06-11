@@ -32,7 +32,6 @@ export const BOOKING_CONFIG = {
   workEndHour: 20,
 } as const;
 
-// Duration options
 export type JobDuration = "short" | "long";
 
 export interface DurationOption {
@@ -89,7 +88,7 @@ export type StartMinute = number;
 /**
  * Resolved config the slot engine runs on: the operator's editable availability
  * settings plus the structural timezone. Built by server callers from
- * `getSettings()` and `BOOKING_CONFIG.timeZone`.
+ * `getSettings()` and {@link BOOKING_CONFIG}.timeZone.
  */
 export type AvailabilityConfig = AvailabilitySettings & { timeZone: string };
 
@@ -172,7 +171,7 @@ export interface BuildAvailableDaysResult {
   days: BookableDay[];
   /**
    * True when today was filtered out because the same-day cutoff or minimum
-   * notice window has elapsed. Surfaced to the UI so we can explain to the
+   * notice window has elapsed. Surfaced to the UI so it can explain to the
    * user why the list starts at tomorrow instead of silently shifting.
    */
   sameDayClosed: boolean;
@@ -523,7 +522,7 @@ export function validateBookingRequest(
 }
 
 /**
- * Shape of the booking-form fields we validate at the API edge. Each field is
+ * Shape of the booking-form fields validated at the API edge. Each field is
  * optional because the payload comes from JSON.parse of a request body.
  */
 export interface BookingPayloadFields {
@@ -556,14 +555,14 @@ export const BOOKING_FIELD_LIMITS = {
  * Minimal email regex - rejects "a@", "@b", "a@b" (no TLD), whitespace-only
  * input. The domain is matched as one-or-more dot-separated dot-free segments
  * so dots only appear at explicit boundaries - this eliminates the backtrack
- * ambiguity that triggers the polynomial-ReDoS analyzer.
+ * ambiguity that triggers the polynomial-ReDoS analyser.
  *
- * Module-internal only - all email validation goes through validateEmail below.
+ * Module-internal only - all email validation goes through {@link validateEmail} below.
  */
 const EMAIL_REGEX = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/;
 
 /**
- * Discriminator returned by validateEmail. "empty" means the input is blank
+ * Discriminator returned by {@link validateEmail}. "empty" means the input is blank
  * (callers decide whether that's allowed based on whether the field is required).
  */
 export type EmailValidationResult = "empty" | "invalid" | "too-long" | "ok";
@@ -585,7 +584,7 @@ export function validateEmail(raw: string): EmailValidationResult {
 
 /**
  * Validates the user-supplied fields on a booking POST/edit payload. Returns
- * the same `{ valid, error }` shape as `validateBookingRequest` so call sites
+ * the same `{ valid, error }` shape as {@link validateBookingRequest} so call sites
  * can treat both checks uniformly.
  * @param payload - Request body fields.
  * @param opts - Validation options.

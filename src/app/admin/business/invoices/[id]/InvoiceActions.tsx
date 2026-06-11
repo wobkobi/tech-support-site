@@ -126,7 +126,7 @@ export function InvoiceActions({
    * Entry point for voiding an invoice. DRAFT voids run silently (no client to
    * notify); SENT/PAID voids open a modal so the operator can decide whether
    * to email the client and tweak the message. The actual server call lives
-   * in `submitVoid` below so both paths share the network code.
+   * in {@link submitVoid} below so both paths share the network code.
    */
   async function voidInvoice(): Promise<void> {
     if (isDraft) {
@@ -325,8 +325,8 @@ export function InvoiceActions({
     setPreviewOpen(true);
     try {
       // First open: send no includeReview override so the server defaults to
-      // whatever eligibility says, and we adopt that into local state. On
-      // re-fetch (after edits), pass our current toggle so the preview matches.
+      // whatever eligibility says, and that result is adopted into local state.
+      // On re-fetch (after edits), pass the current toggle so the preview matches.
       const sendIncludeReview = eligibility !== null;
       const res = await fetch(`/api/business/invoices/${invoiceId}/preview-email`, {
         method: "POST",

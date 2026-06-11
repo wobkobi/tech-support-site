@@ -36,7 +36,7 @@ export interface DriveDistance {
 }
 
 /**
- * Discriminated outcome from `lookupDriveDistance`. Lets callers distinguish
+ * Discriminated outcome from {@link lookupDriveDistance}. Lets callers distinguish
  * "the API or env is broken" (should surface to the operator) from
  * "we asked and got nothing" (charge $0 travel and move on).
  */

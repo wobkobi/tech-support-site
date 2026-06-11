@@ -37,11 +37,9 @@ export async function POST(
     return NextResponse.json({ error: "Invoice has no client email" }, { status: 400 });
   }
 
-  // Optional operator overrides (match the preview):
-  // - greetingName: target a specific person inside a company invoice
-  // - customBody: replace the default intro paragraph
-  // - includeReview: explicit yes/no for the review link. When omitted we
-  //   default to whatever eligibility says (canSend ? include : skip).
+  // Optional operator overrides (match the preview): greetingName targets a
+  // person inside a company invoice, customBody replaces the intro paragraph,
+  // includeReview forces the review link on/off (defaults to eligibility).
   const body = (await request.json().catch(() => ({}))) as {
     greetingName?: unknown;
     customBody?: unknown;
@@ -61,7 +59,7 @@ export async function POST(
 
   // Server-side gate: if the customer is in cooldown or already reviewed, an
   // explicit `includeReview: true` from a stale client is ignored - the UI
-  // blocks the checkbox but we shouldn't trust client state.
+  // blocks the checkbox but client state is not trusted.
   const includeReview = (includeReviewOverride ?? eligibility.canSend) && eligibility.canSend;
   const reviewUrl =
     includeReview && "reviewUrl" in eligibility ? (eligibility.reviewUrl ?? null) : null;
@@ -99,7 +97,7 @@ export async function POST(
     return NextResponse.json({ error: "Email send failed" }, { status: 502 });
   }
 
-  // Stamp reviewLinkSentAt iff we actually included the review line. This is
+  // Stamp reviewLinkSentAt iff the review line was actually included. This is
   // what powers the 30-day cooldown for invoice-to-invoice sends in
   // getInvoiceReviewEligibility. Resending the same invoice with the toggle
   // still on re-stamps it; sending with the toggle off leaves it alone (the

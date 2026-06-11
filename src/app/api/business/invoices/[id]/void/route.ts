@@ -62,8 +62,8 @@ export async function POST(
   const incomeEntryCount = await prisma.incomeEntry.count({ where: { invoiceId: id } });
 
   // Generate the VOIDED-stamped PDF from the updated row. If this fails, the
-  // void still succeeds - we just can't email or sync. Surface notified:false
-  // to the caller so they can advise the operator to email manually.
+  // void still succeeds - the email and Drive sync are skipped. Surface
+  // notified:false to the caller so the operator can be advised to email manually.
   let pdfBytes: Buffer | null = null;
   try {
     pdfBytes = await generateInvoicePdf({

@@ -192,7 +192,7 @@ const STEP_ICON = cn(
 const SKELETON_BLOCK = cn("bg-seasalt-900/40 rounded-lg");
 
 /**
- * Async island that fetches slot data inside the Suspense boundary. Renders
+ * Async island that fetches slot data inside the {@link Suspense} boundary. Renders
  * an unavailable banner instead of the form when the calendar fetch failed.
  * @returns Booking form or an unavailable banner.
  */
@@ -249,7 +249,7 @@ async function BookingFormIsland(): Promise<React.ReactElement> {
 }
 
 /**
- * Skeleton shown while BookingFormIsland streams in. Matches the rough
+ * Skeleton shown while {@link BookingFormIsland} streams in. Matches the rough
  * visual height of the real form to avoid layout shift on hydration.
  * @returns Skeleton placeholder element.
  */

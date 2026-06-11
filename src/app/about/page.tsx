@@ -1,7 +1,7 @@
 // src/app/about/page.tsx
 /**
  * @file page.tsx
- * @description About page: background, approach, and who I help.
+ * @description About page: background, approach, and who the service helps.
  */
 
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";

@@ -15,7 +15,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Pull just the two columns we need; cheaper than fetching the whole table.
+  // Pull just the two columns needed; cheaper than fetching the whole table.
   const rows = await prisma.taskTemplate.findMany({
     select: { device: true, action: true },
   });

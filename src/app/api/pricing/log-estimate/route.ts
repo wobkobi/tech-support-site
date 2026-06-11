@@ -90,8 +90,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       : null;
 
   // NODE_ENV is "production" on Vercel (both prod and preview deploys run
-  // Next.js in production mode) and "development" when I run `npm run dev`
-  // locally. The admin page uses this to hide my own test submissions.
+  // Next.js in production mode) and "development" under `npm run dev`
+  // locally. The admin page uses this to hide local test submissions.
   const environment = process.env.NODE_ENV ?? "production";
 
   try {

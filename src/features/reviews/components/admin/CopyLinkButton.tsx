@@ -10,7 +10,7 @@ import type React from "react";
 import { useState } from "react";
 
 /**
- * Props for CopyLinkButton component.
+ * Props for the {@link CopyLinkButton} component.
  */
 interface CopyLinkButtonProps {
   /** The full review URL to copy */

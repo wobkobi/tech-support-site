@@ -2,14 +2,14 @@
 /**
  * @file AddressAutocomplete.tsx
  * @description Address input backed by the legacy google.maps.places.Autocomplete
- * widget attached to a real <input> we control. Lazy-loads on visibility and
+ * widget attached to a component-owned <input>. Lazy-loads on visibility and
  * falls back to a plain text input when the API key is missing or the loader
  * fails.
  *
- * The legacy widget is deprecated but supported for 12+ months. We previously
- * tried the new PlaceAutocompleteElement web component but it requires a
- * fully-configured "Places API (New)" + billing setup on the Cloud project,
- * and styling its shadow DOM is painful.
+ * The legacy widget is deprecated but supported for 12+ months. The newer
+ * PlaceAutocompleteElement web component requires a fully-configured
+ * "Places API (New)" + billing setup on the Cloud project, and styling its
+ * shadow DOM is painful.
  */
 
 "use client";
@@ -22,7 +22,7 @@ import { useEffect, useRef, useState } from "react";
 import { FaTriangleExclamation } from "react-icons/fa6";
 
 /**
- * Props for AddressAutocomplete component.
+ * Props for the {@link AddressAutocomplete} component.
  */
 export interface AddressAutocompleteProps {
   /** Current address value */
@@ -95,9 +95,9 @@ export default function AddressAutocomplete({
 
   const isVisible = useOnVisible(wrapperRef);
 
-  // Notify the parent that we're permanently in fallback mode (no autocomplete
-  // available). Fires whether the cause is a missing key, a script error, or
-  // both. Mirrors the visual warning banner below.
+  // Notify the parent that the field is permanently in fallback mode (no
+  // autocomplete available). Fires whether the cause is a missing key, a
+  // script error, or both.
   useEffect(() => {
     if (fallbackFiredRef.current) return;
     if (apiKeyMissing || scriptError) {
@@ -107,7 +107,7 @@ export default function AddressAutocomplete({
   }, [apiKeyMissing, scriptError, onFallbackMode]);
 
   // Lazy-load the Maps script once the wrapper scrolls into view, then attach
-  // the Autocomplete widget to our existing <input>.
+  // the Autocomplete widget to the existing <input>.
   useEffect(() => {
     if (typeof window === "undefined" || !isVisible || !inputRef.current) return;
 

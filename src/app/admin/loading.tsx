@@ -3,8 +3,8 @@
  * @file loading.tsx
  * @description Loading skeleton for the /admin dashboard (this segment's index
  * page): today snapshot bar, quick-action row, stat-card grid and the 2x2
- * data-panel grid. Child routes define their own loading.tsx, so this no longer
- * doubles as the generic fallback.
+ * data-panel grid. Child routes define their own loading.tsx, so this covers
+ * only the dashboard index.
  */
 
 import { AdminSkeletonShell } from "@/features/admin/components/AdminSkeletonShell";

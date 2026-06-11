@@ -31,7 +31,7 @@ export interface ContactSuggestion {
 }
 
 /**
- * Props for SendReviewLinkForm component.
+ * Props for the {@link SendReviewLinkForm} component.
  */
 interface SendReviewLinkFormProps {
   /** Contacts that have never received a review link, shown in a pre-fill dropdown */

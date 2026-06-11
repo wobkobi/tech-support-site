@@ -3,7 +3,7 @@
  * @file availability-config.server.ts
  * @description Server-only bridge that resolves the booking slot engine's config
  * from the settings panel. Every booking surface (days/hold/request/edit routes
- * + the booking pages) builds its `AvailabilityConfig` here so they share one
+ * + the booking pages) builds its {@link AvailabilityConfig} here so they share one
  * source - the operator's saved availability plus the structural timezone.
  */
 

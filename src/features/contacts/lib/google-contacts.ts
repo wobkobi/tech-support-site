@@ -34,8 +34,7 @@ export async function importFromGoogleContacts(): Promise<number> {
     const people = getPeopleClient();
 
     // Build phone > email map from existing Contact rows so phone-only Google
-    // contacts can be matched to a known email and imported. Used to live on
-    // the ReviewRequest model; Contact carries the same data now.
+    // contacts can be matched to a known email and imported.
     const contactEmailByPhone = new Map<string, string>();
     const contactRows = await prisma.contact.findMany({
       where: { phone: { not: null }, email: { not: null } },
@@ -61,8 +60,8 @@ export async function importFromGoogleContacts(): Promise<number> {
       const connections = response.data.connections ?? [];
       pageToken = response.data.nextPageToken ?? undefined;
 
-      // Resolve each Google person to the fields we need, then batch DB lookups
-      // for the whole page so we issue 2 findManys instead of N findFirsts.
+      // Resolve each Google person to the fields needed, then batch DB lookups
+      // for the whole page so each page issues 2 findManys instead of N findFirsts.
       interface Resolved {
         resourceName: string;
         etag: string | null;
@@ -474,7 +473,7 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
           updatePersonFields: updateFields.join(","),
           requestBody: { etag: currentEtag, ...updateBody },
         });
-        // Refresh etag from the response - it changed because we just wrote.
+        // Refresh etag from the response - the write above changed it.
         googlePerson.etag = updated.data.etag ?? currentEtag;
       } catch (err) {
         console.error(`[google-contacts] updateContact failed for ${resourceName}:`, err);

@@ -80,7 +80,7 @@ const A5_DIGITAL_CONFIG: PageConfig = {
 const A5_PRINT_CONFIG: PageConfig = {
   label: "Print (A5 + 3mm bleed)",
   // 3 mm bleed at 300 DPI ≈ 35.43 px per side > 1748 + 2×35.43 ≈ 1818.86
-  // and 2480 + 2×35.43 ≈ 2550.86, which we round up to whole pixels: 1819×2551.
+  // and 2480 + 2×35.43 ≈ 2550.86, rounded up to whole pixels: 1819×2551.
   viewport: { width: 1819, height: 2551 },
   pdfSize: { width: 436.53, height: 612.28 },
   trimSize: { width: 419.53, height: 595.28 },
@@ -141,8 +141,7 @@ function addCropMarks(page: PDFPage, trimWidth: number): void {
   // Calculate bleed margin (distance from page edge to trim edge)
   const bleedMargin = (pageWidth - trimWidth) / 2;
 
-  // Crop mark styling
-  const markColor = rgb(0, 0, 0); // Pure black
+  const markColor = rgb(0, 0, 0);
 
   // --- Top-left corner ---
   // Horizontal mark (extends left from trim edge)
@@ -269,7 +268,6 @@ async function generateVariant(
       height: config.pdfSize.height,
     });
 
-    // Add crop marks for print variant
     if (config.cropMarks) {
       addCropMarks(pdfPage, config.trimSize.width);
     }
@@ -305,11 +303,9 @@ async function exportPoster(options: ExportOptions): Promise<string[]> {
   const generatedFiles: string[] = [];
 
   try {
-    // Select configs based on format
     const digitalConfig = format === "a4" ? A4_DIGITAL_CONFIG : A5_DIGITAL_CONFIG;
     const printConfig = format === "a4" ? A4_PRINT_CONFIG : A5_PRINT_CONFIG;
 
-    // Determine which configs to generate
     const configs: PageConfig[] = [];
     if (variant === "digital" || variant === "both") {
       configs.push(digitalConfig);
@@ -318,7 +314,6 @@ async function exportPoster(options: ExportOptions): Promise<string[]> {
       configs.push(printConfig);
     }
 
-    // Generate each variant
     for (const config of configs) {
       console.log(`Generating: ${config.label}`);
       const filepath = await generateVariant(browser, config, url, outDir);
@@ -336,7 +331,7 @@ async function exportPoster(options: ExportOptions): Promise<string[]> {
  * screenshot, and saves the result as a single-page A5 PDF.
  * @param options - Export configuration (URL and output path).
  * @returns Promise that resolves when the PDF has been written to disk.
- * @deprecated Use generateVariant with PageConfig instead.
+ * @deprecated Use {@link generateVariant} with {@link PageConfig} instead.
  */
 async function exportPosterToPDF(options: ExportOptions): Promise<void> {
   const { url, output } = options;

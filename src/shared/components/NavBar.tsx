@@ -1,7 +1,7 @@
 // src/shared/components/NavBar.tsx
 /**
  * @file NavBar.tsx
- * @description Navigation bar with mobile-first scroll reveal behavior.
+ * @description Navigation bar with mobile-first scroll reveal behaviour.
  */
 
 "use client";
@@ -278,7 +278,7 @@ export function NavBar(): React.ReactElement | null {
     };
   }, [mobileMenuOpen]);
 
-  // Scroll behavior: hide on downward scroll, show immediately on upward scroll.
+  // Scroll behaviour: hide on downward scroll, show immediately on upward scroll.
   useEffect(() => {
     if (typeof window === "undefined") {
       return;

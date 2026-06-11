@@ -80,7 +80,7 @@ async function importHmacKey(secret: string): Promise<CryptoKey> {
 }
 
 /**
- * Mints a signed session-cookie value valid for `ADMIN_SESSION_MAX_AGE_SECONDS`.
+ * Mints a signed session-cookie value valid for {@link ADMIN_SESSION_MAX_AGE_SECONDS}.
  * Signs with `process.env.ADMIN_SECRET` (no separate signing key - rotating
  * the admin secret intentionally invalidates every session).
  * @returns Cookie value `<payload>.<sig>` ready to set on `Set-Cookie`.

@@ -28,10 +28,10 @@ export async function autoMaintain(prisma: PrismaClient): Promise<ConflictEntry[
 }
 
 /**
- * Lifts ReviewRequest state onto Contact so the standalone model could be
- * retired. The ReviewRequest model is no longer in the Prisma schema, so we
- * read the orphaned collection via raw MongoDB to bridge any pre-retirement
- * rows into Contact fields. For each row with a resolvable contact, sets
+ * Lifts ReviewRequest state onto Contact. The ReviewRequest model is no
+ * longer in the Prisma schema, so the orphaned collection is read via raw
+ * MongoDB to bridge any pre-retirement rows into Contact fields. For each
+ * row with a resolvable contact, sets
  * Contact.reviewToken (only if null), Contact.reviewLinkSentAt (only if
  * older or null), Contact.reviewLinkSentMode (when missing), and
  * Contact.reviewLinkSubmittedAt (when newer or null). Idempotent.
