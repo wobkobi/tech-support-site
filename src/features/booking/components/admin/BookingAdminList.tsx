@@ -23,6 +23,9 @@ export interface AdminBookingRow {
   status: "held" | "confirmed" | "cancelled" | "completed";
   cancelToken: string;
   reviewSentAt: string | null;
+  /** Public quote the customer saw before booking (snapshot); null when they didn't get one. */
+  quotedLow: number | null;
+  quotedHigh: number | null;
 }
 
 type StatusFilter = "all" | "held" | "confirmed" | "cancelled" | "completed";
@@ -320,6 +323,12 @@ export function BookingAdminList({
                   <span className={cn("text-xs text-slate-500")}>
                     {formatDateTimeShort(b.startAt)} &ndash; {formatDateTimeShort(b.endAt)}
                   </span>
+                  {b.quotedLow != null && b.quotedHigh != null && (
+                    <span className={cn("text-xs text-slate-500")}>
+                      <span className={cn("text-slate-400")}>Quoted: </span>${b.quotedLow} &ndash; $
+                      {b.quotedHigh}
+                    </span>
+                  )}
                 </div>
 
                 <div className={cn("flex flex-wrap gap-2 sm:shrink-0")}>

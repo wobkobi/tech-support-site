@@ -41,6 +41,8 @@ export default async function AdminBookingsPage(): Promise<React.ReactElement> {
       status: true,
       cancelToken: true,
       reviewSentAt: true,
+      quotedLowAtBooking: true,
+      quotedHighAtBooking: true,
     },
   });
 
@@ -56,6 +58,8 @@ export default async function AdminBookingsPage(): Promise<React.ReactElement> {
     status: b.status as AdminBookingRow["status"],
     cancelToken: b.cancelToken,
     reviewSentAt: b.reviewSentAt?.toISOString() ?? null,
+    quotedLow: b.quotedLowAtBooking ?? null,
+    quotedHigh: b.quotedHighAtBooking ?? null,
   }));
 
   const confirmedCount = allBookings.filter((b) => b.status === "confirmed").length;
