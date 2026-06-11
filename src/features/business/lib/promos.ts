@@ -51,6 +51,32 @@ export const getActivePromo = unstable_cache(
   { tags: [ACTIVE_PROMO_TAG], revalidate: 60 },
 );
 
+/**
+ * Resolves the promo that was in force on a given date (newest wins on
+ * overlap). Used by the admin calculator to price a past job with the promo
+ * that was live when the work actually happened, not today's.
+ * @param date - The job date to resolve against.
+ * @returns Resolved promo or null.
+ */
+export async function resolvePromoForDate(date: Date): Promise<ActivePromo | null> {
+  const row = await prisma.promo
+    .findFirst({
+      where: { isActive: true, startAt: { lte: date }, endAt: { gt: date } },
+      orderBy: { createdAt: "desc" },
+    })
+    .catch(() => null);
+  if (!row) return null;
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    startAt: row.startAt.toISOString(),
+    endAt: row.endAt.toISOString(),
+    flatHourlyRate: row.flatHourlyRate,
+    percentDiscount: row.percentDiscount,
+  };
+}
+
 /** Promo snapshot fields stored on a Booking, plus its createdAt. */
 export interface BookingPromoSnapshot {
   promoIdAtBooking?: string | null;

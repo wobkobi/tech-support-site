@@ -94,7 +94,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const environment = process.env.NODE_ENV ?? "production";
 
   try {
-    await prisma.priceEstimateLog.create({
+    const created = await prisma.priceEstimateLog.create({
       data: {
         description,
         aiEstimatedMins,
@@ -111,7 +111,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         environment,
       },
     });
-    return NextResponse.json({ ok: true });
+    // Return the id so the wizard can carry it to /booking and the booking can
+    // snapshot which quote the customer saw.
+    return NextResponse.json({ ok: true, id: created.id });
   } catch (err) {
     console.error("[log-estimate] failed:", err);
     return NextResponse.json({ ok: false, error: "Could not log estimate" }, { status: 500 });

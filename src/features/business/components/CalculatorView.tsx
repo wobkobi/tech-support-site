@@ -121,6 +121,8 @@ interface CalculatorDraft {
    * before this existed simply lack it and default to "" on load (safe, no bump).
    */
   aiInput: string;
+  /** Date the job was done (YYYY-MM-DD); drives the holiday + promo lookup. Additive - older drafts default to today. */
+  jobDate: string;
   timeRanges: ParsedRange[];
   durationMinsOverride: number | null;
   hourlyRateId: string | null;
@@ -253,6 +255,14 @@ function emptyTask(rates: RateConfig[]): TaskLine {
   };
 }
 
+/**
+ * Today's date as an NZ-local YYYY-MM-DD string - the calculator's job-date default.
+ * @returns ISO date string in Pacific/Auckland.
+ */
+function todayNZDate(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Pacific/Auckland" }).format(new Date());
+}
+
 interface CalculatorViewProps {
   /** Live business identity, threaded into the invoice preview. */
   identity: IdentitySettings;
@@ -368,9 +378,51 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
   const [editingRateId, setEditingRateId] = useState<string | null>(null);
   const [resettingRates, setResettingRates] = useState(false);
 
-  // Active promo + per-job skip flag (not persisted).
+  // Active promo + per-job skip flag (not persisted). activePromo holds the
+  // promo for the selected job date (refined by the job-context effect below).
   const [activePromo, setActivePromo] = useState<ActivePromo | null>(null);
   const [skipPromo, setSkipPromo] = useState(false);
+
+  // Job date drives the holiday + promo lookup so a past job is priced by what
+  // applied THEN, not today. Persisted in the draft; defaults to today (NZ).
+  const [jobDate, setJobDate] = useState<string>(() => initialDraft?.jobDate ?? todayNZDate());
+  // Holiday context for the selected date: name (for the UI) + the live labour
+  // uplift fraction (0 when the date isn't a public holiday).
+  const [holiday, setHoliday] = useState<{ name: string | null; uplift: number }>({
+    name: null,
+    uplift: 0,
+  });
+
+  // Resolve the job date -> { holiday, promo } whenever the date changes. Best
+  // effort: failures leave the prior context in place. Overwrites activePromo
+  // with the date-resolved promo so every downstream consumer is date-aware.
+  useEffect(() => {
+    if (!jobDate) return;
+    let cancelled = false;
+    fetch(`/api/business/job-context?date=${encodeURIComponent(jobDate)}`)
+      .then((r) => r.json())
+      .then(
+        (d: {
+          ok?: boolean;
+          holidayName?: string | null;
+          holidayUplift?: number;
+          promo?: ActivePromo | null;
+        }) => {
+          if (cancelled || !d?.ok) return;
+          setHoliday({
+            name: d.holidayName ?? null,
+            uplift: typeof d.holidayUplift === "number" ? d.holidayUplift : 0,
+          });
+          setActivePromo(d.promo ?? null);
+        },
+      )
+      .catch(() => {
+        /* leave the prior context in place */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [jobDate]);
 
   useEffect(() => {
     const apiKey = process.env.GOOGLE_MAPS_API_KEY;
@@ -459,6 +511,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
     const t = setTimeout(() => {
       saveDraft({
         aiInput,
+        jobDate,
         timeRanges,
         durationMinsOverride,
         hourlyRateId,
@@ -479,6 +532,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
     return () => clearTimeout(t);
   }, [
     aiInput,
+    jobDate,
     timeRanges,
     durationMinsOverride,
     hourlyRateId,
@@ -539,12 +593,14 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
     clientName,
     clientEmail,
   };
-  const totals = calcJobTotal(job, !skipPromo ? activePromo : null, pricing);
+  // Apply the date's public-holiday uplift to labour (0 when not a holiday).
+  const jobPricing = { ...pricing, holidayUplift: holiday.uplift };
+  const totals = calcJobTotal(job, !skipPromo ? activePromo : null, jobPricing);
   // Memoise the flattened line items so the preview panel's React.memo can
   // skip re-render when unrelated parent state changes (e.g. typing in the
   // AI input box). Recomputes when any meaningful input shifts.
   const previewLineItems = useMemo(
-    () => jobToLineItems(job, pricing.billingIncrementMins),
+    () => jobToLineItems(job, pricing.billingIncrementMins, holiday.uplift),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       tasks,
@@ -552,6 +608,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
       timeRanges,
       durationMins,
       hourlyRate,
+      holiday.uplift,
       travelEntries,
       clientName,
       clientEmail,
@@ -913,7 +970,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
     setSavingInvoice(true);
     try {
       await saveTaskTemplates(tasks);
-      const lineItems = jobToLineItems(job, pricing.billingIncrementMins);
+      const lineItems = jobToLineItems(job, pricing.billingIncrementMins, holiday.uplift);
       const promoActive = activePromo && !skipPromo && totals.promoDiscount > 0;
       const res = await fetch("/api/business/invoices", {
         method: "POST",
@@ -1279,6 +1336,38 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
           }}
         />
       )}
+
+      {/* Job date - drives the public-holiday + promo lookup for this job. */}
+      <div
+        className={cn(
+          "mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3",
+        )}
+      >
+        <label htmlFor="job-date" className={cn("text-sm font-semibold text-slate-700")}>
+          Job date
+        </label>
+        <input
+          id="job-date"
+          type="date"
+          value={jobDate}
+          onChange={(e) => setJobDate(e.target.value || todayNZDate())}
+          className={cn(
+            "focus:ring-russian-violet/30 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2",
+          )}
+        />
+        <span className={cn("text-xs text-slate-500")}>
+          Sets which promo and public-holiday rate apply.
+        </span>
+        {holiday.name && (
+          <span
+            className={cn(
+              "rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800",
+            )}
+          >
+            {holiday.name} - labour +{Math.round(holiday.uplift * 100)}%
+          </span>
+        )}
+      </div>
 
       {/* Promo chip with per-job skip toggle. */}
       {activePromo && (

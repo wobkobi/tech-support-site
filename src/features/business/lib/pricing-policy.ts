@@ -180,14 +180,22 @@ export function isWithinTravelWindow(
 }
 
 /**
- * Applies the 15-minute floor then rounds to the nearest 5-minute increment.
- * 0 stays 0 (no work, no charge) so a placeholder job does not invent time.
+ * Rounds to the nearest billing increment then applies the minimum-billable
+ * floor. 0 stays 0 (no work, no charge) so a placeholder job does not invent
+ * time. Both bounds default to the code constants but accept the live pricing
+ * settings so callers (calculator, job parser) stay consistent.
  * @param rawMins - Actual worked minutes.
+ * @param minBillableMins - Minimum billable floor (live setting; defaults to the const).
+ * @param incrementMins - Rounding increment (live setting; defaults to the const).
  * @returns Billable minutes after the floor.
  */
-export function floorBillableMins(rawMins: number): number {
+export function floorBillableMins(
+  rawMins: number,
+  minBillableMins: number = MIN_BILLABLE_MINS,
+  incrementMins: number = BILLING_INCREMENT_MINS,
+): number {
   if (rawMins <= 0) return 0;
-  return Math.max(MIN_BILLABLE_MINS, billableMins(rawMins));
+  return Math.max(minBillableMins, billableMins(rawMins, incrementMins));
 }
 
 // > Copy generators
