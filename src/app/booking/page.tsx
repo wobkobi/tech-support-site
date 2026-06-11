@@ -4,8 +4,8 @@
  * @description Booking page with duration-aware slot availability.
  *   The static shell (heading, sidebar, skeleton) renders immediately while
  *   the slot data is streamed in via a Suspense boundary, so TTFB stays
- *   constant even when the calendar cache is cold and we have to hit the
- *   live Google Calendar API.
+ *   constant even when the calendar cache is cold and slot data has to come
+ *   from the live Google Calendar API.
  */
 
 import BookingForm from "@/features/booking/components/BookingForm";
@@ -29,13 +29,6 @@ export const metadata: Metadata = {
   title: "Book a Tech Support Appointment in Auckland",
   description:
     "Book an on-site or remote tech support appointment in Auckland. Same-day, evening and weekend slots available. Pick a 1- or 2-hour slot and get an instant calendar invite.",
-  keywords: [
-    "book tech support Auckland",
-    "computer repair appointment Auckland",
-    "IT support booking Auckland",
-    "same day tech support Auckland",
-    "weekend computer help Auckland",
-  ],
   alternates: { canonical: "/booking" },
   openGraph: {
     title: "Book an Appointment - To The Point Tech",

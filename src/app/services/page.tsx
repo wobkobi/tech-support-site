@@ -1,7 +1,7 @@
 // src/app/services/page.tsx
 /**
  * @file page.tsx
- * @description Services page with wider layout and better organization.
+ * @description Services page: full list of service categories.
  */
 
 import { getPublicPricing } from "@/features/business/lib/pricing-policy.server";
@@ -31,18 +31,6 @@ export const metadata: Metadata = {
   title: "Tech Support Services - Computers, Wi-Fi, Phones & More",
   description:
     "On-site and remote tech support across Auckland: computer and laptop repair, Wi-Fi setup, virus removal, data recovery, smart TVs, printers, email, cloud backup and small business IT.",
-  keywords: [
-    "computer repair Auckland",
-    "laptop repair Auckland",
-    "Wi-Fi setup Auckland",
-    "virus removal Auckland",
-    "data recovery Auckland",
-    "printer setup Auckland",
-    "smart TV setup Auckland",
-    "small business IT support Auckland",
-    "Mac support Auckland",
-    "Windows support Auckland",
-  ],
   alternates: { canonical: "/services" },
   openGraph: {
     title: "Tech Support Services - To The Point Tech",

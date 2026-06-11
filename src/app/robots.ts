@@ -18,7 +18,10 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: "*",
-        allow: "/",
+        // "/reviews" must be allowed explicitly: "Disallow: /review" is a
+        // prefix match that would otherwise block the public reviews page
+        // (the longer Allow rule wins under Google's precedence).
+        allow: ["/", "/reviews"],
         disallow: [
           "/admin",
           "/admin/",

@@ -41,28 +41,6 @@ export const metadata: Metadata = {
   },
   description:
     "Friendly computer and IT support across Auckland. On-site and remote help with PCs, Macs, Wi-Fi, phones, printers and more. Same-day, evening and weekend appointments. No jargon, no upselling, transparent pricing.",
-  keywords: [
-    "computer repair Auckland",
-    "IT support Auckland",
-    "tech support Auckland",
-    "Wi-Fi setup Auckland",
-    "laptop repair Auckland",
-    "Mac support Auckland",
-    "PC support Auckland",
-    "small business IT support Auckland",
-    "remote tech support NZ",
-    "home computer help Auckland",
-    "printer setup Auckland",
-    "smart TV setup Auckland",
-    "data recovery Auckland",
-    "virus removal Auckland",
-    "Auckland computer help",
-    "Auckland IT help",
-    "tech support near me Auckland",
-    "computer technician Auckland",
-    "on-site IT support Auckland",
-    "mobile tech support Auckland",
-  ],
   applicationName: "To The Point Tech",
   authors: [{ name: "Harrison Raynes" }],
   creator: "Harrison Raynes",
@@ -136,7 +114,6 @@ export const metadata: Metadata = {
   manifest: "/site.webmanifest",
 };
 
-// Viewport and theme colour (light/dark)
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
@@ -369,7 +346,8 @@ export default async function RootLayout({
         },
       })),
     },
-    sameAs: ["https://www.google.com/search?q=To+The+Point+Tech+Auckland"],
+    // sameAs deliberately omitted until real profiles exist (Google Business
+    // Profile, Facebook, etc.) - a placeholder URL helps nothing.
   };
 
   const websiteJsonLd = {
@@ -378,12 +356,14 @@ export default async function RootLayout({
     "@id": `${siteUrl}#website`,
     url: siteUrl,
     name: "To The Point Tech",
+    // Brand variants people actually type; feeds Google's site-name display.
+    alternateName: ["To The Point", "To The Point Tech Auckland"],
     publisher: { "@id": `${siteUrl}#business` },
     inLanguage: "en-NZ",
   };
 
   return (
-    <html lang="en" className={`${exo.variable} font-sans`}>
+    <html lang="en-NZ" className={`${exo.variable} font-sans`}>
       <head>
         <script dangerouslySetInnerHTML={{ __html: legacyRedirectScript }} />
       </head>
