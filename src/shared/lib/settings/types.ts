@@ -115,12 +115,38 @@ export interface Benchmark {
   mins: number;
 }
 
+/** How confident the estimator is in a quote; drives how wide the price range is. */
+export type EstimateConfidence = "high" | "medium" | "low";
+
+/** Low/high multipliers applied to the point estimate for one confidence level. */
+export interface EstimatorRangeBand {
+  /** Multiplier for the LOW end of the range (e.g. 0.85 = 85% of the point estimate). */
+  lowFactor: number;
+  /** Multiplier for the HIGH end of the range (e.g. 1.2 = 120%). */
+  highFactor: number;
+}
+
+/**
+ * Confidence-scaled range widths for the public estimator. As confidence falls
+ * the band widens - and the LOW end drops faster than the HIGH end rises, so a
+ * vague job reads "from $X" without inflating the top number.
+ */
+export interface EstimatorRange {
+  high: EstimatorRangeBand;
+  medium: EstimatorRangeBand;
+  low: EstimatorRangeBand;
+  /** Minimum dollar gap between low and high so tiny jobs don't look falsely precise. */
+  minSpread: number;
+}
+
 export interface EstimatorSettings {
   /**
    * Standalone task-duration baselines the public price estimator starts from
    * before the stacking rules combine a multi-task visit. Editable as a list.
    */
   benchmarks: Benchmark[];
+  /** Confidence-scaled width of the customer-facing price range. */
+  range: EstimatorRange;
 }
 
 export interface TaxSettings {

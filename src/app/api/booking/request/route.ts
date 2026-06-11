@@ -258,13 +258,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }),
     ]);
     const baseRow = rates.find((r) => r.ratePerHour !== null && r.isDefault) ?? null;
-    const complexRow = rates.find((r) => r.label === "Complex") ?? null;
     const travelRow = rates.find((r) => r.unit === "travel-hour") ?? null;
     const baseRateAtBooking = baseRow?.ratePerHour ?? null;
-    const complexRateAtBooking =
-      baseRateAtBooking !== null && complexRow?.hourlyDelta != null
-        ? Math.round((baseRateAtBooking + complexRow.hourlyDelta) * 100) / 100
-        : null;
     const travelRatePerHourAtBooking = travelRow?.ratePerHour ?? null;
 
     // One-way drive time for in-person bookings; lets the late-cancel
@@ -315,8 +310,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           duration,
           travelMinsAtBooking,
           // Rate snapshot locks in the quoted price against later admin edits.
+          // complexRateAtBooking is no longer written (the Complex tier was
+          // removed); the column stays for historical bookings.
           baseRateAtBooking,
-          complexRateAtBooking,
           travelRatePerHourAtBooking,
           // Promo snapshot denormalised - survives Promo deletion before service.
           promoIdAtBooking: activePromo?.id ?? null,

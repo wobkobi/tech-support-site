@@ -39,6 +39,11 @@ export const BILLING_INCREMENT_MINS = 5;
 /** Multiplier applied to labour on NZ public holidays. Travel and parts are not uplifted. */
 export const PUBLIC_HOLIDAY_UPLIFT = 0.25;
 
+/** Fallback Standard base rate ($/hr) when no default hourly RateConfig row exists; mirrors the seed default. */
+export const FALLBACK_BASE_RATE = 65;
+/** Fallback travel rate ($/hr) when no `travel-hour` RateConfig row exists; mirrors the seed default. */
+export const FALLBACK_TRAVEL_RATE = 40;
+
 /** Region label for nationwide NZ public holidays in the PublicHoliday table. */
 export const NZ_REGION = "NZ";
 /** Region for the operator's regional anniversary day (also charged the uplift). */
@@ -231,7 +236,7 @@ export function travelCopy(
   minTravelCharge: number = MIN_TRAVEL_CHARGE,
 ): string {
   return (
-    `Travel is **one round trip** billed at **$${travelRatePerHour}/h** - a separate, ` +
+    `Travel is **one round trip** billed at **$${travelRatePerHour}/hr** - a separate, ` +
     `lower rate than labour. ` +
     `**Minimum $${minTravelCharge}** when there is any travel at all. ` +
     `If a job runs long and needs a second visit, **that second trip is on me**.`

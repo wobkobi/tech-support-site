@@ -75,6 +75,15 @@ export const DEFAULT_SETTINGS: Settings = {
       { label: "Data recovery", mins: 120 },
       { label: "PC build", mins: 180 },
     ],
+    // Confidence-scaled range. Asymmetric on purpose: as confidence falls the
+    // low end drops faster than the high end rises, so a vague job reads
+    // "from $X" without a scary top number. Editable in the estimator tab.
+    range: {
+      high: { lowFactor: 0.85, highFactor: 1.2 },
+      medium: { lowFactor: 0.7, highFactor: 1.35 },
+      low: { lowFactor: 0.55, highFactor: 1.6 },
+      minSpread: 20,
+    },
   },
 
   // Source: business-identity.ts + layout.tsx JSON-LD + HOME_ADDRESS env.

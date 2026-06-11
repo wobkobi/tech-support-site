@@ -9,9 +9,11 @@
  */
 
 import { BenchmarkListField } from "@/features/admin/components/settings/BenchmarkListField";
+import { NumberField } from "@/features/admin/components/settings/SettingsFields";
 import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
 import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
 import { cn } from "@/shared/lib/cn";
+import { ESTIMATOR_FIELD_META } from "@/shared/lib/settings/field-meta";
 import type { EstimatorSettings } from "@/shared/lib/settings/types";
 import type React from "react";
 
@@ -30,6 +32,24 @@ interface Props {
 export function EstimatorTab({ initial, defaults }: Props): React.ReactElement {
   const form = useSettingsForm("estimator", initial, defaults);
   const { draft, setDraft, dirty, saving, fieldErrors, blocks, warns, savedAt } = form;
+  const m = ESTIMATOR_FIELD_META;
+
+  /**
+   * Updates one confidence band's low/high multiplier (stored as a fraction).
+   * @param level - Confidence level being edited.
+   * @param key - Which end of the band to set.
+   * @param value - New multiplier as a fraction (e.g. 0.85).
+   * @returns void
+   */
+  const setBand = (
+    level: "high" | "medium" | "low",
+    key: "lowFactor" | "highFactor",
+    value: number,
+  ): void =>
+    setDraft((p) => ({
+      ...p,
+      range: { ...p.range, [level]: { ...p.range[level], [key]: value } },
+    }));
 
   return (
     <div>
@@ -38,6 +58,84 @@ export function EstimatorTab({ initial, defaults }: Props): React.ReactElement {
         fieldErrors={fieldErrors}
         onChange={(benchmarks) => setDraft((p) => ({ ...p, benchmarks }))}
       />
+
+      {/* Price range width - the confidence-scaled band the public estimator shows. */}
+      <div className={cn("mt-8")}>
+        <h3 className={cn("text-russian-violet text-lg font-semibold")}>Estimate range width</h3>
+        <p className={cn("mt-1 text-sm text-slate-500")}>
+          How wide the customer-facing price range is, set by how clearly the job was described.
+          Percentages are of the estimate; vaguer jobs get a wider, lower range so they read
+          &ldquo;from $X&rdquo; without a scary top number.
+        </p>
+        <div className={cn("divide-y divide-slate-100")}>
+          <NumberField
+            id="range.high.lowFactor"
+            meta={m["range.high.lowFactor"]}
+            value={Math.round(draft.range.high.lowFactor * 100)}
+            min={0}
+            step={1}
+            customised={draft.range.high.lowFactor !== defaults.range.high.lowFactor}
+            onChange={(v) => setBand("high", "lowFactor", (v ?? 0) / 100)}
+          />
+          <NumberField
+            id="range.high.highFactor"
+            meta={m["range.high.highFactor"]}
+            value={Math.round(draft.range.high.highFactor * 100)}
+            min={0}
+            step={1}
+            error={fieldErrors["range.high"]}
+            customised={draft.range.high.highFactor !== defaults.range.high.highFactor}
+            onChange={(v) => setBand("high", "highFactor", (v ?? 0) / 100)}
+          />
+          <NumberField
+            id="range.medium.lowFactor"
+            meta={m["range.medium.lowFactor"]}
+            value={Math.round(draft.range.medium.lowFactor * 100)}
+            min={0}
+            step={1}
+            customised={draft.range.medium.lowFactor !== defaults.range.medium.lowFactor}
+            onChange={(v) => setBand("medium", "lowFactor", (v ?? 0) / 100)}
+          />
+          <NumberField
+            id="range.medium.highFactor"
+            meta={m["range.medium.highFactor"]}
+            value={Math.round(draft.range.medium.highFactor * 100)}
+            min={0}
+            step={1}
+            error={fieldErrors["range.medium"]}
+            customised={draft.range.medium.highFactor !== defaults.range.medium.highFactor}
+            onChange={(v) => setBand("medium", "highFactor", (v ?? 0) / 100)}
+          />
+          <NumberField
+            id="range.low.lowFactor"
+            meta={m["range.low.lowFactor"]}
+            value={Math.round(draft.range.low.lowFactor * 100)}
+            min={0}
+            step={1}
+            customised={draft.range.low.lowFactor !== defaults.range.low.lowFactor}
+            onChange={(v) => setBand("low", "lowFactor", (v ?? 0) / 100)}
+          />
+          <NumberField
+            id="range.low.highFactor"
+            meta={m["range.low.highFactor"]}
+            value={Math.round(draft.range.low.highFactor * 100)}
+            min={0}
+            step={1}
+            error={fieldErrors["range.low"]}
+            customised={draft.range.low.highFactor !== defaults.range.low.highFactor}
+            onChange={(v) => setBand("low", "highFactor", (v ?? 0) / 100)}
+          />
+          <NumberField
+            id="range.minSpread"
+            meta={m["range.minSpread"]}
+            value={draft.range.minSpread}
+            min={0}
+            error={fieldErrors["range.minSpread"]}
+            customised={draft.range.minSpread !== defaults.range.minSpread}
+            onChange={(v) => setDraft((p) => ({ ...p, range: { ...p.range, minSpread: v ?? 0 } }))}
+          />
+        </div>
+      </div>
 
       {/* Guardrail blocks - save was refused. */}
       {blocks.length > 0 && (
