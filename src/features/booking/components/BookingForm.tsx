@@ -22,7 +22,7 @@ import { EmailInput } from "@/shared/components/EmailInput";
 import { PhoneInput } from "@/shared/components/PhoneInput";
 import { cn } from "@/shared/lib/cn";
 import { validatePhone } from "@/shared/lib/normalise-phone";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { FaCheck } from "react-icons/fa6";
@@ -111,6 +111,11 @@ export default function BookingForm({
 }: BookingFormProps): React.ReactElement {
   const router = useRouter();
   const isEditMode = Boolean(cancelToken);
+  // Carried from the /pricing wizard's "Book now" link (?estimate=<id>); lets
+  // the booking snapshot which public quote the customer saw. 24-hex only.
+  const estimateParam = useSearchParams().get("estimate");
+  const estimateId =
+    estimateParam && /^[a-f0-9]{24}$/i.test(estimateParam) ? estimateParam : undefined;
 
   // Duration choices built from the live settings; labels reflect the operator's
   // configured short/long lengths. Descriptions stay as fixed copy.
@@ -578,6 +583,7 @@ export default function BookingForm({
             notes: notes.trim(),
             website,
             idempotencyKey,
+            estimateId,
           };
 
       const res = await fetch(endpoint, {

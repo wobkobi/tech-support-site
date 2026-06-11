@@ -80,6 +80,9 @@ export function PricingWizard({
   const [aiConfidence, setAiConfidence] = useState<EstimateConfidence>("medium");
   const [result, setResult] = useState<PriceRange | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
+  // Id of the logged estimate, carried to /booking so the booking snapshots
+  // which quote the customer actually saw.
+  const [estimateId, setEstimateId] = useState<string | null>(null);
 
   useEffect(() => {
     // Rates + active promo in parallel; promo may be null.
@@ -297,7 +300,7 @@ export function PricingWizard({
     // Audit log: fire-and-forget so failures don't break the UX. Captures
     // the raw text, AI interpretation, meeting mode the customer picked, and
     // the exact range shown so disputes can be reconstructed.
-    void fetch("/api/pricing/log-estimate", {
+    fetch("/api/pricing/log-estimate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -314,9 +317,14 @@ export function PricingWizard({
         promoTitle: activePromo?.title ?? null,
         promoLabel: activePromo ? summariseForBanner(activePromo) : null,
       }),
-    }).catch(() => {
-      // Logging is best-effort; ignore network/server errors.
-    });
+    })
+      .then((r) => r.json())
+      .then((d: { id?: string }) => {
+        if (d?.id) setEstimateId(d.id);
+      })
+      .catch(() => {
+        // Logging is best-effort; ignore network/server errors.
+      });
   }
 
   /**
@@ -359,6 +367,7 @@ export function PricingWizard({
     setAiExplanation("");
     setAiEstimatedMins(0);
     setResult(null);
+    setEstimateId(null);
   }
 
   /**
@@ -560,7 +569,7 @@ export function PricingWizard({
 
           <div className="flex flex-wrap gap-3">
             <Link
-              href="/booking"
+              href={estimateId ? `/booking?estimate=${estimateId}` : "/booking"}
               className="bg-russian-violet hover:bg-russian-violet/90 rounded-xl px-5 py-2.5 text-base font-semibold text-white"
             >
               Book now
