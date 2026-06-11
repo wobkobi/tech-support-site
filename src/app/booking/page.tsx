@@ -20,6 +20,7 @@ import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
 import { CARD, FrostedSection, PageShell, SOFT_CARD } from "@/shared/components/PageLayout";
 import { cn } from "@/shared/lib/cn";
 import { prisma } from "@/shared/lib/prisma";
+import { getSettings } from "@/shared/lib/settings/get-settings";
 import type { Metadata } from "next";
 import type React from "react";
 import { Suspense } from "react";
@@ -206,6 +207,8 @@ const SKELETON_BLOCK = cn("bg-seasalt-900/40 rounded-lg");
 async function BookingFormIsland(): Promise<React.ReactElement> {
   const { days, degraded, sameDayClosed, acceptingBookings, closedMessage, durations } =
     await getAvailableDays();
+  // Pricing context for the inline "get a rough estimate" affordance.
+  const settings = await getSettings();
   if (!acceptingBookings) {
     return (
       <div
@@ -250,7 +253,13 @@ async function BookingFormIsland(): Promise<React.ReactElement> {
           </p>
         </div>
       )}
-      <BookingForm availableDays={days} durations={durations} />
+      <BookingForm
+        availableDays={days}
+        durations={durations}
+        estimatorRange={settings.estimator.range}
+        minBillableMins={settings.pricing.minBillableMins}
+        minTravelCharge={settings.pricing.minTravelCharge}
+      />
     </div>
   );
 }

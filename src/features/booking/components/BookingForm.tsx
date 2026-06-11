@@ -17,11 +17,13 @@ import {
   type StartMinute,
   type TimeOfDay,
 } from "@/features/booking/lib/booking";
+import { fetchQuickEstimate } from "@/features/business/lib/quick-estimate";
 import { Button } from "@/shared/components/Button";
 import { EmailInput } from "@/shared/components/EmailInput";
 import { PhoneInput } from "@/shared/components/PhoneInput";
 import { cn } from "@/shared/lib/cn";
 import { validatePhone } from "@/shared/lib/normalise-phone";
+import type { EstimatorRange } from "@/shared/lib/settings/types";
 import { useRouter, useSearchParams } from "next/navigation";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
@@ -92,6 +94,12 @@ export interface BookingFormProps {
   durations: { short: number; long: number };
   cancelToken?: string;
   initialValues?: BookingFormInitialValues;
+  /** Live estimator range widths - enables the inline "get a rough estimate" (new bookings only). */
+  estimatorRange?: EstimatorRange;
+  /** Min billable minutes (live setting) for the inline estimate. */
+  minBillableMins?: number;
+  /** Travel floor (live setting) for the inline estimate. */
+  minTravelCharge?: number;
 }
 
 /**
@@ -101,6 +109,9 @@ export interface BookingFormProps {
  * @param props.durations - Live job durations (minutes) for the picker labels.
  * @param props.cancelToken - Cancel token for edit mode; omit for new bookings
  * @param props.initialValues - Pre-filled values for edit mode
+ * @param props.estimatorRange - Live estimator range widths; enables the inline rough estimate.
+ * @param props.minBillableMins - Min billable minutes for the inline estimate.
+ * @param props.minTravelCharge - Travel floor for the inline estimate.
  * @returns Booking form element
  */
 export default function BookingForm({
@@ -108,14 +119,25 @@ export default function BookingForm({
   durations,
   cancelToken,
   initialValues,
+  estimatorRange,
+  minBillableMins,
+  minTravelCharge,
 }: BookingFormProps): React.ReactElement {
   const router = useRouter();
   const isEditMode = Boolean(cancelToken);
-  // Carried from the /pricing wizard's "Book now" link (?estimate=<id>); lets
-  // the booking snapshot which public quote the customer saw. 24-hex only.
+  // Estimate id sent with the booking so it can snapshot which public quote the
+  // customer saw - seeded from the /pricing wizard's "Book now" link
+  // (?estimate=<id>, 24-hex) and replaced if they run the inline estimate below.
   const estimateParam = useSearchParams().get("estimate");
-  const estimateId =
-    estimateParam && /^[a-f0-9]{24}$/i.test(estimateParam) ? estimateParam : undefined;
+  const [estimateId, setEstimateId] = useState<string | undefined>(
+    estimateParam && /^[a-f0-9]{24}$/i.test(estimateParam) ? estimateParam : undefined,
+  );
+  // Inline "get a rough estimate" state (new bookings only).
+  const [estimating, setEstimating] = useState(false);
+  const [quote, setQuote] = useState<{ low: number; high: number } | null>(null);
+  const [quoteError, setQuoteError] = useState<string | null>(null);
+  const canInlineEstimate =
+    !isEditMode && estimatorRange != null && minBillableMins != null && minTravelCharge != null;
 
   // Duration choices built from the live settings; labels reflect the operator's
   // configured short/long lengths. Descriptions stay as fixed copy.
@@ -180,6 +202,34 @@ export default function BookingForm({
   // to fake a success response without creating a booking.
   const [website, setWebsite] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  /**
+   * Runs the inline rough estimate from the current description + meeting +
+   * address, shows the range, and captures the logged estimate id so the
+   * booking snapshots the quote the customer saw.
+   * @returns Resolves when the estimate completes.
+   */
+  async function runInlineEstimate(): Promise<void> {
+    if (!estimatorRange || minBillableMins == null || minTravelCharge == null) return;
+    setEstimating(true);
+    setQuoteError(null);
+    try {
+      const res = await fetchQuickEstimate({
+        description: notes.trim(),
+        meeting: meetingType === "remote" ? "remote" : "in-person",
+        address: meetingType === "remote" ? undefined : combineUnitAndAddress(unit, address),
+        estimatorRange,
+        minBillableMins,
+        minTravelCharge,
+      });
+      setQuote({ low: res.low, high: res.high });
+      if (res.estimateId) setEstimateId(res.estimateId);
+    } catch {
+      setQuoteError("Couldn't get an estimate just now - you can still book.");
+    } finally {
+      setEstimating(false);
+    }
+  }
   const [error, setError] = useState<string | null>(null);
   // Submit-time validation errors. Rendered both in a top summary and inline.
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -1242,6 +1292,31 @@ export default function BookingForm({
             </p>
           )}
         </div>
+
+        {canInlineEstimate && (
+          <div className={cn("flex flex-col gap-2")}>
+            <button
+              type="button"
+              onClick={() => void runInlineEstimate()}
+              disabled={estimating || notes.trim().length < BOOKING_FIELD_LIMITS.notesMin}
+              className={cn(
+                "border-russian-violet/40 text-russian-violet hover:bg-russian-violet/5 self-start rounded-md border px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-50",
+              )}
+            >
+              {estimating ? "Estimating..." : "Get a rough estimate"}
+            </button>
+            {quote && (
+              <p className={cn("text-rich-black text-sm")}>
+                Rough estimate:{" "}
+                <strong>
+                  ${quote.low} &ndash; ${quote.high}
+                </strong>
+                . A ballpark from your description - the final cost is confirmed before any work.
+              </p>
+            )}
+            {quoteError && <p className={cn("text-coquelicot-600 text-sm")}>{quoteError}</p>}
+          </div>
+        )}
       </fieldset>
 
       {/* Booking summary - live recap of what's selected so the user can see
