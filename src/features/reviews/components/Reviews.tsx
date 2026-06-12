@@ -12,11 +12,11 @@ import React from "react";
 const REVIEW_CHAR_LIMIT = 280;
 
 /**
- * Normalizes whitespace: trims edges and collapses internal newlines/spaces to single spaces.
- * @param text - Text to normalize.
- * @returns Normalized text.
+ * Normalises whitespace: trims edges and collapses internal newlines/spaces to single spaces.
+ * @param text - Text to normalise.
+ * @returns Normalised text.
  */
-function normalizeText(text: string): string {
+function normaliseText(text: string): string {
   return text.trim().replace(/\s+/g, " ");
 }
 
@@ -36,13 +36,13 @@ function isLongReview(text: string): boolean {
  * @returns A span element with the review text.
  */
 function ReviewText({ text }: { text: string }): React.ReactElement {
-  const normalizedText = normalizeText(text);
+  const normalisedText = normaliseText(text);
 
-  if (!isLongReview(normalizedText)) {
-    return <span className={cn("wrap-break-word inline whitespace-normal")}>{normalizedText}</span>;
+  if (!isLongReview(normalisedText)) {
+    return <span className={cn("wrap-break-word inline whitespace-normal")}>{normalisedText}</span>;
   }
 
-  const preview = normalizedText.slice(0, REVIEW_CHAR_LIMIT);
+  const preview = normalisedText.slice(0, REVIEW_CHAR_LIMIT);
   const wordSafe = preview.replace(/\s+\S*$/, "");
   const base = (wordSafe.trim().length > 0 ? wordSafe : preview).trim();
 
@@ -97,7 +97,7 @@ export interface ReviewsProps {
 
 /**
  * Reviews section content. No outer frosted wrapper.
- * 1-3 items render as centered wrapped cards. 4+ items use marquee.
+ * 1-3 items render as centred wrapped cards. 4+ items use marquee.
  * @param props - Component props.
  * @param [props.items] - Reviews to render.
  * @returns The reviews section, or null if empty.

@@ -41,6 +41,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ ok: true, matchedCount: 0 });
     }
 
+    // Load bookings for email/phone lookup
     const bookingIds = unmatched.map((r) => r.bookingId).filter((id): id is string => id !== null);
 
     const bookings =
@@ -60,6 +61,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     }
 
+    // Build contact lookup maps
     const contacts = await prisma.contact.findMany({
       select: { id: true, email: true, phone: true, reviewToken: true },
     });
@@ -80,6 +82,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       contacts.filter((c) => c.reviewToken).map((c) => [c.reviewToken!, c.id]),
     );
 
+    // Link each review to its contact
     let matchedCount = 0;
     for (const review of unmatched) {
       let contactId: string | undefined;

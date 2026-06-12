@@ -319,6 +319,7 @@ function parseLegacyInvoiceText(text: string): ParsedInvoiceData {
     );
   }
 
+  // Extract issue and due dates
   let issueDate: Date | null = null;
   const issueDateMatch = text.match(/Invoice\s*#?\s+\S+\s+Date\s+(\d{1,2})\/(\d{1,2})\/(\d{4})/i);
   if (issueDateMatch) {
@@ -366,6 +367,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   try {
+    // Fetch all invoice PDFs from Drive
     const files = await searchAllInvoicePdfs();
     let created = 0;
     let skipped = 0;
@@ -381,12 +383,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       if (seen.has(dedupeKey)) continue;
       seen.add(dedupeKey);
 
+      // Match the filename to an existing invoice
       let existing = null;
       for (const number of candidates) {
         existing = await prisma.invoice.findFirst({ where: { number } });
         if (existing) break;
       }
 
+      // Refresh stubs and backfill Drive links
       if (existing) {
         const BAD_NAMES = new Set(["bill to", "client name", "client", "due", "duye"]);
         const nameLC = existing.clientName?.toLowerCase().trim() ?? "";
@@ -425,6 +429,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         continue;
       }
 
+      // Create a new invoice from the parsed PDF
       const number = candidates[0];
       const { data: parsed } = await downloadAndParse(file.fileId);
       const issueDate = parsed?.issueDate ?? estimateIssueDate(number);

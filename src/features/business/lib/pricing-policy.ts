@@ -33,7 +33,7 @@ export const GST_REGISTERED = false;
 /** Minimum charge once any billable work happens; 15 is a multiple of BILLING_INCREMENT_MINS so the floor + round don't double-snap. */
 export const MIN_BILLABLE_MINS = 15;
 
-/** Round-to-nearest step for billable time; mirrors billableMins in business.ts. */
+/** Round-to-nearest step for billable time; mirrors {@link billableMins} in business.ts. */
 export const BILLING_INCREMENT_MINS = 5;
 
 /** Multiplier applied to labour on NZ public holidays. Travel and parts are not uplifted. */
@@ -122,7 +122,7 @@ export function breakdownTravelCharge(
 
 /**
  * Round-trip travel charge. Doubles one-way drive time, snaps to $5, and
- * floors at MIN_TRAVEL_CHARGE. Returns 0 for no travel (remote, or geocoded
+ * floors at {@link MIN_TRAVEL_CHARGE}. Returns 0 for no travel (remote, or geocoded
  * to origin) so the floor doesn't invent a charge.
  *
  * Pass ONE-WAY travelMins; this doubles internally. Passing round-trip
@@ -284,7 +284,7 @@ export function gstCopy(registered: boolean = GST_REGISTERED): string {
  * the live, settings-backed values are resolved by `getPolicy()` in
  * `pricing-policy.server.ts`. Defined as a type (not an eager const) so this
  * client-safe module never reads its cross-module constants at evaluation time -
- * `MIN_TRAVEL_CHARGE` comes from business.ts, which imports back from here, so an
+ * {@link MIN_TRAVEL_CHARGE} comes from business.ts, which imports back from here, so an
  * eager read would hit the circular-import temporal dead zone.
  */
 export interface Policy {

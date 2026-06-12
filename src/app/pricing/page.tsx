@@ -47,13 +47,6 @@ export async function generateMetadata(): Promise<Metadata> {
       ? `Pricing - ${summariseForBanner(promo)} | To The Point Tech`
       : `Pricing - $${pricing.baseRate}/h Tech Support in Auckland`,
     description: `Transparent tech support pricing in Auckland. ${rateBlurb} No hidden fees, no upselling. On-site and remote rates available.`,
-    keywords: [
-      "tech support pricing Auckland",
-      "computer repair cost Auckland",
-      "IT support hourly rate Auckland",
-      "affordable tech support Auckland",
-      "transparent IT pricing NZ",
-    ],
     alternates: { canonical: "/pricing" },
     openGraph: {
       title: "Pricing - To The Point Tech",

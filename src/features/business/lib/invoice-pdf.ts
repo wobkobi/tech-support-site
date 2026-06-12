@@ -49,7 +49,7 @@ function fmt(n: number): string {
 }
 
 /**
- * Converts a CSS hex color (e.g. "#0B093D") into pdf-lib's rgb() colour.
+ * Converts a CSS hex colour (e.g. "#0B093D") into pdf-lib's rgb() colour.
  * @param hex - Hex colour with leading #.
  * @returns pdf-lib RGB colour.
  */

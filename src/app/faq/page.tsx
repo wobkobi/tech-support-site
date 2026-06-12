@@ -1,7 +1,7 @@
 // src/app/faq/page.tsx
 /**
  * @file page.tsx
- * @description FAQ page: common questions about services, pricing, and how I work.
+ * @description FAQ page: common questions about services, pricing, and ways of working.
  * Server-rendered with live rates from the RateConfig table so the headline
  * prices stay in sync with whatever the operator has set, and cancellation /
  * unsuccessful-work / GST copy comes from pricing-policy.ts so this page
@@ -25,12 +25,6 @@ export const metadata: Metadata = {
   title: "FAQ - Tech Support Questions Answered",
   description:
     "Common questions about tech support in Auckland: service areas, remote support, pricing, devices supported, booking, cancellations and what happens if I can't fix it.",
-  keywords: [
-    "tech support FAQ Auckland",
-    "computer help questions",
-    "IT support pricing questions",
-    "remote support FAQ",
-  ],
   alternates: { canonical: "/faq" },
   openGraph: {
     title: "FAQ - To The Point Tech",
@@ -54,7 +48,7 @@ const linkStyle = cn(
 );
 
 /**
- * Strips `**…\=**` markers for JSON-LD plain-text contexts.
+ * Strips `**…**` markers for JSON-LD plain-text contexts.
  * @param text - Copy string with `**…**` segments.
  * @returns Plain-text equivalent.
  */

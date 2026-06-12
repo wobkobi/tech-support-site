@@ -48,11 +48,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Load all contacts
   const contacts = await prisma.contact.findMany({
     orderBy: { name: "asc" },
     select: { name: true, email: true, phone: true, address: true },
   });
 
+  // Build the header row
   const headers = [
     "First Name",
     "Middle Name",
@@ -86,6 +88,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     "Address 1 - Extended Address",
   ];
 
+  // Build one row per contact
   const rows = contacts.map((c) => {
     const { first, last } = splitName(c.name);
     return [

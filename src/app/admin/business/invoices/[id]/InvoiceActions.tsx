@@ -45,6 +45,7 @@ export function InvoiceActions({
   status,
 }: InvoiceActionsProps): React.ReactElement {
   const router = useRouter();
+  // Send-email preview state
   const [previewOpen, setPreviewOpen] = useState(false);
   const [preview, setPreview] = useState<{ subject: string; html: string; to: string } | null>(
     null,
@@ -53,6 +54,7 @@ export function InvoiceActions({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sentAt, setSentAt] = useState<string | null>(null);
+  // Action busy flags
   const [marking, setMarking] = useState(false);
   const [voiding, setVoiding] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -126,7 +128,7 @@ export function InvoiceActions({
    * Entry point for voiding an invoice. DRAFT voids run silently (no client to
    * notify); SENT/PAID voids open a modal so the operator can decide whether
    * to email the client and tweak the message. The actual server call lives
-   * in `submitVoid` below so both paths share the network code.
+   * in {@link submitVoid} below so both paths share the network code.
    */
   async function voidInvoice(): Promise<void> {
     if (isDraft) {
@@ -325,8 +327,8 @@ export function InvoiceActions({
     setPreviewOpen(true);
     try {
       // First open: send no includeReview override so the server defaults to
-      // whatever eligibility says, and we adopt that into local state. On
-      // re-fetch (after edits), pass our current toggle so the preview matches.
+      // whatever eligibility says, and that result is adopted into local state.
+      // On re-fetch (after edits), pass the current toggle so the preview matches.
       const sendIncludeReview = eligibility !== null;
       const res = await fetch(`/api/business/invoices/${invoiceId}/preview-email`, {
         method: "POST",

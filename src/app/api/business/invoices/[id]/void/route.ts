@@ -28,12 +28,14 @@ export async function POST(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Load the invoice
   const { id } = await ctx.params;
   const invoice = await prisma.invoice.findUnique({ where: { id } });
   if (!invoice) {
     return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
   }
 
+  // Parse optional overrides
   const body = (await request.json().catch(() => ({}))) as {
     sendNotification?: unknown;
     greetingName?: unknown;
@@ -62,8 +64,8 @@ export async function POST(
   const incomeEntryCount = await prisma.incomeEntry.count({ where: { invoiceId: id } });
 
   // Generate the VOIDED-stamped PDF from the updated row. If this fails, the
-  // void still succeeds - we just can't email or sync. Surface notified:false
-  // to the caller so they can advise the operator to email manually.
+  // void still succeeds - the email and Drive sync are skipped. Surface
+  // notified:false to the caller so the operator can be advised to email manually.
   let pdfBytes: Buffer | null = null;
   try {
     pdfBytes = await generateInvoicePdf({
@@ -77,6 +79,7 @@ export async function POST(
     console.error(`[invoice-void] PDF generation failed for ${updated.number}:`, err);
   }
 
+  // Send the void notification
   let notified = false;
   if (sendNotification && pdfBytes && updated.clientEmail) {
     notified = await sendVoidNotification({

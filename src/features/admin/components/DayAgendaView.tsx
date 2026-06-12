@@ -107,6 +107,7 @@ export function DayAgendaView({
   holidaysByDateKey,
 }: DayAgendaViewProps): React.ReactElement {
   const router = useRouter();
+  // Day selection and sheet state
   const [selectedDayKey, setSelectedDayKey] = useState(initialDayKey);
   const [modalStartAt, setModalStartAt] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
@@ -259,9 +260,7 @@ export function DayAgendaView({
    */
   function goToDay(newDayKey: string): void {
     if (!bufferedDayKeys.includes(newDayKey)) {
-      // Day falls outside the prefetched 21-day window - bounce through the
-      // server so it rebuilds the buffer around the new day. useTransition
-      // keeps the old day visible (dimmed) while the fetch happens.
+      // useTransition keeps the old day visible (dimmed) while the fetch happens.
       const params = new URLSearchParams({ day: newDayKey });
       startTransition(() => {
         router.push(`/admin/schedule?${params.toString()}`);
@@ -272,9 +271,9 @@ export function DayAgendaView({
     if (typeof window !== "undefined") {
       const url = new URL(window.location.href);
       url.searchParams.set("day", newDayKey);
-      // weekStart is server-derived from `day` when both are present, so we
-      // drop it from the URL to avoid drift when stepping across the
-      // visible-week boundary inside the buffer.
+      // weekStart is server-derived from `day` when both are present, so drop
+      // it from the URL to avoid drift when stepping across the visible-week
+      // boundary inside the buffer.
       url.searchParams.delete("weekStart");
       window.history.replaceState(null, "", url.toString());
     }

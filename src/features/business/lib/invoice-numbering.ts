@@ -23,7 +23,7 @@ export interface NextInvoiceNumber {
 
 /**
  * Fetches the next invoice number, preferring Sheets and falling back to a
- * Prisma `findFirst(orderBy number desc)` + `nextInvoiceNumber` when Sheets
+ * Prisma `findFirst(orderBy number desc)` + {@link nextInvoiceNumber} when Sheets
  * is unreachable. Callers should pass `sheetNextCount` to
  * {@link writeBackInvoiceCounter} after the invoice row is created so the
  * Sheets counter stays in sync.

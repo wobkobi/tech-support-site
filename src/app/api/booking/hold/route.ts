@@ -66,6 +66,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreateBoo
   if (limited) return limited as NextResponse<CreateBookingResponse>;
 
   try {
+    // Parse and validate body
     const body = (await request.json()) as CreateBookingRequest;
     const { name, email, phone, notes, dateKey, slotStart, slotEnd, meetingType, address } = body;
 
@@ -91,6 +92,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreateBoo
       );
     }
 
+    // Load availability and hold settings
     const now = new Date();
     const { config, acceptingBookings } = await getAvailabilityConfig();
     if (!acceptingBookings) {

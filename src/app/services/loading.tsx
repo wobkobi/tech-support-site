@@ -2,7 +2,7 @@
 /**
  * @file loading.tsx
  * @description Streaming skeleton for the services page: heading card, the
- * "what I help with" card with its service-area grid, the home/business pair
+ * "What I help with" card with its service-area grid, the home/business pair
  * and the closing CTA. Shown while the live pricing lookup runs.
  */
 

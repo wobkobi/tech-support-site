@@ -58,7 +58,7 @@ export async function PATCH(
   const { id } = await params;
 
   try {
-    // Fetch review before updating so we have source info for auto-link.
+    // Fetch the review before updating to keep source info for the auto-link.
     const review = await prisma.review.findUnique({
       where: { id },
       select: {

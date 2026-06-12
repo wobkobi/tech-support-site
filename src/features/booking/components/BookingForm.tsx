@@ -129,7 +129,7 @@ export default function BookingForm({
 
   // Form state. `selectedDateKey` is stored instead of the full BookableDay
   // object so that when `availableDays` changes (e.g. after router.refresh on
-  // a 409), we always read the latest slot data from props during render -
+  // a 409), the latest slot data is always read from props during render -
   // no useEffect-driven reconciliation needed.
   const [duration, setDuration] = useState<JobDuration>(initialValues?.duration ?? "short");
   const [selectedDateKey, setSelectedDateKey] = useState<string | null>(() => {
@@ -170,9 +170,7 @@ export default function BookingForm({
   // Resets on any address change to re-check different mistypes.
   const [addressOverrideAcked, setAddressOverrideAcked] = useState(false);
   const [notes, setNotes] = useState(initialValues?.notes ?? "");
-  // Honeypot: real users never see/fill this; bots typically auto-fill any
-  // input that looks like a contact field. A non-empty value tells the server
-  // to fake a success response without creating a booking.
+  // Honeypot value - see the hidden input in the form markup below.
   const [website, setWebsite] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -208,8 +206,8 @@ export default function BookingForm({
   const contactLookupEmailRef = useRef<string>("");
   // Debounced draft writer.
   const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Suppress the very first save so we don't immediately re-persist what we
-  // just restored.
+  // Suppress the very first save so the just-restored draft isn't immediately
+  // re-persisted.
   const draftLoadedRef = useRef(false);
 
   /**
@@ -272,9 +270,9 @@ export default function BookingForm({
   // Synchronise the selected time during render if it's no longer available
   // for the current day + duration (e.g. after a router.refresh changed slot
   // availability). The `selectedTime !== null` guard prevents an infinite
-  // setState loop - once we null the selection, the next render sees null and
-  // stops. This is the React-recommended "adjust state when a prop changes"
-  // pattern, used instead of a useEffect.
+  // setState loop - once the selection is nulled, the next render sees null
+  // and stops. This is the React-recommended "adjust state when a prop
+  // changes" pattern, used instead of a useEffect.
   if (selectedTime !== null && selectedDay) {
     const window = selectedDay.timeWindows.find((w) => w.value === selectedTime);
     const sub = window?.subSlots.find((s) => s.minute === selectedMinute);
@@ -287,14 +285,13 @@ export default function BookingForm({
 
   // Restore a localStorage draft on mount (new-booking mode only). Selection
   // (dateKey/timeOfDay/startMinute) is only restored when it still matches a
-  // currently-available slot - otherwise we silently drop those fields so the
-  // user picks a fresh time without seeing a misleading pre-pick.
+  // currently-available slot - otherwise those fields are silently dropped so
+  // the user picks a fresh time without seeing a misleading pre-pick.
   //
   // The setState-in-effect lint is intentionally suppressed: localStorage is
   // unavailable during SSR, so the read cannot move to a useState lazy
   // initialiser (it would either crash server-side or cause a hydration
-  // mismatch). This is the canonical "read once from an external source on
-  // mount" pattern.
+  // mismatch).
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (isEditMode) return;
@@ -338,7 +335,7 @@ export default function BookingForm({
     } catch (err) {
       console.warn("[BookingForm] Failed to restore draft:", err);
     }
-    // availableDays is a render-stable prop; we intentionally only run on mount.
+    // availableDays is a render-stable prop; intentionally run on mount only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditMode]);
   /* eslint-enable react-hooks/set-state-in-effect */
@@ -523,8 +520,8 @@ export default function BookingForm({
     // Soft geocode check for typed-but-not-picked addresses. First failure flips
     // addressOverrideAcked so a second click submits anyway. Network errors
     // don't block submission - clarify out-of-band if needed.
-    // Skipped entirely in maps-fallback mode because we can't expect a verified
-    // pick when the autocomplete widget is unavailable.
+    // Skipped entirely in maps-fallback mode because a verified pick can't be
+    // expected when the autocomplete widget is unavailable.
     if (meetingType === "in-person" && !addressVerified && !addressOverrideAcked && !mapsFallback) {
       try {
         const verifyRes = await fetch("/api/pricing/travel-time", {
@@ -550,6 +547,8 @@ export default function BookingForm({
       }
     }
 
+    // Edit and create hit different endpoints: edit identifies the booking by
+    // cancel token; create adds the honeypot field + idempotency key instead.
     try {
       const endpoint = isEditMode ? "/api/booking/edit" : "/api/booking/request";
       const payload = isEditMode
@@ -613,6 +612,7 @@ export default function BookingForm({
         }
       }
 
+      // Redirect to the success page
       if (isEditMode) {
         router.push(`/booking/success?cancelToken=${encodeURIComponent(cancelToken!)}`);
       } else {
@@ -1186,7 +1186,7 @@ export default function BookingForm({
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             onPaste={(e) => {
-              // Detect when the paste would push us past maxLength so the user
+              // Detect when the paste would push the value past maxLength so the user
               // gets a hint that their text was trimmed (browsers silently
               // truncate on maxLength). textarea selection range narrows the
               // check to whatever the paste is actually replacing.

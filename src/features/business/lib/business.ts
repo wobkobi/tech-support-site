@@ -14,10 +14,8 @@ import { formatDateSlash } from "@/shared/lib/date-format";
 
 /**
  * Minimum travel cost (NZD) below which a calculated travel charge is
- * skipped rather than added to the invoice. Short trips (a couple of km
- * to the nearest customers) would otherwise produce a sub-$10 line item
- * that's awkward to bill and looks petty. The travelInfo is still
- * surfaced in the UI so the operator can manually add it if they want.
+ * skipped rather than added to the invoice - a sub-$10 line item looks petty.
+ * The travelInfo is still surfaced in the UI so the operator can add it manually.
  */
 export const MIN_TRAVEL_CHARGE = 10;
 
@@ -63,9 +61,9 @@ export function formatUTCDDMMYYYY(date: Date): string {
 
 /**
  * Invoice totals with an optional discount. GST mode is driven by
- * GST_REGISTERED in pricing-policy.ts. When false (today), gstAmount=0;
+ * {@link GST_REGISTERED} in pricing-policy.ts. When false (today), gstAmount=0;
  * when true (future), gstAmount is back-calculated from the inclusive
- * total via calcGstFromInclusive and total stays equal to taxableAmount
+ * total via {@link calcGstFromInclusive} and total stays equal to taxableAmount
  * (GST is already inside the displayed price). Discount is subtracted
  * before GST is computed, matching IRD's price-reduction treatment.
  * @param lineItems - Array of line items with qty and unit price.
@@ -109,7 +107,7 @@ export function nextInvoiceNumber(
 }
 
 /**
- * Rounds a duration to the nearest BILLING_INCREMENT_MINS slot. Symmetric
+ * Rounds a duration to the nearest {@link BILLING_INCREMENT_MINS} slot. Symmetric
  * rounding so customers are never bumped a full slot for a single minute of
  * overage; the operator gives back as often as they collect.
  * @param mins - Actual duration in minutes
@@ -165,10 +163,10 @@ export function hourlyTaskMinutes(tasks: TaskLine[]): number {
 
 /** Minimum minutes a task can shrink to before it's dropped as descriptive noise. */
 const MIN_TASK_MINUTES = 5;
-// Rounding granularity for AI-parsed task qty after rebalancing. Mirrors the
+// Rounding granularity for AI-parsed task qty after rebalancing. Matches the
 // pricing billing increment's default (5) but stays an independent literal: it
 // is an internal AI-parse detail, and referencing BILLING_INCREMENT_MINS here
-// would re-introduce the business.ts <-> pricing-policy.ts circular-import TDZ.
+// would re-introduce a circular-import TDZ with the pricing-policy module.
 const TASK_QTY_SNAP_MIN = 5;
 /** Minutes every isShort task is pinned to. Matches the AI's 0.25h SHORT-set assignment. */
 const SHORT_TASK_MINUTES = 15;
@@ -427,13 +425,13 @@ export function jobToLineItems(
   return items;
 }
 
-/** Active-promo shape consumed by `calcJobTotal`. Kept loose so business.ts doesn't depend on the wider promos module. */
+/** Active-promo shape consumed by {@link calcJobTotal}. Kept loose so business.ts doesn't depend on the wider promos module. */
 export interface JobPromo {
   flatHourlyRate: number | null;
   percentDiscount: number | null;
 }
 
-/** Live pricing values threaded into calcJobTotal; defaults are the code consts. */
+/** Live pricing values threaded into {@link calcJobTotal}; defaults are the code consts. */
 export interface JobPricing {
   gstRegistered: boolean;
   minTravelCharge: number;
@@ -502,8 +500,8 @@ function isHourlyTask(task: TaskLine): boolean {
  * labour portion (time charge + hourly tasks); otherwise per-task `unsuccessful`
  * flags halve just those hourly task lines, leaving the time charge at full
  * price. Both fold into the single `unsuccessfulDiscount`. GST mode is driven
- * by GST_REGISTERED (see calcInvoiceTotals);
- * job.gst is ignored. Travel floor (MIN_TRAVEL_CHARGE) only applies when an
+ * by {@link GST_REGISTERED} (see {@link calcInvoiceTotals});
+ * job.gst is ignored. Travel floor ({@link MIN_TRAVEL_CHARGE}) only applies when an
  * auto entry contributed - manual-only travel passes through unchanged.
  * @param job - Job calculation with time, tasks, and parts.
  * @param promo - Optional active promo to apply.
@@ -514,7 +512,7 @@ export function calcJobTotal(
   job: JobCalculation,
   promo: JobPromo | null = null,
   // Default built lazily (call-time, not module-eval) so reading the consts
-  // here can't trip the business.ts <-> pricing-policy.ts circular-import TDZ.
+  // here can't trip the circular-import TDZ with the pricing-policy module.
   pricing: JobPricing = {
     gstRegistered: GST_REGISTERED,
     minTravelCharge: MIN_TRAVEL_CHARGE,

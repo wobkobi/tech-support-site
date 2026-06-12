@@ -12,7 +12,7 @@ import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 /**
  * Cache tag invalidated by routes that mutate bookings or blocked days so the
  * schedule page picks up changes within one render cycle. Stays separate
- * from the underlying `fetchAllCalendarEvents` so non-schedule callers (the
+ * from the underlying {@link fetchAllCalendarEvents} so non-schedule callers (the
  * booking-slot availability check, etc.) can keep doing live reads.
  */
 export const SCHEDULE_CALENDAR_TAG = "schedule-calendar-events";
@@ -169,9 +169,9 @@ export async function deleteBookingEvent(params: { eventId: string }): Promise<v
 
 /**
  * Creates an all-day "Busy" event on the booking calendar to block out the day
- * for new bookings. The existing fetchAllCalendarEvents path treats non-personal
- * all-day events as full-day blockers, so this is the same shape Harrison was
- * already making by hand.
+ * for new bookings. The existing {@link fetchAllCalendarEvents} path treats non-personal
+ * all-day events as full-day blockers, so this matches the shape of a manually
+ * created all-day Busy event.
  * @param params - Create parameters.
  * @param params.dateKey - NZ-local YYYY-MM-DD for the day to block.
  * @param params.summary - Event title (defaults to "Busy").
@@ -241,7 +241,7 @@ export async function fetchAllCalendarEvents(
       const processedEvents: CalendarEvent[] = [];
 
       for (const event of events) {
-        // Skip cancelled events (organizer cancelled or event was deleted)
+        // Skip cancelled events (organiser cancelled or event was deleted)
         if (event.status === "cancelled") continue;
 
         // Skip events the user has declined
@@ -342,9 +342,9 @@ export async function createTravelBlockEvent(params: {
 }
 
 /**
- * Cached wrapper around `fetchAllCalendarEvents` for the admin schedule page.
+ * Cached wrapper around {@link fetchAllCalendarEvents} for the admin schedule page.
  * 60-second TTL with revalidation on booking/blocked-day mutations via
- * `SCHEDULE_CALENDAR_TAG`. Takes ISO strings (not Date objects) so the cache
+ * {@link SCHEDULE_CALENDAR_TAG}. Takes ISO strings (not Date objects) so the cache
  * key is deterministically serialisable.
  * @param startIso - ISO 8601 start of range.
  * @param endIso - ISO 8601 end of range.

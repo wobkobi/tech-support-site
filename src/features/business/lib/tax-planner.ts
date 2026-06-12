@@ -38,7 +38,7 @@ export const DEFAULT_TAX_RATES: TaxRates = {
   gstOutOfInclusive: 3 / 23,
 };
 
-/** Output of `computeTaxPlan` covering set-asides, savings targets, and GST. */
+/** Output of {@link computeTaxPlan} covering set-asides, savings targets, and GST. */
 export interface TaxPlan {
   income: number;
   expensesExcl: number;

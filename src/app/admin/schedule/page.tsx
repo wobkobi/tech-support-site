@@ -21,8 +21,7 @@ export const metadata: Metadata = {
 /**
  * Weeks of events to prefetch on each side of the requested week. Larger =
  * fewer server round-trips when stepping through weeks; smaller = faster
- * initial load. The buffer size is symmetric (BUFFER_WEEKS weeks before and
- * after the requested week).
+ * initial load.
  */
 const BUFFER_WEEKS = 3;
 const BUFFER_DAYS_BEFORE = BUFFER_WEEKS * 7;

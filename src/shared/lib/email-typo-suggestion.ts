@@ -2,8 +2,8 @@
 /**
  * @file email-typo-suggestion.ts
  * @description Suggests a corrected email when the domain looks like a typo of
- * a popular one (gmail / hotmail / yahoo / etc.). Pure function, no deps; used
- * by EmailInput's blur handler.
+ * a popular one (gmail / hotmail / yahoo / etc.). Pure function with no
+ * dependencies.
  */
 
 /** Common consumer email domains, including NZ variants. */
@@ -25,14 +25,14 @@ const COMMON_DOMAINS: ReadonlyArray<string> = [
   "proton.me",
 ];
 
-/** Common TLDs we'll consider as part of a near-match. */
+/** Common TLDs considered as part of a near-match. */
 const COMMON_TLDS = new Set([".com", ".co.nz", ".net", ".org", ".nz"]);
 
 /**
  * Damerau-Levenshtein distance with a small fast bail-out at >2.
  * @param a - First string.
  * @param b - Second string.
- * @returns Edit distance, or 99 once it's clearly past our threshold.
+ * @returns Edit distance, or 99 once it's clearly past the threshold.
  */
 function editDistance(a: string, b: string): number {
   if (a === b) return 0;
@@ -76,7 +76,7 @@ export function suggestEmailCorrection(email: string): string | null {
   // Exact match: nothing to suggest.
   if (COMMON_DOMAINS.includes(domain)) return null;
 
-  // Skip suggestions for domains using uncommon TLDs - we'd be guessing.
+  // Skip suggestions for domains using uncommon TLDs - any match would be a guess.
   const hasCommonTld = [...COMMON_TLDS].some((tld) => domain.endsWith(tld));
   if (!hasCommonTld && !domain.endsWith(".com") && !domain.endsWith(".nz")) return null;
 
@@ -84,7 +84,7 @@ export function suggestEmailCorrection(email: string): string | null {
   for (const candidate of COMMON_DOMAINS) {
     const dist = editDistance(domain, candidate);
     // Distance 1 is a confident suggestion; 2 only if both domains are long
-    // enough that two edits are still likely a typo (avoids "aol.com" ->
+    // enough that two edits are still likely a typo (avoids "aol.com" >
     // "icloud.com" style false positives).
     const threshold = candidate.length >= 9 ? 2 : 1;
     if (dist <= threshold && (!best || dist < best.distance)) {

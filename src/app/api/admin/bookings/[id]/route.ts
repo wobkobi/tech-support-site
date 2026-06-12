@@ -57,11 +57,13 @@ export async function PATCH(
   const { id } = await params;
   const body = (await request.json()) as PatchPayload;
 
+  // Load the booking
   const booking = await prisma.booking.findUnique({ where: { id } });
   if (!booking) {
     return NextResponse.json({ error: "Booking not found." }, { status: 404 });
   }
 
+  // Sparse update: only fields present in the body get written.
   const data: Record<string, unknown> = {};
 
   if (body.name !== undefined) data.name = body.name.trim();
@@ -122,6 +124,7 @@ export async function PATCH(
     data.status = "confirmed";
   }
 
+  // Apply the update
   const updated = await prisma.booking.update({ where: { id }, data });
 
   // Same cancellation draft applies to on-behalf and no-show paths.
@@ -138,10 +141,10 @@ export async function PATCH(
 
   // When transitioning to "completed", send the review request email if one
   // has not already gone out. updateMany with the null-or-missing guard is
-  // atomic, so we can't race with the /api/cron/send-review-emails cron - if
-  // the cron already claimed the send, our updateMany returns count=0 and we
-  // skip. Same `isSet: false` clause as the cron to handle MongoDB documents
-  // where `reviewSentAt` was never written (pre-schema docs).
+  // atomic, so it cannot race with the /api/cron/send-review-emails cron - if
+  // the cron already claimed the send, the updateMany returns count=0 and the
+  // send is skipped. Same `isSet: false` clause as the cron to handle MongoDB
+  // documents where `reviewSentAt` was never written (pre-schema docs).
   let reviewSent = false;
   if (
     body.status === "completed" &&
@@ -158,8 +161,8 @@ export async function PATCH(
     });
 
     if (claim.count > 0) {
-      // We won the race - sendCustomerReviewRequest never throws (catches its
-      // own errors and logs), so the PATCH response stays successful even if
+      // Claim won - sendCustomerReviewRequest never throws (catches its own
+      // errors and logs), so the PATCH response stays successful even if
       // Resend has a hiccup. Trade-off: a single failed send won't auto-retry.
       await sendCustomerReviewRequest({
         id,
@@ -171,6 +174,7 @@ export async function PATCH(
     }
   }
 
+  // Sync contact details
   if (body.address !== undefined && booking.email) {
     try {
       await prisma.contact.updateMany({

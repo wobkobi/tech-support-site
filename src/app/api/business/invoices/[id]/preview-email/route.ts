@@ -29,11 +29,9 @@ export async function POST(
     return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
   }
 
-  // Optional operator overrides:
-  // - greetingName: target a specific person when the invoice is for a company
-  // - customBody: replace the default intro paragraph with a per-send message
-  // - includeReview: explicit yes/no for the review link. Defaults to whatever
-  //   the eligibility check decides so the preview reflects the gating UI.
+  // Optional operator overrides: greetingName targets a person inside a
+  // company invoice, customBody replaces the intro paragraph, includeReview
+  // forces the review link on/off (defaults to the eligibility check).
   const body = (await request.json().catch(() => ({}))) as {
     greetingName?: unknown;
     customBody?: unknown;

@@ -14,7 +14,7 @@ import { useEffect, useRef, useState } from "react";
 import { type ReviewRow } from "./review-types";
 
 /**
- * Props for ReviewCard component.
+ * Props for the {@link ReviewCard} component.
  */
 interface ReviewCardProps {
   /** Review data */

@@ -3,8 +3,8 @@
 /**
  * @file EmailInput.tsx
  * @description Shared email input with consistent blur-validation and inline
- * error display. Used by every form on the site that takes an email address so
- * validation behaviour stays identical even when wording differs.
+ * error display, keeping validation and typo-suggestion behaviour identical
+ * across every email field even when wording differs.
  */
 
 import { validateEmail } from "@/features/booking/lib/booking";

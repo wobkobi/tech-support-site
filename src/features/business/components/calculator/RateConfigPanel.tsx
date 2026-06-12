@@ -29,9 +29,8 @@ interface Props {
 }
 
 /**
- * Admin-only rate management panel: lists every RateConfig with edit/delete
- * actions, and a form below to create or update one. Used at the top of the
- * calculator when the operator opens the Rate settings toggle. Pure
+ * Admin-only rate management panel: lists every {@link RateConfig} with
+ * edit/delete actions, and a form below to create or update one. Pure
  * presentational - all state and handlers live in the parent.
  * @param props - Component props.
  * @param props.rates - Full rate list to render in the table.
