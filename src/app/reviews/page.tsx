@@ -18,12 +18,6 @@ export const metadata: Metadata = {
   title: "Reviews - What Auckland Clients Say About To The Point Tech",
   description:
     "Real reviews from Auckland clients who have used To The Point Tech for computer repair, Wi-Fi setup, virus removal, smart home, and small-business IT support.",
-  keywords: [
-    "tech support reviews Auckland",
-    "computer repair reviews Auckland",
-    "IT support testimonials",
-    "To The Point Tech reviews",
-  ],
   alternates: { canonical: "/reviews" },
   openGraph: {
     title: "Reviews - To The Point Tech",
@@ -57,8 +51,7 @@ export default async function ReviewsPage(): Promise<React.ReactElement> {
     where: { status: "approved" },
   });
 
-  // Normalize whitespace in all reviews
-  const normalizedRows = rows.map((r) => ({
+  const normalisedRows = rows.map((r) => ({
     ...r,
     text: r.text.trim().replace(/\s+/g, " "),
     firstName: r.firstName?.trim() || null,
@@ -115,7 +108,7 @@ export default async function ReviewsPage(): Promise<React.ReactElement> {
               className={cn("animate-slide-up animate-fill-both animate-delay-100")}
             >
               <ul className={cn("grid gap-4 sm:grid-cols-2")}>
-                {normalizedRows.map((r) => (
+                {normalisedRows.map((r) => (
                   <li
                     key={r.id}
                     id={`review-${r.id}`}

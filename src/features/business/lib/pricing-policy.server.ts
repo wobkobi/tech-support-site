@@ -23,7 +23,7 @@ import "server-only";
 /**
  * Live policy bundle, resolved from the settings panel (defaults + DB override).
  * Server-only because it reads the settings store; client code receives the
- * resolved values as props. `GST_RATE` stays a legislated constant.
+ * resolved values as props. {@link GST_RATE} stays a legislated constant.
  * @returns The current policy values the operator has configured.
  */
 export async function getPolicy(): Promise<Policy> {
@@ -138,13 +138,6 @@ export async function getPublicPricing(): Promise<PublicPricing> {
 const hdNz = new Holidays("NZ");
 const hdAuckland = new Holidays("NZ", "AUK");
 
-/**
- * Returns the `date-holidays` match for an NZ-local YYYY-MM-DD, or null.
- * Checks the nationwide instance first; falls back to the Auckland-regional
- * instance for the anniversary day. Only `type: "public"` entries count.
- * @param key - NZ-local YYYY-MM-DD date string.
- * @returns `{ name, region }` or null.
- */
 /**
  * Scans a `date-holidays` result list for an entry matching the given NZ-local
  * date key. Only `type: "public"` entries count.

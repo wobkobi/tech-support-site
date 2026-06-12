@@ -4,8 +4,8 @@
  * @description Booking page with duration-aware slot availability.
  *   The static shell (heading, sidebar, skeleton) renders immediately while
  *   the slot data is streamed in via a Suspense boundary, so TTFB stays
- *   constant even when the calendar cache is cold and we have to hit the
- *   live Google Calendar API.
+ *   constant even when the calendar cache is cold and slot data has to come
+ *   from the live Google Calendar API.
  */
 
 import BookingForm from "@/features/booking/components/BookingForm";
@@ -30,13 +30,6 @@ export const metadata: Metadata = {
   title: "Book a Tech Support Appointment in Auckland",
   description:
     "Book an on-site or remote tech support appointment in Auckland. Same-day, evening and weekend slots available. Pick a 1- or 2-hour slot and get an instant calendar invite.",
-  keywords: [
-    "book tech support Auckland",
-    "computer repair appointment Auckland",
-    "IT support booking Auckland",
-    "same day tech support Auckland",
-    "weekend computer help Auckland",
-  ],
   alternates: { canonical: "/booking" },
   openGraph: {
     title: "Book an Appointment - To The Point Tech",
@@ -63,6 +56,7 @@ interface CalendarFetchResult {
  * @returns Events plus a `degraded` flag for the no-data state.
  */
 async function getCalendarEvents(now: Date, maxDate: Date): Promise<CalendarFetchResult> {
+  // Try the cache first
   const cachedEvents = await prisma.calendarEventCache.findMany({
     where: {
       expiresAt: { gt: now },
@@ -87,6 +81,7 @@ async function getCalendarEvents(now: Date, maxDate: Date): Promise<CalendarFetc
     };
   }
 
+  // Fall back to the live API
   try {
     const liveEvents = await fetchAllCalendarEvents(now, maxDate);
     console.log(
@@ -157,6 +152,7 @@ async function getAvailableDays(): Promise<{
 
   const maxDate = new Date(now.getTime() + config.maxAdvanceDays * 24 * 60 * 60 * 1000);
 
+  // Load blocking bookings and calendar events
   const [existingBookings, calendar] = await Promise.all([
     prisma.booking.findMany({
       where: {
@@ -174,6 +170,7 @@ async function getAvailableDays(): Promise<{
     getCalendarEvents(now, maxDate),
   ]);
 
+  // Build the bookable-day grid
   const existingForSlots: ExistingBooking[] = existingBookings.map((b) => ({
     id: b.id,
     startAt: b.startAt,
@@ -200,7 +197,7 @@ const STEP_ICON = cn(
 const SKELETON_BLOCK = cn("bg-seasalt-900/40 rounded-lg");
 
 /**
- * Async island that fetches slot data inside the Suspense boundary. Renders
+ * Async island that fetches slot data inside the {@link Suspense} boundary. Renders
  * an unavailable banner instead of the form when the calendar fetch failed.
  * @returns Booking form or an unavailable banner.
  */
@@ -265,7 +262,7 @@ async function BookingFormIsland(): Promise<React.ReactElement> {
 }
 
 /**
- * Skeleton shown while BookingFormIsland streams in. Matches the rough
+ * Skeleton shown while {@link BookingFormIsland} streams in. Matches the rough
  * visual height of the real form to avoid layout shift on hydration.
  * @returns Skeleton placeholder element.
  */

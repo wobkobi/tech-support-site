@@ -7,7 +7,7 @@
 
 /**
  * Runs once when the server process starts. Only validates on the Node.js
- * runtime - the edge runtime does not carry the server secrets we check.
+ * runtime - the edge runtime does not carry the server secrets being checked.
  */
 export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME === "nodejs") {

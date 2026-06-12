@@ -11,12 +11,10 @@ import { NextRequest, NextResponse } from "next/server";
 export const maxDuration = 60;
 
 /**
- * Builds the patch payload for a status change. Stamps `voidedAt` when the
- * target is VOIDED so the audit trail records when the cancellation happened;
- * clears `voidedAt` when the target is any non-VOIDED status so an un-voided
- * invoice doesn't keep the stale "Voided 22 May" label on the detail page.
- * All paths that flip status (the void endpoint, the dropdown PATCH, the
- * full-update PATCH) funnel through here for consistency.
+ * Builds the patch payload for a status change: stamps `voidedAt` when the
+ * target is VOIDED (audit trail), clears it for any other status so an
+ * un-voided invoice drops the stale "Voided" label. All status-flipping
+ * paths funnel through here.
  * @param next - Target InvoiceStatus.
  * @returns Partial update payload to splat into prisma.invoice.update data.
  */
@@ -28,9 +26,7 @@ function statusDataFor(next: InvoiceStatus): { status: InvoiceStatus; voidedAt?:
 /**
  * Returns null when the transition is allowed, or an error message when it's
  * not. VOIDED is terminal - once a tax invoice is cancelled the audit trail
- * must remain (NZ IRD record-retention). To "un-void", issue a fresh invoice;
- * use the resend-notification button if the cancellation email needs to go
- * out again.
+ * must remain (NZ IRD record-retention); issue a fresh invoice instead.
  * @param current - The invoice's current status.
  * @param next - The requested target status.
  * @returns Error message, or null when allowed.
@@ -118,7 +114,7 @@ export async function PATCH(
   const { id } = await params;
   const body = await request.json();
 
-  // Load the current row so we can enforce transition rules + the
+  // Load the current row to enforce transition rules + the
   // VOIDED-is-immutable invariant. One extra query in exchange for a much
   // stronger audit guarantee.
   const current = await prisma.invoice.findUnique({
@@ -129,7 +125,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
   }
 
-  // Full update
+  // Full update: the body carries invoice fields, not just a status.
   if (body.clientName !== undefined || body.lineItems !== undefined) {
     if (current.status === "VOIDED") {
       return NextResponse.json(
@@ -143,7 +139,7 @@ export async function PATCH(
       if (err) return NextResponse.json({ error: err }, { status: 409 });
     }
     // GST mode is driven by the live pricing settings (gstRegistered); the
-    // request body no longer carries gst. gstAmount is non-zero once that flag
+    // request body does not carry gst. gstAmount is non-zero once that flag
     // is on, stays 0 today.
     const { GST_REGISTERED } = await getPolicy();
     const { subtotal, gstAmount, total } = calcInvoiceTotals(lineItems ?? [], 0, GST_REGISTERED);
@@ -171,11 +167,9 @@ export async function PATCH(
     return NextResponse.json({ ok: true, invoice });
   }
 
-  // Status-only patch. The dropdown on the list view hits this path - it's a
-  // low-friction admin override that intentionally does NOT trigger the void
-  // notification flow (that lives at /void). voidedAt is stamped/cleared by
-  // statusDataFor so the detail page label stays in sync if the operator
-  // un-voids an invoice they cancelled by mistake.
+  // Status-only patch (the list-view dropdown). Intentionally does NOT
+  // trigger the void notification flow (that lives at /void); statusDataFor
+  // stamps/clears voidedAt so the detail page label stays in sync.
   const { status } = body;
   if (!["DRAFT", "SENT", "PAID", "VOIDED"].includes(status)) {
     return NextResponse.json({ error: "Invalid status" }, { status: 400 });
@@ -212,7 +206,7 @@ export async function DELETE(
   // Only DRAFT invoices are deletable. SENT/PAID/VOIDED are part of the audit
   // trail (and for VOIDED in particular, the IRD record-retention rule) so
   // they can never be removed - the UI hides the delete button for those
-  // statuses, but we enforce it server-side too in case of crafted requests.
+  // statuses, but the rule is enforced server-side too in case of crafted requests.
   const existing = await prisma.invoice.findUnique({
     where: { id },
     select: { status: true },

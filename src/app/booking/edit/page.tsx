@@ -159,6 +159,7 @@ export default async function EditBookingPage({
 
   if (!cancelToken) notFound();
 
+  // Load the booking by token
   const booking = await prisma.booking.findFirst({
     where: { cancelToken },
     select: {
@@ -200,6 +201,7 @@ export default async function EditBookingPage({
     notes: userNotes,
   };
 
+  // Load availability for rescheduling
   const availableDays = await getAvailableDays(booking.id);
   const { config: availabilityConfig } = await getAvailabilityConfig();
 

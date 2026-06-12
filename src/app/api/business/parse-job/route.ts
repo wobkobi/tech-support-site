@@ -75,7 +75,7 @@ function minsToHHMM(mins: number): string {
 }
 
 /**
- * Extracts every HH:MM–HH:MM segment found on digit-led lines. Used internally
+ * Extracts every HH:MM-HH:MM segment found on digit-led lines. Used internally
  * to compute the worked-minutes hint passed to the AI as a "pre-computed
  * session total" annotation.
  * @param input - Raw job description text.
@@ -115,7 +115,7 @@ function extractRanges(input: string): RangeWithDuration[] {
 }
 
 /**
- * Sums all HH:MM–HH:MM segments on lines that start with a digit. Feeds the
+ * Sums all HH:MM-HH:MM segments on lines that start with a digit. Feeds the
  * AI pre-compute hint so the model uses the operator-stated minutes verbatim.
  * @param input - Raw job description text.
  * @returns Total worked minutes, or null if no time ranges detected.
@@ -159,6 +159,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Parse and validate body
   const body = await request.json();
   const { input, answers } = body as { input: unknown; answers?: Record<string, unknown> };
 
@@ -187,6 +188,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
   try {
+    // Load rates, templates and settings
     const [rates, templates, settings] = await Promise.all([
       prisma.rateConfig.findMany({ orderBy: { label: "asc" } }),
       prisma.taskTemplate.findMany({ orderBy: [{ usageCount: "desc" }, { description: "asc" }] }),
@@ -236,6 +238,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       userContent += `\n\n[User clarifications: ${clarifications}]`;
     }
 
+    // Call the model and parse the response
     const completion = await client.chat.completions.create({
       model: "gpt-4.1",
       max_tokens: 1000,
@@ -259,7 +262,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (!parsed.noTravelCharge && parsed.statedDistanceKm && parsed.statedDistanceKm > 0) {
       // Operator stated round-trip km but no time. Halve back to a one-way
       // figure so downstream consumers (calcTravelCharge) get the contract
-      // they expect; durationMins stays 0 here because we have no time signal.
+      // they expect; durationMins stays 0 here because there is no time signal.
       parsed.travel = {
         distanceKmOneWay: Math.round((parsed.statedDistanceKm / 2) * 10) / 10,
         durationMins: 0,
@@ -281,10 +284,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     }
 
+    // Resolve task templates and rates
     if (parsed.tasks?.length > 0) {
       const ratesForLookup = rateDtos as unknown as RateConfig[];
       /**
-       * Resolves a rate label (e.g. "Standard", "At home") to its RateConfig row.
+       * Resolves a rate label (e.g. "Standard", "At home") to its {@link RateConfig} row.
        * @param label - Case-insensitive rate label emitted by the AI.
        * @returns Matching RateConfig or null.
        */
@@ -369,7 +373,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // matches the billable hours total. Tasks the AI flagged `isExplicit`
     // carry an operator-stated duration and pass through untouched - only the
     // floating set absorbs the gap. When every task is pinned, fall back to
-    // scaling everyone equally so we still hit the target.
+    // scaling every task equally so the sum still hits the target.
     if (
       parsed.tasks?.length > 0 &&
       typeof parsed.durationMins === "number" &&

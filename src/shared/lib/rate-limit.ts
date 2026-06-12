@@ -72,7 +72,7 @@ export function getClientIp(request: NextRequest): string {
 }
 
 /**
- * Convenience wrapper that runs `rateLimit` and, when blocked, returns a
+ * Convenience wrapper that runs {@link rateLimit} and, when blocked, returns a
  * 429 response carrying a `Retry-After` header. Returns null when the request
  * should proceed.
  * @param request - Incoming request used to derive the client IP.

@@ -3,7 +3,7 @@
  * @file route.ts
  * @description Admin login endpoint. Verifies the operator-supplied secret
  * against `ADMIN_SECRET`, then sets a signed session cookie. Rate-limited per
- * IP via the shared `rateLimitOrReject` helper so a brute-force on the secret
+ * IP via the shared {@link rateLimitOrReject} helper so a brute-force on the secret
  * stops fast.
  */
 

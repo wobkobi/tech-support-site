@@ -28,10 +28,10 @@ export async function autoMaintain(prisma: PrismaClient): Promise<ConflictEntry[
 }
 
 /**
- * Lifts ReviewRequest state onto Contact so the standalone model could be
- * retired. The ReviewRequest model is no longer in the Prisma schema, so we
- * read the orphaned collection via raw MongoDB to bridge any pre-retirement
- * rows into Contact fields. For each row with a resolvable contact, sets
+ * Lifts ReviewRequest state onto Contact. The ReviewRequest model is no
+ * longer in the Prisma schema, so the orphaned collection is read via raw
+ * MongoDB to bridge any pre-retirement rows into Contact fields. For each
+ * row with a resolvable contact, sets
  * Contact.reviewToken (only if null), Contact.reviewLinkSentAt (only if
  * older or null), Contact.reviewLinkSentMode (when missing), and
  * Contact.reviewLinkSubmittedAt (when newer or null). Idempotent.
@@ -48,6 +48,7 @@ async function migrateReviewRequestsToContacts(prisma: PrismaClient): Promise<vo
     createdAt: { $date: string } | Date;
   }
 
+  // Read orphaned ReviewRequest rows
   let rrs: OrphanedRR[] = [];
   try {
     const result = (await prisma.$runCommandRaw({
@@ -61,6 +62,7 @@ async function migrateReviewRequestsToContacts(prisma: PrismaClient): Promise<vo
   }
   if (rrs.length === 0) return;
 
+  // Build contact lookup maps
   const contacts = await prisma.contact.findMany({
     select: {
       id: true,
@@ -105,6 +107,7 @@ async function migrateReviewRequestsToContacts(prisma: PrismaClient): Promise<vo
     return new Date(v.$date);
   }
 
+  // Lift each row's send state onto its contact
   for (const rr of rrs) {
     const rrContactId = unwrapOid(rr.contactId ?? null);
     const contact = rrContactId
@@ -266,6 +269,7 @@ async function matchReviewContacts(prisma: PrismaClient): Promise<void> {
 
   const bookingIds = unlinked.map((r) => r.bookingId).filter((id): id is string => id !== null);
 
+  // Fetch related bookings and contacts
   const [bookingRows, contacts] = await Promise.all([
     bookingIds.length > 0
       ? prisma.booking.findMany({
@@ -278,6 +282,7 @@ async function matchReviewContacts(prisma: PrismaClient): Promise<void> {
     }),
   ]);
 
+  // Build lookup maps
   const bookingEmailById = new Map(bookingRows.map((b) => [b.id, b.email.toLowerCase()]));
   const bookingPhoneById = new Map<string, string>();
   for (const b of bookingRows) {
@@ -301,6 +306,7 @@ async function matchReviewContacts(prisma: PrismaClient): Promise<void> {
     contacts.filter((c) => c.reviewToken).map((c) => [c.reviewToken!, c.id]),
   );
 
+  // Link each review to its contact
   await Promise.all(
     unlinked.map(async (r) => {
       let contactId: string | undefined;
@@ -340,6 +346,7 @@ async function autoEnrich(prisma: PrismaClient): Promise<ConflictEntry[]> {
     }),
   ]);
 
+  // Build contact lookup maps
   const contactByEmail = new Map(
     contacts.filter((c) => c.email).map((c) => [c.email!.toLowerCase(), c]),
   );
@@ -372,6 +379,7 @@ async function autoEnrich(prisma: PrismaClient): Promise<ConflictEntry[]> {
     return undefined;
   }
 
+  // Update and conflict accumulators
   const conflicts: ConflictEntry[] = [];
   const conflictSeen = new Set<string>();
   const phoneFilled = new Set<string>();

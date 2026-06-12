@@ -200,6 +200,7 @@ export async function sendOwnerBookingNotification(
     return;
   }
 
+  // Derive display fields
   const kind = options?.kind ?? "new";
   const start = formatDateTimeLong(booking.startAt);
   const previous = options?.previousStartAt ? formatDateTimeLong(options.previousStartAt) : null;
@@ -218,6 +219,7 @@ export async function sendOwnerBookingNotification(
       ? `<p style="margin:0 0 16px;color:#555;font-size:13px">Was: <s>${escapeHtml(previous)}</s></p>`
       : "";
 
+  // Render the email body
   const html = `
 <!DOCTYPE html>
 <html lang="en">
@@ -238,6 +240,7 @@ export async function sendOwnerBookingNotification(
 </body>
 </html>`;
 
+  // Send via Resend
   try {
     await getResend().emails.send({
       from,
@@ -271,6 +274,7 @@ export async function sendCustomerBookingConfirmation(
     return;
   }
 
+  // Derive display fields
   const kind = options?.kind ?? "new";
   const firstName = booking.name.split(" ")[0];
   const safeFirstName = escapeHtml(firstName);
@@ -298,6 +302,7 @@ export async function sendCustomerBookingConfirmation(
     ? `<div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;padding:12px 16px;margin-bottom:16px"><p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#0c0a3e">🏷 Rate locked in: ${escapeHtml(booking.promoTitleAtBooking)}</p><p style="margin:0;font-size:13px;color:#444;line-height:1.5">This rate applies to your appointment even if the offer ends before your visit.</p></div>`
     : "";
 
+  // Render the email body
   const html = `
 <!DOCTYPE html>
 <html lang="en">
@@ -331,6 +336,7 @@ ${await buildEmailSignature(siteUrl)}
 </body>
 </html>`;
 
+  // Send via Resend
   try {
     await getResend().emails.send({
       from,
@@ -359,6 +365,7 @@ export async function sendBookingReminderEmail(booking: BookingNotificationData)
     return false;
   }
 
+  // Derive display fields
   const firstName = booking.name.split(" ")[0];
   const safeFirstName = escapeHtml(firstName);
   const start = formatDateTimeLong(booking.startAt);
@@ -369,6 +376,7 @@ export async function sendBookingReminderEmail(booking: BookingNotificationData)
     ? `<div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;padding:12px 16px;margin-bottom:16px"><p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#0c0a3e">🏷 Rate locked in: ${escapeHtml(booking.promoTitleAtBooking)}</p><p style="margin:0;font-size:13px;color:#444;line-height:1.5">This rate applies to your appointment even if the offer ends before your visit.</p></div>`
     : "";
 
+  // Render the email body
   const html = `
 <!DOCTYPE html>
 <html lang="en">
@@ -401,6 +409,7 @@ ${await buildEmailSignature(siteUrl)}
 </body>
 </html>`;
 
+  // Send via Resend
   try {
     await getResend().emails.send({
       from,
@@ -661,7 +670,7 @@ interface SendInvoiceEmailArgs {
  * @param args.invoice - Invoice row fields needed for the body.
  * @param args.pdfBytes - Raw PDF bytes returned by `generateInvoicePdf`.
  * @param args.reviewUrl - Stable per-contact review URL, or null to omit the review line.
- * @param args.greetingName - Optional greeting target (forwarded to buildInvoiceEmail).
+ * @param args.greetingName - Optional greeting target (forwarded to {@link buildInvoiceEmail}).
  * @param args.customBody - Optional intro replacement.
  * @returns True if the email was accepted by Resend, false on failure or misconfig.
  */
@@ -717,12 +726,12 @@ interface BuildVoidEmailArgs {
 
 /**
  * Renders the "your invoice has been voided" email subject + body. Mirrors
- * buildInvoiceEmail but drops the bank-transfer block and review line - voided
+ * {@link buildInvoiceEmail} but drops the bank-transfer block and review line - voided
  * invoices never request payment or a review.
  * @param args - Render inputs.
  * @param args.invoice - Invoice row fields needed for the body.
  * @param args.greetingName - Optional operator-typed greeting target.
- * @param args.customBody - Optional override; falls back to DEFAULT_VOID_EMAIL_BODY.
+ * @param args.customBody - Optional override; falls back to {@link DEFAULT_VOID_EMAIL_BODY}.
  * @returns Subject + escaped HTML body.
  */
 export async function buildVoidEmail({
@@ -809,8 +818,8 @@ export async function sendVoidNotification({
   const { subject, html } = await buildVoidEmail({ invoice, greetingName, customBody });
   try {
     // Resend SDK v3+ returns { data, error } instead of throwing on API-level
-    // failures (invalid sender, rate limit, etc.). Check error explicitly so
-    // we don't silently report "Client notified" when Resend rejected the call.
+    // failures (invalid sender, rate limit, etc.). Check error explicitly so a
+    // rejected call isn't silently reported as "Client notified".
     const result = await getResend().emails.send({
       from,
       replyTo: process.env.ADMIN_EMAIL,

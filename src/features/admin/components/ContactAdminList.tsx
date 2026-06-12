@@ -389,6 +389,7 @@ export function ContactAdminList({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setContacts(initialContacts);
   }, [initialContacts]);
+  // Edit, sync, and UI state
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<EditValues>({
     name: "",
@@ -425,6 +426,7 @@ export function ContactAdminList({
     return PAGE_LOAD_TIME - new Date(c.createdAt).getTime() < NEW_CONTACT_MS;
   }
 
+  // Filter and bucket contacts
   const q = query.toLowerCase().trim();
   const visible = q
     ? contacts.filter(

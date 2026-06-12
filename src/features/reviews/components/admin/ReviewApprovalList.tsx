@@ -27,7 +27,7 @@ interface ContactPickerEntry {
 }
 
 /**
- * Props for ReviewApprovalList component.
+ * Props for the {@link ReviewApprovalList} component.
  */
 interface ReviewApprovalListProps {
   /** Reviews pending approval */
@@ -36,7 +36,7 @@ interface ReviewApprovalListProps {
   approved: ReviewRow[];
   /** Contacts available for linking to reviews */
   contacts: ContactPickerEntry[];
-  /** Whether to show the SendReviewLinkForm at the top. Defaults to true. */
+  /** Whether to show the {@link SendReviewLinkForm} at the top. Defaults to true. */
   showSendForm?: boolean;
 }
 
@@ -47,7 +47,7 @@ interface ReviewApprovalListProps {
  * @param props.pending - Reviews awaiting approval.
  * @param props.approved - Already-approved reviews.
  * @param props.contacts - Contacts available for linking.
- * @param props.showSendForm - Whether to show the SendReviewLinkForm at the top. Defaults to true.
+ * @param props.showSendForm - Whether to show the {@link SendReviewLinkForm} at the top. Defaults to true.
  * @returns Review approval list element.
  */
 export function ReviewApprovalList({

@@ -21,7 +21,7 @@ interface Props {
   gstRegistered: boolean;
   /**
    * Per-rate overrides for income tax / ACC / KiwiSaver, sourced from the
-   * workbook's SETTINGS tab. Falls back to DEFAULT_TAX_RATES when the sheet
+   * workbook's SETTINGS tab. Falls back to {@link DEFAULT_TAX_RATES} when the sheet
    * couldn't be read so the dashboard always renders something sensible.
    */
   rates?: TaxRates;

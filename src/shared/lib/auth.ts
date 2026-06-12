@@ -28,11 +28,8 @@ export function isValidAdminToken(token: string | null | undefined): boolean {
   }
 }
 
-// Per-IP failed-auth bucket. Only counts admin requests with a wrong/missing
-// X-Admin-Secret header so the operator's legitimate (successful) traffic
-// never hits the limit. When an IP exceeds the threshold within the window,
-// subsequent isAdminRequest calls from that IP fast-fail (return false
-// without running timingSafeEqual) until the window expires.
+// Per-IP failed-auth bucket. Only wrong/missing X-Admin-Secret attempts count,
+// so the operator's legitimate (successful) traffic never hits the limit.
 interface AuthFailBucket {
   count: number;
   resetAt: number;
@@ -45,7 +42,7 @@ const AUTH_FAIL_MAX_BUCKETS = 1_000;
 /**
  * Returns true when the given IP is currently over its failed-auth budget.
  * Read-only check; does not increment.
- * @param ip - Client IP from `getClientIp`.
+ * @param ip - Client IP from {@link getClientIp}.
  * @returns Whether to fast-fail this request.
  */
 function isOverAuthFailLimit(ip: string): boolean {
@@ -57,7 +54,7 @@ function isOverAuthFailLimit(ip: string): boolean {
 /**
  * Records one failed admin-auth attempt against the IP's bucket. Also runs an
  * opportunistic eviction pass so a burst of unique IPs can't leak memory.
- * @param ip - Client IP from `getClientIp`.
+ * @param ip - Client IP from {@link getClientIp}.
  */
 function recordAuthFail(ip: string): void {
   const now = Date.now();

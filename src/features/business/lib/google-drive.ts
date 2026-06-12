@@ -60,7 +60,7 @@ export async function getOrCreateInvoiceFolder(yearCode: string): Promise<string
 
 /**
  * Adds an "anyone with the link can view" permission to a Drive file so the
- * link we embed in invoice emails works without the recipient having to sign
+ * link embedded in invoice emails works without the recipient having to sign
  * into Google. Idempotent: Drive accepts repeat calls without duplicating the
  * permission, and failures are logged but never thrown so this can never break
  * the surrounding upload flow.
@@ -109,7 +109,7 @@ export async function uploadInvoicePdf(
       await ensureAnyoneWithLinkReader(res.data.id!);
       return { fileId: res.data.id!, webUrl: res.data.webViewLink! };
     } catch (err) {
-      // File may have been deleted from Drive — fall through to create a fresh one.
+      // File may have been deleted from Drive - fall through to create a fresh one.
       console.warn(
         `[drive] Update failed for ${existingFileId} (${invoiceNumber}); creating new file:`,
         err,
@@ -158,7 +158,7 @@ export async function listInvoicePdfs(
 
 /**
  * Searches all of Drive for PDFs matching the invoice filename convention (e.g. TTP-2627-0042.pdf).
- * Used by the sync route to back-fill driveFileId/driveWebUrl on existing invoice records.
+ * Back-fills driveFileId/driveWebUrl on existing invoice records.
  * @returns Array of file metadata objects for all matching PDFs found in Drive.
  */
 export async function searchAllInvoicePdfs(): Promise<

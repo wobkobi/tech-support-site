@@ -119,6 +119,7 @@ export function PricingWizard({
             .replace(/,?\s*New Zealand$/i, "")
             .trim();
 
+    // Fetch travel time and AI estimate in parallel
     const [travelRes, estimateRes] = await Promise.allSettled([
       dest
         ? fetch("/api/pricing/travel-time", {
@@ -160,6 +161,7 @@ export function PricingWizard({
       setAddressNotFound(true);
     }
 
+    // Fallback defaults when the AI estimate fails
     let estimatedMins = 60;
     let fullRate = 65;
     let explanation = "";
@@ -266,6 +268,7 @@ export function PricingWizard({
       return lines;
     })();
 
+    // Assemble the final price range
     const range: PriceRange = {
       low: promoRange.low,
       high: promoRange.high,

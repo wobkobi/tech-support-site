@@ -31,6 +31,7 @@ export default async function AdminPage(): Promise<React.ReactElement> {
   const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
+  // --- Parallel dashboard queries ---
   const [
     pendingCount,
     approvedCount,
@@ -141,13 +142,14 @@ export default async function AdminPage(): Promise<React.ReactElement> {
         createdAt: true,
       },
     }),
-    // Newest cache row -> calendar freshness for system status.
+    // Newest cache row > calendar freshness for system status.
     prisma.calendarEventCache.findFirst({
       orderBy: { fetchedAt: "desc" },
       select: { fetchedAt: true },
     }),
   ]);
 
+  // --- Review-link coverage ---
   const sentEmails = new Set<string>([
     ...contactsWithReviewSent.flatMap((c) => (c.email ? [c.email.toLowerCase()] : [])),
     ...bookingsWithReviewSent.flatMap((b) => (b.email ? [b.email.toLowerCase()] : [])),
@@ -162,7 +164,7 @@ export default async function AdminPage(): Promise<React.ReactElement> {
     return true;
   });
 
-  // --- Derived KPIs for the new dashboard sections ---
+  // --- Derived KPIs for the dashboard sections ---
   const monthRevenue = monthIncome._sum.amount ?? 0;
   const outstandingTotal = outstandingInvoices.reduce((s, inv) => s + inv.total, 0);
   const overdueInvoices = outstandingInvoices.filter(
@@ -212,6 +214,7 @@ export default async function AdminPage(): Promise<React.ReactElement> {
     ? now.getTime() - latestCacheEntry.fetchedAt.getTime()
     : null;
 
+  // --- Stat cards ---
   const stats = [
     {
       label: "Revenue this month",

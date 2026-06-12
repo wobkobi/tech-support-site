@@ -27,6 +27,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   try {
+    // Load settings and compute the cutoff
     const { comms } = await getSettings();
     if (!comms.notifyReviewRequest) {
       return NextResponse.json({ ok: true, skipped: "review requests disabled", sent: 0 });
@@ -35,10 +36,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const now = new Date();
     const delayAgo = new Date(now.getTime() - comms.reviewEmailDelayMins * 60 * 1000);
 
-    // Find bookings that:
-    // 1. Ended at least the configured delay ago (appointment is definitely over)
-    // 2. Are confirmed or completed
-    // 3. Haven't had review email sent yet
+    // Find confirmed/completed bookings that ended at least the configured
+    // delay ago and have not had a review email yet.
     //
     // MongoDB gotcha: documents written before reviewSentAt existed in the
     // schema have no `reviewSentAt` field at all (not even null). Prisma's
@@ -128,8 +127,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     for (const booking of toSend) {
       try {
-        // Mark as sent FIRST to prevent duplicate emails if send fails after DB update
-        // Trade-off: if send fails, we've marked it (won't retry), but this prevents spam
+        // Mark as sent FIRST to prevent duplicate emails if send fails after DB update.
+        // Trade-off: a failed send stays marked (no retry), but this prevents spam.
         await prisma.booking.update({
           where: { id: booking.id },
           data: {

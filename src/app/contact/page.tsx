@@ -16,12 +16,6 @@ export const metadata: Metadata = {
   title: "Contact - Local Tech Support in Auckland",
   description:
     "Call 021 297 1237 or email harrison@tothepoint.co.nz for friendly tech support across Auckland. Same-day, evening and weekend appointments available.",
-  keywords: [
-    "contact tech support Auckland",
-    "computer help phone number Auckland",
-    "IT support near me Auckland",
-    "Auckland tech support contact",
-  ],
   alternates: { canonical: "/contact" },
   openGraph: {
     title: "Contact - To The Point Tech",

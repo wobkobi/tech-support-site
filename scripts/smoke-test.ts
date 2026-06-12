@@ -80,8 +80,8 @@ const SKIP_PATHS: ReadonlySet<string> = new Set([]);
 
 /**
  * Path prefixes considered admin. Marked specs get the X-Admin-Secret header
- * attached at request time (session cookie + URL token were both replaced by
- * the cookie-auth migration; the header path is what scripts/cron still use).
+ * attached at request time (scripts and cron use the header path; the admin
+ * UI uses the session cookie).
  */
 const ADMIN_PREFIXES: ReadonlyArray<string> = ["/admin"];
 
@@ -109,8 +109,8 @@ const IGNORE_404_URLS = ["/_vercel/insights/", "/_vercel/speed-insights/"];
  * Walks the App Router tree and turns every `page.{tsx,ts,jsx,js}` into a route.
  * - Route groups `(...)` are stripped from the URL.
  * - Dynamic segments `[id]`, `[...slug]` are skipped (no sample data to test).
- * - Paths in `SKIP_PATHS` are filtered out.
- * - Names default to a Title-Cased version of the path; `PAGE_OVERRIDES`
+ * - Paths in {@link SKIP_PATHS} are filtered out.
+ * - Names default to a Title-Cased version of the path; {@link PAGE_OVERRIDES}
  *   supplies friendlier names + per-page ignoreErrors.
  * @returns Discovered routes split into public and admin.
  */
@@ -302,7 +302,7 @@ async function checkPage(browser: Browser, baseUrl: string, spec: PageSpec): Pro
       if (secret) await page.setExtraHTTPHeaders({ "x-admin-secret": secret });
     }
 
-    // Track 4xx/5xx responses by URL so we can filter known-missing local endpoints
+    // Track 4xx/5xx responses by URL so known-missing local endpoints can be filtered
     page.on("response", (response) => {
       const status = response.status();
       if (status < 400) return;
@@ -425,9 +425,11 @@ function printTable(results: PageResult[]): void {
   let exitCode = 0;
 
   try {
+    // Build and prepare the standalone output
     if (!skipBuild) runBuild();
     copyStandaloneAssets();
 
+    // Start the server and wait for readiness
     server = startServer(port);
 
     server.stderr?.on("data", (chunk: Buffer) => {
@@ -437,6 +439,7 @@ function printTable(results: PageResult[]): void {
 
     await waitForServer(port);
 
+    // Launch the browser
     browser = await puppeteer.launch({
       headless: true,
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
@@ -462,6 +465,7 @@ function printTable(results: PageResult[]): void {
     const allPages = [...publicPages, ...adminPagesAuthed];
     console.log(`Checking ${allPages.length} pages…\n`);
 
+    // Visit each page and collect results
     const results: PageResult[] = [];
 
     for (const spec of allPages) {
@@ -476,6 +480,7 @@ function printTable(results: PageResult[]): void {
       );
     }
 
+    // Report results and set the exit code
     printTable(results);
 
     const failed = results.filter((r) => r.status !== "pass");

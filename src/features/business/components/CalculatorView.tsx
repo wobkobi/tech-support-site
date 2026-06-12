@@ -229,9 +229,8 @@ function timeAgo(savedAt: number, now: number): string {
 
 /**
  * Builds an empty hourly task line seeded with the default base rate (e.g.
- * Standard $65/hr) and no modifiers. The operator picks the device + action
- * after adding the row, and toggles modifier chips to adjust the effective
- * rate. Flat-rate rows (Travel etc.) come from AI parse or address lookup.
+ * Standard $65/hr) and no modifiers. Flat-rate rows (Travel etc.) come from
+ * AI parse or address lookup.
  * @param rates - The list of available rate configurations.
  * @returns A default hourly TaskLine.
  */
@@ -298,6 +297,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
     initialDraft?.savedAt ?? null,
   );
 
+  // Server-fetched reference data
   const [rates, setRates] = useState<RateConfig[]>([]);
   const [taskTemplates, setTaskTemplates] = useState<TaskTemplate[]>([]);
   // Multiple time slots all lump into one billable duration. AI parse populates
@@ -319,6 +319,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
   const [hourlyRateId, setHourlyRateId] = useState<string | null>(
     () => initialDraft?.hourlyRateId ?? null,
   );
+  // Tasks, parts, and notes
   const [tasks, setTasks] = useState<TaskLine[]>(() => initialDraft?.tasks ?? []);
   const [parts, setParts] = useState<PartLine[]>(() => initialDraft?.parts ?? []);
   const [showParts, setShowParts] = useState(false);
@@ -326,6 +327,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
   const [notes, setNotes] = useState(() => initialDraft?.notes ?? "");
   // Half off labour when ticked (per pricing-policy.unsuccessfulWorkCopy).
   const [unsuccessful, setUnsuccessful] = useState(() => initialDraft?.unsuccessful ?? false);
+  // Client details
   const [clientName, setClientName] = useState(() => initialDraft?.clientName ?? "");
   const [clientEmail, setClientEmail] = useState(() => initialDraft?.clientEmail ?? "");
   // Address-to state mirrors the InvoiceBuilder's segmented control so the
@@ -351,6 +353,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
   const [pendingInvoiceId, setPendingInvoiceId] = useState<string | null>(null);
   const [sheetSyncToast, setSheetSyncToast] = useState<string | null>(null);
 
+  // AI parse session
   const [aiInput, setAiInput] = useState(() => initialDraft?.aiInput ?? "");
   const [parsing, setParsing] = useState(false);
   const [parseResult, setParseResult] = useState<ParseJobResponse | null>(null);
@@ -359,14 +362,17 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
   const [clarifyQuestions, setClarifyQuestions] = useState<ParseJobQuestion[]>([]);
   const [clarifyAnswers, setClarifyAnswers] = useState<Record<string, string>>({});
 
+  // Travel lookup
   const [jobAddress, setJobAddress] = useState(() => initialDraft?.jobAddress ?? "");
   const [lookingUpTravel, setLookingUpTravel] = useState(false);
   const addressInputRef = useRef<HTMLInputElement>(null);
 
+  // Contacts and income save
   const [contacts, setContacts] = useState<GoogleContact[]>([]);
   const [savingIncome, setSavingIncome] = useState(false);
   const [incomeToast, setIncomeToast] = useState<string | null>(null);
 
+  // Rate management
   const [showRates, setShowRates] = useState(false);
   const [rateForm, setRateForm] = useState({
     label: "",
@@ -393,7 +399,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
     uplift: 0,
   });
 
-  // Resolve the job date -> { holiday, promo } whenever the date changes. Best
+  // Resolve the job date > { holiday, promo } whenever the date changes. Best
   // effort: failures leave the prior context in place. Overwrites activePromo
   // with the date-resolved promo so every downstream consumer is date-aware.
   useEffect(() => {
@@ -424,6 +430,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
     };
   }, [jobDate]);
 
+  // Google Maps address autocomplete
   useEffect(() => {
     const apiKey = process.env.GOOGLE_MAPS_API_KEY;
     if (!apiKey || !addressInputRef.current) return;
@@ -467,6 +474,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
     };
   }, []);
 
+  // Initial data fetch
   useEffect(() => {
     const now = nowTime();
     Promise.all([
@@ -557,6 +565,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
     return () => clearTimeout(t);
   }, [draftRestoredAt]);
 
+  // Derived durations and rate groupings
   const sumRangesMin = timeRanges.reduce((s, r) => s + timeDiffMins(r.startTime, r.endTime), 0);
   const durationMins = durationMinsOverride != null ? durationMinsOverride : sumRangesMin;
   // Aggregate first start / last end - used for the travel departure ISO and
@@ -579,6 +588,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
     .sort((a, b) => a.label.localeCompare(b.label));
   const flatRates = rates.filter((r) => r.flatRate !== null);
 
+  // Assemble the job and totals
   const job: JobCalculation = {
     startTime: aggregateStart,
     endTime: aggregateEnd,
@@ -620,16 +630,13 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
   /**
    * Applies a parsed job response to the calculator state, hydrating time +
    * tasks + parts + notes from the AI parse result. The auto travel entry is
-   * created whenever the parser found any drive time; calcTravelCharge applies
-   * the $10 minimum so a 1-min drive still bills the published floor.
+   * created whenever the parser found any drive time; {@link calcTravelCharge}
+   * applies the $10 minimum so a 1-min drive still bills the published floor.
    * @param result - The parsed job response returned by the AI.
    * @param rateList - The current list of rate configurations (used for travel rate lookup).
    */
   const applyParseResult = useCallback(
     (result: ParseJobResponse, rateList: RateConfig[]) => {
-      // Add the auto travel entry when the parser found any drive time. The
-      // $10 floor in calcTravelCharge handles the petty-billing concern - a
-      // 1-min drive still bills $10 because that's the published minimum.
       const includeTravelDefault = (result.travel?.durationMins ?? 0) > 0;
 
       // Hydrate the time slots. Prefer the per-range list when the parser found
@@ -681,6 +688,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
         parsedWindowMin = result.durationMins;
       }
 
+      // Hydrate rate, task, and part lines
       setHourlyRateId(result.hourlyRateId);
       const parsedTasks: TaskLine[] = result.tasks.map((t) => {
         const device = t.device ?? null;
@@ -912,9 +920,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
 
   /**
    * Resets every persisted form field back to its mount-time default and
-   * drops the saved draft. Single source of truth for "start fresh", shared
-   * by the manual Clear button, the income-save success path, and the
-   * Discard link on the draft-restored toast.
+   * drops the saved draft. Single source of truth for "start fresh".
    */
   function resetFormState(): void {
     const now = nowTime();
@@ -945,15 +951,12 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
 
   /**
    * Direct save: POSTs the calculator state straight to the invoices API and
-   * navigates to the detail page. Used
-   * by the "Save invoice" button - the primary action when the operator is
-   * happy with the live preview and doesn't need to override the invoice
-   * number / issue date / due date.
-   *
-   * Backdating / custom invoice number / custom due date is handled by
-   * editing a saved DRAFT after the fact (the [id]/edit route).
+   * navigates to the detail page. Backdating / custom invoice number / custom
+   * due date is handled by editing a saved DRAFT after the fact (the [id]/edit
+   * route).
    */
   async function handleSaveInvoice(): Promise<void> {
+    // Validate required fields
     setSaveInvoiceError(null);
     if (!clientName.trim()) {
       setSaveInvoiceError("Client name is required.");
@@ -969,6 +972,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
     }
     setSavingInvoice(true);
     try {
+      // Build and POST the invoice
       await saveTaskTemplates(tasks);
       const lineItems = jobToLineItems(job, pricing.billingIncrementMins, holiday.uplift);
       const promoActive = activePromo && !skipPromo && totals.promoDiscount > 0;
@@ -1061,7 +1065,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
    * Calls the travel-time API with the current job address and replaces the
    * single auto travel entry. Manual entries (parking, etc.) are preserved.
    * Drive time of 0 (geocoded to origin or no match) leaves no auto entry;
-   * any non-zero drive time bills the $10 minimum via calcTravelCharge.
+   * any non-zero drive time bills the $10 minimum via {@link calcTravelCharge}.
    */
   async function handleTravelLookup(): Promise<void> {
     if (!jobAddress.trim()) return;
@@ -1105,7 +1109,6 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
     setLookingUpTravel(false);
   }
 
-  // Rate management
   /**
    * Populates the rate form with an existing rate's values and enters edit mode.
    * @param r - The rate configuration to edit.
@@ -1140,7 +1143,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
 
   /**
    * Re-fetches the rates list from the API. Used after a reset and after
-   * a 404 on edit/delete (which means the row was wiped server-side and our
+   * a 404 on edit/delete (which means the row was wiped server-side and the
    * local snapshot is stale).
    */
   async function refreshRates(): Promise<void> {
@@ -1241,7 +1244,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
       ratePerHour: rateForm.type === "hourly" ? amount : null,
       flatRate: rateForm.type === "flat" ? amount : null,
       hourlyDelta: rateForm.type === "modifier" ? amount : null,
-      // Percent modifiers store a fraction (25 entered -> 0.25).
+      // Percent modifiers store a fraction (25 entered > 0.25).
       percentDelta: rateForm.type === "percent" ? amount / 100 : null,
       unit:
         rateForm.type === "modifier" || rateForm.type === "percent" ? "modifier" : rateForm.unit,
@@ -1255,7 +1258,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
         body: JSON.stringify(body),
       });
       // Bail safely on non-OK - 404 typically means the rate was wiped via
-      // Reset and our local snapshot is stale. Re-fetch and exit edit mode.
+      // Reset and the local snapshot is stale. Re-fetch and exit edit mode.
       if (!res.ok) {
         console.error("[calculator] PATCH rate failed with status", res.status);
         handleCancelEdit();
@@ -1623,7 +1626,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
               setPickedContactGoogleId(c.id || null);
               // Bypass the setAddressMode wrapper - it reads pickedContactName
               // from this same render's closure (still null), which would flip
-              // the mode to "custom". We just set the name explicitly above.
+              // the mode to "custom". The name is already set explicitly above.
               setAddressModeState("name");
             }}
             onClearContact={() => {

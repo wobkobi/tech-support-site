@@ -120,6 +120,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const limited = rateLimitOrReject(request, "estimate-duration", 5, 60_000);
   if (limited) return limited;
 
+  // Parse and validate body
   const body = await request.json().catch(() => null);
   const description = (body as { description?: unknown })?.description;
 
@@ -141,6 +142,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       benchmarks: settings.estimator.benchmarks,
     });
 
+    // Call the model and parse the response
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const completion = await client.chat.completions.create({
       model: "gpt-4.1-mini",
@@ -157,6 +159,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const text = completion.choices[0]?.message?.content ?? "";
     const parsed = JSON.parse(text) as EstimateResult;
 
+    // Validate the response shape
     if (
       typeof parsed.estimatedMins !== "number" ||
       !parsed.explanation ||

@@ -30,8 +30,8 @@ interface Props {
 }
 
 /**
- * Live A4-styled invoice preview. Mirrors invoice-pdf.ts so the operator sees
- * the same layout the customer will receive. Pure presentational.
+ * Live A4-styled invoice preview. Matches the generated PDF layout so the
+ * operator sees the same invoice the customer will receive. Pure presentational.
  * @param props - Component props.
  * @param props.identity - Live business identity for the header/payment/footer.
  * @param props.number - Invoice number to display ("DRAFT" for unsaved).

@@ -80,7 +80,7 @@ export interface SocialSpec {
   blur: number;
   /** Logo scale as a fraction of the canvas dimensions. */
   logoScale: number;
-  /** JPEG output quality (1–100). */
+  /** JPEG output quality (1-100). */
   quality: number;
   /** Use square logo mark instead of full wordmark. */
   useMarkLogo?: boolean;
@@ -261,7 +261,7 @@ export interface BackdropVariant {
   name: string;
   /** Target width in pixels (height derived from aspect ratio). */
   width: number;
-  /** Compression quality (1–100). */
+  /** Compression quality (1-100). */
   quality: number;
   /** Output format. */
   format: "webp" | "avif" | "jpeg";

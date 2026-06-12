@@ -89,6 +89,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
+    // Validate payload fields
     const payloadCheck = validateBookingPayloadFields(
       { name, notes, dateKey, timeOfDay, duration, meetingType, address, phone },
       { requireEmail: false },
@@ -166,6 +167,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       console.error("[booking/edit] Failed to fetch calendar events:", error);
     }
 
+    // Validate the requested slot
     const validation = validateBookingRequest(
       dateKey,
       timeOfDay,
@@ -190,6 +192,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const durationLabel = `${duration === "short" ? "Standard" : "Extended"} (${durationMinutes} min)`;
     const cleanDurationLabel = `${duration === "short" ? "Standard" : "Extended"} ${durationMinutes} min`;
 
+    // Calculate start/end times
     const [year, month, day] = dateKey.split("-").map(Number);
     const utcOffset = getPacificAucklandOffset(year, month, day);
     const startAt = new Date(Date.UTC(year, month - 1, day, startHour - utcOffset, startMinute, 0));
@@ -217,7 +220,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       bookingNotes += `Phone: ${phoneE164}\n`;
     }
 
-    // Delete old calendar event
+    // Replace the calendar event: delete the old one, then create at the new time.
     if (booking.calendarEventId) {
       try {
         await deleteBookingEvent({ eventId: booking.calendarEventId });
@@ -254,6 +257,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // email notifications can show "was: <old time>".
     const previousStartAt = booking.startAt;
 
+    // Update the booking
     try {
       await prisma.booking.update({
         where: { id: booking.id },
@@ -281,11 +285,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     // Upsert Contact + sync to Google. Best-effort: a failure here must not
-    // fail the edit (the booking + calendar event are already saved). The
-    // Contact's name/phone/address are kept in step with the booking so a
-    // customer who corrects their phone via the edit form sees that propagate
-    // to the contact and (via syncContactToGoogle's bidirectional merge) to
-    // Google Contacts.
+    // fail the edit (the booking + calendar event are already saved). Contact
+    // name/phone/address stay in step with the booking so edit-form
+    // corrections propagate to Google Contacts.
     try {
       const contactEmail = booking.email.toLowerCase();
       const existing = await prisma.contact.findFirst({ where: { email: contactEmail } });

@@ -78,15 +78,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     ? new Date(dueDate)
     : new Date(Date.now() + identity.paymentTermsDays * 24 * 60 * 60 * 1000);
 
+  // Allocate the invoice number
   const { number, sheetNextCount, sheetSyncWarning } = await getNextInvoiceNumber();
   const discount = typeof promoDiscount === "number" && promoDiscount > 0 ? promoDiscount : 0;
   const unsuccessfulDiscountValue =
     typeof unsuccessfulDiscount === "number" && unsuccessfulDiscount > 0 ? unsuccessfulDiscount : 0;
-  // GST mode is driven by the live pricing settings (gstRegistered); the request
-  // body no longer carries gst. gstAmount is non-zero once that flag is on,
-  // stays 0 today. Promo + unsuccessful both reduce the taxable amount before
-  // GST (per IRD treatment of price reductions); they sum into a single discount
-  // argument for calcInvoiceTotals, then get persisted as separate audit fields.
+  // GST mode is driven by the live pricing settings (gstRegistered); the
+  // request body does not carry gst. Promo + unsuccessful both reduce the
+  // taxable amount before GST (per IRD treatment of price reductions); they
+  // sum into one discount argument for calcInvoiceTotals but persist as
+  // separate audit fields.
   const { GST_REGISTERED } = await getPolicy();
   const { subtotal, gstAmount, total } = calcInvoiceTotals(
     lineItems,
@@ -94,6 +95,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     GST_REGISTERED,
   );
 
+  // Create the invoice
   const invoice = await prisma.invoice.create({
     data: {
       number,

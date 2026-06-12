@@ -16,7 +16,7 @@ interface PromoBody {
 }
 
 /**
- * Validates a PromoBody. Enforces XOR of pricing fields + start < end.
+ * Validates a {@link PromoBody}. Enforces XOR of pricing fields + start < end.
  * @param body - Parsed request body.
  * @returns Error message or null when valid.
  */

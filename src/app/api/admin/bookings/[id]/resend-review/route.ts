@@ -16,7 +16,7 @@ export const maxDuration = 60;
  * POST /api/admin/bookings/[id]/resend-review
  * Sends (or resends) the review request email for a booking, bypassing the
  * reviewSentAt guard used by the cron. Updates reviewSentAt after the call.
- * Requires X-Admin-Secret header. sendCustomerReviewRequest never throws,
+ * Requires X-Admin-Secret header. {@link sendCustomerReviewRequest} never throws,
  * so reviewSentAt is always updated regardless of Resend delivery status.
  * @param request - Incoming request.
  * @param params - Route params.

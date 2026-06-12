@@ -1,7 +1,7 @@
 // src/shared/components/NavBar.tsx
 /**
  * @file NavBar.tsx
- * @description Navigation bar with mobile-first scroll reveal behavior.
+ * @description Navigation bar with mobile-first scroll reveal behaviour.
  */
 
 "use client";
@@ -104,11 +104,13 @@ export function NavBar(): React.ReactElement | null {
   });
   const mobileMenuOpen = mobileMenuState.open && mobileMenuState.pathname === pathname;
 
+  // Scroll reveal state
   const [isScrolled, setIsScrolled] = useState(false);
   const [isHidden, setIsHidden] = useState(false);
   const [scrollOffset, setScrollOffset] = useState(0);
   const [isHoveringTop, setIsHoveringTop] = useState(false);
 
+  // Scroll and focus refs
   const scrollLockRef = useRef(0);
   const bodyLockedRef = useRef(false);
   const lastScrollYRef = useRef(0);
@@ -278,7 +280,7 @@ export function NavBar(): React.ReactElement | null {
     };
   }, [mobileMenuOpen]);
 
-  // Scroll behavior: hide on downward scroll, show immediately on upward scroll.
+  // Scroll behaviour: hide on downward scroll, show immediately on upward scroll.
   useEffect(() => {
     if (typeof window === "undefined") {
       return;

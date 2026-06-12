@@ -65,7 +65,7 @@ function endOfDayISO(date: string): string {
 }
 
 /**
- * `endAt` ISO > inclusive YYYY-MM-DD (subtracts the day we added on save).
+ * `endAt` ISO > inclusive YYYY-MM-DD (subtracts the day added on save).
  * @param iso - ISO 8601 timestamp.
  * @returns Date-input string.
  */

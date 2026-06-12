@@ -1,27 +1,23 @@
 // src/app/about/page.tsx
 /**
  * @file page.tsx
- * @description About page: background, approach, and who I help.
+ * @description About page: background, approach, and who the service helps.
  */
 
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
 import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
 import { cn } from "@/shared/lib/cn";
+import { getSiteUrl } from "@/shared/lib/site-url";
 import type { Metadata } from "next";
 import Link from "next/link";
 import type React from "react";
+
+const siteUrl = getSiteUrl();
 
 export const metadata: Metadata = {
   title: "About Harrison Raynes - Local Tech Support in Auckland",
   description:
     "Computer science graduate based in Auckland. I help households and small businesses across Auckland with friendly, jargon-free tech support.",
-  keywords: [
-    "tech support Auckland",
-    "local IT support Auckland",
-    "Harrison Raynes",
-    "small business IT Auckland",
-    "home computer help Auckland",
-  ],
   alternates: { canonical: "/about" },
   openGraph: {
     title: "About - To The Point Tech",
@@ -40,8 +36,27 @@ const linkStyle = cn(
  * @returns About page element.
  */
 export default function AboutPage(): React.ReactElement {
+  // Tie the person entity to the business `@id` so a "Harrison Raynes"
+  // search resolves to the business and vice versa.
+  const personJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Person",
+    "@id": `${siteUrl}/about#person`,
+    name: "Harrison Raynes",
+    jobTitle: "Founder & Technician",
+    worksFor: { "@id": `${siteUrl}#business` },
+    knowsAbout: ["Computer Repair", "IT Support", "Networking", "Smart Home Setup"],
+    workLocation: { "@type": "City", name: "Auckland" },
+    url: `${siteUrl}/about`,
+  };
+
   return (
     <PageShell>
+      <script
+        id="ld-person"
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd) }}
+      />
       <BreadcrumbJsonLd
         crumbs={[
           { name: "Home", path: "/" },

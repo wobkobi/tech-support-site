@@ -13,7 +13,7 @@ const db = new PrismaClient();
  * @returns Promise that resolves when the connection check succeeds.
  */
 async function main(): Promise<void> {
-  await db.review.count(); // simple read
+  await db.review.count(); // cheap read that proves connectivity; result unused
   console.log("OK");
 }
 main().finally(() => db.$disconnect());

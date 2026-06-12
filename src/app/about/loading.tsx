@@ -2,7 +2,7 @@
 /**
  * @file loading.tsx
  * @description Streaming skeleton for the about page: a heading card plus the
- * approach and "who I help" list cards.
+ * approach and "Who I help" list cards.
  */
 
 import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";

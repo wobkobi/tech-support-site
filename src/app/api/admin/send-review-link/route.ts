@@ -3,8 +3,8 @@
  * @file route.ts
  * @description Admin endpoint to send a review request link to a past client.
  * Lands a Contact (creating one if needed), ensures Contact.reviewToken is set,
- * stamps Contact.reviewLinkSentAt, then sends the email/SMS. The standalone
- * ReviewRequest model was retired; all send-state lives on Contact now.
+ * stamps Contact.reviewLinkSentAt, then sends the email/SMS. All send-state
+ * lives on the Contact row.
  */
 
 import {
@@ -37,6 +37,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   try {
+    // Parse and validate body
     const body = (await request.json()) as {
       name?: string;
       email?: string;
@@ -54,7 +55,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const siteUrl = getSiteUrl();
 
-    // Land the Contact first so we know who we're talking to.
+    // Land the Contact first to identify the recipient.
     const normalisedEmail = mode === "email" ? email!.trim().toLowerCase() : null;
     let normalisedPhone: string | null = null;
     if (mode === "sms") {
@@ -78,7 +79,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ ok: true, reviewUrl, existing: true });
     }
 
-    // Dedup against the booking auto-send so we don't double-up via a different channel.
+    // Dedup against the booking auto-send to avoid doubling up via a different channel.
     if (normalisedEmail) {
       const existingBooking = await prisma.booking.findFirst({
         where: {
@@ -104,6 +105,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       },
     });
 
+    // Build the link and send the email
     const reviewUrl = `${siteUrl}/review?token=${reviewToken}`;
 
     if (mode === "sms") {

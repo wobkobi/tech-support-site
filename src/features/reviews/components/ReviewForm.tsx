@@ -144,6 +144,8 @@ export default function ReviewFormProtected({
     try {
       let res: Response;
 
+      // Review fields common to both branches; create (POST) adds the booking/
+      // contact identifiers, edit (PATCH) adds the customer ref instead.
       const payload = {
         text: t,
         firstName: isAnonymous ? null : f,
@@ -177,6 +179,7 @@ export default function ReviewFormProtected({
         throw new Error(data?.error || `Request failed with ${res.status}`);
       }
 
+      // Show success then redirect home
       setSent(true);
 
       setTimeout(() => {

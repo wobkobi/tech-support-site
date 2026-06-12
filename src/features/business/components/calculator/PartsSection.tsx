@@ -12,10 +12,8 @@ interface Props {
 }
 
 /**
- * Collapsible "Parts / materials" card on the calculator. Each row pairs a
- * description text input with a numeric cost input and a remove button; an
- * "Add part" link appends an empty row. Empty list + collapsed state is the
- * default - parts are an opt-in for jobs that need them.
+ * Collapsible "Parts / materials" card on the calculator. Empty list +
+ * collapsed state is the default - parts are an opt-in for jobs that need them.
  * @param props - Component props.
  * @param props.parts - Current parts array.
  * @param props.onPartsChange - Functional setter that takes the previous parts list and returns the next.

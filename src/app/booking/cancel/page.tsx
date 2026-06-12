@@ -98,8 +98,8 @@ function FeeBanner({
 }
 
 /**
- * Inner content component. Wrapped in Suspense by the page export because
- * useSearchParams requires it.
+ * Inner content component. Wrapped in {@link Suspense} by the page export because
+ * {@link useSearchParams} requires it.
  * @returns The cancel UI element.
  */
 function CancelContent(): React.ReactElement {
@@ -274,7 +274,7 @@ function CancelContent(): React.ReactElement {
 }
 
 /**
- * Booking cancel page. Suspense is required because CancelContent uses useSearchParams.
+ * Booking cancel page. {@link Suspense} is required because {@link CancelContent} uses {@link useSearchParams}.
  * @returns The cancel page element.
  */
 export default function BookingCancelPage(): React.ReactElement {

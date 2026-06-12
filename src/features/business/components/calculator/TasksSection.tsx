@@ -344,12 +344,9 @@ export function TasksSection({
 
 /**
  * Compact qty + unit-price + total + delete row shared by both flat-rate and
- * device/action task rows. Stacks on mobile (qty/price/total in a 3-up grid
- * with the delete button to the right). At sm+ it becomes an inline strip:
- * compact for flat-rate rows (which sit next to the rate dropdown), or - when
- * `spread` is set for device/action task rows - full width, with inline
- * hrs / $/hr hints and the line total + delete pushed to the right edge so the
- * money lines up under the effective-rate readout above.
+ * device/action task rows. Stacks on mobile; at sm+ it becomes an inline strip -
+ * compact for flat-rate rows, or full width when `spread` is set so the line
+ * total lines up under the effective-rate readout above.
  * @param props - Component props.
  * @param props.task - The task line to render controls for.
  * @param props.onQty - Called when the operator edits the hours / qty input.

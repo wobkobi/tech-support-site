@@ -5,7 +5,7 @@
  * description, unit, and (for optional rules) the "what happens when it's off"
  * note shown above each field. Kept here, beside the defaults and validators,
  * so the help text and the rules never drift apart. Authored per group as each
- * tab is built; `GROUP_META` covers all groups so the tab bar can render.
+ * tab is built; {@link GROUP_META} covers all groups so the tab bar can render.
  */
 
 import type { SettingsGroup } from "@/shared/lib/settings/types";

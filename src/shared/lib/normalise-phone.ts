@@ -89,7 +89,7 @@ export function toE164NZ(raw: string): string {
 /**
  * Returns true when a normalised phone string looks like a valid phone number.
  * Requires 7-15 digits (E.164 max). The leading '+' is ignored for the count.
- * @param normalised - Already-normalised phone string (from normalisePhone).
+ * @param normalised - Already-normalised phone string (from {@link normalisePhone}).
  * @returns Whether the phone number is valid.
  */
 export function isValidPhone(normalised: string): boolean {
@@ -99,7 +99,7 @@ export function isValidPhone(normalised: string): boolean {
 }
 
 /**
- * Discriminator returned by validatePhone. "empty" means the input is blank
+ * Discriminator returned by {@link validatePhone}. "empty" means the input is blank
  * (callers decide whether that's allowed based on whether the field is required).
  */
 export type PhoneValidationResult = "empty" | "invalid" | "ok";
