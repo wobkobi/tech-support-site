@@ -9,11 +9,18 @@ import { Button } from "@/shared/components/Button";
 import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
 import { cn } from "@/shared/lib/cn";
 import { prisma } from "@/shared/lib/prisma";
+import type { Metadata } from "next";
 import Link from "next/link";
 import type React from "react";
 
 // This page reads searchParams so it is always dynamic - revalidate has no effect.
 export const dynamic = "force-dynamic";
+
+// Token-gated form, not a landing page: keep it out of search results.
+export const metadata: Metadata = {
+  title: "Leave a review",
+  robots: { index: false, follow: false },
+};
 
 /**
  * Review page with optional token-based protection

@@ -9,9 +9,17 @@ import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { Button } from "@/shared/components/Button";
 import { cn } from "@/shared/lib/cn";
 import { prisma } from "@/shared/lib/prisma";
+import type { Metadata } from "next";
 import type React from "react";
 import { FaCircleCheck, FaHouse, FaPenToSquare, FaTag } from "react-icons/fa6";
 import { BookingConversion } from "./BookingConversion";
+
+// Post-booking confirmation, only reachable after submitting the form: keep
+// it out of search results.
+export const metadata: Metadata = {
+  title: "Booking request received",
+  robots: { index: false, follow: false },
+};
 
 const CARD = "border-seasalt-400/60 bg-seasalt-800 rounded-xl border p-5 shadow-sm sm:p-6";
 

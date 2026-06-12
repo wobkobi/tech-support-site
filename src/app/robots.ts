@@ -18,20 +18,12 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: "*",
-        // "/reviews" must be allowed explicitly: "Disallow: /review" is a
-        // prefix match that would otherwise block the public reviews page
-        // (the longer Allow rule wins under Google's precedence).
-        allow: ["/", "/reviews"],
-        disallow: [
-          "/admin",
-          "/admin/",
-          "/api/",
-          "/booking/edit",
-          "/booking/cancel",
-          "/booking/success",
-          "/review",
-          "/poster",
-        ],
+        // Booking-flow, review-form and poster pages are deliberately NOT
+        // disallowed here: they carry a noindex meta tag instead, and Google
+        // only honours noindex on pages it is allowed to crawl. Blocking
+        // them in robots.txt would freeze whatever Google last indexed.
+        allow: ["/"],
+        disallow: ["/admin", "/admin/", "/api/"],
       },
     ],
     sitemap: `${siteUrl}/sitemap.xml`,

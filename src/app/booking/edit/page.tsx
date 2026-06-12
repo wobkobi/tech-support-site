@@ -23,10 +23,17 @@ import { fetchAllCalendarEvents } from "@/features/calendar/lib/google-calendar"
 import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
 import { cn } from "@/shared/lib/cn";
 import { prisma } from "@/shared/lib/prisma";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type React from "react";
 
 export const dynamic = "force-dynamic";
+
+// Token-gated editor reached from booking emails: keep it out of search results.
+export const metadata: Metadata = {
+  title: "Edit booking",
+  robots: { index: false, follow: false },
+};
 
 /**
  * Derive NZ dateKey (YYYY-MM-DD) from a UTC Date.
