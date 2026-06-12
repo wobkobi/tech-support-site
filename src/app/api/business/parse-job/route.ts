@@ -158,6 +158,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Parse and validate body
   const body = await request.json();
   const { input, answers } = body as { input: unknown; answers?: Record<string, unknown> };
 
@@ -186,6 +187,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
   try {
+    // Load rates, templates and settings
     const [rates, templates, settings] = await Promise.all([
       prisma.rateConfig.findMany({ orderBy: { label: "asc" } }),
       prisma.taskTemplate.findMany({ orderBy: [{ usageCount: "desc" }, { description: "asc" }] }),
@@ -230,6 +232,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       userContent += `\n\n[User clarifications: ${clarifications}]`;
     }
 
+    // Call the model and parse the response
     const completion = await client.chat.completions.create({
       model: "gpt-4.1",
       max_tokens: 1000,
@@ -275,6 +278,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     }
 
+    // Resolve task templates and rates
     if (parsed.tasks?.length > 0) {
       const ratesForLookup = rateDtos as unknown as RateConfig[];
       /**

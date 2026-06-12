@@ -31,6 +31,7 @@ export default async function AdminPage(): Promise<React.ReactElement> {
   const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
+  // --- Parallel dashboard queries ---
   const [
     pendingCount,
     approvedCount,
@@ -148,6 +149,7 @@ export default async function AdminPage(): Promise<React.ReactElement> {
     }),
   ]);
 
+  // --- Review-link coverage ---
   const sentEmails = new Set<string>([
     ...contactsWithReviewSent.flatMap((c) => (c.email ? [c.email.toLowerCase()] : [])),
     ...bookingsWithReviewSent.flatMap((b) => (b.email ? [b.email.toLowerCase()] : [])),
@@ -212,6 +214,7 @@ export default async function AdminPage(): Promise<React.ReactElement> {
     ? now.getTime() - latestCacheEntry.fetchedAt.getTime()
     : null;
 
+  // --- Stat cards ---
   const stats = [
     {
       label: "Revenue this month",

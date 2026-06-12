@@ -50,6 +50,7 @@ export async function importFromGoogleContacts(): Promise<number> {
     let count = 0;
 
     do {
+      // Fetch one page of connections
       const response = await people.people.connections.list({
         resourceName: "people/me",
         personFields: "names,emailAddresses,phoneNumbers,addresses,organizations",

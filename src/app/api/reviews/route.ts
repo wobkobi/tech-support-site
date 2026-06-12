@@ -68,6 +68,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   const prisma = prismaClient;
   try {
+    // Parse and validate body
     const body = (await request.json()) as {
       text?: string;
       firstName?: string;
@@ -157,6 +158,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const { reviews: reviewSettings } = await getSettings();
     const status = verified && reviewSettings.autoApproveVerified ? "approved" : "pending";
 
+    // Create the review
     const review = await prisma.review.create({
       data: {
         text,

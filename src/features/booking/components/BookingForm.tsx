@@ -547,6 +547,8 @@ export default function BookingForm({
       }
     }
 
+    // Edit and create hit different endpoints: edit identifies the booking by
+    // cancel token; create adds the honeypot field + idempotency key instead.
     try {
       const endpoint = isEditMode ? "/api/booking/edit" : "/api/booking/request";
       const payload = isEditMode
@@ -610,6 +612,7 @@ export default function BookingForm({
         }
       }
 
+      // Redirect to the success page
       if (isEditMode) {
         router.push(`/booking/success?cancelToken=${encodeURIComponent(cancelToken!)}`);
       } else {

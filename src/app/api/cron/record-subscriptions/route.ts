@@ -33,6 +33,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }).format(new Date());
   const todayNZ = new Date(nzDateStr + "T00:00:00.000Z");
 
+  // Find subscriptions due today
   const due = await prisma.subscription.findMany({
     where: { isActive: true, nextDue: { lte: todayNZ } },
   });
@@ -44,6 +45,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   for (const sub of due) {
     try {
+      // Compute GST split and next due date
       const today = new Date();
       const rate = sub.gstRate;
       const inclNum = sub.amountIncl;
@@ -62,6 +64,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         continue;
       }
 
+      // Record the expense entry
       await prisma.expenseEntry.create({
         data: {
           date: today,
@@ -77,6 +80,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         },
       });
 
+      // Append to the expenses sheet
       try {
         const sheets = getSheetsClient();
         const spreadsheetId = getSheetId();

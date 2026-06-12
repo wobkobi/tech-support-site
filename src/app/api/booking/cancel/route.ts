@@ -75,6 +75,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (limited) return limited;
 
   try {
+    // Parse and validate body
     const body = (await request.json()) as CancelPayload;
     const { cancelToken } = body;
 
@@ -82,6 +83,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ ok: false, error: "Missing cancel token." }, { status: 400 });
     }
 
+    // Load the booking
     const booking = await prisma.booking.findFirst({
       where: { cancelToken },
     });
@@ -94,6 +96,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ ok: false, error: "Booking already cancelled." }, { status: 400 });
     }
 
+    // Remove the calendar event
     if (booking.calendarEventId) {
       try {
         await deleteBookingEvent({ eventId: booking.calendarEventId });
@@ -117,6 +120,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       CANCELLATION.travelChargeHours,
     );
 
+    // Cancel the booking
     const updated = await prisma.booking.update({
       where: { id: booking.id },
       data: {

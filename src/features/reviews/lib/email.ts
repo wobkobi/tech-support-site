@@ -200,6 +200,7 @@ export async function sendOwnerBookingNotification(
     return;
   }
 
+  // Derive display fields
   const kind = options?.kind ?? "new";
   const start = formatDateTimeLong(booking.startAt);
   const previous = options?.previousStartAt ? formatDateTimeLong(options.previousStartAt) : null;
@@ -218,6 +219,7 @@ export async function sendOwnerBookingNotification(
       ? `<p style="margin:0 0 16px;color:#555;font-size:13px">Was: <s>${escapeHtml(previous)}</s></p>`
       : "";
 
+  // Render the email body
   const html = `
 <!DOCTYPE html>
 <html lang="en">
@@ -238,6 +240,7 @@ export async function sendOwnerBookingNotification(
 </body>
 </html>`;
 
+  // Send via Resend
   try {
     await getResend().emails.send({
       from,
@@ -271,6 +274,7 @@ export async function sendCustomerBookingConfirmation(
     return;
   }
 
+  // Derive display fields
   const kind = options?.kind ?? "new";
   const firstName = booking.name.split(" ")[0];
   const safeFirstName = escapeHtml(firstName);
@@ -298,6 +302,7 @@ export async function sendCustomerBookingConfirmation(
     ? `<div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;padding:12px 16px;margin-bottom:16px"><p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#0c0a3e">🏷 Rate locked in: ${escapeHtml(booking.promoTitleAtBooking)}</p><p style="margin:0;font-size:13px;color:#444;line-height:1.5">This rate applies to your appointment even if the offer ends before your visit.</p></div>`
     : "";
 
+  // Render the email body
   const html = `
 <!DOCTYPE html>
 <html lang="en">
@@ -331,6 +336,7 @@ ${await buildEmailSignature(siteUrl)}
 </body>
 </html>`;
 
+  // Send via Resend
   try {
     await getResend().emails.send({
       from,
@@ -359,6 +365,7 @@ export async function sendBookingReminderEmail(booking: BookingNotificationData)
     return false;
   }
 
+  // Derive display fields
   const firstName = booking.name.split(" ")[0];
   const safeFirstName = escapeHtml(firstName);
   const start = formatDateTimeLong(booking.startAt);
@@ -369,6 +376,7 @@ export async function sendBookingReminderEmail(booking: BookingNotificationData)
     ? `<div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;padding:12px 16px;margin-bottom:16px"><p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#0c0a3e">🏷 Rate locked in: ${escapeHtml(booking.promoTitleAtBooking)}</p><p style="margin:0;font-size:13px;color:#444;line-height:1.5">This rate applies to your appointment even if the offer ends before your visit.</p></div>`
     : "";
 
+  // Render the email body
   const html = `
 <!DOCTYPE html>
 <html lang="en">
@@ -401,6 +409,7 @@ ${await buildEmailSignature(siteUrl)}
 </body>
 </html>`;
 
+  // Send via Resend
   try {
     await getResend().emails.send({
       from,

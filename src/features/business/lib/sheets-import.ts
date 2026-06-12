@@ -108,6 +108,7 @@ async function importFromSheet(
   let expensesSkipped = 0;
   const errors: string[] = [];
 
+  // Import Cashbook income rows
   for (let i = 0; i < cashRows.length; i++) {
     const row = cashRows[i];
     const date = parseDate(row[0] ?? "");
@@ -146,6 +147,7 @@ async function importFromSheet(
     }
   }
 
+  // Import Expenses rows
   for (let i = 0; i < expRows.length; i++) {
     const row = expRows[i];
     const date = parseDate(row[0] ?? "");

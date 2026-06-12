@@ -425,9 +425,11 @@ function printTable(results: PageResult[]): void {
   let exitCode = 0;
 
   try {
+    // Build and prepare the standalone output
     if (!skipBuild) runBuild();
     copyStandaloneAssets();
 
+    // Start the server and wait for readiness
     server = startServer(port);
 
     server.stderr?.on("data", (chunk: Buffer) => {
@@ -437,6 +439,7 @@ function printTable(results: PageResult[]): void {
 
     await waitForServer(port);
 
+    // Launch the browser
     browser = await puppeteer.launch({
       headless: true,
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
@@ -462,6 +465,7 @@ function printTable(results: PageResult[]): void {
     const allPages = [...publicPages, ...adminPagesAuthed];
     console.log(`Checking ${allPages.length} pages…\n`);
 
+    // Visit each page and collect results
     const results: PageResult[] = [];
 
     for (const spec of allPages) {
@@ -476,6 +480,7 @@ function printTable(results: PageResult[]): void {
       );
     }
 
+    // Report results and set the exit code
     printTable(results);
 
     const failed = results.filter((r) => r.status !== "pass");

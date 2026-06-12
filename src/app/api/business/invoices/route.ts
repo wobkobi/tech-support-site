@@ -78,6 +78,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     ? new Date(dueDate)
     : new Date(Date.now() + identity.paymentTermsDays * 24 * 60 * 60 * 1000);
 
+  // Allocate the invoice number
   const { number, sheetNextCount, sheetSyncWarning } = await getNextInvoiceNumber();
   const discount = typeof promoDiscount === "number" && promoDiscount > 0 ? promoDiscount : 0;
   const unsuccessfulDiscountValue =
@@ -94,6 +95,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     GST_REGISTERED,
   );
 
+  // Create the invoice
   const invoice = await prisma.invoice.create({
     data: {
       number,

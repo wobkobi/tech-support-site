@@ -28,6 +28,7 @@ export async function POST(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Load the invoice
   const { id } = await ctx.params;
   const invoice = await prisma.invoice.findUnique({ where: { id } });
   if (!invoice) {
@@ -50,6 +51,7 @@ export async function POST(
   const includeReviewOverride =
     typeof body.includeReview === "boolean" ? body.includeReview : undefined;
 
+  // Check review-link eligibility
   const siteUrl = getSiteUrl();
   const eligibility = await getInvoiceReviewEligibility({
     contactId: invoice.contactId,
@@ -64,6 +66,7 @@ export async function POST(
   const reviewUrl =
     includeReview && "reviewUrl" in eligibility ? (eligibility.reviewUrl ?? null) : null;
 
+  // Generate the invoice PDF
   let pdfBytes: Buffer;
   try {
     pdfBytes = await generateInvoicePdf({
@@ -78,6 +81,7 @@ export async function POST(
     return NextResponse.json({ error: "PDF generation failed" }, { status: 500 });
   }
 
+  // Send the email
   const ok = await sendInvoiceEmail({
     invoice: {
       number: invoice.number,

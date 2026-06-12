@@ -275,6 +275,7 @@ export function buildAvailableDays(
     const isTomorrow = i === 1;
     const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
+    // Build day labels
     const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
     const shortDayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const monthNames = [
@@ -337,6 +338,7 @@ export function buildAvailableDays(
         return true;
       };
 
+      // Check each start hour's sub-slots
       for (const slotHour of startHoursForDay(window, longMins)) {
         const subSlots: SubSlot[] = [];
 

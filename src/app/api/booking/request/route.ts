@@ -168,6 +168,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       console.error("[booking/request] Failed to fetch calendar events:", error);
     }
 
+    // Validate with duration
     const validation = validateBookingRequest(
       dateKey,
       timeOfDay,
@@ -190,6 +191,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
     const durationMinutes = duration === "short" ? config.durations.short : config.durations.long;
 
+    // Calculate start/end times
     const [year, month, day] = dateKey.split("-").map(Number);
 
     // Get dynamic UTC offset for this date (handles NZDT/NZST)
@@ -200,6 +202,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const cancelToken = randomUUID();
     const reviewToken = randomUUID();
 
+    // Build notes
     let bookingNotes = `${notes.trim()}\n\n`;
     const timeLabel =
       startMinute === 0
@@ -212,6 +215,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       bookingNotes += `Address: ${address.trim()}\n`;
     }
 
+    // Create calendar event
     let calendarEventId: string | null = null;
     try {
       const cleanDurationLabel = `${duration === "short" ? "Standard" : "Extended"} ${durationMinutes} min`;
@@ -286,6 +290,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     });
     const publicHolidayName = holiday?.name ?? null;
 
+    // Create booking
     try {
       const booking = await prisma.booking.create({
         data: {

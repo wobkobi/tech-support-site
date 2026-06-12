@@ -287,6 +287,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
     initialDraft?.savedAt ?? null,
   );
 
+  // Server-fetched reference data
   const [rates, setRates] = useState<RateConfig[]>([]);
   const [taskTemplates, setTaskTemplates] = useState<TaskTemplate[]>([]);
   // Multiple time slots all lump into one billable duration. AI parse populates
@@ -308,6 +309,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
   const [hourlyRateId, setHourlyRateId] = useState<string | null>(
     () => initialDraft?.hourlyRateId ?? null,
   );
+  // Tasks, parts, and notes
   const [tasks, setTasks] = useState<TaskLine[]>(() => initialDraft?.tasks ?? []);
   const [parts, setParts] = useState<PartLine[]>(() => initialDraft?.parts ?? []);
   const [showParts, setShowParts] = useState(false);
@@ -315,6 +317,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
   const [notes, setNotes] = useState(() => initialDraft?.notes ?? "");
   // Half off labour when ticked (per pricing-policy.unsuccessfulWorkCopy).
   const [unsuccessful, setUnsuccessful] = useState(() => initialDraft?.unsuccessful ?? false);
+  // Client details
   const [clientName, setClientName] = useState(() => initialDraft?.clientName ?? "");
   const [clientEmail, setClientEmail] = useState(() => initialDraft?.clientEmail ?? "");
   // Address-to state mirrors the InvoiceBuilder's segmented control so the
@@ -340,6 +343,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
   const [pendingInvoiceId, setPendingInvoiceId] = useState<string | null>(null);
   const [sheetSyncToast, setSheetSyncToast] = useState<string | null>(null);
 
+  // AI parse session
   const [aiInput, setAiInput] = useState(() => initialDraft?.aiInput ?? "");
   const [parsing, setParsing] = useState(false);
   const [parseResult, setParseResult] = useState<ParseJobResponse | null>(null);
@@ -348,14 +352,17 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
   const [clarifyQuestions, setClarifyQuestions] = useState<ParseJobQuestion[]>([]);
   const [clarifyAnswers, setClarifyAnswers] = useState<Record<string, string>>({});
 
+  // Travel lookup
   const [jobAddress, setJobAddress] = useState(() => initialDraft?.jobAddress ?? "");
   const [lookingUpTravel, setLookingUpTravel] = useState(false);
   const addressInputRef = useRef<HTMLInputElement>(null);
 
+  // Contacts and income save
   const [contacts, setContacts] = useState<GoogleContact[]>([]);
   const [savingIncome, setSavingIncome] = useState(false);
   const [incomeToast, setIncomeToast] = useState<string | null>(null);
 
+  // Rate management
   const [showRates, setShowRates] = useState(false);
   const [rateForm, setRateForm] = useState({
     label: "",
@@ -371,6 +378,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
   const [activePromo, setActivePromo] = useState<ActivePromo | null>(null);
   const [skipPromo, setSkipPromo] = useState(false);
 
+  // Google Maps address autocomplete
   useEffect(() => {
     const apiKey = process.env.GOOGLE_MAPS_API_KEY;
     if (!apiKey || !addressInputRef.current) return;
@@ -414,6 +422,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
     };
   }, []);
 
+  // Initial data fetch
   useEffect(() => {
     const now = nowTime();
     Promise.all([
@@ -502,6 +511,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
     return () => clearTimeout(t);
   }, [draftRestoredAt]);
 
+  // Derived durations and rate groupings
   const sumRangesMin = timeRanges.reduce((s, r) => s + timeDiffMins(r.startTime, r.endTime), 0);
   const durationMins = durationMinsOverride != null ? durationMinsOverride : sumRangesMin;
   // Aggregate first start / last end - used for the travel departure ISO and
@@ -524,6 +534,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
     .sort((a, b) => a.label.localeCompare(b.label));
   const flatRates = rates.filter((r) => r.flatRate !== null);
 
+  // Assemble the job and totals
   const job: JobCalculation = {
     startTime: aggregateStart,
     endTime: aggregateEnd,
@@ -620,6 +631,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
         parsedWindowMin = result.durationMins;
       }
 
+      // Hydrate rate, task, and part lines
       setHourlyRateId(result.hourlyRateId);
       const parsedTasks: TaskLine[] = result.tasks.map((t) => {
         const device = t.device ?? null;
@@ -887,6 +899,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
    * route).
    */
   async function handleSaveInvoice(): Promise<void> {
+    // Validate required fields
     setSaveInvoiceError(null);
     if (!clientName.trim()) {
       setSaveInvoiceError("Client name is required.");
@@ -902,6 +915,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
     }
     setSavingInvoice(true);
     try {
+      // Build and POST the invoice
       await saveTaskTemplates(tasks);
       const lineItems = jobToLineItems(job, pricing.billingIncrementMins);
       const promoActive = activePromo && !skipPromo && totals.promoDiscount > 0;

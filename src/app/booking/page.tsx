@@ -55,6 +55,7 @@ interface CalendarFetchResult {
  * @returns Events plus a `degraded` flag for the no-data state.
  */
 async function getCalendarEvents(now: Date, maxDate: Date): Promise<CalendarFetchResult> {
+  // Try the cache first
   const cachedEvents = await prisma.calendarEventCache.findMany({
     where: {
       expiresAt: { gt: now },
@@ -79,6 +80,7 @@ async function getCalendarEvents(now: Date, maxDate: Date): Promise<CalendarFetc
     };
   }
 
+  // Fall back to the live API
   try {
     const liveEvents = await fetchAllCalendarEvents(now, maxDate);
     console.log(
@@ -149,6 +151,7 @@ async function getAvailableDays(): Promise<{
 
   const maxDate = new Date(now.getTime() + config.maxAdvanceDays * 24 * 60 * 60 * 1000);
 
+  // Load blocking bookings and calendar events
   const [existingBookings, calendar] = await Promise.all([
     prisma.booking.findMany({
       where: {
@@ -166,6 +169,7 @@ async function getAvailableDays(): Promise<{
     getCalendarEvents(now, maxDate),
   ]);
 
+  // Build the bookable-day grid
   const existingForSlots: ExistingBooking[] = existingBookings.map((b) => ({
     id: b.id,
     startAt: b.startAt,

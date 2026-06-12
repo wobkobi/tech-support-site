@@ -31,6 +31,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   try {
+    // Load settings and policy
     const { comms } = await getSettings();
     if (!comms.notifyReminder) {
       return NextResponse.json({ ok: true, skipped: "reminders disabled", emailsSent: 0 });
@@ -44,6 +45,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const fromTime = new Date(now.getTime() + lowerHours * 60 * 60 * 1000);
     const upperTime = new Date(now.getTime() + comms.reminderLeadHours * 60 * 60 * 1000);
 
+    // Find bookings needing reminders
     const emailCandidates = await prisma.booking.findMany({
       where: {
         status: "confirmed",
@@ -66,6 +68,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     const results = { emailsSent: 0, failed: 0, errors: [] as string[] };
 
+    // Send each reminder email
     for (const b of emailCandidates) {
       try {
         const ok = await sendBookingReminderEmail({

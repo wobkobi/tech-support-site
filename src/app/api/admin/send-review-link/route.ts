@@ -37,6 +37,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   try {
+    // Parse and validate body
     const body = (await request.json()) as {
       name?: string;
       email?: string;
@@ -104,6 +105,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       },
     });
 
+    // Build the link and send the email
     const reviewUrl = `${siteUrl}/review?token=${reviewToken}`;
 
     if (mode === "sms") {

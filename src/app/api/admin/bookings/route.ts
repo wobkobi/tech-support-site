@@ -54,6 +54,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
+  // Parse the payload; trim free-text fields and lowercase the email
   const body = (await request.json()) as AdminBookingPayload;
   const name = body.name?.trim() ?? "";
   const email = body.email?.trim().toLowerCase() ?? "";
@@ -64,6 +65,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const durationMinutes = body.durationMinutes;
   const sendConfirmation = body.sendConfirmation === true;
 
+  // Validate fields
   if (!name || name.length > BOOKING_FIELD_LIMITS.name) {
     return NextResponse.json({ ok: false, error: "Customer name is required." }, { status: 400 });
   }
@@ -97,6 +99,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     phoneE164 = phoneCheck.e164;
   }
 
+  // Resolve start and end times
   const startAt = new Date(startAtStr);
   const endAt = new Date(startAt.getTime() + durationMinutes * 60_000);
   const now = new Date();
@@ -151,11 +154,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const cancelToken = randomUUID();
   const reviewToken = randomUUID();
 
+  // Build booking notes
   let bookingNotes = notes ? `${notes}\n\n` : "";
   bookingNotes += `[Manual entry by admin - ${durationMinutes} min]\n`;
   bookingNotes += `Meeting type: ${address ? "In-person" : "Remote"}\n`;
   if (address) bookingNotes += `Address: ${address}\n`;
 
+  // Create the calendar event
   let calendarEventId: string | null = null;
   try {
     const summary = `Tech Support: ${name} - ${durationMinutes === 60 ? "1 hour" : "2 hours"}`;
@@ -178,6 +183,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 
+  // Create the booking
   const { availability } = await getSettings();
   try {
     const booking = await prisma.booking.create({
@@ -210,6 +216,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       console.error("[admin/bookings] Contact upsert failed:", contactErr);
     }
 
+    // Send the confirmation email
     if (sendConfirmation) {
       await sendCustomerBookingConfirmation({
         id: booking.id,

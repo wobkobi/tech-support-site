@@ -57,11 +57,13 @@ export async function PATCH(
   const { id } = await params;
   const body = (await request.json()) as PatchPayload;
 
+  // Load the booking
   const booking = await prisma.booking.findUnique({ where: { id } });
   if (!booking) {
     return NextResponse.json({ error: "Booking not found." }, { status: 404 });
   }
 
+  // Sparse update: only fields present in the body get written.
   const data: Record<string, unknown> = {};
 
   if (body.name !== undefined) data.name = body.name.trim();
@@ -122,6 +124,7 @@ export async function PATCH(
     data.status = "confirmed";
   }
 
+  // Apply the update
   const updated = await prisma.booking.update({ where: { id }, data });
 
   // Same cancellation draft applies to on-behalf and no-show paths.
@@ -171,6 +174,7 @@ export async function PATCH(
     }
   }
 
+  // Sync contact details
   if (body.address !== undefined && booking.email) {
     try {
       await prisma.contact.updateMany({

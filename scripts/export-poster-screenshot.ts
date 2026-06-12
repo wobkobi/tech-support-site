@@ -141,6 +141,7 @@ function addCropMarks(page: PDFPage, trimWidth: number): void {
   // Calculate bleed margin (distance from page edge to trim edge)
   const bleedMargin = (pageWidth - trimWidth) / 2;
 
+  // Crop mark styling
   const markColor = rgb(0, 0, 0);
 
   // --- Top-left corner ---
@@ -268,6 +269,7 @@ async function generateVariant(
       height: config.pdfSize.height,
     });
 
+    // Add crop marks for print variant
     if (config.cropMarks) {
       addCropMarks(pdfPage, config.trimSize.width);
     }
@@ -303,9 +305,11 @@ async function exportPoster(options: ExportOptions): Promise<string[]> {
   const generatedFiles: string[] = [];
 
   try {
+    // Select configs based on format
     const digitalConfig = format === "a4" ? A4_DIGITAL_CONFIG : A5_DIGITAL_CONFIG;
     const printConfig = format === "a4" ? A4_PRINT_CONFIG : A5_PRINT_CONFIG;
 
+    // Determine which configs to generate
     const configs: PageConfig[] = [];
     if (variant === "digital" || variant === "both") {
       configs.push(digitalConfig);
@@ -314,6 +318,7 @@ async function exportPoster(options: ExportOptions): Promise<string[]> {
       configs.push(printConfig);
     }
 
+    // Generate each variant
     for (const config of configs) {
       console.log(`Generating: ${config.label}`);
       const filepath = await generateVariant(browser, config, url, outDir);

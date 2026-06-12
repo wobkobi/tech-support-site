@@ -161,17 +161,20 @@ export async function buildSocialImages(): Promise<void> {
   console.log("📱 Building social images...");
   await ensureDir("public");
 
+  // Read logos used by social specs
   const logoFullBuffer = await fs.readFile(LOGO_FULL);
   const logoProfileBuffer = await fs.readFile(LOGO_PROFILE);
 
   for (const spec of SOCIAL_SPECS) {
     const { name, width, height, blur, logoScale, quality, useMarkLogo } = spec;
 
+    // Create blurred background
     const bg = await sharp(BACKDROP)
       .resize(width, height, { fit: "cover", position: "centre" })
       .blur(blur)
       .toBuffer();
 
+    // Create frosted card box
     const frostedCard = await sharp(makeFrostedCard(width, height, logoScale))
       .resize(width, height)
       .png()
@@ -180,6 +183,7 @@ export async function buildSocialImages(): Promise<void> {
     // Select logo - use profile logo for profile pictures, otherwise use mark or full
     const logoSource = useMarkLogo ? logoProfileBuffer : logoFullBuffer;
 
+    // Resize logo to fit
     const logo = await sharp(logoSource)
       .resize({
         width: Math.round(width * logoScale),

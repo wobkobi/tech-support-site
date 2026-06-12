@@ -107,6 +107,7 @@ export function DayAgendaView({
   holidaysByDateKey,
 }: DayAgendaViewProps): React.ReactElement {
   const router = useRouter();
+  // Day selection and sheet state
   const [selectedDayKey, setSelectedDayKey] = useState(initialDayKey);
   const [modalStartAt, setModalStartAt] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);

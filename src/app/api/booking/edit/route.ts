@@ -77,6 +77,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ ok: false, error: "Missing cancel token." }, { status: 400 });
     }
 
+    // Find booking
     const booking = await prisma.booking.findFirst({ where: { cancelToken } });
     if (!booking) {
       return NextResponse.json({ ok: false, error: "Booking not found." }, { status: 404 });
@@ -88,6 +89,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
+    // Validate payload fields
     const payloadCheck = validateBookingPayloadFields(
       { name, notes, dateKey, timeOfDay, duration, meetingType, address, phone },
       { requireEmail: false },
@@ -165,6 +167,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       console.error("[booking/edit] Failed to fetch calendar events:", error);
     }
 
+    // Validate the requested slot
     const validation = validateBookingRequest(
       dateKey,
       timeOfDay,
@@ -189,11 +192,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const durationLabel = `${duration === "short" ? "Standard" : "Extended"} (${durationMinutes} min)`;
     const cleanDurationLabel = `${duration === "short" ? "Standard" : "Extended"} ${durationMinutes} min`;
 
+    // Calculate start/end times
     const [year, month, day] = dateKey.split("-").map(Number);
     const utcOffset = getPacificAucklandOffset(year, month, day);
     const startAt = new Date(Date.UTC(year, month - 1, day, startHour - utcOffset, startMinute, 0));
     const endAt = new Date(startAt.getTime() + durationMinutes * 60 * 1000);
 
+    // Build updated notes
     let bookingNotes = `${notes.trim()}\n\n`;
     const timeLabel =
       startMinute === 0
@@ -224,6 +229,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     }
 
+    // Create new calendar event
     let calendarEventId: string | null = null;
     try {
       const summary = `Tech Support: ${name.trim()} - ${cleanDurationLabel}`;
@@ -251,6 +257,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // email notifications can show "was: <old time>".
     const previousStartAt = booking.startAt;
 
+    // Update the booking
     try {
       await prisma.booking.update({
         where: { id: booking.id },

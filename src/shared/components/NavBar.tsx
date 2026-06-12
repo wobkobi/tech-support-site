@@ -104,11 +104,13 @@ export function NavBar(): React.ReactElement | null {
   });
   const mobileMenuOpen = mobileMenuState.open && mobileMenuState.pathname === pathname;
 
+  // Scroll reveal state
   const [isScrolled, setIsScrolled] = useState(false);
   const [isHidden, setIsHidden] = useState(false);
   const [scrollOffset, setScrollOffset] = useState(0);
   const [isHoveringTop, setIsHoveringTop] = useState(false);
 
+  // Scroll and focus refs
   const scrollLockRef = useRef(0);
   const bodyLockedRef = useRef(false);
   const lastScrollYRef = useRef(0);

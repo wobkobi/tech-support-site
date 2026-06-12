@@ -45,6 +45,7 @@ export function InvoiceActions({
   status,
 }: InvoiceActionsProps): React.ReactElement {
   const router = useRouter();
+  // Send-email preview state
   const [previewOpen, setPreviewOpen] = useState(false);
   const [preview, setPreview] = useState<{ subject: string; html: string; to: string } | null>(
     null,
@@ -53,6 +54,7 @@ export function InvoiceActions({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sentAt, setSentAt] = useState<string | null>(null);
+  // Action busy flags
   const [marking, setMarking] = useState(false);
   const [voiding, setVoiding] = useState(false);
   const [deleting, setDeleting] = useState(false);

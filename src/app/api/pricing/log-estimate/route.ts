@@ -56,6 +56,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const body = (await request.json().catch(() => null)) as LogBody | null;
   if (!body) return NextResponse.json({ error: "invalid body" }, { status: 400 });
 
+  // Sanitise the payload fields
   const description =
     typeof body.description === "string" ? body.description.trim().slice(0, 500) : "";
   if (!description) return NextResponse.json({ error: "description required" }, { status: 400 });
@@ -94,6 +95,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // locally. The admin page uses this to hide local test submissions.
   const environment = process.env.NODE_ENV ?? "production";
 
+  // Persist the log entry
   try {
     await prisma.priceEstimateLog.create({
       data: {

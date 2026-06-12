@@ -27,6 +27,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   try {
+    // Load settings and compute the cutoff
     const { comms } = await getSettings();
     if (!comms.notifyReviewRequest) {
       return NextResponse.json({ ok: true, skipped: "review requests disabled", sent: 0 });
