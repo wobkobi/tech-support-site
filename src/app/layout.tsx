@@ -46,19 +46,14 @@ export const metadata: Metadata = {
   creator: "Harrison Raynes",
   publisher: "To The Point Tech",
   category: "Technology",
-  alternates: {
-    canonical: "/",
-    languages: { "en-NZ": "/" },
-  },
   openGraph: {
     type: "website",
     locale: "en_NZ",
     siteName: "To The Point Tech",
-    url: "/",
     title: "To The Point Tech - Computer & IT Support in Auckland",
     description:
       "Friendly computer and IT support across Auckland. On-site and remote help, transparent pricing, no jargon.",
-    images: [{ url: "/og-1200x630.jpg", width: 1200, height: 630, alt: "To The Point Tech" }],
+    // og:image is served route-wide by the file-based src/app/opengraph-image.jpg.
   },
   twitter: {
     card: "summary_large_image",

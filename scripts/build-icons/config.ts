@@ -84,11 +84,23 @@ export interface SocialSpec {
   quality: number;
   /** Use square logo mark instead of full wordmark. */
   useMarkLogo?: boolean;
+  /** Extra destination to copy the finished image to (besides public/). */
+  copyTo?: string;
 }
 
 export const SOCIAL_SPECS: SocialSpec[] = [
-  // Open Graph (Facebook, LinkedIn, Discord, etc.)
-  { name: "og-1200x630", width: 1200, height: 630, blur: 25, logoScale: 0.85, quality: 90 },
+  // Open Graph (Facebook, LinkedIn, Discord, etc.). Also copied to
+  // src/app/opengraph-image.jpg, which Next serves as og:image on every
+  // route; the public/ copy stays for twitter.images and JSON-LD.
+  {
+    name: "og-1200x630",
+    width: 1200,
+    height: 630,
+    blur: 25,
+    logoScale: 0.85,
+    quality: 90,
+    copyTo: "src/app/opengraph-image.jpg",
+  },
   // Twitter/X Card
   {
     name: "twitter-card-1200x600",

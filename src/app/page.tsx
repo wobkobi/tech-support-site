@@ -11,6 +11,7 @@ import { FrostedSection, PageShell } from "@/shared/components/PageLayout";
 import { cn } from "@/shared/lib/cn";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
+import type { Metadata } from "next";
 import { unstable_cache } from "next/cache";
 import Image from "next/image";
 import type React from "react";
@@ -35,6 +36,13 @@ import {
   FaTv,
   FaWifi,
 } from "react-icons/fa6";
+
+export const metadata: Metadata = {
+  alternates: {
+    canonical: "/",
+    languages: { "en-NZ": "/" },
+  },
+};
 
 // Rely on on-demand revalidation (revalidateReviewPaths fires on every review change).
 // Long fallback avoids waking a cold DB on a fixed timer.

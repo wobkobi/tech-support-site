@@ -6,6 +6,7 @@
  */
 
 import { cn } from "@/shared/lib/cn";
+import type { Metadata } from "next";
 import Image from "next/image";
 import type React from "react";
 import {
@@ -27,6 +28,12 @@ import {
   FaTv,
   FaWifi,
 } from "react-icons/fa6";
+
+// Print artwork source, not a web page: keep it out of search results.
+export const metadata: Metadata = {
+  title: "Poster",
+  robots: { index: false, follow: false },
+};
 
 const supportItems: Array<{ label: string; icon: React.ComponentType<{ className?: string }> }> = [
   { label: "Computers", icon: FaLaptop },
