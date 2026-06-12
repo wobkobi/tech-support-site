@@ -1,6 +1,6 @@
 {
   "name": "tech-support-site",
-  "version": "1.108.1",
+  "version": "1.108.2",
   "private": true,
   "type": "module",
   "scripts": {
@@ -98,7 +98,7 @@
     "prisma": "6.19.3",
     "puppeteer": "^25.1.0",
     "qr-code-styling": "^1.9.2",
-    "sharp": "^0.35.0",
+    "sharp": "^0.35.1",
     "simple-git-hooks": "^2.13.1",
     "tailwindcss": "^4.3.0",
     "tsx": "^4.22.4",
