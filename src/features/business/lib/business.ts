@@ -373,13 +373,18 @@ export function effectiveHourlyRate(
  * per part, and a single Travel row summed from `travelEntries`.
  * @param job - Job calculation with time, tasks, parts.
  * @param incrementMins - Billing increment (live pricing setting); defaults to the code const.
+ * @param holidayUplift - Public-holiday labour uplift fraction (0 = none); adds a surcharge line.
  * @returns Array of line items ready for an invoice.
  */
 export function jobToLineItems(
   job: JobCalculation,
   incrementMins: number = BILLING_INCREMENT_MINS,
+  holidayUplift: number = 0,
 ): LineItem[] {
   const items: LineItem[] = [];
+  // Running total of labour (time charge + hourly tasks) so the public-holiday
+  // surcharge line can uplift exactly that, never travel or parts.
+  let labourTotal = 0;
 
   if (job.durationMins > 0 && job.hourlyRate) {
     const billed = billableMins(job.durationMins, incrementMins);
@@ -392,15 +397,30 @@ export function jobToLineItems(
       unitPrice: lineTotal,
       lineTotal,
     });
+    labourTotal += lineTotal;
   }
 
   for (const task of job.tasks) {
+    const lineTotal = Math.round(task.qty * task.unitPrice * 100) / 100;
     items.push({
       description: task.description,
       qty: task.qty,
       unitPrice: task.unitPrice,
-      lineTotal: Math.round(task.qty * task.unitPrice * 100) / 100,
+      lineTotal,
     });
+    if (isHourlyTask(task)) labourTotal += lineTotal;
+  }
+
+  if (holidayUplift > 0 && labourTotal > 0) {
+    const surcharge = Math.round(labourTotal * holidayUplift * 100) / 100;
+    if (surcharge > 0) {
+      items.push({
+        description: `Public holiday surcharge (+${Math.round(holidayUplift * 100)}%)`,
+        qty: 1,
+        unitPrice: surcharge,
+        lineTotal: surcharge,
+      });
+    }
   }
 
   for (const part of job.parts) {
@@ -436,6 +456,8 @@ export interface JobPricing {
   gstRegistered: boolean;
   minTravelCharge: number;
   billingIncrementMins: number;
+  /** Public-holiday labour uplift as a fraction (e.g. 0.25); 0/undefined when the job date isn't a holiday. */
+  holidayUplift?: number;
 }
 
 /**
@@ -523,6 +545,7 @@ export function calcJobTotal(
   tasksTotal: number;
   partsTotal: number;
   travelTotal: number;
+  holidaySurcharge: number;
   subtotal: number;
   promoDiscount: number;
   unsuccessfulDiscount: number;
@@ -542,7 +565,16 @@ export function calcJobTotal(
     hasAutoEntry && rawTravelTotal > 0 && rawTravelTotal < pricing.minTravelCharge
       ? pricing.minTravelCharge
       : rawTravelTotal;
-  const subtotal = Math.round((timeCharge + tasksTotal + partsTotal + travelTotal) * 100) / 100;
+  // Public-holiday surcharge uplifts labour only (time charge + hourly tasks),
+  // never travel or parts. 0 when the job date isn't a holiday.
+  const holidayUplift = pricing.holidayUplift ?? 0;
+  const hourlyTasksTotal = job.tasks
+    .filter(isHourlyTask)
+    .reduce((s, t) => s + t.qty * t.unitPrice, 0);
+  const holidaySurcharge =
+    holidayUplift > 0 ? Math.round((timeCharge + hourlyTasksTotal) * holidayUplift * 100) / 100 : 0;
+  const subtotal =
+    Math.round((timeCharge + tasksTotal + partsTotal + travelTotal + holidaySurcharge) * 100) / 100;
   const promoDiscount = computeJobPromoDiscount(job, promo, pricing.billingIncrementMins);
   let unsuccessfulDiscount = 0;
   if (job.unsuccessful) {
@@ -569,6 +601,7 @@ export function calcJobTotal(
     tasksTotal,
     partsTotal,
     travelTotal,
+    holidaySurcharge,
     subtotal,
     promoDiscount,
     unsuccessfulDiscount,

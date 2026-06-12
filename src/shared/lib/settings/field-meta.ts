@@ -378,13 +378,49 @@ export const PRICING_FIELD_META: Record<string, FieldMeta> = {
   },
 };
 
-/** Metadata for the estimator group's single editable field (the benchmark list). */
+/** Metadata for the estimator group's editable fields (benchmark list + range widths). */
 export const ESTIMATOR_FIELD_META: Record<string, FieldMeta> = {
   benchmarks: {
     title: "Task-duration benchmarks",
     description:
       "How long each task takes on its own. The estimator combines these for multi-task visits. Edit a time, add a task, or remove one.",
     unit: "minutes",
+  },
+  "range.high.lowFactor": {
+    title: "Detailed job - low end",
+    description: "Low price as a % of the estimate when the description is clear.",
+    unit: "%",
+  },
+  "range.high.highFactor": {
+    title: "Detailed job - high end",
+    description: "High price as a % of the estimate when the description is clear.",
+    unit: "%",
+  },
+  "range.medium.lowFactor": {
+    title: "Some detail - low end",
+    description: "Low price % for a partly-specified job.",
+    unit: "%",
+  },
+  "range.medium.highFactor": {
+    title: "Some detail - high end",
+    description: "High price % for a partly-specified job.",
+    unit: "%",
+  },
+  "range.low.lowFactor": {
+    title: "Vague job - low end",
+    description: "Low price % when the description is thin (drop this to read 'from $X').",
+    unit: "%",
+  },
+  "range.low.highFactor": {
+    title: "Vague job - high end",
+    description: "High price % when the description is thin (keep modest so it doesn't deter).",
+    unit: "%",
+  },
+  "range.minSpread": {
+    title: "Minimum range spread",
+    description:
+      "Smallest dollar gap between low and high so tiny jobs don't look falsely precise.",
+    unit: "$",
   },
 };
 

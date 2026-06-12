@@ -62,10 +62,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!description) return NextResponse.json({ error: "description required" }, { status: 400 });
 
   const aiEstimatedMins = Math.max(0, Math.round(Number(body.aiEstimatedMins) || 0));
-  const aiCategory: AiEstimateCategory =
-    body.aiCategory === AiEstimateCategory.complex
-      ? AiEstimateCategory.complex
-      : AiEstimateCategory.standard;
+  // The "complex" tier was removed; every estimate logs as standard now. The
+  // enum + column stay so historical rows still read.
+  const aiCategory: AiEstimateCategory = AiEstimateCategory.standard;
   const aiExplanation =
     typeof body.aiExplanation === "string" ? body.aiExplanation.trim().slice(0, 400) : "";
   const aiTasks = cleanTasks(body.aiTasks);
@@ -97,7 +96,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   // Persist the log entry
   try {
-    await prisma.priceEstimateLog.create({
+    const created = await prisma.priceEstimateLog.create({
       data: {
         description,
         aiEstimatedMins,
@@ -114,7 +113,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         environment,
       },
     });
-    return NextResponse.json({ ok: true });
+    // Return the id so the wizard can carry it to /booking and the booking can
+    // snapshot which quote the customer saw.
+    return NextResponse.json({ ok: true, id: created.id });
   } catch (err) {
     console.error("[log-estimate] failed:", err);
     return NextResponse.json({ ok: false, error: "Could not log estimate" }, { status: 500 });

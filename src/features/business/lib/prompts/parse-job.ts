@@ -94,8 +94,8 @@ EXAMPLES — multi-task splitting + specific actions + details:
 
 BILLING — single source of truth for time distribution. Run the algorithm step by step.
 1. Determine durationMins (from pre-computed annotation if present, otherwise from the description).
-2. Convert to decimal hours, ROUNDING UP to the next 0.25 (matches the calculator's billable rule of rounding up to the nearest 15-min increment).
-   Examples: 105 min = 1.75h exactly → 1.75h. 107 min → 2.0h (110 ceils to 120). 110 min → 2.0h. 120 min → 2.0h. 121 min → 2.25h.
+2. Convert durationMins to billable minutes using the BILLING line in the context message: round to the NEAREST billing increment, then take the larger of that and the minimum billable time; divide by 60 for totalHours. Distribute totalHours across the tasks on that same increment grid. The 0.25h figures in the examples below assume the default 15-min increment - ALWAYS use the increment + minimum from the context message instead; the examples only illustrate how to apportion time between tasks (which task gets more).
+   Examples at the default settings (5-min increment, 15-min minimum): 23 min → 0.42h. 107 min → 1.75h. 110 min → 1.83h. 8 min → 0.25h (below the minimum).
 3. Identify how many distinct tasks there are (N).
 4. Classify each task into one of three sets, then distribute totalHours across them.
 
@@ -120,7 +120,7 @@ BILLING — single source of truth for time distribution. Run the algorithm step
    - "isExplicit": true for every task in P (any pinned task — short or long). The calculator uses this flag to keep the parser-emitted qty unchanged during the post-parse safety-net rebalance, so window mismatches only redistribute the floating tasks.
 
 Worked examples:
-- 80-min job, 3 tasks: "connected printer to wifi (30 mins)", "advised on M365/Norton subs", "QoL tweaks (15 mins)". totalHours = ceil(80/15)*15/60 = 1.5h.
+- Job with totalHours = 1.5h, 3 tasks: "connected printer to wifi (30 mins)", "advised on M365/Norton subs", "QoL tweaks (15 mins)".
   P = {printer (0.5h, isExplicit, NOT short), QoL (0.25h, isExplicit, short)}. F = {advice}.
   floatingHours = 1.5 - 0.5 - 0.25 = 0.75. subBase = 0.75. Final: printer 0.5 / advice 0.75 / QoL 0.25.
 - 1.75h across 3 tasks (Streaming setup, Phone factory reset, Car Bluetooth setup): no explicit durations. P = {}. S = {Phone factory reset} (inherent one-shot). F = {Streaming, Phone factory reset, Car}. After the subBase pass, the factory reset is pinned at 0.25 via the short rule, leaving 1.5 for the other two → 0.75 each. Final: 0.75 / 0.25 / 0.75. isShort: false / true / false. isExplicit: all false.
@@ -142,13 +142,12 @@ RATES — base + stacked modifiers (effective $/hr = base + sum of modifier delt
 For each hourly task, set:
 - "baseRateLabel": always "Standard" (the base hourly rate)
 - "modifierLabels": array of modifier labels to apply per the triggers below. Empty array [] if no modifiers.
-The SERVER computes unitPrice from these labels - DO NOT compute it yourself, just pick labels.
+The SERVER computes unitPrice from these labels - DO NOT compute it yourself, just pick labels. The dollar value of each modifier comes from the live rate config above; match by label name, never by any example figure.
 
 Modifier triggers:
-- "At home" (-$10): WORK was done at Harrison's home, alone, no screen-share. Triggers: phrases that clearly mean Harrison's location, like "I worked from home", "did this at home", "I was at home for this", "took the laptop home". STRONG OVERRIDE: if the description includes a destination address ("Meola Road", "their place", "123 Smith St", a suburb name) OR a travel verb where Harrison is the subject ("drove to", "walked to", "biked to", "took the bus to") → Harrison went to the client. Do NOT apply At home, even if "at home" appears elsewhere in the description (it's almost certainly describing the customer's context, not Harrison's). Add a warning when "at home" was present but overridden.
-- "Remote" (-$10): client on-screen via screen share. Triggers: "remote", "TeamViewer", "AnyDesk", "screen share", "remote access", "remote desktop", client watching/guiding.
-- "Complex" (+$20): genuinely complex task. Triggers: data recovery, hardware repair, PC build, PC assembly, full system migration, motherboard-level diagnosis, BIOS work, operating system reinstall paired with recovery.
-- "Research" (-$25): time spent figuring out / investigating an unfamiliar problem, not direct delivery. Triggers: "researched", "had to look up", "figured out how to", "spent time investigating", "wasn't sure so I read up on", "learned how to", "had to work out", "looked into". Apply to the SPECIFIC task that was research-heavy, not the whole job - if Harrison researched an obscure printer driver for 90 min and then spent 30 min installing it, only the 90-min research task gets Research. Stacks freely with location modifiers (At home, Remote). For job-wide "flat $50 for the research" cases the operator picks a flat-rate row at review - do NOT try to guess flat-vs-hourly, always emit Research as a modifier on the research task.
+- "At home": WORK was done at Harrison's home, alone, no screen-share. Triggers: phrases that clearly mean Harrison's location, like "I worked from home", "did this at home", "I was at home for this", "took the laptop home". STRONG OVERRIDE: if the description includes a destination address ("Meola Road", "their place", "123 Smith St", a suburb name) OR a travel verb where Harrison is the subject ("drove to", "walked to", "biked to", "took the bus to") → Harrison went to the client. Do NOT apply At home, even if "at home" appears elsewhere in the description (it's almost certainly describing the customer's context, not Harrison's). Add a warning when "at home" was present but overridden.
+- "Remote": client on-screen via screen share. Triggers: "remote", "TeamViewer", "AnyDesk", "screen share", "remote access", "remote desktop", client watching/guiding.
+- "Research": time spent figuring out / investigating an unfamiliar problem, not direct delivery. Triggers: "researched", "had to look up", "figured out how to", "spent time investigating", "wasn't sure so I read up on", "learned how to", "had to work out", "looked into". Apply to the SPECIFIC task that was research-heavy, not the whole job - if Harrison researched an obscure printer driver for 90 min and then spent 30 min installing it, only the 90-min research task gets Research. Stacks freely with location modifiers (At home, Remote). For job-wide "flat $50 for the research" cases the operator picks a flat-rate row at review - do NOT try to guess flat-vs-hourly, always emit Research as a modifier on the research task.
 
 Customer-context phrases that DO NOT trigger At home (the customer is describing where THEY use the device, not where Harrison worked):
 - "their Spotify works at home and in the car"
@@ -157,10 +156,10 @@ Customer-context phrases that DO NOT trigger At home (the customer is describing
 - "across multiple devices at home"
 Treat these as descriptive context, not a location signal for billing.
 
-Stacking: combine triggers freely - e.g. on-site regular → []; data recovery at home → ["At home", "Complex"]; research at home → ["At home", "Research"]; remote research → ["Remote", "Research"].
+Stacking: combine triggers freely - e.g. on-site regular → []; research at home → ["At home", "Research"]; remote research → ["Remote", "Research"].
 
 Mixed jobs: different tasks in the same job CAN and SHOULD have different modifier sets if their context differs. Examples:
-- At-home job with both Windows reinstall (At home only) and data recovery (At home + Complex) → task A modifierLabels ["At home"], task B modifierLabels ["At home", "Complex"].
+- At-home job with a Windows reinstall (At home) and an obscure driver Harrison had to research (At home + Research) → task A modifierLabels ["At home"], task B modifierLabels ["At home", "Research"].
 - On-site job where Harrison researched an obscure printer driver before installing it → research task modifierLabels ["Research"], install task modifierLabels [].
 
 If location/rate signals conflict, do NOT silently pick - add a warning describing the conflict and state which you assumed.
@@ -186,11 +185,11 @@ OTHER RULES:
 - confidence: "high" if all session times are clearly stated. "medium" if some times were estimated. "low" if mostly guessed.
 - warnings[]: Flag anything ambiguous, assumed, or conflicting in plain English.
 - destination: The client's suburb or address if the job was at the client's location (e.g. "Papakura", "123 Smith St Manukau"). Set to null if working from home or doing remote support.
-- statedDistanceKm: If the user explicitly states a travel distance AND traveled by car or vehicle, set this to the total round-trip km as a number (e.g. "traveled 10 km there and back" → 10, "drove 8 km each way" → 16). Set to null if no distance was stated, or if travel was by foot, bicycle, or public transport.
-  - Walking, cycling, or public transport: set statedDistanceKm to null, set noTravelCharge to true, and add a warning: "Traveled by [mode] - no travel charge applied. Verify if this should be charged."
-  - Car/vehicle with stated km: set statedDistanceKm to the round-trip total, noTravelCharge to false.
-  - Car/vehicle without stated km but with a destination: set statedDistanceKm to null, noTravelCharge to false (the route will look it up via API).
-- noTravelCharge: true if the user traveled by foot, bicycle, or public transport (mileage rate does not apply). false for all car/vehicle travel and when travel mode is unspecified.
+- statedDistanceKm: If the user explicitly states a travel distance AND traveled by car/vehicle OR public transport, set this to the total round-trip km as a number (e.g. "traveled 10 km there and back" → 10, "drove 8 km each way" → 16). Set to null if no distance was stated, or if travel was by foot or bicycle.
+  - Walking or cycling: set statedDistanceKm to null, set noTravelCharge to true, and add a warning: "Traveled by [mode] - no travel charge applied (assumed local job). Verify if this should be charged."
+  - Car/vehicle or public transport, with stated km: set statedDistanceKm to the round-trip total, noTravelCharge to false.
+  - Car/vehicle or public transport, without stated km but with a destination: set statedDistanceKm to null, noTravelCharge to false (the route looks up the driving route via API and charges it - travel bills the same regardless of how the operator actually got there).
+- noTravelCharge: true ONLY if the user traveled by foot or bicycle (assumed a local job, no travel charge). false for all car/vehicle and public transport travel, and when travel mode is unspecified.
 - Ignore dates and client names.
 
 CLARIFICATION MODE:
@@ -253,6 +252,9 @@ Return this exact JSON shape (when not asking for clarification):
  * @param identity.company - Business / trading name.
  * @param identity.name - Sole-trader operator name.
  * @param identity.location - Business locality (e.g. Auckland, New Zealand).
+ * @param billing - Live billing-rounding settings the BILLING step reads.
+ * @param billing.minBillableMins - Minimum billable time (minutes).
+ * @param billing.incrementMins - Rounding increment (minutes).
  * @returns Context string to prepend to the user's job description.
  */
 export function buildParseJobContext(
@@ -260,6 +262,7 @@ export function buildParseJobContext(
   templates: TaskTemplate[] = [],
   currentTime?: string,
   identity?: { company: string; name: string; location: string },
+  billing?: { minBillableMins: number; incrementMins: number },
 ): string {
   const templateBlock =
     templates.length > 0
@@ -277,9 +280,12 @@ export function buildParseJobContext(
   const identityBlock = identity
     ? `Business: ${identity.company}, sole trader ${identity.name}, based in ${identity.location}.\n\n`
     : "";
+  const billingBlock = billing
+    ? `BILLING: round worked time to the nearest ${billing.incrementMins} min, with a ${billing.minBillableMins} min minimum.\n\n`
+    : "";
   return `${identityBlock}Current rates:
 ${JSON.stringify(rates, null, 2)}
 
-${templateBlock}${timeBlock}--- BEGIN USER DATA ---
+${templateBlock}${billingBlock}${timeBlock}--- BEGIN USER DATA ---
 `;
 }

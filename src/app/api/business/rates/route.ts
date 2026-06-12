@@ -3,9 +3,9 @@ import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
 // Seed shape: one base hourly rate (Standard), modifier rates that shift the
-// effective $/hr (Complex +$20, At home -$10, Remote -$10), a percentage
-// modifier for Public Holiday (+25%), and the Travel flat rate. Combination
-// rates like "Complex at home" are derived from base + modifiers, not stored.
+// effective $/hr (At home -$10, Remote -$10), a percentage modifier for Public
+// Holiday (+25%), and the Travel time rate. There is no separate Complex tier
+// - everything bills at the Standard rate plus the other modifiers.
 const DEFAULTS = [
   {
     label: "Standard",
@@ -15,15 +15,6 @@ const DEFAULTS = [
     percentDelta: null,
     unit: "hour",
     isDefault: true,
-  },
-  {
-    label: "Complex",
-    ratePerHour: null,
-    flatRate: null,
-    hourlyDelta: 20,
-    percentDelta: null,
-    unit: "modifier",
-    isDefault: false,
   },
   {
     label: "At home",
@@ -54,7 +45,7 @@ const DEFAULTS = [
   },
   {
     label: "Travel",
-    // Time-based travel rate ($40/h round-trip, $10 minimum) - sidesteps any
+    // Time-based travel rate ($40/hr round-trip, $10 minimum) - sidesteps any
     // IRD per-km comparison and matches "you pay for my time, including drive
     // time". Round-trip + floor enforcement live in calcTravelCharge.
     ratePerHour: 40,
@@ -82,10 +73,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   if (missing.length > 0) {
     await prisma.rateConfig.createMany({ data: missing });
   }
-  // Passive cleanup: the Student modifier is no longer part of DEFAULTS.
-  // Delete any leftover row on every seed call so production matches the
+  // Passive cleanup: Student and Complex are no longer part of DEFAULTS.
+  // Delete any leftover rows on every seed call so production matches the
   // DEFAULTS shape without needing a manual migration.
-  await prisma.rateConfig.deleteMany({ where: { label: "Student" } });
+  await prisma.rateConfig.deleteMany({ where: { label: { in: ["Student", "Complex"] } } });
 
   // Travel rate migration: legacy rows still carry { flatRate: 1.2, unit: "km" }
   // from the per-km model. Switch to { ratePerHour: 40, unit: "travel-hour" }

@@ -1,6 +1,7 @@
 "use client";
 
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
+import { priceRangeFor } from "@/features/business/lib/estimate-range";
 import { calcTravelCharge } from "@/features/business/lib/pricing-policy";
 import {
   applyPromoToHourlyRate,
@@ -9,6 +10,7 @@ import {
 } from "@/features/business/lib/promos";
 import type { PriceRange, PublicRate } from "@/features/business/types/pricing";
 import { cn } from "@/shared/lib/cn";
+import type { EstimateConfidence, EstimatorRange } from "@/shared/lib/settings/types";
 import Link from "next/link";
 import type React from "react";
 import { useEffect, useState } from "react";
@@ -47,6 +49,8 @@ interface Props {
   minBillableMins: number;
   /** Travel floor (live pricing setting) for the travel estimate. */
   minTravelCharge: number;
+  /** Confidence-scaled price-range widths (live estimator setting). */
+  estimatorRange: EstimatorRange;
 }
 
 /**
@@ -55,9 +59,14 @@ interface Props {
  * @param props - Component props.
  * @param props.minBillableMins - Minimum billable minutes used to floor the estimate.
  * @param props.minTravelCharge - Travel floor for the travel estimate.
+ * @param props.estimatorRange - Confidence-scaled price-range widths (live estimator setting).
  * @returns The rendered wizard.
  */
-export function PricingWizard({ minBillableMins, minTravelCharge }: Props): React.ReactElement {
+export function PricingWizard({
+  minBillableMins,
+  minTravelCharge,
+  estimatorRange,
+}: Props): React.ReactElement {
   const [rates, setRates] = useState<PublicRate[]>([]);
   const [activePromo, setActivePromo] = useState<ActivePromo | null>(null);
   const [loading, setLoading] = useState(true);
@@ -68,8 +77,12 @@ export function PricingWizard({ minBillableMins, minTravelCharge }: Props): Reac
   const [addressNotFound, setAddressNotFound] = useState(false);
   const [aiExplanation, setAiExplanation] = useState("");
   const [aiEstimatedMins, setAiEstimatedMins] = useState(0);
+  const [aiConfidence, setAiConfidence] = useState<EstimateConfidence>("medium");
   const [result, setResult] = useState<PriceRange | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
+  // Id of the logged estimate, carried to /booking so the booking snapshots
+  // which quote the customer actually saw.
+  const [estimateId, setEstimateId] = useState<string | null>(null);
 
   useEffect(() => {
     // Rates + active promo in parallel; promo may be null.
@@ -125,7 +138,7 @@ export function PricingWizard({ minBillableMins, minTravelCharge }: Props): Reac
             ok: boolean;
             result?: {
               estimatedMins: number;
-              category: "standard" | "complex";
+              confidence: EstimateConfidence;
               explanation: string;
               tasks: { label: string; mins: number }[];
             };
@@ -152,14 +165,14 @@ export function PricingWizard({ minBillableMins, minTravelCharge }: Props): Reac
     let estimatedMins = 60;
     let fullRate = 65;
     let explanation = "";
-    let category: "standard" | "complex" = "standard";
+    let confidence: EstimateConfidence = "medium";
     let tasks: { label: string; mins: number }[] = [];
 
     if (estimateRes.status === "fulfilled" && estimateRes.value.ok && estimateRes.value.result) {
       const ai = estimateRes.value.result;
       estimatedMins = ai.estimatedMins;
       explanation = ai.explanation;
-      category = ai.category;
+      confidence = ai.confidence ?? "medium";
       tasks = Array.isArray(ai.tasks) ? ai.tasks : [];
 
       // Mirror effectiveHourlyRate: Standard base + stacked modifier deltas.
@@ -167,18 +180,14 @@ export function PricingWizard({ minBillableMins, minTravelCharge }: Props): Reac
         rates.find((r) => r.ratePerHour !== null && r.isDefault)?.ratePerHour ??
         rates.find((r) => r.ratePerHour !== null)?.ratePerHour ??
         65;
-      const complexDelta =
-        ai.category === "complex"
-          ? (rates.find((r) => r.label === "Complex" && r.hourlyDelta !== null)?.hourlyDelta ?? 0)
-          : 0;
       const remoteDelta =
         meeting === "remote"
           ? (rates.find((r) => r.label === "Remote" && r.hourlyDelta !== null)?.hourlyDelta ?? 0)
           : 0;
-      fullRate = baseStandard + complexDelta + remoteDelta;
+      fullRate = baseStandard + remoteDelta;
     }
 
-    // Travel rate is decoupled from labour; Complex/Remote/promo never touch it.
+    // Travel rate is decoupled from labour; Remote/promo never touch it.
     const travelRatePerHour =
       rates.find((r) => r.unit === "travel-hour" && r.ratePerHour !== null)?.ratePerHour ?? 40;
 
@@ -187,23 +196,22 @@ export function PricingWizard({ minBillableMins, minTravelCharge }: Props): Reac
 
     setAiExplanation(explanation);
     setAiEstimatedMins(estimatedMins);
+    setAiConfidence(confidence);
 
-    // Floor short jobs to the published billable minimum. ±25% spread with a
-    // $20 minimum bucket keeps the high end defensible per published policy.
+    // Floor short jobs to the published billable minimum. The range width is
+    // confidence-scaled (see priceRangeFor) - wider, with a lower low end, when
+    // the description is vague.
     const effectiveMins = Math.max(minBillableMins, estimatedMins);
 
     /**
-     * Builds a ±25% price range rounded to the nearest $5 with a $20 min spread.
+     * Confidence-scaled price band for one slice, via the shared helper so the
+     * pricing page and the inline booking estimate use identical math.
      * @param mins - Minutes for this slice.
      * @param rate - Effective $/hr.
      * @returns Whole-dollar low/high range.
      */
-    const rangeFor = (mins: number, rate: number): { low: number; high: number } => {
-      const cost = (mins / 60) * rate;
-      const low = Math.floor((cost * 0.75) / 5) * 5;
-      const high = Math.max(Math.ceil((cost * 1.25) / 5) * 5, low + 20);
-      return { low, high };
-    };
+    const rangeFor = (mins: number, rate: number): { low: number; high: number } =>
+      priceRangeFor(mins, rate, confidence, estimatorRange);
 
     // Travel uses the dedicated Travel rate (never promo-discounted, never
     // labour-rate). Routes through calcTravelCharge so the floor + round-trip
@@ -295,13 +303,12 @@ export function PricingWizard({ minBillableMins, minTravelCharge }: Props): Reac
     // Audit log: fire-and-forget so failures don't break the UX. Captures
     // the raw text, AI interpretation, meeting mode the customer picked, and
     // the exact range shown so disputes can be reconstructed.
-    void fetch("/api/pricing/log-estimate", {
+    fetch("/api/pricing/log-estimate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         description: issueDescription,
         aiEstimatedMins: estimatedMins,
-        aiCategory: category,
         aiExplanation: explanation,
         aiTasks: tasks,
         address: dest || null,
@@ -313,9 +320,14 @@ export function PricingWizard({ minBillableMins, minTravelCharge }: Props): Reac
         promoTitle: activePromo?.title ?? null,
         promoLabel: activePromo ? summariseForBanner(activePromo) : null,
       }),
-    }).catch(() => {
-      // Logging is best-effort; ignore network/server errors.
-    });
+    })
+      .then((r) => r.json())
+      .then((d: { id?: string }) => {
+        if (d?.id) setEstimateId(d.id);
+      })
+      .catch(() => {
+        // Logging is best-effort; ignore network/server errors.
+      });
   }
 
   /**
@@ -358,6 +370,7 @@ export function PricingWizard({ minBillableMins, minTravelCharge }: Props): Reac
     setAiExplanation("");
     setAiEstimatedMins(0);
     setResult(null);
+    setEstimateId(null);
   }
 
   /**
@@ -522,6 +535,12 @@ export function PricingWizard({ minBillableMins, minTravelCharge }: Props): Reac
                     : ""}
               All prices in NZD. No GST.
             </p>
+            {aiConfidence === "low" && (
+              <p className="text-coquelicot-600 mt-3 text-sm font-medium">
+                Your description was brief, so this is a wide ballpark - I'll pin it down once I see
+                it.
+              </p>
+            )}
           </div>
 
           {aiExplanation && <p className="mb-4 text-base text-slate-600">{aiExplanation}</p>}
@@ -553,7 +572,7 @@ export function PricingWizard({ minBillableMins, minTravelCharge }: Props): Reac
 
           <div className="flex flex-wrap gap-3">
             <Link
-              href="/booking"
+              href={estimateId ? `/booking?estimate=${estimateId}` : "/booking"}
               className="bg-russian-violet hover:bg-russian-violet/90 rounded-xl px-5 py-2.5 text-base font-semibold text-white"
             >
               Book now

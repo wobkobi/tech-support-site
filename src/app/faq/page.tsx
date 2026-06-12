@@ -134,18 +134,17 @@ export default async function FaqPage(): Promise<React.ReactElement> {
     },
     {
       question: "How much does it cost?",
-      plainAnswer: `Most work is $${pricing.baseRate}/h. Complex or lengthy jobs - things like data recovery, hardware repairs, or migrating a whole PC - are $${pricing.complexRate}/h. On-site visits also include round-trip drive time at $${pricing.travelRatePerHour}/h ($10 minimum). I'll always confirm which rate applies before any work starts so there are no surprises on the bill.`,
+      plainAnswer: `Work is $${pricing.baseRate}/hr whatever the job - troubleshooting, setup, data recovery, hardware repairs, the lot. On-site visits also include round-trip drive time at $${pricing.travelRatePerHour}/hr ($10 minimum). I'll always confirm the expected cost before any work starts so there are no surprises on the bill.`,
       answer: (
         <>
           <p>
-            Most work is <strong>${pricing.baseRate}/h</strong>. Complex or lengthy jobs - data
-            recovery, hardware repairs, or full PC migrations - are{" "}
-            <strong>${pricing.complexRate}/h</strong>. I confirm which rate applies before any work
-            starts, so there are no surprises on the invoice.
+            Work is <strong>${pricing.baseRate}/hr</strong> whatever the job - troubleshooting,
+            setup, data recovery, hardware repairs, the lot. I confirm the expected cost before any
+            work starts, so there are no surprises on the invoice.
           </p>
           <p className={cn("text-rich-black/80 mt-2")}>
             On-site visits also include one round trip billed at{" "}
-            <strong>${pricing.travelRatePerHour}/h</strong> (the dedicated Travel rate, lower than
+            <strong>${pricing.travelRatePerHour}/hr</strong> (the dedicated Travel rate, lower than
             labour), with a $10 minimum when there's any travel at all.
           </p>
           <p className={cn("text-rich-black/80 mt-2")}>

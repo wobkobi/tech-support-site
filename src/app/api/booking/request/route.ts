@@ -61,6 +61,8 @@ interface BookingRequestPayload {
    * idempotency.
    */
   idempotencyKey?: string;
+  /** Id of the PriceEstimateLog the customer saw before booking, if any. */
+  estimateId?: string;
 }
 
 /**
@@ -88,6 +90,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       notes,
       website,
       idempotencyKey,
+      estimateId,
     } = body;
 
     if (idempotencyKey) {
@@ -259,13 +262,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }),
     ]);
     const baseRow = rates.find((r) => r.ratePerHour !== null && r.isDefault) ?? null;
-    const complexRow = rates.find((r) => r.label === "Complex") ?? null;
     const travelRow = rates.find((r) => r.unit === "travel-hour") ?? null;
     const baseRateAtBooking = baseRow?.ratePerHour ?? null;
-    const complexRateAtBooking =
-      baseRateAtBooking !== null && complexRow?.hourlyDelta != null
-        ? Math.round((baseRateAtBooking + complexRow.hourlyDelta) * 100) / 100
-        : null;
     const travelRatePerHourAtBooking = travelRow?.ratePerHour ?? null;
 
     // One-way drive time for in-person bookings; lets the late-cancel
@@ -289,6 +287,23 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return null;
     });
     const publicHolidayName = holiday?.name ?? null;
+
+    // Snapshot the public quote the customer saw (carried from /pricing or the
+    // inline booking estimate). Best effort; the id is validated loosely and
+    // the low/high are copied so they survive the estimate-log retention purge.
+    let priceEstimateIdAtBooking: string | null = null;
+    let quotedLowAtBooking: number | null = null;
+    let quotedHighAtBooking: number | null = null;
+    if (estimateId && /^[a-f0-9]{24}$/i.test(estimateId)) {
+      const est = await prisma.priceEstimateLog
+        .findUnique({ where: { id: estimateId } })
+        .catch(() => null);
+      if (est) {
+        priceEstimateIdAtBooking = est.id;
+        quotedLowAtBooking = est.priceLow;
+        quotedHighAtBooking = est.priceHigh;
+      }
+    }
 
     // Create booking
     try {
@@ -316,8 +331,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           duration,
           travelMinsAtBooking,
           // Rate snapshot locks in the quoted price against later admin edits.
+          // complexRateAtBooking is no longer written (the Complex tier was
+          // removed); the column stays for historical bookings.
           baseRateAtBooking,
-          complexRateAtBooking,
           travelRatePerHourAtBooking,
           // Promo snapshot denormalised - survives Promo deletion before service.
           promoIdAtBooking: activePromo?.id ?? null,
@@ -325,6 +341,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           promoFlatHourlyRateAtBooking: activePromo?.flatHourlyRate ?? null,
           promoPercentDiscountAtBooking: activePromo?.percentDiscount ?? null,
           publicHolidayName,
+          // Snapshot of the public quote the customer saw before booking.
+          priceEstimateIdAtBooking,
+          quotedLowAtBooking,
+          quotedHighAtBooking,
         },
       });
 

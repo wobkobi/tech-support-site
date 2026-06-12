@@ -162,6 +162,14 @@ model Booking {
   complexRateAtBooking          Float?
   travelRatePerHourAtBooking    Float?
 
+  // Public price-estimate snapshot - the quote the customer saw (on /pricing or
+  // the inline booking estimate) before booking, so the operator can compare it
+  // to the final job. The estimate row may be purged after retention; the
+  // low/high are snapshotted here so they survive on the booking.
+  priceEstimateIdAtBooking String? @db.ObjectId
+  quotedLowAtBooking       Int?
+  quotedHighAtBooking      Int?
+
   // Cancellation state stamped by /api/booking/cancel (customer path) and
   // the admin booking cancel UI (operator + cancel-for-customer paths).
   // lateCancellation + travelChargeApplies are derived from the cancel

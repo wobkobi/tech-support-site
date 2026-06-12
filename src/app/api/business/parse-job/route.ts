@@ -1,4 +1,5 @@
 import { composeDescription, effectiveHourlyRate } from "@/features/business/lib/business";
+import { floorBillableMins } from "@/features/business/lib/pricing-policy";
 import {
   buildParseJobContext,
   buildParseJobPrompt,
@@ -212,11 +213,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // System prompt is static (cacheable) - all per-call data is appended to
     // the user message via buildParseJobContext.
     const systemPrompt = buildParseJobPrompt();
-    const context = buildParseJobContext(rateDtos, templateDtos, currentTime, {
-      company,
-      name,
-      location,
-    });
+    const context = buildParseJobContext(
+      rateDtos,
+      templateDtos,
+      currentTime,
+      { company, name, location },
+      {
+        minBillableMins: settings.pricing.minBillableMins,
+        incrementMins: settings.pricing.billingIncrementMins,
+      },
+    );
 
     const precomputed = calcSessionMins(input);
     // Close the untrusted USER DATA block before any server-supplied trusted
@@ -373,12 +379,23 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       typeof parsed.durationMins === "number" &&
       parsed.durationMins > 0
     ) {
-      // Round UP to match the calculator's billable rule (ceil to next 15-min slot).
-      // Same policy as the prompt's BILLING step 2 - so the safety net + AI agree on the target.
-      const targetHours = Math.ceil((parsed.durationMins / 60) * 4) / 4;
+      // Match the calculator's billable rule exactly (round to the live billing
+      // increment, floor at the minimum) so the safety net, AI, and invoice agree
+      // on the target. incHours is one increment expressed in hours.
+      const incHours = settings.pricing.billingIncrementMins / 60;
+      const targetHours =
+        Math.round(
+          (floorBillableMins(
+            parsed.durationMins,
+            settings.pricing.minBillableMins,
+            settings.pricing.billingIncrementMins,
+          ) /
+            60) *
+            100,
+        ) / 100;
       const sumQty = parsed.tasks.reduce((s, t) => s + (t.qty || 0), 0);
       const diff = Math.round((targetHours - sumQty) * 100) / 100;
-      if (sumQty > 0 && Math.abs(diff) >= 0.25) {
+      if (sumQty > 0 && Math.abs(diff) >= incHours) {
         const pinnedSum = parsed.tasks
           .filter((t) => t.isExplicit)
           .reduce((s, t) => s + (t.qty || 0), 0);
@@ -390,7 +407,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           if (canScaleFloating && t.isExplicit) return t;
           return {
             ...t,
-            qty: Math.max(0.25, Math.round(t.qty * multiplier * 100) / 100),
+            qty: Math.max(incHours, Math.round(t.qty * multiplier * 100) / 100),
           };
         });
         // Park any rounding remainder on the largest floating task (or the
@@ -406,7 +423,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             const largest = driftable.reduce((max, cur) => (cur.t.qty > max.t.qty ? cur : max));
             parsed.tasks[largest.i] = {
               ...parsed.tasks[largest.i],
-              qty: Math.max(0.25, Math.round((parsed.tasks[largest.i].qty + drift) * 100) / 100),
+              qty: Math.max(
+                incHours,
+                Math.round((parsed.tasks[largest.i].qty + drift) * 100) / 100,
+              ),
             };
           }
         }
