@@ -1,77 +1,38 @@
-# My Site for Tech Support
+# Tech Support Site
 
-trying to get job
+A tech support business site with online booking, built with Next.js 16, TypeScript, and Tailwind
+CSS v4. Deployed on Vercel.
 
-Built this from scratch with Next.js 16, TypeScript, and Tailwind CSS v4. It's a live booking
-platform with Google Calendar sync, automated review emails, and a custom admin panel. Pretty happy
-with how the mobile responsiveness turned out.
+## Features
 
-## What I Built
+- Real-time booking with Google Calendar availability and 15-minute holds to prevent double-bookings
+- Automated emails via Resend (booking confirmations, reminders, review requests)
+- Admin dashboard for managing bookings, reviews, and settings
+- Price estimator and marketing poster generator (print-ready PDFs)
 
-**Tech stack:**
+## Tech stack
 
-- Next.js 16 (App Router + Turbopack)
-- TypeScript & TSX
-- Prisma ORM (MongoDB)
-- Tailwind CSS v4 with custom design tokens (5-color palette: Rich Black, Seasalt, Coquelicot,
-  Russian Violet, Moonstone)
-- Google Calendar API for real-time availability
-- Transactional emails via Resend
-- Vitest for testing (162+ tests passing)
-- Deployed on Vercel
+- Next.js 16 (App Router + Turbopack), React 19, TypeScript
+- Tailwind CSS v4
+- Prisma ORM with MongoDB
+- Google Calendar API, Resend
 
-**Features:**
-
-- Real-time booking system with 15-min hold TTL to prevent double-bookings
-- Google Calendar integration for availability checks (cached every 15min)
-- Automated review requests sent 30min after appointments
-- Admin dashboard for review moderation with email preview before sending
-- Mobile-first responsive design (navbar and booking form were tricky to get right)
-- Custom lazy-loading hook with IntersectionObserver
-- Polymorphic Button component (works as links or buttons)
-- Marketing poster generator with print-ready PDFs (A5 + 3mm bleed, 600 DPI)
-
-**What I learned:**
-
-- Proper mobile responsiveness (fixed-width elements on mobile are evil)
-- Managing concurrent bookings with database holds
-- Working with timezones (Pacific/Auckland NZDT/NZST handling)
-- Setting up external cron jobs (Vercel Hobby plan limitations)
-- Building accessible forms with proper ARIA attributes
-- Pre-commit hooks for code quality (Prettier, ESLint, tests)
-
-## Quick Commands I Use
+## Commands
 
 ```bash
-npm run dev              # Start dev server
-npm run build            # Production build
-npm run test             # Run tests in watch mode
-npm run test:run         # Run tests once
-npm run build:icons      # Regenerate 37 favicon/social assets
-npm run build:poster     # Regenerate marketing PDFs
-npx prisma studio        # Visual database editor
-npm run db:seed          # Load test data
-npm run db:unseed        # Clear database
+npm run dev          # Start dev server
+npm run build        # Production build
+npm run smoke        # Smoke tests
+npm run build:icons  # Regenerate favicon/social assets
+npm run build:poster # Regenerate marketing poster PDFs
+npx prisma studio    # Visual database editor
 ```
 
-## Build Workflow
+Pre-commit hooks handle formatting, linting, and builds automatically - no need to run them
+manually.
 
-Pre-commit hooks automatically run icon generation, Next.js build, prettier, eslint, and tests (~24
-seconds total). Icon generation creates 37 favicon/social/QR assets from source files.
+## Cron jobs
 
-Marketing poster PDFs (digital + print with 3mm bleed) are generated manually via
-`npm run build:poster` when the design changes. Uses Puppeteer to screenshot the `/poster` page at
-600 DPI.
-
-## Cron Jobs Setup
-
-Had to use external cron service ([cron-job.org](https://cron-job.org)) since Vercel Hobby plan only
-allows 1 cron job with daily minimum. Set up 4 endpoints that hit every 15 minutes:
-
-- `/api/cron/release-holds` - Releases expired booking holds (15-min TTL)
-- `/api/cron/send-review-emails` - Sends review requests 30min after appointments
-- `/api/cron/refresh-calendar-cache` - Keeps Google Calendar availability fresh
-- `/api/cron/send-booking-reminders` - Sends a 24h-out email reminder for upcoming bookings
-
-Each endpoint needs `Authorization: Bearer $CRON_SECRET` header. Set up email alerts on cron-job.org
-for 3 consecutive failures.
+Scheduled tasks run via [cron-job.org](https://cron-job.org), hitting `/api/cron/*` endpoints with
+an `Authorization: Bearer $CRON_SECRET` header. They handle releasing expired holds, refreshing the
+calendar cache, sending reminder and review emails, and other maintenance.
