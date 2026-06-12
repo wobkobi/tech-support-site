@@ -166,7 +166,7 @@ export async function buildSocialImages(): Promise<void> {
   const logoProfileBuffer = await fs.readFile(LOGO_PROFILE);
 
   for (const spec of SOCIAL_SPECS) {
-    const { name, width, height, blur, logoScale, quality, useMarkLogo } = spec;
+    const { name, width, height, blur, logoScale, quality, useMarkLogo, copyTo } = spec;
 
     // Create blurred background
     const bg = await sharp(BACKDROP)
@@ -199,7 +199,13 @@ export async function buildSocialImages(): Promise<void> {
       .jpeg({ quality })
       .toFile(`public/${name}.jpg`);
 
-    console.log(`  ✓ ${name} (${width}x${height})`);
+    // Mirror to any extra destination (e.g. Next's file-based opengraph-image)
+    if (copyTo) {
+      await fs.copyFile(`public/${name}.jpg`, copyTo);
+      console.log(`  ✓ ${name} (${width}x${height}) > ${copyTo}`);
+    } else {
+      console.log(`  ✓ ${name} (${width}x${height})`);
+    }
   }
 }
 
