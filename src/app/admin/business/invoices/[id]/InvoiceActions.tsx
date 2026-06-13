@@ -540,7 +540,7 @@ export function InvoiceActions({
               )}
             >
               <div className={cn("min-w-0")}>
-                <h2 className={cn("text-russian-violet text-lg font-bold")}>Send invoice</h2>
+                <h2 className={cn("text-lg font-bold text-russian-violet")}>Send invoice</h2>
                 <p className={cn("mt-1 text-sm text-slate-600")}>
                   To: <span className={cn("font-medium")}>{preview?.to ?? clientEmail}</span>
                 </p>
@@ -572,7 +572,7 @@ export function InvoiceActions({
                 <div className={cn("p-6")}>
                   <label
                     htmlFor="greeting-name"
-                    className={cn("mb-2 block text-xs font-semibold uppercase text-slate-400")}
+                    className={cn("mb-2 block text-xs font-semibold text-slate-400 uppercase")}
                   >
                     Greeting (the person you're emailing)
                   </label>
@@ -586,12 +586,12 @@ export function InvoiceActions({
                     disabled={sending}
                     className={cn(
                       "mb-4 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm",
-                      "ring-russian-violet/20 focus:border-russian-violet focus:outline-none focus:ring-1",
+                      "ring-russian-violet/20 focus:border-russian-violet focus:ring-1 focus:outline-none",
                     )}
                   />
                   <label
                     htmlFor="custom-body"
-                    className={cn("mb-2 block text-xs font-semibold uppercase text-slate-400")}
+                    className={cn("mb-2 block text-xs font-semibold text-slate-400 uppercase")}
                   >
                     Message
                   </label>
@@ -604,7 +604,7 @@ export function InvoiceActions({
                     disabled={sending}
                     className={cn(
                       "mb-4 w-full resize-y rounded-lg border border-slate-200 px-3 py-2 text-sm",
-                      "ring-russian-violet/20 focus:border-russian-violet focus:outline-none focus:ring-1",
+                      "ring-russian-violet/20 focus:border-russian-violet focus:ring-1 focus:outline-none",
                     )}
                   />
                   {eligibility && (
@@ -624,7 +624,7 @@ export function InvoiceActions({
                             void openPreview();
                           }}
                           className={cn(
-                            "text-russian-violet focus:ring-russian-violet/30 mt-0.5 h-4 w-4 rounded border-slate-300",
+                            "mt-0.5 h-4 w-4 rounded border-slate-300 text-russian-violet focus:ring-russian-violet/30",
                           )}
                         />
                         <span className={cn(!eligibility.canSend && "text-slate-400")}>
@@ -642,7 +642,7 @@ export function InvoiceActions({
                                     type="button"
                                     onClick={() => setShowAddContact(true)}
                                     className={cn(
-                                      "text-russian-violet font-semibold underline hover:opacity-80",
+                                      "font-semibold text-russian-violet underline hover:opacity-80",
                                     )}
                                   >
                                     add {clientName?.trim().split(" ")[0] || "them"} to contacts
@@ -656,11 +656,11 @@ export function InvoiceActions({
                       </label>
                     </div>
                   )}
-                  <p className={cn("mb-2 text-xs font-semibold uppercase text-slate-400")}>
+                  <p className={cn("mb-2 text-xs font-semibold text-slate-400 uppercase")}>
                     Subject
                   </p>
                   <p className={cn("mb-4 text-sm font-medium text-slate-800")}>{preview.subject}</p>
-                  <p className={cn("mb-2 text-xs font-semibold uppercase text-slate-400")}>Body</p>
+                  <p className={cn("mb-2 text-xs font-semibold text-slate-400 uppercase")}>Body</p>
                   <div
                     className={cn(
                       "rounded-lg border border-slate-200 bg-slate-50 p-2 text-sm text-slate-800",
@@ -726,7 +726,7 @@ export function InvoiceActions({
               )}
             >
               <div className={cn("min-w-0")}>
-                <h2 className={cn("text-russian-violet text-lg font-bold")}>
+                <h2 className={cn("text-lg font-bold text-russian-violet")}>
                   {isVoided ? "Resend void notification" : "Void invoice"}
                 </h2>
                 <p className={cn("mt-1 text-sm text-slate-600")}>
@@ -779,7 +779,7 @@ export function InvoiceActions({
                       onChange={(e) => setVoidSendNotification(e.target.checked)}
                       disabled={voiding}
                       className={cn(
-                        "text-russian-violet focus:ring-russian-violet/30 mt-0.5 h-4 w-4 rounded border-slate-300",
+                        "mt-0.5 h-4 w-4 rounded border-slate-300 text-russian-violet focus:ring-russian-violet/30",
                       )}
                     />
                     <span>
@@ -791,7 +791,7 @@ export function InvoiceActions({
                     <>
                       <label
                         htmlFor="void-greeting-name"
-                        className={cn("mb-2 block text-xs font-semibold uppercase text-slate-400")}
+                        className={cn("mb-2 block text-xs font-semibold text-slate-400 uppercase")}
                       >
                         Greeting (the person you're emailing)
                       </label>
@@ -805,12 +805,12 @@ export function InvoiceActions({
                         disabled={voiding}
                         className={cn(
                           "mb-4 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm",
-                          "ring-russian-violet/20 focus:border-russian-violet focus:outline-none focus:ring-1",
+                          "ring-russian-violet/20 focus:border-russian-violet focus:ring-1 focus:outline-none",
                         )}
                       />
                       <label
                         htmlFor="void-custom-body"
-                        className={cn("mb-2 block text-xs font-semibold uppercase text-slate-400")}
+                        className={cn("mb-2 block text-xs font-semibold text-slate-400 uppercase")}
                       >
                         Message
                       </label>
@@ -823,16 +823,16 @@ export function InvoiceActions({
                         disabled={voiding}
                         className={cn(
                           "mb-4 w-full resize-y rounded-lg border border-slate-200 px-3 py-2 text-sm",
-                          "ring-russian-violet/20 focus:border-russian-violet focus:outline-none focus:ring-1",
+                          "ring-russian-violet/20 focus:border-russian-violet focus:ring-1 focus:outline-none",
                         )}
                       />
-                      <p className={cn("mb-2 text-xs font-semibold uppercase text-slate-400")}>
+                      <p className={cn("mb-2 text-xs font-semibold text-slate-400 uppercase")}>
                         Subject
                       </p>
                       <p className={cn("mb-4 text-sm font-medium text-slate-800")}>
                         {voidPreview?.subject ?? `Invoice ${invoiceNumber} - voided`}
                       </p>
-                      <p className={cn("mb-2 text-xs font-semibold uppercase text-slate-400")}>
+                      <p className={cn("mb-2 text-xs font-semibold text-slate-400 uppercase")}>
                         Body
                       </p>
                       <div
@@ -853,7 +853,7 @@ export function InvoiceActions({
                           />
                         ) : null}
                       </div>
-                      <p className={cn("mt-3 text-xs italic text-slate-500")}>
+                      <p className={cn("mt-3 text-xs text-slate-500 italic")}>
                         The VOIDED-stamped PDF will be attached automatically.
                       </p>
                     </>

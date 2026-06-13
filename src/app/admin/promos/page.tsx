@@ -47,7 +47,7 @@ export default async function AdminPromosPage(): Promise<React.ReactElement> {
 
   return (
     <AdminPageLayout current="promos">
-      <h1 className={cn("text-russian-violet mb-6 text-2xl font-extrabold")}>Promos</h1>
+      <h1 className={cn("mb-6 text-2xl font-extrabold text-russian-violet")}>Promos</h1>
       <p className={cn("mb-6 text-sm text-slate-500")}>
         Time-limited offers. Each active promo applies automatically to the public pricing wizard,
         the admin calculator, and the site-wide banner. Only one promo is active at a time; if date

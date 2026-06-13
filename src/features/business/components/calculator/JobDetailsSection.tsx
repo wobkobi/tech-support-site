@@ -123,7 +123,7 @@ export function JobDetailsSection({
 
   return (
     <div className={cn("space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}>
-      <h2 className={cn("text-russian-violet text-sm font-semibold")}>Time</h2>
+      <h2 className={cn("text-sm font-semibold text-russian-violet")}>Time</h2>
 
       <div className={cn("space-y-2")}>
         {timeRanges.map((range, index) => {
@@ -143,7 +143,7 @@ export function JobDetailsSection({
                     onChange={(e) => patchRange(index, { startTime: e.target.value })}
                     aria-invalid={issue?.tone === "warn"}
                     className={cn(
-                      "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2",
+                      "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
                       issue?.tone === "warn" && "border-amber-400",
                     )}
                   />
@@ -160,7 +160,7 @@ export function JobDetailsSection({
                     onChange={(e) => patchRange(index, { endTime: e.target.value })}
                     aria-invalid={issue?.tone === "warn"}
                     className={cn(
-                      "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2",
+                      "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
                       issue?.tone === "warn" && "border-amber-400",
                     )}
                   />
@@ -181,7 +181,7 @@ export function JobDetailsSection({
                 <p
                   className={cn(
                     "text-xs",
-                    issue.tone === "warn" ? "text-amber-600" : "italic text-slate-400",
+                    issue.tone === "warn" ? "text-amber-600" : "text-slate-400 italic",
                   )}
                 >
                   {issue.text}
@@ -212,7 +212,7 @@ export function JobDetailsSection({
           value={durationMinsOverride ?? durationMins}
           onChange={(e) => onDurationOverrideChange(parseInt(e.target.value) || 0)}
           className={cn(
-            "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2",
+            "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
           )}
         />
         <p className={cn("mt-1 text-xs text-slate-400")}>
@@ -227,7 +227,7 @@ export function JobDetailsSection({
           {durationMinsOverride != null &&
             durationMinsOverride !== sumRangesMin &&
             sumRangesMin > 0 && (
-              <span className={cn("ml-1 italic text-slate-300")}>
+              <span className={cn("ml-1 text-slate-300 italic")}>
                 (slots sum {minsToHoursLabel(sumRangesMin)})
               </span>
             )}
@@ -240,7 +240,7 @@ export function JobDetailsSection({
           value={hourlyRateId ?? ""}
           onChange={(e) => onHourlyRateIdChange(e.target.value || null)}
           className={cn(
-            "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
+            "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
           )}
         >
           <option value="">None</option>

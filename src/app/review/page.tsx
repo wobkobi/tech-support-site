@@ -107,12 +107,12 @@ export default async function ReviewPage({
             <section className={cn(CARD)}>
               <h1
                 className={cn(
-                  "text-russian-violet mb-2 text-2xl font-extrabold sm:text-3xl md:text-4xl",
+                  "mb-2 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl",
                 )}
               >
                 Invalid Review Link
               </h1>
-              <p className={cn("text-rich-black/80 mb-4 text-base")}>
+              <p className={cn("mb-4 text-base text-rich-black/80")}>
                 This review link is invalid or has expired. If you recently had an appointment,
                 please check your email for the correct link.
               </p>
@@ -128,12 +128,12 @@ export default async function ReviewPage({
               <section className={cn(CARD)}>
                 <h1
                   className={cn(
-                    "text-russian-violet mb-2 text-2xl font-extrabold sm:text-3xl md:text-4xl",
+                    "mb-2 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl",
                   )}
                 >
                   {alreadyReviewed ? "Edit your review" : "How was your appointment?"}
                 </h1>
-                <p className={cn("text-rich-black/80 text-base")}>
+                <p className={cn("text-base text-rich-black/80")}>
                   {alreadyReviewed
                     ? `Hi ${prefillName}! You can update your review any time using this link.`
                     : `Hi ${prefillName}! Thanks for choosing To The Point Tech. I'd love to hear about your experience.`}
@@ -159,16 +159,16 @@ export default async function ReviewPage({
             <section className={cn(CARD)}>
               <h1
                 className={cn(
-                  "text-russian-violet mb-2 text-2xl font-extrabold sm:text-3xl md:text-4xl",
+                  "mb-2 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl",
                 )}
               >
                 Review Link Required
               </h1>
-              <p className={cn("text-rich-black/80 mb-4 text-base")}>
+              <p className={cn("mb-4 text-base text-rich-black/80")}>
                 To leave a review, please use the personalized review link sent to your email after
                 your appointment.
               </p>
-              <p className={cn("text-rich-black/80 mb-4 text-base")}>
+              <p className={cn("mb-4 text-base text-rich-black/80")}>
                 This helps ensure all reviews are from verified customers. If you can't find your
                 review link, feel free to{" "}
                 <Link href="/contact" className={cn("text-coquelicot-500 hover:underline")}>

@@ -86,24 +86,24 @@ export default async function BookingSuccessPage({
       <div className={cn("mx-auto my-5 w-full max-w-[min(100vw-2rem,56rem)] sm:my-10")}>
         <div
           className={cn(
-            "border-seasalt-400/40 bg-seasalt-800/60 rounded-2xl border p-5 shadow-lg backdrop-blur-xl sm:p-10",
+            "rounded-2xl border border-seasalt-400/40 bg-seasalt-800/60 p-5 shadow-lg backdrop-blur-xl sm:p-10",
           )}
         >
           <div className={cn("flex flex-col gap-4 sm:gap-5")}>
             <section className={cn(CARD, "text-center")}>
               <div className={cn("mb-4 flex justify-center")}>
-                <FaCircleCheck className={cn("text-moonstone-600 h-16 w-16")} aria-hidden />
+                <FaCircleCheck className={cn("h-16 w-16 text-moonstone-600")} aria-hidden />
               </div>
 
               <h1
                 className={cn(
-                  "text-russian-violet mb-3 text-2xl font-extrabold sm:text-3xl md:text-4xl",
+                  "mb-3 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl",
                 )}
               >
                 Booking confirmed!
               </h1>
 
-              <p className={cn("text-rich-black/80 mb-6 text-sm sm:text-base")}>
+              <p className={cn("mb-6 text-sm text-rich-black/80 sm:text-base")}>
                 Your appointment is confirmed. Check your email for the details and a Google
                 Calendar invite - if you don't see it within a few minutes, check your spam folder.
               </p>
@@ -136,12 +136,12 @@ export default async function BookingSuccessPage({
             </section>
 
             <section className={cn(CARD)}>
-              <h2 className={cn("text-russian-violet mb-2 text-lg font-bold sm:text-xl")}>
+              <h2 className={cn("mb-2 text-lg font-bold text-russian-violet sm:text-xl")}>
                 What happens next?
               </h2>
               <ol
                 className={cn(
-                  "text-rich-black/80 list-inside list-decimal space-y-1 text-sm sm:text-base",
+                  "list-inside list-decimal space-y-1 text-sm text-rich-black/80 sm:text-base",
                 )}
               >
                 <li>A confirmation email has been sent to you with the appointment details</li>
@@ -158,15 +158,15 @@ export default async function BookingSuccessPage({
             {promoTitle && (
               <section
                 className={cn(
-                  "border-mustard-400 bg-mustard-900 flex items-start gap-3 rounded-xl border p-5 shadow-sm sm:p-6",
+                  "flex items-start gap-3 rounded-xl border border-mustard-400 bg-mustard-900 p-5 shadow-sm sm:p-6",
                 )}
               >
-                <FaTag className={cn("text-russian-violet mt-1 h-5 w-5 shrink-0")} aria-hidden />
+                <FaTag className={cn("mt-1 h-5 w-5 shrink-0 text-russian-violet")} aria-hidden />
                 <div>
-                  <h2 className={cn("text-russian-violet mb-1 text-base font-bold sm:text-lg")}>
+                  <h2 className={cn("mb-1 text-base font-bold text-russian-violet sm:text-lg")}>
                     Rate locked in: {promoTitle}
                   </h2>
-                  <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
+                  <p className={cn("text-sm text-rich-black/80 sm:text-base")}>
                     This rate applies to your appointment even if the offer ends before your visit.
                   </p>
                 </div>
@@ -174,10 +174,10 @@ export default async function BookingSuccessPage({
             )}
 
             <section className={cn(CARD)}>
-              <h2 className={cn("text-russian-violet mb-2 text-lg font-bold sm:text-xl")}>
+              <h2 className={cn("mb-2 text-lg font-bold text-russian-violet sm:text-xl")}>
                 Cancellation policy
               </h2>
-              <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
+              <p className={cn("text-sm text-rich-black/80 sm:text-base")}>
                 {renderEmphasised(cancellationCopy(CANCELLATION))}
               </p>
             </section>

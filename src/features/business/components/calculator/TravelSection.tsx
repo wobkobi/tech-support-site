@@ -76,7 +76,7 @@ export function TravelSection({
 
   return (
     <div className={cn("space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}>
-      <h2 className={cn("text-russian-violet text-sm font-semibold")}>Travel</h2>
+      <h2 className={cn("text-sm font-semibold text-russian-violet")}>Travel</h2>
       <div className={cn("flex gap-2")}>
         <input
           ref={addressInputRef}
@@ -91,7 +91,7 @@ export function TravelSection({
             }
           }}
           className={cn(
-            "focus:ring-russian-violet/30 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
+            "flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
           )}
         />
         <button
@@ -129,7 +129,7 @@ export function TravelSection({
                     placeholder={entry.isAuto ? "Lookup" : "e.g. Parking"}
                     onChange={(e) => patchEntry(index, { label: e.target.value, isAuto: false })}
                     className={cn(
-                      "focus:ring-russian-violet/30 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
+                      "flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
                     )}
                   />
                   <div className={cn("flex items-center")}>
@@ -152,7 +152,7 @@ export function TravelSection({
                         })
                       }
                       className={cn(
-                        "focus:ring-russian-violet/30 w-24 rounded-r-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
+                        "w-24 rounded-r-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
                       )}
                     />
                   </div>

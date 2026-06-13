@@ -207,12 +207,12 @@ export default async function AdminReviewsPage(): Promise<React.ReactElement> {
 
   return (
     <AdminPageLayout current="reviews">
-      <h1 className={cn("text-russian-violet mb-6 text-2xl font-extrabold")}>
+      <h1 className={cn("mb-6 text-2xl font-extrabold text-russian-violet")}>
         Reviews
         {pending.length > 0 && (
           <span
             className={cn(
-              "bg-coquelicot-500/20 text-coquelicot-400 ml-3 rounded-full px-2.5 py-0.5 text-sm font-semibold",
+              "ml-3 rounded-full bg-coquelicot-500/20 px-2.5 py-0.5 text-sm font-semibold text-coquelicot-400",
             )}
           >
             {pending.length} pending
@@ -237,7 +237,7 @@ export default async function AdminReviewsPage(): Promise<React.ReactElement> {
 
         <div className={cn("flex flex-col gap-6")}>
           <div className={cn("rounded-xl border border-slate-200 bg-white p-6 shadow-sm")}>
-            <h2 className={cn("text-russian-violet mb-4 text-sm font-semibold")}>
+            <h2 className={cn("mb-4 text-sm font-semibold text-russian-violet")}>
               Send a review link
             </h2>
             <SendReviewLinkForm contactSuggestions={contactSuggestions} />
@@ -245,7 +245,7 @@ export default async function AdminReviewsPage(): Promise<React.ReactElement> {
 
           {linkHistory.length > 0 && (
             <div className={cn("rounded-xl border border-slate-200 bg-white p-6 shadow-sm")}>
-              <h2 className={cn("text-russian-violet mb-4 text-sm font-semibold")}>Link history</h2>
+              <h2 className={cn("mb-4 text-sm font-semibold text-russian-violet")}>Link history</h2>
               <ReviewLinkHistoryTable entries={linkHistory} />
             </div>
           )}

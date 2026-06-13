@@ -67,7 +67,7 @@ export function SettingsSearch({ onJump }: Props): React.ReactElement {
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Search settings (e.g. cancellation, GST, reminder)..."
         className={cn(
-          "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-300 px-4 py-2.5 text-base focus:outline-none focus:ring-2",
+          "w-full rounded-lg border border-slate-300 px-4 py-2.5 text-base focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
         )}
       />
       {results.length > 0 && (

@@ -184,11 +184,11 @@ export function SettingsView({
                 type="button"
                 onClick={() => setActive(group)}
                 className={cn(
-                  "whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors",
+                  "border-b-2 px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors",
                   isActive
                     ? "border-russian-violet text-russian-violet"
                     : "border-transparent text-slate-500 hover:text-slate-700",
-                  !ready && "italic text-slate-400",
+                  !ready && "text-slate-400 italic",
                 )}
               >
                 {GROUP_META[group].title}
@@ -198,7 +198,7 @@ export function SettingsView({
         </div>
 
         <div className={cn("rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6")}>
-          <h2 className={cn("text-russian-violet text-lg font-bold")}>{meta.title}</h2>
+          <h2 className={cn("text-lg font-bold text-russian-violet")}>{meta.title}</h2>
           <p className={cn("mt-1 text-sm text-slate-500")}>{meta.blurb}</p>
           <div className={cn("mt-4")}>
             {active === "availability" ? (

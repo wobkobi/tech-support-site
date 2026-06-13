@@ -108,12 +108,12 @@ export function ClientPickerSection({
   return (
     <div className={cn("space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}>
       <div className={cn("flex items-center justify-between")}>
-        <h2 className={cn("text-russian-violet text-sm font-semibold")}>Client</h2>
+        <h2 className={cn("text-sm font-semibold text-russian-violet")}>Client</h2>
         {pickedContactName && (
           <button
             type="button"
             onClick={onClearContact}
-            className={cn("hover:text-russian-violet text-xs text-slate-500 underline")}
+            className={cn("text-xs text-slate-500 underline hover:text-russian-violet")}
           >
             x Clear
           </button>
@@ -164,14 +164,14 @@ export function ClientPickerSection({
           }}
           onKeyDown={onKeyDown}
           className={cn(
-            "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
+            "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
             !editable && addressMode !== "custom" && "bg-slate-50 text-slate-700",
           )}
         />
         {suggestions.length > 0 && (
           <div
             className={cn(
-              "absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg",
+              "absolute top-full right-0 left-0 z-20 mt-1 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg",
             )}
           >
             {suggestions.map((c, i) => {
@@ -192,12 +192,12 @@ export function ClientPickerSection({
                     active ? "bg-russian-violet/10" : "hover:bg-slate-50",
                   )}
                 >
-                  <span className={cn("text-rich-black font-medium")}>{c.name || c.email}</span>
+                  <span className={cn("font-medium text-rich-black")}>{c.name || c.email}</span>
                   {c.email && c.name && (
-                    <span className={cn("text-rich-black/50 ml-2 text-xs")}>{c.email}</span>
+                    <span className={cn("ml-2 text-xs text-rich-black/50")}>{c.email}</span>
                   )}
                   {c.company && (
-                    <span className={cn("text-rich-black/40 ml-2 text-xs")}>{c.company}</span>
+                    <span className={cn("ml-2 text-xs text-rich-black/40")}>{c.company}</span>
                   )}
                 </button>
               );
@@ -211,7 +211,7 @@ export function ClientPickerSection({
         value={clientEmail}
         onChange={(e) => onClientEmailChange(e.target.value)}
         className={cn(
-          "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
+          "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
         )}
       />
     </div>

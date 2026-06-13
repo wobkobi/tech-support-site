@@ -271,7 +271,7 @@ export function BookingAdminList({
               className={cn(
                 "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
                 isActive
-                  ? "text-russian-violet bg-white shadow-sm"
+                  ? "bg-white text-russian-violet shadow-sm"
                   : "text-slate-500 hover:text-slate-700",
               )}
             >
@@ -306,7 +306,7 @@ export function BookingAdminList({
               >
                 <div className={cn("flex min-w-0 flex-col gap-1")}>
                   <div className={cn("flex min-w-0 flex-wrap items-center gap-2")}>
-                    <span className={cn("text-russian-violet min-w-0 truncate font-semibold")}>
+                    <span className={cn("min-w-0 truncate font-semibold text-russian-violet")}>
                       {b.name}
                     </span>
                     <span
@@ -318,7 +318,7 @@ export function BookingAdminList({
                       {b.status}
                     </span>
                   </div>
-                  <span className={cn("break-all text-xs text-slate-500")}>{b.email}</span>
+                  <span className={cn("text-xs break-all text-slate-500")}>{b.email}</span>
                   {b.phone && <span className={cn("text-xs text-slate-500")}>{b.phone}</span>}
                   <span className={cn("text-xs text-slate-500")}>
                     {formatDateTimeShort(b.startAt)} &ndash; {formatDateTimeShort(b.endAt)}
@@ -357,7 +357,7 @@ export function BookingAdminList({
                           target="_blank"
                           rel="noreferrer"
                           className={cn(
-                            "bg-russian-violet/10 text-russian-violet hover:bg-russian-violet/20 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+                            "rounded-lg bg-russian-violet/10 px-3 py-1.5 text-xs font-medium text-russian-violet transition-colors hover:bg-russian-violet/20",
                           )}
                         >
                           Reschedule
@@ -366,7 +366,7 @@ export function BookingAdminList({
                       <button
                         onClick={() => (isExpanded ? setExpandedId(null) : openEdit(b))}
                         className={cn(
-                          "bg-russian-violet/10 text-russian-violet hover:bg-russian-violet/20 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+                          "rounded-lg bg-russian-violet/10 px-3 py-1.5 text-xs font-medium text-russian-violet transition-colors hover:bg-russian-violet/20",
                         )}
                       >
                         {isExpanded ? "Close" : "Edit"}
@@ -383,32 +383,32 @@ export function BookingAdminList({
                   </p>
                   <div className={cn("grid gap-3 sm:grid-cols-2")}>
                     <label className={cn("flex flex-col gap-1")}>
-                      <span className={cn("text-russian-violet text-xs font-semibold")}>Name</span>
+                      <span className={cn("text-xs font-semibold text-russian-violet")}>Name</span>
                       <input
                         className={cn(
-                          "focus:border-russian-violet focus:ring-russian-violet/30 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-1",
+                          "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
                         )}
                         value={edit.name}
                         onChange={(e) => setField(b.id, "name", e.target.value)}
                       />
                     </label>
                     <label className={cn("flex flex-col gap-1")}>
-                      <span className={cn("text-russian-violet text-xs font-semibold")}>Email</span>
+                      <span className={cn("text-xs font-semibold text-russian-violet")}>Email</span>
                       <input
                         type="email"
                         className={cn(
-                          "focus:border-russian-violet focus:ring-russian-violet/30 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-1",
+                          "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
                         )}
                         value={edit.email}
                         onChange={(e) => setField(b.id, "email", e.target.value)}
                       />
                     </label>
                     <label className={cn("flex flex-col gap-1")}>
-                      <span className={cn("text-russian-violet text-xs font-semibold")}>Phone</span>
+                      <span className={cn("text-xs font-semibold text-russian-violet")}>Phone</span>
                       <input
                         type="tel"
                         className={cn(
-                          "focus:border-russian-violet focus:ring-russian-violet/30 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-1",
+                          "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
                         )}
                         value={edit.phone}
                         onChange={(e) => setField(b.id, "phone", e.target.value)}
@@ -419,7 +419,7 @@ export function BookingAdminList({
 
                   {edit.address !== undefined && edit.address !== "" && (
                     <div className={cn("flex flex-col gap-1")}>
-                      <span className={cn("text-russian-violet text-xs font-semibold")}>
+                      <span className={cn("text-xs font-semibold text-russian-violet")}>
                         Address
                       </span>
                       <AddressAutocomplete
@@ -432,10 +432,10 @@ export function BookingAdminList({
                   )}
 
                   <label className={cn("flex flex-col gap-1")}>
-                    <span className={cn("text-russian-violet text-xs font-semibold")}>Notes</span>
+                    <span className={cn("text-xs font-semibold text-russian-violet")}>Notes</span>
                     <textarea
                       className={cn(
-                        "focus:border-russian-violet focus:ring-russian-violet/30 min-h-25 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-1",
+                        "min-h-25 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
                       )}
                       value={edit.notes}
                       onChange={(e) => setField(b.id, "notes", e.target.value)}
@@ -449,7 +449,7 @@ export function BookingAdminList({
                       onClick={() => saveEdit(b)}
                       disabled={isSaving}
                       className={cn(
-                        "bg-russian-violet hover:bg-russian-violet/90 rounded-lg px-4 py-2 text-xs font-medium text-white transition-colors disabled:opacity-50",
+                        "rounded-lg bg-russian-violet px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-russian-violet/90 disabled:opacity-50",
                       )}
                     >
                       {isSaving ? "Saving\u2026" : "Save changes"}
@@ -533,7 +533,7 @@ export function BookingAdminList({
                         onClick={() => void resendReview(b.id)}
                         disabled={isSaving || isResending}
                         className={cn(
-                          "bg-moonstone-600/15 text-moonstone-700 hover:bg-moonstone-600/25 rounded-lg px-4 py-2 text-xs font-medium transition-colors disabled:opacity-50",
+                          "rounded-lg bg-moonstone-600/15 px-4 py-2 text-xs font-medium text-moonstone-700 transition-colors hover:bg-moonstone-600/25 disabled:opacity-50",
                         )}
                       >
                         {isResending

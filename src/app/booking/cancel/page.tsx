@@ -64,7 +64,7 @@ function FeeBanner({
       <div
         role="alert"
         className={cn(
-          "border-coquelicot-500/60 bg-coquelicot-50 text-rich-black rounded-lg border-2 p-4 text-sm sm:text-base",
+          "bg-coquelicot-50 rounded-lg border-2 border-coquelicot-500/60 p-4 text-sm text-rich-black sm:text-base",
         )}
       >
         <strong>${policy.callOutFee} call-out fee plus round-trip travel</strong> will apply - we're
@@ -78,7 +78,7 @@ function FeeBanner({
       <div
         role="alert"
         className={cn(
-          "border-mustard-500/60 bg-mustard-900/40 text-rich-black rounded-lg border-2 p-4 text-sm sm:text-base",
+          "rounded-lg border-2 border-mustard-500/60 bg-mustard-900/40 p-4 text-sm text-rich-black sm:text-base",
         )}
       >
         <strong>${policy.callOutFee} call-out fee</strong> will apply - you're inside the{" "}
@@ -89,7 +89,7 @@ function FeeBanner({
   return (
     <div
       className={cn(
-        "border-moonstone-500/50 bg-moonstone-600/10 text-rich-black rounded-lg border-2 p-4 text-sm sm:text-base",
+        "rounded-lg border-2 border-moonstone-500/50 bg-moonstone-600/10 p-4 text-sm text-rich-black sm:text-base",
       )}
     >
       <strong>No fee</strong> applies for this cancellation - thanks for the heads up.
@@ -198,12 +198,12 @@ function CancelContent(): React.ReactElement {
       <div className={cn("mx-auto my-5 w-full max-w-[min(100vw-2rem,56rem)] sm:my-10")}>
         <div
           className={cn(
-            "border-seasalt-400/40 bg-seasalt-800/60 rounded-2xl border p-5 shadow-lg backdrop-blur-xl sm:p-10",
+            "rounded-2xl border border-seasalt-400/40 bg-seasalt-800/60 p-5 shadow-lg backdrop-blur-xl sm:p-10",
           )}
         >
           <div className={cn("flex flex-col gap-4 sm:gap-5")}>
             <section className={cn(CARD)}>
-              <h1 className={cn("text-russian-violet mb-3 text-2xl font-extrabold sm:text-3xl")}>
+              <h1 className={cn("mb-3 text-2xl font-extrabold text-russian-violet sm:text-3xl")}>
                 Cancel booking
               </h1>
 
@@ -233,7 +233,7 @@ function CancelContent(): React.ReactElement {
                   </p>
                   <FeeBanner startAt={load.startAt} policy={load.policy} />
                   {submit.kind === "error" && (
-                    <p className={cn("text-coquelicot-500 text-sm")}>{submit.message}</p>
+                    <p className={cn("text-sm text-coquelicot-500")}>{submit.message}</p>
                   )}
                   <div className={cn("flex flex-wrap gap-3")}>
                     <button
@@ -241,7 +241,7 @@ function CancelContent(): React.ReactElement {
                       onClick={() => void runCancel()}
                       disabled={submit.kind === "submitting"}
                       className={cn(
-                        "bg-coquelicot-500 hover:bg-coquelicot-600 rounded-xl px-5 py-2.5 text-base font-semibold text-white transition-colors disabled:opacity-50",
+                        "rounded-xl bg-coquelicot-500 px-5 py-2.5 text-base font-semibold text-white transition-colors hover:bg-coquelicot-600 disabled:opacity-50",
                       )}
                     >
                       {submit.kind === "submitting" ? "Cancelling..." : "Confirm cancellation"}

@@ -86,7 +86,7 @@ export default async function AdminPriceEstimatesPage({
     <AdminPageLayout current="price-estimates">
       <div className={cn("mb-6 flex flex-wrap items-center justify-between gap-4")}>
         <div>
-          <h1 className={cn("text-russian-violet text-2xl font-extrabold")}>Price estimates</h1>
+          <h1 className={cn("text-2xl font-extrabold text-russian-violet")}>Price estimates</h1>
           <p className={cn("mt-1 text-sm text-slate-500")}>
             Read-only audit log of public pricing wizard submissions. Rows are deleted after 30
             days.
@@ -133,7 +133,7 @@ export default async function AdminPriceEstimatesPage({
                     {log.environment !== "production" && (
                       <span
                         className={cn(
-                          "border-coquelicot/40 bg-coquelicot/10 text-coquelicot-500 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                          "rounded-md border border-coquelicot/40 bg-coquelicot/10 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-coquelicot-500 uppercase",
                         )}
                       >
                         {log.environment}
@@ -154,18 +154,18 @@ export default async function AdminPriceEstimatesPage({
                     <span className={cn("text-slate-500")}>
                       {formatMins(log.aiEstimatedMins)} at ${log.hourlyRate.toFixed(0)}/hr
                     </span>
-                    <span className={cn("text-russian-violet font-bold")}>
+                    <span className={cn("font-bold text-russian-violet")}>
                       ${log.priceLow} - ${log.priceHigh}
                     </span>
                   </div>
                 </div>
 
-                <p className={cn("mb-2 whitespace-pre-wrap text-sm text-slate-700")}>
+                <p className={cn("mb-2 text-sm whitespace-pre-wrap text-slate-700")}>
                   {log.description}
                 </p>
 
                 {log.aiExplanation && (
-                  <p className={cn("mb-2 text-xs italic text-slate-500")}>
+                  <p className={cn("mb-2 text-xs text-slate-500 italic")}>
                     AI: {log.aiExplanation}
                   </p>
                 )}

@@ -39,14 +39,14 @@ function ReviewText({ text }: { text: string }): React.ReactElement {
   const normalisedText = normaliseText(text);
 
   if (!isLongReview(normalisedText)) {
-    return <span className={cn("wrap-break-word inline whitespace-normal")}>{normalisedText}</span>;
+    return <span className={cn("inline wrap-break-word whitespace-normal")}>{normalisedText}</span>;
   }
 
   const preview = normalisedText.slice(0, REVIEW_CHAR_LIMIT);
   const wordSafe = preview.replace(/\s+\S*$/, "");
   const base = (wordSafe.trim().length > 0 ? wordSafe : preview).trim();
 
-  return <span className={cn("wrap-break-word inline whitespace-normal")}>{base + "…"}</span>;
+  return <span className={cn("inline wrap-break-word whitespace-normal")}>{base + "…"}</span>;
 }
 
 /**
@@ -76,7 +76,7 @@ function ReviewCard({
         <p className={cn("line-clamp-4")}>
           <ReviewText text={r.text} />
         </p>
-        <p className={cn("text-russian-violet pt-3 text-right text-sm font-semibold sm:text-base")}>
+        <p className={cn("pt-3 text-right text-sm font-semibold text-russian-violet sm:text-base")}>
           - {r.name}
         </p>
       </Link>
@@ -122,7 +122,7 @@ export default function Reviews({ items = [] }: ReviewsProps): React.ReactElemen
       <section aria-labelledby="reviews-section" className={cn("mx-auto w-full max-w-6xl")}>
         <h2
           id="reviews-section"
-          className={cn("text-rich-black mb-2 text-center text-xl font-semibold sm:text-2xl")}
+          className={cn("mb-2 text-center text-xl font-semibold text-rich-black sm:text-2xl")}
         >
           What People Say
         </h2>
@@ -142,7 +142,7 @@ export default function Reviews({ items = [] }: ReviewsProps): React.ReactElemen
                 r={r}
                 className={cn(
                   marqueeCardBase,
-                  "sm:w-md w-[min(26rem,calc(100vw-3rem))] shrink-0",
+                  "w-[min(26rem,calc(100vw-3rem))] shrink-0 sm:w-md",
                   i < items.length && "animate-fade-in animate-fill-both",
                 )}
                 style={i < items.length ? { animationDelay: `${i * 150}ms` } : undefined}
@@ -159,7 +159,7 @@ export default function Reviews({ items = [] }: ReviewsProps): React.ReactElemen
     <section aria-labelledby="reviews-section" className={cn("mx-auto w-full max-w-6xl")}>
       <h2
         id="reviews-section"
-        className={cn("text-rich-black mb-2 text-center text-xl font-semibold sm:text-2xl")}
+        className={cn("mb-2 text-center text-xl font-semibold text-rich-black sm:text-2xl")}
       >
         What People Say
       </h2>

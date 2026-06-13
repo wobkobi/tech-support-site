@@ -34,25 +34,25 @@ export default function AdminError({
       <FrostedSection maxWidth="56rem">
         <div className={cn("flex flex-col gap-6 sm:gap-8")}>
           <section className={cn(CARD, "text-center")}>
-            <div className={cn("text-coquelicot-500 mb-4 text-7xl font-extrabold sm:text-8xl")}>
+            <div className={cn("mb-4 text-7xl font-extrabold text-coquelicot-500 sm:text-8xl")}>
               Oops!
             </div>
 
             <h1
               className={cn(
-                "text-russian-violet mb-4 text-3xl font-extrabold sm:text-4xl md:text-5xl",
+                "mb-4 text-3xl font-extrabold text-russian-violet sm:text-4xl md:text-5xl",
               )}
             >
               An admin page hit an error
             </h1>
 
-            <p className={cn("text-rich-black mb-6 text-base sm:text-lg md:text-xl")}>
+            <p className={cn("mb-6 text-base text-rich-black sm:text-lg md:text-xl")}>
               Retry the action below. If it keeps failing, check the technical details and the
               server logs.
             </p>
 
             <p
-              className={cn("text-rich-black/70 wrap-break-word mb-6 text-sm italic sm:text-base")}
+              className={cn("mb-6 text-sm wrap-break-word text-rich-black/70 italic sm:text-base")}
               role="status"
               aria-live="polite"
             >
@@ -70,13 +70,13 @@ export default function AdminError({
               </Button>
             </div>
 
-            <details className={cn("text-rich-black/80 mt-6 text-base")}>
-              <summary className={cn("hover:text-russian-violet cursor-pointer font-semibold")}>
+            <details className={cn("mt-6 text-base text-rich-black/80")}>
+              <summary className={cn("cursor-pointer font-semibold hover:text-russian-violet")}>
                 Technical details
               </summary>
               <pre
                 className={cn(
-                  "border-seasalt-400/60 bg-seasalt-900/60 mt-3 max-w-full overflow-auto rounded-lg border p-4 text-left text-base",
+                  "mt-3 max-w-full overflow-auto rounded-lg border border-seasalt-400/60 bg-seasalt-900/60 p-4 text-left text-base",
                 )}
               >
                 {String(error?.stack || error)}

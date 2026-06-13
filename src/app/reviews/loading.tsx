@@ -38,7 +38,7 @@ export default function ReviewsLoading(): React.ReactElement {
                 <li
                   key={i}
                   className={cn(
-                    "bg-seasalt-800/80 border-seasalt-400/60 flex flex-col rounded-lg border-2 p-4 sm:p-5",
+                    "flex flex-col rounded-lg border-2 border-seasalt-400/60 bg-seasalt-800/80 p-4 sm:p-5",
                   )}
                 >
                   <Bone className={cn("mb-2 h-5 w-full")} />

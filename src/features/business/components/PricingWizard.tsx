@@ -408,7 +408,7 @@ export function PricingWizard({
               )}
             />
           ))}
-          <span className="ml-2 whitespace-nowrap text-xs text-slate-400">
+          <span className="ml-2 text-xs whitespace-nowrap text-slate-400">
             {stepIndex + 1} / {totalSteps}
           </span>
         </div>
@@ -416,7 +416,7 @@ export function PricingWizard({
 
       {step === "issue" && (
         <div>
-          <h3 className="text-coquelicot mb-1 text-lg font-bold">What do you need help with?</h3>
+          <h3 className="mb-1 text-lg font-bold text-coquelicot">What do you need help with?</h3>
           <p className="mb-4 text-base text-slate-600">
             Describe the issue or job - the more detail, the better the estimate.
           </p>
@@ -426,9 +426,9 @@ export function PricingWizard({
             onChange={(e) => setIssueDescription(e.target.value)}
             placeholder="e.g. My laptop is running really slow and I think it has a virus. Also want to set up my new phone."
             className={cn(
-              "w-full resize-none rounded-xl border px-4 py-3 text-base text-slate-700 outline-none transition-all",
+              "w-full resize-none rounded-xl border px-4 py-3 text-base text-slate-700 transition-all outline-none",
               "border-coquelicot/40 bg-white",
-              "focus:border-coquelicot focus:ring-coquelicot/30 focus:ring-2",
+              "focus:border-coquelicot focus:ring-2 focus:ring-coquelicot/30",
             )}
           />
         </div>
@@ -436,7 +436,7 @@ export function PricingWizard({
 
       {step === "meeting" && (
         <div>
-          <h3 className="text-russian-violet mb-1 text-lg font-bold">
+          <h3 className="mb-1 text-lg font-bold text-russian-violet">
             How would you like the work done?
           </h3>
           <p className="mb-4 text-base text-slate-600">
@@ -467,11 +467,11 @@ export function PricingWizard({
                   className={cn(
                     "rounded-xl border p-4 text-left transition-all",
                     selected
-                      ? "border-russian-violet bg-russian-violet/5 ring-russian-violet/30 ring-2"
+                      ? "border-russian-violet bg-russian-violet/5 ring-2 ring-russian-violet/30"
                       : "border-slate-200 bg-white hover:border-slate-300",
                   )}
                 >
-                  <p className="text-russian-violet text-base font-bold">{option.title}</p>
+                  <p className="text-base font-bold text-russian-violet">{option.title}</p>
                   <p className="mt-1 text-sm text-slate-600">{option.body}</p>
                 </button>
               );
@@ -482,7 +482,7 @@ export function PricingWizard({
 
       {step === "address" && (
         <div>
-          <h3 className="text-russian-violet mb-1 text-lg font-bold">Where are you located?</h3>
+          <h3 className="mb-1 text-lg font-bold text-russian-violet">Where are you located?</h3>
           <p className="mb-4 text-base text-slate-600">
             Enter your address so drive time can be included, or skip for an estimate without
             travel.
@@ -497,9 +497,9 @@ export function PricingWizard({
 
       {step === "results" && result && (
         <div>
-          <div className="border-russian-violet/20 bg-russian-violet/5 mb-4 rounded-2xl border p-6 text-center">
+          <div className="mb-4 rounded-2xl border border-russian-violet/20 bg-russian-violet/5 p-6 text-center">
             {aiEstimatedMins > 0 && (
-              <p className="text-rich-black mb-3 text-2xl font-bold sm:text-3xl">
+              <p className="mb-3 text-2xl font-bold text-rich-black sm:text-3xl">
                 {formatDuration(aiEstimatedMins)}
               </p>
             )}
@@ -509,7 +509,7 @@ export function PricingWizard({
                 {formatPriceRound(result.originalLow)} – {formatPriceRound(result.originalHigh)}
               </p>
             )}
-            <p className="text-russian-violet text-4xl font-extrabold sm:text-5xl">
+            <p className="text-4xl font-extrabold text-russian-violet sm:text-5xl">
               {formatPriceRound(result.low)} – {formatPriceRound(result.high)}
             </p>
             {result.promoLabel && (
@@ -519,7 +519,7 @@ export function PricingWizard({
             )}
             <p
               className={cn(
-                "border-coquelicot/30 bg-coquelicot/5 text-coquelicot-500 mt-4 rounded-lg border px-3 py-2 text-base font-bold",
+                "mt-4 rounded-lg border border-coquelicot/30 bg-coquelicot/5 px-3 py-2 text-base font-bold text-coquelicot-500",
               )}
             >
               You're charged for the actual time worked at the agreed hourly rate. Jobs that turn
@@ -536,7 +536,7 @@ export function PricingWizard({
               All prices in NZD. No GST.
             </p>
             {aiConfidence === "low" && (
-              <p className="text-coquelicot-600 mt-3 text-sm font-medium">
+              <p className="mt-3 text-sm font-medium text-coquelicot-600">
                 Your description was brief, so this is a wide ballpark - I'll pin it down once I see
                 it.
               </p>
@@ -547,14 +547,14 @@ export function PricingWizard({
 
           {result.breakdown.length > 0 && (
             <div className={cn(SOFT_CARD, "mb-4")}>
-              <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
+              <p className="mb-2 text-sm font-semibold tracking-wide text-slate-500 uppercase">
                 Breakdown
               </p>
               <div className="divide-y divide-slate-100">
                 {result.breakdown.map((line, i) => (
                   <div key={i} className="flex items-baseline justify-between py-1.5">
                     <span className="text-slate-700">{line.label}</span>
-                    <span className="ml-4 whitespace-nowrap font-medium text-slate-700">
+                    <span className="ml-4 font-medium whitespace-nowrap text-slate-700">
                       {line.low === line.high
                         ? formatPriceRound(line.low)
                         : `${formatPriceRound(line.low)} - ${formatPriceRound(line.high)}`}
@@ -573,7 +573,7 @@ export function PricingWizard({
           <div className="flex flex-wrap gap-3">
             <Link
               href={estimateId ? `/booking?estimate=${estimateId}` : "/booking"}
-              className="bg-russian-violet hover:bg-russian-violet/90 rounded-xl px-5 py-2.5 text-base font-semibold text-white"
+              className="rounded-xl bg-russian-violet px-5 py-2.5 text-base font-semibold text-white hover:bg-russian-violet/90"
             >
               Book now
             </Link>

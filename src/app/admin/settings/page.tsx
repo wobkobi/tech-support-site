@@ -27,7 +27,7 @@ export default async function SettingsPage(): Promise<React.ReactElement> {
 
   return (
     <AdminPageLayout current="settings">
-      <h1 className={cn("text-russian-violet mb-1 text-2xl font-extrabold")}>Settings</h1>
+      <h1 className={cn("mb-1 text-2xl font-extrabold text-russian-violet")}>Settings</h1>
       <p className={cn("mb-6 text-sm text-slate-500")}>
         Change the values your site runs on without editing code. Each field explains what it does;
         edits go live as soon as you save.

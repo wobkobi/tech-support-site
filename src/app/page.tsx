@@ -129,14 +129,14 @@ export default async function Home(): Promise<React.ReactElement> {
                 priority
                 fetchPriority="high"
                 draggable={false}
-                className={cn("w-70 sm:w-95 md:w-120 lg:w-140 h-auto")}
+                className={cn("h-auto w-70 sm:w-95 md:w-120 lg:w-140")}
               />
             </div>
 
             <h1
               id="hero-heading"
               className={cn(
-                "text-russian-violet mx-auto mb-4 max-w-5xl text-2xl font-extrabold sm:text-3xl md:text-4xl",
+                "mx-auto mb-4 max-w-5xl text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl",
               )}
             >
               Computer & IT Support in Auckland
@@ -144,7 +144,7 @@ export default async function Home(): Promise<React.ReactElement> {
 
             <p
               className={cn(
-                "text-rich-black mx-auto mb-8 max-w-7xl text-lg font-medium sm:text-xl md:text-2xl",
+                "mx-auto mb-8 max-w-7xl text-lg font-medium text-rich-black sm:text-xl md:text-2xl",
               )}
             >
               Friendly tech help across Auckland. Clear explanations, no jargon, and solutions that
@@ -162,7 +162,7 @@ export default async function Home(): Promise<React.ReactElement> {
               </Button>
             </div>
 
-            <p className={cn("text-rich-black/70 mt-6 text-base sm:text-lg")}>
+            <p className={cn("mt-6 text-base text-rich-black/70 sm:text-lg")}>
               Same day appointments available • Evening & weekend hours • Remote support options
             </p>
           </section>
@@ -177,15 +177,15 @@ export default async function Home(): Promise<React.ReactElement> {
             >
               <div
                 className={cn(
-                  "border-moonstone-500/50 bg-moonstone-600/30 mx-auto mb-3 grid size-16 place-items-center rounded-full border-2",
+                  "mx-auto mb-3 grid size-16 place-items-center rounded-full border-2 border-moonstone-500/50 bg-moonstone-600/30",
                 )}
               >
-                <FaCircleCheck className={cn("text-moonstone-600 h-8 w-8")} aria-hidden />
+                <FaCircleCheck className={cn("h-8 w-8 text-moonstone-600")} aria-hidden />
               </div>
-              <h3 className={cn("text-russian-violet mb-2 text-xl font-bold sm:text-2xl")}>
+              <h3 className={cn("mb-2 text-xl font-bold text-russian-violet sm:text-2xl")}>
                 Computer Science Graduate
               </h3>
-              <p className={cn("text-rich-black/80 text-base sm:text-lg")}>
+              <p className={cn("text-base text-rich-black/80 sm:text-lg")}>
                 University-trained with real-world experience
               </p>
             </div>
@@ -198,15 +198,15 @@ export default async function Home(): Promise<React.ReactElement> {
             >
               <div
                 className={cn(
-                  "border-moonstone-500/50 bg-moonstone-600/30 mx-auto mb-3 grid size-16 place-items-center rounded-full border-2",
+                  "mx-auto mb-3 grid size-16 place-items-center rounded-full border-2 border-moonstone-500/50 bg-moonstone-600/30",
                 )}
               >
-                <FaMapLocationDot className={cn("text-moonstone-600 h-8 w-8")} aria-hidden />
+                <FaMapLocationDot className={cn("h-8 w-8 text-moonstone-600")} aria-hidden />
               </div>
-              <h3 className={cn("text-russian-violet mb-2 text-xl font-bold sm:text-2xl")}>
+              <h3 className={cn("mb-2 text-xl font-bold text-russian-violet sm:text-2xl")}>
                 Proudly Local
               </h3>
-              <p className={cn("text-rich-black/80 text-base sm:text-lg")}>
+              <p className={cn("text-base text-rich-black/80 sm:text-lg")}>
                 Born and raised here, serving the community
               </p>
             </div>
@@ -219,15 +219,15 @@ export default async function Home(): Promise<React.ReactElement> {
             >
               <div
                 className={cn(
-                  "border-moonstone-500/50 bg-moonstone-600/30 mx-auto mb-3 grid size-16 place-items-center rounded-full border-2",
+                  "mx-auto mb-3 grid size-16 place-items-center rounded-full border-2 border-moonstone-500/50 bg-moonstone-600/30",
                 )}
               >
-                <FaHandshake className={cn("text-moonstone-600 h-8 w-8")} aria-hidden />
+                <FaHandshake className={cn("h-8 w-8 text-moonstone-600")} aria-hidden />
               </div>
-              <h3 className={cn("text-russian-violet mb-2 text-xl font-bold sm:text-2xl")}>
+              <h3 className={cn("mb-2 text-xl font-bold text-russian-violet sm:text-2xl")}>
                 No Upselling
               </h3>
-              <p className={cn("text-rich-black/80 text-base sm:text-lg")}>
+              <p className={cn("text-base text-rich-black/80 sm:text-lg")}>
                 Honest advice, fair pricing, clear communication
               </p>
             </div>
@@ -240,7 +240,7 @@ export default async function Home(): Promise<React.ReactElement> {
           >
             <h2
               id="services-heading"
-              className={cn("text-rich-black mb-8 text-3xl font-bold sm:text-4xl md:text-5xl")}
+              className={cn("mb-8 text-3xl font-bold text-rich-black sm:text-4xl md:text-5xl")}
             >
               What I can help with
             </h2>
@@ -254,19 +254,19 @@ export default async function Home(): Promise<React.ReactElement> {
                 <li
                   key={label}
                   className={cn(
-                    "border-seasalt-400/60 bg-seasalt-800 flex items-center gap-3 rounded-xl border p-3 shadow-sm transition-all hover:shadow-md",
+                    "flex items-center gap-3 rounded-xl border border-seasalt-400/60 bg-seasalt-800 p-3 shadow-sm transition-all hover:shadow-md",
                   )}
                 >
                   <span
                     className={cn(
-                      "border-moonstone-500/50 bg-moonstone-600/30 grid size-12 shrink-0 place-items-center rounded-lg border sm:size-14",
+                      "grid size-12 shrink-0 place-items-center rounded-lg border border-moonstone-500/50 bg-moonstone-600/30 sm:size-14",
                     )}
                   >
-                    <Icon className={cn("text-moonstone-600 h-7 w-7 sm:h-8 sm:w-8")} aria-hidden />
+                    <Icon className={cn("h-7 w-7 text-moonstone-600 sm:h-8 sm:w-8")} aria-hidden />
                   </span>
                   <span
                     className={cn(
-                      "text-rich-black line-clamp-2 text-left text-sm font-medium leading-tight sm:text-base",
+                      "line-clamp-2 text-left text-sm leading-tight font-medium text-rich-black sm:text-base",
                     )}
                   >
                     {label}
@@ -288,49 +288,49 @@ export default async function Home(): Promise<React.ReactElement> {
             className={cn("grid gap-5 md:grid-cols-2 md:gap-6")}
           >
             <article className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-300")}>
-              <h2 className={cn("text-russian-violet mb-4 text-2xl font-bold sm:text-3xl")}>
+              <h2 className={cn("mb-4 text-2xl font-bold text-russian-violet sm:text-3xl")}>
                 About Me
               </h2>
-              <p className={cn("text-rich-black mb-4 text-base sm:text-lg")}>
+              <p className={cn("mb-4 text-base text-rich-black sm:text-lg")}>
                 Hi, I'm Harrison, a computer science graduate based in Auckland. I started To The
                 Point Tech to give locals a reliable, friendly person to call when technology acts
                 up.
               </p>
-              <p className={cn("text-rich-black/90 text-base sm:text-lg")}>
+              <p className={cn("text-base text-rich-black/90 sm:text-lg")}>
                 I focus on practical fixes and clear explanations, leaving with your problems
                 solved.
               </p>
             </article>
 
             <article className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-400")}>
-              <h2 className={cn("text-russian-violet mb-4 text-2xl font-bold sm:text-3xl")}>
+              <h2 className={cn("mb-4 text-2xl font-bold text-russian-violet sm:text-3xl")}>
                 My approach
               </h2>
-              <ul className={cn("text-rich-black space-y-3 text-base sm:text-lg")}>
+              <ul className={cn("space-y-3 text-base text-rich-black sm:text-lg")}>
                 <li className={cn("flex gap-3")}>
                   <FaCircleCheck
-                    className={cn("text-moonstone-600 mt-1 h-5 w-5 shrink-0")}
+                    className={cn("mt-1 h-5 w-5 shrink-0 text-moonstone-600")}
                     aria-hidden
                   />
                   <span>Listen first, understand your needs</span>
                 </li>
                 <li className={cn("flex gap-3")}>
                   <FaCircleCheck
-                    className={cn("text-moonstone-600 mt-1 h-5 w-5 shrink-0")}
+                    className={cn("mt-1 h-5 w-5 shrink-0 text-moonstone-600")}
                     aria-hidden
                   />
                   <span>Explain everything as clearly as possible</span>
                 </li>
                 <li className={cn("flex gap-3")}>
                   <FaCircleCheck
-                    className={cn("text-moonstone-600 mt-1 h-5 w-5 shrink-0")}
+                    className={cn("mt-1 h-5 w-5 shrink-0 text-moonstone-600")}
                     aria-hidden
                   />
                   <span>Leave clear notes you can refer back to</span>
                 </li>
                 <li className={cn("flex gap-3")}>
                   <FaCircleCheck
-                    className={cn("text-moonstone-600 mt-1 h-5 w-5 shrink-0")}
+                    className={cn("mt-1 h-5 w-5 shrink-0 text-moonstone-600")}
                     aria-hidden
                   />
                   <span>Transparent pricing, no hidden fees</span>
@@ -351,11 +351,11 @@ export default async function Home(): Promise<React.ReactElement> {
             >
               <div
                 className={cn(
-                  "border-moonstone-500/50 bg-moonstone-600/30 grid size-16 shrink-0 place-items-center rounded-full border-2",
+                  "grid size-16 shrink-0 place-items-center rounded-full border-2 border-moonstone-500/50 bg-moonstone-600/30",
                 )}
               >
                 <FaDownload
-                  className={cn("text-moonstone-600 h-8 w-8 -translate-y-0.5")}
+                  className={cn("h-8 w-8 -translate-y-0.5 text-moonstone-600")}
                   aria-hidden
                 />
               </div>
@@ -363,11 +363,11 @@ export default async function Home(): Promise<React.ReactElement> {
               <div className={cn("flex-1")}>
                 <h2
                   id="flyer-heading"
-                  className={cn("text-russian-violet mb-1 text-xl font-bold sm:text-2xl")}
+                  className={cn("mb-1 text-xl font-bold text-russian-violet sm:text-2xl")}
                 >
                   Know someone who needs tech help?
                 </h2>
-                <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
+                <p className={cn("text-sm text-rich-black/80 sm:text-base")}>
                   Download this flyer to share with neighbours or pin to a noticeboard.
                 </p>
               </div>
@@ -399,25 +399,25 @@ export default async function Home(): Promise<React.ReactElement> {
       <footer className={cn("mx-auto mb-6 w-fit max-w-[calc(100vw-2rem)] sm:mb-8")}>
         <div
           className={cn(
-            "border-seasalt-400/40 bg-seasalt-800/70 flex flex-col items-center gap-1 rounded-xl border p-4 shadow-lg backdrop-blur-md sm:flex-row sm:gap-8 sm:px-6 sm:py-4",
+            "flex flex-col items-center gap-1 rounded-xl border border-seasalt-400/40 bg-seasalt-800/70 p-4 shadow-lg backdrop-blur-md sm:flex-row sm:gap-8 sm:px-6 sm:py-4",
           )}
         >
           <a
             href="tel:+64212971237"
             className={cn(
-              "text-russian-violet hover:text-coquelicot-500 flex items-center gap-3 rounded-md px-4 py-2 text-base font-bold transition-colors sm:text-lg",
+              "flex items-center gap-3 rounded-md px-4 py-2 text-base font-bold text-russian-violet transition-colors hover:text-coquelicot-500 sm:text-lg",
             )}
           >
             <FaPhone className={cn("h-4 w-4 shrink-0 sm:h-6 sm:w-6")} aria-hidden />
             <span>021 297 1237</span>
           </a>
 
-          <div className={cn("bg-seasalt-400/50 hidden h-6 w-px sm:block")} />
+          <div className={cn("hidden h-6 w-px bg-seasalt-400/50 sm:block")} />
 
           <a
             href="mailto:harrison@tothepoint.co.nz"
             className={cn(
-              "text-russian-violet hover:text-coquelicot-500 flex items-center gap-3 rounded-md px-4 py-2 text-base font-bold transition-colors sm:text-lg",
+              "flex items-center gap-3 rounded-md px-4 py-2 text-base font-bold text-russian-violet transition-colors hover:text-coquelicot-500 sm:text-lg",
             )}
           >
             <FaEnvelope className={cn("h-6 w-6 shrink-0 sm:h-7 sm:w-7")} aria-hidden />

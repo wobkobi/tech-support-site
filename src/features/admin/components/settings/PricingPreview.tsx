@@ -65,7 +65,7 @@ export function PricingPreview({ config }: Props): React.ReactElement {
 
   return (
     <div className={cn("mt-6 rounded-lg border border-slate-200 bg-slate-50 p-4")}>
-      <h3 className={cn("text-russian-violet text-xs font-bold uppercase tracking-wide")}>
+      <h3 className={cn("text-xs font-bold tracking-wide text-russian-violet uppercase")}>
         Live preview
       </h3>
       <ul className={cn("mt-2 space-y-1 text-sm text-slate-600")}>

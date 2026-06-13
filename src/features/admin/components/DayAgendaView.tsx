@@ -448,7 +448,7 @@ export function DayAgendaView({
     >
       <div className={cn("mb-4 flex items-end justify-between gap-3")}>
         <div>
-          <h1 className={cn("text-russian-violet text-2xl font-extrabold")}>Schedule</h1>
+          <h1 className={cn("text-2xl font-extrabold text-russian-violet")}>Schedule</h1>
           <p className={cn("mt-1 text-sm text-slate-500")}>{yearLabel}</p>
         </div>
       </div>
@@ -463,7 +463,7 @@ export function DayAgendaView({
         onPointerDown={stopPointer}
         onPointerUp={stopPointer}
         className={cn(
-          "sticky top-14 z-10 -mx-4 mb-4 bg-slate-50 px-4 pb-2 pt-1 sm:top-8 sm:-mx-6 sm:px-6",
+          "sticky top-14 z-10 -mx-4 mb-4 bg-slate-50 px-4 pt-1 pb-2 sm:top-8 sm:-mx-6 sm:px-6",
         )}
       >
         {/* Mini 7-day strip - visible week containing the selected day. Dots
@@ -484,15 +484,15 @@ export function DayAgendaView({
                 className={cn(
                   "flex h-10 flex-col items-center justify-center rounded-md border transition-colors",
                   isSelected
-                    ? "bg-russian-violet border-russian-violet text-white"
+                    ? "border-russian-violet bg-russian-violet text-white"
                     : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
-                  !isSelected && isTodayCell && "ring-russian-violet/40 ring-2 ring-inset",
+                  !isSelected && isTodayCell && "ring-2 ring-russian-violet/40 ring-inset",
                 )}
               >
                 <span className={cn("text-[9px] font-medium uppercase opacity-70")}>
                   {wd.weekday}
                 </span>
-                <span className={cn("text-xs font-bold leading-tight")}>{wd.dayOfMonth}</span>
+                <span className={cn("text-xs leading-tight font-bold")}>{wd.dayOfMonth}</span>
                 <span className={cn("mt-0.5 flex h-1 items-center gap-0.5")} aria-hidden>
                   {dotCount > 0
                     ? Array.from({ length: dotCount }).map((_, i) => (
@@ -545,7 +545,7 @@ export function DayAgendaView({
               {bookingCount > 0 && (
                 <span
                   className={cn(
-                    "bg-russian-violet/10 text-russian-violet inline-flex h-7 items-center rounded-full px-2.5 font-semibold",
+                    "inline-flex h-7 items-center rounded-full bg-russian-violet/10 px-2.5 font-semibold text-russian-violet",
                   )}
                 >
                   {bookingCount} booking{bookingCount === 1 ? "" : "s"}
@@ -566,7 +566,7 @@ export function DayAgendaView({
               {isToday && (
                 <span
                   className={cn(
-                    "inline-flex h-7 items-center rounded-full bg-slate-100 px-2.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500",
+                    "inline-flex h-7 items-center rounded-full bg-slate-100 px-2.5 text-[10px] font-semibold tracking-wide text-slate-500 uppercase",
                   )}
                 >
                   Today
@@ -658,7 +658,7 @@ export function DayAgendaView({
                 <div
                   key={`gap-${idx}`}
                   className={cn(
-                    "flex items-center gap-2 px-2 text-[11px] font-medium uppercase tracking-wide text-slate-400",
+                    "flex items-center gap-2 px-2 text-[11px] font-medium tracking-wide text-slate-400 uppercase",
                   )}
                   aria-hidden
                 >
@@ -724,7 +724,7 @@ export function DayAgendaView({
                             href={`tel:${ev.booking.phone}`}
                             onClick={(e) => e.stopPropagation()}
                             className={cn(
-                              "bg-russian-violet/10 text-russian-violet hover:bg-russian-violet/20 inline-flex h-10 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold",
+                              "inline-flex h-10 items-center gap-1.5 rounded-lg bg-russian-violet/10 px-3 text-sm font-semibold text-russian-violet hover:bg-russian-violet/20",
                             )}
                           >
                             Call {ev.booking.phone}
@@ -734,7 +734,7 @@ export function DayAgendaView({
                           href={`mailto:${ev.booking.email}`}
                           onClick={(e) => e.stopPropagation()}
                           className={cn(
-                            "bg-russian-violet/10 text-russian-violet hover:bg-russian-violet/20 inline-flex h-10 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold",
+                            "inline-flex h-10 items-center gap-1.5 rounded-lg bg-russian-violet/10 px-3 text-sm font-semibold text-russian-violet hover:bg-russian-violet/20",
                           )}
                         >
                           Email
@@ -748,7 +748,7 @@ export function DayAgendaView({
                             rel="noreferrer"
                             onClick={(e) => e.stopPropagation()}
                             className={cn(
-                              "bg-russian-violet/10 text-russian-violet hover:bg-russian-violet/20 inline-flex h-10 items-center gap-1.5 rounded-lg px-3 text-sm font-semibold",
+                              "inline-flex h-10 items-center gap-1.5 rounded-lg bg-russian-violet/10 px-3 text-sm font-semibold text-russian-violet hover:bg-russian-violet/20",
                             )}
                           >
                             Open in Maps
@@ -762,7 +762,7 @@ export function DayAgendaView({
                         </div>
                       )}
                       {ev.booking.notes && (
-                        <div className={cn("whitespace-pre-wrap text-xs text-slate-600")}>
+                        <div className={cn("text-xs whitespace-pre-wrap text-slate-600")}>
                           <span className={cn("text-slate-400")}>Notes: </span>
                           {ev.booking.notes}
                         </div>
@@ -789,7 +789,7 @@ export function DayAgendaView({
         onClick={handleAddBooking}
         data-no-swipe
         className={cn(
-          "bg-russian-violet mt-6 inline-flex h-12 w-full items-center justify-center rounded-lg px-4 text-sm font-semibold text-white hover:opacity-90",
+          "mt-6 inline-flex h-12 w-full items-center justify-center rounded-lg bg-russian-violet px-4 text-sm font-semibold text-white hover:opacity-90",
         )}
       >
         Add booking on this day

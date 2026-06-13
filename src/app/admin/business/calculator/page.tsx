@@ -31,7 +31,7 @@ export default async function CalculatorPage(): Promise<React.ReactElement> {
 
   return (
     <AdminPageLayout current="business-calculator">
-      <h1 className={cn("text-russian-violet mb-6 text-2xl font-extrabold")}>Job calculator</h1>
+      <h1 className={cn("mb-6 text-2xl font-extrabold text-russian-violet")}>Job calculator</h1>
       <Suspense>
         <CalculatorView identity={identity} pricing={pricing} />
       </Suspense>

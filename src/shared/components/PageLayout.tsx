@@ -80,7 +80,7 @@ export function FrostedSection({
     >
       <div
         className={cn(
-          "border-seasalt-400/40 bg-seasalt-800/60 rounded-2xl border p-4 shadow-lg backdrop-blur-md sm:p-6 md:p-8",
+          "rounded-2xl border border-seasalt-400/40 bg-seasalt-800/60 p-4 shadow-lg backdrop-blur-md sm:p-6 md:p-8",
         )}
       >
         {children}

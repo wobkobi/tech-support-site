@@ -21,7 +21,7 @@ export default async function IncomePage(): Promise<React.ReactElement> {
 
   return (
     <AdminPageLayout current="business-income">
-      <h1 className={cn("text-russian-violet mb-6 text-2xl font-extrabold")}>Income</h1>
+      <h1 className={cn("mb-6 text-2xl font-extrabold text-russian-violet")}>Income</h1>
       <IncomeView />
     </AdminPageLayout>
   );

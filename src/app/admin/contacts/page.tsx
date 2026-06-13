@@ -92,7 +92,7 @@ export default async function AdminContactsPage(): Promise<React.ReactElement> {
 
   return (
     <AdminPageLayout current="contacts">
-      <h1 className={cn("text-russian-violet mb-6 text-2xl font-extrabold")}>
+      <h1 className={cn("mb-6 text-2xl font-extrabold text-russian-violet")}>
         Contacts
         <span className={cn("ml-3 text-lg font-semibold text-slate-400")}>
           {allContacts.length}

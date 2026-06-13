@@ -261,12 +261,12 @@ export default async function EditBookingPage({
           <section className={cn(CARD, "animate-fade-in")}>
             <h1
               className={cn(
-                "text-russian-violet mb-3 text-2xl font-extrabold sm:text-3xl md:text-4xl",
+                "mb-3 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl",
               )}
             >
               Edit booking
             </h1>
-            <p className={cn("text-rich-black text-sm sm:text-base")}>
+            <p className={cn("text-sm text-rich-black sm:text-base")}>
               Update your appointment details below. A new calendar invite will be sent when you
               save.
             </p>

@@ -292,7 +292,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
         onSubmit={(e) => void handleSubmit(e)}
         className={cn("space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}
       >
-        <h2 className={cn("text-russian-violet text-sm font-semibold")}>
+        <h2 className={cn("text-sm font-semibold text-russian-violet")}>
           {editingId ? "Edit promo" : "New promo"}
         </h2>
 
@@ -306,7 +306,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
               onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
               placeholder="e.g. Soft launch"
               className={cn(
-                "focus:ring-russian-violet/30 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
+                "rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
               )}
             />
           </label>
@@ -318,7 +318,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
               onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
               placeholder="Shown on the pricing page"
               className={cn(
-                "focus:ring-russian-violet/30 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
+                "rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
               )}
             />
           </label>
@@ -330,7 +330,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
               value={form.startDate}
               onChange={(e) => setForm((p) => ({ ...p, startDate: e.target.value }))}
               className={cn(
-                "focus:ring-russian-violet/30 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
+                "rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
               )}
             />
           </label>
@@ -342,7 +342,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
               value={form.endDate}
               onChange={(e) => setForm((p) => ({ ...p, endDate: e.target.value }))}
               className={cn(
-                "focus:ring-russian-violet/30 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
+                "rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
               )}
             />
           </label>
@@ -354,7 +354,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
                 setForm((p) => ({ ...p, type: e.target.value as PromoType, amount: "" }))
               }
               className={cn(
-                "focus:ring-russian-violet/30 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
+                "rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
               )}
             >
               <option value="flat">Flat $/hr</option>
@@ -375,7 +375,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
               onChange={(e) => setForm((p) => ({ ...p, amount: e.target.value }))}
               placeholder={form.type === "flat" ? "50" : "20"}
               className={cn(
-                "focus:ring-russian-violet/30 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
+                "rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
               )}
             />
           </label>
@@ -398,7 +398,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
             type="submit"
             disabled={busy}
             className={cn(
-              "bg-russian-violet rounded-lg px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50",
+              "rounded-lg bg-russian-violet px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50",
             )}
           >
             {busy ? "Saving..." : editingId ? "Update promo" : "Create promo"}
@@ -445,7 +445,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
             )}
           >
             <table className={cn("w-full text-sm")}>
-              <thead className={cn("bg-slate-50 text-xs uppercase text-slate-500")}>
+              <thead className={cn("bg-slate-50 text-xs text-slate-500 uppercase")}>
                 <tr>
                   <th className={cn("px-4 py-2 text-left")}>Title</th>
                   <th className={cn("px-4 py-2 text-left")}>Period</th>

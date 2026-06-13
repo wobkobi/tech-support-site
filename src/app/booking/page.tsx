@@ -211,7 +211,7 @@ async function BookingFormIsland(): Promise<React.ReactElement> {
       <div
         role="status"
         className={cn(
-          "border-mustard-500/60 bg-mustard-900/40 text-rich-black flex flex-col gap-2 rounded-lg border-2 p-5",
+          "flex flex-col gap-2 rounded-lg border-2 border-mustard-500/60 bg-mustard-900/40 p-5 text-rich-black",
         )}
       >
         <p className={cn("text-base font-semibold")}>Online booking is paused</p>
@@ -224,7 +224,7 @@ async function BookingFormIsland(): Promise<React.ReactElement> {
       <div
         role="alert"
         className={cn(
-          "border-coquelicot-500/60 bg-coquelicot-50 text-rich-black flex flex-col gap-3 rounded-lg border-2 p-5",
+          "bg-coquelicot-50 flex flex-col gap-3 rounded-lg border-2 border-coquelicot-500/60 p-5 text-rich-black",
         )}
       >
         <p className={cn("text-base font-semibold sm:text-lg")}>
@@ -241,7 +241,7 @@ async function BookingFormIsland(): Promise<React.ReactElement> {
       {sameDayClosed && (
         <div
           className={cn(
-            "border-moonstone-500/40 bg-moonstone-600/10 text-rich-black rounded-lg border p-4",
+            "rounded-lg border border-moonstone-500/40 bg-moonstone-600/10 p-4 text-rich-black",
           )}
         >
           <p className={cn("text-base")}>
@@ -360,12 +360,12 @@ export default function BookingPage(): React.ReactElement {
           <section className={cn(CARD, "animate-fade-in")}>
             <h1
               className={cn(
-                "text-russian-violet mb-3 text-2xl font-extrabold sm:text-3xl md:text-4xl",
+                "mb-3 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl",
               )}
             >
               Request an appointment
             </h1>
-            <p className={cn("text-rich-black text-sm sm:text-base")}>
+            <p className={cn("text-sm text-rich-black sm:text-base")}>
               Pick a time that works for you and tell me what you need help with. I'll confirm the
               details and send you a calendar invite.
               <br />
@@ -395,49 +395,49 @@ export default function BookingPage(): React.ReactElement {
             >
               {/* How it works */}
               <div className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-200")}>
-                <h2 className={cn("text-russian-violet mb-4 text-xl font-bold sm:text-2xl")}>
+                <h2 className={cn("mb-4 text-xl font-bold text-russian-violet sm:text-2xl")}>
                   How it works
                 </h2>
                 <ol className={cn("space-y-5")}>
                   <li className={cn("flex gap-3")}>
                     <span className={STEP_ICON}>
-                      <FaClock className={cn("text-moonstone-600 text-base")} aria-hidden />
+                      <FaClock className={cn("text-base text-moonstone-600")} aria-hidden />
                     </span>
                     <div>
-                      <p className={cn("text-rich-black text-base font-semibold")}>Choose length</p>
-                      <p className={cn("text-rich-black/70 text-base")}>1 or 2 hours</p>
+                      <p className={cn("text-base font-semibold text-rich-black")}>Choose length</p>
+                      <p className={cn("text-base text-rich-black/70")}>1 or 2 hours</p>
                     </div>
                   </li>
                   <li className={cn("flex gap-3")}>
                     <span className={STEP_ICON}>
-                      <FaCalendarCheck className={cn("text-moonstone-600 text-base")} aria-hidden />
+                      <FaCalendarCheck className={cn("text-base text-moonstone-600")} aria-hidden />
                     </span>
                     <div>
-                      <p className={cn("text-rich-black text-base font-semibold")}>Pick a time</p>
-                      <p className={cn("text-rich-black/70 text-base")}>Day and start time</p>
+                      <p className={cn("text-base font-semibold text-rich-black")}>Pick a time</p>
+                      <p className={cn("text-base text-rich-black/70")}>Day and start time</p>
                     </div>
                   </li>
                   <li className={cn("flex gap-3")}>
                     <span className={STEP_ICON}>
-                      <FaListCheck className={cn("text-moonstone-600 text-base")} aria-hidden />
+                      <FaListCheck className={cn("text-base text-moonstone-600")} aria-hidden />
                     </span>
                     <div>
-                      <p className={cn("text-rich-black text-base font-semibold")}>
+                      <p className={cn("text-base font-semibold text-rich-black")}>
                         Describe the issue
                       </p>
-                      <p className={cn("text-rich-black/70 text-base")}>What you need help with</p>
+                      <p className={cn("text-base text-rich-black/70")}>What you need help with</p>
                     </div>
                   </li>
                   <li className={cn("flex gap-3")}>
                     <span className={STEP_ICON}>
                       <FaEnvelopeOpenText
-                        className={cn("text-moonstone-600 text-base")}
+                        className={cn("text-base text-moonstone-600")}
                         aria-hidden
                       />
                     </span>
                     <div>
-                      <p className={cn("text-rich-black text-base font-semibold")}>Get confirmed</p>
-                      <p className={cn("text-rich-black/70 text-base")}>Calendar invite by email</p>
+                      <p className={cn("text-base font-semibold text-rich-black")}>Get confirmed</p>
+                      <p className={cn("text-base text-rich-black/70")}>Calendar invite by email</p>
                     </div>
                   </li>
                 </ol>
@@ -447,7 +447,7 @@ export default function BookingPage(): React.ReactElement {
               <div
                 className={cn(SOFT_CARD, "animate-slide-up animate-fill-both animate-delay-300")}
               >
-                <p className={cn("text-rich-black/80 text-base leading-relaxed")}>
+                <p className={cn("text-base leading-relaxed text-rich-black/80")}>
                   <strong>Timing is flexible.</strong> Most appointments are 1 hour. Choose 2 hours
                   if you have multiple issues or need more time. Actual time may be shorter or
                   longer as needed.

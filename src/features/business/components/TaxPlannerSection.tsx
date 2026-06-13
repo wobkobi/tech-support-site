@@ -61,7 +61,7 @@ export function TaxPlannerSection({
   return (
     <section className={cn("mb-8")}>
       <div className={cn("mb-3 flex flex-wrap items-baseline gap-2")}>
-        <h2 className={cn("text-russian-violet text-lg font-bold")}>Tax planner</h2>
+        <h2 className={cn("text-lg font-bold text-russian-violet")}>Tax planner</h2>
         <span className={cn("text-xs font-medium text-slate-500")}>{fyLabel}</span>
       </div>
 
@@ -73,7 +73,7 @@ export function TaxPlannerSection({
       >
         {/* Tax account: income tax + ACC (+ GST when registered). Paid to IRD/ACC. */}
         <div className={cn("rounded-xl border border-slate-200 bg-white p-4 shadow-sm")}>
-          <h3 className={cn("text-russian-violet mb-1 text-sm font-bold uppercase tracking-wide")}>
+          <h3 className={cn("mb-1 text-sm font-bold tracking-wide text-russian-violet uppercase")}>
             Tax account
           </h3>
           <p className={cn("mb-3 text-[11px] text-slate-400")}>Reserved for IRD + ACC bills.</p>
@@ -98,7 +98,7 @@ export function TaxPlannerSection({
 
         {/* KiwiSaver - separate provider, separate reserve. */}
         <div className={cn("rounded-xl border border-slate-200 bg-white p-4 shadow-sm")}>
-          <h3 className={cn("text-russian-violet mb-1 text-sm font-bold uppercase tracking-wide")}>
+          <h3 className={cn("mb-1 text-sm font-bold tracking-wide text-russian-violet uppercase")}>
             KiwiSaver
           </h3>
           <p className={cn("mb-3 text-[11px] text-slate-400")}>
@@ -123,7 +123,7 @@ export function TaxPlannerSection({
         {gstRegistered && (
           <div className={cn("rounded-xl border border-slate-200 bg-white p-4 shadow-sm")}>
             <h3
-              className={cn("text-russian-violet mb-3 text-sm font-bold uppercase tracking-wide")}
+              className={cn("mb-3 text-sm font-bold tracking-wide text-russian-violet uppercase")}
             >
               GST
             </h3>
@@ -184,7 +184,7 @@ function PlannerRow({
           className={cn(
             "font-mono text-sm",
             emphasis
-              ? "text-russian-violet text-base"
+              ? "text-base text-russian-violet"
               : muted
                 ? "text-slate-500"
                 : "text-slate-800",
@@ -208,8 +208,8 @@ function PlannerRow({
 function SmallStat({ label, value }: { label: string; value: string }): React.ReactElement {
   return (
     <div>
-      <p className={cn("text-[10px] uppercase tracking-wide text-slate-400")}>{label}</p>
-      <p className={cn("text-russian-violet font-mono text-sm font-bold")}>{value}</p>
+      <p className={cn("text-[10px] tracking-wide text-slate-400 uppercase")}>{label}</p>
+      <p className={cn("font-mono text-sm font-bold text-russian-violet")}>{value}</p>
     </div>
   );
 }

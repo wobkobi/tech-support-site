@@ -1355,7 +1355,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
           value={jobDate}
           onChange={(e) => setJobDate(e.target.value || todayNZDate())}
           className={cn(
-            "focus:ring-russian-violet/30 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2",
+            "rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
           )}
         />
         <span className={cn("text-xs text-slate-500")}>
@@ -1431,7 +1431,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
         <div className={cn("space-y-5")}>
           {/* AI input */}
           <div className={cn("rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}>
-            <h2 className={cn("text-russian-violet mb-3 text-sm font-semibold")}>
+            <h2 className={cn("mb-3 text-sm font-semibold text-russian-violet")}>
               Describe the job
             </h2>
             <textarea
@@ -1446,7 +1446,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
               rows={6}
               placeholder="e.g. Was at Dave's for 2 hours, removed some malware, set up his new router, had to drive out to Papakura"
               className={cn(
-                "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
+                "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
               )}
             />
             {parseError && <p className={cn("mt-1 text-xs text-red-600")}>{parseError}</p>}
@@ -1456,7 +1456,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
                 suppressHydrationWarning
                 disabled={parsing || !aiInput.trim()}
                 className={cn(
-                  "bg-russian-violet rounded-lg px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50",
+                  "rounded-lg bg-russian-violet px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50",
                 )}
               >
                 {parsing ? "Parsing..." : hasParsed ? "Re-parse" : "Parse with AI"}
@@ -1493,7 +1493,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
                           setClarifyAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))
                         }
                         className={cn(
-                          "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs focus:outline-none focus:ring-2",
+                          "w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
                         )}
                       />
                     </div>
@@ -1504,7 +1504,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
                     onClick={() => void handleParse(clarifyAnswers)}
                     disabled={parsing}
                     className={cn(
-                      "bg-russian-violet rounded-lg px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50",
+                      "rounded-lg bg-russian-violet px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50",
                     )}
                   >
                     {parsing ? "Parsing..." : "Submit answers"}
@@ -1596,7 +1596,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
               className={cn(
-                "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
+                "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
               )}
             />
           </div>
@@ -1650,7 +1650,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
                 checked={unsuccessful}
                 onChange={(e) => setUnsuccessful(e.target.checked)}
                 className={cn(
-                  "text-russian-violet focus:ring-russian-violet/30 mt-0.5 h-4 w-4 rounded border-slate-300",
+                  "mt-0.5 h-4 w-4 rounded border-slate-300 text-russian-violet focus:ring-russian-violet/30",
                 )}
               />
               <span>
@@ -1719,7 +1719,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
               disabled={savingInvoice || parsing}
               suppressHydrationWarning
               className={cn(
-                "bg-russian-violet w-full rounded-lg px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50",
+                "w-full rounded-lg bg-russian-violet px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50",
               )}
             >
               {savingInvoice ? "Saving..." : "Save invoice"}

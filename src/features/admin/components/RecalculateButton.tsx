@@ -45,7 +45,7 @@ export function RecalculateButton(): React.ReactElement {
           "rounded-lg px-4 py-2 text-sm font-semibold transition-colors",
           recalculating
             ? "cursor-not-allowed bg-slate-100 text-slate-400"
-            : "bg-russian-violet hover:bg-russian-violet/90 text-white",
+            : "bg-russian-violet text-white hover:bg-russian-violet/90",
         )}
       >
         {recalculating ? "Recalculating…" : "Recalculate travel times"}

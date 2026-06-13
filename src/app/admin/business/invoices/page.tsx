@@ -21,7 +21,7 @@ export default async function InvoicesPage(): Promise<React.ReactElement> {
 
   return (
     <AdminPageLayout current="business-invoices">
-      <h1 className={cn("text-russian-violet mb-6 text-2xl font-extrabold")}>Invoices</h1>
+      <h1 className={cn("mb-6 text-2xl font-extrabold text-russian-violet")}>Invoices</h1>
       <InvoicesListView />
     </AdminPageLayout>
   );

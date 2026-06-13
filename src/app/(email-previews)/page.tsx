@@ -20,21 +20,21 @@ export default function EmailPreviewsPage(): React.ReactElement {
     <PageShell>
       <FrostedSection>
         <main
-          className={cn("mx-auto flex w-full max-w-5xl flex-col gap-6 pb-6 pt-4 sm:pb-8 sm:pt-6")}
+          className={cn("mx-auto flex w-full max-w-5xl flex-col gap-6 pt-4 pb-6 sm:pt-6 sm:pb-8")}
         >
           <section
             className={cn(
-              "border-seasalt-400/60 bg-seasalt-800 rounded-xl border p-4 shadow-sm sm:p-6",
+              "rounded-xl border border-seasalt-400/60 bg-seasalt-800 p-4 shadow-sm sm:p-6",
             )}
           >
             <h1
               className={cn(
-                "text-russian-violet mb-2 text-2xl font-extrabold sm:text-3xl md:text-4xl",
+                "mb-2 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl",
               )}
             >
               Email previews
             </h1>
-            <p className={cn("text-rich-black/80 text-sm sm:text-base")}>
+            <p className={cn("text-sm text-rich-black/80 sm:text-base")}>
               Email templates are not configured in this build.
             </p>
           </section>

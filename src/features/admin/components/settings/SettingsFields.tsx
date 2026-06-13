@@ -43,7 +43,7 @@ export function FieldShell({
   return (
     <div className={cn("py-4")}>
       <label htmlFor={id} className={cn("flex items-baseline justify-between gap-3")}>
-        <span className={cn("text-russian-violet text-sm font-semibold")}>
+        <span className={cn("text-sm font-semibold text-russian-violet")}>
           {meta.title}
           {customised && (
             <span
@@ -56,7 +56,7 @@ export function FieldShell({
         </span>
       </label>
       <p className={cn("mt-0.5 text-sm text-slate-500")}>{meta.description}</p>
-      {meta.off && <p className={cn("mt-0.5 text-xs italic text-slate-400")}>{meta.off}</p>}
+      {meta.off && <p className={cn("mt-0.5 text-xs text-slate-400 italic")}>{meta.off}</p>}
       <div className={cn("mt-2")}>{children}</div>
       {error && <p className={cn("mt-1 text-xs font-medium text-red-600")}>{error}</p>}
     </div>
@@ -125,7 +125,7 @@ export function NumberField({
             if (Number.isFinite(n)) onChange(n);
           }}
           className={cn(
-            "focus:ring-russian-violet/30 w-32 rounded-lg border px-3 py-2.5 text-base focus:outline-none focus:ring-2",
+            "w-32 rounded-lg border px-3 py-2.5 text-base focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
             error ? "border-red-400" : "border-slate-300",
           )}
         />

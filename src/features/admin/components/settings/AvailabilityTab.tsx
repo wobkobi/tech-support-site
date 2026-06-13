@@ -76,7 +76,7 @@ function HourSelect({ value, onChange, from, to, close }: HourSelectProps): Reac
       value={value}
       onChange={(e) => onChange(Number(e.target.value))}
       className={cn(
-        "focus:ring-russian-violet/30 rounded-lg border border-slate-300 px-2 py-2 text-sm focus:outline-none focus:ring-2",
+        "rounded-lg border border-slate-300 px-2 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
       )}
     >
       {opts.map((h) => (
@@ -142,14 +142,14 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
             rows={2}
             onChange={(e) => setTop({ closedMessage: e.target.value })}
             className={cn(
-              "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-300 px-3 py-2 text-base focus:outline-none focus:ring-2",
+              "w-full rounded-lg border border-slate-300 px-3 py-2 text-base focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
             )}
           />
         </FieldShell>
       </div>
 
       {/* Weekly hours */}
-      <h3 className={cn("text-russian-violet mt-6 text-xs font-bold uppercase tracking-wide")}>
+      <h3 className={cn("mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase")}>
         Weekly hours
       </h3>
       <p className={cn("mt-1 text-sm text-slate-500")}>
@@ -232,7 +232,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
                     )}
                   </div>
                 ) : (
-                  <span className={cn("text-sm italic text-slate-400")}>Day off</span>
+                  <span className={cn("text-sm text-slate-400 italic")}>Day off</span>
                 )}
               </div>
             </div>
@@ -241,7 +241,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
       </div>
 
       {/* Booking rules */}
-      <h3 className={cn("text-russian-violet mt-6 text-xs font-bold uppercase tracking-wide")}>
+      <h3 className={cn("mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase")}>
         Booking rules
       </h3>
       <div className={cn("divide-y divide-slate-100")}>
@@ -296,7 +296,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
       </div>
 
       {/* Durations + daily caps */}
-      <h3 className={cn("text-russian-violet mt-6 text-xs font-bold uppercase tracking-wide")}>
+      <h3 className={cn("mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase")}>
         Job lengths &amp; daily limits
       </h3>
       <div className={cn("divide-y divide-slate-100")}>
@@ -385,7 +385,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
           onClick={() => void form.save()}
           disabled={!dirty || saving}
           className={cn(
-            "bg-russian-violet rounded-lg px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50",
+            "rounded-lg bg-russian-violet px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50",
           )}
         >
           {saving ? "Saving..." : "Save changes"}

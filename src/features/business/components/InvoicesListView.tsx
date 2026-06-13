@@ -145,7 +145,7 @@ export function InvoicesListView(): React.ReactElement {
           <Link
             href={`/admin/business/calculator`}
             className={cn(
-              "bg-russian-violet rounded-lg px-4 py-2 text-sm font-medium text-white hover:opacity-90",
+              "rounded-lg bg-russian-violet px-4 py-2 text-sm font-medium text-white hover:opacity-90",
             )}
           >
             New invoice
@@ -178,7 +178,7 @@ export function InvoicesListView(): React.ReactElement {
               key={inv.id}
               className={cn(
                 "rounded-xl border border-slate-200 bg-white p-3 shadow-sm",
-                "hover:border-russian-violet/30 transition-colors",
+                "transition-colors hover:border-russian-violet/30",
               )}
             >
               <div className={cn("flex items-center justify-between gap-2")}>
@@ -270,10 +270,10 @@ export function InvoicesListView(): React.ReactElement {
                     {inv.number}
                   </td>
                   <td className={cn("px-4 py-3 font-medium text-slate-700")}>{inv.clientName}</td>
-                  <td className={cn("whitespace-nowrap px-4 py-3 text-xs text-slate-500")}>
+                  <td className={cn("px-4 py-3 text-xs whitespace-nowrap text-slate-500")}>
                     {new Date(inv.issueDate).toLocaleDateString("en-NZ")}
                   </td>
-                  <td className={cn("whitespace-nowrap px-4 py-3 font-semibold text-slate-700")}>
+                  <td className={cn("px-4 py-3 font-semibold whitespace-nowrap text-slate-700")}>
                     {formatNZD(inv.total)}
                   </td>
                   <td className={cn("px-4 py-3")} onClick={(e) => e.stopPropagation()}>

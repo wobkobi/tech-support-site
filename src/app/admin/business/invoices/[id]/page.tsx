@@ -67,7 +67,7 @@ export default async function InvoiceViewPage({
             priority
           />
           <div className={cn("text-right")}>
-            <p className={cn("text-russian-violet text-2xl font-extrabold leading-none")}>
+            <p className={cn("text-2xl leading-none font-extrabold text-russian-violet")}>
               {identity.gstNumber ? "TAX INVOICE" : "INVOICE"}
             </p>
             <p className={cn("mt-2 font-mono text-sm font-semibold text-slate-700")}>
@@ -101,7 +101,7 @@ export default async function InvoiceViewPage({
         {/* Bill to (left) + dates (right) - mirrors PDF layout. */}
         <div className={cn("mb-6 flex items-start justify-between gap-6")}>
           <div>
-            <p className={cn("mb-1 text-xs font-bold uppercase tracking-wider text-slate-400")}>
+            <p className={cn("mb-1 text-xs font-bold tracking-wider text-slate-400 uppercase")}>
               Bill to
             </p>
             <p className={cn("text-base font-bold text-slate-800")}>{invoice.clientName}</p>
@@ -128,7 +128,7 @@ export default async function InvoiceViewPage({
             Unit price 11%, Total 13%. */}
         <table className={cn("mb-0 w-full text-sm")}>
           <thead>
-            <tr className={cn("border-russian-violet border-b-2 text-slate-800")}>
+            <tr className={cn("border-b-2 border-russian-violet text-slate-800")}>
               <th className={cn("w-[67%] px-3 py-2 text-left font-bold")}>Description</th>
               <th className={cn("w-[9%] px-3 py-2 text-center font-bold")}>Qty</th>
               <th className={cn("w-[11%] px-3 py-2 text-center font-bold")}>Price</th>
@@ -150,12 +150,12 @@ export default async function InvoiceViewPage({
             ))}
           </tbody>
         </table>
-        <div className={cn("mb-6 mt-4 h-px bg-slate-300")} />
+        <div className={cn("mt-4 mb-6 h-px bg-slate-300")} />
 
         <div className={cn("mb-6 ml-auto w-3/5 space-y-1 text-sm")}>
           <div className={cn("flex justify-between gap-3")}>
             <span className={cn("text-slate-500")}>Subtotal</span>
-            <span className={cn("whitespace-nowrap font-medium text-slate-700")}>
+            <span className={cn("font-medium whitespace-nowrap text-slate-700")}>
               {formatNZD(invoice.subtotal)}
             </span>
           </div>
@@ -176,14 +176,14 @@ export default async function InvoiceViewPage({
           {invoice.gstAmount > 0 && (
             <div className={cn("flex justify-between gap-3")}>
               <span className={cn("text-slate-500")}>Includes GST</span>
-              <span className={cn("whitespace-nowrap font-medium text-slate-700")}>
+              <span className={cn("font-medium whitespace-nowrap text-slate-700")}>
                 {formatNZD(invoice.gstAmount)}
               </span>
             </div>
           )}
           <div className={cn("flex justify-between gap-3 border-t border-slate-200 pt-1")}>
             <span className={cn("font-semibold text-slate-800")}>Total</span>
-            <span className={cn("text-russian-violet whitespace-nowrap font-extrabold")}>
+            <span className={cn("font-extrabold whitespace-nowrap text-russian-violet")}>
               {formatNZD(invoice.total)}
             </span>
           </div>
@@ -194,7 +194,7 @@ export default async function InvoiceViewPage({
             "rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500",
           )}
         >
-          <p className={cn("text-russian-violet mb-1 text-sm font-bold")}>Bank transfer</p>
+          <p className={cn("mb-1 text-sm font-bold text-russian-violet")}>Bank transfer</p>
           <p>Payee: {identity.name}</p>
           <p className={cn("font-semibold text-slate-700")}>Account: {identity.bankAccount}</p>
           <p className={cn("font-semibold text-slate-700")}>Reference: {invoice.number}</p>
@@ -204,7 +204,7 @@ export default async function InvoiceViewPage({
           </p>
         </div>
         {invoice.notes && (
-          <p className={cn("mt-3 text-xs italic text-slate-500")}>{invoice.notes}</p>
+          <p className={cn("mt-3 text-xs text-slate-500 italic")}>{invoice.notes}</p>
         )}
 
         {/* Sender contact footer (matches the page-bottom footer in the PDF). */}

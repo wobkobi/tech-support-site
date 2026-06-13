@@ -83,7 +83,7 @@ export function TasksSection({
       className={cn("space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5")}
     >
       <div className={cn("flex items-center justify-between gap-2")}>
-        <h2 className={cn("text-russian-violet text-sm font-semibold")}>Tasks</h2>
+        <h2 className={cn("text-sm font-semibold text-russian-violet")}>Tasks</h2>
         <button
           type="button"
           onClick={onManageTags}
@@ -114,7 +114,7 @@ export function TasksSection({
                   value={`rate:${task.rateConfigId}`}
                   onChange={(e) => onUpdateTask(idx, "rateConfigId", e.target.value.slice(5))}
                   className={cn(
-                    "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 sm:w-40 sm:py-2 sm:text-xs",
+                    "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none sm:w-40 sm:py-2 sm:text-xs",
                   )}
                 >
                   {flatRates.map((r) => (
@@ -232,14 +232,14 @@ export function TasksSection({
                     placeholder="Details (optional)"
                     aria-label="Details"
                     className={cn(
-                      "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 sm:py-2 sm:text-xs",
+                      "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none sm:py-2 sm:text-xs",
                     )}
                   />
                 </div>
                 <p
                   className={cn(
                     "truncate rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-700 sm:py-1.5 sm:text-xs",
-                    !composed && "italic text-slate-400",
+                    !composed && "text-slate-400 italic",
                   )}
                   title={composed || "Pick device + action"}
                 >
@@ -251,7 +251,7 @@ export function TasksSection({
                     onChange={(e) => onSetTaskBase(idx, e.target.value || null)}
                     aria-label="Base rate"
                     className={cn(
-                      "focus:ring-russian-violet/30 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs focus:outline-none focus:ring-2",
+                      "rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
                     )}
                   >
                     <option value="">No base</option>
@@ -333,7 +333,7 @@ export function TasksSection({
       <button
         onClick={onAddTask}
         className={cn(
-          "hover:text-russian-violet inline-flex h-11 items-center text-sm text-slate-500 underline sm:h-auto sm:text-xs",
+          "inline-flex h-11 items-center text-sm text-slate-500 underline hover:text-russian-violet sm:h-auto sm:text-xs",
         )}
       >
         + Add task
@@ -379,7 +379,7 @@ function TaskTotalsRow({
     >
       <label className={cn("flex flex-col gap-0.5 sm:contents")}>
         <span
-          className={cn("text-[10px] font-medium uppercase tracking-wide text-slate-400 sm:hidden")}
+          className={cn("text-[10px] font-medium tracking-wide text-slate-400 uppercase sm:hidden")}
         >
           Hrs
         </span>
@@ -392,14 +392,14 @@ function TaskTotalsRow({
           onChange={(e) => onQty(parseFloat(e.target.value) || 0)}
           aria-label="Quantity"
           className={cn(
-            "focus:ring-russian-violet/30 number-input-clean w-full rounded-lg border border-slate-200 bg-white px-2 py-2.5 text-right text-sm focus:outline-none focus:ring-2 sm:w-20 sm:py-2 sm:text-xs",
+            "number-input-clean w-full rounded-lg border border-slate-200 bg-white px-2 py-2.5 text-right text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none sm:w-20 sm:py-2 sm:text-xs",
           )}
         />
       </label>
       {spread && <span className={cn("hidden text-xs text-slate-400 sm:inline")}>hrs</span>}
       <label className={cn("flex flex-col gap-0.5 sm:contents")}>
         <span
-          className={cn("text-[10px] font-medium uppercase tracking-wide text-slate-400 sm:hidden")}
+          className={cn("text-[10px] font-medium tracking-wide text-slate-400 uppercase sm:hidden")}
         >
           {spread ? "$/hr" : "$/unit"}
         </span>
@@ -412,7 +412,7 @@ function TaskTotalsRow({
           onChange={(e) => onPrice(parseFloat(e.target.value) || 0)}
           aria-label="Unit price"
           className={cn(
-            "focus:ring-russian-violet/30 number-input-clean w-full rounded-lg border border-slate-200 bg-white px-2 py-2.5 text-right text-sm focus:outline-none focus:ring-2 sm:w-24 sm:py-2 sm:text-xs",
+            "number-input-clean w-full rounded-lg border border-slate-200 bg-white px-2 py-2.5 text-right text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none sm:w-24 sm:py-2 sm:text-xs",
           )}
         />
       </label>

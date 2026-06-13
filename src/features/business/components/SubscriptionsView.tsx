@@ -254,7 +254,7 @@ export function SubscriptionsView(): React.ReactElement {
               setShowForm(true);
             }}
             className={cn(
-              "bg-russian-violet rounded-lg px-4 py-2 text-sm font-medium text-white hover:opacity-90",
+              "rounded-lg bg-russian-violet px-4 py-2 text-sm font-medium text-white hover:opacity-90",
             )}
           >
             + Add subscription
@@ -282,7 +282,7 @@ export function SubscriptionsView(): React.ReactElement {
                 value={form.description}
                 onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
                 className={cn(
-                  "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2",
+                  "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
                 )}
               />
             </div>
@@ -295,7 +295,7 @@ export function SubscriptionsView(): React.ReactElement {
                 value={form.supplier}
                 onChange={(e) => setForm((p) => ({ ...p, supplier: e.target.value }))}
                 className={cn(
-                  "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2",
+                  "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
                 )}
               />
             </div>
@@ -307,7 +307,7 @@ export function SubscriptionsView(): React.ReactElement {
                 value={form.category}
                 onChange={(e) => setForm((p) => ({ ...p, category: e.target.value }))}
                 className={cn(
-                  "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2",
+                  "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
                 )}
               >
                 {EXPENSE_CATEGORIES.map((c) => (
@@ -329,7 +329,7 @@ export function SubscriptionsView(): React.ReactElement {
                 value={form.amountIncl}
                 onChange={(e) => setForm((p) => ({ ...p, amountIncl: e.target.value }))}
                 className={cn(
-                  "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2",
+                  "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
                 )}
               />
             </div>
@@ -341,7 +341,7 @@ export function SubscriptionsView(): React.ReactElement {
                 value={form.gstRate}
                 onChange={(e) => setForm((p) => ({ ...p, gstRate: e.target.value }))}
                 className={cn(
-                  "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2",
+                  "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
                 )}
               >
                 <option value="0.15">15%</option>
@@ -356,7 +356,7 @@ export function SubscriptionsView(): React.ReactElement {
                 value={form.method}
                 onChange={(e) => setForm((p) => ({ ...p, method: e.target.value }))}
                 className={cn(
-                  "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2",
+                  "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
                 )}
               >
                 {PAYMENT_METHODS.map((m) => (
@@ -374,7 +374,7 @@ export function SubscriptionsView(): React.ReactElement {
                 value={form.frequency}
                 onChange={(e) => setForm((p) => ({ ...p, frequency: e.target.value }))}
                 className={cn(
-                  "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2",
+                  "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
                 )}
               >
                 {VALID_FREQUENCIES.map((f) => (
@@ -394,7 +394,7 @@ export function SubscriptionsView(): React.ReactElement {
                 value={form.nextDue}
                 onChange={(e) => setForm((p) => ({ ...p, nextDue: e.target.value }))}
                 className={cn(
-                  "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2",
+                  "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
                 )}
               />
             </div>
@@ -404,7 +404,7 @@ export function SubscriptionsView(): React.ReactElement {
                 value={form.notes}
                 onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
                 className={cn(
-                  "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2",
+                  "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
                 )}
               />
             </div>
@@ -414,7 +414,7 @@ export function SubscriptionsView(): React.ReactElement {
               type="submit"
               disabled={saving}
               className={cn(
-                "bg-russian-violet rounded-lg px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50",
+                "rounded-lg bg-russian-violet px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50",
               )}
             >
               {saving ? "Saving..." : editId ? "Update" : "Add"}
@@ -464,7 +464,7 @@ export function SubscriptionsView(): React.ReactElement {
                     </p>
                   </div>
                   <div className={cn("mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs")}>
-                    <span className={cn("capitalize text-slate-500")}>{sub.frequency}</span>
+                    <span className={cn("text-slate-500 capitalize")}>{sub.frequency}</span>
                     <span
                       className={cn(
                         overdue
@@ -571,7 +571,7 @@ export function SubscriptionsView(): React.ReactElement {
                       <td className={cn("px-4 py-3 text-slate-800")}>
                         {formatNZD(sub.amountIncl)}
                       </td>
-                      <td className={cn("px-4 py-3 capitalize text-slate-600")}>{sub.frequency}</td>
+                      <td className={cn("px-4 py-3 text-slate-600 capitalize")}>{sub.frequency}</td>
                       <td
                         className={cn(
                           "px-4 py-3",
