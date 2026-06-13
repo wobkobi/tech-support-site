@@ -224,7 +224,7 @@ export function SendReviewLinkForm({
             clearFields();
           }}
           className={cn(
-            "text-russian-violet w-full text-left text-sm font-semibold hover:underline",
+            "w-full text-left text-sm font-semibold text-russian-violet hover:underline",
           )}
         >
           {open ? "Hide form" : "+ Send review link to past client"}
@@ -255,7 +255,7 @@ export function SendReviewLinkForm({
                   setListOpen(true);
                 }}
                 className={cn(
-                  "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-1",
+                  "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
                 )}
               />
               {listOpen && (
@@ -350,7 +350,7 @@ export function SendReviewLinkForm({
                   placeholder="Full name"
                   required
                   className={cn(
-                    "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-1",
+                    "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
                   )}
                 />
                 <EmailInput
@@ -363,15 +363,15 @@ export function SendReviewLinkForm({
                   className={cn("rounded-lg")}
                 />
               </div>
-              {error && <p className={cn("text-coquelicot-400 text-xs")}>{error}</p>}
+              {error && <p className={cn("text-xs text-coquelicot-400")}>{error}</p>}
               {success && (
-                <p className={cn("text-moonstone-600 text-xs")}>Review link sent successfully.</p>
+                <p className={cn("text-xs text-moonstone-600")}>Review link sent successfully.</p>
               )}
               <button
                 type="submit"
                 disabled={loading}
                 className={cn(
-                  "bg-moonstone-600 hover:bg-moonstone-700 self-start rounded-lg px-5 py-2 text-sm font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+                  "self-start rounded-lg bg-moonstone-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-moonstone-700 disabled:cursor-not-allowed disabled:opacity-50",
                 )}
               >
                 {loading ? "Loading preview..." : "Preview email"}
@@ -382,7 +382,7 @@ export function SendReviewLinkForm({
           {/* Email preview */}
           {mode === "email" && previewHtml && (
             <div className={cn("flex flex-col gap-3")}>
-              <p className={cn("text-xs font-semibold uppercase tracking-wide text-slate-500")}>
+              <p className={cn("text-xs font-semibold tracking-wide text-slate-500 uppercase")}>
                 Preview - sending to {email}
               </p>
               <iframe
@@ -392,14 +392,14 @@ export function SendReviewLinkForm({
                 style={{ height: "480px" }}
                 sandbox="allow-same-origin"
               />
-              {error && <p className={cn("text-coquelicot-400 text-xs")}>{error}</p>}
+              {error && <p className={cn("text-xs text-coquelicot-400")}>{error}</p>}
               <div className={cn("flex gap-2")}>
                 <button
                   type="button"
                   disabled={loading}
                   onClick={() => void handleSend()}
                   className={cn(
-                    "bg-moonstone-600 hover:bg-moonstone-700 rounded-lg px-5 py-2 text-sm font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+                    "rounded-lg bg-moonstone-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-moonstone-700 disabled:cursor-not-allowed disabled:opacity-50",
                   )}
                 >
                   {loading ? "Sending..." : "Send email"}
@@ -433,7 +433,7 @@ export function SendReviewLinkForm({
                   placeholder="Full name"
                   required
                   className={cn(
-                    "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-1",
+                    "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
                   )}
                 />
                 <PhoneInput
@@ -456,12 +456,12 @@ export function SendReviewLinkForm({
                   {phoneValid ? `Stored as: ${phoneE164}` : "Invalid phone number"}
                 </p>
               )}
-              {error && <p className={cn("text-coquelicot-400 text-xs")}>{error}</p>}
+              {error && <p className={cn("text-xs text-coquelicot-400")}>{error}</p>}
               <button
                 type="submit"
                 disabled={loading || (!!phoneInput && !phoneValid)}
                 className={cn(
-                  "bg-moonstone-600 hover:bg-moonstone-700 self-start rounded-lg px-5 py-2 text-sm font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+                  "self-start rounded-lg bg-moonstone-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-moonstone-700 disabled:cursor-not-allowed disabled:opacity-50",
                 )}
               >
                 {loading ? "Generating..." : "Generate text"}
@@ -474,12 +474,12 @@ export function SendReviewLinkForm({
             <div className={cn("rounded-lg border border-slate-200 bg-slate-50 p-3")}>
               <p
                 className={cn(
-                  "text-coquelicot-500 mb-2 text-xs font-semibold uppercase tracking-wide",
+                  "mb-2 text-xs font-semibold tracking-wide text-coquelicot-500 uppercase",
                 )}
               >
                 Already sent - here is their existing link
               </p>
-              <p className={cn("mb-3 break-all text-xs text-slate-500")}>{existingUrl}</p>
+              <p className={cn("mb-3 text-xs break-all text-slate-500")}>{existingUrl}</p>
               <CopyLinkButton url={existingUrl} />
             </div>
           )}
@@ -488,7 +488,7 @@ export function SendReviewLinkForm({
           {smsText && (
             <div className={cn("rounded-lg border border-slate-200 bg-slate-50 p-3")}>
               <p
-                className={cn("mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500")}
+                className={cn("mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase")}
               >
                 Copy and send from your phone
               </p>
@@ -497,7 +497,7 @@ export function SendReviewLinkForm({
                 type="button"
                 onClick={handleCopy}
                 className={cn(
-                  "bg-moonstone-600 hover:bg-moonstone-700 rounded-lg px-4 py-1.5 text-xs font-semibold text-white transition-colors",
+                  "rounded-lg bg-moonstone-600 px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-moonstone-700",
                 )}
               >
                 {copied ? "Copied!" : "Copy message"}

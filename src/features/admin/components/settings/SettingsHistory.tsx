@@ -92,7 +92,7 @@ export function SettingsHistory<T>({ group, onRestore }: Props<T>): React.ReactE
       <button
         type="button"
         onClick={toggle}
-        className={cn("text-russian-violet text-sm font-medium hover:underline")}
+        className={cn("text-sm font-medium text-russian-violet hover:underline")}
       >
         {open ? "Hide change history" : "Change history"}
       </button>

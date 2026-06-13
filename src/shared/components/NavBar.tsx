@@ -458,7 +458,7 @@ export function NavBar(): React.ReactElement | null {
       >
         <div
           className={cn(
-            "border-seasalt-400/40 bg-seasalt-800/90 flex h-20 w-full flex-nowrap items-center justify-between rounded-2xl border px-5 shadow-lg backdrop-blur-lg transition-[border-color,box-shadow] duration-300",
+            "flex h-20 w-full flex-nowrap items-center justify-between rounded-2xl border border-seasalt-400/40 bg-seasalt-800/90 px-5 shadow-lg backdrop-blur-lg transition-[border-color,box-shadow] duration-300",
             isScrolled && "border-opacity-70 shadow-2xl",
           )}
         >
@@ -478,7 +478,7 @@ export function NavBar(): React.ReactElement | null {
               className={cn("h-10 w-10 shrink-0 select-none")}
             />
             <span
-              className={cn("text-russian-violet whitespace-nowrap text-lg font-bold sm:text-xl")}
+              className={cn("text-lg font-bold whitespace-nowrap text-russian-violet sm:text-xl")}
             >
               To The Point Tech
             </span>
@@ -493,10 +493,10 @@ export function NavBar(): React.ReactElement | null {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "shrink-0 whitespace-nowrap rounded-lg px-4 py-2.5 text-lg font-semibold transition-all duration-200 xl:text-xl",
+                    "shrink-0 rounded-lg px-4 py-2.5 text-lg font-semibold whitespace-nowrap transition-all duration-200 xl:text-xl",
                     active
-                      ? "text-russian-violet bg-moonstone-600/20 shadow-sm"
-                      : "text-rich-black hover:bg-moonstone-600/15 hover:text-russian-violet hover:scale-105 hover:shadow-md",
+                      ? "bg-moonstone-600/20 text-russian-violet shadow-sm"
+                      : "text-rich-black hover:scale-105 hover:bg-moonstone-600/15 hover:text-russian-violet hover:shadow-md",
                   )}
                   aria-current={active ? "page" : undefined}
                 >
@@ -530,7 +530,7 @@ export function NavBar(): React.ReactElement | null {
             <button
               onClick={toggleMobileMenu}
               className={cn(
-                "bg-seasalt-900/20 hover:bg-seasalt-900/30 flex h-11 w-11 items-center justify-center rounded-lg transition-all lg:hidden",
+                "flex h-11 w-11 items-center justify-center rounded-lg bg-seasalt-900/20 transition-all hover:bg-seasalt-900/30 lg:hidden",
               )}
               aria-label="Toggle mobile menu"
               aria-expanded={mobileMenuOpen}
@@ -539,19 +539,19 @@ export function NavBar(): React.ReactElement | null {
               <div className={cn("flex h-5 w-5 flex-col justify-center gap-1")}>
                 <span
                   className={cn(
-                    "bg-russian-violet h-0.5 w-full rounded-full transition-all",
+                    "h-0.5 w-full rounded-full bg-russian-violet transition-all",
                     mobileMenuOpen && "translate-y-1.5 rotate-45",
                   )}
                 />
                 <span
                   className={cn(
-                    "bg-russian-violet h-0.5 w-full rounded-full transition-all",
+                    "h-0.5 w-full rounded-full bg-russian-violet transition-all",
                     mobileMenuOpen && "opacity-0",
                   )}
                 />
                 <span
                   className={cn(
-                    "bg-russian-violet h-0.5 w-full rounded-full transition-all",
+                    "h-0.5 w-full rounded-full bg-russian-violet transition-all",
                     mobileMenuOpen && "-translate-y-1.5 -rotate-45",
                   )}
                 />
@@ -564,7 +564,7 @@ export function NavBar(): React.ReactElement | null {
       {mobileMenuOpen && (
         <div
           className={cn(
-            "bg-rich-black/50 fixed inset-0 z-40 backdrop-blur-sm lg:hidden",
+            "fixed inset-0 z-40 bg-rich-black/50 backdrop-blur-sm lg:hidden",
             "animate-in fade-in duration-200",
           )}
           onClick={closeMobileMenu}
@@ -575,7 +575,7 @@ export function NavBar(): React.ReactElement | null {
       <nav
         ref={mobileDrawerRef}
         className={cn(
-          "border-seasalt-400/40 bg-seasalt-800/95 overscroll-behavior-contain fixed right-4 z-40 max-h-[calc(100dvh-8rem)] max-w-[min(calc(100vw-2rem),18rem)] overflow-y-auto rounded-2xl border shadow-2xl backdrop-blur-xl lg:hidden",
+          "overscroll-behavior-contain fixed right-4 z-40 max-h-[calc(100dvh-8rem)] max-w-[min(calc(100vw-2rem),18rem)] overflow-y-auto rounded-2xl border border-seasalt-400/40 bg-seasalt-800/95 shadow-2xl backdrop-blur-xl lg:hidden",
           // `.app-mobile-drawer` (globals.css) owns top + translate transition.
           "app-mobile-drawer",
           mobileMenuOpen ? "translate-x-0" : "translate-x-full",
@@ -597,8 +597,8 @@ export function NavBar(): React.ReactElement | null {
                 className={cn(
                   "rounded-lg px-4 py-3 text-base font-semibold transition-all duration-200",
                   active
-                    ? "text-russian-violet bg-moonstone-600/20 shadow-sm"
-                    : "text-rich-black hover:bg-moonstone-600/15 hover:text-russian-violet hover:scale-[1.02] hover:shadow-md",
+                    ? "bg-moonstone-600/20 text-russian-violet shadow-sm"
+                    : "text-rich-black hover:scale-[1.02] hover:bg-moonstone-600/15 hover:text-russian-violet hover:shadow-md",
                 )}
                 aria-current={active ? "page" : undefined}
                 onClick={closeMobileMenu}
@@ -608,7 +608,7 @@ export function NavBar(): React.ReactElement | null {
             );
           })}
 
-          <div className={cn("border-seasalt-400/40 mt-4 flex flex-col gap-2 border-t pt-4")}>
+          <div className={cn("mt-4 flex flex-col gap-2 border-t border-seasalt-400/40 pt-4")}>
             <Button
               href="/booking"
               variant="primary"

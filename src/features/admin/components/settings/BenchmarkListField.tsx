@@ -68,7 +68,7 @@ export function BenchmarkListField({
 
   return (
     <div className={cn("py-4")}>
-      <p className={cn("text-russian-violet text-sm font-semibold")}>{meta.title}</p>
+      <p className={cn("text-sm font-semibold text-russian-violet")}>{meta.title}</p>
       <p className={cn("mt-0.5 text-sm text-slate-500")}>{meta.description}</p>
 
       {fieldErrors.benchmarks && (

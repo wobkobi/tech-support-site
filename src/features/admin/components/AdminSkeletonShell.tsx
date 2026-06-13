@@ -44,7 +44,7 @@ export function AdminSkeletonShell({
     >
       {/* Sidebar skeleton (lg+ only; mobile uses a drawer). */}
       <aside
-        className={cn("bg-russian-violet hidden h-screen w-56 shrink-0 flex-col px-3 py-4 lg:flex")}
+        className={cn("hidden h-screen w-56 shrink-0 flex-col bg-russian-violet px-3 py-4 lg:flex")}
         aria-hidden="true"
       >
         <div className={cn("border-b border-white/10 px-2 pb-4")}>
@@ -61,7 +61,7 @@ export function AdminSkeletonShell({
       {/* Content column. Padding mirrors AdminPageLayout's
           `px-4 pb-8 pt-16 sm:px-6 sm:pt-8 lg:pt-8`. */}
       <div className={cn("min-w-0 flex-1 bg-slate-50")}>
-        <div className={cn(contentClassName ?? "px-4 pb-8 pt-16 sm:px-6 sm:pt-8 lg:pt-8")}>
+        <div className={cn(contentClassName ?? "px-4 pt-16 pb-8 sm:px-6 sm:pt-8 lg:pt-8")}>
           {children}
           <span className={cn("sr-only")}>{label}...</span>
         </div>

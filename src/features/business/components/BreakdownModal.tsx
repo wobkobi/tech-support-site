@@ -102,7 +102,7 @@ export function BreakdownModal({ data, onClose }: BreakdownModalProps): React.Re
         <div
           className={cn("flex items-center justify-between border-b border-slate-200 px-5 py-4")}
         >
-          <h2 className={cn("text-russian-violet text-lg font-bold")}>{data.title}</h2>
+          <h2 className={cn("text-lg font-bold text-russian-violet")}>{data.title}</h2>
           <button
             type="button"
             onClick={onClose}
@@ -180,14 +180,14 @@ export function BreakdownModal({ data, onClose }: BreakdownModalProps): React.Re
                 <span className={cn("text-sm font-semibold text-slate-600")}>
                   {data.total.label}
                 </span>
-                <span className={cn("text-russian-violet font-mono text-base font-bold")}>
+                <span className={cn("font-mono text-base font-bold text-russian-violet")}>
                   {data.total.value}
                 </span>
               </div>
             ) : data.rows && !data.amountAsCount ? (
               <div className={cn("flex items-baseline gap-3")}>
                 <span className={cn("text-sm font-semibold text-slate-600")}>Total</span>
-                <span className={cn("text-russian-violet font-mono text-base font-bold")}>
+                <span className={cn("font-mono text-base font-bold text-russian-violet")}>
                   {formatNZD(rowsTotal)}
                 </span>
               </div>
@@ -199,7 +199,7 @@ export function BreakdownModal({ data, onClose }: BreakdownModalProps): React.Re
               <Link
                 href={data.viewAll.href}
                 className={cn(
-                  "text-russian-violet inline-flex items-center gap-1 text-sm font-semibold hover:underline",
+                  "inline-flex items-center gap-1 text-sm font-semibold text-russian-violet hover:underline",
                 )}
               >
                 {data.viewAll.label}

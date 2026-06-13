@@ -118,7 +118,7 @@ export function PromoBannerClient({ promo }: Props): React.ReactElement {
     <div
       ref={bannerRef}
       className={cn(
-        "z-60 fixed inset-x-0 top-0",
+        "fixed inset-x-0 top-0 z-60",
         // Matches the mustard strap on /pricing so both promo surfaces look the same.
         "bg-mustard-500 text-russian-violet-500",
 
@@ -135,7 +135,7 @@ export function PromoBannerClient({ promo }: Props): React.ReactElement {
         className={cn("block hover:underline focus:outline-none focus-visible:underline")}
       >
         <FaBolt
-          className={cn("text-russian-violet-500 mr-2 inline-block h-4 w-4 sm:h-5 sm:w-5")}
+          className={cn("mr-2 inline-block h-4 w-4 text-russian-violet-500 sm:h-5 sm:w-5")}
           aria-hidden="true"
         />
         <span className={cn("font-bold")}>Limited offer:</span> {summariseForBanner(promo)}
@@ -147,13 +147,13 @@ export function PromoBannerClient({ promo }: Props): React.ReactElement {
         title="Dismiss"
         className={cn(
           // Pinned top-right so wrapping copy doesn't shove it mid-sentence on mobile.
-          "group absolute right-2 top-1/2 -translate-y-1/2 sm:right-3",
+          "group absolute top-1/2 right-2 -translate-y-1/2 sm:right-3",
           "inline-flex h-8 w-8 items-center justify-center rounded-full",
           "bg-russian-violet-500/10 text-russian-violet-500",
-          "ring-russian-violet-500/20 ring-1",
+          "ring-1 ring-russian-violet-500/20",
           "hover:bg-russian-violet-500 hover:text-mustard-500 hover:ring-russian-violet-500",
-          "hover:rotate-90 hover:scale-110 active:scale-95",
-          "focus-visible:ring-russian-violet-500/60 focus:outline-none focus-visible:ring-2",
+          "hover:scale-110 hover:rotate-90 active:scale-95",
+          "focus:outline-none focus-visible:ring-2 focus-visible:ring-russian-violet-500/60",
           "transition-all duration-200 ease-out",
         )}
       >

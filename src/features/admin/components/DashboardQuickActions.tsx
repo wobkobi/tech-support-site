@@ -122,7 +122,7 @@ export function DashboardQuickActions({
             {bookings.length > 0 && (
               <span
                 className={cn(
-                  "bg-coquelicot-500/15 text-coquelicot-400 ml-2 rounded-full px-2 py-0.5 text-xs font-semibold",
+                  "ml-2 rounded-full bg-coquelicot-500/15 px-2 py-0.5 text-xs font-semibold text-coquelicot-400",
                 )}
               >
                 {bookings.length}
@@ -152,12 +152,12 @@ export function DashboardQuickActions({
                       {formatDateShort(b.startAt)}
                       {b.email ? ` · ${b.email}` : " · no email"}
                     </p>
-                    {err && <p className={cn("text-coquelicot-400 text-xs")}>{err}</p>}
+                    {err && <p className={cn("text-xs text-coquelicot-400")}>{err}</p>}
                   </div>
                   {isDone ? (
                     <span
                       className={cn(
-                        "text-moonstone-600 inline-flex shrink-0 items-center gap-1 text-xs font-semibold",
+                        "inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-moonstone-600",
                       )}
                     >
                       Done
@@ -169,7 +169,7 @@ export function DashboardQuickActions({
                       disabled={isRunning}
                       onClick={() => handleComplete(b.id)}
                       className={cn(
-                        "bg-russian-violet hover:bg-russian-violet/90 shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition-colors disabled:opacity-50",
+                        "shrink-0 rounded-lg bg-russian-violet px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-russian-violet/90 disabled:opacity-50",
                       )}
                     >
                       {isRunning

@@ -73,12 +73,12 @@ export default async function ReviewsPage(): Promise<React.ReactElement> {
             <h1
               id="reviews-heading"
               className={cn(
-                "text-russian-violet mb-4 text-2xl font-extrabold sm:text-3xl md:text-4xl",
+                "mb-4 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl",
               )}
             >
               What clients say
             </h1>
-            <p className={cn("text-rich-black/80 text-base sm:text-lg")}>
+            <p className={cn("text-base text-rich-black/80 sm:text-lg")}>
               Feedback from people I've helped.
             </p>
           </section>
@@ -90,11 +90,11 @@ export default async function ReviewsPage(): Promise<React.ReactElement> {
             >
               <h2
                 id="no-reviews-heading"
-                className={cn("text-russian-violet mb-2 text-xl font-bold sm:text-2xl")}
+                className={cn("mb-2 text-xl font-bold text-russian-violet sm:text-2xl")}
               >
                 No reviews yet
               </h2>
-              <p className={cn("text-rich-black/70 text-base sm:text-lg")}>
+              <p className={cn("text-base text-rich-black/70 sm:text-lg")}>
                 Be the first!{" "}
                 <Link href="/booking" className={linkStyle}>
                   Book an appointment
@@ -113,13 +113,13 @@ export default async function ReviewsPage(): Promise<React.ReactElement> {
                     key={r.id}
                     id={`review-${r.id}`}
                     className={cn(
-                      "bg-seasalt-800/80 border-seasalt-400/60 flex flex-col rounded-lg border-2 p-4 sm:p-5",
+                      "flex flex-col rounded-lg border-2 border-seasalt-400/60 bg-seasalt-800/80 p-4 sm:p-5",
                     )}
                   >
-                    <p className={cn("text-rich-black flex-1 text-base sm:text-lg")}>{r.text}</p>
+                    <p className={cn("flex-1 text-base text-rich-black sm:text-lg")}>{r.text}</p>
                     <p
                       className={cn(
-                        "text-russian-violet pt-3 text-right text-base font-semibold sm:text-lg",
+                        "pt-3 text-right text-base font-semibold text-russian-violet sm:text-lg",
                       )}
                     >
                       - {formatReviewerName(r)}
@@ -134,7 +134,7 @@ export default async function ReviewsPage(): Promise<React.ReactElement> {
             aria-label="Leave a review"
             className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-200")}
           >
-            <p className={cn("text-rich-black text-sm sm:text-base")}>
+            <p className={cn("text-sm text-rich-black sm:text-base")}>
               Had an appointment? You'll receive a review link by email after your visit. Or{" "}
               <Link href="/booking" className={linkStyle}>
                 book now

@@ -146,7 +146,7 @@ export function Combobox({
         }}
         onKeyDown={onKeyDown}
         className={cn(
-          "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 sm:py-2 sm:text-xs",
+          "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none sm:py-2 sm:text-xs",
           inputClassName,
         )}
       />
@@ -155,7 +155,7 @@ export function Combobox({
           id={listId}
           role="listbox"
           className={cn(
-            "absolute left-0 right-0 top-full z-20 mt-1 max-h-56 overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 text-sm shadow-lg",
+            "absolute top-full right-0 left-0 z-20 mt-1 max-h-56 overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 text-sm shadow-lg",
           )}
         >
           {options.map((opt, i) => (
@@ -172,7 +172,7 @@ export function Combobox({
               className={cn(
                 "cursor-pointer px-3 py-2",
                 i === highlight ? "bg-slate-100" : "bg-white",
-                opt.isCreate ? "text-russian-violet font-semibold" : "text-slate-700",
+                opt.isCreate ? "font-semibold text-russian-violet" : "text-slate-700",
               )}
             >
               {opt.label}

@@ -27,7 +27,7 @@ export function GetEstimateButton(): React.ReactElement {
       }
       className={cn(
         "mt-5 inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white",
-        "bg-russian-violet hover:bg-russian-violet/90 transition-colors",
+        "bg-russian-violet transition-colors hover:bg-russian-violet/90",
       )}
     >
       Get a rough estimate

@@ -176,7 +176,7 @@ export function ManualBookingModal({
         <div
           className={cn("flex items-center justify-between border-b border-slate-200 px-5 py-4")}
         >
-          <h2 id="manual-booking-title" className={cn("text-russian-violet text-lg font-bold")}>
+          <h2 id="manual-booking-title" className={cn("text-lg font-bold text-russian-violet")}>
             New booking
           </h2>
           <button
@@ -258,7 +258,7 @@ export function ManualBookingModal({
                   return (
                     <div
                       className={cn(
-                        "absolute left-0 right-0 top-full z-20 mt-1 max-h-64 overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg",
+                        "absolute top-full right-0 left-0 z-20 mt-1 max-h-64 overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg",
                       )}
                     >
                       {matches.slice(0, 30).map((c) => (
@@ -366,7 +366,7 @@ export function ManualBookingModal({
               type="submit"
               disabled={submitting}
               className={cn(
-                "bg-russian-violet hover:bg-russian-violet/90 rounded-md px-4 py-2 text-sm font-semibold text-white disabled:opacity-50",
+                "rounded-md bg-russian-violet px-4 py-2 text-sm font-semibold text-white hover:bg-russian-violet/90 disabled:opacity-50",
               )}
             >
               {submitting ? "Saving..." : "Create booking"}

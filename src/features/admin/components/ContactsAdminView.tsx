@@ -131,7 +131,7 @@ export function ContactsAdminView({
                       <div className={cn("space-y-1.5")}>
                         <p
                           className={cn(
-                            "text-xs font-medium uppercase tracking-wide text-slate-400",
+                            "text-xs font-medium tracking-wide text-slate-400 uppercase",
                           )}
                         >
                           Name - pick one
@@ -142,7 +142,7 @@ export function ContactsAdminView({
                               void resolveConflict(conflict, conflict.contactName, null)
                             }
                             className={cn(
-                              "hover:border-russian-violet hover:text-russian-violet rounded border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors",
+                              "rounded border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-russian-violet hover:text-russian-violet",
                             )}
                           >
                             {conflict.contactName}
@@ -152,7 +152,7 @@ export function ContactsAdminView({
                               void resolveConflict(conflict, conflict.sourceName, null)
                             }
                             className={cn(
-                              "hover:border-russian-violet hover:text-russian-violet rounded border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors",
+                              "rounded border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-russian-violet hover:text-russian-violet",
                             )}
                           >
                             {conflict.sourceName}
@@ -164,7 +164,7 @@ export function ContactsAdminView({
                       <div className={cn("space-y-1.5")}>
                         <p
                           className={cn(
-                            "text-xs font-medium uppercase tracking-wide text-slate-400",
+                            "text-xs font-medium tracking-wide text-slate-400 uppercase",
                           )}
                         >
                           Phone - pick one
@@ -175,7 +175,7 @@ export function ContactsAdminView({
                               void resolveConflict(conflict, null, conflict.contactPhone)
                             }
                             className={cn(
-                              "hover:border-russian-violet hover:text-russian-violet rounded border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors",
+                              "rounded border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-russian-violet hover:text-russian-violet",
                             )}
                           >
                             {conflict.contactPhone ?? "-"}
@@ -185,7 +185,7 @@ export function ContactsAdminView({
                               void resolveConflict(conflict, null, conflict.sourcePhone)
                             }
                             className={cn(
-                              "hover:border-russian-violet hover:text-russian-violet rounded border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors",
+                              "rounded border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-russian-violet hover:text-russian-violet",
                             )}
                           >
                             {conflict.sourcePhone}
@@ -234,7 +234,7 @@ export function ContactsAdminView({
                 "rounded-lg px-4 py-2 text-sm font-semibold transition-colors",
                 syncing || syncConfirmPending
                   ? "cursor-not-allowed bg-slate-100 text-slate-400"
-                  : "bg-russian-violet hover:bg-russian-violet/90 text-white",
+                  : "bg-russian-violet text-white hover:bg-russian-violet/90",
               )}
             >
               {syncing ? "Syncing…" : "Sync with Google Contacts"}
@@ -258,7 +258,7 @@ export function ContactsAdminView({
                 <button
                   onClick={() => void runSync()}
                   className={cn(
-                    "bg-russian-violet hover:bg-russian-violet/90 rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition-colors",
+                    "rounded-lg bg-russian-violet px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-russian-violet/90",
                   )}
                 >
                   Confirm

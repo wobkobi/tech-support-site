@@ -107,7 +107,7 @@ export function SchedulingTab({ initial, defaults }: Props): React.ReactElement 
           onClick={() => void form.save()}
           disabled={!dirty || saving}
           className={cn(
-            "bg-russian-violet rounded-lg px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50",
+            "rounded-lg bg-russian-violet px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50",
           )}
         >
           {saving ? "Saving..." : "Save changes"}

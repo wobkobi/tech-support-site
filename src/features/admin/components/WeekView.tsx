@@ -200,7 +200,7 @@ export function WeekView({
     <div className={cn("transition-opacity", isPending && "opacity-60")}>
       <div className={cn("mb-6 flex flex-wrap items-end justify-between gap-3")}>
         <div>
-          <h1 className={cn("text-russian-violet text-2xl font-extrabold")}>Schedule</h1>
+          <h1 className={cn("text-2xl font-extrabold text-russian-violet")}>Schedule</h1>
           <p className={cn("mt-1 text-sm text-slate-500")}>
             {days[0]?.subLabel} - {days[6]?.subLabel} ({days[0]?.date.getFullYear()})
           </p>
@@ -260,7 +260,7 @@ export function WeekView({
                   {holidayName && (
                     <div
                       className={cn(
-                        "mb-1 truncate text-[10px] font-semibold uppercase tracking-wide text-amber-700",
+                        "mb-1 truncate text-[10px] font-semibold tracking-wide text-amber-700 uppercase",
                       )}
                       title={holidayName}
                     >
@@ -268,7 +268,7 @@ export function WeekView({
                     </div>
                   )}
                   <div
-                    className={cn("text-xs font-semibold uppercase tracking-wide text-slate-500")}
+                    className={cn("text-xs font-semibold tracking-wide text-slate-500 uppercase")}
                   >
                     {day.label}
                   </div>
@@ -391,7 +391,7 @@ function DayColumn({ day, onClick }: DayColumnProps): React.ReactElement {
       onClick={onClick}
       className={cn(
         "relative border-r border-slate-200 last:border-r-0 hover:bg-slate-50/40",
-        "focus:ring-russian-violet/30 cursor-pointer focus:outline-none focus:ring-2 focus:ring-inset",
+        "cursor-pointer focus:ring-2 focus:ring-russian-violet/30 focus:outline-none focus:ring-inset",
       )}
       style={{ height: `${DAY_HEIGHT_PX}px` }}
     >
@@ -399,7 +399,7 @@ function DayColumn({ day, onClick }: DayColumnProps): React.ReactElement {
       {Array.from({ length: DAY_HOURS }).map((_, i) => (
         <div
           key={i}
-          className={cn("pointer-events-none absolute left-0 right-0 border-t border-slate-100")}
+          className={cn("pointer-events-none absolute right-0 left-0 border-t border-slate-100")}
           style={{ top: `${i * 60 * PX_PER_MINUTE}px` }}
         />
       ))}
@@ -414,7 +414,7 @@ function DayColumn({ day, onClick }: DayColumnProps): React.ReactElement {
             key={ev.id}
             onClick={(e) => e.stopPropagation()}
             className={cn(
-              "absolute left-1 right-1 overflow-hidden rounded-md border px-1.5 py-1 text-[11px] leading-tight shadow-sm",
+              "absolute right-1 left-1 overflow-hidden rounded-md border px-1.5 py-1 text-[11px] leading-tight shadow-sm",
               KIND_STYLES[ev.kind],
             )}
             style={{ top: `${top}px`, height: `${height}px` }}

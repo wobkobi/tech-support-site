@@ -238,7 +238,7 @@ export function TravelBlockAdminList({
             <div className={cn("flex flex-col gap-2")}>
               {/* Header: event identity */}
               <div className={cn("flex min-w-0 flex-wrap items-center gap-2")}>
-                <span className={cn("text-russian-violet min-w-0 truncate text-sm font-semibold")}>
+                <span className={cn("min-w-0 truncate text-sm font-semibold text-russian-violet")}>
                   {b.summary ?? b.sourceEventId}
                 </span>
                 <span
@@ -282,7 +282,7 @@ export function TravelBlockAdminList({
 
               {/* Destination address - wrap long unbroken strings on mobile. */}
               {b.destination && (
-                <p className={cn("wrap-break-word text-xs text-slate-500")}>
+                <p className={cn("text-xs wrap-break-word text-slate-500")}>
                   <span className={cn("font-medium text-slate-400")}>To: </span>
                   {b.destination}
                 </p>
@@ -291,7 +291,7 @@ export function TravelBlockAdminList({
               {/* Transport mode selector */}
               <div>
                 <p
-                  className={cn("mb-1 text-xs font-medium uppercase tracking-wide text-slate-400")}
+                  className={cn("mb-1 text-xs font-medium tracking-wide text-slate-400 uppercase")}
                 >
                   How I'm getting there
                 </p>
@@ -323,7 +323,7 @@ export function TravelBlockAdminList({
               {/* Origin */}
               <div>
                 <p
-                  className={cn("mb-1 text-xs font-medium uppercase tracking-wide text-slate-400")}
+                  className={cn("mb-1 text-xs font-medium tracking-wide text-slate-400 uppercase")}
                 >
                   Departing from
                 </p>
@@ -344,7 +344,7 @@ export function TravelBlockAdminList({
                         disabled={isSaving || !originInput.trim()}
                         onClick={() => void saveOrigin(b.id, originInput.trim() || null)}
                         className={cn(
-                          "bg-russian-violet rounded-lg px-2.5 py-1 text-xs font-medium text-white transition-colors disabled:opacity-50",
+                          "rounded-lg bg-russian-violet px-2.5 py-1 text-xs font-medium text-white transition-colors disabled:opacity-50",
                         )}
                       >
                         Save
@@ -418,7 +418,7 @@ export function TravelBlockAdminList({
                 <div>
                   <p
                     className={cn(
-                      "mb-0.5 text-xs font-medium uppercase tracking-wide text-slate-400",
+                      "mb-0.5 text-xs font-medium tracking-wide text-slate-400 uppercase",
                     )}
                   >
                     Travel there
@@ -441,7 +441,7 @@ export function TravelBlockAdminList({
                 <div>
                   <p
                     className={cn(
-                      "mb-0.5 text-xs font-medium uppercase tracking-wide text-slate-400",
+                      "mb-0.5 text-xs font-medium tracking-wide text-slate-400 uppercase",
                     )}
                   >
                     Travel back

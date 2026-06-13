@@ -60,7 +60,7 @@ export function RateConfigPanel({
   return (
     <div className={cn("mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}>
       <div className={cn("mb-3 flex items-center justify-between gap-2")}>
-        <h2 className={cn("text-russian-violet text-sm font-semibold")}>Rate config</h2>
+        <h2 className={cn("text-sm font-semibold text-russian-violet")}>Rate config</h2>
         <button
           type="button"
           onClick={onResetRates}
@@ -184,7 +184,7 @@ export function RateConfigPanel({
           value={form.label}
           onChange={(e) => onFormChange((p) => ({ ...p, label: e.target.value }))}
           className={cn(
-            "focus:ring-russian-violet/30 rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 sm:py-2 sm:text-xs",
+            "rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none sm:py-2 sm:text-xs",
           )}
         />
         <select
@@ -196,7 +196,7 @@ export function RateConfigPanel({
             }))
           }
           className={cn(
-            "focus:ring-russian-violet/30 rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 sm:py-2 sm:text-xs",
+            "rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none sm:py-2 sm:text-xs",
           )}
         >
           <option value="hourly">Hourly base</option>
@@ -221,7 +221,7 @@ export function RateConfigPanel({
           value={form.amount}
           onChange={(e) => onFormChange((p) => ({ ...p, amount: e.target.value }))}
           className={cn(
-            "focus:ring-russian-violet/30 rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 sm:py-2 sm:text-xs",
+            "rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none sm:py-2 sm:text-xs",
           )}
         />
         <input
@@ -230,14 +230,14 @@ export function RateConfigPanel({
           value={form.unit}
           onChange={(e) => onFormChange((p) => ({ ...p, unit: e.target.value }))}
           className={cn(
-            "focus:ring-russian-violet/30 rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 sm:py-2 sm:text-xs",
+            "rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none sm:py-2 sm:text-xs",
           )}
         />
         <div className={cn("flex gap-2")}>
           <button
             type="submit"
             className={cn(
-              "bg-russian-violet rounded-lg px-4 py-2.5 text-sm font-medium text-white hover:opacity-90 sm:py-2 sm:text-xs",
+              "rounded-lg bg-russian-violet px-4 py-2.5 text-sm font-medium text-white hover:opacity-90 sm:py-2 sm:text-xs",
             )}
           >
             {editingRateId ? "Update" : "Add"}

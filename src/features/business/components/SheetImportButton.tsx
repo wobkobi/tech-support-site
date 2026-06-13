@@ -169,7 +169,7 @@ export function SheetImportButton(): React.ReactElement {
               }}
               disabled={loading}
               className={cn(
-                "bg-russian-violet rounded-lg px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50",
+                "rounded-lg bg-russian-violet px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50",
               )}
             >
               {loading ? "Importing..." : "Confirm import"}

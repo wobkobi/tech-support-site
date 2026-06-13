@@ -289,7 +289,7 @@ export default async function BusinessPage({
 
   return (
     <AdminPageLayout current="business">
-      <h1 className={cn("text-russian-violet mb-6 text-2xl font-extrabold")}>Business</h1>
+      <h1 className={cn("mb-6 text-2xl font-extrabold text-russian-violet")}>Business</h1>
 
       {/* FY scope selector */}
       <div
@@ -309,14 +309,14 @@ export default async function BusinessPage({
                 "rounded-lg border px-3 py-1.5 text-sm font-semibold transition-colors",
                 active
                   ? "border-russian-violet bg-russian-violet text-white"
-                  : "hover:border-russian-violet/50 hover:text-russian-violet border-slate-300 bg-white text-slate-600",
+                  : "border-slate-300 bg-white text-slate-600 hover:border-russian-violet/50 hover:text-russian-violet",
               )}
             >
               {tab.label}
               {tab.current && !active && (
                 <span
                   className={cn(
-                    "bg-moonstone-600/15 text-moonstone-600 ml-2 rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                    "ml-2 rounded-full bg-moonstone-600/15 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-moonstone-600 uppercase",
                   )}
                 >
                   Current
@@ -356,7 +356,7 @@ export default async function BusinessPage({
             key={l.label}
             href={l.href}
             className={cn(
-              "bg-russian-violet rounded-lg px-4 py-2 text-center text-sm font-medium text-white transition-opacity hover:opacity-90 sm:w-auto sm:text-left",
+              "rounded-lg bg-russian-violet px-4 py-2 text-center text-sm font-medium text-white transition-opacity hover:opacity-90 sm:w-auto sm:text-left",
             )}
           >
             {l.label}

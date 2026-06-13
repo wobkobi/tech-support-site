@@ -103,7 +103,7 @@ export default async function AdminTravelPage(): Promise<React.ReactElement> {
 
   return (
     <AdminPageLayout current="travel">
-      <h1 className={cn("text-russian-violet mb-6 text-2xl font-extrabold")}>Travel blocks</h1>
+      <h1 className={cn("mb-6 text-2xl font-extrabold text-russian-violet")}>Travel blocks</h1>
 
       <div className={cn("rounded-xl border border-slate-200 bg-white p-6 shadow-sm")}>
         <div className={cn("mb-5 flex flex-wrap items-center justify-between gap-4")}>

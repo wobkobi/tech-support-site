@@ -40,13 +40,13 @@ export default function NotFound(): React.ReactElement {
       <FrostedSection maxWidth="56rem">
         <div className={cn("flex flex-col gap-6 sm:gap-8")}>
           <section className={cn(CARD, "text-center")}>
-            <div className={cn("text-coquelicot-500 mb-4 text-8xl font-extrabold sm:text-9xl")}>
+            <div className={cn("mb-4 text-8xl font-extrabold text-coquelicot-500 sm:text-9xl")}>
               404
             </div>
 
             <h1
               className={cn(
-                "text-russian-violet mb-4 text-3xl font-extrabold sm:text-4xl md:text-5xl",
+                "mb-4 text-3xl font-extrabold text-russian-violet sm:text-4xl md:text-5xl",
               )}
             >
               Well, this is awkward...
@@ -54,7 +54,7 @@ export default function NotFound(): React.ReactElement {
 
             <p
               suppressHydrationWarning
-              className={cn("text-rich-black mb-6 text-base sm:text-lg md:text-xl")}
+              className={cn("mb-6 text-base text-rich-black sm:text-lg md:text-xl")}
             >
               {message}
             </p>

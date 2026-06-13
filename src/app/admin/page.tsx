@@ -269,17 +269,17 @@ export default async function AdminPage(): Promise<React.ReactElement> {
 
   return (
     <AdminPageLayout current="dashboard">
-      <h1 className={cn("text-russian-violet mb-6 text-2xl font-extrabold")}>Dashboard</h1>
+      <h1 className={cn("mb-6 text-2xl font-extrabold text-russian-violet")}>Dashboard</h1>
 
       {/* Today's snapshot - pinned at the top so the morning glance is instant. */}
       <div
         className={cn(
-          "border-russian-violet/20 from-russian-violet/5 bg-linear-to-r mb-6 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border to-white px-5 py-4",
+          "mb-6 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-russian-violet/20 bg-linear-to-r from-russian-violet/5 to-white px-5 py-4",
         )}
       >
-        <p className={cn("text-russian-violet text-sm font-semibold")}>Today</p>
+        <p className={cn("text-sm font-semibold text-russian-violet")}>Today</p>
         <p className={cn("text-sm text-slate-700")}>
-          <span className={cn("text-russian-violet font-bold")}>{todaysBookings.length}</span>{" "}
+          <span className={cn("font-bold text-russian-violet")}>{todaysBookings.length}</span>{" "}
           booking{todaysBookings.length === 1 ? "" : "s"}
         </p>
         <p className={cn("text-sm text-slate-700")}>
@@ -295,13 +295,13 @@ export default async function AdminPage(): Promise<React.ReactElement> {
         </p>
         {overdueInvoices.length > 0 && (
           <p className={cn("text-sm text-slate-700")}>
-            <span className={cn("text-coquelicot-400 font-bold")}>{overdueInvoices.length}</span>{" "}
+            <span className={cn("font-bold text-coquelicot-400")}>{overdueInvoices.length}</span>{" "}
             overdue invoice{overdueInvoices.length === 1 ? "" : "s"}
           </p>
         )}
         {heldCount > 0 && (
           <p className={cn("text-sm text-slate-700")}>
-            <span className={cn("text-coquelicot-400 font-bold")}>{heldCount}</span> held booking
+            <span className={cn("font-bold text-coquelicot-400")}>{heldCount}</span> held booking
             {heldCount === 1 ? "" : "s"} to action
           </p>
         )}
@@ -352,7 +352,7 @@ export default async function AdminPage(): Promise<React.ReactElement> {
             <Link
               href={`/admin/bookings`}
               className={cn(
-                "hover:text-russian-violet inline-flex items-center gap-1 text-xs text-slate-400",
+                "inline-flex items-center gap-1 text-xs text-slate-400 hover:text-russian-violet",
               )}
             >
               View all
@@ -393,7 +393,7 @@ export default async function AdminPage(): Promise<React.ReactElement> {
               {pendingReviews.length > 0 && (
                 <span
                   className={cn(
-                    "bg-coquelicot-500/15 text-coquelicot-400 ml-2 rounded-full px-2 py-0.5 text-xs font-semibold",
+                    "ml-2 rounded-full bg-coquelicot-500/15 px-2 py-0.5 text-xs font-semibold text-coquelicot-400",
                   )}
                 >
                   {pendingCount}
@@ -403,7 +403,7 @@ export default async function AdminPage(): Promise<React.ReactElement> {
             <Link
               href={`/admin/reviews`}
               className={cn(
-                "hover:text-russian-violet inline-flex items-center gap-1 text-xs text-slate-400",
+                "inline-flex items-center gap-1 text-xs text-slate-400 hover:text-russian-violet",
               )}
             >
               Review all
@@ -490,7 +490,7 @@ export default async function AdminPage(): Promise<React.ReactElement> {
             <Link
               href={`/admin/settings`}
               className={cn(
-                "hover:text-russian-violet inline-flex items-center gap-1 text-xs text-slate-400",
+                "inline-flex items-center gap-1 text-xs text-slate-400 hover:text-russian-violet",
               )}
             >
               Settings
@@ -504,7 +504,7 @@ export default async function AdminPage(): Promise<React.ReactElement> {
                 className={cn(
                   "text-xs",
                   calendarLastRefreshMs === null
-                    ? "text-coquelicot-400 font-medium"
+                    ? "font-medium text-coquelicot-400"
                     : calendarLastRefreshMs > 30 * 60 * 1000
                       ? "text-yellow-600"
                       : "text-slate-500",

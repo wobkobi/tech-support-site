@@ -85,7 +85,7 @@ export default async function AdminBookingsPage(): Promise<React.ReactElement> {
   return (
     <AdminPageLayout current="bookings">
       <div className={cn("mb-6 flex flex-wrap items-center justify-between gap-4")}>
-        <h1 className={cn("text-russian-violet text-2xl font-extrabold")}>Bookings</h1>
+        <h1 className={cn("text-2xl font-extrabold text-russian-violet")}>Bookings</h1>
         <div className={cn("flex flex-wrap gap-2")}>
           {statusStats.map((s) => (
             <span

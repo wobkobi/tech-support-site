@@ -115,7 +115,7 @@ export function ContactConflictsView({ initial }: ContactConflictsViewProps): Re
             >
               <div className={cn("mb-3 flex items-baseline justify-between gap-3")}>
                 <div className={cn("min-w-0")}>
-                  <p className={cn("text-russian-violet truncate text-base font-semibold")}>
+                  <p className={cn("truncate text-base font-semibold text-russian-violet")}>
                     {c.contactName}
                   </p>
                   {c.contactEmail && (
@@ -124,7 +124,7 @@ export function ContactConflictsView({ initial }: ContactConflictsViewProps): Re
                 </div>
                 <span
                   className={cn(
-                    "text-coquelicot-500 bg-coquelicot-500/10 shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase",
+                    "shrink-0 rounded-full bg-coquelicot-500/10 px-2.5 py-0.5 text-xs font-semibold text-coquelicot-500 uppercase",
                   )}
                 >
                   {c.field}
@@ -133,29 +133,29 @@ export function ContactConflictsView({ initial }: ContactConflictsViewProps): Re
 
               <div className={cn("grid grid-cols-1 gap-3 md:grid-cols-2")}>
                 <div className={cn("rounded-lg border border-slate-200 bg-slate-50 p-3")}>
-                  <p className={cn("mb-1 text-xs font-semibold uppercase text-slate-400")}>
+                  <p className={cn("mb-1 text-xs font-semibold text-slate-400 uppercase")}>
                     Site value
                   </p>
                   <p className={cn("text-sm font-medium text-slate-800")}>
-                    {c.siteValue || <span className={cn("italic text-slate-400")}>empty</span>}
+                    {c.siteValue || <span className={cn("text-slate-400 italic")}>empty</span>}
                   </p>
                   <button
                     type="button"
                     onClick={() => void resolve(c.id, "site")}
                     disabled={isResolving}
                     className={cn(
-                      "bg-russian-violet hover:bg-russian-violet/90 mt-3 w-full rounded-lg px-3 py-2 text-xs font-semibold text-white transition-colors disabled:opacity-50",
+                      "mt-3 w-full rounded-lg bg-russian-violet px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-russian-violet/90 disabled:opacity-50",
                     )}
                   >
                     {isResolving ? "Saving…" : "Use site value"}
                   </button>
                 </div>
                 <div className={cn("rounded-lg border border-slate-200 bg-slate-50 p-3")}>
-                  <p className={cn("mb-1 text-xs font-semibold uppercase text-slate-400")}>
+                  <p className={cn("mb-1 text-xs font-semibold text-slate-400 uppercase")}>
                     Google value
                   </p>
                   <p className={cn("text-sm font-medium text-slate-800")}>
-                    {c.googleValue || <span className={cn("italic text-slate-400")}>empty</span>}
+                    {c.googleValue || <span className={cn("text-slate-400 italic")}>empty</span>}
                   </p>
                   <button
                     type="button"
@@ -170,7 +170,7 @@ export function ContactConflictsView({ initial }: ContactConflictsViewProps): Re
                 </div>
               </div>
 
-              {err && <p className={cn("text-coquelicot-500 mt-3 text-xs")}>{err}</p>}
+              {err && <p className={cn("mt-3 text-xs text-coquelicot-500")}>{err}</p>}
               <p className={cn("mt-3 text-xs text-slate-400")}>
                 Detected {new Date(c.createdAt).toLocaleString()}
               </p>

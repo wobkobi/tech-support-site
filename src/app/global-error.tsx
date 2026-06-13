@@ -29,7 +29,7 @@ export default function GlobalError({
 
   return (
     <html lang="en-NZ">
-      <body className={cn("bg-seasalt-900 text-rich-black min-h-screen")}>
+      <body className={cn("min-h-screen bg-seasalt-900 text-rich-black")}>
         <main className={cn("mx-auto w-full max-w-5xl px-3 py-8 sm:px-6 sm:py-12")}>
           <h1 className={cn("mb-3 text-center text-2xl font-bold sm:mb-4 sm:text-3xl md:text-4xl")}>
             Something went wrong
@@ -37,7 +37,7 @@ export default function GlobalError({
 
           <div
             className={cn(
-              "border-seasalt-400/60 bg-seasalt-800 rounded-lg border p-4 shadow-sm sm:p-6",
+              "rounded-lg border border-seasalt-400/60 bg-seasalt-800 p-4 shadow-sm sm:p-6",
             )}
           >
             <p
@@ -53,7 +53,7 @@ export default function GlobalError({
                 type="button"
                 onClick={reset}
                 className={cn(
-                  "bg-russian-violet text-seasalt-800 inline-flex items-center gap-2 rounded-md px-4 py-2 text-base font-semibold",
+                  "inline-flex items-center gap-2 rounded-md bg-russian-violet px-4 py-2 text-base font-semibold text-seasalt-800",
                   "hover:bg-russian-violet-600 disabled:opacity-60",
                 )}
               >
@@ -64,7 +64,7 @@ export default function GlobalError({
               <Link
                 href="/"
                 className={cn(
-                  "text-russian-violet hover:text-coquelicot-500 inline-flex items-center gap-2 rounded-md px-3 py-2 text-base font-semibold",
+                  "inline-flex items-center gap-2 rounded-md px-3 py-2 text-base font-semibold text-russian-violet hover:text-coquelicot-500",
                 )}
               >
                 <FaHouse className={cn("h-4 w-4")} aria-hidden />
@@ -72,11 +72,11 @@ export default function GlobalError({
               </Link>
             </div>
 
-            <details className={cn("text-rich-black/80 mt-4 text-base")}>
+            <details className={cn("mt-4 text-base text-rich-black/80")}>
               <summary className={cn("cursor-pointer")}>Technical details</summary>
               <pre
                 className={cn(
-                  "border-seasalt-400/60 bg-seasalt-800 mt-2 overflow-auto rounded-md border p-3",
+                  "mt-2 overflow-auto rounded-md border border-seasalt-400/60 bg-seasalt-800 p-3",
                 )}
               >
                 {String(error?.stack || error)}

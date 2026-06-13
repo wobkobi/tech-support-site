@@ -136,7 +136,7 @@ export function PhoneInput({
         className={cn(DEFAULT_INPUT_CLASSES, activeError && "border-coquelicot-500/60", className)}
       />
       {!hideError && activeError && (
-        <p id={describedBy} className={cn("text-coquelicot-600 mt-1 text-xs")}>
+        <p id={describedBy} className={cn("mt-1 text-xs text-coquelicot-600")}>
           {activeError}
         </p>
       )}

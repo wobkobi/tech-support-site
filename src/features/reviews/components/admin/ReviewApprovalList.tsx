@@ -160,7 +160,7 @@ export function ReviewApprovalList({
               void handleLinkContact(row.id, val || null);
             }}
             className={cn(
-              "focus:border-russian-violet focus:ring-russian-violet/30 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 focus:outline-none focus:ring-1",
+              "rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
             )}
           >
             <option value="">-- no contact --</option>
@@ -188,7 +188,7 @@ export function ReviewApprovalList({
         <button
           onClick={() => setLinkingId(row.id)}
           className={cn(
-            "bg-moonstone-600/10 text-moonstone-600 hover:bg-moonstone-600/20 rounded-full px-2 py-0.5 text-xs font-medium transition-colors",
+            "rounded-full bg-moonstone-600/10 px-2 py-0.5 text-xs font-medium text-moonstone-600 transition-colors hover:bg-moonstone-600/20",
           )}
           title="Change linked contact"
         >
@@ -201,7 +201,7 @@ export function ReviewApprovalList({
       <button
         onClick={() => setLinkingId(row.id)}
         className={cn(
-          "text-russian-violet/50 hover:text-russian-violet rounded px-1 py-0.5 text-xs transition-colors",
+          "rounded px-1 py-0.5 text-xs text-russian-violet/50 transition-colors hover:text-russian-violet",
         )}
       >
         Link contact
@@ -224,18 +224,18 @@ export function ReviewApprovalList({
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         className={cn(
-          "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-1",
+          "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
         )}
       />
 
       {/* Pending */}
       <section>
-        <h2 className={cn("text-russian-violet mb-3 text-lg font-bold")}>
+        <h2 className={cn("mb-3 text-lg font-bold text-russian-violet")}>
           Pending{" "}
           {visiblePending.length > 0 && (
             <span
               className={cn(
-                "bg-coquelicot-500/20 text-coquelicot-400 ml-1 rounded-full px-2 py-0.5 text-sm",
+                "ml-1 rounded-full bg-coquelicot-500/20 px-2 py-0.5 text-sm text-coquelicot-400",
               )}
             >
               {visiblePending.length}
@@ -266,12 +266,12 @@ export function ReviewApprovalList({
 
       {/* Approved */}
       <section>
-        <h2 className={cn("text-russian-violet mb-3 text-lg font-bold")}>
+        <h2 className={cn("mb-3 text-lg font-bold text-russian-violet")}>
           Approved{" "}
           {approved.length > 0 && (
             <span
               className={cn(
-                "bg-moonstone-600/20 text-moonstone-600 ml-1 rounded-full px-2 py-0.5 text-sm",
+                "ml-1 rounded-full bg-moonstone-600/20 px-2 py-0.5 text-sm text-moonstone-600",
               )}
             >
               {visibleApproved.length}

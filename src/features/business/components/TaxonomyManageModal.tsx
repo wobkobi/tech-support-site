@@ -163,7 +163,7 @@ export function TaxonomyManageModal({ onClose, onChanged }: Props): React.ReactE
           className={cn("flex items-center justify-between border-b border-slate-200 px-5 py-4")}
         >
           <div>
-            <h2 className={cn("text-russian-violet text-base font-bold")}>Manage tags</h2>
+            <h2 className={cn("text-base font-bold text-russian-violet")}>Manage tags</h2>
             <p className={cn("mt-0.5 text-xs text-slate-500")}>
               Clear devices or actions you no longer want; tasks tagged with them keep their other
               fields and get retagged on the next AI parse.
@@ -252,11 +252,11 @@ function TagSection({
 }): React.ReactElement {
   return (
     <section>
-      <h3 className={cn("text-russian-violet mb-2 text-xs font-bold uppercase tracking-wider")}>
+      <h3 className={cn("mb-2 text-xs font-bold tracking-wider text-russian-violet uppercase")}>
         {title}
       </h3>
       {tags.length === 0 ? (
-        <p className={cn("text-xs italic text-slate-400")}>None yet.</p>
+        <p className={cn("text-xs text-slate-400 italic")}>None yet.</p>
       ) : (
         <ul className={cn("flex flex-col gap-1")}>
           {tags.map((tag) => {

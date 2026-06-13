@@ -56,7 +56,7 @@ export default function PricingLoading(): React.ReactElement {
               {Array.from({ length: 7 }).map((_, i) => (
                 <div
                   className={cn(
-                    "border-seasalt-400/80 bg-seasalt-900/60 flex items-center justify-between gap-3 rounded-xl border p-3 sm:p-4",
+                    "flex items-center justify-between gap-3 rounded-xl border border-seasalt-400/80 bg-seasalt-900/60 p-3 sm:p-4",
                   )}
                   key={i}
                 >

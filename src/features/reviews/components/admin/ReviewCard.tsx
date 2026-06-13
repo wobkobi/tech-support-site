@@ -113,11 +113,11 @@ export function ReviewCard({
     <div className={cn(SOFT_CARD, "flex flex-col gap-3")}>
       {/* Header row */}
       <div className={cn("flex flex-wrap items-center gap-2")}>
-        <span className={cn("text-russian-violet font-semibold")}>{formatReviewerName(row)}</span>
+        <span className={cn("font-semibold text-russian-violet")}>{formatReviewerName(row)}</span>
         {row.verified && (
           <span
             className={cn(
-              "bg-moonstone-600/20 text-moonstone-600 rounded-full px-2 py-0.5 text-xs font-medium",
+              "rounded-full bg-moonstone-600/20 px-2 py-0.5 text-xs font-medium text-moonstone-600",
             )}
           >
             Verified
@@ -132,7 +132,7 @@ export function ReviewCard({
       <p className={cn("leading-relaxed text-slate-700")}>{row.text}</p>
 
       {/* Error */}
-      {error && <p className={cn("text-coquelicot-400 text-xs")}>{error}</p>}
+      {error && <p className={cn("text-xs text-coquelicot-400")}>{error}</p>}
 
       {/* Actions */}
       <div className={cn("flex flex-wrap items-center gap-2")}>
@@ -156,7 +156,7 @@ export function ReviewCard({
             onClick={() => patch("approve")}
             disabled={loading !== null}
             className={cn(
-              "bg-moonstone-600 hover:bg-moonstone-700 rounded-lg px-4 py-1.5 text-sm font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+              "rounded-lg bg-moonstone-600 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-moonstone-700 disabled:cursor-not-allowed disabled:opacity-50",
             )}
           >
             {loading === "approve" ? "Approving…" : "Approve"}
@@ -214,7 +214,7 @@ export function ReviewCard({
                         void remove();
                       }}
                       className={cn(
-                        "text-coquelicot-500 text-xs font-semibold disabled:opacity-50",
+                        "text-xs font-semibold text-coquelicot-500 disabled:opacity-50",
                       )}
                     >
                       {loading === "delete" ? "Deleting…" : "Yes, delete"}
@@ -234,7 +234,7 @@ export function ReviewCard({
                   onClick={() => setConfirmDelete(true)}
                   disabled={loading !== null}
                   className={cn(
-                    "text-coquelicot-500 hover:bg-coquelicot-500/10 px-4 py-2 text-left text-sm font-medium transition-colors disabled:opacity-50",
+                    "px-4 py-2 text-left text-sm font-medium text-coquelicot-500 transition-colors hover:bg-coquelicot-500/10 disabled:opacity-50",
                     onRevoke ? "rounded-b-lg" : "rounded-lg",
                   )}
                 >

@@ -93,7 +93,7 @@ export default async function PosterPage({
           {/* Main frosted card - content-sized */}
           <div
             className={cn(
-              "rounded-4xl border-seasalt-400/40 bg-seasalt-800/60 border-[3px] p-6 shadow-xl backdrop-blur-xl",
+              "rounded-4xl border-[3px] border-seasalt-400/40 bg-seasalt-800/60 p-6 shadow-xl backdrop-blur-xl",
             )}
           >
             <div className={cn("flex flex-col gap-6")}>
@@ -105,7 +105,7 @@ export default async function PosterPage({
                   width={1376}
                   height={313}
                   priority
-                  className={cn("w-344 h-auto")}
+                  className={cn("h-auto w-344")}
                 />
               </div>
 
@@ -113,7 +113,7 @@ export default async function PosterPage({
               <div className={cn("mx-auto flex flex-wrap justify-center gap-3")}>
                 <div
                   className={cn(
-                    "border-moonstone-500/30 px-4.5 relative flex items-center gap-3 rounded-xl border-2 py-1.5 shadow-sm",
+                    "relative flex items-center gap-3 rounded-xl border-2 border-moonstone-500/30 px-4.5 py-1.5 shadow-sm",
                   )}
                   style={{ backgroundColor: "#f6f7f8" }}
                 >
@@ -121,15 +121,15 @@ export default async function PosterPage({
                     className={cn("absolute inset-0 rounded-xl")}
                     style={{ backgroundColor: "rgba(67, 188, 205, 0.15)" }}
                   />
-                  <FaCircleCheck className={cn("text-moonstone-600 relative z-10 h-11 w-11")} />
-                  <span className={cn("text-rich-black relative z-10 text-[34px] font-semibold")}>
+                  <FaCircleCheck className={cn("relative z-10 h-11 w-11 text-moonstone-600")} />
+                  <span className={cn("relative z-10 text-[34px] font-semibold text-rich-black")}>
                     CS Graduate
                   </span>
                 </div>
 
                 <div
                   className={cn(
-                    "border-moonstone-500/30 px-4.5 relative flex items-center gap-3 rounded-xl border-2 py-1.5 shadow-sm",
+                    "relative flex items-center gap-3 rounded-xl border-2 border-moonstone-500/30 px-4.5 py-1.5 shadow-sm",
                   )}
                   style={{ backgroundColor: "#f6f7f8" }}
                 >
@@ -137,15 +137,15 @@ export default async function PosterPage({
                     className={cn("absolute inset-0 rounded-xl")}
                     style={{ backgroundColor: "rgba(67, 188, 205, 0.15)" }}
                   />
-                  <FaLocationDot className={cn("text-moonstone-600 relative z-10 h-11 w-11")} />
-                  <span className={cn("text-rich-black relative z-10 text-[34px] font-semibold")}>
+                  <FaLocationDot className={cn("relative z-10 h-11 w-11 text-moonstone-600")} />
+                  <span className={cn("relative z-10 text-[34px] font-semibold text-rich-black")}>
                     Proudly Local
                   </span>
                 </div>
 
                 <div
                   className={cn(
-                    "border-moonstone-500/30 px-4.5 relative flex items-center gap-3 rounded-xl border-2 py-1.5 shadow-sm",
+                    "relative flex items-center gap-3 rounded-xl border-2 border-moonstone-500/30 px-4.5 py-1.5 shadow-sm",
                   )}
                   style={{ backgroundColor: "#f6f7f8" }}
                 >
@@ -153,8 +153,8 @@ export default async function PosterPage({
                     className={cn("absolute inset-0 rounded-xl")}
                     style={{ backgroundColor: "rgba(67, 188, 205, 0.15)" }}
                   />
-                  <FaClock className={cn("text-moonstone-600 relative z-10 h-11 w-11")} />
-                  <span className={cn("text-rich-black relative z-10 text-[34px] font-semibold")}>
+                  <FaClock className={cn("relative z-10 h-11 w-11 text-moonstone-600")} />
+                  <span className={cn("relative z-10 text-[34px] font-semibold text-rich-black")}>
                     Same-Day Available
                   </span>
                 </div>
@@ -164,26 +164,26 @@ export default async function PosterPage({
               <section className={cn("flex flex-col gap-5")}>
                 <div
                   className={cn(
-                    "border-seasalt-400/60 bg-seasalt-800 p-4.5 rounded-[18px] border-2 shadow-sm",
+                    "rounded-[18px] border-2 border-seasalt-400/60 bg-seasalt-800 p-4.5 shadow-sm",
                   )}
                 >
-                  <h2 className={cn("text-russian-violet mb-1.5 text-[53px] font-bold")}>
+                  <h2 className={cn("mb-1.5 text-[53px] font-bold text-russian-violet")}>
                     About Me
                   </h2>
-                  <p className={cn("text-rich-black text-[40px] font-medium leading-tight")}>
+                  <p className={cn("text-[40px] leading-tight font-medium text-rich-black")}>
                     {aboutMeText}
                   </p>
                 </div>
 
                 <div
                   className={cn(
-                    "border-seasalt-400/60 bg-seasalt-800 p-4.5 rounded-[18px] border-2 shadow-sm",
+                    "rounded-[18px] border-2 border-seasalt-400/60 bg-seasalt-800 p-4.5 shadow-sm",
                   )}
                 >
-                  <h2 className={cn("text-russian-violet mb-1.5 text-[53px] font-bold")}>
+                  <h2 className={cn("mb-1.5 text-[53px] font-bold text-russian-violet")}>
                     Services
                   </h2>
-                  <p className={cn("text-rich-black text-[40px] font-medium leading-tight")}>
+                  <p className={cn("text-[40px] leading-tight font-medium text-rich-black")}>
                     {servicesText}
                   </p>
                 </div>
@@ -191,7 +191,7 @@ export default async function PosterPage({
 
               {/* Support grid */}
               <section>
-                <h2 className={cn("text-rich-black mb-3 text-center text-[53px] font-semibold")}>
+                <h2 className={cn("mb-3 text-center text-[53px] font-semibold text-rich-black")}>
                   Areas I Can Help With
                 </h2>
 
@@ -200,20 +200,20 @@ export default async function PosterPage({
                     <li
                       key={label}
                       className={cn(
-                        "border-seasalt-400/60 bg-seasalt-800 h-27 px-4.5 flex items-center gap-3 rounded-xl border-2",
+                        "flex h-27 items-center gap-3 rounded-xl border-2 border-seasalt-400/60 bg-seasalt-800 px-4.5",
                       )}
                     >
                       <span
                         className={cn(
-                          "border-moonstone-500/30 bg-moonstone-600/15 size-18 grid shrink-0 place-items-center rounded-xl border-2",
+                          "grid size-18 shrink-0 place-items-center rounded-xl border-2 border-moonstone-500/30 bg-moonstone-600/15",
                         )}
                       >
-                        <Icon className={cn("text-moonstone-600 h-11 w-11")} aria-hidden />
+                        <Icon className={cn("h-11 w-11 text-moonstone-600")} aria-hidden />
                       </span>
 
                       <span
                         className={cn(
-                          "text-rich-black text-left text-[40px] font-semibold leading-tight",
+                          "text-left text-[40px] leading-tight font-semibold text-rich-black",
                         )}
                       >
                         {label}
@@ -229,7 +229,7 @@ export default async function PosterPage({
           <footer className={cn("flex items-center justify-center")}>
             <div
               className={cn(
-                "bg-seasalt-800/70 border-seasalt-400/40 rounded-3xl border-2 p-10 shadow-xl backdrop-blur-md",
+                "rounded-3xl border-2 border-seasalt-400/40 bg-seasalt-800/70 p-10 shadow-xl backdrop-blur-md",
               )}
             >
               <div className={cn("flex items-center gap-11")}>
@@ -237,7 +237,7 @@ export default async function PosterPage({
                 <div className={cn("flex shrink-0 flex-col items-center gap-2")}>
                   <div
                     className={cn(
-                      "border-seasalt-400/60 grid size-60 place-items-center rounded-[10px] border-2 bg-white p-3 shadow-sm",
+                      "grid size-60 place-items-center rounded-[10px] border-2 border-seasalt-400/60 bg-white p-3 shadow-sm",
                     )}
                   >
                     <Image
@@ -248,7 +248,7 @@ export default async function PosterPage({
                       className={cn("h-full w-full")}
                     />
                   </div>
-                  <span className={cn("text-rich-black text-center text-[34px] font-semibold")}>
+                  <span className={cn("text-center text-[34px] font-semibold text-rich-black")}>
                     Scan to Book
                   </span>
                 </div>
@@ -258,7 +258,7 @@ export default async function PosterPage({
                   <a
                     href="tel:+64212971237"
                     className={cn(
-                      "text-russian-violet flex items-center gap-4 text-[44px] font-semibold",
+                      "flex items-center gap-4 text-[44px] font-semibold text-russian-violet",
                     )}
                   >
                     <FaPhone className={cn("h-10 w-10 shrink-0")} aria-hidden />
@@ -268,7 +268,7 @@ export default async function PosterPage({
                   <a
                     href="mailto:harrison@tothepoint.co.nz"
                     className={cn(
-                      "text-russian-violet flex items-center gap-4 text-[44px] font-semibold",
+                      "flex items-center gap-4 text-[44px] font-semibold text-russian-violet",
                     )}
                   >
                     <FaEnvelope className={cn("h-11 w-11 shrink-0")} aria-hidden />
@@ -276,7 +276,7 @@ export default async function PosterPage({
                   </a>
 
                   <div className={cn("flex items-center gap-4 text-[44px] font-semibold")}>
-                    <FaGlobe className={cn("text-russian-violet h-11 w-11 shrink-0")} aria-hidden />
+                    <FaGlobe className={cn("h-11 w-11 shrink-0 text-russian-violet")} aria-hidden />
                     <p className={cn("text-russian-violet")}>tothepoint.co.nz</p>
                   </div>
                 </div>

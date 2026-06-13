@@ -61,7 +61,7 @@ export function EstimatorTab({ initial, defaults }: Props): React.ReactElement {
 
       {/* Price range width - the confidence-scaled band the public estimator shows. */}
       <div className={cn("mt-8")}>
-        <h3 className={cn("text-russian-violet text-lg font-semibold")}>Estimate range width</h3>
+        <h3 className={cn("text-lg font-semibold text-russian-violet")}>Estimate range width</h3>
         <p className={cn("mt-1 text-sm text-slate-500")}>
           How wide the customer-facing price range is, set by how clearly the job was described.
           Percentages are of the estimate; vaguer jobs get a wider, lower range so they read
@@ -178,7 +178,7 @@ export function EstimatorTab({ initial, defaults }: Props): React.ReactElement {
           onClick={() => void form.save()}
           disabled={!dirty || saving}
           className={cn(
-            "bg-russian-violet rounded-lg px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50",
+            "rounded-lg bg-russian-violet px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50",
           )}
         >
           {saving ? "Saving..." : "Save changes"}

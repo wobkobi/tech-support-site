@@ -66,12 +66,12 @@ function InvoicePreviewPanelImpl({
     <div
       className={cn(
         "flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm",
-        "lg:aspect-210/297 lg:sticky lg:top-4 lg:overflow-y-auto",
+        "lg:sticky lg:top-4 lg:aspect-210/297 lg:overflow-y-auto",
         // Print: defeat sticky + scroll so the browser captures the full invoice.
         "print:static print:aspect-auto print:overflow-visible print:rounded-none print:border-0 print:shadow-none",
       )}
     >
-      <div className={cn("flex flex-1 flex-col px-10 pb-10 pt-10")}>
+      <div className={cn("flex flex-1 flex-col px-10 pt-10 pb-10")}>
         {/* Header row: chip + wordmark on the left, INVOICE block on the right. */}
         <div className={cn("mb-8 flex items-start justify-between gap-4")}>
           <Image
@@ -83,14 +83,14 @@ function InvoicePreviewPanelImpl({
             priority
           />
           <div className={cn("text-right")}>
-            <p className={cn("text-russian-violet text-2xl font-extrabold leading-none")}>
+            <p className={cn("text-2xl leading-none font-extrabold text-russian-violet")}>
               {identity.gstNumber ? "TAX INVOICE" : "INVOICE"}
             </p>
             <p className={cn("mt-2 font-mono text-sm text-slate-700")}>
               {number || "TTP-XXXX-0000"}
             </p>
             {number === "DRAFT" && (
-              <p className={cn("mt-1 text-[11px] font-bold uppercase text-slate-400")}>DRAFT</p>
+              <p className={cn("mt-1 text-[11px] font-bold text-slate-400 uppercase")}>DRAFT</p>
             )}
             {identity.gstNumber && (
               <p className={cn("mt-1 text-[11px] text-slate-500")}>GST# {identity.gstNumber}</p>
@@ -101,7 +101,7 @@ function InvoicePreviewPanelImpl({
         {/* Bill to (left) + dates (right). */}
         <div className={cn("mb-6 flex items-start justify-between gap-6")}>
           <div>
-            <p className={cn("mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400")}>
+            <p className={cn("mb-1 text-[10px] font-bold tracking-wider text-slate-400 uppercase")}>
               Bill to
             </p>
             <p className={cn("text-sm font-bold text-slate-800")}>{clientName || "Client name"}</p>
@@ -131,7 +131,7 @@ function InvoicePreviewPanelImpl({
             blowing out the column. */}
         <table className={cn("mb-0 w-full table-fixed text-xs")}>
           <thead>
-            <tr className={cn("border-russian-violet border-b-2 text-slate-800")}>
+            <tr className={cn("border-b-2 border-russian-violet text-slate-800")}>
               <th className={cn("w-[67%] px-2 py-2 text-left font-bold")}>Description</th>
               <th className={cn("w-[9%] px-2 py-2 text-center font-bold")}>Qty</th>
               <th className={cn("w-[11%] px-2 py-2 text-center font-bold")}>Price</th>
@@ -143,7 +143,7 @@ function InvoicePreviewPanelImpl({
               <tr>
                 <td
                   colSpan={4}
-                  className={cn("px-2 py-3 text-center text-xs italic text-slate-300")}
+                  className={cn("px-2 py-3 text-center text-xs text-slate-300 italic")}
                 >
                   (no line items yet)
                 </td>
@@ -157,9 +157,9 @@ function InvoicePreviewPanelImpl({
                     idx === lineItems.length - 1 && "border-b-0",
                   )}
                 >
-                  <td className={cn("wrap-break-word px-2 py-2 align-top text-slate-700")}>
+                  <td className={cn("px-2 py-2 align-top wrap-break-word text-slate-700")}>
                     {item.description || (
-                      <span className={cn("italic text-slate-300")}>(line description)</span>
+                      <span className={cn("text-slate-300 italic")}>(line description)</span>
                     )}
                   </td>
                   <td className={cn("px-2 py-2 text-right align-top text-slate-700")}>
@@ -209,7 +209,7 @@ function InvoicePreviewPanelImpl({
           )}
           <div className={cn("h-px bg-slate-300")} />
           <div
-            className={cn("text-russian-violet flex justify-between gap-3 text-sm font-extrabold")}
+            className={cn("flex justify-between gap-3 text-sm font-extrabold text-russian-violet")}
           >
             <span>Total</span>
             <span className={cn("whitespace-nowrap")}>{formatNZD(totals.total)}</span>
@@ -220,7 +220,7 @@ function InvoicePreviewPanelImpl({
         <div
           className={cn("mb-4 space-y-1 rounded-lg border border-slate-200 px-3 py-3 text-[11px]")}
         >
-          <p className={cn("text-russian-violet text-xs font-bold")}>Bank transfer</p>
+          <p className={cn("text-xs font-bold text-russian-violet")}>Bank transfer</p>
           <p className={cn("text-slate-500")}>Payee: {identity.name}</p>
           <p className={cn("font-semibold text-slate-700")}>Account: {identity.bankAccount}</p>
           <p className={cn("font-semibold text-slate-700")}>

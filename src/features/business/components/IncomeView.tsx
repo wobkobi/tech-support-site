@@ -103,7 +103,7 @@ export function IncomeView(): React.ReactElement {
         onSubmit={handleAdd}
         className={cn("mb-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}
       >
-        <h2 className={cn("text-russian-violet mb-4 text-sm font-semibold")}>Add income</h2>
+        <h2 className={cn("mb-4 text-sm font-semibold text-russian-violet")}>Add income</h2>
         <div className={cn("grid gap-3 sm:grid-cols-2")}>
           <div>
             <label className={cn("mb-1 block text-xs font-medium text-slate-600")}>Date</label>
@@ -113,7 +113,7 @@ export function IncomeView(): React.ReactElement {
               value={form.date}
               onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))}
               className={cn(
-                "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
+                "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
               )}
             />
           </div>
@@ -125,7 +125,7 @@ export function IncomeView(): React.ReactElement {
               value={form.customer}
               onChange={(e) => setForm((p) => ({ ...p, customer: e.target.value }))}
               className={cn(
-                "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
+                "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
               )}
             />
           </div>
@@ -139,7 +139,7 @@ export function IncomeView(): React.ReactElement {
               value={form.description}
               onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
               className={cn(
-                "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
+                "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
               )}
             />
           </div>
@@ -155,7 +155,7 @@ export function IncomeView(): React.ReactElement {
               value={form.amount}
               onChange={(e) => setForm((p) => ({ ...p, amount: e.target.value }))}
               className={cn(
-                "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
+                "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
               )}
             />
           </div>
@@ -167,7 +167,7 @@ export function IncomeView(): React.ReactElement {
               value={form.method}
               onChange={(e) => setForm((p) => ({ ...p, method: e.target.value }))}
               className={cn(
-                "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
+                "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
               )}
             >
               {INCOME_METHODS.map((m) => (
@@ -184,7 +184,7 @@ export function IncomeView(): React.ReactElement {
               value={form.notes}
               onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
               className={cn(
-                "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
+                "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
               )}
             />
           </div>
@@ -194,7 +194,7 @@ export function IncomeView(): React.ReactElement {
           type="submit"
           disabled={saving}
           className={cn(
-            "bg-russian-violet mt-4 rounded-lg px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50",
+            "mt-4 rounded-lg bg-russian-violet px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50",
           )}
         >
           {saving ? "Saving..." : "Add income"}
@@ -285,12 +285,12 @@ export function IncomeView(): React.ReactElement {
             <tbody className={cn("divide-y divide-slate-100")}>
               {entries.map((e) => (
                 <tr key={e.id} className={cn("hover:bg-slate-50")}>
-                  <td className={cn("whitespace-nowrap px-4 py-3 text-xs text-slate-500")}>
+                  <td className={cn("px-4 py-3 text-xs whitespace-nowrap text-slate-500")}>
                     {new Date(e.date).toLocaleDateString("en-NZ")}
                   </td>
                   <td className={cn("px-4 py-3 font-medium text-slate-700")}>{e.customer}</td>
                   <td className={cn("px-4 py-3 text-slate-500")}>{e.description}</td>
-                  <td className={cn("whitespace-nowrap px-4 py-3 font-semibold text-green-600")}>
+                  <td className={cn("px-4 py-3 font-semibold whitespace-nowrap text-green-600")}>
                     {formatNZD(e.amount)}
                   </td>
                   <td className={cn("px-4 py-3 text-xs text-slate-400")}>{e.method}</td>

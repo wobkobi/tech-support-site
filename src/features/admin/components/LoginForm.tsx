@@ -76,7 +76,7 @@ export function LoginForm({ nextPath }: LoginFormProps): React.ReactElement {
           onChange={(e) => setSecret(e.target.value)}
           disabled={busy}
           className={cn(
-            "focus:border-russian-violet focus:ring-russian-violet/30 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-1",
+            "rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
           )}
         />
       </label>
@@ -93,7 +93,7 @@ export function LoginForm({ nextPath }: LoginFormProps): React.ReactElement {
         type="submit"
         disabled={busy || secret.length === 0}
         className={cn(
-          "bg-russian-violet inline-flex h-11 items-center justify-center rounded-lg px-4 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50",
+          "inline-flex h-11 items-center justify-center rounded-lg bg-russian-violet px-4 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50",
         )}
       >
         {busy ? "Signing in..." : "Sign in"}

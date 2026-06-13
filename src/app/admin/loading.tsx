@@ -22,7 +22,7 @@ export default function AdminDashboardLoading(): React.ReactElement {
       <Bone className={cn("mb-6 h-8 w-40 bg-slate-200")} />
 
       {/* Today snapshot bar */}
-      <div className={cn("border-russian-violet/20 mb-6 rounded-xl border bg-white px-5 py-4")}>
+      <div className={cn("mb-6 rounded-xl border border-russian-violet/20 bg-white px-5 py-4")}>
         <div className={cn("flex flex-wrap items-center gap-x-6 gap-y-2")}>
           <Bone className={cn("h-4 w-12 bg-slate-200")} />
           <Bone className={cn("h-4 w-28 bg-slate-200")} />

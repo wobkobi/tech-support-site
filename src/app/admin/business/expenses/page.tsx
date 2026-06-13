@@ -22,7 +22,7 @@ export default async function ExpensesPage(): Promise<React.ReactElement> {
 
   return (
     <AdminPageLayout current="business-expenses">
-      <h1 className={cn("text-russian-violet mb-6 text-2xl font-extrabold")}>Expenses</h1>
+      <h1 className={cn("mb-6 text-2xl font-extrabold text-russian-violet")}>Expenses</h1>
       <ExpensesView />
       <div className="mt-10">
         <SubscriptionsView />

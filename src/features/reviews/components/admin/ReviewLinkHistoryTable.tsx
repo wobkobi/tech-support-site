@@ -188,13 +188,13 @@ export function ReviewLinkHistoryTable({
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         className={cn(
-          "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-1",
+          "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
         )}
       />
       {visibleEntries.length === 0 ? (
         <p className={cn("text-sm text-slate-400")}>No matching entries.</p>
       ) : (
-        <div className={cn("max-h-128 flex flex-col gap-2 overflow-y-auto")}>
+        <div className={cn("flex max-h-128 flex-col gap-2 overflow-y-auto")}>
           {visibleEntries.map((entry) => {
             const key = entryKey(entry);
             const isEditing = key !== null && editingKey === key;
@@ -241,7 +241,7 @@ export function ReviewLinkHistoryTable({
                     </div>
                     <p className={cn("mt-0.5 text-xs text-slate-500")}>
                       {contact ?? (
-                        <span className={cn("italic text-slate-400")}>
+                        <span className={cn("text-slate-400 italic")}>
                           {entry.source === "Legacy" ? "no contact info" : "SMS only"}
                         </span>
                       )}
@@ -254,7 +254,7 @@ export function ReviewLinkHistoryTable({
                       type="button"
                       onClick={() => openEdit(entry)}
                       className={cn(
-                        "hover:text-russian-violet shrink-0 text-slate-400 transition-colors",
+                        "shrink-0 text-slate-400 transition-colors hover:text-russian-violet",
                       )}
                       aria-label="Edit contact details"
                     >
@@ -277,7 +277,7 @@ export function ReviewLinkHistoryTable({
                           onChange={(e) => setEditEmail(e.target.value)}
                           placeholder="Email (optional)"
                           className={cn(
-                            "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-1",
+                            "w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-700 focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
                           )}
                         />
                         <input
@@ -287,7 +287,7 @@ export function ReviewLinkHistoryTable({
                           onBlur={(e) => setEditPhoneInput(formatNZPhone(e.target.value))}
                           placeholder="021 123 1234"
                           className={cn(
-                            "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-1",
+                            "w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-700 focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
                             editPhoneInput && !phoneValid ? "border-coquelicot-500/60" : "",
                           )}
                         />
@@ -304,7 +304,7 @@ export function ReviewLinkHistoryTable({
                           </p>
                         )}
                         {saveError && (
-                          <p className={cn("text-coquelicot-400 text-xs")}>{saveError}</p>
+                          <p className={cn("text-xs text-coquelicot-400")}>{saveError}</p>
                         )}
                         <div className={cn("flex gap-2")}>
                           <button
@@ -312,7 +312,7 @@ export function ReviewLinkHistoryTable({
                             disabled={saving || (!!editPhoneInput && !phoneValid)}
                             onClick={() => handleSave(entry)}
                             className={cn(
-                              "bg-moonstone-600 hover:bg-moonstone-700 rounded-lg px-3 py-1 text-xs font-semibold text-white transition-colors disabled:opacity-50",
+                              "rounded-lg bg-moonstone-600 px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-moonstone-700 disabled:opacity-50",
                             )}
                           >
                             {saving ? "Saving…" : "Save"}
@@ -339,7 +339,7 @@ export function ReviewLinkHistoryTable({
                     {entry.reviewed ? (
                       <span
                         className={cn(
-                          "text-moonstone-600 inline-flex items-center gap-1 text-xs font-medium",
+                          "inline-flex items-center gap-1 text-xs font-medium text-moonstone-600",
                         )}
                       >
                         Reviewed
@@ -358,7 +358,7 @@ export function ReviewLinkHistoryTable({
                             disabled={revoking}
                             onClick={() => handleRevoke(entry)}
                             className={cn(
-                              "text-coquelicot-500 hover:text-coquelicot-600 text-xs font-semibold transition-colors disabled:opacity-50",
+                              "text-xs font-semibold text-coquelicot-500 transition-colors hover:text-coquelicot-600 disabled:opacity-50",
                             )}
                           >
                             {revoking ? "Revoking…" : "Confirm revoke"}
@@ -381,14 +381,14 @@ export function ReviewLinkHistoryTable({
                           type="button"
                           onClick={() => setConfirmRevokeKey(key)}
                           className={cn(
-                            "hover:text-coquelicot-500 ml-auto text-xs text-slate-400 transition-colors",
+                            "ml-auto text-xs text-slate-400 transition-colors hover:text-coquelicot-500",
                           )}
                         >
                           Revoke
                         </button>
                       ))}
                     {revokeError && (
-                      <p className={cn("text-coquelicot-400 text-xs")}>{revokeError}</p>
+                      <p className={cn("text-xs text-coquelicot-400")}>{revokeError}</p>
                     )}
                   </div>
                 )}

@@ -38,7 +38,7 @@ export function AdminPageLayout({
             hamburger button (h-11 + 12px top inset = ~56px). Print drops
             padding so the invoice fills the page edge-to-edge. */}
         <div
-          className={cn(contentClassName ?? "px-4 pb-8 pt-16 sm:px-6 sm:pt-8 lg:pt-8", "print:p-0")}
+          className={cn(contentClassName ?? "px-4 pt-16 pb-8 sm:px-6 sm:pt-8 lg:pt-8", "print:p-0")}
         >
           {children}
         </div>

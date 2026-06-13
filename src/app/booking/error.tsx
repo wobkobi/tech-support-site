@@ -34,25 +34,25 @@ export default function BookingError({
       <FrostedSection maxWidth="56rem">
         <div className={cn("flex flex-col gap-6 sm:gap-8")}>
           <section className={cn(CARD, "text-center")}>
-            <div className={cn("text-coquelicot-500 mb-4 text-7xl font-extrabold sm:text-8xl")}>
+            <div className={cn("mb-4 text-7xl font-extrabold text-coquelicot-500 sm:text-8xl")}>
               Oops!
             </div>
 
             <h1
               className={cn(
-                "text-russian-violet mb-4 text-3xl font-extrabold sm:text-4xl md:text-5xl",
+                "mb-4 text-3xl font-extrabold text-russian-violet sm:text-4xl md:text-5xl",
               )}
             >
               Something went wrong with the booking page
             </h1>
 
-            <p className={cn("text-rich-black mb-6 text-base sm:text-lg md:text-xl")}>
+            <p className={cn("mb-6 text-base text-rich-black sm:text-lg md:text-xl")}>
               Nothing has been booked yet, so you haven&apos;t lost anything. Give it another go, or
               get in touch and I&apos;ll sort it out.
             </p>
 
             <p
-              className={cn("text-rich-black/70 wrap-break-word mb-6 text-sm italic sm:text-base")}
+              className={cn("mb-6 text-sm wrap-break-word text-rich-black/70 italic sm:text-base")}
               role="status"
               aria-live="polite"
             >

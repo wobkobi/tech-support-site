@@ -27,7 +27,7 @@ export function PartsSection({ parts, onPartsChange, show, onToggle }: Props): R
       <button
         onClick={onToggle}
         className={cn(
-          "text-russian-violet flex w-full items-center justify-between text-left text-sm font-semibold",
+          "flex w-full items-center justify-between text-left text-sm font-semibold text-russian-violet",
         )}
       >
         Parts / materials
@@ -55,7 +55,7 @@ export function PartsSection({ parts, onPartsChange, show, onToggle }: Props): R
                   })
                 }
                 className={cn(
-                  "focus:ring-russian-violet/30 col-span-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 sm:col-span-1 sm:py-2 sm:text-xs",
+                  "col-span-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none sm:col-span-1 sm:py-2 sm:text-xs",
                 )}
               />
               <input
@@ -72,7 +72,7 @@ export function PartsSection({ parts, onPartsChange, show, onToggle }: Props): R
                   })
                 }
                 className={cn(
-                  "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 sm:py-2 sm:text-xs",
+                  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none sm:py-2 sm:text-xs",
                 )}
               />
               <button
@@ -89,7 +89,7 @@ export function PartsSection({ parts, onPartsChange, show, onToggle }: Props): R
           <button
             onClick={() => onPartsChange((p) => [...p, { description: "", cost: 0 }])}
             className={cn(
-              "hover:text-russian-violet inline-flex h-11 items-center text-sm text-slate-500 underline sm:h-auto sm:text-xs",
+              "inline-flex h-11 items-center text-sm text-slate-500 underline hover:text-russian-violet sm:h-auto sm:text-xs",
             )}
           >
             + Add part

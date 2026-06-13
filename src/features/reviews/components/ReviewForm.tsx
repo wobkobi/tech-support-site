@@ -201,7 +201,7 @@ export default function ReviewFormProtected({
       {isVerified && (
         <div
           className={cn(
-            "border-moonstone-500/50 bg-moonstone-600/10 text-moonstone-600 flex items-center gap-2 rounded-lg border p-3 text-base",
+            "flex items-center gap-2 rounded-lg border border-moonstone-500/50 bg-moonstone-600/10 p-3 text-base text-moonstone-600",
           )}
         >
           <svg className={cn("h-5 w-5")} fill="currentColor" viewBox="0 0 20 20">
@@ -224,7 +224,7 @@ export default function ReviewFormProtected({
           role="alert"
           aria-live="assertive"
           className={cn(
-            "border-coquelicot-500/50 bg-coquelicot-500/10 text-rich-black rounded-lg border p-3 text-base",
+            "rounded-lg border border-coquelicot-500/50 bg-coquelicot-500/10 p-3 text-base text-rich-black",
           )}
         >
           <p className={cn("font-semibold")}>Please fix the following:</p>
@@ -272,11 +272,11 @@ export default function ReviewFormProtected({
 
       {/* Identity */}
       <div
-        className={cn("border-seasalt-400/80 bg-seasalt-900/60 space-y-4 rounded-xl border p-4")}
+        className={cn("space-y-4 rounded-xl border border-seasalt-400/80 bg-seasalt-900/60 p-4")}
       >
         {/* Name display options */}
         <div>
-          <p className={cn("text-rich-black mb-2 text-base font-semibold")}>
+          <p className={cn("mb-2 text-base font-semibold text-rich-black")}>
             How do you want to appear?
           </p>
           <div className={cn("grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-2")}>
@@ -287,7 +287,7 @@ export default function ReviewFormProtected({
                 disabled={loading}
                 onClick={() => setNameDisplay(opt.value)}
                 className={cn(
-                  "whitespace-nowrap rounded-lg border px-4 py-1.5 text-base font-medium transition-colors",
+                  "rounded-lg border px-4 py-1.5 text-base font-medium whitespace-nowrap transition-colors",
                   nameDisplay === opt.value
                     ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
                     : "border-seasalt-400/60 bg-seasalt text-rich-black hover:border-russian-violet/40",
@@ -300,9 +300,9 @@ export default function ReviewFormProtected({
         </div>
 
         {/* Live name preview */}
-        <p className={cn("text-rich-black/60 text-base")}>
+        <p className={cn("text-base text-rich-black/60")}>
           {"Appears as: "}
-          <span className={cn("text-russian-violet font-semibold")}>
+          <span className={cn("font-semibold text-russian-violet")}>
             {nameDisplay === "anonymous"
               ? "Anonymous"
               : (() => {
@@ -320,7 +320,7 @@ export default function ReviewFormProtected({
             <div>
               <label
                 htmlFor={firstId}
-                className={cn("text-rich-black mb-1 block text-base font-semibold")}
+                className={cn("mb-1 block text-base font-semibold text-rich-black")}
               >
                 First name <span className={cn("text-coquelicot-500")}>*</span>
               </label>
@@ -342,7 +342,7 @@ export default function ReviewFormProtected({
                 aria-describedby={errors.firstName ? `${firstId}-error` : undefined}
               />
               {errors.firstName && (
-                <p id={`${firstId}-error`} className={cn("text-coquelicot-500 mt-1 text-base")}>
+                <p id={`${firstId}-error`} className={cn("mt-1 text-base text-coquelicot-500")}>
                   {errors.firstName}
                 </p>
               )}
@@ -351,9 +351,9 @@ export default function ReviewFormProtected({
             <div>
               <label
                 htmlFor={lastId}
-                className={cn("text-rich-black mb-1 block text-base font-semibold")}
+                className={cn("mb-1 block text-base font-semibold text-rich-black")}
               >
-                Last name <span className={cn("text-rich-black/50 font-normal")}>(optional)</span>
+                Last name <span className={cn("font-normal text-rich-black/50")}>(optional)</span>
               </label>
               <input
                 id={lastId}
@@ -375,13 +375,13 @@ export default function ReviewFormProtected({
 
       {/* Optional contact details */}
       <div
-        className={cn("border-seasalt-400/80 bg-seasalt-900/60 space-y-3 rounded-xl border p-4")}
+        className={cn("space-y-3 rounded-xl border border-seasalt-400/80 bg-seasalt-900/60 p-4")}
       >
         <div>
-          <p className={cn("text-rich-black text-base font-semibold")}>
-            Stay in touch <span className={cn("text-rich-black/40 font-normal")}>(optional)</span>
+          <p className={cn("text-base font-semibold text-rich-black")}>
+            Stay in touch <span className={cn("font-normal text-rich-black/40")}>(optional)</span>
           </p>
-          <p className={cn("text-rich-black/50 mt-0.5 text-base")}>
+          <p className={cn("mt-0.5 text-base text-rich-black/50")}>
             Leave your number or email if you'd like me to be able to reach you - totally up to you.
           </p>
         </div>
@@ -390,7 +390,7 @@ export default function ReviewFormProtected({
           <div>
             <label
               htmlFor={phoneId}
-              className={cn("text-rich-black mb-1 block text-base font-semibold")}
+              className={cn("mb-1 block text-base font-semibold text-rich-black")}
             >
               Phone
             </label>
@@ -410,7 +410,7 @@ export default function ReviewFormProtected({
           <div>
             <label
               htmlFor={emailId}
-              className={cn("text-rich-black mb-1 block text-base font-semibold")}
+              className={cn("mb-1 block text-base font-semibold text-rich-black")}
             >
               Email
             </label>
@@ -430,23 +430,23 @@ export default function ReviewFormProtected({
       </div>
 
       {/* Review */}
-      <div className={cn("border-seasalt-400/80 bg-seasalt-900/60 rounded-xl border p-4")}>
+      <div className={cn("rounded-xl border border-seasalt-400/80 bg-seasalt-900/60 p-4")}>
         <div className={cn("flex items-baseline justify-between gap-3")}>
-          <label htmlFor={textId} className={cn("text-rich-black block text-base font-semibold")}>
+          <label htmlFor={textId} className={cn("block text-base font-semibold text-rich-black")}>
             Review <span className={cn("text-coquelicot-500")}>*</span>
           </label>
           <span
             className={cn(
               "tabular-nums transition-all duration-200",
               textCount > textMax
-                ? "text-coquelicot-500 text-sm font-bold"
+                ? "text-sm font-bold text-coquelicot-500"
                 : remaining <= 50
-                  ? "text-coquelicot-500 text-sm font-semibold"
+                  ? "text-sm font-semibold text-coquelicot-500"
                   : remaining <= 150
-                    ? "text-coquelicot-500/80 text-sm font-medium"
+                    ? "text-sm font-medium text-coquelicot-500/80"
                     : textCount > 0 && textCount < textMin
-                      ? "text-coquelicot-500/80 text-sm"
-                      : "text-rich-black/70 text-sm",
+                      ? "text-sm text-coquelicot-500/80"
+                      : "text-sm text-rich-black/70",
             )}
             aria-live="polite"
           >
@@ -461,7 +461,7 @@ export default function ReviewFormProtected({
           placeholder={`Share your experience (at least ${textMin} characters)...`}
           className={cn(
             "border-seasalt-400/60 bg-seasalt text-rich-black focus:ring-moonstone-500/50",
-            "min-h-35 mt-1 w-full rounded-md border px-3 py-2 outline-none focus:ring-2",
+            "mt-1 min-h-35 w-full rounded-md border px-3 py-2 outline-none focus:ring-2",
             errors.text && "border-coquelicot-500/60",
           )}
           value={text}
@@ -473,7 +473,7 @@ export default function ReviewFormProtected({
           aria-describedby={errors.text ? `${textId}-error` : undefined}
         />
         {errors.text && (
-          <p id={`${textId}-error`} className={cn("text-coquelicot-500 mt-1 text-base")}>
+          <p id={`${textId}-error`} className={cn("mt-1 text-base text-coquelicot-500")}>
             {errors.text}
           </p>
         )}

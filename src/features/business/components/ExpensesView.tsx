@@ -117,7 +117,7 @@ export function ExpensesView(): React.ReactElement {
         onSubmit={handleAdd}
         className={cn("mb-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}
       >
-        <h2 className={cn("text-russian-violet mb-4 text-sm font-semibold")}>Add expense</h2>
+        <h2 className={cn("mb-4 text-sm font-semibold text-russian-violet")}>Add expense</h2>
         <div className={cn("grid gap-3 sm:grid-cols-2")}>
           <div>
             <label className={cn("mb-1 block text-xs font-medium text-slate-600")}>Date</label>
@@ -127,7 +127,7 @@ export function ExpensesView(): React.ReactElement {
               value={form.date}
               onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))}
               className={cn(
-                "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
+                "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
               )}
             />
           </div>
@@ -139,7 +139,7 @@ export function ExpensesView(): React.ReactElement {
               value={form.supplier}
               onChange={(e) => setForm((p) => ({ ...p, supplier: e.target.value }))}
               className={cn(
-                "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
+                "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
               )}
             />
           </div>
@@ -153,7 +153,7 @@ export function ExpensesView(): React.ReactElement {
               value={form.description}
               onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
               className={cn(
-                "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
+                "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
               )}
             />
           </div>
@@ -163,7 +163,7 @@ export function ExpensesView(): React.ReactElement {
               value={form.category}
               onChange={(e) => setForm((p) => ({ ...p, category: e.target.value }))}
               className={cn(
-                "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
+                "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
               )}
             >
               {EXPENSE_CATEGORIES.map((c) => (
@@ -183,7 +183,7 @@ export function ExpensesView(): React.ReactElement {
               value={form.amountIncl}
               onChange={(e) => setForm((p) => ({ ...p, amountIncl: e.target.value }))}
               className={cn(
-                "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
+                "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
               )}
             />
           </div>
@@ -193,7 +193,7 @@ export function ExpensesView(): React.ReactElement {
               value={form.gstRate}
               onChange={(e) => setForm((p) => ({ ...p, gstRate: e.target.value }))}
               className={cn(
-                "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
+                "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
               )}
             >
               <option value="0.15">15%</option>
@@ -213,7 +213,7 @@ export function ExpensesView(): React.ReactElement {
               value={form.method}
               onChange={(e) => setForm((p) => ({ ...p, method: e.target.value }))}
               className={cn(
-                "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
+                "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
               )}
             >
               {PAYMENT_METHODS.map((m) => (
@@ -230,7 +230,7 @@ export function ExpensesView(): React.ReactElement {
               value={form.notes}
               onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
               className={cn(
-                "focus:ring-russian-violet/30 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2",
+                "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
               )}
             />
           </div>
@@ -252,7 +252,7 @@ export function ExpensesView(): React.ReactElement {
           type="submit"
           disabled={saving}
           className={cn(
-            "bg-russian-violet mt-4 rounded-lg px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50",
+            "mt-4 rounded-lg bg-russian-violet px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50",
           )}
         >
           {saving ? "Saving..." : "Add expense"}
@@ -346,15 +346,15 @@ export function ExpensesView(): React.ReactElement {
             <tbody className={cn("divide-y divide-slate-100")}>
               {entries.map((e) => (
                 <tr key={e.id} className={cn("hover:bg-slate-50")}>
-                  <td className={cn("whitespace-nowrap px-4 py-3 text-xs text-slate-500")}>
+                  <td className={cn("px-4 py-3 text-xs whitespace-nowrap text-slate-500")}>
                     {new Date(e.date).toLocaleDateString("en-NZ")}
                   </td>
                   <td className={cn("px-4 py-3 font-medium text-slate-700")}>{e.supplier}</td>
                   <td className={cn("px-4 py-3 text-xs text-slate-500")}>{e.category}</td>
-                  <td className={cn("whitespace-nowrap px-4 py-3 text-slate-700")}>
+                  <td className={cn("px-4 py-3 whitespace-nowrap text-slate-700")}>
                     {formatNZD(e.amountIncl)}
                   </td>
-                  <td className={cn("whitespace-nowrap px-4 py-3 font-semibold text-slate-700")}>
+                  <td className={cn("px-4 py-3 font-semibold whitespace-nowrap text-slate-700")}>
                     {formatNZD(e.amountExcl)}
                   </td>
                   <td className={cn("px-4 py-3")}>

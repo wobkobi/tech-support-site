@@ -71,3 +71,6 @@ next-env.d.ts
 # generated docs & analysis artifacts
 /docs/
 google-tokens.txt
+
+# local reference material
+To the Point - Template.xlsx

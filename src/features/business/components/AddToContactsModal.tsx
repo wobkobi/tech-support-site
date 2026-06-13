@@ -116,7 +116,7 @@ export function AddToContactsModal({
         <div
           className={cn("flex items-center justify-between border-b border-slate-200 px-5 py-4")}
         >
-          <h2 className={cn("text-russian-violet text-base font-semibold")}>Add to contacts?</h2>
+          <h2 className={cn("text-base font-semibold text-russian-violet")}>Add to contacts?</h2>
           <button
             type="button"
             onClick={() => onClose(null)}
@@ -137,7 +137,7 @@ export function AddToContactsModal({
             }
           </p>
           <p className={cn("text-xs text-slate-500")}>{email}</p>
-          {error && <p className={cn("text-coquelicot-500 text-xs")}>{error}</p>}
+          {error && <p className={cn("text-xs text-coquelicot-500")}>{error}</p>}
         </div>
 
         <div className={cn("flex justify-end gap-2 border-t border-slate-200 px-5 py-3")}>
@@ -156,7 +156,7 @@ export function AddToContactsModal({
             onClick={() => void handleConfirm()}
             disabled={saving}
             className={cn(
-              "bg-moonstone-600 hover:bg-moonstone-700 rounded-lg px-4 py-2 text-sm font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+              "rounded-lg bg-moonstone-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-moonstone-700 disabled:cursor-not-allowed disabled:opacity-50",
             )}
           >
             {saving ? "Adding..." : "Yes, add"}

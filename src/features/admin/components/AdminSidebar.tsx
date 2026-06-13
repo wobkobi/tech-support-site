@@ -201,7 +201,7 @@ export function AdminSidebar({ current }: AdminSidebarProps): React.ReactElement
         aria-label="Open menu"
         aria-expanded={open}
         className={cn(
-          "bg-russian-violet fixed left-3 top-3 z-30 inline-flex h-11 w-11 items-center justify-center rounded-lg text-white shadow-lg lg:hidden print:hidden",
+          "fixed top-3 left-3 z-30 inline-flex h-11 w-11 items-center justify-center rounded-lg bg-russian-violet text-white shadow-lg lg:hidden print:hidden",
         )}
       >
         <FaBars className={cn("text-base")} />
@@ -219,7 +219,7 @@ export function AdminSidebar({ current }: AdminSidebarProps): React.ReactElement
 
       <aside
         className={cn(
-          "bg-russian-violet fixed inset-y-0 left-0 z-40 flex w-56 flex-col lg:translate-x-0 print:hidden",
+          "fixed inset-y-0 left-0 z-40 flex w-56 flex-col bg-russian-violet lg:translate-x-0 print:hidden",
           // `.app-admin-drawer` (globals.css) owns the translate transition.
           "app-admin-drawer",
           open ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
@@ -228,7 +228,7 @@ export function AdminSidebar({ current }: AdminSidebarProps): React.ReactElement
         {/* Brand */}
         <div className={cn("flex items-start justify-between border-b border-white/10 px-5 py-5")}>
           <div>
-            <p className={cn("text-xs font-semibold uppercase tracking-widest text-white/40")}>
+            <p className={cn("text-xs font-semibold tracking-widest text-white/40 uppercase")}>
               Admin
             </p>
             <p className={cn("mt-0.5 text-sm font-bold text-white")}>To The Point</p>
@@ -267,7 +267,7 @@ export function AdminSidebar({ current }: AdminSidebarProps): React.ReactElement
 
           <p
             className={cn(
-              "mb-1 mt-4 px-3 text-xs font-semibold uppercase tracking-widest text-white/30",
+              "mt-4 mb-1 px-3 text-xs font-semibold tracking-widest text-white/30 uppercase",
             )}
           >
             Business

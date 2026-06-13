@@ -28,7 +28,7 @@ export default function HomeLoading(): React.ReactElement {
         >
           {/* Hero */}
           <section className={cn("flex flex-col items-center text-center")}>
-            <Bone className={cn("w-70 sm:w-95 md:w-120 lg:w-140 mb-6 h-24 sm:h-28")} />
+            <Bone className={cn("mb-6 h-24 w-70 sm:h-28 sm:w-95 md:w-120 lg:w-140")} />
             <Bone className={cn("mb-4 h-9 w-full max-w-3xl sm:h-10")} />
             <Bone className={cn("mb-8 h-6 w-full max-w-2xl")} />
             <div className={cn("flex flex-wrap items-center justify-center gap-4")}>
@@ -61,7 +61,7 @@ export default function HomeLoading(): React.ReactElement {
                 <li
                   key={i}
                   className={cn(
-                    "border-seasalt-400/60 bg-seasalt-800 flex items-center gap-3 rounded-xl border p-3 shadow-sm",
+                    "flex items-center gap-3 rounded-xl border border-seasalt-400/60 bg-seasalt-800 p-3 shadow-sm",
                   )}
                 >
                   <Bone className={cn("size-12 shrink-0 rounded-lg sm:size-14")} />

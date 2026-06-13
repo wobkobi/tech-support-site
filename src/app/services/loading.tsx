@@ -42,7 +42,7 @@ export default function ServicesLoading(): React.ReactElement {
                 <div
                   key={i}
                   className={cn(
-                    "border-seasalt-400/60 bg-seasalt-800 rounded-lg border p-3 shadow-sm",
+                    "rounded-lg border border-seasalt-400/60 bg-seasalt-800 p-3 shadow-sm",
                   )}
                 >
                   <div className={cn("mb-2 flex items-center gap-2")}>

@@ -204,8 +204,8 @@ export default function AddressAutocomplete({
         aria-describedby={ariaDescribedBy}
         aria-invalid={ariaInvalid}
         className={cn(
-          "border-seasalt-400/80 bg-seasalt text-rich-black w-full rounded-md border px-4 py-3 text-base",
-          "focus:border-russian-violet focus:ring-russian-violet/30 focus:outline-none focus:ring-1",
+          "w-full rounded-md border border-seasalt-400/80 bg-seasalt px-4 py-3 text-base text-rich-black",
+          "focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
           showWarning && "border-yellow-500/60",
           ariaInvalid && "border-coquelicot-500/60",
         )}

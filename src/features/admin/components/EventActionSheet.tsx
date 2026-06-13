@@ -298,7 +298,7 @@ export function EventActionSheet({
                   target="_blank"
                   rel="noreferrer"
                   className={cn(
-                    "bg-russian-violet/10 text-russian-violet hover:bg-russian-violet/20 inline-flex h-11 items-center justify-center rounded-lg px-4 text-sm font-semibold",
+                    "inline-flex h-11 items-center justify-center rounded-lg bg-russian-violet/10 px-4 text-sm font-semibold text-russian-violet hover:bg-russian-violet/20",
                   )}
                 >
                   Reschedule
@@ -313,7 +313,7 @@ export function EventActionSheet({
               onClick={() => void handleResendReview()}
               disabled={busy}
               className={cn(
-                "bg-moonstone-600/15 text-moonstone-700 hover:bg-moonstone-600/25 inline-flex h-11 items-center justify-center rounded-lg px-4 text-sm font-semibold disabled:opacity-50",
+                "inline-flex h-11 items-center justify-center rounded-lg bg-moonstone-600/15 px-4 text-sm font-semibold text-moonstone-700 hover:bg-moonstone-600/25 disabled:opacity-50",
               )}
             >
               Send review email

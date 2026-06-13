@@ -30,7 +30,7 @@ interface Props {
  */
 function SectionHeading({ children }: { children: React.ReactNode }): React.ReactElement {
   return (
-    <h3 className={cn("text-russian-violet mt-6 text-xs font-bold uppercase tracking-wide")}>
+    <h3 className={cn("mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase")}>
       {children}
     </h3>
   );
@@ -235,7 +235,7 @@ export function IdentityTab({ initial, defaults }: Props): React.ReactElement {
           onClick={() => void form.save()}
           disabled={!dirty || saving}
           className={cn(
-            "bg-russian-violet rounded-lg px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50",
+            "rounded-lg bg-russian-violet px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50",
           )}
         >
           {saving ? "Saving..." : "Save changes"}
