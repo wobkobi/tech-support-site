@@ -8,7 +8,7 @@ const config: Config = {
     "prettier-plugin-packagejson",
     "prettier-plugin-tailwindcss",
   ],
-  tailwindConfig: "./tailwind.config.ts",
+  tailwindStylesheet: "./src/app/globals.css",
 
   printWidth: 100,
   tabWidth: 2,
