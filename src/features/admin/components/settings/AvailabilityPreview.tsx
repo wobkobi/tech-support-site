@@ -87,7 +87,7 @@ export function AvailabilityPreview({ config }: Props): React.ReactElement {
                     {fmtHour(d.open)}-{fmtHour(d.close)}
                   </p>
                   {d.break && (
-                    <p className={cn("text-[10px] text-slate-400")}>
+                    <p className={cn("text-[11px] text-slate-400")}>
                       break {fmtHour(d.break.start)}-{fmtHour(d.break.end)}
                     </p>
                   )}
