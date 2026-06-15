@@ -463,7 +463,7 @@ export function validateBookingRequest(
   calendarEvents: Array<{ id: string; start: string; end: string }>,
   now: Date,
   config: AvailabilityConfig,
-): { valid: boolean; error?: string } {
+): { valid: true } | { valid: false; error: string } {
   const [year, month, day] = dateKey.split("-").map(Number);
   if (!year || !month || !day) {
     return { valid: false, error: "Invalid date format" };
