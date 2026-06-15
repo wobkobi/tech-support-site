@@ -28,6 +28,7 @@ import {
   sendCustomerBookingConfirmation,
   sendOwnerBookingNotification,
 } from "@/features/reviews/lib/email";
+import { errorResponse } from "@/shared/lib/api-response";
 import { isValidPhone, toE164NZ } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
@@ -122,7 +123,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       { requireEmail: true },
     );
     if (!payloadCheck.valid) {
-      return NextResponse.json({ ok: false, error: payloadCheck.error }, { status: 400 });
+      return errorResponse(payloadCheck.error, 400);
     }
 
     const now = new Date();
@@ -184,13 +185,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
 
     if (!validation.valid) {
-      return NextResponse.json({ ok: false, error: validation.error }, { status: 400 });
+      return errorResponse(validation.error, 400);
     }
 
     // Resolve the slot from the (already-validated) hour label + live durations.
     const startHour = parseHourLabel(timeOfDay);
     if (startHour === null) {
-      return NextResponse.json({ ok: false, error: "Invalid time or duration" }, { status: 400 });
+      return errorResponse("Invalid time or duration", 400);
     }
     const durationMinutes = duration === "short" ? config.durations.short : config.durations.long;
 

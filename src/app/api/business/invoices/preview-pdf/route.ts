@@ -1,8 +1,9 @@
 // src/app/api/business/invoices/preview-pdf/route.ts
 import { generateInvoicePdf } from "@/features/business/lib/invoice-pdf";
 import type { Invoice, LineItem } from "@/features/business/types/business";
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 
 // Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
 export const maxDuration = 60;
@@ -33,12 +34,12 @@ interface PreviewPayload {
  */
 export async function POST(request: NextRequest): Promise<Response> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   const body = (await request.json()) as PreviewPayload;
   if (!body.number || !body.clientName) {
-    return NextResponse.json({ error: "number and clientName are required" }, { status: 400 });
+    return errorResponse("number and clientName are required", 400);
   }
 
   // Build the minimum Invoice shape generateInvoicePdf needs. Status is

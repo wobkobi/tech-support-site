@@ -7,6 +7,7 @@
  */
 
 import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-create";
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { toE164NZ } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
@@ -39,7 +40,7 @@ function parseNotes(notes: string | null): { phone: string | null; address: stri
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   const mergedByEmail = new Map<

@@ -1,4 +1,5 @@
 import { getInvoiceCounter, setInvoiceCounter } from "@/features/business/lib/google-sheets";
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -12,14 +13,14 @@ export const maxDuration = 60;
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
   try {
     const data = await getInvoiceCounter();
     return NextResponse.json({ ok: true, ...data });
   } catch (err) {
     console.error("[sheets/invoice-counter] GET failed:", err);
-    return NextResponse.json({ error: "Sheet unavailable" }, { status: 503 });
+    return errorResponse("Sheet unavailable", 503);
   }
 }
 
@@ -30,7 +31,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
   try {
     const body = await request.json();
@@ -45,6 +46,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: true, written: newCount });
   } catch (err) {
     console.error("[sheets/invoice-counter] POST failed:", err);
-    return NextResponse.json({ error: "Sheet write failed" }, { status: 503 });
+    return errorResponse("Sheet write failed", 503);
   }
 }

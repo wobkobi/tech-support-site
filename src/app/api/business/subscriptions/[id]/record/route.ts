@@ -4,6 +4,7 @@ import {
   formatUTCDDMMYYYY,
 } from "@/features/business/lib/business";
 import { getSheetId, getSheetsClient } from "@/features/business/lib/google-sheets";
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
@@ -21,14 +22,14 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   const { id } = await params;
 
   const sub = await prisma.subscription.findUnique({ where: { id } });
   if (!sub) {
-    return NextResponse.json({ error: "Subscription not found" }, { status: 404 });
+    return errorResponse("Subscription not found", 404);
   }
 
   const today = new Date();

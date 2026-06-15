@@ -1,3 +1,4 @@
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
@@ -64,7 +65,7 @@ const DEFAULTS = [
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   const existing = await prisma.rateConfig.findMany({ select: { label: true } });
@@ -107,14 +108,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   const body = await request.json();
   const { label, ratePerHour, flatRate, hourlyDelta, percentDelta, unit, isDefault } = body;
 
   if (!label || typeof label !== "string") {
-    return NextResponse.json({ error: "label is required" }, { status: 400 });
+    return errorResponse("label is required", 400);
   }
 
   if (isDefault) {
@@ -144,7 +145,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
  */
 export async function DELETE(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
   await prisma.rateConfig.deleteMany({});
   await prisma.rateConfig.createMany({ data: DEFAULTS });

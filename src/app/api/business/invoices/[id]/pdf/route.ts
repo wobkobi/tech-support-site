@@ -1,8 +1,9 @@
 // src/app/api/business/invoices/[id]/pdf/route.ts
 import { generateInvoicePdf } from "@/features/business/lib/invoice-pdf";
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 
 // Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
 export const maxDuration = 60;
@@ -22,13 +23,13 @@ export async function GET(
   ctx: { params: Promise<{ id: string }> },
 ): Promise<Response> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   const { id } = await ctx.params;
   const invoice = await prisma.invoice.findUnique({ where: { id } });
   if (!invoice) {
-    return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+    return errorResponse("Invoice not found", 404);
   }
 
   const pdfBytes = await generateInvoicePdf({

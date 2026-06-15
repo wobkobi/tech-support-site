@@ -12,6 +12,7 @@ import {
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { deleteBookingEvent, SCHEDULE_CALENDAR_TAG } from "@/features/calendar/lib/google-calendar";
 import { sendCustomerReviewRequest } from "@/features/reviews/lib/email";
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { toE164NZ } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
@@ -51,7 +52,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   const { id } = await params;
@@ -60,7 +61,7 @@ export async function PATCH(
   // Load the booking
   const booking = await prisma.booking.findUnique({ where: { id } });
   if (!booking) {
-    return NextResponse.json({ error: "Booking not found." }, { status: 404 });
+    return errorResponse("Booking not found.", 404);
   }
 
   // Sparse update: only fields present in the body get written.
@@ -215,14 +216,14 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   const { id } = await params;
 
   const booking = await prisma.booking.findUnique({ where: { id } });
   if (!booking) {
-    return NextResponse.json({ error: "Booking not found." }, { status: 404 });
+    return errorResponse("Booking not found.", 404);
   }
 
   if (booking.calendarEventId) {

@@ -8,7 +8,11 @@
  */
 
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
-import { validateEmail } from "@/features/booking/lib/booking";
+import {
+  combineUnitAndAddress,
+  splitUnitFromAddress,
+  validateEmail,
+} from "@/features/booking/lib/booking";
 import { EmailInput } from "@/shared/components/EmailInput";
 import { PhoneInput } from "@/shared/components/PhoneInput";
 import { cn } from "@/shared/lib/cn";
@@ -52,6 +56,10 @@ export function ManualBookingModal({
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
+  // Unit kept separate from the street address, same as the public booking form:
+  // Google Places autocomplete predicts the street but rarely the apartment/unit,
+  // so without its own box the unit gets lost.
+  const [unit, setUnit] = useState("");
   const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
   const [durationMinutes, setDurationMinutes] = useState<60 | 120>(60);
@@ -137,7 +145,7 @@ export function ManualBookingModal({
           name: name.trim(),
           email: email.trim().toLowerCase(),
           phone: phoneE164 || null,
-          address: address.trim() || null,
+          address: combineUnitAndAddress(unit, address) || null,
           notes: notes.trim(),
           startAt: startAt.toISOString(),
           durationMinutes,
@@ -270,7 +278,13 @@ export function ManualBookingModal({
                             setName(c.name);
                             setEmail(c.email ?? "");
                             setPhone(c.phone ? formatNZPhone(c.phone) : "");
-                            setAddress(c.address ?? "");
+                            // Split the stored address back into unit + street so the
+                            // dedicated unit box stays populated on edit.
+                            {
+                              const split = splitUnitFromAddress(c.address ?? "");
+                              setUnit(split.unit);
+                              setAddress(split.rest);
+                            }
                             setNameListOpen(false);
                           }}
                           className={cn(
@@ -309,15 +323,31 @@ export function ManualBookingModal({
             </Field>
           </div>
 
-          <Field label="Address" htmlFor="mb-address">
-            <AddressAutocomplete
-              id="mb-address"
-              value={address}
-              onChange={setAddress}
-              placeholder="Street address"
-              maxLength={250}
-            />
-          </Field>
+          <div className={cn("grid grid-cols-3 gap-3")}>
+            <Field label="Apt / Unit" htmlFor="mb-unit">
+              <input
+                id="mb-unit"
+                type="text"
+                value={unit}
+                onChange={(e) => setUnit(e.target.value)}
+                autoComplete="off"
+                maxLength={20}
+                placeholder="12"
+                className={textInputClasses}
+              />
+            </Field>
+            <div className={cn("col-span-2")}>
+              <Field label="Address" htmlFor="mb-address">
+                <AddressAutocomplete
+                  id="mb-address"
+                  value={address}
+                  onChange={setAddress}
+                  placeholder="Street address"
+                  maxLength={250}
+                />
+              </Field>
+            </div>
+          </div>
 
           <Field label="Notes" htmlFor="mb-notes">
             <textarea

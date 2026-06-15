@@ -7,6 +7,7 @@
  */
 
 import { cn } from "@/shared/lib/cn";
+import { formatDateTimeShort } from "@/shared/lib/date-format";
 import type React from "react";
 import { useEffect, useState } from "react";
 
@@ -80,21 +81,15 @@ function formatExpiry(expiresAt: string | null): string {
  * @returns Formatted time range string.
  */
 function formatEventTime(start: string, end: string): string {
-  const fmt = new Intl.DateTimeFormat("en-NZ", {
-    timeZone: "Pacific/Auckland",
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
-  return `${fmt.format(new Date(start))} \u2013 ${new Intl.DateTimeFormat("en-NZ", {
+  // Start uses the canonical "Mon 11 May, 2:30 pm" formatter; the end is
+  // time-only (no canonical formatter for that) so it stays inline.
+  const endTime = new Intl.DateTimeFormat("en-NZ", {
     timeZone: "Pacific/Auckland",
     hour: "numeric",
     minute: "2-digit",
     hour12: true,
-  }).format(new Date(end))}`;
+  }).format(new Date(end));
+  return `${formatDateTimeShort(start)} \u2013 ${endTime}`;
 }
 
 interface TravelBlockAdminListProps {

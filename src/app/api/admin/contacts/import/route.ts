@@ -5,6 +5,7 @@
  */
 
 import { importFromGoogleContacts } from "@/features/contacts/lib/google-contacts";
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -20,7 +21,7 @@ export const maxDuration = 60;
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   try {
@@ -31,6 +32,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Generic message to the client; the OAuth / Google API detail goes only
     // to the server log so a transient Google failure can't leak credential
     // shape or integration internals.
-    return NextResponse.json({ ok: false, error: "Contact import failed." }, { status: 500 });
+    return errorResponse("Contact import failed.", 500);
   }
 }

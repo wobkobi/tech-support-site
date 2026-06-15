@@ -6,6 +6,7 @@
  */
 
 import { HOME_REGION, NZ_REGION } from "@/features/business/lib/pricing-policy";
+import { errorResponse } from "@/shared/lib/api-response";
 import { isCronAuthorized } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { google } from "googleapis";
@@ -40,7 +41,7 @@ function regionFor(description: string | null | undefined): string | null {
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!isCronAuthorized(request)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   const apiKey = process.env.GOOGLE_MAPS_SERVER_KEY ?? process.env.GOOGLE_MAPS_API_KEY;

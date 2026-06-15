@@ -6,6 +6,7 @@
 
 import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-create";
 import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { toE164NZ } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
@@ -20,7 +21,7 @@ import { NextRequest, NextResponse } from "next/server";
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   const contacts = await prisma.contact.findMany({
@@ -47,7 +48,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   const body = (await request.json().catch(() => null)) as {
@@ -59,12 +60,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   } | null;
 
   if (!body || !body.name?.trim() || !body.email?.trim()) {
-    return NextResponse.json({ error: "Name and email are required" }, { status: 400 });
+    return errorResponse("Name and email are required", 400);
   }
 
   const email = body.email.trim().toLowerCase();
   if (!email.includes("@")) {
-    return NextResponse.json({ error: "Invalid email" }, { status: 400 });
+    return errorResponse("Invalid email", 400);
   }
 
   const phoneE164 = body.phone ? toE164NZ(body.phone) || null : null;

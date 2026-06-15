@@ -8,6 +8,7 @@ import {
 } from "@/features/business/lib/constants";
 import type { Subscription } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
+import { formatDateShort } from "@/shared/lib/date-format";
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
 
@@ -39,19 +40,6 @@ function emptyForm(): FormState {
     nextDue: todayISO(),
     notes: "",
   };
-}
-
-/**
- * Formats an ISO date string as a human-readable NZ date (e.g. "03 May 2026").
- * @param iso - ISO date string
- * @returns Formatted date string
- */
-function formatNextDue(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-NZ", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
 }
 
 /**
@@ -474,7 +462,7 @@ export function SubscriptionsView(): React.ReactElement {
                             : "text-slate-500",
                       )}
                     >
-                      Due {formatNextDue(sub.nextDue)}
+                      Due {formatDateShort(sub.nextDue)}
                       {overdue && " (overdue)"}
                     </span>
                     <button
@@ -582,7 +570,7 @@ export function SubscriptionsView(): React.ReactElement {
                               : "text-slate-600",
                         )}
                       >
-                        {formatNextDue(sub.nextDue)}
+                        {formatDateShort(sub.nextDue)}
                         {overdue && <span className={cn("ml-1 text-xs")}>(overdue)</span>}
                       </td>
                       <td className={cn("px-4 py-3")}>

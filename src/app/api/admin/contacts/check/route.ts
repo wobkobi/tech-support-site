@@ -5,6 +5,7 @@
  * "Add to contacts?" popup to decide whether to prompt the operator.
  */
 
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
@@ -18,7 +19,7 @@ import { NextRequest, NextResponse } from "next/server";
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   const email = request.nextUrl.searchParams.get("email")?.trim().toLowerCase() ?? "";

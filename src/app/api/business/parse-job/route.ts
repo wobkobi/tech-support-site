@@ -11,6 +11,7 @@ import type {
   ParsedRange,
   RateConfig,
 } from "@/features/business/types/business";
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
@@ -156,7 +157,7 @@ function findTemplateByTags<T extends { device: string | null; action: string | 
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   // Parse and validate body
@@ -164,10 +165,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const { input, answers } = body as { input: unknown; answers?: Record<string, unknown> };
 
   if (!input || typeof input !== "string" || input.trim().length === 0) {
-    return NextResponse.json({ error: "input is required" }, { status: 400 });
+    return errorResponse("input is required", 400);
   }
   if (input.length > 1000) {
-    return NextResponse.json({ error: "input must be 1000 characters or fewer" }, { status: 400 });
+    return errorResponse("input must be 1000 characters or fewer", 400);
   }
 
   // Whitelist the clarification answer keys to the IDs the model is allowed to
@@ -442,6 +443,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: true, result: parsed });
   } catch (err) {
     console.error("[parse-job] failed:", err);
-    return NextResponse.json({ error: "Could not parse job description" }, { status: 422 });
+    return errorResponse("Could not parse job description", 422);
   }
 }

@@ -6,6 +6,7 @@
  * minutes so the next refresh recalculates.
  */
 
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { TransportMode } from "@prisma/client";
@@ -26,7 +27,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   const { id } = await params;
@@ -39,7 +40,7 @@ export async function PATCH(
 
   const rawMode = body.transportMode;
   if (rawMode !== undefined && !VALID_MODES.has(rawMode)) {
-    return NextResponse.json({ error: "Invalid transport mode" }, { status: 400 });
+    return errorResponse("Invalid transport mode", 400);
   }
   const mode = rawMode as TransportMode | undefined;
 
@@ -49,13 +50,13 @@ export async function PATCH(
   const hasIgnored = typeof body.ignored === "boolean";
 
   if (!hasMode && !hasOrigin && !hasBackDest && !hasIgnored) {
-    return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
+    return errorResponse("Nothing to update", 400);
   }
 
   try {
     const block = await prisma.travelBlock.findUnique({ where: { id } });
     if (!block) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
+      return errorResponse("Not found", 404);
     }
 
     await prisma.travelBlock.update({
@@ -125,6 +126,6 @@ export async function PATCH(
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("[travel/[id]] Error:", error);
-    return NextResponse.json({ ok: false, error: "Update failed" }, { status: 500 });
+    return errorResponse("Update failed", 500);
   }
 }

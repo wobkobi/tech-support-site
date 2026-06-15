@@ -5,6 +5,7 @@
  */
 
 import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -26,7 +27,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   const { id } = await params;
@@ -36,6 +37,6 @@ export async function POST(
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error(`[admin/contacts/${id}/sync-google] POST error:`, error);
-    return NextResponse.json({ ok: false, error: "Sync failed" });
+    return errorResponse("Sync failed", 200);
   }
 }

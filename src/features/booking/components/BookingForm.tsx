@@ -9,6 +9,7 @@
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import {
   BOOKING_FIELD_LIMITS,
+  combineUnitAndAddress,
   splitUnitFromAddress,
   SUB_SLOT_MINUTES,
   validateEmail,
@@ -72,20 +73,6 @@ export interface BookingFormInitialValues {
   meetingType: "in-person" | "remote" | "";
   address: string;
   notes: string;
-}
-
-/**
- * Combines a unit number and a street-and-rest back into the saved address
- * string ("12/160 Kepa Road Orakei"). Returns just the rest when no unit is
- * present, so non-apartment addresses are unchanged.
- * @param unit - Apartment / unit number, may be empty.
- * @param rest - Street address + suburb.
- * @returns Combined address string suitable for persistence.
- */
-function combineUnitAndAddress(unit: string, rest: string): string {
-  const u = unit.trim();
-  const r = rest.trim();
-  return u ? `${u}/${r}` : r;
 }
 
 export interface BookingFormProps {

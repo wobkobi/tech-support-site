@@ -4,6 +4,7 @@ import { calcGstFromInclusive, formatNZD, todayISO } from "@/features/business/l
 import { EXPENSE_CATEGORIES, PAYMENT_METHODS } from "@/features/business/lib/constants";
 import type { ExpenseEntry } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
+import { formatDateShort } from "@/shared/lib/date-format";
 import type React from "react";
 import { useEffect, useState } from "react";
 
@@ -302,9 +303,7 @@ export function ExpensesView(): React.ReactElement {
                   "mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs",
                 )}
               >
-                <span className={cn("text-slate-500")}>
-                  {new Date(e.date).toLocaleDateString("en-NZ")}
-                </span>
+                <span className={cn("text-slate-500")}>{formatDateShort(e.date)}</span>
                 <button
                   onClick={() => handleDelete(e.id)}
                   className={cn(
@@ -347,7 +346,7 @@ export function ExpensesView(): React.ReactElement {
               {entries.map((e) => (
                 <tr key={e.id} className={cn("hover:bg-slate-50")}>
                   <td className={cn("px-4 py-3 text-xs whitespace-nowrap text-slate-500")}>
-                    {new Date(e.date).toLocaleDateString("en-NZ")}
+                    {formatDateShort(e.date)}
                   </td>
                   <td className={cn("px-4 py-3 font-medium text-slate-700")}>{e.supplier}</td>
                   <td className={cn("px-4 py-3 text-xs text-slate-500")}>{e.category}</td>

@@ -5,6 +5,7 @@
  */
 
 import { sendCustomerReviewRequest } from "@/features/reviews/lib/email";
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
@@ -28,7 +29,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   const { id } = await params;
@@ -39,7 +40,7 @@ export async function POST(
   });
 
   if (!booking) {
-    return NextResponse.json({ error: "Booking not found." }, { status: 404 });
+    return errorResponse("Booking not found.", 404);
   }
 
   await sendCustomerReviewRequest(booking);

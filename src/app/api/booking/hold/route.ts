@@ -6,6 +6,7 @@
 
 import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
 import { createBookingEvent } from "@/features/calendar/lib/google-calendar";
+import { errorResponse } from "@/shared/lib/api-response";
 import { toE164NZ } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
@@ -71,13 +72,13 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreateBoo
     const { name, email, phone, notes, dateKey, slotStart, slotEnd, meetingType, address } = body;
 
     if (!name?.trim()) {
-      return NextResponse.json({ ok: false, error: "Name is required." }, { status: 400 });
+      return errorResponse("Name is required.", 400);
     }
     if (!email?.trim() || !email.includes("@")) {
-      return NextResponse.json({ ok: false, error: "Valid email is required." }, { status: 400 });
+      return errorResponse("Valid email is required.", 400);
     }
     if (!dateKey || !slotStart || !slotEnd) {
-      return NextResponse.json({ ok: false, error: "Please select a time slot." }, { status: 400 });
+      return errorResponse("Please select a time slot.", 400);
     }
     if (!meetingType) {
       return NextResponse.json(
@@ -109,7 +110,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreateBoo
     const [endHour, endMinute] = slotEnd.split(":").map(Number);
 
     if (!year || !month || !day) {
-      return NextResponse.json({ ok: false, error: "Invalid date format." }, { status: 400 });
+      return errorResponse("Invalid date format.", 400);
     }
 
     // Get dynamic UTC offset for this date (handles NZDT/NZST)
@@ -120,7 +121,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<CreateBoo
     const endAt = new Date(Date.UTC(year, month - 1, day, endHour - utcOffset, endMinute, 0));
 
     if (startAt >= endAt) {
-      return NextResponse.json({ ok: false, error: "Invalid time range." }, { status: 400 });
+      return errorResponse("Invalid time range.", 400);
     }
 
     if (startAt < now) {

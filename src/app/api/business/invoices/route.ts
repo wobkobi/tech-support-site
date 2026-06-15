@@ -6,6 +6,7 @@ import {
 } from "@/features/business/lib/invoice-numbering";
 import { extractYearCode, generateInvoicePdf } from "@/features/business/lib/invoice-pdf";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { prisma } from "@/shared/lib/prisma";
@@ -18,7 +19,7 @@ import { NextRequest, NextResponse } from "next/server";
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   const invoices = await prisma.invoice.findMany({ orderBy: { issueDate: "desc" } });
@@ -32,7 +33,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   const body = await request.json();
@@ -66,7 +67,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   };
 
   if (!clientName || !clientEmail || !Array.isArray(lineItems)) {
-    return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    return errorResponse("Missing required fields", 400);
   }
 
   // Default issue + due dates server-side so the calculator's direct-save path

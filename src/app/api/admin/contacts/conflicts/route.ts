@@ -4,6 +4,7 @@
  * @description Admin endpoint listing pending Google Contacts sync conflicts.
  */
 
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
@@ -17,7 +18,7 @@ import { NextRequest, NextResponse } from "next/server";
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   try {
@@ -52,6 +53,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     });
   } catch (err) {
     console.error("[admin/contacts/conflicts] GET error:", err);
-    return NextResponse.json({ error: "Failed to load conflicts" }, { status: 500 });
+    return errorResponse("Failed to load conflicts", 500);
   }
 }

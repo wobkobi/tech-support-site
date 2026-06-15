@@ -4,6 +4,7 @@ import { formatNZD, todayISO } from "@/features/business/lib/business";
 import { INCOME_METHODS } from "@/features/business/lib/constants";
 import type { IncomeEntry } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
+import { formatDateShort } from "@/shared/lib/date-format";
 import type React from "react";
 import { useEffect, useState } from "react";
 
@@ -240,9 +241,7 @@ export function IncomeView(): React.ReactElement {
                   "mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs",
                 )}
               >
-                <span className={cn("text-slate-500")}>
-                  {new Date(e.date).toLocaleDateString("en-NZ")}
-                </span>
+                <span className={cn("text-slate-500")}>{formatDateShort(e.date)}</span>
                 <span className={cn("text-slate-400")}>{e.method}</span>
                 <button
                   onClick={() => handleDelete(e.id)}
@@ -286,7 +285,7 @@ export function IncomeView(): React.ReactElement {
               {entries.map((e) => (
                 <tr key={e.id} className={cn("hover:bg-slate-50")}>
                   <td className={cn("px-4 py-3 text-xs whitespace-nowrap text-slate-500")}>
-                    {new Date(e.date).toLocaleDateString("en-NZ")}
+                    {formatDateShort(e.date)}
                   </td>
                   <td className={cn("px-4 py-3 font-medium text-slate-700")}>{e.customer}</td>
                   <td className={cn("px-4 py-3 text-slate-500")}>{e.description}</td>

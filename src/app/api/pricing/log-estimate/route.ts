@@ -1,3 +1,4 @@
+import { errorResponse } from "@/shared/lib/api-response";
 import { prisma } from "@/shared/lib/prisma";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 import { AiEstimateCategory } from "@prisma/client";
@@ -54,12 +55,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (limited) return limited;
 
   const body = (await request.json().catch(() => null)) as LogBody | null;
-  if (!body) return NextResponse.json({ error: "invalid body" }, { status: 400 });
+  if (!body) return errorResponse("invalid body", 400);
 
   // Sanitise the payload fields
   const description =
     typeof body.description === "string" ? body.description.trim().slice(0, 500) : "";
-  if (!description) return NextResponse.json({ error: "description required" }, { status: 400 });
+  if (!description) return errorResponse("description required", 400);
 
   const aiEstimatedMins = Math.max(0, Math.round(Number(body.aiEstimatedMins) || 0));
   // The "complex" tier was removed; every estimate logs as standard now. The
@@ -118,6 +119,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: true, id: created.id });
   } catch (err) {
     console.error("[log-estimate] failed:", err);
-    return NextResponse.json({ ok: false, error: "Could not log estimate" }, { status: 500 });
+    return errorResponse("Could not log estimate", 500);
   }
 }

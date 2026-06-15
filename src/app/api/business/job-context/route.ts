@@ -9,6 +9,7 @@
 
 import { lookupPublicHoliday } from "@/features/business/lib/pricing-policy.server";
 import { resolvePromoForDate, type ActivePromo } from "@/features/business/lib/promos";
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import { NextRequest, NextResponse } from "next/server";
@@ -29,12 +30,12 @@ interface JobContextResponse {
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   const dateStr = request.nextUrl.searchParams.get("date");
   if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-    return NextResponse.json({ error: "date (YYYY-MM-DD) is required" }, { status: 400 });
+    return errorResponse("date (YYYY-MM-DD) is required", 400);
   }
 
   // Pin to NZ midday so the holiday/promo lookups land on the intended NZ day

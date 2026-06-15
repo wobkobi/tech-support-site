@@ -7,6 +7,7 @@
  * load a prior version back into the editor for review + re-save.
  */
 
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { DEFAULT_SETTINGS } from "@/shared/lib/settings/defaults";
@@ -63,10 +64,10 @@ export async function GET(
   { params }: { params: Promise<{ group: string }> },
 ): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
   const group = asGroup((await params).group);
-  if (!group) return NextResponse.json({ error: "Unknown settings group" }, { status: 404 });
+  if (!group) return errorResponse("Unknown settings group", 404);
 
   const rows = await prisma.settingAudit.findMany({
     where: { group },

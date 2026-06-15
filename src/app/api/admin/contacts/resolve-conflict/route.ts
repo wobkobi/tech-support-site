@@ -5,6 +5,7 @@
  * the contact and the source record (Booking or Review).
  */
 
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { toE164NZ } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
@@ -33,14 +34,14 @@ interface ResolveBody {
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   const body = (await request.json()) as ResolveBody;
   const { contactId, sourceId, source, name, phone } = body;
 
   if (!contactId || !sourceId || !source) {
-    return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
+    return errorResponse("Missing required fields.", 400);
   }
 
   const contactUpdate: Record<string, string | null> = {};
@@ -73,6 +74,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("[admin/contacts/resolve-conflict] POST error:", error);
-    return NextResponse.json({ error: "Failed to resolve conflict." }, { status: 500 });
+    return errorResponse("Failed to resolve conflict.", 500);
   }
 }

@@ -4,6 +4,7 @@ import {
   formatUTCDDMMYYYY,
 } from "@/features/business/lib/business";
 import { getSheetId, getSheetsClient } from "@/features/business/lib/google-sheets";
+import { errorResponse } from "@/shared/lib/api-response";
 import { isCronAuthorized } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
@@ -20,7 +21,7 @@ export const maxDuration = 60;
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!isCronAuthorized(request)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   // nextDue is stored as UTC midnight (admin form + advanceNextDue), so UTC

@@ -6,6 +6,7 @@
  */
 
 import { sendCustomerReviewRequest } from "@/features/reviews/lib/email";
+import { errorResponse } from "@/shared/lib/api-response";
 import { isCronAuthorized } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
@@ -23,7 +24,7 @@ export const maxDuration = 60;
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!isCronAuthorized(request)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   try {
@@ -157,6 +158,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     });
   } catch (error) {
     console.error("[review-email] Cron error:", error);
-    return NextResponse.json({ ok: false, error: "Failed to send review emails" }, { status: 500 });
+    return errorResponse("Failed to send review emails", 500);
   }
 }

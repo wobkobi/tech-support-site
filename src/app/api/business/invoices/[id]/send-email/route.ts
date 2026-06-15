@@ -3,6 +3,7 @@ import { getInvoiceReviewEligibility } from "@/features/business/lib/contact-rev
 import { uploadInvoicePdf } from "@/features/business/lib/google-drive";
 import { extractYearCode, generateInvoicePdf } from "@/features/business/lib/invoice-pdf";
 import { sendInvoiceEmail } from "@/features/reviews/lib/email";
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { getSiteUrl } from "@/shared/lib/site-url";
@@ -25,17 +26,17 @@ export async function POST(
   ctx: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   // Load the invoice
   const { id } = await ctx.params;
   const invoice = await prisma.invoice.findUnique({ where: { id } });
   if (!invoice) {
-    return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+    return errorResponse("Invoice not found", 404);
   }
   if (!invoice.clientEmail) {
-    return NextResponse.json({ error: "Invoice has no client email" }, { status: 400 });
+    return errorResponse("Invoice has no client email", 400);
   }
 
   // Optional operator overrides (match the preview): greetingName targets a
@@ -78,7 +79,7 @@ export async function POST(
     });
   } catch (err) {
     console.error(`[invoice-email] PDF generation failed for ${invoice.number}:`, err);
-    return NextResponse.json({ error: "PDF generation failed" }, { status: 500 });
+    return errorResponse("PDF generation failed", 500);
   }
 
   // Send the email
@@ -98,7 +99,7 @@ export async function POST(
     customBody,
   });
   if (!ok) {
-    return NextResponse.json({ error: "Email send failed" }, { status: 502 });
+    return errorResponse("Email send failed", 502);
   }
 
   // Stamp reviewLinkSentAt iff the review line was actually included. This is

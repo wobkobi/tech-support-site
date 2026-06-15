@@ -12,6 +12,7 @@ import {
   findOrCreateContactByPhone,
 } from "@/features/contacts/lib/find-or-create";
 import { sendPastClientReviewRequest } from "@/features/reviews/lib/email";
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { isValidPhone, toE164NZ } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
@@ -33,7 +34,7 @@ export const maxDuration = 60;
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   try {
@@ -47,10 +48,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const { name, email, phone, mode = "email" } = body;
 
     if (!name?.trim()) {
-      return NextResponse.json({ ok: false, error: "Name is required." }, { status: 400 });
+      return errorResponse("Name is required.", 400);
     }
     if (mode === "email" && (!email?.trim() || !email.includes("@"))) {
-      return NextResponse.json({ ok: false, error: "Valid email is required." }, { status: 400 });
+      return errorResponse("Valid email is required.", 400);
     }
 
     const siteUrl = getSiteUrl();
@@ -60,11 +61,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     let normalisedPhone: string | null = null;
     if (mode === "sms") {
       if (!phone) {
-        return NextResponse.json({ ok: false, error: "Phone is required." }, { status: 400 });
+        return errorResponse("Phone is required.", 400);
       }
       normalisedPhone = toE164NZ(phone);
       if (!isValidPhone(normalisedPhone)) {
-        return NextResponse.json({ ok: false, error: "Invalid phone number." }, { status: 400 });
+        return errorResponse("Invalid phone number.", 400);
       }
     }
 
@@ -122,6 +123,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: true, reviewUrl });
   } catch (error) {
     console.error("[admin/send-review-link] Error:", error);
-    return NextResponse.json({ ok: false, error: "Failed to send review link." }, { status: 500 });
+    return errorResponse("Failed to send review link.", 500);
   }
 }

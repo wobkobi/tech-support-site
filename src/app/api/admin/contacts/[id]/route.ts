@@ -5,6 +5,7 @@
  */
 
 import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { isValidPhone, normalisePhone, toE164NZ } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
@@ -32,19 +33,19 @@ export async function PATCH(
   params: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   const { id } = await params.params;
   const body = (await request.json()) as ContactPatchBody;
 
   if (body.name !== undefined && !body.name.trim()) {
-    return NextResponse.json({ error: "Name is required." }, { status: 400 });
+    return errorResponse("Name is required.", 400);
   }
   if (body.email !== undefined) {
     const trimmedEmail = body.email.trim().toLowerCase();
     if (trimmedEmail && !/^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/.test(trimmedEmail)) {
-      return NextResponse.json({ error: "Please enter a valid email address." }, { status: 400 });
+      return errorResponse("Please enter a valid email address.", 400);
     }
     if (trimmedEmail) {
       const dupe = await prisma.contact.findFirst({
@@ -52,12 +53,12 @@ export async function PATCH(
         select: { id: true },
       });
       if (dupe) {
-        return NextResponse.json({ error: "That email is already in use." }, { status: 409 });
+        return errorResponse("That email is already in use.", 409);
       }
     }
   }
   if (body.phone !== undefined && body.phone.trim() && !isValidPhone(normalisePhone(body.phone))) {
-    return NextResponse.json({ error: "Please enter a valid phone number." }, { status: 400 });
+    return errorResponse("Please enter a valid phone number.", 400);
   }
 
   const updateData: Record<string, string | null> = {};

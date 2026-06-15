@@ -6,6 +6,7 @@
 
 import { sendOwnerReviewNotification } from "@/features/reviews/lib/email";
 import { reviewTextError } from "@/features/reviews/lib/validation";
+import { errorResponse } from "@/shared/lib/api-response";
 import { normalisePhone } from "@/shared/lib/normalise-phone";
 import { prisma as prismaClient } from "@/shared/lib/prisma";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
@@ -83,7 +84,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const text = body.text?.trim() ?? "";
     const textErr = reviewTextError(text);
-    if (textErr) return NextResponse.json({ error: textErr }, { status: 400 });
+    if (textErr) return errorResponse(textErr, 400);
 
     const firstName = body.firstName?.trim() || null;
     const lastName = body.lastName?.trim() || null;
@@ -185,6 +186,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: true, id: review.id, verified }, { status: 201 });
   } catch (error) {
     console.error("[reviews] POST error:", error);
-    return NextResponse.json({ error: "Failed to submit review." }, { status: 500 });
+    return errorResponse("Failed to submit review.", 500);
   }
 }

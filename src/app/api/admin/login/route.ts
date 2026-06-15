@@ -12,6 +12,7 @@ import {
   ADMIN_SESSION_MAX_AGE_SECONDS,
   createSessionCookieValue,
 } from "@/shared/lib/admin-session";
+import { errorResponse } from "@/shared/lib/api-response";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 import { timingSafeEqual } from "crypto";
 import { type NextRequest, NextResponse } from "next/server";
@@ -53,11 +54,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     body = (await request.json()) as { secret?: unknown };
   } catch {
-    return NextResponse.json({ ok: false, error: "Bad request." }, { status: 400 });
+    return errorResponse("Bad request.", 400);
   }
   const candidate = typeof body.secret === "string" ? body.secret : "";
   if (!matchesAdminSecret(candidate)) {
-    return NextResponse.json({ ok: false, error: "Invalid credentials." }, { status: 401 });
+    return errorResponse("Invalid credentials.", 401);
   }
 
   const cookieValue = await createSessionCookieValue();
