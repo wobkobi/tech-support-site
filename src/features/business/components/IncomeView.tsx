@@ -3,10 +3,17 @@
 import { formatNZD, todayISO } from "@/features/business/lib/business";
 import { INCOME_METHODS } from "@/features/business/lib/constants";
 import type { IncomeEntry } from "@/features/business/types/business";
+import { Button } from "@/shared/components/Button";
+import { Field } from "@/shared/components/Field";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
 import type React from "react";
 import { useEffect, useState } from "react";
+
+const inputClasses = cn(
+  "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm",
+  "focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
+);
 
 /**
  * Client component for recording and displaying income entries.
@@ -106,100 +113,80 @@ export function IncomeView(): React.ReactElement {
       >
         <h2 className={cn("mb-4 text-sm font-semibold text-russian-violet")}>Add income</h2>
         <div className={cn("grid gap-3 sm:grid-cols-2")}>
-          <div>
-            <label className={cn("mb-1 block text-xs font-medium text-slate-600")}>Date</label>
+          <Field label="Date" htmlFor="inc-date" required>
             <input
+              id="inc-date"
               type="date"
               required
               value={form.date}
               onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))}
-              className={cn(
-                "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-              )}
+              className={inputClasses}
             />
-          </div>
-          <div>
-            <label className={cn("mb-1 block text-xs font-medium text-slate-600")}>Customer</label>
+          </Field>
+          <Field label="Customer" htmlFor="inc-customer" required>
             <input
+              id="inc-customer"
               type="text"
               required
               value={form.customer}
               onChange={(e) => setForm((p) => ({ ...p, customer: e.target.value }))}
-              className={cn(
-                "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-              )}
+              className={inputClasses}
             />
-          </div>
-          <div>
-            <label className={cn("mb-1 block text-xs font-medium text-slate-600")}>
-              Description
-            </label>
+          </Field>
+          <Field label="Description" htmlFor="inc-description" required>
             <input
+              id="inc-description"
               type="text"
               required
               value={form.description}
               onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
-              className={cn(
-                "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-              )}
+              className={inputClasses}
             />
-          </div>
-          <div>
-            <label className={cn("mb-1 block text-xs font-medium text-slate-600")}>
-              Amount (NZD)
-            </label>
+          </Field>
+          <Field label="Amount (NZD)" htmlFor="inc-amount" required>
             <input
+              id="inc-amount"
               type="number"
               required
               min="0"
               step="0.01"
               value={form.amount}
               onChange={(e) => setForm((p) => ({ ...p, amount: e.target.value }))}
-              className={cn(
-                "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-              )}
+              className={inputClasses}
             />
-          </div>
-          <div>
-            <label className={cn("mb-1 block text-xs font-medium text-slate-600")}>
-              Payment method
-            </label>
+          </Field>
+          <Field label="Payment method" htmlFor="inc-method">
             <select
+              id="inc-method"
               value={form.method}
               onChange={(e) => setForm((p) => ({ ...p, method: e.target.value }))}
-              className={cn(
-                "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-              )}
+              className={inputClasses}
             >
               {INCOME_METHODS.map((m) => (
                 <option key={m}>{m}</option>
               ))}
             </select>
-          </div>
-          <div>
-            <label className={cn("mb-1 block text-xs font-medium text-slate-600")}>
-              Notes (optional)
-            </label>
+          </Field>
+          <Field label="Notes" htmlFor="inc-notes" optional>
             <input
+              id="inc-notes"
               type="text"
               value={form.notes}
               onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
-              className={cn(
-                "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-              )}
+              className={inputClasses}
             />
-          </div>
+          </Field>
         </div>
         {error && <p className={cn("mt-2 text-xs text-red-600")}>{error}</p>}
-        <button
+        <Button
           type="submit"
+          variant="secondary"
+          size="sm"
           disabled={saving}
-          className={cn(
-            "mt-4 rounded-lg bg-russian-violet px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50",
-          )}
+          className={cn("mt-4")}
         >
           {saving ? "Saving..." : "Add income"}
-        </button>
+        </Button>
       </form>
 
       {/* Mobile card list - stacks each entry so the date/amount/description

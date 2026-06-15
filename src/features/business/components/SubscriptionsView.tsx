@@ -7,10 +7,17 @@ import {
   VALID_FREQUENCIES,
 } from "@/features/business/lib/constants";
 import type { Subscription } from "@/features/business/types/business";
+import { Button } from "@/shared/components/Button";
+import { Field } from "@/shared/components/Field";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
+
+const inputClasses = cn(
+  "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm",
+  "focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
+);
 
 interface FormState {
   description: string;
@@ -261,42 +268,35 @@ export function SubscriptionsView(): React.ReactElement {
             {editId ? "Edit subscription" : "New subscription"}
           </h3>
           <div className={cn("grid grid-cols-2 gap-3 sm:grid-cols-3")}>
-            <div className="col-span-2 sm:col-span-2">
-              <label className={cn("mb-1 block text-xs font-medium text-slate-600")}>
-                Description
-              </label>
+            <Field
+              label="Description"
+              htmlFor="sub-description"
+              required
+              className="col-span-2 sm:col-span-2"
+            >
               <input
+                id="sub-description"
                 required
                 value={form.description}
                 onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
-                className={cn(
-                  "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-                )}
+                className={inputClasses}
               />
-            </div>
-            <div>
-              <label className={cn("mb-1 block text-xs font-medium text-slate-600")}>
-                Supplier
-              </label>
+            </Field>
+            <Field label="Supplier" htmlFor="sub-supplier" required>
               <input
+                id="sub-supplier"
                 required
                 value={form.supplier}
                 onChange={(e) => setForm((p) => ({ ...p, supplier: e.target.value }))}
-                className={cn(
-                  "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-                )}
+                className={inputClasses}
               />
-            </div>
-            <div>
-              <label className={cn("mb-1 block text-xs font-medium text-slate-600")}>
-                Category
-              </label>
+            </Field>
+            <Field label="Category" htmlFor="sub-category">
               <select
+                id="sub-category"
                 value={form.category}
                 onChange={(e) => setForm((p) => ({ ...p, category: e.target.value }))}
-                className={cn(
-                  "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-                )}
+                className={inputClasses}
               >
                 {EXPENSE_CATEGORIES.map((c) => (
                   <option key={c} value={c}>
@@ -304,48 +304,36 @@ export function SubscriptionsView(): React.ReactElement {
                   </option>
                 ))}
               </select>
-            </div>
-            <div>
-              <label className={cn("mb-1 block text-xs font-medium text-slate-600")}>
-                Amount (incl. GST)
-              </label>
+            </Field>
+            <Field label="Amount (incl. GST)" htmlFor="sub-amount" required>
               <input
+                id="sub-amount"
                 required
                 type="number"
                 min="0.01"
                 step="0.01"
                 value={form.amountIncl}
                 onChange={(e) => setForm((p) => ({ ...p, amountIncl: e.target.value }))}
-                className={cn(
-                  "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-                )}
+                className={inputClasses}
               />
-            </div>
-            <div>
-              <label className={cn("mb-1 block text-xs font-medium text-slate-600")}>
-                GST rate
-              </label>
+            </Field>
+            <Field label="GST rate" htmlFor="sub-gst">
               <select
+                id="sub-gst"
                 value={form.gstRate}
                 onChange={(e) => setForm((p) => ({ ...p, gstRate: e.target.value }))}
-                className={cn(
-                  "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-                )}
+                className={inputClasses}
               >
                 <option value="0.15">15%</option>
                 <option value="0">No GST</option>
               </select>
-            </div>
-            <div>
-              <label className={cn("mb-1 block text-xs font-medium text-slate-600")}>
-                Payment method
-              </label>
+            </Field>
+            <Field label="Payment method" htmlFor="sub-method">
               <select
+                id="sub-method"
                 value={form.method}
                 onChange={(e) => setForm((p) => ({ ...p, method: e.target.value }))}
-                className={cn(
-                  "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-                )}
+                className={inputClasses}
               >
                 {PAYMENT_METHODS.map((m) => (
                   <option key={m} value={m}>
@@ -353,17 +341,13 @@ export function SubscriptionsView(): React.ReactElement {
                   </option>
                 ))}
               </select>
-            </div>
-            <div>
-              <label className={cn("mb-1 block text-xs font-medium text-slate-600")}>
-                Frequency
-              </label>
+            </Field>
+            <Field label="Frequency" htmlFor="sub-frequency">
               <select
+                id="sub-frequency"
                 value={form.frequency}
                 onChange={(e) => setForm((p) => ({ ...p, frequency: e.target.value }))}
-                className={cn(
-                  "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-                )}
+                className={inputClasses}
               >
                 {VALID_FREQUENCIES.map((f) => (
                   <option key={f} value={f}>
@@ -371,51 +355,33 @@ export function SubscriptionsView(): React.ReactElement {
                   </option>
                 ))}
               </select>
-            </div>
-            <div>
-              <label className={cn("mb-1 block text-xs font-medium text-slate-600")}>
-                {editId ? "Next due" : "First due"}
-              </label>
+            </Field>
+            <Field label={editId ? "Next due" : "First due"} htmlFor="sub-nextdue" required>
               <input
+                id="sub-nextdue"
                 required
                 type="date"
                 value={form.nextDue}
                 onChange={(e) => setForm((p) => ({ ...p, nextDue: e.target.value }))}
-                className={cn(
-                  "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-                )}
+                className={inputClasses}
               />
-            </div>
-            <div className="col-span-2 sm:col-span-3">
-              <label className={cn("mb-1 block text-xs font-medium text-slate-600")}>Notes</label>
+            </Field>
+            <Field label="Notes" htmlFor="sub-notes" optional className="col-span-2 sm:col-span-3">
               <input
+                id="sub-notes"
                 value={form.notes}
                 onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
-                className={cn(
-                  "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-                )}
+                className={inputClasses}
               />
-            </div>
+            </Field>
           </div>
           <div className={cn("mt-4 flex gap-2")}>
-            <button
-              type="submit"
-              disabled={saving}
-              className={cn(
-                "rounded-lg bg-russian-violet px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50",
-              )}
-            >
+            <Button type="submit" variant="secondary" size="sm" disabled={saving}>
               {saving ? "Saving..." : editId ? "Update" : "Add"}
-            </button>
-            <button
-              type="button"
-              onClick={cancelForm}
-              className={cn(
-                "rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50",
-              )}
-            >
+            </Button>
+            <Button type="button" variant="ghost" size="sm" onClick={cancelForm}>
               Cancel
-            </button>
+            </Button>
           </div>
         </form>
       )}
