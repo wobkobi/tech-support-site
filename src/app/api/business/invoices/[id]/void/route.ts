@@ -2,6 +2,7 @@
 import { uploadInvoicePdf } from "@/features/business/lib/google-drive";
 import { extractYearCode, generateInvoicePdf } from "@/features/business/lib/invoice-pdf";
 import { sendVoidNotification } from "@/features/reviews/lib/email";
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
@@ -25,14 +26,14 @@ export async function POST(
   ctx: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   // Load the invoice
   const { id } = await ctx.params;
   const invoice = await prisma.invoice.findUnique({ where: { id } });
   if (!invoice) {
-    return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+    return errorResponse("Invoice not found", 404);
   }
 
   // Parse optional overrides

@@ -1,4 +1,5 @@
 import { runSheetsImport } from "@/features/business/lib/sheets-import";
+import { errorResponse } from "@/shared/lib/api-response";
 import { isCronAuthorized } from "@/shared/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -14,13 +15,13 @@ export const maxDuration = 60;
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!isCronAuthorized(request)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
   try {
     const result = await runSheetsImport(false);
     return NextResponse.json(result);
   } catch (err) {
     console.error("[cron/sync-sheets] failed:", err);
-    return NextResponse.json({ error: "Sync failed" }, { status: 503 });
+    return errorResponse("Sync failed", 503);
   }
 }

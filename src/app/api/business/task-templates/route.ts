@@ -1,4 +1,5 @@
 import { composeDescription } from "@/features/business/lib/business";
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
@@ -27,7 +28,7 @@ function normaliseTag(raw: unknown): string | null {
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   const templates = await prisma.taskTemplate.findMany({
@@ -48,7 +49,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   const body = await request.json();
@@ -60,7 +61,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   };
 
   if (typeof defaultPrice !== "number" || isNaN(defaultPrice)) {
-    return NextResponse.json({ error: "defaultPrice is required" }, { status: 400 });
+    return errorResponse("defaultPrice is required", 400);
   }
 
   const normDevice = normaliseTag(device);

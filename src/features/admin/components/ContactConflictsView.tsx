@@ -9,6 +9,7 @@
  */
 
 import { cn } from "@/shared/lib/cn";
+import { formatDateTimeShort } from "@/shared/lib/date-format";
 import Link from "next/link";
 import type React from "react";
 import { useState } from "react";
@@ -172,7 +173,7 @@ export function ContactConflictsView({ initial }: ContactConflictsViewProps): Re
 
               {err && <p className={cn("mt-3 text-xs text-coquelicot-500")}>{err}</p>}
               <p className={cn("mt-3 text-xs text-slate-400")}>
-                Detected {new Date(c.createdAt).toLocaleString()}
+                Detected {formatDateTimeShort(c.createdAt)}
               </p>
             </li>
           );

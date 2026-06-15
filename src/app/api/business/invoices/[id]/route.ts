@@ -2,6 +2,7 @@ import { calcInvoiceTotals } from "@/features/business/lib/business";
 import { uploadInvoicePdf } from "@/features/business/lib/google-drive";
 import { extractYearCode, generateInvoicePdf } from "@/features/business/lib/invoice-pdf";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import type { InvoiceStatus } from "@prisma/client";
@@ -86,12 +87,12 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   const { id } = await params;
   const invoice = await prisma.invoice.findUnique({ where: { id } });
-  if (!invoice) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!invoice) return errorResponse("Not found", 404);
   return NextResponse.json({ ok: true, invoice });
 }
 
@@ -108,7 +109,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   const { id } = await params;
@@ -122,7 +123,7 @@ export async function PATCH(
     select: { status: true },
   });
   if (!current) {
-    return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+    return errorResponse("Invoice not found", 404);
   }
 
   // Full update: the body carries invoice fields, not just a status.
@@ -136,7 +137,7 @@ export async function PATCH(
     const { clientName, clientEmail, issueDate, dueDate, lineItems, notes, status } = body;
     if (status !== undefined) {
       const err = validateTransition(current.status, status as InvoiceStatus);
-      if (err) return NextResponse.json({ error: err }, { status: 409 });
+      if (err) return errorResponse(err, 409);
     }
     // GST mode is driven by the live pricing settings (gstRegistered); the
     // request body does not carry gst. gstAmount is non-zero once that flag
@@ -172,11 +173,11 @@ export async function PATCH(
   // stamps/clears voidedAt so the detail page label stays in sync.
   const { status } = body;
   if (!["DRAFT", "SENT", "PAID", "VOIDED"].includes(status)) {
-    return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+    return errorResponse("Invalid status", 400);
   }
   const transitionErr = validateTransition(current.status, status as InvoiceStatus);
   if (transitionErr) {
-    return NextResponse.json({ error: transitionErr }, { status: 409 });
+    return errorResponse(transitionErr, 409);
   }
   const invoice = await prisma.invoice.update({
     where: { id },
@@ -199,7 +200,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   const { id } = await params;
@@ -212,15 +213,12 @@ export async function DELETE(
     select: { status: true },
   });
   if (!existing) {
-    return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+    return errorResponse("Invoice not found", 404);
   }
   if (existing.status !== "DRAFT") {
-    return NextResponse.json(
-      {
-        error:
-          "Only DRAFT invoices can be deleted. Void the invoice instead to preserve the audit trail.",
-      },
-      { status: 409 },
+    return errorResponse(
+      "Only DRAFT invoices can be deleted. Void the invoice instead to preserve the audit trail.",
+      409,
     );
   }
   await prisma.invoice.delete({ where: { id } });

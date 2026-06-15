@@ -1,5 +1,6 @@
 // src/app/api/business/promos/route.ts
 import { ACTIVE_PROMO_TAG } from "@/features/business/lib/promos";
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { revalidateTag } from "next/cache";
@@ -44,7 +45,7 @@ function validatePromo(body: PromoBody): string | null {
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
   const promos = await prisma.promo.findMany({ orderBy: { startAt: "desc" } });
   return NextResponse.json({ ok: true, promos });
@@ -57,11 +58,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
   const body = (await request.json()) as PromoBody;
   const err = validatePromo(body);
-  if (err) return NextResponse.json({ error: err }, { status: 400 });
+  if (err) return errorResponse(err, 400);
 
   const promo = await prisma.promo.create({
     data: {

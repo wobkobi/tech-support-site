@@ -1,4 +1,5 @@
 import { downloadDriveFile, searchAllInvoicePdfs } from "@/features/business/lib/google-drive";
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
@@ -363,7 +364,7 @@ async function downloadAndParse(fileId: string): Promise<{ data: ParsedInvoiceDa
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   try {
@@ -462,6 +463,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: true, created, skipped, updated, errors });
   } catch (err) {
     console.error("[import-drive] failed:", err);
-    return NextResponse.json({ error: "Import failed" }, { status: 503 });
+    return errorResponse("Import failed", 503);
   }
 }

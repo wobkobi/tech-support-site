@@ -1,5 +1,6 @@
 import { GST_RATE } from "@/features/business/lib/pricing-policy";
 import { parseAmount, parseRate } from "@/features/business/lib/validation";
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
@@ -11,7 +12,7 @@ import { NextRequest, NextResponse } from "next/server";
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   const entries = await prisma.expenseEntry.findMany({ orderBy: { date: "desc" } });
@@ -25,7 +26,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   const body = await request.json();
@@ -33,17 +34,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     body;
 
   if (!date || !supplier || !description || !category || amountIncl === undefined || !method) {
-    return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    return errorResponse("Missing required fields", 400);
   }
 
   const inclNum = parseAmount(amountIncl);
   if (inclNum === null) {
-    return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
+    return errorResponse("Invalid amount", 400);
   }
 
   const rate = gstRate === undefined ? GST_RATE : parseRate(gstRate);
   if (rate === null) {
-    return NextResponse.json({ error: "Invalid GST rate" }, { status: 400 });
+    return errorResponse("Invalid GST rate", 400);
   }
 
   const gstAmount = Math.round(((inclNum * rate) / (1 + rate)) * 100) / 100;

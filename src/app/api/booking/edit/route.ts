@@ -24,6 +24,7 @@ import {
   sendCustomerBookingConfirmation,
   sendOwnerBookingNotification,
 } from "@/features/reviews/lib/email";
+import { errorResponse } from "@/shared/lib/api-response";
 import { isValidPhone, toE164NZ } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
@@ -74,13 +75,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     } = body;
 
     if (!cancelToken) {
-      return NextResponse.json({ ok: false, error: "Missing cancel token." }, { status: 400 });
+      return errorResponse("Missing cancel token.", 400);
     }
 
     // Find booking
     const booking = await prisma.booking.findFirst({ where: { cancelToken } });
     if (!booking) {
-      return NextResponse.json({ ok: false, error: "Booking not found." }, { status: 404 });
+      return errorResponse("Booking not found.", 404);
     }
     if (booking.status === "cancelled") {
       return NextResponse.json(
@@ -95,7 +96,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       { requireEmail: false },
     );
     if (!payloadCheck.valid) {
-      return NextResponse.json({ ok: false, error: payloadCheck.error }, { status: 400 });
+      return errorResponse(payloadCheck.error, 400);
     }
 
     const now = new Date();
@@ -117,13 +118,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       reschedule.maxReschedules !== null &&
       booking.rescheduleCount >= reschedule.maxReschedules
     ) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error:
-            "This booking has already been changed the maximum number of times. Please call or text me to reschedule.",
-        },
-        { status: 400 },
+      return errorResponse(
+        "This booking has already been changed the maximum number of times. Please call or text me to reschedule.",
+        400,
       );
     }
 
@@ -180,13 +177,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
 
     if (!validation.valid) {
-      return NextResponse.json({ ok: false, error: validation.error }, { status: 400 });
+      return errorResponse(validation.error, 400);
     }
 
     // Resolve the new slot from the validated hour label + live durations.
     const startHour = parseHourLabel(timeOfDay);
     if (startHour === null) {
-      return NextResponse.json({ ok: false, error: "Invalid time or duration." }, { status: 400 });
+      return errorResponse("Invalid time or duration.", 400);
     }
     const durationMinutes = duration === "short" ? config.durations.short : config.durations.long;
     const durationLabel = `${duration === "short" ? "Standard" : "Extended"} (${durationMinutes} min)`;

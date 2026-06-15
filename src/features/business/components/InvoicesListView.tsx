@@ -3,6 +3,7 @@
 import { formatNZD } from "@/features/business/lib/business";
 import type { Invoice, InvoiceStatus } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
+import { formatDateShort } from "@/shared/lib/date-format";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type React from "react";
@@ -213,9 +214,7 @@ export function InvoicesListView(): React.ReactElement {
                   "mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs",
                 )}
               >
-                <span className={cn("text-slate-500")}>
-                  {new Date(inv.issueDate).toLocaleDateString("en-NZ")}
-                </span>
+                <span className={cn("text-slate-500")}>{formatDateShort(inv.issueDate)}</span>
                 <span className={cn("font-semibold text-slate-700")}>{formatNZD(inv.total)}</span>
                 {inv.driveWebUrl ? (
                   <a
@@ -271,7 +270,7 @@ export function InvoicesListView(): React.ReactElement {
                   </td>
                   <td className={cn("px-4 py-3 font-medium text-slate-700")}>{inv.clientName}</td>
                   <td className={cn("px-4 py-3 text-xs whitespace-nowrap text-slate-500")}>
-                    {new Date(inv.issueDate).toLocaleDateString("en-NZ")}
+                    {formatDateShort(inv.issueDate)}
                   </td>
                   <td className={cn("px-4 py-3 font-semibold whitespace-nowrap text-slate-700")}>
                     {formatNZD(inv.total)}

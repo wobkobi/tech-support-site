@@ -4,6 +4,7 @@ import {
   getFySheetIdForDate,
 } from "@/features/business/lib/sheets-sync";
 import { parseAmount } from "@/features/business/lib/validation";
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
@@ -15,7 +16,7 @@ import { NextRequest, NextResponse } from "next/server";
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   const entries = await prisma.incomeEntry.findMany({ orderBy: { date: "desc" } });
@@ -29,19 +30,19 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   const body = await request.json();
   const { date, customer, description, amount, method, notes, invoiceId } = body;
 
   if (!date || !customer || !description || amount === undefined || !method) {
-    return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    return errorResponse("Missing required fields", 400);
   }
 
   const safeAmount = parseAmount(amount);
   if (safeAmount === null) {
-    return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
+    return errorResponse("Invalid amount", 400);
   }
 
   const entryDate = new Date(date);

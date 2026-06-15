@@ -6,6 +6,7 @@
  */
 
 import { refreshCalendarCache } from "@/features/calendar/lib/calendar-cache";
+import { errorResponse } from "@/shared/lib/api-response";
 import { isCronAuthorized } from "@/shared/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -20,7 +21,7 @@ export const maxDuration = 60;
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!isCronAuthorized(request)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   try {

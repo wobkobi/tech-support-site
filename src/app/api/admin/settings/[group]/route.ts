@@ -7,6 +7,7 @@
  * always reject; WARNs reject unless the client confirms.
  */
 
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { DEFAULT_SETTINGS } from "@/shared/lib/settings/defaults";
 import { getSettings } from "@/shared/lib/settings/get-settings";
@@ -40,10 +41,10 @@ export async function GET(
   { params }: { params: Promise<{ group: string }> },
 ): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
   const group = asGroup((await params).group);
-  if (!group) return NextResponse.json({ error: "Unknown settings group" }, { status: 404 });
+  if (!group) return errorResponse("Unknown settings group", 404);
 
   const settings = await getSettings();
   return NextResponse.json({ ok: true, value: settings[group] });
@@ -65,17 +66,17 @@ export async function PUT(
   { params }: { params: Promise<{ group: string }> },
 ): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
   const group = asGroup((await params).group);
-  if (!group) return NextResponse.json({ error: "Unknown settings group" }, { status: 404 });
+  if (!group) return errorResponse("Unknown settings group", 404);
 
   const body = (await request.json().catch(() => null)) as {
     value?: unknown;
     confirmWarnings?: boolean;
   } | null;
   if (!body || typeof body.value !== "object" || body.value === null) {
-    return NextResponse.json({ error: "Missing value" }, { status: 400 });
+    return errorResponse("Missing value", 400);
   }
 
   const value = body.value as Settings[typeof group];
@@ -83,7 +84,7 @@ export async function PUT(
   // 1. Per-field shape + bounds.
   const fieldErrors = validateGroup(group, value);
   if (fieldErrors.length > 0) {
-    return NextResponse.json({ error: "Invalid", fieldErrors }, { status: 400 });
+    return NextResponse.json({ ok: false, error: "Invalid", fieldErrors }, { status: 400 });
   }
 
   // 2. Cross-setting coherence on the full proposed settings. Assign via a
@@ -94,10 +95,10 @@ export async function PUT(
   const blocks = issues.filter((i) => i.level === "block").map((i) => i.message);
   const warns = issues.filter((i) => i.level === "warn").map((i) => i.message);
   if (blocks.length > 0) {
-    return NextResponse.json({ error: "Blocked", blocks }, { status: 422 });
+    return NextResponse.json({ ok: false, error: "Blocked", blocks }, { status: 422 });
   }
   if (warns.length > 0 && !body.confirmWarnings) {
-    return NextResponse.json({ error: "Confirm", warns }, { status: 409 });
+    return NextResponse.json({ ok: false, error: "Confirm", warns }, { status: 409 });
   }
 
   await saveSettingsGroup(group, value);

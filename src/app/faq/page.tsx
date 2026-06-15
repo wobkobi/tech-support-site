@@ -324,7 +324,7 @@ export default async function FaqPage(): Promise<React.ReactElement> {
                       <details key={item.question} className={cn(SOFT_CARD, "group")}>
                         <summary
                           className={cn(
-                            "flex cursor-pointer items-center justify-between gap-3 text-sm font-semibold text-rich-black select-text sm:text-base",
+                            "flex cursor-pointer items-center justify-between gap-3 text-base font-semibold text-rich-black select-text sm:text-lg",
                             "list-none [&::-webkit-details-marker]:hidden",
                           )}
                         >
@@ -338,7 +338,7 @@ export default async function FaqPage(): Promise<React.ReactElement> {
                             ▾
                           </span>
                         </summary>
-                        <div className={cn("mt-3 text-sm text-rich-black/90 sm:text-base")}>
+                        <div className={cn("mt-3 text-base text-rich-black/90 sm:text-lg")}>
                           {item.answer}
                         </div>
                       </details>

@@ -7,6 +7,7 @@ import {
   DEFAULT_VOID_EMAIL_BODY,
 } from "@/features/business/lib/invoice-email-defaults";
 import { cn } from "@/shared/lib/cn";
+import { formatDateShort } from "@/shared/lib/date-format";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type React from "react";
@@ -634,7 +635,7 @@ export function InvoiceActions({
                               {eligibility.reason === "already-reviewed" &&
                                 "(this customer has already left a review)"}
                               {eligibility.reason === "sent-recently" &&
-                                ` (review request sent ${new Date(eligibility.lastSentAt).toLocaleDateString()} - can re-send from ${new Date(eligibility.nextAllowedAt).toLocaleDateString()})`}
+                                ` (review request sent ${formatDateShort(eligibility.lastSentAt)} - can re-send from ${formatDateShort(eligibility.nextAllowedAt)})`}
                               {eligibility.reason === "no-contact" && (
                                 <>
                                   (no contact record -{" "}

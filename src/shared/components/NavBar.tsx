@@ -470,7 +470,9 @@ export function NavBar(): React.ReactElement | null {
           >
             <Image
               src="/source/logo.svg"
-              alt="Logo"
+              // Decorative: the adjacent "To The Point Tech" text already names the
+              // link, so an alt here would just add "Logo" noise for screen readers.
+              alt=""
               width={40}
               height={40}
               priority

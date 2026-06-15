@@ -8,8 +8,14 @@
  */
 
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
-import { validateEmail } from "@/features/booking/lib/booking";
+import {
+  combineUnitAndAddress,
+  splitUnitFromAddress,
+  validateEmail,
+} from "@/features/booking/lib/booking";
+import { Button } from "@/shared/components/Button";
 import { EmailInput } from "@/shared/components/EmailInput";
+import { Field } from "@/shared/components/Field";
 import { PhoneInput } from "@/shared/components/PhoneInput";
 import { cn } from "@/shared/lib/cn";
 import { formatNZPhone, validatePhone } from "@/shared/lib/normalise-phone";
@@ -52,6 +58,10 @@ export function ManualBookingModal({
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
+  // Unit kept separate from the street address, same as the public booking form:
+  // Google Places autocomplete predicts the street but rarely the apartment/unit,
+  // so without its own box the unit gets lost.
+  const [unit, setUnit] = useState("");
   const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
   const [durationMinutes, setDurationMinutes] = useState<60 | 120>(60);
@@ -137,7 +147,7 @@ export function ManualBookingModal({
           name: name.trim(),
           email: email.trim().toLowerCase(),
           phone: phoneE164 || null,
-          address: address.trim() || null,
+          address: combineUnitAndAddress(unit, address) || null,
           notes: notes.trim(),
           startAt: startAt.toISOString(),
           durationMinutes,
@@ -193,7 +203,7 @@ export function ManualBookingModal({
 
         <form onSubmit={handleSubmit} className={cn("space-y-4 px-5 py-5")}>
           <div className={cn("grid grid-cols-2 gap-3")}>
-            <Field label="Start" htmlFor="mb-start">
+            <Field label="Start" htmlFor="mb-start" required>
               <input
                 id="mb-start"
                 type="datetime-local"
@@ -216,7 +226,7 @@ export function ManualBookingModal({
             </Field>
           </div>
 
-          <Field label="Customer name" htmlFor="mb-name">
+          <Field label="Customer name" htmlFor="mb-name" required>
             <div
               ref={nameWrapRef}
               className={cn("relative")}
@@ -270,7 +280,13 @@ export function ManualBookingModal({
                             setName(c.name);
                             setEmail(c.email ?? "");
                             setPhone(c.phone ? formatNZPhone(c.phone) : "");
-                            setAddress(c.address ?? "");
+                            // Split the stored address back into unit + street so the
+                            // dedicated unit box stays populated on edit.
+                            {
+                              const split = splitUnitFromAddress(c.address ?? "");
+                              setUnit(split.unit);
+                              setAddress(split.rest);
+                            }
                             setNameListOpen(false);
                           }}
                           className={cn(
@@ -295,10 +311,10 @@ export function ManualBookingModal({
           </Field>
 
           <div className={cn("grid grid-cols-2 gap-3")}>
-            <Field label="Phone" htmlFor="mb-phone">
+            <Field label="Phone" htmlFor="mb-phone" optional>
               <PhoneInput id="mb-phone" value={phone} onChange={setPhone} />
             </Field>
-            <Field label="Email" htmlFor="mb-email">
+            <Field label="Email" htmlFor="mb-email" required>
               <EmailInput
                 id="mb-email"
                 value={email}
@@ -309,17 +325,33 @@ export function ManualBookingModal({
             </Field>
           </div>
 
-          <Field label="Address" htmlFor="mb-address">
-            <AddressAutocomplete
-              id="mb-address"
-              value={address}
-              onChange={setAddress}
-              placeholder="Street address"
-              maxLength={250}
-            />
-          </Field>
+          <div className={cn("grid grid-cols-3 gap-3")}>
+            <Field label="Apt / Unit" htmlFor="mb-unit" optional>
+              <input
+                id="mb-unit"
+                type="text"
+                value={unit}
+                onChange={(e) => setUnit(e.target.value)}
+                autoComplete="off"
+                maxLength={20}
+                placeholder="12"
+                className={textInputClasses}
+              />
+            </Field>
+            <div className={cn("col-span-2")}>
+              <Field label="Address" htmlFor="mb-address" optional>
+                <AddressAutocomplete
+                  id="mb-address"
+                  value={address}
+                  onChange={setAddress}
+                  placeholder="Street address"
+                  maxLength={250}
+                />
+              </Field>
+            </div>
+          </div>
 
-          <Field label="Notes" htmlFor="mb-notes">
+          <Field label="Notes" htmlFor="mb-notes" optional>
             <textarea
               id="mb-notes"
               value={notes}
@@ -352,53 +384,15 @@ export function ManualBookingModal({
           )}
 
           <div className={cn("flex justify-end gap-2 pt-2")}>
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={submitting}
-              className={cn(
-                "rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50",
-              )}
-            >
+            <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={submitting}>
               Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className={cn(
-                "rounded-md bg-russian-violet px-4 py-2 text-sm font-semibold text-white hover:bg-russian-violet/90 disabled:opacity-50",
-              )}
-            >
+            </Button>
+            <Button type="submit" variant="secondary" size="sm" disabled={submitting}>
               {submitting ? "Saving..." : "Create booking"}
-            </button>
+            </Button>
           </div>
         </form>
       </div>
-    </div>
-  );
-}
-
-interface FieldProps {
-  label: string;
-  htmlFor: string;
-  children: React.ReactNode;
-}
-
-/**
- * Renders a labelled form field with consistent spacing.
- * @param props - Field props.
- * @param props.label - Visible label text.
- * @param props.htmlFor - Input id the label associates with.
- * @param props.children - Field input element(s).
- * @returns Labelled field element.
- */
-function Field({ label, htmlFor, children }: FieldProps): React.ReactElement {
-  return (
-    <div>
-      <label htmlFor={htmlFor} className={cn("mb-1 block text-xs font-semibold text-slate-600")}>
-        {label}
-      </label>
-      {children}
     </div>
   );
 }

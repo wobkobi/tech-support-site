@@ -1,3 +1,4 @@
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
@@ -17,13 +18,13 @@ export async function DELETE(
   { params }: { params: Promise<{ name: string }> },
 ): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   const { name } = await params;
   const decoded = decodeURIComponent(name).trim();
   if (!decoded) {
-    return NextResponse.json({ error: "name is required" }, { status: 400 });
+    return errorResponse("name is required", 400);
   }
 
   const result = await prisma.taskTemplate.updateMany({

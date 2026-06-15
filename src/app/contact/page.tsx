@@ -53,7 +53,7 @@ export default function ContactPage(): React.ReactElement {
               Get in touch
             </h1>
 
-            <p className={cn("mx-auto mb-8 max-w-2xl text-sm text-rich-black sm:text-base")}>
+            <p className={cn("mx-auto mb-8 max-w-2xl text-base text-rich-black sm:text-lg")}>
               Have a tech problem or question? Call or email and I'll help you figure it out.
             </p>
 
@@ -78,7 +78,7 @@ export default function ContactPage(): React.ReactElement {
               </Button>
             </div>
 
-            <p className={cn("mx-auto mt-6 max-w-xl text-sm text-rich-black/70 sm:text-base")}>
+            <p className={cn("mx-auto mt-6 max-w-xl text-base text-rich-black/70 sm:text-lg")}>
               I usually respond within a few hours during business days.
             </p>
           </section>
@@ -106,10 +106,10 @@ export default function ContactPage(): React.ReactElement {
                 >
                   Service area
                 </h2>
-                <p className={cn("mb-3 text-sm text-rich-black sm:text-base")}>
+                <p className={cn("mb-3 text-base text-rich-black sm:text-lg")}>
                   On-site visits across Auckland.
                 </p>
-                <p className={cn("text-sm text-rich-black/80 sm:text-base")}>
+                <p className={cn("text-base text-rich-black/80 sm:text-lg")}>
                   Remote support available for software and account issues. No travel needed.
                 </p>
               </div>
@@ -128,11 +128,11 @@ export default function ContactPage(): React.ReactElement {
               What to include when you contact me
             </h2>
 
-            <p className={cn("mb-4 text-sm text-rich-black sm:text-base")}>
+            <p className={cn("mb-4 text-base text-rich-black sm:text-lg")}>
               A few details help me give you a quick, accurate quote:
             </p>
 
-            <ul className={cn("space-y-2.5 text-sm text-rich-black sm:text-base")}>
+            <ul className={cn("space-y-2.5 text-base text-rich-black sm:text-lg")}>
               <li className={cn("flex gap-3")}>
                 <span className={cn("mt-1 text-lg text-moonstone-600")}>•</span>
                 <span>What's happening or what you want to achieve</span>
@@ -151,7 +151,7 @@ export default function ContactPage(): React.ReactElement {
               </li>
             </ul>
 
-            <p className={cn("mt-4 text-sm text-rich-black/80 sm:text-base")}>
+            <p className={cn("mt-4 text-base text-rich-black/80 sm:text-lg")}>
               Feel free to include screenshots or photos if they help explain the issue.
             </p>
           </section>
@@ -161,7 +161,7 @@ export default function ContactPage(): React.ReactElement {
             aria-label="Ready to get started"
             className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-300 text-center")}
           >
-            <p className={cn("mb-4 text-sm text-rich-black sm:text-base")}>
+            <p className={cn("mb-4 text-base text-rich-black sm:text-lg")}>
               Prefer to book directly?
             </p>
             <Button href="/booking" variant="primary" size="md">

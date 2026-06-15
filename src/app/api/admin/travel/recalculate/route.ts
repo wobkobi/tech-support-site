@@ -6,6 +6,7 @@
  */
 
 import { refreshCalendarCache } from "@/features/calendar/lib/calendar-cache";
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { type NextRequest, NextResponse } from "next/server";
@@ -18,7 +19,7 @@ import { type NextRequest, NextResponse } from "next/server";
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   try {
@@ -36,6 +37,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: true, cachedCount: result.cachedCount });
   } catch (error) {
     console.error("[travel/recalculate] Error:", error);
-    return NextResponse.json({ ok: false, error: "Recalculation failed" }, { status: 500 });
+    return errorResponse("Recalculation failed", 500);
   }
 }

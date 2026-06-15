@@ -1,4 +1,5 @@
 import { searchAllInvoicePdfs } from "@/features/business/lib/google-drive";
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
@@ -34,7 +35,7 @@ function extractCandidates(filename: string): string[] {
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   try {
@@ -74,6 +75,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     });
   } catch (err) {
     console.error("[sync-drive] failed:", err);
-    return NextResponse.json({ error: "Sync failed" }, { status: 503 });
+    return errorResponse("Sync failed", 503);
   }
 }

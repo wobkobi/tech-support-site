@@ -4,6 +4,7 @@
  * @description PATCH /api/reviews/[id] - Allows a customer to edit their review (with valid customerRef), resets status to pending.
  */
 
+import { errorResponse } from "@/shared/lib/api-response";
 import { prisma } from "@/shared/lib/prisma";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 import { NextRequest, NextResponse } from "next/server";
@@ -99,6 +100,6 @@ export async function PATCH(
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (error) {
     console.error("[reviews] PATCH error:", error);
-    return NextResponse.json({ error: "Failed to update review." }, { status: 500 });
+    return errorResponse("Failed to update review.", 500);
   }
 }

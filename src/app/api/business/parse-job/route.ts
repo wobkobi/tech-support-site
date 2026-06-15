@@ -11,6 +11,7 @@ import type {
   ParsedRange,
   RateConfig,
 } from "@/features/business/types/business";
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
@@ -25,8 +26,12 @@ interface RangeWithDuration extends ParsedRange {
   durationMins: number;
 }
 
+// Two times on one line, captured as start/end. The separator is forgiving so
+// the operator does not have to type a dash: a dash (-/–/—), the word "to", or
+// just whitespace all split the pair. Regex backtracking lets the bare-space
+// case work even though each time captures an optional trailing meridiem.
 const TIME_RANGE_RE =
-  /(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\s*[-–—]\s*(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/gi;
+  /(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)(?:\s*[-–—]\s*|\s+to\s+|\s+)(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/gi;
 
 type Meridiem = "am" | "pm" | null;
 
@@ -75,9 +80,10 @@ function minsToHHMM(mins: number): string {
 }
 
 /**
- * Extracts every HH:MM-HH:MM segment found on digit-led lines. Used internally
- * to compute the worked-minutes hint passed to the AI as a "pre-computed
- * session total" annotation.
+ * Extracts every start/end time segment found on digit-led lines, accepting a
+ * dash, "to", or plain whitespace between the two times. Used internally to
+ * compute the worked-minutes hint passed to the AI as a "pre-computed session
+ * total" annotation.
  * @param input - Raw job description text.
  * @returns Array of parsed time ranges (may be empty when nothing detected).
  */
@@ -156,7 +162,7 @@ function findTemplateByTags<T extends { device: string | null; action: string | 
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   // Parse and validate body
@@ -164,10 +170,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const { input, answers } = body as { input: unknown; answers?: Record<string, unknown> };
 
   if (!input || typeof input !== "string" || input.trim().length === 0) {
-    return NextResponse.json({ error: "input is required" }, { status: 400 });
+    return errorResponse("input is required", 400);
   }
   if (input.length > 1000) {
-    return NextResponse.json({ error: "input must be 1000 characters or fewer" }, { status: 400 });
+    return errorResponse("input must be 1000 characters or fewer", 400);
   }
 
   // Whitelist the clarification answer keys to the IDs the model is allowed to
@@ -442,6 +448,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: true, result: parsed });
   } catch (err) {
     console.error("[parse-job] failed:", err);
-    return NextResponse.json({ error: "Could not parse job description" }, { status: 422 });
+    return errorResponse("Could not parse job description", 422);
   }
 }

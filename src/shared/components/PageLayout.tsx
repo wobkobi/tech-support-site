@@ -12,7 +12,7 @@ export const CARD = cn(
 );
 
 export const SOFT_CARD = cn(
-  "border-seasalt-400/80 bg-seasalt-900/60 rounded-xl border p-3 text-sm sm:p-4 sm:text-base",
+  "border-seasalt-400/80 bg-seasalt-900/60 rounded-xl border p-3 text-base sm:p-4 sm:text-lg",
 );
 
 /** Props for PageShell. */

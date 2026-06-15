@@ -5,6 +5,7 @@
  */
 
 import { buildPastClientReviewEmailHtml } from "@/features/reviews/lib/email";
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -17,7 +18,7 @@ import { NextRequest, NextResponse } from "next/server";
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   try {
@@ -25,7 +26,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const { name } = body;
 
     if (!name?.trim()) {
-      return NextResponse.json({ ok: false, error: "Name is required." }, { status: 400 });
+      return errorResponse("Name is required.", 400);
     }
 
     const firstName = name.trim().split(" ")[0];
@@ -34,6 +35,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: true, html });
   } catch (error) {
     console.error("[admin/preview-review-email] Error:", error);
-    return NextResponse.json({ ok: false, error: "Failed to generate preview." }, { status: 500 });
+    return errorResponse("Failed to generate preview.", 500);
   }
 }

@@ -149,7 +149,7 @@ export default async function ReviewsPage(): Promise<React.ReactElement> {
             aria-label="Leave a review"
             className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-200")}
           >
-            <p className={cn("text-sm text-rich-black sm:text-base")}>
+            <p className={cn("text-base text-rich-black sm:text-lg")}>
               Had an appointment? You'll receive a review link by email after your visit. Or{" "}
               <Link href="/booking" className={linkStyle}>
                 book now

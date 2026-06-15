@@ -1,5 +1,6 @@
 // src/app/api/business/promos/[id]/route.ts
 import { ACTIVE_PROMO_TAG } from "@/features/business/lib/promos";
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { revalidateTag } from "next/cache";
@@ -17,7 +18,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
   const { id } = await params;
   const body = (await request.json()) as Partial<{
@@ -47,7 +48,7 @@ export async function PATCH(
     revalidateTag(ACTIVE_PROMO_TAG, "default");
     return NextResponse.json({ ok: true, promo });
   } catch {
-    return NextResponse.json({ error: "Promo not found" }, { status: 404 });
+    return errorResponse("Promo not found", 404);
   }
 }
 
@@ -63,7 +64,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
   const { id } = await params;
   try {
@@ -72,6 +73,6 @@ export async function DELETE(
     revalidateTag(ACTIVE_PROMO_TAG, "default");
     return NextResponse.json({ ok: true });
   } catch {
-    return NextResponse.json({ error: "Promo not found" }, { status: 404 });
+    return errorResponse("Promo not found", 404);
   }
 }

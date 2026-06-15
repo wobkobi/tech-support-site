@@ -1,5 +1,6 @@
 import { VALID_FREQUENCIES } from "@/features/business/lib/constants";
 import { parseAmount, parseRate } from "@/features/business/lib/validation";
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
@@ -11,7 +12,7 @@ import { NextRequest, NextResponse } from "next/server";
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
   const subscriptions = await prisma.subscription.findMany({
     orderBy: { nextDue: "asc" },
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   const body = await request.json();
@@ -43,19 +44,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   } = body;
 
   if (!description || !supplier || amountIncl === undefined || !frequency || !nextDue) {
-    return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    return errorResponse("Missing required fields", 400);
   }
   if (!VALID_FREQUENCIES.includes(frequency)) {
-    return NextResponse.json({ error: "Invalid frequency" }, { status: 400 });
+    return errorResponse("Invalid frequency", 400);
   }
 
   const safeAmount = parseAmount(amountIncl);
   if (safeAmount === null) {
-    return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
+    return errorResponse("Invalid amount", 400);
   }
   const safeRate = gstRate === undefined ? 0.15 : parseRate(gstRate);
   if (safeRate === null) {
-    return NextResponse.json({ error: "Invalid GST rate" }, { status: 400 });
+    return errorResponse("Invalid GST rate", 400);
   }
 
   const subscription = await prisma.subscription.create({

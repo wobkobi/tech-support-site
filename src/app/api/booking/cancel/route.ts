@@ -14,6 +14,7 @@ import {
 } from "@/features/business/lib/pricing-policy";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { deleteBookingEvent } from "@/features/calendar/lib/google-calendar";
+import { errorResponse } from "@/shared/lib/api-response";
 import { prisma } from "@/shared/lib/prisma";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 import { NextRequest, NextResponse } from "next/server";
@@ -37,7 +38,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   const token = request.nextUrl.searchParams.get("token");
   if (!token) {
-    return NextResponse.json({ ok: false, error: "Missing cancel token." }, { status: 400 });
+    return errorResponse("Missing cancel token.", 400);
   }
 
   const booking = await prisma.booking.findFirst({
@@ -45,7 +46,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     select: { startAt: true, status: true },
   });
   if (!booking) {
-    return NextResponse.json({ ok: false, error: "Booking not found." }, { status: 404 });
+    return errorResponse("Booking not found.", 404);
   }
 
   // Hand the live cancellation policy to the client so the fee banner quotes
@@ -80,7 +81,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const { cancelToken } = body;
 
     if (!cancelToken) {
-      return NextResponse.json({ ok: false, error: "Missing cancel token." }, { status: 400 });
+      return errorResponse("Missing cancel token.", 400);
     }
 
     // Load the booking
@@ -89,11 +90,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     });
 
     if (!booking) {
-      return NextResponse.json({ ok: false, error: "Booking not found." }, { status: 404 });
+      return errorResponse("Booking not found.", 404);
     }
 
     if (booking.status === "cancelled") {
-      return NextResponse.json({ ok: false, error: "Booking already cancelled." }, { status: 400 });
+      return errorResponse("Booking already cancelled.", 400);
     }
 
     // Remove the calendar event
@@ -150,6 +151,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     });
   } catch (error) {
     console.error("[booking/cancel] Error:", error);
-    return NextResponse.json({ ok: false, error: "Failed to cancel booking." }, { status: 500 });
+    return errorResponse("Failed to cancel booking.", 500);
   }
 }

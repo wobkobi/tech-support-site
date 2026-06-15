@@ -9,6 +9,7 @@
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import {
   BOOKING_FIELD_LIMITS,
+  combineUnitAndAddress,
   splitUnitFromAddress,
   SUB_SLOT_MINUTES,
   validateEmail,
@@ -72,20 +73,6 @@ export interface BookingFormInitialValues {
   meetingType: "in-person" | "remote" | "";
   address: string;
   notes: string;
-}
-
-/**
- * Combines a unit number and a street-and-rest back into the saved address
- * string ("12/160 Kepa Road Orakei"). Returns just the rest when no unit is
- * present, so non-apartment addresses are unchanged.
- * @param unit - Apartment / unit number, may be empty.
- * @param rest - Street address + suburb.
- * @returns Combined address string suitable for persistence.
- */
-function combineUnitAndAddress(unit: string, rest: string): string {
-  const u = unit.trim();
-  const r = rest.trim();
-  return u ? `${u}/${r}` : r;
 }
 
 export interface BookingFormProps {
@@ -780,9 +767,6 @@ export default function BookingForm({
           <label className={cn("mb-2 block text-base font-semibold text-rich-black")}>
             Choose a day
           </label>
-          <p className={cn("mb-2 text-base text-rich-black/60")}>
-            All times shown in NZ time (Auckland).
-          </p>
 
           {!availableDays.some((d) => d.hasAnySlots) ? (
             <p className={cn("text-base text-rich-black/70")}>
@@ -1391,13 +1375,7 @@ export default function BookingForm({
 
               <dt className={cn("text-rich-black/60")}>Time</dt>
               <dd className={cn("text-rich-black")}>
-                {timeLabel ? (
-                  <>
-                    {timeLabel} <span className={cn("text-sm text-rich-black/60")}>NZ time</span>
-                  </>
-                ) : (
-                  <span className={cn("text-rich-black/50")}>—</span>
-                )}
+                {timeLabel ? timeLabel : <span className={cn("text-rich-black/50")}>—</span>}
               </dd>
 
               <dt className={cn("text-rich-black/60")}>Meeting</dt>

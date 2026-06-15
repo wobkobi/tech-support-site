@@ -1,5 +1,6 @@
 import type { GoogleContact } from "@/features/business/types/business";
 import { getOAuth2Client } from "@/features/calendar/lib/google-calendar";
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { google } from "googleapis";
 import { NextRequest, NextResponse } from "next/server";
@@ -14,7 +15,7 @@ export const maxDuration = 60;
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   try {
@@ -42,6 +43,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: true, contacts });
   } catch (err) {
     console.error("[contacts] failed:", err);
-    return NextResponse.json({ error: "Could not fetch contacts" }, { status: 503 });
+    return errorResponse("Could not fetch contacts", 503);
   }
 }

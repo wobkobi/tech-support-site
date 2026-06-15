@@ -1,5 +1,6 @@
 import { VALID_FREQUENCIES } from "@/features/business/lib/constants";
 import { parseAmount, parseRate } from "@/features/business/lib/validation";
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
@@ -16,7 +17,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   const { id } = await params;
@@ -35,14 +36,14 @@ export async function PATCH(
   } = body;
 
   if (frequency && !(VALID_FREQUENCIES as readonly string[]).includes(frequency)) {
-    return NextResponse.json({ error: "Invalid frequency" }, { status: 400 });
+    return errorResponse("Invalid frequency", 400);
   }
 
   let safeAmount: number | undefined;
   if (amountIncl !== undefined) {
     const parsed = parseAmount(amountIncl);
     if (parsed === null) {
-      return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
+      return errorResponse("Invalid amount", 400);
     }
     safeAmount = parsed;
   }
@@ -51,7 +52,7 @@ export async function PATCH(
   if (gstRate !== undefined) {
     const parsed = parseRate(gstRate);
     if (parsed === null) {
-      return NextResponse.json({ error: "Invalid GST rate" }, { status: 400 });
+      return errorResponse("Invalid GST rate", 400);
     }
     safeRate = parsed;
   }
@@ -87,7 +88,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   const { id } = await params;

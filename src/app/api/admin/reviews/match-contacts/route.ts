@@ -4,6 +4,7 @@
  * @description Admin API to auto-match reviews to contacts by email or phone.
  */
 
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { normalisePhone, toE164NZ } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
@@ -24,7 +25,7 @@ export const maxDuration = 60;
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   try {
@@ -107,6 +108,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: true, matchedCount });
   } catch (error) {
     console.error("[admin/reviews/match-contacts] POST error:", error);
-    return NextResponse.json({ error: "Failed to match contacts" }, { status: 500 });
+    return errorResponse("Failed to match contacts", 500);
   }
 }

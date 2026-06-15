@@ -1,6 +1,7 @@
 // src/app/api/business/invoices/[id]/preview-email/route.ts
 import { getInvoiceReviewEligibility } from "@/features/business/lib/contact-review-token";
 import { buildInvoiceEmail } from "@/features/reviews/lib/email";
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { getSiteUrl } from "@/shared/lib/site-url";
@@ -20,13 +21,13 @@ export async function POST(
   ctx: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   const { id } = await ctx.params;
   const invoice = await prisma.invoice.findUnique({ where: { id } });
   if (!invoice) {
-    return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+    return errorResponse("Invoice not found", 404);
   }
 
   // Optional operator overrides: greetingName targets a person inside a

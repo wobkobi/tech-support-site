@@ -6,6 +6,7 @@
  */
 
 import { deleteBookingEvent, SCHEDULE_CALENDAR_TAG } from "@/features/calendar/lib/google-calendar";
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { revalidateTag } from "next/cache";
 import { type NextRequest, NextResponse } from "next/server";
@@ -26,12 +27,12 @@ export async function DELETE(
   { params }: { params: Promise<{ eventId: string }> },
 ): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   const { eventId } = await params;
   if (!eventId) {
-    return NextResponse.json({ ok: false, error: "Missing eventId." }, { status: 400 });
+    return errorResponse("Missing eventId.", 400);
   }
 
   try {

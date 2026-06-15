@@ -19,6 +19,7 @@ import {
 import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-create";
 import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
 import { sendCustomerBookingConfirmation } from "@/features/reviews/lib/email";
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { validatePhone } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
@@ -51,7 +52,7 @@ interface AdminBookingPayload {
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   // Parse the payload; trim free-text fields and lowercase the email
@@ -67,21 +68,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   // Validate fields
   if (!name || name.length > BOOKING_FIELD_LIMITS.name) {
-    return NextResponse.json({ ok: false, error: "Customer name is required." }, { status: 400 });
+    return errorResponse("Customer name is required.", 400);
   }
   const emailCheck = validateEmail(email);
   if (emailCheck !== "ok") {
     const msg = emailCheck === "too-long" ? "Email is too long." : "Valid email is required.";
-    return NextResponse.json({ ok: false, error: msg }, { status: 400 });
+    return errorResponse(msg, 400);
   }
   if (notes.length > BOOKING_FIELD_LIMITS.notes) {
-    return NextResponse.json({ ok: false, error: "Notes too long." }, { status: 400 });
+    return errorResponse("Notes too long.", 400);
   }
   if (address && address.length > BOOKING_FIELD_LIMITS.address) {
-    return NextResponse.json({ ok: false, error: "Address too long." }, { status: 400 });
+    return errorResponse("Address too long.", 400);
   }
   if (!startAtStr || isNaN(Date.parse(startAtStr))) {
-    return NextResponse.json({ ok: false, error: "Invalid start time." }, { status: 400 });
+    return errorResponse("Invalid start time.", 400);
   }
   if (durationMinutes !== 60 && durationMinutes !== 120) {
     return NextResponse.json(
@@ -94,7 +95,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (phoneRaw) {
     const phoneCheck = validatePhone(phoneRaw);
     if (phoneCheck.result !== "ok") {
-      return NextResponse.json({ ok: false, error: "Invalid phone number." }, { status: 400 });
+      return errorResponse("Invalid phone number.", 400);
     }
     phoneE164 = phoneCheck.e164;
   }
@@ -234,9 +235,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: true, bookingId: booking.id });
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
-      return NextResponse.json({ ok: false, error: "This slot was just taken." }, { status: 409 });
+      return errorResponse("This slot was just taken.", 409);
     }
     console.error("[admin/bookings] Booking insert failed:", err);
-    return NextResponse.json({ ok: false, error: "Failed to save booking." }, { status: 500 });
+    return errorResponse("Failed to save booking.", 500);
   }
 }

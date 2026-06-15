@@ -1,4 +1,5 @@
 import { lookupDriveDistance } from "@/features/business/lib/travel-distance";
+import { errorResponse } from "@/shared/lib/api-response";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -21,7 +22,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const raw = body.destination;
 
   if (!raw || typeof raw !== "string" || !raw.trim()) {
-    return NextResponse.json({ error: "destination is required" }, { status: 400 });
+    return errorResponse("destination is required", 400);
   }
 
   let departureTime: Date | undefined;

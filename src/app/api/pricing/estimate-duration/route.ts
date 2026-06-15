@@ -1,4 +1,5 @@
 import { getPublicPricing } from "@/features/business/lib/pricing-policy.server";
+import { errorResponse } from "@/shared/lib/api-response";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import type { Benchmark } from "@/shared/lib/settings/types";
@@ -125,7 +126,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const description = (body as { description?: unknown })?.description;
 
   if (!description || typeof description !== "string" || !description.trim()) {
-    return NextResponse.json({ error: "description is required" }, { status: 400 });
+    return errorResponse("description is required", 400);
   }
 
   const trimmed = description.trim().slice(0, 500);
@@ -190,6 +191,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: true, result: parsed });
   } catch (err) {
     console.error("[estimate-duration] failed:", err);
-    return NextResponse.json({ error: "Could not estimate duration" }, { status: 422 });
+    return errorResponse("Could not estimate duration", 422);
   }
 }

@@ -10,6 +10,7 @@ import {
   createBlockedDayEvent,
   SCHEDULE_CALENDAR_TAG,
 } from "@/features/calendar/lib/google-calendar";
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
@@ -33,14 +34,14 @@ interface BlockedDayPayload {
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   const body = (await request.json()) as BlockedDayPayload;
   const dateKey = body.dateKey?.trim() ?? "";
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
-    return NextResponse.json({ ok: false, error: "Invalid date." }, { status: 400 });
+    return errorResponse("Invalid date.", 400);
   }
 
   const [y, m, d] = dateKey.split("-").map(Number);

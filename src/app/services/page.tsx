@@ -171,12 +171,12 @@ export default async function ServicesPage(): Promise<React.ReactElement> {
               Services
             </h1>
 
-            <p className={cn("mb-4 text-sm text-rich-black sm:text-base")}>
+            <p className={cn("mb-4 text-base text-rich-black sm:text-lg")}>
               I help with the everyday tech problems no matter how big or small. The goal is to get
               things working reliably and leave you with a setup you understand.
             </p>
 
-            <p className={cn("text-sm text-rich-black/90 sm:text-base")}>
+            <p className={cn("text-base text-rich-black/90 sm:text-lg")}>
               Every job includes clear explanations, and I can leave notes so you know what changed
               and how to handle things next time.
             </p>
@@ -217,7 +217,7 @@ export default async function ServicesPage(): Promise<React.ReactElement> {
                       {area.label}
                     </h3>
                   </div>
-                  <ul className={cn("space-y-1 text-sm text-rich-black/80 sm:text-base")}>
+                  <ul className={cn("space-y-1 text-base text-rich-black/80 sm:text-lg")}>
                     {area.examples.map((example) => (
                       <li key={example} className={cn("flex gap-2")}>
                         <span className={cn("mt-0.5 text-moonstone-600")}>•</span>
@@ -229,7 +229,7 @@ export default async function ServicesPage(): Promise<React.ReactElement> {
               ))}
             </div>
 
-            <p className={cn("mt-6 text-sm text-rich-black/90 sm:text-base")}>
+            <p className={cn("mt-6 text-base text-rich-black/90 sm:text-lg")}>
               Not sure which category your problem fits? That's fine. Just describe what's happening
               and I'll figure out the best approach.
             </p>
@@ -247,11 +247,11 @@ export default async function ServicesPage(): Promise<React.ReactElement> {
                 For home users
               </h2>
 
-              <p className={cn("mb-3 text-sm text-rich-black sm:text-base")}>
+              <p className={cn("mb-3 text-base text-rich-black sm:text-lg")}>
                 Common home visits include:
               </p>
 
-              <ul className={cn("space-y-2 text-sm text-rich-black/90 sm:text-base")}>
+              <ul className={cn("space-y-2 text-base text-rich-black/90 sm:text-lg")}>
                 <li className={cn("flex gap-2")}>
                   <span className={cn("mt-1 text-moonstone-600")}>•</span>
                   <span>Setting up a new laptop, phone, or tablet with all your accounts</span>
@@ -290,11 +290,11 @@ export default async function ServicesPage(): Promise<React.ReactElement> {
                 For small businesses
               </h2>
 
-              <p className={cn("mb-3 text-sm text-rich-black sm:text-base")}>
+              <p className={cn("mb-3 text-base text-rich-black sm:text-lg")}>
                 Light IT support for sole traders and small teams:
               </p>
 
-              <ul className={cn("space-y-2 text-sm text-rich-black/90 sm:text-base")}>
+              <ul className={cn("space-y-2 text-base text-rich-black/90 sm:text-lg")}>
                 <li className={cn("flex gap-2")}>
                   <span className={cn("mt-1 text-moonstone-600")}>•</span>
                   <span>Setting up workstations, email, and shared files</span>
@@ -317,7 +317,7 @@ export default async function ServicesPage(): Promise<React.ReactElement> {
                 </li>
               </ul>
 
-              <p className={cn("mt-3 text-sm text-rich-black/90 sm:text-base")}>
+              <p className={cn("mt-3 text-base text-rich-black/90 sm:text-lg")}>
                 No ongoing contracts required. You call when you need help.
               </p>
             </section>
@@ -327,7 +327,7 @@ export default async function ServicesPage(): Promise<React.ReactElement> {
             aria-label="Next steps"
             className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-400 text-center")}
           >
-            <p className={cn("mb-4 text-sm text-rich-black sm:text-base")}>Ready to get started?</p>
+            <p className={cn("mb-4 text-base text-rich-black sm:text-lg")}>Ready to get started?</p>
             <div className={cn("flex flex-wrap items-center justify-center gap-3")}>
               <Button href="/pricing" variant="ghost" size="md">
                 View pricing

@@ -7,6 +7,7 @@
 
 import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-create";
 import { revalidateReviewPaths } from "@/features/reviews/lib/revalidate";
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
@@ -26,7 +27,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   const body = (await request.json()) as {
@@ -46,13 +47,13 @@ export async function PATCH(
       return NextResponse.json({ ok: true });
     } catch (error) {
       console.error(`[admin/reviews] PATCH contactId error for ${id}:`, error);
-      return NextResponse.json({ error: "Failed to update review" }, { status: 500 });
+      return errorResponse("Failed to update review", 500);
     }
   }
 
   const { action } = body;
   if (action !== "approve" && action !== "revoke") {
-    return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+    return errorResponse("Invalid action", 400);
   }
 
   const { id } = await params;
@@ -126,7 +127,7 @@ export async function PATCH(
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error(`[admin/reviews] PATCH error for ${id}:`, error);
-    return NextResponse.json({ error: "Failed to update review" }, { status: 500 });
+    return errorResponse("Failed to update review", 500);
   }
 }
 
@@ -143,7 +144,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   const { id } = await params;
@@ -157,6 +158,6 @@ export async function DELETE(
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error(`[admin/reviews] DELETE error for ${id}:`, error);
-    return NextResponse.json({ error: "Failed to delete review" }, { status: 500 });
+    return errorResponse("Failed to delete review", 500);
   }
 }

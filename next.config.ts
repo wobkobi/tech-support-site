@@ -14,6 +14,7 @@ const cspProd =
   "connect-src 'self' https://maps.googleapis.com; " +
   "worker-src 'self' blob:; " +
   "manifest-src 'self'; " +
+  "object-src 'none'; " +
   "frame-ancestors 'none'; " +
   "base-uri 'self'; " +
   "form-action 'self';";
@@ -26,6 +27,7 @@ const cspDev =
   "font-src 'self' data: https://fonts.gstatic.com; " +
   "connect-src 'self' ws: http://localhost:3000 http://127.0.0.1:3000 https://maps.googleapis.com https://va.vercel-scripts.com; " +
   "worker-src 'self' blob:; " +
+  "object-src 'none'; " +
   "frame-ancestors 'none'; " +
   "base-uri 'self'; " +
   "form-action 'self';";

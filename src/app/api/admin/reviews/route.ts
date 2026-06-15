@@ -5,6 +5,7 @@
  */
 
 import { reviewTextError } from "@/features/reviews/lib/validation";
+import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
@@ -18,7 +19,7 @@ import { NextRequest, NextResponse } from "next/server";
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return errorResponse("Unauthorized", 401);
   }
 
   try {
@@ -31,7 +32,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const text = body.text?.trim() ?? "";
     const textErr = reviewTextError(text);
-    if (textErr) return NextResponse.json({ error: textErr }, { status: 400 });
+    if (textErr) return errorResponse(textErr, 400);
 
     const isAnonymous = body.isAnonymous ?? false;
     const firstName = isAnonymous ? null : body.firstName?.trim() || null;
@@ -61,6 +62,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: true, review }, { status: 201 });
   } catch (error) {
     console.error("[admin/reviews] POST error:", error);
-    return NextResponse.json({ error: "Failed to create review." }, { status: 500 });
+    return errorResponse("Failed to create review.", 500);
   }
 }

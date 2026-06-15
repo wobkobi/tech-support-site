@@ -15,7 +15,7 @@ import { EmailInput } from "@/shared/components/EmailInput";
 import { PhoneInput } from "@/shared/components/PhoneInput";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
-import { validatePhone } from "@/shared/lib/normalise-phone";
+import { formatNZPhone, validatePhone } from "@/shared/lib/normalise-phone";
 import type React from "react";
 import { useEffect, useState } from "react";
 
@@ -254,7 +254,7 @@ function ContactCard({
                 <div className={cn("space-y-0.5 text-slate-500")}>
                   <p>{c.name}</p>
                   {c.email && <p>{c.email}</p>}
-                  {c.phone && <p>{c.phone}</p>}
+                  {c.phone && <p>{formatNZPhone(c.phone)}</p>}
                   {c.address && <p>{c.address}</p>}
                 </div>
                 <div className={cn("flex gap-2")}>
@@ -316,7 +316,7 @@ function ContactCard({
           href={`tel:${c.phone}`}
           className={cn("text-sm text-slate-500 transition-colors hover:text-slate-700")}
         >
-          {c.phone}
+          {formatNZPhone(c.phone)}
         </a>
       )}
       {c.address && <p className={cn("text-sm wrap-break-word text-slate-500")}>{c.address}</p>}
