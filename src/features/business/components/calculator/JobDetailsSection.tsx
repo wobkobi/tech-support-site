@@ -102,9 +102,10 @@ export function JobDetailsSection({
     onDurationOverrideChange(null);
   }
 
-  /** Appends a blank slot below the existing ones. */
+  /** Appends a slot; rolling entry seeds its start from the previous slot's end. */
   function addRange(): void {
-    onTimeRangesChange([...timeRanges, { startTime: "", endTime: "" }]);
+    const prevEnd = timeRanges[timeRanges.length - 1]?.endTime ?? "";
+    onTimeRangesChange([...timeRanges, { startTime: prevEnd, endTime: "" }]);
     onDurationOverrideChange(null);
   }
 

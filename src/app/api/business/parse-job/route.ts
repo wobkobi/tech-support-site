@@ -26,8 +26,12 @@ interface RangeWithDuration extends ParsedRange {
   durationMins: number;
 }
 
+// Two times on one line, captured as start/end. The separator is forgiving so
+// the operator does not have to type a dash: a dash (-/–/—), the word "to", or
+// just whitespace all split the pair. Regex backtracking lets the bare-space
+// case work even though each time captures an optional trailing meridiem.
 const TIME_RANGE_RE =
-  /(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\s*[-–—]\s*(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/gi;
+  /(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)(?:\s*[-–—]\s*|\s+to\s+|\s+)(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/gi;
 
 type Meridiem = "am" | "pm" | null;
 
@@ -76,9 +80,10 @@ function minsToHHMM(mins: number): string {
 }
 
 /**
- * Extracts every HH:MM-HH:MM segment found on digit-led lines. Used internally
- * to compute the worked-minutes hint passed to the AI as a "pre-computed
- * session total" annotation.
+ * Extracts every start/end time segment found on digit-led lines, accepting a
+ * dash, "to", or plain whitespace between the two times. Used internally to
+ * compute the worked-minutes hint passed to the AI as a "pre-computed session
+ * total" annotation.
  * @param input - Raw job description text.
  * @returns Array of parsed time ranges (may be empty when nothing detected).
  */
