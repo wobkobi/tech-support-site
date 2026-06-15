@@ -6,6 +6,7 @@
 
 import { ReviewScrollHandler } from "@/features/reviews/components/ReviewScrollHandler";
 import { formatReviewerName } from "@/features/reviews/lib/formatting";
+import { splitReviewsIntoColumns } from "@/features/reviews/lib/gridColumns";
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
 import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
 import { cn } from "@/shared/lib/cn";
@@ -58,6 +59,9 @@ export default async function ReviewsPage(): Promise<React.ReactElement> {
     lastName: r.lastName?.trim() || null,
   }));
 
+  // Balance reviews into two columns so the masonry grid packs with no gaps.
+  const reviewColumns = splitReviewsIntoColumns(normalisedRows);
+
   return (
     <PageShell>
       <ReviewScrollHandler />
@@ -107,26 +111,37 @@ export default async function ReviewsPage(): Promise<React.ReactElement> {
               aria-label="Client reviews"
               className={cn("animate-slide-up animate-fill-both animate-delay-100")}
             >
-              <ul className={cn("grid gap-4 sm:grid-cols-2")}>
-                {normalisedRows.map((r) => (
-                  <li
-                    key={r.id}
-                    id={`review-${r.id}`}
-                    className={cn(
-                      "flex flex-col rounded-lg border-2 border-seasalt-400/60 bg-seasalt-800/80 p-4 sm:p-5",
-                    )}
+              {/* Two balanced masonry columns (see splitReviewsIntoColumns). On mobile both
+                  <ul>s collapse via display:contents into one flex column, where the CSS
+                  `order` (date index) restores a single newest-first list. */}
+              <div className={cn("flex flex-col gap-4 sm:flex-row sm:items-start")}>
+                {[reviewColumns.left, reviewColumns.right].map((column, columnIndex) => (
+                  <ul
+                    key={columnIndex}
+                    className={cn("contents sm:flex sm:flex-1 sm:flex-col sm:gap-4")}
                   >
-                    <p className={cn("flex-1 text-base text-rich-black sm:text-lg")}>{r.text}</p>
-                    <p
-                      className={cn(
-                        "pt-3 text-right text-base font-semibold text-russian-violet sm:text-lg",
-                      )}
-                    >
-                      - {formatReviewerName(r)}
-                    </p>
-                  </li>
+                    {column.map(({ review: r, order }) => (
+                      <li
+                        key={r.id}
+                        id={`review-${r.id}`}
+                        style={{ order }}
+                        className={cn(
+                          "flex flex-col rounded-lg border-2 border-seasalt-400/60 bg-seasalt-800/80 p-4 sm:p-5",
+                        )}
+                      >
+                        <p className={cn("text-base text-rich-black sm:text-lg")}>{r.text}</p>
+                        <p
+                          className={cn(
+                            "pt-3 text-right text-base font-semibold text-russian-violet sm:text-lg",
+                          )}
+                        >
+                          - {formatReviewerName(r)}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
                 ))}
-              </ul>
+              </div>
             </section>
           )}
 

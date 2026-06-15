@@ -769,7 +769,7 @@ export function DayAgendaView({
                       )}
                       <div
                         className={cn(
-                          "mt-1 flex items-center justify-between gap-2 text-[10px] text-slate-400",
+                          "mt-1 flex items-center justify-between gap-2 text-[11px] text-slate-400",
                         )}
                       >
                         <span className={cn("font-mono")}>#{ev.booking.id}</span>

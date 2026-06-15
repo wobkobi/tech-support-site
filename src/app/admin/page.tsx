@@ -337,7 +337,7 @@ export default async function AdminPage(): Promise<React.ReactElement> {
               {s.value}
             </p>
             <p className={cn("mt-0.5 text-xs text-slate-500")}>{s.label}</p>
-            {s.sub && <p className={cn("mt-0.5 text-[10px] text-slate-400")}>{s.sub}</p>}
+            {s.sub && <p className={cn("mt-0.5 text-[11px] text-slate-400")}>{s.sub}</p>}
           </Link>
         ))}
       </div>

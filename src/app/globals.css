@@ -323,6 +323,12 @@ aside.app-admin-drawer {
   will-change: transform;
 }
 
+/* Hold the scroll still while a reader hovers or tabs into a card. */
+.animate-marquee:hover,
+.animate-marquee:focus-within {
+  animation-play-state: paused;
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;

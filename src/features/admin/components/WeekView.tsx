@@ -239,128 +239,140 @@ export function WeekView({
         </div>
       </div>
 
-      <div className={cn("overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm")}>
-        <div className={cn("min-w-225")}>
-          {/* Day headers */}
-          <div className={cn("grid grid-cols-[64px_repeat(7,1fr)] border-b border-slate-200")}>
-            <div className={cn("border-r border-slate-200")} />
-            {days.map((day) => {
-              const isToday = day.key === todayNzKey;
-              const busyEvent = day.allDayEvents.find((e) => e.kind === "booking");
-              const hasBookings = day.timedEvents.some((e) => e.kind === "booking");
-              const holidayName = holidaysByDateKey[day.key];
-              return (
-                <div
-                  key={day.key}
-                  className={cn(
-                    "border-r border-slate-200 px-2 py-3 text-center last:border-r-0",
-                    isToday && "bg-russian-violet/5",
-                  )}
-                >
-                  {holidayName && (
-                    <div
-                      className={cn(
-                        "mb-1 truncate text-[10px] font-semibold tracking-wide text-amber-700 uppercase",
-                      )}
-                      title={holidayName}
-                    >
-                      {holidayName}
-                    </div>
-                  )}
+      {/* relative wrapper carries the right-edge fade hint - the grid is wider
+          than the admin content area until ~xl, so it scrolls horizontally. */}
+      <div className={cn("relative")}>
+        <div
+          className={cn("overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm")}
+        >
+          <div className={cn("min-w-225")}>
+            {/* Day headers */}
+            <div className={cn("grid grid-cols-[64px_repeat(7,1fr)] border-b border-slate-200")}>
+              <div className={cn("border-r border-slate-200")} />
+              {days.map((day) => {
+                const isToday = day.key === todayNzKey;
+                const busyEvent = day.allDayEvents.find((e) => e.kind === "booking");
+                const hasBookings = day.timedEvents.some((e) => e.kind === "booking");
+                const holidayName = holidaysByDateKey[day.key];
+                return (
                   <div
-                    className={cn("text-xs font-semibold tracking-wide text-slate-500 uppercase")}
-                  >
-                    {day.label}
-                  </div>
-                  <div className={cn("mt-0.5 flex items-center justify-center gap-1.5")}>
-                    <div
-                      className={cn(
-                        "text-sm font-bold",
-                        isToday ? "text-russian-violet" : "text-slate-800",
-                      )}
-                    >
-                      {day.subLabel}
-                    </div>
-                    <BlockDayButton
-                      dateKey={day.key}
-                      busyEventId={busyEvent?.id ?? null}
-                      hasBookings={hasBookings}
-                      busyAction={busyAction}
-                      onPending={setBusyAction}
-                      onChanged={() => router.refresh()}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* All-day events bar - merges consecutive days into one continuous
-              span so multi-day Busy blocks read as a single bar. */}
-          {allDayBars.length > 0 && (
-            <div className={cn("border-b border-slate-200 px-0 py-1")}>
-              {allDayBars.map((bar) => (
-                <div
-                  key={bar.event.id}
-                  className={cn("grid grid-cols-[64px_repeat(7,1fr)] py-0.5")}
-                >
-                  <div
+                    key={day.key}
                     className={cn(
-                      "mx-1 truncate rounded border px-2 py-0.5 text-center text-[11px] font-semibold",
-                      KIND_STYLES[bar.event.kind],
+                      "border-r border-slate-200 px-2 py-3 text-center last:border-r-0",
+                      isToday && "bg-russian-violet/5",
                     )}
-                    style={{ gridColumnStart: bar.startCol, gridColumnEnd: bar.endCol }}
-                    title={bar.event.title}
                   >
-                    {bar.event.title}
+                    {holidayName && (
+                      <div
+                        className={cn(
+                          "mb-1 truncate text-[10px] font-semibold tracking-wide text-amber-700 uppercase",
+                        )}
+                        title={holidayName}
+                      >
+                        {holidayName}
+                      </div>
+                    )}
+                    <div
+                      className={cn("text-xs font-semibold tracking-wide text-slate-500 uppercase")}
+                    >
+                      {day.label}
+                    </div>
+                    <div className={cn("mt-0.5 flex items-center justify-center gap-1.5")}>
+                      <div
+                        className={cn(
+                          "text-sm font-bold",
+                          isToday ? "text-russian-violet" : "text-slate-800",
+                        )}
+                      >
+                        {day.subLabel}
+                      </div>
+                      <BlockDayButton
+                        dateKey={day.key}
+                        busyEventId={busyEvent?.id ?? null}
+                        hasBookings={hasBookings}
+                        busyAction={busyAction}
+                        onPending={setBusyAction}
+                        onChanged={() => router.refresh()}
+                      />
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Grid body */}
-          <div
-            className={cn("relative grid grid-cols-[64px_repeat(7,1fr)]")}
-            style={{ height: `${DAY_HEIGHT_PX}px` }}
-          >
-            {/* Time gutter */}
-            <div className={cn("relative border-r border-slate-200")}>
-              {hours.map((h, i) => (
-                <div
-                  key={h}
-                  className={cn(
-                    "absolute right-1 text-[11px] font-medium text-slate-400",
-                    i === 0 && "top-0",
-                  )}
-                  style={{ top: i === 0 ? 0 : `${i * 60 * PX_PER_MINUTE - 6}px` }}
-                >
-                  {formatHour(h)}
-                </div>
-              ))}
+                );
+              })}
             </div>
 
-            {/* Day columns */}
-            {days.map((day) => (
-              <DayColumn key={day.key} day={day} onClick={(e) => handleColumnClick(e, day.key)} />
-            ))}
-          </div>
-
-          {/* Legend */}
-          <div
-            className={cn(
-              "flex flex-wrap items-center gap-3 border-t border-slate-200 px-4 py-3 text-xs text-slate-500",
+            {/* All-day events bar - merges consecutive days into one continuous
+              span so multi-day Busy blocks read as a single bar. */}
+            {allDayBars.length > 0 && (
+              <div className={cn("border-b border-slate-200 px-0 py-1")}>
+                {allDayBars.map((bar) => (
+                  <div
+                    key={bar.event.id}
+                    className={cn("grid grid-cols-[64px_repeat(7,1fr)] py-0.5")}
+                  >
+                    <div
+                      className={cn(
+                        "mx-1 truncate rounded border px-2 py-0.5 text-center text-[11px] font-semibold",
+                        KIND_STYLES[bar.event.kind],
+                      )}
+                      style={{ gridColumnStart: bar.startCol, gridColumnEnd: bar.endCol }}
+                      title={bar.event.title}
+                    >
+                      {bar.event.title}
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
-          >
-            <LegendDot kind="booking" label="Booking" />
-            <LegendDot kind="car" label="No car (Car cal)" />
-            <LegendDot kind="personal" label="Personal" />
-            <LegendDot kind="travel" label="Travel" />
-            <span className={cn("ml-auto text-slate-400")}>
-              Click an empty slot to add a booking
-            </span>
+
+            {/* Grid body */}
+            <div
+              className={cn("relative grid grid-cols-[64px_repeat(7,1fr)]")}
+              style={{ height: `${DAY_HEIGHT_PX}px` }}
+            >
+              {/* Time gutter */}
+              <div className={cn("relative border-r border-slate-200")}>
+                {hours.map((h, i) => (
+                  <div
+                    key={h}
+                    className={cn(
+                      "absolute right-1 text-[11px] font-medium text-slate-400",
+                      i === 0 && "top-0",
+                    )}
+                    style={{ top: i === 0 ? 0 : `${i * 60 * PX_PER_MINUTE - 6}px` }}
+                  >
+                    {formatHour(h)}
+                  </div>
+                ))}
+              </div>
+
+              {/* Day columns */}
+              {days.map((day) => (
+                <DayColumn key={day.key} day={day} onClick={(e) => handleColumnClick(e, day.key)} />
+              ))}
+            </div>
+
+            {/* Legend */}
+            <div
+              className={cn(
+                "flex flex-wrap items-center gap-3 border-t border-slate-200 px-4 py-3 text-xs text-slate-500",
+              )}
+            >
+              <LegendDot kind="booking" label="Booking" />
+              <LegendDot kind="car" label="No car (Car cal)" />
+              <LegendDot kind="personal" label="Personal" />
+              <LegendDot kind="travel" label="Travel" />
+              <span className={cn("ml-auto text-slate-400")}>
+                Click an empty slot to add a booking
+              </span>
+            </div>
           </div>
         </div>
+        <div
+          aria-hidden
+          className={cn(
+            "pointer-events-none absolute inset-y-0 right-0 w-8 rounded-r-xl bg-linear-to-l from-white to-transparent",
+          )}
+        />
       </div>
 
       {modalStartAt && (

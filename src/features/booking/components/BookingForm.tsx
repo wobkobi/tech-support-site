@@ -231,6 +231,9 @@ export default function BookingForm({
   const [error, setError] = useState<string | null>(null);
   // Submit-time validation errors. Rendered both in a top summary and inline.
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  // Anchors the error summary so a submit failure can be scrolled into view -
+  // on a long mobile form the alerts sit above the scrolled-to submit button.
+  const errorSummaryRef = useRef<HTMLDivElement>(null);
   // True when the server returned 409 (someone booked the same slot first).
   // Drives a more prominent error with a "Refresh available times" link.
   const [slotStale, setSlotStale] = useState(false);
@@ -243,6 +246,21 @@ export default function BookingForm({
   // True once AddressAutocomplete reports the Maps API is unavailable. The
   // form then skips the "must pick a suggestion" gate.
   const [mapsFallback, setMapsFallback] = useState(false);
+
+  // Bring the error summary into view when a submit attempt surfaces any alert -
+  // a scrolled-down user on a long mobile form would otherwise miss it.
+  // Honour reduced-motion by jumping instead of smooth-scrolling.
+  const hasSubmitError = slotStale || Boolean(error) || Object.keys(fieldErrors).length > 0;
+  useEffect(() => {
+    if (!hasSubmitError) return;
+    const reduceMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    errorSummaryRef.current?.scrollIntoView({
+      behavior: reduceMotion ? "auto" : "smooth",
+      block: "center",
+    });
+  }, [hasSubmitError]);
 
   // Submit guards. `submittingRef` blocks Enter-key spam regardless of React's
   // setState timing. `idempotencyKey` is generated once per mount via the lazy
@@ -1416,77 +1434,79 @@ export default function BookingForm({
       </p>
 
       {/* Submit */}
-      {slotStale && (
-        <div
-          role="alert"
-          className={cn(
-            "bg-coquelicot-50 rounded-md border border-coquelicot-500/40 p-4",
-            "flex flex-col gap-2",
-          )}
-        >
-          <p className={cn("text-base font-medium text-coquelicot-700")}>
-            That time slot was just taken by another customer.
-          </p>
-          <p className={cn("text-sm text-rich-black/70")}>
-            Tap below to load the up-to-date availability - your form details will stay where they
-            are.
-          </p>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={() => {
-              setSlotStale(false);
-              router.refresh();
-            }}
+      <div ref={errorSummaryRef} className={cn("flex flex-col gap-8 empty:hidden")}>
+        {slotStale && (
+          <div
+            role="alert"
+            className={cn(
+              "bg-coquelicot-50 rounded-md border border-coquelicot-500/40 p-4",
+              "flex flex-col gap-2",
+            )}
           >
-            Refresh available times
-          </Button>
-        </div>
-      )}
-      {Object.keys(fieldErrors).length > 0 && (
-        <div
-          role="alert"
-          aria-live="assertive"
-          className={cn(
-            "rounded-md border border-coquelicot-500/50 bg-coquelicot-500/10 p-4 text-rich-black",
-          )}
-        >
-          <p className={cn("text-base font-semibold")}>Please fix the following:</p>
-          <ul className={cn("mt-1 list-disc space-y-0.5 pl-5 text-base")}>
-            {Object.entries(fieldErrors).map(([key, msg]) => {
-              const anchors: Record<string, string> = {
-                duration: "booking-duration",
-                day: "booking-day",
-                time: "booking-time",
-                name: "booking-name",
-                email: "booking-email",
-                phone: "booking-phone",
-                meetingType: "booking-meeting-type",
-                address: "booking-address",
-                notes: "booking-notes",
-              };
-              const anchor = anchors[key];
-              return (
-                <li key={key}>
-                  {anchor ? (
-                    <a href={`#${anchor}`} className={cn("underline")}>
-                      {msg}
-                    </a>
-                  ) : (
-                    msg
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
-      {error && (
-        <p className={cn("text-base font-medium text-coquelicot-600")} role="alert">
-          {error}
-        </p>
-      )}
+            <p className={cn("text-base font-medium text-coquelicot-700")}>
+              That time slot was just taken by another customer.
+            </p>
+            <p className={cn("text-sm text-rich-black/70")}>
+              Tap below to load the up-to-date availability - your form details will stay where they
+              are.
+            </p>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                setSlotStale(false);
+                router.refresh();
+              }}
+            >
+              Refresh available times
+            </Button>
+          </div>
+        )}
+        {Object.keys(fieldErrors).length > 0 && (
+          <div
+            role="alert"
+            aria-live="assertive"
+            className={cn(
+              "rounded-md border border-coquelicot-500/50 bg-coquelicot-500/10 p-4 text-rich-black",
+            )}
+          >
+            <p className={cn("text-base font-semibold")}>Please fix the following:</p>
+            <ul className={cn("mt-1 list-disc space-y-0.5 pl-5 text-base")}>
+              {Object.entries(fieldErrors).map(([key, msg]) => {
+                const anchors: Record<string, string> = {
+                  duration: "booking-duration",
+                  day: "booking-day",
+                  time: "booking-time",
+                  name: "booking-name",
+                  email: "booking-email",
+                  phone: "booking-phone",
+                  meetingType: "booking-meeting-type",
+                  address: "booking-address",
+                  notes: "booking-notes",
+                };
+                const anchor = anchors[key];
+                return (
+                  <li key={key}>
+                    {anchor ? (
+                      <a href={`#${anchor}`} className={cn("underline")}>
+                        {msg}
+                      </a>
+                    ) : (
+                      msg
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+        {error && (
+          <p className={cn("text-base font-medium text-coquelicot-600")} role="alert">
+            {error}
+          </p>
+        )}
+      </div>
 
       {/* Submit band: sticky to the viewport bottom on mobile so users on a
           long form never lose sight of the action; inline on >=sm. */}
