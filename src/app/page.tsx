@@ -266,7 +266,7 @@ export default async function Home(): Promise<React.ReactElement> {
                   </span>
                   <span
                     className={cn(
-                      "line-clamp-2 text-left text-sm leading-tight font-medium text-rich-black sm:text-base",
+                      "line-clamp-2 text-left text-base leading-tight font-medium text-rich-black sm:text-lg",
                     )}
                   >
                     {label}
@@ -367,7 +367,7 @@ export default async function Home(): Promise<React.ReactElement> {
                 >
                   Know someone who needs tech help?
                 </h2>
-                <p className={cn("text-sm text-rich-black/80 sm:text-base")}>
+                <p className={cn("text-base text-rich-black/80 sm:text-lg")}>
                   Download this flyer to share with neighbours or pin to a noticeboard.
                 </p>
               </div>
