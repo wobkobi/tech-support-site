@@ -767,9 +767,6 @@ export default function BookingForm({
           <label className={cn("mb-2 block text-base font-semibold text-rich-black")}>
             Choose a day
           </label>
-          <p className={cn("mb-2 text-base text-rich-black/60")}>
-            All times shown in NZ time (Auckland).
-          </p>
 
           {!availableDays.some((d) => d.hasAnySlots) ? (
             <p className={cn("text-base text-rich-black/70")}>
@@ -1378,13 +1375,7 @@ export default function BookingForm({
 
               <dt className={cn("text-rich-black/60")}>Time</dt>
               <dd className={cn("text-rich-black")}>
-                {timeLabel ? (
-                  <>
-                    {timeLabel} <span className={cn("text-sm text-rich-black/60")}>NZ time</span>
-                  </>
-                ) : (
-                  <span className={cn("text-rich-black/50")}>—</span>
-                )}
+                {timeLabel ? timeLabel : <span className={cn("text-rich-black/50")}>—</span>}
               </dd>
 
               <dt className={cn("text-rich-black/60")}>Meeting</dt>
