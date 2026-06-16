@@ -4,6 +4,7 @@ import { formatNZD, travelEntriesTotal } from "@/features/business/lib/business"
 import { breakdownTravelCharge } from "@/features/business/lib/pricing-policy";
 import type { TravelEntry } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
+import { parseMoney } from "@/shared/lib/parse-money";
 import type React from "react";
 import type { RefObject } from "react";
 
@@ -144,7 +145,22 @@ export function TravelSection({
                       type="number"
                       min="0"
                       step="0.01"
-                      value={entry.cost}
+                      value={entry.cost || ""}
+                      onPaste={(e) => {
+                        // Only intercept when the clipboard carries a "$",
+                        // commas, or other junk; plain numeric pastes fall
+                        // through to the native number input so decimal entry
+                        // stays unaffected.
+                        const text = e.clipboardData.getData("text");
+                        if (!/[^\d.]/.test(text)) return;
+                        const value = parseMoney(text);
+                        if (value === null) return;
+                        e.preventDefault();
+                        patchEntry(index, {
+                          cost: Math.round(value * 100) / 100,
+                          isAuto: false,
+                        });
+                      }}
                       onChange={(e) =>
                         patchEntry(index, {
                           cost: Math.round((parseFloat(e.target.value) || 0) * 100) / 100,

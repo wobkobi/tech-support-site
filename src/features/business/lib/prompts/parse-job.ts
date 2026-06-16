@@ -181,6 +181,7 @@ OTHER RULES:
 - tasks[].baseRateLabel should always be "Standard". tasks[].modifierLabels picked per the modifier rules above (empty array if none).
 - DO NOT emit a unitPrice field on tasks - the server computes it from baseRateLabel + modifierLabels.
 - Only include parts if the user explicitly mentions a physical component they supplied. Do not invent parts.
+- parts[].description: write a concise invoice-friendly name - brand plus the core product, ideally under ~6 words. Drop marketing specs (capacity, speed, material, model qualifiers) unless one is needed to identify the item. Example: "Cruxtec NVMe & NGFF Dual Protocol M.2 SSD to USB-C Enclosure - Aluminum 10Gbps - Up to 4TB" → "Cruxtec M.2 SSD to USB-C Enclosure".
 - notes: A single professional sentence suitable for the invoice footer. Use empty string if nothing meaningful to add.
 - confidence: "high" if all session times are clearly stated. "medium" if some times were estimated. "low" if mostly guessed.
 - warnings[]: Flag anything ambiguous, assumed, or conflicting in plain English.

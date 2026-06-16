@@ -2,6 +2,7 @@
 
 import type { PartLine } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
+import { parseMoney } from "@/shared/lib/parse-money";
 import type React from "react";
 
 interface Props {
@@ -63,7 +64,22 @@ export function PartsSection({ parts, onPartsChange, show, onToggle }: Props): R
                 min="0"
                 step="0.01"
                 placeholder="Cost"
-                value={part.cost}
+                value={part.cost || ""}
+                onPaste={(e) => {
+                  // Only intercept when the clipboard carries a "$", commas, or
+                  // other junk; plain numeric pastes fall through to the native
+                  // number input so decimal entry stays unaffected.
+                  const text = e.clipboardData.getData("text");
+                  if (!/[^\d.]/.test(text)) return;
+                  const value = parseMoney(text);
+                  if (value === null) return;
+                  e.preventDefault();
+                  onPartsChange((p) => {
+                    const n = [...p];
+                    n[idx] = { ...n[idx], cost: value };
+                    return n;
+                  });
+                }}
                 onChange={(e) =>
                   onPartsChange((p) => {
                     const n = [...p];
