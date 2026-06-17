@@ -1,6 +1,6 @@
 {
   "name": "tech-support-site",
-  "version": "1.112.1",
+  "version": "1.112.2",
   "private": true,
   "type": "module",
   "scripts": {
@@ -36,7 +36,7 @@
     "edge >= 93"
   ],
   "overrides": {
-    "postcss": "^8.5.10"
+    "postcss": "^8.5.15"
   },
   "dependencies": {
     "@swc/helpers": "^0.5.23",
@@ -47,7 +47,7 @@
     "date-holidays": "^3.30.2",
     "googleapis": "^173.0.0",
     "next": "^16.2.9",
-    "openai": "^6.42.0",
+    "openai": "^6.43.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-icons": "^5.6.0",
@@ -56,23 +56,23 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.5",
-    "@eslint/js": "^9.39.0",
+    "@eslint/js": "^9.39.4",
     "@next/bundle-analyzer": "^16.2.9",
     "@prisma/client": "6.19.3",
-    "@tailwindcss/postcss": "^4.3.0",
+    "@tailwindcss/postcss": "^4.3.1",
     "@types/google.maps": "^3.65.1",
     "@types/jsdom": "^28.0.3",
     "@types/node": "^25.9.3",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
-    "@typescript-eslint/eslint-plugin": "8.61.0",
-    "@typescript-eslint/parser": "8.61.0",
+    "@typescript-eslint/eslint-plugin": "8.61.1",
+    "@typescript-eslint/parser": "8.61.1",
     "canvas": "^3.2.3",
     "dotenv-cli": "^11.0.0",
     "eslint": "^9.39.4",
     "eslint-config-next": "^16.2.9",
     "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-jsdoc": "^63.0.2",
+    "eslint-plugin-jsdoc": "^63.0.4",
     "eslint-plugin-prettier": "^5.5.6",
     "eslint-plugin-react": "^7.37.5",
     "globals": "^17.6.0",
@@ -80,7 +80,7 @@
     "lint-staged": "^17.0.7",
     "pdf-lib": "^1.17.1",
     "png-to-ico": "^3.0.1",
-    "postcss": "^8.5.10",
+    "postcss": "^8.5.15",
     "prettier": "^3.8.4",
     "prettier-plugin-organize-imports": "^4.3.0",
     "prettier-plugin-packagejson": "^3.0.2",
@@ -90,7 +90,7 @@
     "qr-code-styling": "^1.9.2",
     "sharp": "^0.35.1",
     "simple-git-hooks": "^2.13.1",
-    "tailwindcss": "^4.3.0",
+    "tailwindcss": "^4.3.1",
     "tsx": "^4.22.4",
     "typescript": "6.0.3"
   },
