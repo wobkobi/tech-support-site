@@ -1,7 +1,9 @@
 import {
   BILLING_INCREMENT_MINS,
+  floorBillableMins,
   GST_RATE,
   GST_REGISTERED,
+  MIN_BILLABLE_MINS,
 } from "@/features/business/lib/pricing-policy";
 import type {
   JobCalculation,
@@ -194,7 +196,12 @@ export function collapseToWindow(
   const flat = tasks.filter((t) => t.baseRateId == null);
   if (hourlyIn.length === 0) return { tasks, dropped: 0, rescaled: false };
 
-  if (sumTaskMinutes(hourlyIn) <= windowMin) return { tasks, dropped: 0, rescaled: false };
+  // Tasks already fit the window. Still park any 2 dp qty rounding remainder so
+  // an even split (1h / 3 = 0.33h x 3 = 0.99h) bills the full window, not $0.65
+  // short. Reconciling qty alone keeps the lines footing, so no rescale toast.
+  if (sumTaskMinutes(hourlyIn) <= windowMin) {
+    return { tasks: parkHourRemainder(tasks, windowMin), dropped: 0, rescaled: false };
+  }
 
   // Pin short tasks at 15 min each; drop any that don't fit the window.
   const short: TaskLine[] = hourlyIn
@@ -220,13 +227,21 @@ export function collapseToWindow(
   const remainingMin = windowMin - pinnedMin;
 
   if (floating.length === 0) {
-    return { tasks: [...short, ...explicit, ...flat], dropped, rescaled: true };
+    return {
+      tasks: parkHourRemainder([...short, ...explicit, ...flat], windowMin),
+      dropped,
+      rescaled: true,
+    };
   }
 
   if (remainingMin <= 0) {
     // Pinned tasks already cover the whole window; drop every floating one.
     dropped += floating.length;
-    return { tasks: [...short, ...explicit, ...flat], dropped, rescaled: true };
+    return {
+      tasks: parkHourRemainder([...short, ...explicit, ...flat], windowMin),
+      dropped,
+      rescaled: true,
+    };
   }
 
   // Scale floating tasks proportionally to fill remainingMin; drop tasks that
@@ -261,7 +276,46 @@ export function collapseToWindow(
     }
   }
 
-  return { tasks: [...short, ...explicit, ...floating, ...flat], dropped, rescaled: true };
+  return {
+    tasks: parkHourRemainder([...short, ...explicit, ...floating, ...flat], windowMin),
+    dropped,
+    rescaled: true,
+  };
+}
+
+/**
+ * Parks the decimal-hour rounding remainder on the largest hourly task so the
+ * task quantities sum back to the billed window exactly.
+ *
+ * Tasks store `qty` as hours rounded to 2 dp, but the invoice bills
+ * `qty * unitPrice` per line. An even split (1h across 3 tasks > 20min each >
+ * 0.33h) sums to 0.99h, so the lines under-bill by a cent of time apiece
+ * ($64.35 instead of $65 at $65/hr). The minute-level balancing is correct;
+ * only the 2 dp qty representation drifts, so nudge the biggest task's qty by
+ * the difference. Only reconciles when the tasks already fill the window
+ * (minute sum within one {@link TASK_QTY_SNAP_MIN} of it) so a genuine
+ * under-estimate is left untouched rather than silently inflated.
+ * @param tasks - Task lines (`qty` in decimal hours); flat-rate lines pass through.
+ * @param windowMin - Billed window in minutes (`durationMins`).
+ * @returns Task list with the remainder parked, or the input unchanged when nothing needs adjusting.
+ */
+function parkHourRemainder(tasks: TaskLine[], windowMin: number): TaskLine[] {
+  if (windowMin <= 0) return tasks;
+  const hourly = tasks.filter((t) => t.baseRateId != null);
+  if (hourly.length === 0) return tasks;
+  if (sumTaskMinutes(hourly) < windowMin - TASK_QTY_SNAP_MIN) return tasks;
+  const targetHours = Math.round((windowMin / 60) * 100) / 100;
+  const sumQty = Math.round(hourly.reduce((s, t) => s + t.qty, 0) * 100) / 100;
+  const diff = Math.round((targetHours - sumQty) * 100) / 100;
+  if (diff === 0) return tasks;
+  let biggest = hourly[0];
+  for (const t of hourly) if (t.qty > biggest.qty) biggest = t;
+  const adjustedQty = Math.max(MIN_TASK_MINUTES / 60, Math.round((biggest.qty + diff) * 100) / 100);
+  return tasks.map((t) =>
+    t === biggest
+      ? { ...t, qty: adjustedQty, lineTotal: Math.round(adjustedQty * t.unitPrice * 100) / 100 }
+      : t,
+  );
 }
 
 /**
@@ -370,16 +424,24 @@ export function effectiveHourlyRate(
 /**
  * Converts a job calculation into a flat array of invoice line items.
  * Emits one Labour row (when hours + rate are set), one row per task, one row
- * per part, and a single Travel row summed from `travelEntries`.
+ * per part, and a single Travel row summed from `travelEntries`. Must stay in
+ * lockstep with {@link calcJobTotal}: the labour row applies the same
+ * {@link floorBillableMins} minimum, and the Travel row applies the same
+ * {@link MIN_TRAVEL_CHARGE} floor, so the issued invoice never under-bills the
+ * operator's on-screen total.
  * @param job - Job calculation with time, tasks, parts.
  * @param incrementMins - Billing increment (live pricing setting); defaults to the code const.
  * @param holidayUplift - Public-holiday labour uplift fraction (0 = none); adds a surcharge line.
+ * @param minTravelCharge - Minimum auto-travel charge (live pricing setting); defaults to the code const.
+ * @param minBillableMins - Minimum billable time floor (live pricing setting); defaults to the code const.
  * @returns Array of line items ready for an invoice.
  */
 export function jobToLineItems(
   job: JobCalculation,
   incrementMins: number = BILLING_INCREMENT_MINS,
   holidayUplift: number = 0,
+  minTravelCharge: number = MIN_TRAVEL_CHARGE,
+  minBillableMins: number = MIN_BILLABLE_MINS,
 ): LineItem[] {
   const items: LineItem[] = [];
   // Running total of labour (time charge + hourly tasks) so the public-holiday
@@ -387,7 +449,7 @@ export function jobToLineItems(
   let labourTotal = 0;
 
   if (job.durationMins > 0 && job.hourlyRate) {
-    const billed = billableMins(job.durationMins, incrementMins);
+    const billed = floorBillableMins(job.durationMins, minBillableMins, incrementMins);
     const hours = billed / 60;
     const rate = job.hourlyRate.ratePerHour ?? 0;
     const lineTotal = Math.round(hours * rate * 100) / 100;
@@ -432,7 +494,15 @@ export function jobToLineItems(
     });
   }
 
-  const travelTotal = travelEntriesTotal(job.travelEntries);
+  // Auto entries trigger the minimum-charge floor; manual-only entries
+  // (parking, ferry, etc.) don't. Mirrors calcJobTotal so the issued invoice
+  // matches the operator's on-screen total.
+  const rawTravelTotal = travelEntriesTotal(job.travelEntries);
+  const hasAutoEntry = job.travelEntries.some((e) => e.isAuto && e.cost > 0);
+  const travelTotal =
+    hasAutoEntry && rawTravelTotal > 0 && rawTravelTotal < minTravelCharge
+      ? minTravelCharge
+      : rawTravelTotal;
   if (travelTotal > 0) {
     items.push({
       description: "Travel",
@@ -456,6 +526,8 @@ export interface JobPricing {
   gstRegistered: boolean;
   minTravelCharge: number;
   billingIncrementMins: number;
+  /** Minimum billable time floor in minutes (live setting); defaults to {@link MIN_BILLABLE_MINS} when absent. */
+  minBillableMins?: number;
   /** Public-holiday labour uplift as a fraction (e.g. 0.25); 0/undefined when the job date isn't a holiday. */
   holidayUplift?: number;
 }
@@ -465,12 +537,14 @@ export interface JobPricing {
  * @param job - Job calculation.
  * @param promo - Active promo or null.
  * @param incrementMins - Billing increment (live pricing setting); defaults to the code const.
+ * @param minBillableMins - Minimum billable floor (live pricing setting); defaults to the code const.
  * @returns Discount in dollars.
  */
 export function computeJobPromoDiscount(
   job: JobCalculation,
   promo: JobPromo | null,
   incrementMins: number = BILLING_INCREMENT_MINS,
+  minBillableMins: number = MIN_BILLABLE_MINS,
 ): number {
   if (!promo) return 0;
 
@@ -481,7 +555,7 @@ export function computeJobPromoDiscount(
   const hourlyTasksTotal = hourlyTasks.reduce((s, t) => s + t.qty * t.unitPrice, 0);
   const hourlyTasksHours = hourlyTasks.reduce((s, t) => s + t.qty, 0);
 
-  const billed = billableMins(job.durationMins, incrementMins);
+  const billed = floorBillableMins(job.durationMins, minBillableMins, incrementMins);
   const timeHours = billed / 60;
   const timeCharge = Math.round(timeHours * (job.hourlyRate?.ratePerHour ?? 0) * 100) / 100;
 
@@ -539,6 +613,7 @@ export function calcJobTotal(
     gstRegistered: GST_REGISTERED,
     minTravelCharge: MIN_TRAVEL_CHARGE,
     billingIncrementMins: BILLING_INCREMENT_MINS,
+    minBillableMins: MIN_BILLABLE_MINS,
   },
 ): {
   timeCharge: number;
@@ -552,7 +627,11 @@ export function calcJobTotal(
   gstAmount: number;
   total: number;
 } {
-  const billed = billableMins(job.durationMins, pricing.billingIncrementMins);
+  const billed = floorBillableMins(
+    job.durationMins,
+    pricing.minBillableMins ?? MIN_BILLABLE_MINS,
+    pricing.billingIncrementMins,
+  );
   const hours = billed / 60;
   const rate = job.hourlyRate?.ratePerHour ?? 0;
   const timeCharge = Math.round(hours * rate * 100) / 100;
@@ -575,7 +654,12 @@ export function calcJobTotal(
     holidayUplift > 0 ? Math.round((timeCharge + hourlyTasksTotal) * holidayUplift * 100) / 100 : 0;
   const subtotal =
     Math.round((timeCharge + tasksTotal + partsTotal + travelTotal + holidaySurcharge) * 100) / 100;
-  const promoDiscount = computeJobPromoDiscount(job, promo, pricing.billingIncrementMins);
+  const promoDiscount = computeJobPromoDiscount(
+    job,
+    promo,
+    pricing.billingIncrementMins,
+    pricing.minBillableMins ?? MIN_BILLABLE_MINS,
+  );
   let unsuccessfulDiscount = 0;
   if (job.unsuccessful) {
     // Whole-job flag halves the time charge plus every hourly task; per-task

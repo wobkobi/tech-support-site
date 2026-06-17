@@ -26,6 +26,7 @@ export default async function CalculatorPage(): Promise<React.ReactElement> {
     gstRegistered: policy.GST_REGISTERED,
     minTravelCharge: policy.MIN_TRAVEL_CHARGE,
     billingIncrementMins: policy.BILLING_INCREMENT_MINS,
+    minBillableMins: policy.MIN_BILLABLE_MINS,
   };
 
   return (

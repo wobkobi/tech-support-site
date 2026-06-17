@@ -610,7 +610,14 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
   // skip re-render when unrelated parent state changes (e.g. typing in the
   // AI input box). Recomputes when any meaningful input shifts.
   const previewLineItems = useMemo(
-    () => jobToLineItems(job, pricing.billingIncrementMins, holiday.uplift),
+    () =>
+      jobToLineItems(
+        job,
+        pricing.billingIncrementMins,
+        holiday.uplift,
+        pricing.minTravelCharge,
+        pricing.minBillableMins,
+      ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       tasks,
@@ -974,7 +981,13 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
     try {
       // Build and POST the invoice
       await saveTaskTemplates(tasks);
-      const lineItems = jobToLineItems(job, pricing.billingIncrementMins, holiday.uplift);
+      const lineItems = jobToLineItems(
+        job,
+        pricing.billingIncrementMins,
+        holiday.uplift,
+        pricing.minTravelCharge,
+        pricing.minBillableMins,
+      );
       const promoActive = activePromo && !skipPromo && totals.promoDiscount > 0;
       const res = await fetch("/api/business/invoices", {
         method: "POST",
