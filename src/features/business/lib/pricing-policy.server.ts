@@ -65,7 +65,7 @@ export interface PublicPricing {
 /** Per-label description shown under each modifier on the accordion. */
 const MODIFIER_DESCRIPTIONS: Record<string, string> = {
   Remote: "Screen-share session - I log in instead of visiting.",
-  "At home": "Residential discount available on request.",
+  "At home": "Bench repair at my place - I take the device home to fix it instead of visiting.",
   "Public Holiday": "Applied automatically on NZ public holidays.",
 };
 
