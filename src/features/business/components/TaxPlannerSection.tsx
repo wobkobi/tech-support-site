@@ -59,10 +59,10 @@ export function TaxPlannerSection({
   const taxAccountTarget = plan.setAsides.incomeTax + plan.setAsides.acc + gstToReserve;
 
   return (
-    <section className={cn("mb-8")}>
-      <div className={cn("mb-3 flex flex-wrap items-baseline gap-2")}>
-        <h2 className={cn("text-lg font-bold text-russian-violet")}>Tax planner</h2>
-        <span className={cn("text-xs font-medium text-slate-500")}>{fyLabel}</span>
+    <section className="mb-8">
+      <div className="mb-3 flex flex-wrap items-baseline gap-2">
+        <h2 className="text-lg font-bold text-russian-violet">Tax planner</h2>
+        <span className="text-xs font-medium text-slate-500">{fyLabel}</span>
       </div>
 
       <div
@@ -72,11 +72,11 @@ export function TaxPlannerSection({
         )}
       >
         {/* Tax account: income tax + ACC (+ GST when registered). Paid to IRD/ACC. */}
-        <div className={cn("rounded-xl border border-slate-200 bg-white p-4 shadow-sm")}>
-          <h3 className={cn("mb-1 text-sm font-bold tracking-wide text-russian-violet uppercase")}>
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <h3 className="mb-1 text-sm font-bold tracking-wide text-russian-violet uppercase">
             Tax account
           </h3>
-          <p className={cn("mb-3 text-[11px] text-slate-400")}>Reserved for IRD + ACC bills.</p>
+          <p className="mb-3 text-[11px] text-slate-400">Reserved for IRD + ACC bills.</p>
           <PlannerRow
             label={`Income tax @ ${incomeTaxPct}`}
             value={formatNZD(plan.setAsides.incomeTax)}
@@ -86,22 +86,22 @@ export function TaxPlannerSection({
             <PlannerRow label="GST to pay" value={formatNZD(Math.max(0, plan.gst.netToPay))} />
           )}
           <PlannerRow label="Tax account total" value={formatNZD(taxAccountTarget)} emphasis />
-          <div className={cn("mt-3 grid grid-cols-2 gap-2 border-t border-slate-100 pt-2")}>
+          <div className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-100 pt-2">
             <SmallStat label="Weekly target" value={formatNZD(taxAccountTarget / 52)} />
             <SmallStat label="Monthly target" value={formatNZD(taxAccountTarget / 12)} />
           </div>
-          <p className={cn("mt-2 text-[11px] leading-snug text-slate-400")}>
+          <p className="mt-2 text-[11px] leading-snug text-slate-400">
             This is the amount that should sit in your tax account. The weekly/monthly targets are
             what you'd need to transfer to be on pace by 31 March.
           </p>
         </div>
 
         {/* KiwiSaver - separate provider, separate reserve. */}
-        <div className={cn("rounded-xl border border-slate-200 bg-white p-4 shadow-sm")}>
-          <h3 className={cn("mb-1 text-sm font-bold tracking-wide text-russian-violet uppercase")}>
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <h3 className="mb-1 text-sm font-bold tracking-wide text-russian-violet uppercase">
             KiwiSaver
           </h3>
-          <p className={cn("mb-3 text-[11px] text-slate-400")}>
+          <p className="mb-3 text-[11px] text-slate-400">
             Voluntary - paid to your KiwiSaver provider, not IRD.
           </p>
           <PlannerRow
@@ -109,11 +109,11 @@ export function TaxPlannerSection({
             value={formatNZD(plan.setAsides.kiwiSaver)}
             emphasis
           />
-          <div className={cn("mt-3 grid grid-cols-2 gap-2 border-t border-slate-100 pt-2")}>
+          <div className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-100 pt-2">
             <SmallStat label="Weekly target" value={formatNZD(plan.setAsides.kiwiSaver / 52)} />
             <SmallStat label="Monthly target" value={formatNZD(plan.setAsides.kiwiSaver / 12)} />
           </div>
-          <p className={cn("mt-2 text-[11px] leading-snug text-slate-400")}>
+          <p className="mt-2 text-[11px] leading-snug text-slate-400">
             Aim for at least $1,042.86/year to capture the full $521 govt contribution match.
             Profit-based target ({formatNZD(plan.setAsides.kiwiSaver)}) is just the rate × profit.
           </p>
@@ -121,10 +121,8 @@ export function TaxPlannerSection({
 
         {/* GST - hidden until gstRegistered is flipped to true in tax-planner.ts */}
         {gstRegistered && (
-          <div className={cn("rounded-xl border border-slate-200 bg-white p-4 shadow-sm")}>
-            <h3
-              className={cn("mb-3 text-sm font-bold tracking-wide text-russian-violet uppercase")}
-            >
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <h3 className="mb-3 text-sm font-bold tracking-wide text-russian-violet uppercase">
               GST
             </h3>
             <PlannerRow
@@ -141,7 +139,7 @@ export function TaxPlannerSection({
               value={formatNZD(Math.abs(plan.gst.netToPay))}
               emphasis
             />
-            <p className={cn("mt-2 text-[11px] leading-snug text-slate-400")}>
+            <p className="mt-2 text-[11px] leading-snug text-slate-400">
               Output GST is calculated as 3/23 of GST-inclusive income.
             </p>
           </div>
@@ -178,7 +176,7 @@ function PlannerRow({
         emphasis && "border-t border-slate-200 pt-2 font-bold",
       )}
     >
-      <div className={cn("flex items-baseline justify-between gap-3")}>
+      <div className="flex items-baseline justify-between gap-3">
         <span className={cn("text-sm", muted ? "text-slate-500" : "text-slate-700")}>{label}</span>
         <span
           className={cn(
@@ -208,8 +206,8 @@ function PlannerRow({
 function SmallStat({ label, value }: { label: string; value: string }): React.ReactElement {
   return (
     <div>
-      <p className={cn("text-[10px] tracking-wide text-slate-400 uppercase")}>{label}</p>
-      <p className={cn("font-mono text-sm font-bold text-russian-violet")}>{value}</p>
+      <p className="text-[10px] tracking-wide text-slate-400 uppercase">{label}</p>
+      <p className="font-mono text-sm font-bold text-russian-violet">{value}</p>
     </div>
   );
 }

@@ -63,9 +63,7 @@ function FeeBanner({
     return (
       <div
         role="alert"
-        className={cn(
-          "bg-coquelicot-50 rounded-lg border-2 border-coquelicot-500/60 p-4 text-sm text-rich-black sm:text-base",
-        )}
+        className="bg-coquelicot-50 rounded-lg border-2 border-coquelicot-500/60 p-4 text-sm text-rich-black sm:text-base"
       >
         <strong>${policy.callOutFee} call-out fee plus round-trip travel</strong> will apply - we're
         inside the {policy.travelChargeHours}-hour window when I would normally be on the way to
@@ -77,9 +75,7 @@ function FeeBanner({
     return (
       <div
         role="alert"
-        className={cn(
-          "rounded-lg border-2 border-mustard-500/60 bg-mustard-900/40 p-4 text-sm text-rich-black sm:text-base",
-        )}
+        className="rounded-lg border-2 border-mustard-500/60 bg-mustard-900/40 p-4 text-sm text-rich-black sm:text-base"
       >
         <strong>${policy.callOutFee} call-out fee</strong> will apply - you're inside the{" "}
         {policy.freeNoticeHours}-hour cancellation window.
@@ -87,11 +83,7 @@ function FeeBanner({
     );
   }
   return (
-    <div
-      className={cn(
-        "rounded-lg border-2 border-moonstone-500/50 bg-moonstone-600/10 p-4 text-sm text-rich-black sm:text-base",
-      )}
-    >
+    <div className="rounded-lg border-2 border-moonstone-500/50 bg-moonstone-600/10 p-4 text-sm text-rich-black sm:text-base">
       <strong>No fee</strong> applies for this cancellation - thanks for the heads up.
     </div>
   );
@@ -179,9 +171,9 @@ function CancelContent(): React.ReactElement {
   }
 
   return (
-    <main className={cn("relative min-h-dvh overflow-hidden")}>
+    <main className="relative min-h-dvh overflow-hidden">
       {/* Backdrop */}
-      <div className={cn("pointer-events-none absolute inset-0 -z-10 overflow-hidden")}>
+      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
         <picture>
           <source type="image/avif" srcSet="/source/backdrop-blur.avif" />
           <img
@@ -189,60 +181,54 @@ function CancelContent(): React.ReactElement {
             alt=""
             fetchPriority="high"
             decoding="async"
-            className={cn("absolute inset-0 h-full w-full scale-110 transform-gpu object-cover")}
+            className="absolute inset-0 h-full w-full scale-110 transform-gpu object-cover"
           />
         </picture>
       </div>
 
       {/* Frosted container */}
-      <div className={cn("mx-auto my-5 w-full max-w-[min(100vw-2rem,56rem)] sm:my-10")}>
-        <div
-          className={cn(
-            "rounded-2xl border border-seasalt-400/40 bg-seasalt-800/60 p-5 shadow-lg backdrop-blur-xl sm:p-10",
-          )}
-        >
-          <div className={cn("flex flex-col gap-4 sm:gap-5")}>
+      <div className="mx-auto my-5 w-full max-w-[min(100vw-2rem,56rem)] sm:my-10">
+        <div className="rounded-2xl border border-seasalt-400/40 bg-seasalt-800/60 p-5 shadow-lg backdrop-blur-xl sm:p-10">
+          <div className="flex flex-col gap-4 sm:gap-5">
             <section className={cn(CARD)}>
-              <h1 className={cn("mb-3 text-2xl font-extrabold text-russian-violet sm:text-3xl")}>
+              <h1 className="mb-3 text-2xl font-extrabold text-russian-violet sm:text-3xl">
                 Cancel booking
               </h1>
 
               {load.kind === "loading" && (
-                <p className={cn("text-rich-black")}>Loading booking details...</p>
+                <p className="text-rich-black">Loading booking details...</p>
               )}
 
-              {load.kind === "error" && <p className={cn("text-rich-black")}>{load.message}</p>}
+              {load.kind === "error" && <p className="text-rich-black">{load.message}</p>}
 
               {load.kind === "alreadyCancelled" && (
-                <p className={cn("text-rich-black")}>
+                <p className="text-rich-black">
                   This booking has already been cancelled - no further action needed.
                 </p>
               )}
 
               {load.kind === "ready" && submit.kind === "done" && (
-                <p className={cn("text-rich-black")}>
+                <p className="text-rich-black">
                   Booking cancelled. A confirmation email will follow shortly.
                 </p>
               )}
 
               {load.kind === "ready" && submit.kind !== "done" && (
-                <div className={cn("space-y-4")}>
-                  <p className={cn("text-rich-black")}>
+                <div className="space-y-4">
+                  <p className="text-rich-black">
                     You're about to cancel your appointment for{" "}
                     <strong>{formatDateShort(load.startAt)}</strong>.
                   </p>
                   <FeeBanner startAt={load.startAt} policy={load.policy} />
                   {submit.kind === "error" && (
-                    <p className={cn("text-sm text-coquelicot-500")}>{submit.message}</p>
+                    <p className="text-sm text-coquelicot-500">{submit.message}</p>
                   )}
-                  <div className={cn("flex flex-wrap gap-3")}>
+                  <div className="flex flex-wrap gap-3">
                     <button
                       type="button"
                       onClick={() => void runCancel()}
                       disabled={submit.kind === "submitting"}
-                      className={cn(
-                        "rounded-xl bg-coquelicot-500 px-5 py-2.5 text-base font-semibold text-white transition-colors hover:bg-coquelicot-600 disabled:opacity-50",
-                      )}
+                      className="rounded-xl bg-coquelicot-500 px-5 py-2.5 text-base font-semibold text-white transition-colors hover:bg-coquelicot-600 disabled:opacity-50"
                     >
                       {submit.kind === "submitting" ? "Cancelling..." : "Confirm cancellation"}
                     </button>
@@ -256,7 +242,7 @@ function CancelContent(): React.ReactElement {
               {(load.kind === "alreadyCancelled" ||
                 load.kind === "error" ||
                 submit.kind === "done") && (
-                <div className={cn("mt-4 flex flex-wrap gap-3")}>
+                <div className="mt-4 flex flex-wrap gap-3">
                   <Button href="/" variant="secondary" size="sm">
                     Back to home
                   </Button>

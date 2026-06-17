@@ -123,20 +123,18 @@ export function JobDetailsSection({
   const multi = timeRanges.length > 1;
 
   return (
-    <div className={cn("space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}>
-      <h2 className={cn("text-sm font-semibold text-russian-violet")}>Time</h2>
+    <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <h2 className="text-sm font-semibold text-russian-violet">Time</h2>
 
-      <div className={cn("space-y-2")}>
+      <div className="space-y-2">
         {timeRanges.map((range, index) => {
           const issue = slotIssue(range);
           return (
-            <div key={index} className={cn("space-y-1")}>
-              <div className={cn("flex items-end gap-2")}>
-                <div className={cn("flex-1")}>
+            <div key={index} className="space-y-1">
+              <div className="flex items-end gap-2">
+                <div className="flex-1">
                   {index === 0 && (
-                    <label className={cn("mb-1 block text-xs font-medium text-slate-500")}>
-                      Start
-                    </label>
+                    <label className="mb-1 block text-xs font-medium text-slate-500">Start</label>
                   )}
                   <input
                     type="time"
@@ -149,11 +147,9 @@ export function JobDetailsSection({
                     )}
                   />
                 </div>
-                <div className={cn("flex-1")}>
+                <div className="flex-1">
                   {index === 0 && (
-                    <label className={cn("mb-1 block text-xs font-medium text-slate-500")}>
-                      End
-                    </label>
+                    <label className="mb-1 block text-xs font-medium text-slate-500">End</label>
                   )}
                   <input
                     type="time"
@@ -171,9 +167,7 @@ export function JobDetailsSection({
                   onClick={() => removeRange(index)}
                   disabled={!multi}
                   aria-label={`Remove time slot ${index + 1}`}
-                  className={cn(
-                    "rounded-lg border border-red-200 bg-white px-2 py-2 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-300 disabled:hover:bg-white",
-                  )}
+                  className="rounded-lg border border-red-200 bg-white px-2 py-2 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-300 disabled:hover:bg-white"
                 >
                   ×
                 </button>
@@ -194,41 +188,35 @@ export function JobDetailsSection({
         <button
           type="button"
           onClick={addRange}
-          className={cn(
-            "rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50",
-          )}
+          className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
         >
           + Add time slot
         </button>
       </div>
 
       <div>
-        <label className={cn("mb-1 block text-xs font-medium text-slate-500")}>
-          Duration (override)
-        </label>
+        <label className="mb-1 block text-xs font-medium text-slate-500">Duration (override)</label>
         <input
           type="number"
           min="0"
           step="5"
           value={durationMinsOverride ?? durationMins}
           onChange={(e) => onDurationOverrideChange(parseInt(e.target.value) || 0)}
-          className={cn(
-            "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-          )}
+          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
         />
-        <p className={cn("mt-1 text-xs text-slate-400")}>
+        <p className="mt-1 text-xs text-slate-400">
           {minsToHoursLabel(durationMins)}
           {chargingDuration &&
             billableMins(durationMins, billingIncrementMins) !== durationMins && (
-              <span className={cn("ml-1 inline-flex items-center gap-1 text-slate-300")}>
-                <FaCaretRight className={cn("h-3 w-3")} aria-hidden />
+              <span className="ml-1 inline-flex items-center gap-1 text-slate-300">
+                <FaCaretRight className="h-3 w-3" aria-hidden />
                 {minsToHoursLabel(billableMins(durationMins, billingIncrementMins))} billed
               </span>
             )}
           {durationMinsOverride != null &&
             durationMinsOverride !== sumRangesMin &&
             sumRangesMin > 0 && (
-              <span className={cn("ml-1 text-slate-300 italic")}>
+              <span className="ml-1 text-slate-300 italic">
                 (slots sum {minsToHoursLabel(sumRangesMin)})
               </span>
             )}
@@ -236,13 +224,11 @@ export function JobDetailsSection({
       </div>
 
       <div>
-        <label className={cn("mb-1 block text-xs font-medium text-slate-500")}>Hourly rate</label>
+        <label className="mb-1 block text-xs font-medium text-slate-500">Hourly rate</label>
         <select
           value={hourlyRateId ?? ""}
           onChange={(e) => onHourlyRateIdChange(e.target.value || null)}
-          className={cn(
-            "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-          )}
+          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
         >
           <option value="">None</option>
           {baseRates.map((r) => (

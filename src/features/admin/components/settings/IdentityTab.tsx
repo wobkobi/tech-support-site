@@ -12,7 +12,6 @@
 import { NumberField, TextField } from "@/features/admin/components/settings/SettingsFields";
 import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
 import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
-import { cn } from "@/shared/lib/cn";
 import { IDENTITY_FIELD_META } from "@/shared/lib/settings/field-meta";
 import type { BaseAddress, IdentitySettings } from "@/shared/lib/settings/types";
 import type React from "react";
@@ -30,7 +29,7 @@ interface Props {
  */
 function SectionHeading({ children }: { children: React.ReactNode }): React.ReactElement {
   return (
-    <h3 className={cn("mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase")}>
+    <h3 className="mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase">
       {children}
     </h3>
   );
@@ -66,7 +65,7 @@ export function IdentityTab({ initial, defaults }: Props): React.ReactElement {
   return (
     <div>
       <SectionHeading>Contact</SectionHeading>
-      <div className={cn("divide-y divide-slate-100")}>
+      <div className="divide-y divide-slate-100">
         <TextField
           id="name"
           meta={m.name}
@@ -122,7 +121,7 @@ export function IdentityTab({ initial, defaults }: Props): React.ReactElement {
       </div>
 
       <SectionHeading>Base address (travel origin + map)</SectionHeading>
-      <div className={cn("divide-y divide-slate-100")}>
+      <div className="divide-y divide-slate-100">
         <TextField
           id="addrLine"
           meta={m["baseAddress.line"]}
@@ -163,7 +162,7 @@ export function IdentityTab({ initial, defaults }: Props): React.ReactElement {
       </div>
 
       <SectionHeading>Invoicing</SectionHeading>
-      <div className={cn("divide-y divide-slate-100")}>
+      <div className="divide-y divide-slate-100">
         <NumberField
           id="paymentTermsDays"
           meta={m.paymentTermsDays}
@@ -218,9 +217,9 @@ export function IdentityTab({ initial, defaults }: Props): React.ReactElement {
 
       {/* Guardrail blocks */}
       {blocks.length > 0 && (
-        <div className={cn("mt-6 rounded-lg border border-red-200 bg-red-50 p-4")}>
-          <p className={cn("text-sm font-semibold text-red-700")}>Can&apos;t save yet:</p>
-          <ul className={cn("mt-1 list-disc space-y-1 pl-5 text-sm text-red-700")}>
+        <div className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4">
+          <p className="text-sm font-semibold text-red-700">Can&apos;t save yet:</p>
+          <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-red-700">
             {blocks.map((b) => (
               <li key={b}>{b}</li>
             ))}
@@ -229,14 +228,12 @@ export function IdentityTab({ initial, defaults }: Props): React.ReactElement {
       )}
 
       {/* Save bar */}
-      <div className={cn("mt-6 flex items-center gap-3")}>
+      <div className="mt-6 flex items-center gap-3">
         <button
           type="button"
           onClick={() => void form.save()}
           disabled={!dirty || saving}
-          className={cn(
-            "rounded-lg bg-russian-violet px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50",
-          )}
+          className="rounded-lg bg-russian-violet px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
         >
           {saving ? "Saving..." : "Save changes"}
         </button>
@@ -244,16 +241,12 @@ export function IdentityTab({ initial, defaults }: Props): React.ReactElement {
           type="button"
           onClick={form.resetToDefault}
           disabled={saving}
-          className={cn(
-            "rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50",
-          )}
+          className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
         >
           Reset to defaults
         </button>
-        {dirty && !saving && <span className={cn("text-sm text-slate-400")}>Unsaved changes</span>}
-        {!dirty && savedAt && (
-          <span className={cn("text-sm font-medium text-emerald-600")}>Saved</span>
-        )}
+        {dirty && !saving && <span className="text-sm text-slate-400">Unsaved changes</span>}
+        {!dirty && savedAt && <span className="text-sm font-medium text-emerald-600">Saved</span>}
       </div>
 
       <SettingsHistory group="identity" onRestore={(v: IdentitySettings) => setDraft(v)} />

@@ -208,14 +208,14 @@ export function TravelBlockAdminList({
 
   if (blocks.length === 0) {
     return (
-      <p className={cn("text-sm text-slate-400")}>
+      <p className="text-sm text-slate-400">
         No travel blocks yet. Run the calendar cache cron to generate them.
       </p>
     );
   }
 
   return (
-    <div className={cn("grid grid-cols-1 gap-3 xl:grid-cols-2")}>
+    <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
       {blocks.map((b) => {
         const currentMode = (b.transportMode ?? "driving") as TransportMode;
         const isSaving = saving === b.id;
@@ -230,40 +230,28 @@ export function TravelBlockAdminList({
               b.ignored ? "bg-slate-100/60 opacity-70" : "bg-white/50",
             )}
           >
-            <div className={cn("flex flex-col gap-2")}>
+            <div className="flex flex-col gap-2">
               {/* Header: event identity */}
-              <div className={cn("flex min-w-0 flex-wrap items-center gap-2")}>
-                <span className={cn("min-w-0 truncate text-sm font-semibold text-russian-violet")}>
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <span className="min-w-0 truncate text-sm font-semibold text-russian-violet">
                   {b.summary ?? b.sourceEventId}
                 </span>
-                <span
-                  className={cn(
-                    "shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-400",
-                  )}
-                >
+                <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-400">
                   {calendarLabels[b.calendarEmail] ?? b.calendarEmail}
                 </span>
                 {b.ignored && (
-                  <span
-                    className={cn(
-                      "shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700",
-                    )}
-                  >
+                  <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700">
                     Ignored - I have the car
                   </span>
                 )}
                 {b.isCarEvent && (
-                  <label
-                    className={cn(
-                      "ml-auto flex shrink-0 cursor-pointer items-center gap-1.5 text-xs text-slate-600",
-                    )}
-                  >
+                  <label className="ml-auto flex shrink-0 cursor-pointer items-center gap-1.5 text-xs text-slate-600">
                     <input
                       type="checkbox"
                       checked={b.ignored}
                       disabled={isSaving}
                       onChange={(e) => void setIgnored(b.id, e.target.checked)}
-                      className={cn("h-3.5 w-3.5")}
+                      className="h-3.5 w-3.5"
                     />
                     Ignore (I have the car)
                   </label>
@@ -271,26 +259,24 @@ export function TravelBlockAdminList({
               </div>
 
               {/* Event time */}
-              <p className={cn("text-xs text-slate-600")}>
+              <p className="text-xs text-slate-600">
                 {formatEventTime(b.eventStartAt, b.eventEndAt)}
               </p>
 
               {/* Destination address - wrap long unbroken strings on mobile. */}
               {b.destination && (
-                <p className={cn("text-xs wrap-break-word text-slate-500")}>
-                  <span className={cn("font-medium text-slate-400")}>To: </span>
+                <p className="text-xs wrap-break-word text-slate-500">
+                  <span className="font-medium text-slate-400">To: </span>
                   {b.destination}
                 </p>
               )}
 
               {/* Transport mode selector */}
               <div>
-                <p
-                  className={cn("mb-1 text-xs font-medium tracking-wide text-slate-400 uppercase")}
-                >
+                <p className="mb-1 text-xs font-medium tracking-wide text-slate-400 uppercase">
                   How I'm getting there
                 </p>
-                <div className={cn("flex flex-wrap gap-1")}>
+                <div className="flex flex-wrap gap-1">
                   {MODES.map((m) => (
                     <button
                       key={m.value}
@@ -309,7 +295,7 @@ export function TravelBlockAdminList({
                 </div>
                 {(b.rawTravelMinutes === null || b.rawTravelBackMinutes === null) &&
                   b.transportMode !== null && (
-                    <p className={cn("mt-1 text-xs text-amber-500")}>
+                    <p className="mt-1 text-xs text-amber-500">
                       Mode changed - recalculate to update travel times
                     </p>
                   )}
@@ -317,39 +303,31 @@ export function TravelBlockAdminList({
 
               {/* Origin */}
               <div>
-                <p
-                  className={cn("mb-1 text-xs font-medium tracking-wide text-slate-400 uppercase")}
-                >
+                <p className="mb-1 text-xs font-medium tracking-wide text-slate-400 uppercase">
                   Departing from
                 </p>
                 {isEditingOrigin ? (
-                  <div className={cn("flex flex-col gap-1.5")}>
+                  <div className="flex flex-col gap-1.5">
                     <input
                       type="text"
                       value={originInput}
                       onChange={(e) => setOriginInput(e.target.value)}
                       placeholder={b.detectedOrigin ?? "Enter address…"}
-                      className={cn(
-                        "w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs focus:border-slate-400 focus:outline-none",
-                      )}
+                      className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs focus:border-slate-400 focus:outline-none"
                       disabled={isSaving}
                     />
-                    <div className={cn("flex flex-wrap gap-1")}>
+                    <div className="flex flex-wrap gap-1">
                       <button
                         disabled={isSaving || !originInput.trim()}
                         onClick={() => void saveOrigin(b.id, originInput.trim() || null)}
-                        className={cn(
-                          "rounded-lg bg-russian-violet px-2.5 py-1 text-xs font-medium text-white transition-colors disabled:opacity-50",
-                        )}
+                        className="rounded-lg bg-russian-violet px-2.5 py-1 text-xs font-medium text-white transition-colors disabled:opacity-50"
                       >
                         Save
                       </button>
                       <button
                         disabled={isSaving}
                         onClick={() => setEditingOriginId(null)}
-                        className={cn(
-                          "rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500 hover:bg-slate-200 disabled:opacity-50",
-                        )}
+                        className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500 hover:bg-slate-200 disabled:opacity-50"
                       >
                         Cancel
                       </button>
@@ -357,9 +335,7 @@ export function TravelBlockAdminList({
                         <button
                           disabled={isSaving}
                           onClick={() => void saveOrigin(b.id, null)}
-                          className={cn(
-                            "rounded-lg bg-red-50 px-2.5 py-1 text-xs font-medium text-red-500 hover:bg-red-100 disabled:opacity-50",
-                          )}
+                          className="rounded-lg bg-red-50 px-2.5 py-1 text-xs font-medium text-red-500 hover:bg-red-100 disabled:opacity-50"
                         >
                           Clear override
                         </button>
@@ -367,22 +343,16 @@ export function TravelBlockAdminList({
                     </div>
                   </div>
                 ) : (
-                  <div className={cn("flex items-center gap-2")}>
-                    <span className={cn("text-xs text-slate-700")}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-700">
                       {effectiveOrigin ?? "Home (default)"}
                     </span>
                     {b.customOrigin ? (
-                      <span
-                        className={cn(
-                          "rounded bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-600",
-                        )}
-                      >
+                      <span className="rounded bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-600">
                         override
                       </span>
                     ) : b.detectedOrigin ? (
-                      <span
-                        className={cn("rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-400")}
-                      >
+                      <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-400">
                         auto
                       </span>
                     ) : null}
@@ -392,9 +362,7 @@ export function TravelBlockAdminList({
                         setEditingOriginId(b.id);
                         setOriginInput(b.customOrigin ?? "");
                       }}
-                      className={cn(
-                        "rounded px-1.5 py-0.5 text-xs text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-50",
-                      )}
+                      className="rounded px-1.5 py-0.5 text-xs text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-50"
                     >
                       Edit
                     </button>
@@ -402,23 +370,19 @@ export function TravelBlockAdminList({
                 )}
                 {(b.rawTravelMinutes === null || b.rawTravelBackMinutes === null) &&
                   b.customOrigin !== null && (
-                    <p className={cn("mt-1 text-xs text-amber-500")}>
+                    <p className="mt-1 text-xs text-amber-500">
                       Origin changed - recalculate to update travel times
                     </p>
                   )}
               </div>
 
               {/* Travel times grid */}
-              <div className={cn("grid gap-2 sm:grid-cols-2")}>
+              <div className="grid gap-2 sm:grid-cols-2">
                 <div>
-                  <p
-                    className={cn(
-                      "mb-0.5 text-xs font-medium tracking-wide text-slate-400 uppercase",
-                    )}
-                  >
+                  <p className="mb-0.5 text-xs font-medium tracking-wide text-slate-400 uppercase">
                     Travel there
                   </p>
-                  <p className={cn("text-sm text-slate-700")}>
+                  <p className="text-sm text-slate-700">
                     {formatMinutes(b.rawTravelMinutes, b.roundedMinutes)}
                   </p>
                   <p
@@ -434,22 +398,16 @@ export function TravelBlockAdminList({
                   </p>
                 </div>
                 <div>
-                  <p
-                    className={cn(
-                      "mb-0.5 text-xs font-medium tracking-wide text-slate-400 uppercase",
-                    )}
-                  >
+                  <p className="mb-0.5 text-xs font-medium tracking-wide text-slate-400 uppercase">
                     Travel back
                   </p>
-                  <p className={cn("text-sm text-slate-700")}>
+                  <p className="text-sm text-slate-700">
                     {b.travelBackSuppressed
                       ? "chained to next event"
                       : formatMinutes(b.rawTravelBackMinutes, b.roundedBackMinutes)}
                   </p>
                   {b.travelBackSuppressed ? (
-                    <p className={cn("text-xs text-slate-400")}>
-                      no return trip - suppressed by design
-                    </p>
+                    <p className="text-xs text-slate-400">no return trip - suppressed by design</p>
                   ) : (
                     <p
                       className={cn(

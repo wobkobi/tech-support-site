@@ -29,26 +29,22 @@ export default function GlobalError({
 
   return (
     <html lang="en-NZ">
-      <body className={cn("min-h-screen bg-seasalt-900 text-rich-black")}>
-        <main className={cn("mx-auto w-full max-w-5xl px-3 py-8 sm:px-6 sm:py-12")}>
-          <h1 className={cn("mb-3 text-center text-2xl font-bold sm:mb-4 sm:text-3xl md:text-4xl")}>
+      <body className="min-h-screen bg-seasalt-900 text-rich-black">
+        <main className="mx-auto w-full max-w-5xl px-3 py-8 sm:px-6 sm:py-12">
+          <h1 className="mb-3 text-center text-2xl font-bold sm:mb-4 sm:text-3xl md:text-4xl">
             Something went wrong
           </h1>
 
-          <div
-            className={cn(
-              "rounded-lg border border-seasalt-400/60 bg-seasalt-800 p-4 shadow-sm sm:p-6",
-            )}
-          >
+          <div className="rounded-lg border border-seasalt-400/60 bg-seasalt-800 p-4 shadow-sm sm:p-6">
             <p
-              className={cn("mb-3 text-base font-medium sm:mb-4 sm:text-lg")}
+              className="mb-3 text-base font-medium sm:mb-4 sm:text-lg"
               role="status"
               aria-live="polite"
             >
               {msg}
             </p>
 
-            <div className={cn("flex flex-wrap items-center gap-3")}>
+            <div className="flex flex-wrap items-center gap-3">
               <button
                 type="button"
                 onClick={reset}
@@ -57,28 +53,22 @@ export default function GlobalError({
                   "hover:bg-russian-violet-600 disabled:opacity-60",
                 )}
               >
-                <FaArrowRotateRight className={cn("h-4 w-4")} aria-hidden />
+                <FaArrowRotateRight className="h-4 w-4" aria-hidden />
                 Try again
               </button>
 
               <Link
                 href="/"
-                className={cn(
-                  "inline-flex items-center gap-2 rounded-md px-3 py-2 text-base font-semibold text-russian-violet hover:text-coquelicot-500",
-                )}
+                className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-base font-semibold text-russian-violet hover:text-coquelicot-500"
               >
-                <FaHouse className={cn("h-4 w-4")} aria-hidden />
+                <FaHouse className="h-4 w-4" aria-hidden />
                 Go home
               </Link>
             </div>
 
-            <details className={cn("mt-4 text-base text-rich-black/80")}>
-              <summary className={cn("cursor-pointer")}>Technical details</summary>
-              <pre
-                className={cn(
-                  "mt-2 overflow-auto rounded-md border border-seasalt-400/60 bg-seasalt-800 p-3",
-                )}
-              >
+            <details className="mt-4 text-base text-rich-black/80">
+              <summary className="cursor-pointer">Technical details</summary>
+              <pre className="mt-2 overflow-auto rounded-md border border-seasalt-400/60 bg-seasalt-800 p-3">
                 {String(error?.stack || error)}
               </pre>
             </details>

@@ -91,7 +91,7 @@ interface LegendDotProps {
  */
 export function LegendDot({ kind, label }: LegendDotProps): React.ReactElement {
   return (
-    <span className={cn("inline-flex items-center gap-1.5")}>
+    <span className="inline-flex items-center gap-1.5">
       <span className={cn("h-3 w-3 rounded-sm border", KIND_STYLES[kind])} />
       {label}
     </span>

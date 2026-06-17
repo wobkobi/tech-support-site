@@ -239,8 +239,8 @@ export function SubscriptionsView(): React.ReactElement {
         </div>
       )}
 
-      <div className={cn("mb-4 flex items-center justify-between")}>
-        <h2 className={cn("text-lg font-bold text-slate-800")}>Subscriptions</h2>
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-lg font-bold text-slate-800">Subscriptions</h2>
         {!showForm && (
           <button
             onClick={() => {
@@ -248,9 +248,7 @@ export function SubscriptionsView(): React.ReactElement {
               setForm(emptyForm());
               setShowForm(true);
             }}
-            className={cn(
-              "rounded-lg bg-russian-violet px-4 py-2 text-sm font-medium text-white hover:opacity-90",
-            )}
+            className="rounded-lg bg-russian-violet px-4 py-2 text-sm font-medium text-white hover:opacity-90"
           >
             + Add subscription
           </button>
@@ -262,12 +260,12 @@ export function SubscriptionsView(): React.ReactElement {
           onSubmit={(e) => {
             void handleSubmit(e);
           }}
-          className={cn("mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}
+          className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
         >
-          <h3 className={cn("mb-4 font-semibold text-slate-700")}>
+          <h3 className="mb-4 font-semibold text-slate-700">
             {editId ? "Edit subscription" : "New subscription"}
           </h3>
-          <div className={cn("grid grid-cols-2 gap-3 sm:grid-cols-3")}>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <Field
               label="Description"
               htmlFor="sub-description"
@@ -375,7 +373,7 @@ export function SubscriptionsView(): React.ReactElement {
               />
             </Field>
           </div>
-          <div className={cn("mt-4 flex gap-2")}>
+          <div className="mt-4 flex gap-2">
             <Button type="submit" variant="secondary" size="sm" disabled={saving}>
               {saving ? "Saving..." : editId ? "Update" : "Add"}
             </Button>
@@ -387,14 +385,14 @@ export function SubscriptionsView(): React.ReactElement {
       )}
 
       {loading ? (
-        <p className={cn("text-sm text-slate-500")}>Loading...</p>
+        <p className="text-sm text-slate-500">Loading...</p>
       ) : subs.length === 0 ? (
-        <p className={cn("text-sm text-slate-500")}>No subscriptions yet.</p>
+        <p className="text-sm text-slate-500">No subscriptions yet.</p>
       ) : (
         <>
           {/* Mobile card list - the desktop table is too wide for phones with
               seven columns including the action buttons. */}
-          <div className={cn("space-y-2 lg:hidden")}>
+          <div className="space-y-2 lg:hidden">
             {subs.map((sub) => {
               const overdue = sub.isActive && isOverdue(sub.nextDue);
               const dueToday = sub.isActive && isDueToday(sub.nextDue);
@@ -406,19 +404,19 @@ export function SubscriptionsView(): React.ReactElement {
                     overdue ? "border-amber-300 bg-amber-50" : dueToday ? "bg-amber-50/50" : "",
                   )}
                 >
-                  <div className={cn("flex items-start justify-between gap-2")}>
-                    <div className={cn("min-w-0 flex-1")}>
-                      <p className={cn("truncate text-sm font-semibold text-slate-800")}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-slate-800">
                         {sub.description}
                       </p>
-                      <p className={cn("truncate text-xs text-slate-500")}>{sub.supplier}</p>
+                      <p className="truncate text-xs text-slate-500">{sub.supplier}</p>
                     </div>
-                    <p className={cn("shrink-0 text-sm font-semibold text-slate-800")}>
+                    <p className="shrink-0 text-sm font-semibold text-slate-800">
                       {formatNZD(sub.amountIncl)}
                     </p>
                   </div>
-                  <div className={cn("mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs")}>
-                    <span className={cn("text-slate-500 capitalize")}>{sub.frequency}</span>
+                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                    <span className="text-slate-500 capitalize">{sub.frequency}</span>
                     <span
                       className={cn(
                         overdue
@@ -445,26 +443,20 @@ export function SubscriptionsView(): React.ReactElement {
                       {sub.isActive ? "Active" : "Paused"}
                     </button>
                   </div>
-                  {sub.notes && (
-                    <p className={cn("mt-1 truncate text-xs text-slate-400")}>{sub.notes}</p>
-                  )}
-                  <div className={cn("mt-2 flex flex-wrap gap-2")}>
+                  {sub.notes && <p className="mt-1 truncate text-xs text-slate-400">{sub.notes}</p>}
+                  <div className="mt-2 flex flex-wrap gap-2">
                     <button
                       onClick={() => {
                         void handleRecord(sub);
                       }}
                       disabled={recording === sub.id}
-                      className={cn(
-                        "rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50",
-                      )}
+                      className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50"
                     >
                       {recording === sub.id ? "Recording..." : "Record"}
                     </button>
                     <button
                       onClick={() => startEdit(sub)}
-                      className={cn(
-                        "rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50",
-                      )}
+                      className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
                     >
                       Edit
                     </button>
@@ -473,9 +465,7 @@ export function SubscriptionsView(): React.ReactElement {
                         void handleDelete(sub);
                       }}
                       disabled={deleting === sub.id}
-                      className={cn(
-                        "rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50",
-                      )}
+                      className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
                     >
                       Delete
                     </button>
@@ -486,21 +476,17 @@ export function SubscriptionsView(): React.ReactElement {
           </div>
 
           {/* Desktop table */}
-          <div
-            className={cn(
-              "hidden overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm lg:block",
-            )}
-          >
-            <table className={cn("w-full text-sm")}>
+          <div className="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm lg:block">
+            <table className="w-full text-sm">
               <thead>
-                <tr className={cn("border-b border-slate-100 bg-slate-50 text-left")}>
-                  <th className={cn("px-4 py-3 font-semibold text-slate-600")}>Description</th>
-                  <th className={cn("px-4 py-3 font-semibold text-slate-600")}>Supplier</th>
-                  <th className={cn("px-4 py-3 font-semibold text-slate-600")}>Amount</th>
-                  <th className={cn("px-4 py-3 font-semibold text-slate-600")}>Frequency</th>
-                  <th className={cn("px-4 py-3 font-semibold text-slate-600")}>Next due</th>
-                  <th className={cn("px-4 py-3 font-semibold text-slate-600")}>Active</th>
-                  <th className={cn("px-4 py-3 font-semibold text-slate-600")}>Actions</th>
+                <tr className="border-b border-slate-100 bg-slate-50 text-left">
+                  <th className="px-4 py-3 font-semibold text-slate-600">Description</th>
+                  <th className="px-4 py-3 font-semibold text-slate-600">Supplier</th>
+                  <th className="px-4 py-3 font-semibold text-slate-600">Amount</th>
+                  <th className="px-4 py-3 font-semibold text-slate-600">Frequency</th>
+                  <th className="px-4 py-3 font-semibold text-slate-600">Next due</th>
+                  <th className="px-4 py-3 font-semibold text-slate-600">Active</th>
+                  <th className="px-4 py-3 font-semibold text-slate-600">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -515,17 +501,15 @@ export function SubscriptionsView(): React.ReactElement {
                         overdue ? "bg-amber-50" : dueToday ? "bg-amber-50/50" : "",
                       )}
                     >
-                      <td className={cn("px-4 py-3 font-medium text-slate-800")}>
+                      <td className="px-4 py-3 font-medium text-slate-800">
                         {sub.description}
                         {sub.notes && (
-                          <span className={cn("ml-1 text-xs text-slate-400")}>({sub.notes})</span>
+                          <span className="ml-1 text-xs text-slate-400">({sub.notes})</span>
                         )}
                       </td>
-                      <td className={cn("px-4 py-3 text-slate-600")}>{sub.supplier}</td>
-                      <td className={cn("px-4 py-3 text-slate-800")}>
-                        {formatNZD(sub.amountIncl)}
-                      </td>
-                      <td className={cn("px-4 py-3 text-slate-600 capitalize")}>{sub.frequency}</td>
+                      <td className="px-4 py-3 text-slate-600">{sub.supplier}</td>
+                      <td className="px-4 py-3 text-slate-800">{formatNZD(sub.amountIncl)}</td>
+                      <td className="px-4 py-3 text-slate-600 capitalize">{sub.frequency}</td>
                       <td
                         className={cn(
                           "px-4 py-3",
@@ -537,9 +521,9 @@ export function SubscriptionsView(): React.ReactElement {
                         )}
                       >
                         {formatDateShort(sub.nextDue)}
-                        {overdue && <span className={cn("ml-1 text-xs")}>(overdue)</span>}
+                        {overdue && <span className="ml-1 text-xs">(overdue)</span>}
                       </td>
-                      <td className={cn("px-4 py-3")}>
+                      <td className="px-4 py-3">
                         <button
                           onClick={() => {
                             void handleToggleActive(sub);
@@ -554,24 +538,20 @@ export function SubscriptionsView(): React.ReactElement {
                           {sub.isActive ? "Active" : "Paused"}
                         </button>
                       </td>
-                      <td className={cn("px-4 py-3")}>
-                        <div className={cn("flex gap-2")}>
+                      <td className="px-4 py-3">
+                        <div className="flex gap-2">
                           <button
                             onClick={() => {
                               void handleRecord(sub);
                             }}
                             disabled={recording === sub.id}
-                            className={cn(
-                              "rounded-lg bg-green-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50",
-                            )}
+                            className="rounded-lg bg-green-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50"
                           >
                             {recording === sub.id ? "Recording..." : "Record"}
                           </button>
                           <button
                             onClick={() => startEdit(sub)}
-                            className={cn(
-                              "rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50",
-                            )}
+                            className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
                           >
                             Edit
                           </button>
@@ -580,9 +560,7 @@ export function SubscriptionsView(): React.ReactElement {
                               void handleDelete(sub);
                             }}
                             disabled={deleting === sub.id}
-                            className={cn(
-                              "rounded-lg border border-red-200 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50",
-                            )}
+                            className="rounded-lg border border-red-200 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
                           >
                             Delete
                           </button>

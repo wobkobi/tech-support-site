@@ -1,6 +1,5 @@
 "use client";
 
-import { cn } from "@/shared/lib/cn";
 import type React from "react";
 import { useState } from "react";
 
@@ -76,17 +75,13 @@ export function SheetImportButton(): React.ReactElement {
   }
 
   return (
-    <div className={cn("mt-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}>
-      <h2 className={cn("mb-3 font-semibold text-slate-700")}>Import from Google Sheets</h2>
+    <div className="mt-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <h2 className="mb-3 font-semibold text-slate-700">Import from Google Sheets</h2>
 
-      {error && <p className={cn("mb-3 text-sm text-red-600")}>{error}</p>}
+      {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
 
       {done && (
-        <div
-          className={cn(
-            "mb-3 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800",
-          )}
-        >
+        <div className="mb-3 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
           <p className="font-medium">
             Import complete
             {done.source === "folder" && done.perSheet && ` - ${done.perSheet.length} sheet(s)`}
@@ -98,7 +93,7 @@ export function SheetImportButton(): React.ReactElement {
             Expenses: {done.expensesImported} imported, {done.expensesSkipped} skipped
           </p>
           {done.perSheet && done.perSheet.length > 0 && (
-            <ul className={cn("mt-2 list-inside list-disc text-xs text-green-900/80")}>
+            <ul className="mt-2 list-inside list-disc text-xs text-green-900/80">
               {done.perSheet.map((s) => (
                 <li key={s.fileId}>
                   <span className="font-medium">{s.name}</span>: {s.incomeImported} income,{" "}
@@ -115,11 +110,7 @@ export function SheetImportButton(): React.ReactElement {
       )}
 
       {preview && !done && (
-        <div
-          className={cn(
-            "mb-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700",
-          )}
-        >
+        <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
           <p className="mb-1 font-medium">
             Preview (no changes made yet)
             {preview.source === "folder" &&
@@ -135,7 +126,7 @@ export function SheetImportButton(): React.ReactElement {
             or invalid
           </p>
           {preview.perSheet && preview.perSheet.length > 0 && (
-            <ul className={cn("mt-2 list-inside list-disc text-xs text-slate-600")}>
+            <ul className="mt-2 list-inside list-disc text-xs text-slate-600">
               {preview.perSheet.map((s) => (
                 <li key={s.fileId}>
                   <span className="font-medium">{s.name}</span>: {s.incomeImported} income,{" "}
@@ -147,16 +138,14 @@ export function SheetImportButton(): React.ReactElement {
         </div>
       )}
 
-      <div className={cn("flex gap-2")}>
+      <div className="flex gap-2">
         {!preview && !done && (
           <button
             onClick={() => {
               void handlePreview();
             }}
             disabled={loading}
-            className={cn(
-              "rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50",
-            )}
+            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
           >
             {loading ? "Checking..." : "Preview import"}
           </button>
@@ -168,18 +157,14 @@ export function SheetImportButton(): React.ReactElement {
                 void handleImport();
               }}
               disabled={loading}
-              className={cn(
-                "rounded-lg bg-russian-violet px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50",
-              )}
+              className="rounded-lg bg-russian-violet px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
             >
               {loading ? "Importing..." : "Confirm import"}
             </button>
             <button
               onClick={() => setPreview(null)}
               disabled={loading}
-              className={cn(
-                "rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50",
-              )}
+              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
             >
               Cancel
             </button>
@@ -191,9 +176,7 @@ export function SheetImportButton(): React.ReactElement {
               setDone(null);
               setPreview(null);
             }}
-            className={cn(
-              "rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50",
-            )}
+            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
           >
             Import again
           </button>

@@ -7,7 +7,6 @@
  */
 
 import { formatNZD } from "@/features/business/lib/business";
-import { cn } from "@/shared/lib/cn";
 import Link from "next/link";
 import type React from "react";
 import { useEffect } from "react";
@@ -85,51 +84,41 @@ export function BreakdownModal({ data, onClose }: BreakdownModalProps): React.Re
 
   return (
     <div
-      className={cn(
-        "fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-12 backdrop-blur-sm",
-      )}
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-12 backdrop-blur-sm"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-label={data.title}
     >
       <div
-        className={cn(
-          "w-full max-w-2xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl",
-        )}
+        className="w-full max-w-2xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div
-          className={cn("flex items-center justify-between border-b border-slate-200 px-5 py-4")}
-        >
-          <h2 className={cn("text-lg font-bold text-russian-violet")}>{data.title}</h2>
+        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+          <h2 className="text-lg font-bold text-russian-violet">{data.title}</h2>
           <button
             type="button"
             onClick={onClose}
-            className={cn(
-              "text-2xl leading-none text-slate-400 transition-colors hover:text-slate-700",
-            )}
+            className="text-2xl leading-none text-slate-400 transition-colors hover:text-slate-700"
             aria-label="Close"
           >
             ×
           </button>
         </div>
 
-        <div className={cn("max-h-[60vh] overflow-y-auto px-5 py-4")}>
+        <div className="max-h-[60vh] overflow-y-auto px-5 py-4">
           {data.calculation && data.calculation.length > 0 && (
-            <ul className={cn("flex flex-col gap-2 text-sm")}>
+            <ul className="flex flex-col gap-2 text-sm">
               {data.calculation.map((step, i) => (
                 <li
                   key={`${step.label}-${i}`}
-                  className={cn(
-                    "flex items-baseline justify-between gap-3 border-b border-slate-100 pb-2 last:border-0",
-                  )}
+                  className="flex items-baseline justify-between gap-3 border-b border-slate-100 pb-2 last:border-0"
                 >
-                  <span className={cn("text-slate-600")}>
+                  <span className="text-slate-600">
                     {step.subtract ? "Less " : ""}
                     {step.label}
                   </span>
-                  <span className={cn("font-mono text-slate-800")}>
+                  <span className="font-mono text-slate-800">
                     {step.subtract ? "-" : ""}
                     {step.value}
                   </span>
@@ -139,24 +128,22 @@ export function BreakdownModal({ data, onClose }: BreakdownModalProps): React.Re
           )}
 
           {data.rows && data.rows.length > 0 && (
-            <ul className={cn("flex flex-col text-sm")}>
+            <ul className="flex flex-col text-sm">
               {data.rows.map((row, i) => (
                 <li
                   key={i}
-                  className={cn(
-                    "flex items-baseline gap-3 border-b border-slate-100 py-2 last:border-0",
-                  )}
+                  className="flex items-baseline gap-3 border-b border-slate-100 py-2 last:border-0"
                 >
                   {row.date && (
-                    <span className={cn("w-24 shrink-0 text-xs text-slate-400")}>{row.date}</span>
+                    <span className="w-24 shrink-0 text-xs text-slate-400">{row.date}</span>
                   )}
-                  <div className={cn("min-w-0 flex-1")}>
-                    <p className={cn("truncate font-medium text-slate-800")}>{row.label}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium text-slate-800">{row.label}</p>
                     {row.sublabel && (
-                      <p className={cn("truncate text-xs text-slate-500")}>{row.sublabel}</p>
+                      <p className="truncate text-xs text-slate-500">{row.sublabel}</p>
                     )}
                   </div>
-                  <span className={cn("shrink-0 font-mono text-slate-800")}>
+                  <span className="shrink-0 font-mono text-slate-800">
                     {data.amountAsCount ? String(row.amount) : formatNZD(row.amount)}
                   </span>
                 </li>
@@ -165,29 +152,23 @@ export function BreakdownModal({ data, onClose }: BreakdownModalProps): React.Re
           )}
 
           {data.rows && data.rows.length === 0 && (
-            <p className={cn("py-4 text-center text-sm text-slate-400")}>No entries.</p>
+            <p className="py-4 text-center text-sm text-slate-400">No entries.</p>
           )}
         </div>
 
         {(data.total || data.viewAll || (data.rows && data.rows.length > 0)) && (
-          <div
-            className={cn(
-              "flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-5 py-3",
-            )}
-          >
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-5 py-3">
             {data.total ? (
-              <div className={cn("flex items-baseline gap-3")}>
-                <span className={cn("text-sm font-semibold text-slate-600")}>
-                  {data.total.label}
-                </span>
-                <span className={cn("font-mono text-base font-bold text-russian-violet")}>
+              <div className="flex items-baseline gap-3">
+                <span className="text-sm font-semibold text-slate-600">{data.total.label}</span>
+                <span className="font-mono text-base font-bold text-russian-violet">
                   {data.total.value}
                 </span>
               </div>
             ) : data.rows && !data.amountAsCount ? (
-              <div className={cn("flex items-baseline gap-3")}>
-                <span className={cn("text-sm font-semibold text-slate-600")}>Total</span>
-                <span className={cn("font-mono text-base font-bold text-russian-violet")}>
+              <div className="flex items-baseline gap-3">
+                <span className="text-sm font-semibold text-slate-600">Total</span>
+                <span className="font-mono text-base font-bold text-russian-violet">
                   {formatNZD(rowsTotal)}
                 </span>
               </div>
@@ -198,12 +179,10 @@ export function BreakdownModal({ data, onClose }: BreakdownModalProps): React.Re
             {data.viewAll && (
               <Link
                 href={data.viewAll.href}
-                className={cn(
-                  "inline-flex items-center gap-1 text-sm font-semibold text-russian-violet hover:underline",
-                )}
+                className="inline-flex items-center gap-1 text-sm font-semibold text-russian-violet hover:underline"
               >
                 {data.viewAll.label}
-                <FaCaretRight className={cn("h-4 w-4")} aria-hidden />
+                <FaCaretRight className="h-4 w-4" aria-hidden />
               </Link>
             )}
           </div>

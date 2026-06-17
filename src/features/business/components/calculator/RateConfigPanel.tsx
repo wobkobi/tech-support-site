@@ -58,22 +58,20 @@ export function RateConfigPanel({
   onResetRates,
 }: Props): React.ReactElement {
   return (
-    <div className={cn("mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}>
-      <div className={cn("mb-3 flex items-center justify-between gap-2")}>
-        <h2 className={cn("text-sm font-semibold text-russian-violet")}>Rate config</h2>
+    <div className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-russian-violet">Rate config</h2>
         <button
           type="button"
           onClick={onResetRates}
           disabled={resettingRates}
-          className={cn(
-            "rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50",
-          )}
+          className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
         >
           {resettingRates ? "Resetting..." : "Reset to defaults"}
         </button>
       </div>
       {/* Mobile: stacked rate cards - five columns are too dense for phones. */}
-      <div className={cn("mb-4 space-y-2 lg:hidden")}>
+      <div className="mb-4 space-y-2 lg:hidden">
         {rates.map((r) => (
           <div
             key={r.id}
@@ -82,18 +80,15 @@ export function RateConfigPanel({
               editingRateId === r.id ? "bg-russian-violet/5" : "bg-white",
             )}
           >
-            <div className={cn("flex items-start justify-between gap-2")}>
-              <div className={cn("min-w-0 flex-1")}>
-                <p className={cn("flex items-center gap-1.5 text-sm font-semibold text-slate-700")}>
-                  <span className={cn("truncate")}>{r.label}</span>
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+                  <span className="truncate">{r.label}</span>
                   {r.isDefault && (
-                    <FaCheck
-                      className={cn("h-3 w-3 shrink-0 text-emerald-600")}
-                      aria-label="Default"
-                    />
+                    <FaCheck className="h-3 w-3 shrink-0 text-emerald-600" aria-label="Default" />
                   )}
                 </p>
-                <p className={cn("text-xs text-slate-500")}>
+                <p className="text-xs text-slate-500">
                   {r.ratePerHour !== null
                     ? `$${r.ratePerHour}/hr`
                     : r.hourlyDelta !== null
@@ -103,19 +98,19 @@ export function RateConfigPanel({
                         : r.percentDelta !== null
                           ? `${r.percentDelta < 0 ? "-" : "+"}${Math.round(r.percentDelta * 100)}%`
                           : "-"}
-                  {r.unit && <span className={cn("ml-2 text-slate-400")}>{r.unit}</span>}
+                  {r.unit && <span className="ml-2 text-slate-400">{r.unit}</span>}
                 </p>
               </div>
-              <div className={cn("flex shrink-0 gap-2 text-xs")}>
+              <div className="flex shrink-0 gap-2 text-xs">
                 <button
                   onClick={() => onStartEdit(r)}
-                  className={cn("inline-flex h-8 items-center text-slate-500 hover:text-slate-700")}
+                  className="inline-flex h-8 items-center text-slate-500 hover:text-slate-700"
                 >
                   Edit
                 </button>
                 <button
                   onClick={() => onDeleteRate(r.id)}
-                  className={cn("inline-flex h-8 items-center text-red-400 hover:text-red-600")}
+                  className="inline-flex h-8 items-center text-red-400 hover:text-red-600"
                 >
                   Delete
                 </button>
@@ -126,21 +121,21 @@ export function RateConfigPanel({
       </div>
 
       {/* Desktop table */}
-      <table className={cn("mb-4 hidden w-full text-xs lg:table")}>
+      <table className="mb-4 hidden w-full text-xs lg:table">
         <thead>
-          <tr className={cn("border-b border-slate-100")}>
+          <tr className="border-b border-slate-100">
             {["Label", "Rate", "Unit", "Default", ""].map((h) => (
-              <th key={h} className={cn("pb-2 text-left text-xs font-semibold text-slate-400")}>
+              <th key={h} className="pb-2 text-left text-xs font-semibold text-slate-400">
                 {h}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className={cn("divide-y divide-slate-50")}>
+        <tbody className="divide-y divide-slate-50">
           {rates.map((r) => (
             <tr key={r.id} className={cn(editingRateId === r.id ? "bg-russian-violet/5" : "")}>
-              <td className={cn("py-1.5 text-slate-700")}>{r.label}</td>
-              <td className={cn("py-1.5 text-slate-500")}>
+              <td className="py-1.5 text-slate-700">{r.label}</td>
+              <td className="py-1.5 text-slate-500">
                 {r.ratePerHour !== null
                   ? `$${r.ratePerHour}/hr`
                   : r.hourlyDelta !== null
@@ -151,20 +146,20 @@ export function RateConfigPanel({
                         ? `${r.percentDelta < 0 ? "-" : "+"}${Math.round(r.percentDelta * 100)}%`
                         : "-"}
               </td>
-              <td className={cn("py-1.5 text-slate-400")}>{r.unit}</td>
-              <td className={cn("py-1.5")}>
-                {r.isDefault ? <FaCheck className={cn("h-3 w-3")} aria-hidden /> : null}
+              <td className="py-1.5 text-slate-400">{r.unit}</td>
+              <td className="py-1.5">
+                {r.isDefault ? <FaCheck className="h-3 w-3" aria-hidden /> : null}
               </td>
-              <td className={cn("flex gap-2 py-1.5")}>
+              <td className="flex gap-2 py-1.5">
                 <button
                   onClick={() => onStartEdit(r)}
-                  className={cn("text-slate-400 hover:text-slate-700")}
+                  className="text-slate-400 hover:text-slate-700"
                 >
                   Edit
                 </button>
                 <button
                   onClick={() => onDeleteRate(r.id)}
-                  className={cn("text-red-400 hover:text-red-600")}
+                  className="text-red-400 hover:text-red-600"
                 >
                   Delete
                 </button>
@@ -175,7 +170,7 @@ export function RateConfigPanel({
       </table>
       <form
         onSubmit={onSubmit}
-        className={cn("grid grid-cols-1 items-end gap-2 sm:grid-cols-2 lg:grid-cols-5")}
+        className="grid grid-cols-1 items-end gap-2 sm:grid-cols-2 lg:grid-cols-5"
       >
         <input
           type="text"
@@ -183,9 +178,7 @@ export function RateConfigPanel({
           required
           value={form.label}
           onChange={(e) => onFormChange((p) => ({ ...p, label: e.target.value }))}
-          className={cn(
-            "rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none sm:py-2 sm:text-xs",
-          )}
+          className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none sm:py-2 sm:text-xs"
         />
         <select
           value={form.type}
@@ -195,9 +188,7 @@ export function RateConfigPanel({
               type: e.target.value as RateType,
             }))
           }
-          className={cn(
-            "rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none sm:py-2 sm:text-xs",
-          )}
+          className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none sm:py-2 sm:text-xs"
         >
           <option value="hourly">Hourly base</option>
           <option value="modifier">Modifier ($)</option>
@@ -220,25 +211,19 @@ export function RateConfigPanel({
           min={form.type === "modifier" || form.type === "percent" ? undefined : 0}
           value={form.amount}
           onChange={(e) => onFormChange((p) => ({ ...p, amount: e.target.value }))}
-          className={cn(
-            "rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none sm:py-2 sm:text-xs",
-          )}
+          className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none sm:py-2 sm:text-xs"
         />
         <input
           type="text"
           placeholder="Unit"
           value={form.unit}
           onChange={(e) => onFormChange((p) => ({ ...p, unit: e.target.value }))}
-          className={cn(
-            "rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none sm:py-2 sm:text-xs",
-          )}
+          className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none sm:py-2 sm:text-xs"
         />
-        <div className={cn("flex gap-2")}>
+        <div className="flex gap-2">
           <button
             type="submit"
-            className={cn(
-              "rounded-lg bg-russian-violet px-4 py-2.5 text-sm font-medium text-white hover:opacity-90 sm:py-2 sm:text-xs",
-            )}
+            className="rounded-lg bg-russian-violet px-4 py-2.5 text-sm font-medium text-white hover:opacity-90 sm:py-2 sm:text-xs"
           >
             {editingRateId ? "Update" : "Add"}
           </button>
@@ -246,9 +231,7 @@ export function RateConfigPanel({
             <button
               type="button"
               onClick={onCancelEdit}
-              className={cn(
-                "rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 sm:py-2 sm:text-xs",
-              )}
+              className="rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 sm:py-2 sm:text-xs"
             >
               Cancel
             </button>

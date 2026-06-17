@@ -39,14 +39,14 @@ function ReviewText({ text }: { text: string }): React.ReactElement {
   const normalisedText = normaliseText(text);
 
   if (!isLongReview(normalisedText)) {
-    return <span className={cn("inline wrap-break-word whitespace-normal")}>{normalisedText}</span>;
+    return <span className="inline wrap-break-word whitespace-normal">{normalisedText}</span>;
   }
 
   const preview = normalisedText.slice(0, REVIEW_CHAR_LIMIT);
   const wordSafe = preview.replace(/\s+\S*$/, "");
   const base = (wordSafe.trim().length > 0 ? wordSafe : preview).trim();
 
-  return <span className={cn("inline wrap-break-word whitespace-normal")}>{base + "…"}</span>;
+  return <span className="inline wrap-break-word whitespace-normal">{base + "…"}</span>;
 }
 
 /**
@@ -71,12 +71,12 @@ function ReviewCard({
       <Link
         href={`/reviews#review-${r.id}`}
         scroll={false}
-        className={cn("flex h-full flex-col p-4 text-inherit no-underline sm:p-5")}
+        className="flex h-full flex-col p-4 text-inherit no-underline sm:p-5"
       >
-        <p className={cn("line-clamp-4")}>
+        <p className="line-clamp-4">
           <ReviewText text={r.text} />
         </p>
-        <p className={cn("pt-3 text-right text-sm font-semibold text-russian-violet sm:text-base")}>
+        <p className="pt-3 text-right text-sm font-semibold text-russian-violet sm:text-base">
           - {r.name}
         </p>
       </Link>
@@ -119,10 +119,10 @@ export default function Reviews({ items = [] }: ReviewsProps): React.ReactElemen
   if (items.length > 3) {
     const track = [...items, ...items];
     return (
-      <section aria-labelledby="reviews-section" className={cn("mx-auto w-full max-w-6xl")}>
+      <section aria-labelledby="reviews-section" className="mx-auto w-full max-w-6xl">
         <h2
           id="reviews-section"
-          className={cn("mb-2 text-center text-xl font-semibold text-rich-black sm:text-2xl")}
+          className="mb-2 text-center text-xl font-semibold text-rich-black sm:text-2xl"
         >
           What People Say
         </h2>
@@ -135,7 +135,7 @@ export default function Reviews({ items = [] }: ReviewsProps): React.ReactElemen
             "md:-mx-16 md:w-[calc(100%+8rem)]",
           )}
         >
-          <ul className={cn("marquee-track animate-marquee flex w-max gap-3")}>
+          <ul className="marquee-track animate-marquee flex w-max gap-3">
             {track.map((r, i) => (
               <ReviewCard
                 key={`${r.name}-${i}`}
@@ -156,15 +156,15 @@ export default function Reviews({ items = [] }: ReviewsProps): React.ReactElemen
 
   // 1-3 items: grid layout
   return (
-    <section aria-labelledby="reviews-section" className={cn("mx-auto w-full max-w-6xl")}>
+    <section aria-labelledby="reviews-section" className="mx-auto w-full max-w-6xl">
       <h2
         id="reviews-section"
-        className={cn("mb-2 text-center text-xl font-semibold text-rich-black sm:text-2xl")}
+        className="mb-2 text-center text-xl font-semibold text-rich-black sm:text-2xl"
       >
         What People Say
       </h2>
 
-      <ul className={cn("grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3")}>
+      <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3">
         {items.map((r, i) => (
           <ReviewCard key={`${r.name}-${i}`} r={r} className={cn(cardBase, "w-full shadow-sm")} />
         ))}

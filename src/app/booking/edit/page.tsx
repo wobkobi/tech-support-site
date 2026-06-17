@@ -257,16 +257,12 @@ export default async function EditBookingPage({
   return (
     <PageShell>
       <FrostedSection>
-        <div className={cn("flex flex-col gap-6 sm:gap-8")}>
+        <div className="flex flex-col gap-6 sm:gap-8">
           <section className={cn(CARD, "animate-fade-in")}>
-            <h1
-              className={cn(
-                "mb-3 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl",
-              )}
-            >
+            <h1 className="mb-3 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl">
               Edit booking
             </h1>
-            <p className={cn("text-sm text-rich-black sm:text-base")}>
+            <p className="text-sm text-rich-black sm:text-base">
               Update your appointment details below. A new calendar invite will be sent when you
               save.
             </p>

@@ -289,14 +289,10 @@ export default async function BusinessPage({
 
   return (
     <AdminPageLayout current="business">
-      <h1 className={cn("mb-6 text-2xl font-extrabold text-russian-violet")}>Business</h1>
+      <h1 className="mb-6 text-2xl font-extrabold text-russian-violet">Business</h1>
 
       {/* FY scope selector */}
-      <div
-        role="tablist"
-        aria-label="Financial year scope"
-        className={cn("mb-6 flex flex-wrap gap-2")}
-      >
+      <div role="tablist" aria-label="Financial year scope" className="mb-6 flex flex-wrap gap-2">
         {tabs.map((tab) => {
           const active = tab.key === scope.key;
           return (
@@ -314,11 +310,7 @@ export default async function BusinessPage({
             >
               {tab.label}
               {tab.current && !active && (
-                <span
-                  className={cn(
-                    "ml-2 rounded-full bg-moonstone-600/15 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-moonstone-600 uppercase",
-                  )}
-                >
+                <span className="ml-2 rounded-full bg-moonstone-600/15 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-moonstone-600 uppercase">
                   Current
                 </span>
               )}
@@ -350,14 +342,12 @@ export default async function BusinessPage({
       />
 
       {/* Action links - full-width stacked on mobile, side-by-side from sm+. */}
-      <div className={cn("flex flex-col gap-3 sm:flex-row sm:flex-wrap")}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
         {links.map((l) => (
           <Link
             key={l.label}
             href={l.href}
-            className={cn(
-              "rounded-lg bg-russian-violet px-4 py-2 text-center text-sm font-medium text-white transition-opacity hover:opacity-90 sm:w-auto sm:text-left",
-            )}
+            className="rounded-lg bg-russian-violet px-4 py-2 text-center text-sm font-medium text-white transition-opacity hover:opacity-90 sm:w-auto sm:text-left"
           >
             {l.label}
           </Link>

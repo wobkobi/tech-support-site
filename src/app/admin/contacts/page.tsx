@@ -3,7 +3,6 @@ import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
 import { ContactsAdminView } from "@/features/admin/components/ContactsAdminView";
 import { autoMaintain } from "@/features/admin/lib/auto-maintain";
 import { requireAdminAuth } from "@/shared/lib/auth";
-import { cn } from "@/shared/lib/cn";
 import { prisma } from "@/shared/lib/prisma";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -92,25 +91,21 @@ export default async function AdminContactsPage(): Promise<React.ReactElement> {
 
   return (
     <AdminPageLayout current="contacts">
-      <h1 className={cn("mb-6 text-2xl font-extrabold text-russian-violet")}>
+      <h1 className="mb-6 text-2xl font-extrabold text-russian-violet">
         Contacts
-        <span className={cn("ml-3 text-lg font-semibold text-slate-400")}>
-          {allContacts.length}
-        </span>
+        <span className="ml-3 text-lg font-semibold text-slate-400">{allContacts.length}</span>
       </h1>
       {pendingConflictsCount > 0 && (
         <Link
           href={`/admin/contacts/conflicts`}
-          className={cn(
-            "mb-4 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 hover:bg-amber-100",
-          )}
+          className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 hover:bg-amber-100"
         >
           <span>
             <strong>{pendingConflictsCount}</strong> contact{" "}
             {pendingConflictsCount === 1 ? "field has" : "fields have"} a sync conflict between the
             site and Google Contacts.
           </span>
-          <span className={cn("font-semibold")}>Review &amp; resolve →</span>
+          <span className="font-semibold">Review &amp; resolve →</span>
         </Link>
       )}
       <ContactsAdminView initialConflicts={initialConflicts} contacts={contactRows} />

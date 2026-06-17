@@ -404,21 +404,17 @@ export function InvoiceActions({
 
   return (
     <>
-      <div className={cn("mb-6 flex flex-wrap gap-3 print:hidden")}>
+      <div className="mb-6 flex flex-wrap gap-3 print:hidden">
         <Link
           href={backHref}
-          className={cn(
-            "inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50",
-          )}
+          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
         >
-          <FaCaretLeft className={cn("h-4 w-4")} aria-hidden />
+          <FaCaretLeft className="h-4 w-4" aria-hidden />
           Back
         </Link>
         <button
           onClick={() => void downloadPdf()}
-          className={cn(
-            "rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50",
-          )}
+          className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
         >
           Save PDF
         </button>
@@ -427,9 +423,7 @@ export function InvoiceActions({
             href={driveWebUrl}
             target="_blank"
             rel="noreferrer"
-            className={cn(
-              "rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50",
-            )}
+            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
           >
             View PDF in Drive ↗
           </a>
@@ -439,9 +433,7 @@ export function InvoiceActions({
             type="button"
             onClick={() => void deleteDraft()}
             disabled={deleting}
-            className={cn(
-              "rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50",
-            )}
+            className="rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
           >
             {deleting ? "Deleting..." : "Delete draft"}
           </button>
@@ -451,9 +443,7 @@ export function InvoiceActions({
             type="button"
             onClick={() => void voidInvoice()}
             disabled={voiding}
-            className={cn(
-              "rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50",
-            )}
+            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
           >
             {voiding ? "Voiding..." : "Void invoice"}
           </button>
@@ -463,22 +453,18 @@ export function InvoiceActions({
             type="button"
             onClick={resendVoidNotification}
             disabled={voiding}
-            className={cn(
-              "rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-[#5a2a82] hover:bg-slate-50 disabled:opacity-50",
-            )}
+            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-[#5a2a82] hover:bg-slate-50 disabled:opacity-50"
           >
             {voiding ? "Sending..." : "Resend void notification"}
           </button>
         )}
-        <div className={cn("ml-auto flex flex-wrap gap-3")}>
+        <div className="ml-auto flex flex-wrap gap-3">
           {!isPaid && !isVoided && (
             <button
               type="button"
               onClick={() => void markPaid()}
               disabled={marking}
-              className={cn(
-                "rounded-lg border border-green-200 bg-white px-4 py-2 text-sm font-medium text-green-700 hover:bg-green-50 disabled:opacity-50",
-              )}
+              className="rounded-lg border border-green-200 bg-white px-4 py-2 text-sm font-medium text-green-700 hover:bg-green-50 disabled:opacity-50"
             >
               {marking ? "Saving..." : "Mark as paid"}
             </button>
@@ -502,78 +488,58 @@ export function InvoiceActions({
       </div>
 
       {error && !previewOpen && !voidModalOpen && (
-        <p
-          className={cn(
-            "mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 print:hidden",
-          )}
-        >
+        <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 print:hidden">
           {error}
         </p>
       )}
 
       {voidToast && (
-        <p
-          className={cn(
-            "mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 print:hidden",
-          )}
-        >
+        <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 print:hidden">
           {voidToast}
         </p>
       )}
 
       {previewOpen && (
         <div
-          className={cn(
-            "fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 print:hidden",
-          )}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 print:hidden"
           role="dialog"
           aria-modal="true"
         >
           <div
-            className={cn(
-              "flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl bg-white shadow-2xl",
-            )}
+            className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl bg-white shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div
-              className={cn(
-                "flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-4",
-              )}
-            >
-              <div className={cn("min-w-0")}>
-                <h2 className={cn("text-lg font-bold text-russian-violet")}>Send invoice</h2>
-                <p className={cn("mt-1 text-sm text-slate-600")}>
-                  To: <span className={cn("font-medium")}>{preview?.to ?? clientEmail}</span>
+            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-4">
+              <div className="min-w-0">
+                <h2 className="text-lg font-bold text-russian-violet">Send invoice</h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  To: <span className="font-medium">{preview?.to ?? clientEmail}</span>
                 </p>
               </div>
               <button
                 type="button"
                 onClick={closePreview}
                 aria-label="Close"
-                className={cn("text-slate-400 hover:text-slate-700")}
+                className="text-slate-400 hover:text-slate-700"
               >
                 ×
               </button>
             </div>
 
-            <div className={cn("flex-1 overflow-y-auto")}>
+            <div className="flex-1 overflow-y-auto">
               {loading && (
-                <p className={cn("p-6 text-center text-sm text-slate-500")}>Loading preview...</p>
+                <p className="p-6 text-center text-sm text-slate-500">Loading preview...</p>
               )}
               {error && !loading && (
-                <p
-                  className={cn(
-                    "m-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700",
-                  )}
-                >
+                <p className="m-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                   {error}
                 </p>
               )}
               {preview && !loading && (
-                <div className={cn("p-6")}>
+                <div className="p-6">
                   <label
                     htmlFor="greeting-name"
-                    className={cn("mb-2 block text-xs font-semibold text-slate-400 uppercase")}
+                    className="mb-2 block text-xs font-semibold text-slate-400 uppercase"
                   >
                     Greeting (the person you're emailing)
                   </label>
@@ -592,7 +558,7 @@ export function InvoiceActions({
                   />
                   <label
                     htmlFor="custom-body"
-                    className={cn("mb-2 block text-xs font-semibold text-slate-400 uppercase")}
+                    className="mb-2 block text-xs font-semibold text-slate-400 uppercase"
                   >
                     Message
                   </label>
@@ -609,7 +575,7 @@ export function InvoiceActions({
                     )}
                   />
                   {eligibility && (
-                    <div className={cn("mb-4")}>
+                    <div className="mb-4">
                       <label
                         className={cn(
                           "flex items-start gap-2 text-sm",
@@ -624,14 +590,12 @@ export function InvoiceActions({
                             setIncludeReview(e.target.checked);
                             void openPreview();
                           }}
-                          className={cn(
-                            "mt-0.5 h-4 w-4 rounded border-slate-300 text-russian-violet focus:ring-russian-violet/30",
-                          )}
+                          className="mt-0.5 h-4 w-4 rounded border-slate-300 text-russian-violet focus:ring-russian-violet/30"
                         />
                         <span className={cn(!eligibility.canSend && "text-slate-400")}>
                           Include review link in this email
                           {eligibility.canSend === false && (
-                            <span className={cn("ml-1 text-xs italic")}>
+                            <span className="ml-1 text-xs italic">
                               {eligibility.reason === "already-reviewed" &&
                                 "(this customer has already left a review)"}
                               {eligibility.reason === "sent-recently" &&
@@ -642,9 +606,7 @@ export function InvoiceActions({
                                   <button
                                     type="button"
                                     onClick={() => setShowAddContact(true)}
-                                    className={cn(
-                                      "font-semibold text-russian-violet underline hover:opacity-80",
-                                    )}
+                                    className="font-semibold text-russian-violet underline hover:opacity-80"
                                   >
                                     add {clientName?.trim().split(" ")[0] || "them"} to contacts
                                   </button>
@@ -657,37 +619,27 @@ export function InvoiceActions({
                       </label>
                     </div>
                   )}
-                  <p className={cn("mb-2 text-xs font-semibold text-slate-400 uppercase")}>
-                    Subject
-                  </p>
-                  <p className={cn("mb-4 text-sm font-medium text-slate-800")}>{preview.subject}</p>
-                  <p className={cn("mb-2 text-xs font-semibold text-slate-400 uppercase")}>Body</p>
-                  <div
-                    className={cn(
-                      "rounded-lg border border-slate-200 bg-slate-50 p-2 text-sm text-slate-800",
-                    )}
-                  >
+                  <p className="mb-2 text-xs font-semibold text-slate-400 uppercase">Subject</p>
+                  <p className="mb-4 text-sm font-medium text-slate-800">{preview.subject}</p>
+                  <p className="mb-2 text-xs font-semibold text-slate-400 uppercase">Body</p>
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-sm text-slate-800">
                     <iframe
                       title="Invoice email preview"
                       srcDoc={preview.html}
                       sandbox="allow-same-origin"
-                      className={cn("h-105 w-full rounded bg-white")}
+                      className="h-105 w-full rounded bg-white"
                     />
                   </div>
                 </div>
               )}
             </div>
 
-            <div
-              className={cn("flex flex-wrap justify-end gap-3 border-t border-slate-200 px-6 py-4")}
-            >
+            <div className="flex flex-wrap justify-end gap-3 border-t border-slate-200 px-6 py-4">
               <button
                 type="button"
                 onClick={closePreview}
                 disabled={sending}
-                className={cn(
-                  "rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50",
-                )}
+                className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -709,40 +661,31 @@ export function InvoiceActions({
 
       {voidModalOpen && (
         <div
-          className={cn(
-            "fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 print:hidden",
-          )}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 print:hidden"
           role="dialog"
           aria-modal="true"
         >
           <div
-            className={cn(
-              "flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl bg-white shadow-2xl",
-            )}
+            className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl bg-white shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div
-              className={cn(
-                "flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-4",
-              )}
-            >
-              <div className={cn("min-w-0")}>
-                <h2 className={cn("text-lg font-bold text-russian-violet")}>
+            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-4">
+              <div className="min-w-0">
+                <h2 className="text-lg font-bold text-russian-violet">
                   {isVoided ? "Resend void notification" : "Void invoice"}
                 </h2>
-                <p className={cn("mt-1 text-sm text-slate-600")}>
+                <p className="mt-1 text-sm text-slate-600">
                   {clientEmail ? (
                     isVoided ? (
                       <>
                         Re-send the void notification to{" "}
-                        <span className={cn("font-medium")}>{clientEmail}</span>. The invoice stays
-                        voided either way.
+                        <span className="font-medium">{clientEmail}</span>. The invoice stays voided
+                        either way.
                       </>
                     ) : (
                       <>
-                        This invoice was sent to{" "}
-                        <span className={cn("font-medium")}>{clientEmail}</span>. Notify them so
-                        they don't pay the original.
+                        This invoice was sent to <span className="font-medium">{clientEmail}</span>.
+                        Notify them so they don't pay the original.
                       </>
                     )
                   ) : (
@@ -754,34 +697,28 @@ export function InvoiceActions({
                 type="button"
                 onClick={closeVoidModal}
                 aria-label="Close"
-                className={cn("text-slate-400 hover:text-slate-700")}
+                className="text-slate-400 hover:text-slate-700"
               >
                 ×
               </button>
             </div>
 
-            <div className={cn("flex-1 overflow-y-auto p-6")}>
+            <div className="flex-1 overflow-y-auto p-6">
               {error && (
-                <p
-                  className={cn(
-                    "mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700",
-                  )}
-                >
+                <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                   {error}
                 </p>
               )}
 
               {clientEmail && (
                 <>
-                  <label className={cn("mb-3 flex items-start gap-2 text-sm")}>
+                  <label className="mb-3 flex items-start gap-2 text-sm">
                     <input
                       type="checkbox"
                       checked={voidSendNotification}
                       onChange={(e) => setVoidSendNotification(e.target.checked)}
                       disabled={voiding}
-                      className={cn(
-                        "mt-0.5 h-4 w-4 rounded border-slate-300 text-russian-violet focus:ring-russian-violet/30",
-                      )}
+                      className="mt-0.5 h-4 w-4 rounded border-slate-300 text-russian-violet focus:ring-russian-violet/30"
                     />
                     <span>
                       Send notification email to <strong>{clientEmail}</strong>
@@ -792,7 +729,7 @@ export function InvoiceActions({
                     <>
                       <label
                         htmlFor="void-greeting-name"
-                        className={cn("mb-2 block text-xs font-semibold text-slate-400 uppercase")}
+                        className="mb-2 block text-xs font-semibold text-slate-400 uppercase"
                       >
                         Greeting (the person you're emailing)
                       </label>
@@ -811,7 +748,7 @@ export function InvoiceActions({
                       />
                       <label
                         htmlFor="void-custom-body"
-                        className={cn("mb-2 block text-xs font-semibold text-slate-400 uppercase")}
+                        className="mb-2 block text-xs font-semibold text-slate-400 uppercase"
                       >
                         Message
                       </label>
@@ -827,22 +764,14 @@ export function InvoiceActions({
                           "ring-russian-violet/20 focus:border-russian-violet focus:ring-1 focus:outline-none",
                         )}
                       />
-                      <p className={cn("mb-2 text-xs font-semibold text-slate-400 uppercase")}>
-                        Subject
-                      </p>
-                      <p className={cn("mb-4 text-sm font-medium text-slate-800")}>
+                      <p className="mb-2 text-xs font-semibold text-slate-400 uppercase">Subject</p>
+                      <p className="mb-4 text-sm font-medium text-slate-800">
                         {voidPreview?.subject ?? `Invoice ${invoiceNumber} - voided`}
                       </p>
-                      <p className={cn("mb-2 text-xs font-semibold text-slate-400 uppercase")}>
-                        Body
-                      </p>
-                      <div
-                        className={cn(
-                          "rounded-lg border border-slate-200 bg-slate-50 p-2 text-sm text-slate-800",
-                        )}
-                      >
+                      <p className="mb-2 text-xs font-semibold text-slate-400 uppercase">Body</p>
+                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-sm text-slate-800">
                         {voidPreviewLoading && !voidPreview ? (
-                          <p className={cn("p-6 text-center text-sm text-slate-500")}>
+                          <p className="p-6 text-center text-sm text-slate-500">
                             Loading preview...
                           </p>
                         ) : voidPreview ? (
@@ -850,11 +779,11 @@ export function InvoiceActions({
                             title="Void notification email preview"
                             srcDoc={voidPreview.html}
                             sandbox="allow-same-origin"
-                            className={cn("h-105 w-full rounded bg-white")}
+                            className="h-105 w-full rounded bg-white"
                           />
                         ) : null}
                       </div>
-                      <p className={cn("mt-3 text-xs text-slate-500 italic")}>
+                      <p className="mt-3 text-xs text-slate-500 italic">
                         The VOIDED-stamped PDF will be attached automatically.
                       </p>
                     </>
@@ -862,23 +791,19 @@ export function InvoiceActions({
                 </>
               )}
               {!clientEmail && (
-                <p className={cn("text-sm text-slate-600")}>
+                <p className="text-sm text-slate-600">
                   No notification will be sent. The invoice will be marked VOIDED and the Drive PDF
                   will get a diagonal VOID stamp.
                 </p>
               )}
             </div>
 
-            <div
-              className={cn("flex flex-wrap justify-end gap-3 border-t border-slate-200 px-6 py-4")}
-            >
+            <div className="flex flex-wrap justify-end gap-3 border-t border-slate-200 px-6 py-4">
               <button
                 type="button"
                 onClick={closeVoidModal}
                 disabled={voiding}
-                className={cn(
-                  "rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50",
-                )}
+                className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
               >
                 Cancel
               </button>

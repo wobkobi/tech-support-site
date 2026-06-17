@@ -53,43 +53,43 @@ const NAV_ITEMS: NavItem[] = [
   {
     page: "dashboard",
     label: "Dashboard",
-    icon: <FaGaugeHigh className={cn("shrink-0")} />,
+    icon: <FaGaugeHigh className="shrink-0" />,
     path: "/admin",
   },
   {
     page: "reviews",
     label: "Reviews",
-    icon: <FaStar className={cn("shrink-0")} />,
+    icon: <FaStar className="shrink-0" />,
     path: "/admin/reviews",
   },
   {
     page: "contacts",
     label: "Contacts",
-    icon: <FaAddressBook className={cn("shrink-0")} />,
+    icon: <FaAddressBook className="shrink-0" />,
     path: "/admin/contacts",
   },
   {
     page: "schedule",
     label: "Schedule",
-    icon: <FaCalendarWeek className={cn("shrink-0")} />,
+    icon: <FaCalendarWeek className="shrink-0" />,
     path: "/admin/schedule",
   },
   {
     page: "bookings",
     label: "Bookings",
-    icon: <FaCalendarDays className={cn("shrink-0")} />,
+    icon: <FaCalendarDays className="shrink-0" />,
     path: "/admin/bookings",
   },
   {
     page: "travel",
     label: "Travel",
-    icon: <FaRoute className={cn("shrink-0")} />,
+    icon: <FaRoute className="shrink-0" />,
     path: "/admin/travel",
   },
   {
     page: "price-estimates",
     label: "Estimates",
-    icon: <FaMagnifyingGlassDollar className={cn("shrink-0")} />,
+    icon: <FaMagnifyingGlassDollar className="shrink-0" />,
     path: "/admin/price-estimates",
   },
 ];
@@ -98,31 +98,31 @@ const BUSINESS_NAV_ITEMS: NavItem[] = [
   {
     page: "business",
     label: "Overview",
-    icon: <FaBriefcase className={cn("shrink-0")} />,
+    icon: <FaBriefcase className="shrink-0" />,
     path: "/admin/business",
   },
   {
     page: "business-income",
     label: "Income",
-    icon: <FaArrowTrendUp className={cn("shrink-0")} />,
+    icon: <FaArrowTrendUp className="shrink-0" />,
     path: "/admin/business/income",
   },
   {
     page: "business-expenses",
     label: "Expenses",
-    icon: <FaReceipt className={cn("shrink-0")} />,
+    icon: <FaReceipt className="shrink-0" />,
     path: "/admin/business/expenses",
   },
   {
     page: "business-invoices",
     label: "Invoices",
-    icon: <FaFileInvoiceDollar className={cn("shrink-0")} />,
+    icon: <FaFileInvoiceDollar className="shrink-0" />,
     path: "/admin/business/invoices",
   },
   {
     page: "business-calculator",
     label: "Calculator",
-    icon: <FaCalculator className={cn("shrink-0")} />,
+    icon: <FaCalculator className="shrink-0" />,
     path: "/admin/business/calculator",
   },
 ];
@@ -130,14 +130,14 @@ const BUSINESS_NAV_ITEMS: NavItem[] = [
 const PROMOS_NAV_ITEM: NavItem = {
   page: "promos",
   label: "Promos",
-  icon: <FaTags className={cn("shrink-0")} />,
+  icon: <FaTags className="shrink-0" />,
   path: "/admin/promos",
 };
 
 const SETTINGS_NAV_ITEM: NavItem = {
   page: "settings",
   label: "Settings",
-  icon: <FaGear className={cn("shrink-0")} />,
+  icon: <FaGear className="shrink-0" />,
   path: "/admin/settings",
 };
 
@@ -200,11 +200,9 @@ export function AdminSidebar({ current }: AdminSidebarProps): React.ReactElement
         onClick={() => setOpen(true)}
         aria-label="Open menu"
         aria-expanded={open}
-        className={cn(
-          "fixed top-3 left-3 z-30 inline-flex h-11 w-11 items-center justify-center rounded-lg bg-russian-violet text-white shadow-lg lg:hidden print:hidden",
-        )}
+        className="fixed top-3 left-3 z-30 inline-flex h-11 w-11 items-center justify-center rounded-lg bg-russian-violet text-white shadow-lg lg:hidden print:hidden"
       >
-        <FaBars className={cn("text-base")} />
+        <FaBars className="text-base" />
       </button>
 
       {/* Mobile backdrop - visible only when drawer is open. */}
@@ -226,28 +224,24 @@ export function AdminSidebar({ current }: AdminSidebarProps): React.ReactElement
         )}
       >
         {/* Brand */}
-        <div className={cn("flex items-start justify-between border-b border-white/10 px-5 py-5")}>
+        <div className="flex items-start justify-between border-b border-white/10 px-5 py-5">
           <div>
-            <p className={cn("text-xs font-semibold tracking-widest text-white/40 uppercase")}>
-              Admin
-            </p>
-            <p className={cn("mt-0.5 text-sm font-bold text-white")}>To The Point</p>
+            <p className="text-xs font-semibold tracking-widest text-white/40 uppercase">Admin</p>
+            <p className="mt-0.5 text-sm font-bold text-white">To The Point</p>
           </div>
           {/* Close button - only rendered below lg. */}
           <button
             type="button"
             onClick={() => setOpen(false)}
             aria-label="Close menu"
-            className={cn(
-              "inline-flex h-8 w-8 items-center justify-center rounded text-white/60 hover:bg-white/10 hover:text-white lg:hidden",
-            )}
+            className="inline-flex h-8 w-8 items-center justify-center rounded text-white/60 hover:bg-white/10 hover:text-white lg:hidden"
           >
             <FaXmark />
           </button>
         </div>
 
         {/* Nav */}
-        <nav className={cn("flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-4")}>
+        <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-4">
           {NAV_ITEMS.map(({ page, label, icon, path }) => (
             <Link
               key={page}
@@ -265,11 +259,7 @@ export function AdminSidebar({ current }: AdminSidebarProps): React.ReactElement
             </Link>
           ))}
 
-          <p
-            className={cn(
-              "mt-4 mb-1 px-3 text-xs font-semibold tracking-widest text-white/30 uppercase",
-            )}
-          >
+          <p className="mt-4 mb-1 px-3 text-xs font-semibold tracking-widest text-white/30 uppercase">
             Business
           </p>
           {BUSINESS_NAV_ITEMS.map(({ page, label, icon, path }) => (
@@ -289,7 +279,7 @@ export function AdminSidebar({ current }: AdminSidebarProps): React.ReactElement
             </Link>
           ))}
 
-          <div className={cn("my-2 border-t border-white/10")} />
+          <div className="my-2 border-t border-white/10" />
 
           {[PROMOS_NAV_ITEM, SETTINGS_NAV_ITEM].map(({ page, label, icon, path }) => (
             <Link
@@ -310,25 +300,21 @@ export function AdminSidebar({ current }: AdminSidebarProps): React.ReactElement
         </nav>
 
         {/* Footer - link back to the public site + sign-out trigger. */}
-        <div className={cn("flex flex-col gap-1 border-t border-white/10 px-3 py-3")}>
+        <div className="flex flex-col gap-1 border-t border-white/10 px-3 py-3">
           <Link
             href="/"
             onClick={() => setOpen(false)}
-            className={cn(
-              "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-white/60 transition-colors hover:bg-white/10 hover:text-white/90",
-            )}
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-white/60 transition-colors hover:bg-white/10 hover:text-white/90"
           >
-            <FaArrowUpRightFromSquare className={cn("shrink-0")} />
+            <FaArrowUpRightFromSquare className="shrink-0" />
             Back to site
           </Link>
           <button
             type="button"
             onClick={() => void handleSignOut()}
-            className={cn(
-              "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-white/60 transition-colors hover:bg-white/10 hover:text-white/90",
-            )}
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-white/60 transition-colors hover:bg-white/10 hover:text-white/90"
           >
-            <FaArrowRightFromBracket className={cn("shrink-0")} />
+            <FaArrowRightFromBracket className="shrink-0" />
             Sign out
           </button>
         </div>

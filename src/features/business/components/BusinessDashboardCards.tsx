@@ -311,21 +311,19 @@ export function BusinessDashboardCards({
 
   return (
     <>
-      <p className={cn("mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase")}>
+      <p className="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
         Showing: {scope.label}
       </p>
-      <div className={cn("mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4")}>
+      <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {cards.map((c) => (
           <button
             key={c.label}
             type="button"
             onClick={() => setActive(c.breakdown)}
-            className={cn(
-              "rounded-xl border border-slate-200 bg-white px-4 py-4 text-left shadow-sm transition-shadow hover:shadow-md",
-            )}
+            className="rounded-xl border border-slate-200 bg-white px-4 py-4 text-left shadow-sm transition-shadow hover:shadow-md"
           >
             <p className={cn("text-xl font-extrabold", c.color)}>{c.value}</p>
-            <p className={cn("mt-0.5 text-xs text-slate-500")}>{c.label}</p>
+            <p className="mt-0.5 text-xs text-slate-500">{c.label}</p>
           </button>
         ))}
       </div>

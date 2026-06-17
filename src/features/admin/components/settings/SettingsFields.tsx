@@ -41,13 +41,13 @@ export function FieldShell({
   children,
 }: FieldShellProps): React.ReactElement {
   return (
-    <div className={cn("py-4")}>
-      <label htmlFor={id} className={cn("flex items-baseline justify-between gap-3")}>
-        <span className={cn("text-sm font-semibold text-russian-violet")}>
+    <div className="py-4">
+      <label htmlFor={id} className="flex items-baseline justify-between gap-3">
+        <span className="text-sm font-semibold text-russian-violet">
           {meta.title}
           {customised && (
             <span
-              className={cn("ml-2 align-middle text-xs font-normal text-amber-600")}
+              className="ml-2 align-middle text-xs font-normal text-amber-600"
               title="Changed from the default"
             >
               edited
@@ -55,10 +55,10 @@ export function FieldShell({
           )}
         </span>
       </label>
-      <p className={cn("mt-0.5 text-sm text-slate-500")}>{meta.description}</p>
-      {meta.off && <p className={cn("mt-0.5 text-xs text-slate-400 italic")}>{meta.off}</p>}
-      <div className={cn("mt-2")}>{children}</div>
-      {error && <p className={cn("mt-1 text-xs font-medium text-red-600")}>{error}</p>}
+      <p className="mt-0.5 text-sm text-slate-500">{meta.description}</p>
+      {meta.off && <p className="mt-0.5 text-xs text-slate-400 italic">{meta.off}</p>}
+      <div className="mt-2">{children}</div>
+      {error && <p className="mt-1 text-xs font-medium text-red-600">{error}</p>}
     </div>
   );
 }
@@ -106,7 +106,7 @@ export function NumberField({
 }: NumberFieldProps): React.ReactElement {
   return (
     <FieldShell id={id} meta={meta} error={error} customised={customised}>
-      <div className={cn("flex items-center gap-2")}>
+      <div className="flex items-center gap-2">
         <input
           id={id}
           type="number"
@@ -129,7 +129,7 @@ export function NumberField({
             error ? "border-red-400" : "border-slate-300",
           )}
         />
-        {meta.unit && <span className={cn("text-sm text-slate-500")}>{meta.unit}</span>}
+        {meta.unit && <span className="text-sm text-slate-500">{meta.unit}</span>}
       </div>
     </FieldShell>
   );
@@ -196,7 +196,7 @@ export function TextField({
           className={inputClass}
         />
       ) : (
-        <div className={cn("flex items-center gap-2")}>
+        <div className="flex items-center gap-2">
           <input
             id={id}
             type={secret && !revealed ? "password" : (type ?? "text")}
@@ -209,9 +209,7 @@ export function TextField({
             <button
               type="button"
               onClick={() => setRevealed((r) => !r)}
-              className={cn(
-                "shrink-0 rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-600 hover:bg-slate-50",
-              )}
+              className="shrink-0 rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-600 hover:bg-slate-50"
             >
               {revealed ? "Hide" : "Show"}
             </button>
@@ -267,7 +265,7 @@ export function ToggleField({
           )}
         />
       </button>
-      <span className={cn("ml-3 align-middle text-sm text-slate-600")}>{value ? "On" : "Off"}</span>
+      <span className="ml-3 align-middle text-sm text-slate-600">{value ? "On" : "Off"}</span>
     </FieldShell>
   );
 }

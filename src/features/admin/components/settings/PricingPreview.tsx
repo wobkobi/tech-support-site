@@ -8,7 +8,6 @@
  * numbers have a concrete meaning before saving.
  */
 
-import { cn } from "@/shared/lib/cn";
 import type { PricingSettings } from "@/shared/lib/settings/types";
 import type React from "react";
 
@@ -64,11 +63,11 @@ export function PricingPreview({ config }: Props): React.ReactElement {
   );
 
   return (
-    <div className={cn("mt-6 rounded-lg border border-slate-200 bg-slate-50 p-4")}>
-      <h3 className={cn("text-xs font-bold tracking-wide text-russian-violet uppercase")}>
+    <div className="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-4">
+      <h3 className="text-xs font-bold tracking-wide text-russian-violet uppercase">
         Live preview
       </h3>
-      <ul className={cn("mt-2 space-y-1 text-sm text-slate-600")}>
+      <ul className="mt-2 space-y-1 text-sm text-slate-600">
         {lines.map((line) => (
           <li key={line}>{line}</li>
         ))}

@@ -48,50 +48,42 @@ export default function Error({
   return (
     <PageShell>
       <FrostedSection maxWidth="56rem">
-        <div className={cn("flex flex-col gap-6 sm:gap-8")}>
+        <div className="flex flex-col gap-6 sm:gap-8">
           <section className={cn(CARD, "text-center")}>
-            <div className={cn("mb-4 text-7xl font-extrabold text-coquelicot-500 sm:text-8xl")}>
+            <div className="mb-4 text-7xl font-extrabold text-coquelicot-500 sm:text-8xl">
               Oops!
             </div>
 
-            <h1
-              className={cn(
-                "mb-4 text-3xl font-extrabold text-russian-violet sm:text-4xl md:text-5xl",
-              )}
-            >
+            <h1 className="mb-4 text-3xl font-extrabold text-russian-violet sm:text-4xl md:text-5xl">
               The website has encountered an error
             </h1>
 
-            <p className={cn("mb-6 text-base text-rich-black sm:text-lg md:text-xl")}>{quip}</p>
+            <p className="mb-6 text-base text-rich-black sm:text-lg md:text-xl">{quip}</p>
 
             <p
-              className={cn("mb-6 text-sm wrap-break-word text-rich-black/70 italic sm:text-base")}
+              className="mb-6 text-sm wrap-break-word text-rich-black/70 italic sm:text-base"
               role="status"
               aria-live="polite"
             >
               {msg}
             </p>
 
-            <div className={cn("flex flex-wrap items-center justify-center gap-3")}>
+            <div className="flex flex-wrap items-center justify-center gap-3">
               <Button type="button" onClick={reset} variant="primary">
-                <FaArrowRotateRight className={cn("h-5 w-5")} aria-hidden />
+                <FaArrowRotateRight className="h-5 w-5" aria-hidden />
                 Try again
               </Button>
               <Button href="/" variant="ghost">
-                <FaHouse className={cn("h-5 w-5")} aria-hidden />
+                <FaHouse className="h-5 w-5" aria-hidden />
                 Go home
               </Button>
             </div>
 
-            <details className={cn("mt-6 text-base text-rich-black/80")}>
-              <summary className={cn("cursor-pointer font-semibold hover:text-russian-violet")}>
+            <details className="mt-6 text-base text-rich-black/80">
+              <summary className="cursor-pointer font-semibold hover:text-russian-violet">
                 Technical details (for the curious)
               </summary>
-              <pre
-                className={cn(
-                  "mt-3 max-w-full overflow-auto rounded-lg border border-seasalt-400/60 bg-seasalt-900/60 p-4 text-left text-base",
-                )}
-              >
+              <pre className="mt-3 max-w-full overflow-auto rounded-lg border border-seasalt-400/60 bg-seasalt-900/60 p-4 text-left text-base">
                 {String(error?.stack || error)}
               </pre>
             </details>

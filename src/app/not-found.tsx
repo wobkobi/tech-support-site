@@ -38,30 +38,24 @@ export default function NotFound(): React.ReactElement {
   return (
     <PageShell>
       <FrostedSection maxWidth="56rem">
-        <div className={cn("flex flex-col gap-6 sm:gap-8")}>
+        <div className="flex flex-col gap-6 sm:gap-8">
           <section className={cn(CARD, "text-center")}>
-            <div className={cn("mb-4 text-8xl font-extrabold text-coquelicot-500 sm:text-9xl")}>
-              404
-            </div>
+            <div className="mb-4 text-8xl font-extrabold text-coquelicot-500 sm:text-9xl">404</div>
 
-            <h1
-              className={cn(
-                "mb-4 text-3xl font-extrabold text-russian-violet sm:text-4xl md:text-5xl",
-              )}
-            >
+            <h1 className="mb-4 text-3xl font-extrabold text-russian-violet sm:text-4xl md:text-5xl">
               Well, this is awkward...
             </h1>
 
             <p
               suppressHydrationWarning
-              className={cn("mb-6 text-base text-rich-black sm:text-lg md:text-xl")}
+              className="mb-6 text-base text-rich-black sm:text-lg md:text-xl"
             >
               {message}
             </p>
 
-            <div className={cn("flex flex-wrap items-center justify-center gap-3")}>
+            <div className="flex flex-wrap items-center justify-center gap-3">
               <Button href="/" variant="primary">
-                <FaHouse className={cn("h-5 w-5")} aria-hidden />
+                <FaHouse className="h-5 w-5" aria-hidden />
                 Take me home
               </Button>
               <Button href="/contact" variant="ghost">

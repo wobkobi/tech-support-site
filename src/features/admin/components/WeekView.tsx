@@ -198,30 +198,26 @@ export function WeekView({
 
   return (
     <div className={cn("transition-opacity", isPending && "opacity-60")}>
-      <div className={cn("mb-6 flex flex-wrap items-end justify-between gap-3")}>
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className={cn("text-2xl font-extrabold text-russian-violet")}>Schedule</h1>
-          <p className={cn("mt-1 text-sm text-slate-500")}>
+          <h1 className="text-2xl font-extrabold text-russian-violet">Schedule</h1>
+          <p className="mt-1 text-sm text-slate-500">
             {days[0]?.subLabel} - {days[6]?.subLabel} ({days[0]?.date.getFullYear()})
           </p>
         </div>
-        <div className={cn("flex items-center gap-2")}>
+        <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => goToWeek(prevWeekKey)}
             aria-label="Previous week"
-            className={cn(
-              "inline-flex h-11 w-11 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 sm:h-9 sm:w-9",
-            )}
+            className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 sm:h-9 sm:w-9"
           >
             <FaChevronLeft />
           </button>
           <button
             type="button"
             onClick={() => goToWeek(todayWeekKey)}
-            className={cn(
-              "inline-flex h-11 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 sm:h-9",
-            )}
+            className="inline-flex h-11 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 sm:h-9"
           >
             <FaCalendarDay />
             Today
@@ -230,9 +226,7 @@ export function WeekView({
             type="button"
             onClick={() => goToWeek(nextWeekKey)}
             aria-label="Next week"
-            className={cn(
-              "inline-flex h-11 w-11 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 sm:h-9 sm:w-9",
-            )}
+            className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 sm:h-9 sm:w-9"
           >
             <FaChevronRight />
           </button>
@@ -241,14 +235,12 @@ export function WeekView({
 
       {/* relative wrapper carries the right-edge fade hint - the grid is wider
           than the admin content area until ~xl, so it scrolls horizontally. */}
-      <div className={cn("relative")}>
-        <div
-          className={cn("overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm")}
-        >
-          <div className={cn("min-w-225")}>
+      <div className="relative">
+        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="min-w-225">
             {/* Day headers */}
-            <div className={cn("grid grid-cols-[64px_repeat(7,1fr)] border-b border-slate-200")}>
-              <div className={cn("border-r border-slate-200")} />
+            <div className="grid grid-cols-[64px_repeat(7,1fr)] border-b border-slate-200">
+              <div className="border-r border-slate-200" />
               {days.map((day) => {
                 const isToday = day.key === todayNzKey;
                 const busyEvent = day.allDayEvents.find((e) => e.kind === "booking");
@@ -264,20 +256,16 @@ export function WeekView({
                   >
                     {holidayName && (
                       <div
-                        className={cn(
-                          "mb-1 truncate text-[10px] font-semibold tracking-wide text-amber-700 uppercase",
-                        )}
+                        className="mb-1 truncate text-[10px] font-semibold tracking-wide text-amber-700 uppercase"
                         title={holidayName}
                       >
                         {holidayName}
                       </div>
                     )}
-                    <div
-                      className={cn("text-xs font-semibold tracking-wide text-slate-500 uppercase")}
-                    >
+                    <div className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
                       {day.label}
                     </div>
-                    <div className={cn("mt-0.5 flex items-center justify-center gap-1.5")}>
+                    <div className="mt-0.5 flex items-center justify-center gap-1.5">
                       <div
                         className={cn(
                           "text-sm font-bold",
@@ -303,12 +291,9 @@ export function WeekView({
             {/* All-day events bar - merges consecutive days into one continuous
               span so multi-day Busy blocks read as a single bar. */}
             {allDayBars.length > 0 && (
-              <div className={cn("border-b border-slate-200 px-0 py-1")}>
+              <div className="border-b border-slate-200 px-0 py-1">
                 {allDayBars.map((bar) => (
-                  <div
-                    key={bar.event.id}
-                    className={cn("grid grid-cols-[64px_repeat(7,1fr)] py-0.5")}
-                  >
+                  <div key={bar.event.id} className="grid grid-cols-[64px_repeat(7,1fr)] py-0.5">
                     <div
                       className={cn(
                         "mx-1 truncate rounded border px-2 py-0.5 text-center text-[11px] font-semibold",
@@ -326,11 +311,11 @@ export function WeekView({
 
             {/* Grid body */}
             <div
-              className={cn("relative grid grid-cols-[64px_repeat(7,1fr)]")}
+              className="relative grid grid-cols-[64px_repeat(7,1fr)]"
               style={{ height: `${DAY_HEIGHT_PX}px` }}
             >
               {/* Time gutter */}
-              <div className={cn("relative border-r border-slate-200")}>
+              <div className="relative border-r border-slate-200">
                 {hours.map((h, i) => (
                   <div
                     key={h}
@@ -352,26 +337,18 @@ export function WeekView({
             </div>
 
             {/* Legend */}
-            <div
-              className={cn(
-                "flex flex-wrap items-center gap-3 border-t border-slate-200 px-4 py-3 text-xs text-slate-500",
-              )}
-            >
+            <div className="flex flex-wrap items-center gap-3 border-t border-slate-200 px-4 py-3 text-xs text-slate-500">
               <LegendDot kind="booking" label="Booking" />
               <LegendDot kind="car" label="No car (Car cal)" />
               <LegendDot kind="personal" label="Personal" />
               <LegendDot kind="travel" label="Travel" />
-              <span className={cn("ml-auto text-slate-400")}>
-                Click an empty slot to add a booking
-              </span>
+              <span className="ml-auto text-slate-400">Click an empty slot to add a booking</span>
             </div>
           </div>
         </div>
         <div
           aria-hidden
-          className={cn(
-            "pointer-events-none absolute inset-y-0 right-0 w-8 rounded-r-xl bg-linear-to-l from-white to-transparent",
-          )}
+          className="pointer-events-none absolute inset-y-0 right-0 w-8 rounded-r-xl bg-linear-to-l from-white to-transparent"
         />
       </div>
 
@@ -411,7 +388,7 @@ function DayColumn({ day, onClick }: DayColumnProps): React.ReactElement {
       {Array.from({ length: DAY_HOURS }).map((_, i) => (
         <div
           key={i}
-          className={cn("pointer-events-none absolute right-0 left-0 border-t border-slate-100")}
+          className="pointer-events-none absolute right-0 left-0 border-t border-slate-100"
           style={{ top: `${i * 60 * PX_PER_MINUTE}px` }}
         />
       ))}
@@ -432,15 +409,11 @@ function DayColumn({ day, onClick }: DayColumnProps): React.ReactElement {
             style={{ top: `${top}px`, height: `${height}px` }}
             title={`${ev.title}${ev.location ? `\n${ev.location}` : ""}`}
           >
-            <div className={cn("truncate font-semibold")}>{ev.title}</div>
+            <div className="truncate font-semibold">{ev.title}</div>
             {height > 32 && (
-              <div className={cn("truncate opacity-80")}>
-                {formatTimeRange(ev.startAt, ev.endAt)}
-              </div>
+              <div className="truncate opacity-80">{formatTimeRange(ev.startAt, ev.endAt)}</div>
             )}
-            {ev.location && height > 50 && (
-              <div className={cn("truncate opacity-70")}>{ev.location}</div>
-            )}
+            {ev.location && height > 50 && <div className="truncate opacity-70">{ev.location}</div>}
           </div>
         );
       })}

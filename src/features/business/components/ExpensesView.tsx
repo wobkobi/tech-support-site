@@ -100,7 +100,7 @@ export function ExpensesView(): React.ReactElement {
   return (
     <div>
       {/* Totals bar - stacks on mobile so three values stay readable below ~480px. */}
-      <div className={cn("mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3")}>
+      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
         {[
           {
             label: "Total expenses (excl. GST)",
@@ -112,10 +112,10 @@ export function ExpensesView(): React.ReactElement {
         ].map((c) => (
           <div
             key={c.label}
-            className={cn("rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm")}
+            className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm"
           >
             <p className={cn("text-xl font-extrabold", c.color)}>{c.value}</p>
-            <p className={cn("text-xs text-slate-500")}>{c.label}</p>
+            <p className="text-xs text-slate-500">{c.label}</p>
           </div>
         ))}
       </div>
@@ -123,10 +123,10 @@ export function ExpensesView(): React.ReactElement {
       {/* Add form */}
       <form
         onSubmit={handleAdd}
-        className={cn("mb-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}
+        className="mb-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
       >
-        <h2 className={cn("mb-4 text-sm font-semibold text-russian-violet")}>Add expense</h2>
-        <div className={cn("grid gap-3 sm:grid-cols-2")}>
+        <h2 className="mb-4 text-sm font-semibold text-russian-violet">Add expense</h2>
+        <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Date" htmlFor="exp-date" required>
             <input
               id="exp-date"
@@ -192,7 +192,7 @@ export function ExpensesView(): React.ReactElement {
               <option value="0">0% (no GST)</option>
             </select>
             {inclNum > 0 && rate > 0 && (
-              <p className={cn("mt-1 text-xs text-slate-400")}>
+              <p className="mt-1 text-xs text-slate-400">
                 GST: {formatNZD(previewGst)} | Excl: {formatNZD(inclNum - previewGst)}
               </p>
             )}
@@ -218,80 +218,53 @@ export function ExpensesView(): React.ReactElement {
               className={inputClasses}
             />
           </Field>
-          <div className={cn("flex items-center gap-2")}>
+          <div className="flex items-center gap-2">
             <input
               type="checkbox"
               id="receipt"
               checked={form.receipt}
               onChange={(e) => setForm((p) => ({ ...p, receipt: e.target.checked }))}
-              className={cn("h-4 w-4 rounded border-slate-300")}
+              className="h-4 w-4 rounded border-slate-300"
             />
-            <label htmlFor="receipt" className={cn("text-sm text-slate-600")}>
+            <label htmlFor="receipt" className="text-sm text-slate-600">
               Receipt held
             </label>
           </div>
         </div>
-        {error && <p className={cn("mt-2 text-xs text-red-600")}>{error}</p>}
-        <Button
-          type="submit"
-          variant="secondary"
-          size="sm"
-          disabled={saving}
-          className={cn("mt-4")}
-        >
+        {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+        <Button type="submit" variant="secondary" size="sm" disabled={saving} className="mt-4">
           {saving ? "Saving..." : "Add expense"}
         </Button>
       </form>
 
       {/* Mobile card list - stacks each entry; below lg the table overflows. */}
-      <div className={cn("space-y-2 lg:hidden")}>
+      <div className="space-y-2 lg:hidden">
         {loading ? (
-          <p
-            className={cn(
-              "rounded-xl border border-slate-200 bg-white px-5 py-6 text-sm text-slate-400 shadow-sm",
-            )}
-          >
+          <p className="rounded-xl border border-slate-200 bg-white px-5 py-6 text-sm text-slate-400 shadow-sm">
             Loading...
           </p>
         ) : entries.length === 0 ? (
-          <p
-            className={cn(
-              "rounded-xl border border-slate-200 bg-white px-5 py-6 text-sm text-slate-400 shadow-sm",
-            )}
-          >
+          <p className="rounded-xl border border-slate-200 bg-white px-5 py-6 text-sm text-slate-400 shadow-sm">
             No expense entries yet.
           </p>
         ) : (
           entries.map((e) => (
-            <div
-              key={e.id}
-              className={cn("rounded-xl border border-slate-200 bg-white p-3 shadow-sm")}
-            >
-              <div className={cn("flex items-start justify-between gap-2")}>
-                <div className={cn("min-w-0 flex-1")}>
-                  <p className={cn("truncate text-sm font-medium text-slate-700")}>{e.supplier}</p>
-                  <p className={cn("truncate text-xs text-slate-500")}>{e.category}</p>
+            <div key={e.id} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-slate-700">{e.supplier}</p>
+                  <p className="truncate text-xs text-slate-500">{e.category}</p>
                 </div>
-                <div className={cn("shrink-0 text-right")}>
-                  <p className={cn("text-sm font-semibold text-slate-700")}>
-                    {formatNZD(e.amountExcl)}
-                  </p>
-                  <p className={cn("text-[11px] text-slate-400")}>
-                    {formatNZD(e.amountIncl)} incl.
-                  </p>
+                <div className="shrink-0 text-right">
+                  <p className="text-sm font-semibold text-slate-700">{formatNZD(e.amountExcl)}</p>
+                  <p className="text-[11px] text-slate-400">{formatNZD(e.amountIncl)} incl.</p>
                 </div>
               </div>
-              <div
-                className={cn(
-                  "mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs",
-                )}
-              >
-                <span className={cn("text-slate-500")}>{formatDateShort(e.date)}</span>
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs">
+                <span className="text-slate-500">{formatDateShort(e.date)}</span>
                 <button
                   onClick={() => handleDelete(e.id)}
-                  className={cn(
-                    "ml-auto inline-flex h-8 items-center text-red-400 hover:text-red-600",
-                  )}
+                  className="ml-auto inline-flex h-8 items-center text-red-400 hover:text-red-600"
                 >
                   Delete
                 </button>
@@ -302,47 +275,40 @@ export function ExpensesView(): React.ReactElement {
       </div>
 
       {/* Desktop table */}
-      <div
-        className={cn(
-          "hidden overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm lg:block",
-        )}
-      >
+      <div className="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm lg:block">
         {loading ? (
-          <p className={cn("px-5 py-6 text-sm text-slate-400")}>Loading...</p>
+          <p className="px-5 py-6 text-sm text-slate-400">Loading...</p>
         ) : entries.length === 0 ? (
-          <p className={cn("px-5 py-6 text-sm text-slate-400")}>No expense entries yet.</p>
+          <p className="px-5 py-6 text-sm text-slate-400">No expense entries yet.</p>
         ) : (
-          <table className={cn("w-full text-sm")}>
-            <thead className={cn("border-b border-slate-100 bg-slate-50")}>
+          <table className="w-full text-sm">
+            <thead className="border-b border-slate-100 bg-slate-50">
               <tr>
                 {["Date", "Supplier", "Category", "Incl. GST", "Excl. GST", ""].map((h) => (
-                  <th
-                    key={h}
-                    className={cn("px-4 py-3 text-left text-xs font-semibold text-slate-500")}
-                  >
+                  <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-500">
                     {h}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className={cn("divide-y divide-slate-100")}>
+            <tbody className="divide-y divide-slate-100">
               {entries.map((e) => (
-                <tr key={e.id} className={cn("hover:bg-slate-50")}>
-                  <td className={cn("px-4 py-3 text-xs whitespace-nowrap text-slate-500")}>
+                <tr key={e.id} className="hover:bg-slate-50">
+                  <td className="px-4 py-3 text-xs whitespace-nowrap text-slate-500">
                     {formatDateShort(e.date)}
                   </td>
-                  <td className={cn("px-4 py-3 font-medium text-slate-700")}>{e.supplier}</td>
-                  <td className={cn("px-4 py-3 text-xs text-slate-500")}>{e.category}</td>
-                  <td className={cn("px-4 py-3 whitespace-nowrap text-slate-700")}>
+                  <td className="px-4 py-3 font-medium text-slate-700">{e.supplier}</td>
+                  <td className="px-4 py-3 text-xs text-slate-500">{e.category}</td>
+                  <td className="px-4 py-3 whitespace-nowrap text-slate-700">
                     {formatNZD(e.amountIncl)}
                   </td>
-                  <td className={cn("px-4 py-3 font-semibold whitespace-nowrap text-slate-700")}>
+                  <td className="px-4 py-3 font-semibold whitespace-nowrap text-slate-700">
                     {formatNZD(e.amountExcl)}
                   </td>
-                  <td className={cn("px-4 py-3")}>
+                  <td className="px-4 py-3">
                     <button
                       onClick={() => handleDelete(e.id)}
-                      className={cn("text-xs text-red-400 hover:text-red-600")}
+                      className="text-xs text-red-400 hover:text-red-600"
                     >
                       Delete
                     </button>

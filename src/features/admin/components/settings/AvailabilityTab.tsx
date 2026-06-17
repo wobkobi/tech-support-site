@@ -75,9 +75,7 @@ function HourSelect({ value, onChange, from, to, close }: HourSelectProps): Reac
     <select
       value={value}
       onChange={(e) => onChange(Number(e.target.value))}
-      className={cn(
-        "rounded-lg border border-slate-300 px-2 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-      )}
+      className="rounded-lg border border-slate-300 px-2 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
     >
       {opts.map((h) => (
         <option key={h} value={h}>
@@ -123,7 +121,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
   return (
     <div>
       {/* Master switch + paused message */}
-      <div className={cn("divide-y divide-slate-100")}>
+      <div className="divide-y divide-slate-100">
         <ToggleField
           id="acceptingBookings"
           meta={m.acceptingBookings}
@@ -141,28 +139,26 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
             value={draft.closedMessage}
             rows={2}
             onChange={(e) => setTop({ closedMessage: e.target.value })}
-            className={cn(
-              "w-full rounded-lg border border-slate-300 px-3 py-2 text-base focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-            )}
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-base focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
           />
         </FieldShell>
       </div>
 
       {/* Weekly hours */}
-      <h3 className={cn("mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase")}>
+      <h3 className="mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase">
         Weekly hours
       </h3>
-      <p className={cn("mt-1 text-sm text-slate-500")}>
+      <p className="mt-1 text-sm text-slate-500">
         Set the hours you take bookings each day. Turn a day off, or add a midday break that splits
         it into two windows.
       </p>
-      <div className={cn("mt-3 space-y-2")}>
+      <div className="mt-3 space-y-2">
         {DAY_ORDER.map(({ index, name }) => {
           const d = draft.schedule[index];
           return (
-            <div key={index} className={cn("rounded-lg border border-slate-200 p-3")}>
-              <div className={cn("flex flex-wrap items-center gap-3")}>
-                <span className={cn("w-24 text-sm font-semibold text-slate-700")}>{name}</span>
+            <div key={index} className="rounded-lg border border-slate-200 p-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="w-24 text-sm font-semibold text-slate-700">{name}</span>
                 <button
                   type="button"
                   role="switch"
@@ -181,7 +177,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
                   />
                 </button>
                 {d.enabled ? (
-                  <div className={cn("flex flex-wrap items-center gap-2 text-sm text-slate-600")}>
+                  <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
                     <HourSelect
                       value={d.open}
                       from={0}
@@ -196,7 +192,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
                       close
                       onChange={(h) => setDay(index, { close: h })}
                     />
-                    <label className={cn("ml-2 flex items-center gap-1.5")}>
+                    <label className="ml-2 flex items-center gap-1.5">
                       <input
                         type="checkbox"
                         checked={d.break !== null}
@@ -209,7 +205,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
                       Break
                     </label>
                     {d.break && (
-                      <span className={cn("flex items-center gap-2")}>
+                      <span className="flex items-center gap-2">
                         <HourSelect
                           value={d.break.start}
                           from={d.open}
@@ -232,7 +228,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
                     )}
                   </div>
                 ) : (
-                  <span className={cn("text-sm text-slate-400 italic")}>Day off</span>
+                  <span className="text-sm text-slate-400 italic">Day off</span>
                 )}
               </div>
             </div>
@@ -241,10 +237,10 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
       </div>
 
       {/* Booking rules */}
-      <h3 className={cn("mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase")}>
+      <h3 className="mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase">
         Booking rules
       </h3>
-      <div className={cn("divide-y divide-slate-100")}>
+      <div className="divide-y divide-slate-100">
         <NumberField
           id="maxAdvanceDays"
           meta={m.maxAdvanceDays}
@@ -296,10 +292,10 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
       </div>
 
       {/* Durations + daily caps */}
-      <h3 className={cn("mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase")}>
+      <h3 className="mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase">
         Job lengths &amp; daily limits
       </h3>
-      <div className={cn("divide-y divide-slate-100")}>
+      <div className="divide-y divide-slate-100">
         <NumberField
           id="durationShort"
           meta={m["durations.short"]}
@@ -344,9 +340,9 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
 
       {/* Guardrail blocks */}
       {blocks.length > 0 && (
-        <div className={cn("mt-6 rounded-lg border border-red-200 bg-red-50 p-4")}>
-          <p className={cn("text-sm font-semibold text-red-700")}>Can&apos;t save yet:</p>
-          <ul className={cn("mt-1 list-disc space-y-1 pl-5 text-sm text-red-700")}>
+        <div className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4">
+          <p className="text-sm font-semibold text-red-700">Can&apos;t save yet:</p>
+          <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-red-700">
             {blocks.map((b) => (
               <li key={b}>{b}</li>
             ))}
@@ -358,9 +354,9 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
 
       {/* Guardrail warnings */}
       {warns.length > 0 && (
-        <div className={cn("mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4")}>
-          <p className={cn("text-sm font-semibold text-amber-800")}>Heads up:</p>
-          <ul className={cn("mt-1 list-disc space-y-1 pl-5 text-sm text-amber-800")}>
+        <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <p className="text-sm font-semibold text-amber-800">Heads up:</p>
+          <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-amber-800">
             {warns.map((w) => (
               <li key={w}>{w}</li>
             ))}
@@ -369,9 +365,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
             type="button"
             onClick={() => void form.save(true)}
             disabled={saving}
-            className={cn(
-              "mt-3 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50",
-            )}
+            className="mt-3 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
           >
             Save anyway
           </button>
@@ -379,14 +373,12 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
       )}
 
       {/* Save bar */}
-      <div className={cn("mt-6 flex items-center gap-3")}>
+      <div className="mt-6 flex items-center gap-3">
         <button
           type="button"
           onClick={() => void form.save()}
           disabled={!dirty || saving}
-          className={cn(
-            "rounded-lg bg-russian-violet px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50",
-          )}
+          className="rounded-lg bg-russian-violet px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
         >
           {saving ? "Saving..." : "Save changes"}
         </button>
@@ -394,16 +386,12 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
           type="button"
           onClick={form.resetToDefault}
           disabled={saving}
-          className={cn(
-            "rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50",
-          )}
+          className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
         >
           Reset to defaults
         </button>
-        {dirty && !saving && <span className={cn("text-sm text-slate-400")}>Unsaved changes</span>}
-        {!dirty && savedAt && (
-          <span className={cn("text-sm font-medium text-emerald-600")}>Saved</span>
-        )}
+        {dirty && !saving && <span className="text-sm text-slate-400">Unsaved changes</span>}
+        {!dirty && savedAt && <span className="text-sm font-medium text-emerald-600">Saved</span>}
       </div>
 
       <SettingsHistory group="availability" onRestore={(v: AvailabilitySettings) => setDraft(v)} />

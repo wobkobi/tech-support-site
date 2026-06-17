@@ -19,29 +19,29 @@ export default function FaqLoading(): React.ReactElement {
     <PageShell>
       <FrostedSection>
         <div
-          className={cn("flex flex-col gap-6 sm:gap-8")}
+          className="flex flex-col gap-6 sm:gap-8"
           role="status"
           aria-live="polite"
           aria-label="Loading FAQ page"
         >
           {/* Heading card */}
           <section className={cn(CARD)}>
-            <Bone className={cn("mb-4 h-9 w-96 max-w-full sm:h-10")} />
-            <Bone className={cn("h-6 w-full max-w-xl")} />
+            <Bone className="mb-4 h-9 w-96 max-w-full sm:h-10" />
+            <Bone className="h-6 w-full max-w-xl" />
           </section>
 
           {/* Two-column accordion rows */}
           <section className={cn(CARD)}>
-            <div className={cn("flex flex-col gap-4 sm:flex-row sm:items-start")}>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
               {Array.from({ length: 2 }).map((_, col) => (
-                <div key={col} className={cn("flex flex-1 flex-col gap-4")}>
+                <div key={col} className="flex flex-1 flex-col gap-4">
                   {Array.from({ length: 5 }).map((_, i) => (
                     <div
                       key={i}
                       className={cn(SOFT_CARD, "flex items-center justify-between gap-3")}
                     >
-                      <Bone className={cn("h-5 max-w-xs flex-1")} />
-                      <Bone className={cn("size-5 shrink-0 rounded-full")} />
+                      <Bone className="h-5 max-w-xs flex-1" />
+                      <Bone className="size-5 shrink-0 rounded-full" />
                     </div>
                   ))}
                 </div>
@@ -51,10 +51,10 @@ export default function FaqLoading(): React.ReactElement {
 
           {/* Next steps */}
           <section className={cn(CARD)}>
-            <Bone className={cn("h-6 w-full max-w-md")} />
+            <Bone className="h-6 w-full max-w-md" />
           </section>
 
-          <span className={cn("sr-only")}>Loading FAQ page...</span>
+          <span className="sr-only">Loading FAQ page...</span>
         </div>
       </FrostedSection>
     </PageShell>

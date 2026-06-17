@@ -204,27 +204,23 @@ export function EventActionSheet({
       role="dialog"
       aria-modal="true"
       aria-label={`Actions for ${booking.name}`}
-      className={cn(
-        "fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center",
-      )}
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center"
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className={cn("w-full max-w-lg rounded-xl bg-white p-4 shadow-xl")}
+        className="w-full max-w-lg rounded-xl bg-white p-4 shadow-xl"
       >
-        <div className={cn("mb-3 flex items-start justify-between gap-3")}>
-          <div className={cn("min-w-0")}>
-            <p className={cn("truncate text-sm font-semibold text-slate-700")}>{booking.name}</p>
-            <p className={cn("truncate text-xs text-slate-500")}>{event.title}</p>
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-slate-700">{booking.name}</p>
+            <p className="truncate text-xs text-slate-500">{event.title}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className={cn(
-              "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700",
-            )}
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700"
           >
             ×
           </button>
@@ -243,15 +239,13 @@ export function EventActionSheet({
           </p>
         )}
 
-        <div className={cn("flex flex-col gap-2")}>
+        <div className="flex flex-col gap-2">
           {isConfirmed && (
             <button
               type="button"
               onClick={() => void handleComplete()}
               disabled={busy}
-              className={cn(
-                "inline-flex h-11 items-center justify-center rounded-lg bg-green-500/20 px-4 text-sm font-semibold text-green-700 hover:bg-green-500/30 disabled:opacity-50",
-              )}
+              className="inline-flex h-11 items-center justify-center rounded-lg bg-green-500/20 px-4 text-sm font-semibold text-green-700 hover:bg-green-500/30 disabled:opacity-50"
             >
               Mark completed
             </button>
@@ -262,9 +256,7 @@ export function EventActionSheet({
               type="button"
               onClick={() => void handleNoShow()}
               disabled={busy}
-              className={cn(
-                "inline-flex h-11 items-center justify-center rounded-lg bg-amber-500/20 px-4 text-sm font-semibold text-amber-700 hover:bg-amber-500/30 disabled:opacity-50",
-              )}
+              className="inline-flex h-11 items-center justify-center rounded-lg bg-amber-500/20 px-4 text-sm font-semibold text-amber-700 hover:bg-amber-500/30 disabled:opacity-50"
             >
               Mark no-show
             </button>
@@ -276,9 +268,7 @@ export function EventActionSheet({
                 type="button"
                 onClick={() => void handleCancel("operator")}
                 disabled={busy}
-                className={cn(
-                  "inline-flex h-11 items-center justify-center rounded-lg bg-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-300 disabled:opacity-50",
-                )}
+                className="inline-flex h-11 items-center justify-center rounded-lg bg-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-300 disabled:opacity-50"
               >
                 Cancel - my call
               </button>
@@ -286,9 +276,7 @@ export function EventActionSheet({
                 type="button"
                 onClick={() => void handleCancel("on-behalf")}
                 disabled={busy}
-                className={cn(
-                  "inline-flex h-11 items-center justify-center rounded-lg bg-red-500/20 px-4 text-sm font-semibold text-red-600 hover:bg-red-500/30 disabled:opacity-50",
-                )}
+                className="inline-flex h-11 items-center justify-center rounded-lg bg-red-500/20 px-4 text-sm font-semibold text-red-600 hover:bg-red-500/30 disabled:opacity-50"
               >
                 Cancel - for customer
               </button>
@@ -297,9 +285,7 @@ export function EventActionSheet({
                   href={`/booking/edit?token=${booking.cancelToken}`}
                   target="_blank"
                   rel="noreferrer"
-                  className={cn(
-                    "inline-flex h-11 items-center justify-center rounded-lg bg-russian-violet/10 px-4 text-sm font-semibold text-russian-violet hover:bg-russian-violet/20",
-                  )}
+                  className="inline-flex h-11 items-center justify-center rounded-lg bg-russian-violet/10 px-4 text-sm font-semibold text-russian-violet hover:bg-russian-violet/20"
                 >
                   Reschedule
                 </a>
@@ -312,9 +298,7 @@ export function EventActionSheet({
               type="button"
               onClick={() => void handleResendReview()}
               disabled={busy}
-              className={cn(
-                "inline-flex h-11 items-center justify-center rounded-lg bg-moonstone-600/15 px-4 text-sm font-semibold text-moonstone-700 hover:bg-moonstone-600/25 disabled:opacity-50",
-              )}
+              className="inline-flex h-11 items-center justify-center rounded-lg bg-moonstone-600/15 px-4 text-sm font-semibold text-moonstone-700 hover:bg-moonstone-600/25 disabled:opacity-50"
             >
               Send review email
             </button>
@@ -325,9 +309,7 @@ export function EventActionSheet({
               type="button"
               onClick={() => void handleDelete()}
               disabled={busy}
-              className={cn(
-                "inline-flex h-11 items-center justify-center rounded-lg bg-red-500/20 px-4 text-sm font-semibold text-red-600 hover:bg-red-500/30 disabled:opacity-50",
-              )}
+              className="inline-flex h-11 items-center justify-center rounded-lg bg-red-500/20 px-4 text-sm font-semibold text-red-600 hover:bg-red-500/30 disabled:opacity-50"
             >
               Delete booking
             </button>

@@ -31,7 +31,7 @@ export function GetEstimateButton(): React.ReactElement {
       )}
     >
       Get a rough estimate
-      <FaCaretDown className={cn("h-4 w-4")} aria-hidden />
+      <FaCaretDown className="h-4 w-4" aria-hidden />
     </button>
   );
 }

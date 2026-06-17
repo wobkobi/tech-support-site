@@ -149,22 +149,16 @@ export function TaxonomyManageModal({ onClose, onChanged }: Props): React.ReactE
       aria-modal="true"
       aria-label="Manage task taxonomy"
       onClick={onClose}
-      className={cn(
-        "fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-12 backdrop-blur-sm",
-      )}
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-12 backdrop-blur-sm"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className={cn(
-          "w-full max-w-xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl",
-        )}
+        className="w-full max-w-xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl"
       >
-        <div
-          className={cn("flex items-center justify-between border-b border-slate-200 px-5 py-4")}
-        >
+        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
           <div>
-            <h2 className={cn("text-base font-bold text-russian-violet")}>Manage tags</h2>
-            <p className={cn("mt-0.5 text-xs text-slate-500")}>
+            <h2 className="text-base font-bold text-russian-violet">Manage tags</h2>
+            <p className="mt-0.5 text-xs text-slate-500">
               Clear devices or actions you no longer want; tasks tagged with them keep their other
               fields and get retagged on the next AI parse.
             </p>
@@ -173,19 +167,15 @@ export function TaxonomyManageModal({ onClose, onChanged }: Props): React.ReactE
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className={cn(
-              "h-9 w-9 shrink-0 rounded-lg text-2xl leading-none text-slate-400 hover:bg-slate-100 hover:text-slate-700",
-            )}
+            className="h-9 w-9 shrink-0 rounded-lg text-2xl leading-none text-slate-400 hover:bg-slate-100 hover:text-slate-700"
           >
             ×
           </button>
         </div>
 
-        <div className={cn("max-h-[60vh] space-y-6 overflow-y-auto px-5 py-4")}>
-          {loading && <p className={cn("text-sm text-slate-500")}>Loading...</p>}
-          {error && (
-            <p className={cn("rounded bg-red-50 px-3 py-2 text-xs text-red-600")}>{error}</p>
-          )}
+        <div className="max-h-[60vh] space-y-6 overflow-y-auto px-5 py-4">
+          {loading && <p className="text-sm text-slate-500">Loading...</p>}
+          {error && <p className="rounded bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>}
 
           {!loading && (
             <>
@@ -252,13 +242,13 @@ function TagSection({
 }): React.ReactElement {
   return (
     <section>
-      <h3 className={cn("mb-2 text-xs font-bold tracking-wider text-russian-violet uppercase")}>
+      <h3 className="mb-2 text-xs font-bold tracking-wider text-russian-violet uppercase">
         {title}
       </h3>
       {tags.length === 0 ? (
-        <p className={cn("text-xs text-slate-400 italic")}>None yet.</p>
+        <p className="text-xs text-slate-400 italic">None yet.</p>
       ) : (
-        <ul className={cn("flex flex-col gap-1")}>
+        <ul className="flex flex-col gap-1">
           {tags.map((tag) => {
             const rowKey = `${kind}:${tag}`;
             const isBusy = busyKey === rowKey;
@@ -271,25 +261,21 @@ function TagSection({
                   isPending ? "border-red-300 bg-red-50" : "border-slate-200",
                 )}
               >
-                <span className={cn("truncate text-sm text-slate-700")}>{tag}</span>
+                <span className="truncate text-sm text-slate-700">{tag}</span>
                 {isPending ? (
-                  <div className={cn("flex shrink-0 items-center gap-2")}>
-                    <span className={cn("text-xs text-red-700")}>Clear this tag?</span>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span className="text-xs text-red-700">Clear this tag?</span>
                     <button
                       type="button"
                       onClick={() => onConfirmClear(tag)}
-                      className={cn(
-                        "rounded bg-red-600 px-2 py-1 text-xs font-semibold text-white hover:bg-red-700",
-                      )}
+                      className="rounded bg-red-600 px-2 py-1 text-xs font-semibold text-white hover:bg-red-700"
                     >
                       Yes, clear
                     </button>
                     <button
                       type="button"
                       onClick={onCancelClear}
-                      className={cn(
-                        "rounded text-xs font-semibold text-slate-500 hover:text-slate-700",
-                      )}
+                      className="rounded text-xs font-semibold text-slate-500 hover:text-slate-700"
                     >
                       Cancel
                     </button>
@@ -299,9 +285,7 @@ function TagSection({
                     type="button"
                     disabled={isBusy}
                     onClick={() => onRequestClear(tag)}
-                    className={cn(
-                      "shrink-0 rounded text-xs font-semibold text-red-500 hover:text-red-700 disabled:opacity-50",
-                    )}
+                    className="shrink-0 rounded text-xs font-semibold text-red-500 hover:text-red-700 disabled:opacity-50"
                   >
                     {isBusy ? "Clearing..." : "Clear"}
                   </button>

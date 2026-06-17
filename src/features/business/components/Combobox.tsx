@@ -154,9 +154,7 @@ export function Combobox({
         <ul
           id={listId}
           role="listbox"
-          className={cn(
-            "absolute top-full right-0 left-0 z-20 mt-1 max-h-56 overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 text-sm shadow-lg",
-          )}
+          className="absolute top-full right-0 left-0 z-20 mt-1 max-h-56 overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 text-sm shadow-lg"
         >
           {options.map((opt, i) => (
             <li

@@ -5,7 +5,6 @@
  * Pass ?mode=print to add a 3mm bleed on all edges (viewport 1818x2550px).
  */
 
-import { cn } from "@/shared/lib/cn";
 import type { Metadata } from "next";
 import Image from "next/image";
 import type React from "react";
@@ -73,117 +72,95 @@ export default async function PosterPage({
   const outerPadding = mode === "print" ? "67px" : "32px";
 
   return (
-    <div className={cn("relative h-screen w-screen overflow-hidden")}>
+    <div className="relative h-screen w-screen overflow-hidden">
       {/* Backdrop */}
-      <div className={cn("absolute inset-0 -z-10")}>
+      <div className="absolute inset-0 -z-10">
         <Image
           src="/source/backdrop.jpg"
           alt=""
           fill
           priority
           sizes="1748px"
-          className={cn("scale-110 object-cover blur-xl")}
+          className="scale-110 object-cover blur-xl"
         />
       </div>
 
       {/* Even outer gap on all sides */}
-      <div className={cn("flex h-full w-full flex-col")} style={{ padding: outerPadding }}>
+      <div className="flex h-full w-full flex-col" style={{ padding: outerPadding }}>
         {/* Inner column fills available height so footer can pin to bottom */}
-        <div className={cn("flex min-h-0 flex-1 flex-col justify-between gap-6")}>
+        <div className="flex min-h-0 flex-1 flex-col justify-between gap-6">
           {/* Main frosted card - content-sized */}
-          <div
-            className={cn(
-              "rounded-4xl border-[3px] border-seasalt-400/40 bg-seasalt-800/60 p-6 shadow-xl backdrop-blur-xl",
-            )}
-          >
-            <div className={cn("flex flex-col gap-6")}>
+          <div className="rounded-4xl border-[3px] border-seasalt-400/40 bg-seasalt-800/60 p-6 shadow-xl backdrop-blur-xl">
+            <div className="flex flex-col gap-6">
               {/* Logo */}
-              <div className={cn("grid place-items-center")}>
+              <div className="grid place-items-center">
                 <Image
                   src="/source/logo-full.svg"
                   alt="To The Point Tech"
                   width={1376}
                   height={313}
                   priority
-                  className={cn("h-auto w-344")}
+                  className="h-auto w-344"
                 />
               </div>
 
               {/* Trust badges */}
-              <div className={cn("mx-auto flex flex-wrap justify-center gap-3")}>
+              <div className="mx-auto flex flex-wrap justify-center gap-3">
                 <div
-                  className={cn(
-                    "relative flex items-center gap-3 rounded-xl border-2 border-moonstone-500/30 px-4.5 py-1.5 shadow-sm",
-                  )}
+                  className="relative flex items-center gap-3 rounded-xl border-2 border-moonstone-500/30 px-4.5 py-1.5 shadow-sm"
                   style={{ backgroundColor: "#f6f7f8" }}
                 >
                   <div
-                    className={cn("absolute inset-0 rounded-xl")}
+                    className="absolute inset-0 rounded-xl"
                     style={{ backgroundColor: "rgba(67, 188, 205, 0.15)" }}
                   />
-                  <FaCircleCheck className={cn("relative z-10 h-11 w-11 text-moonstone-600")} />
-                  <span className={cn("relative z-10 text-[34px] font-semibold text-rich-black")}>
+                  <FaCircleCheck className="relative z-10 h-11 w-11 text-moonstone-600" />
+                  <span className="relative z-10 text-[34px] font-semibold text-rich-black">
                     CS Graduate
                   </span>
                 </div>
 
                 <div
-                  className={cn(
-                    "relative flex items-center gap-3 rounded-xl border-2 border-moonstone-500/30 px-4.5 py-1.5 shadow-sm",
-                  )}
+                  className="relative flex items-center gap-3 rounded-xl border-2 border-moonstone-500/30 px-4.5 py-1.5 shadow-sm"
                   style={{ backgroundColor: "#f6f7f8" }}
                 >
                   <div
-                    className={cn("absolute inset-0 rounded-xl")}
+                    className="absolute inset-0 rounded-xl"
                     style={{ backgroundColor: "rgba(67, 188, 205, 0.15)" }}
                   />
-                  <FaLocationDot className={cn("relative z-10 h-11 w-11 text-moonstone-600")} />
-                  <span className={cn("relative z-10 text-[34px] font-semibold text-rich-black")}>
+                  <FaLocationDot className="relative z-10 h-11 w-11 text-moonstone-600" />
+                  <span className="relative z-10 text-[34px] font-semibold text-rich-black">
                     Proudly Local
                   </span>
                 </div>
 
                 <div
-                  className={cn(
-                    "relative flex items-center gap-3 rounded-xl border-2 border-moonstone-500/30 px-4.5 py-1.5 shadow-sm",
-                  )}
+                  className="relative flex items-center gap-3 rounded-xl border-2 border-moonstone-500/30 px-4.5 py-1.5 shadow-sm"
                   style={{ backgroundColor: "#f6f7f8" }}
                 >
                   <div
-                    className={cn("absolute inset-0 rounded-xl")}
+                    className="absolute inset-0 rounded-xl"
                     style={{ backgroundColor: "rgba(67, 188, 205, 0.15)" }}
                   />
-                  <FaClock className={cn("relative z-10 h-11 w-11 text-moonstone-600")} />
-                  <span className={cn("relative z-10 text-[34px] font-semibold text-rich-black")}>
+                  <FaClock className="relative z-10 h-11 w-11 text-moonstone-600" />
+                  <span className="relative z-10 text-[34px] font-semibold text-rich-black">
                     Same-Day Available
                   </span>
                 </div>
               </div>
 
               {/* Text boxes - now content-sized with gap preserved */}
-              <section className={cn("flex flex-col gap-5")}>
-                <div
-                  className={cn(
-                    "rounded-[18px] border-2 border-seasalt-400/60 bg-seasalt-800 p-4.5 shadow-sm",
-                  )}
-                >
-                  <h2 className={cn("mb-1.5 text-[53px] font-bold text-russian-violet")}>
-                    About Me
-                  </h2>
-                  <p className={cn("text-[40px] leading-tight font-medium text-rich-black")}>
+              <section className="flex flex-col gap-5">
+                <div className="rounded-[18px] border-2 border-seasalt-400/60 bg-seasalt-800 p-4.5 shadow-sm">
+                  <h2 className="mb-1.5 text-[53px] font-bold text-russian-violet">About Me</h2>
+                  <p className="text-[40px] leading-tight font-medium text-rich-black">
                     {aboutMeText}
                   </p>
                 </div>
 
-                <div
-                  className={cn(
-                    "rounded-[18px] border-2 border-seasalt-400/60 bg-seasalt-800 p-4.5 shadow-sm",
-                  )}
-                >
-                  <h2 className={cn("mb-1.5 text-[53px] font-bold text-russian-violet")}>
-                    Services
-                  </h2>
-                  <p className={cn("text-[40px] leading-tight font-medium text-rich-black")}>
+                <div className="rounded-[18px] border-2 border-seasalt-400/60 bg-seasalt-800 p-4.5 shadow-sm">
+                  <h2 className="mb-1.5 text-[53px] font-bold text-russian-violet">Services</h2>
+                  <p className="text-[40px] leading-tight font-medium text-rich-black">
                     {servicesText}
                   </p>
                 </div>
@@ -191,31 +168,21 @@ export default async function PosterPage({
 
               {/* Support grid */}
               <section>
-                <h2 className={cn("mb-3 text-center text-[53px] font-semibold text-rich-black")}>
+                <h2 className="mb-3 text-center text-[53px] font-semibold text-rich-black">
                   Areas I Can Help With
                 </h2>
 
-                <ul className={cn("grid grid-cols-3 gap-3")}>
+                <ul className="grid grid-cols-3 gap-3">
                   {supportItems.map(({ label, icon: Icon }) => (
                     <li
                       key={label}
-                      className={cn(
-                        "flex h-27 items-center gap-3 rounded-xl border-2 border-seasalt-400/60 bg-seasalt-800 px-4.5",
-                      )}
+                      className="flex h-27 items-center gap-3 rounded-xl border-2 border-seasalt-400/60 bg-seasalt-800 px-4.5"
                     >
-                      <span
-                        className={cn(
-                          "grid size-18 shrink-0 place-items-center rounded-xl border-2 border-moonstone-500/30 bg-moonstone-600/15",
-                        )}
-                      >
-                        <Icon className={cn("h-11 w-11 text-moonstone-600")} aria-hidden />
+                      <span className="grid size-18 shrink-0 place-items-center rounded-xl border-2 border-moonstone-500/30 bg-moonstone-600/15">
+                        <Icon className="h-11 w-11 text-moonstone-600" aria-hidden />
                       </span>
 
-                      <span
-                        className={cn(
-                          "text-left text-[40px] leading-tight font-semibold text-rich-black",
-                        )}
-                      >
+                      <span className="text-left text-[40px] leading-tight font-semibold text-rich-black">
                         {label}
                       </span>
                     </li>
@@ -226,58 +193,46 @@ export default async function PosterPage({
           </div>
 
           {/* Footer - content-sized */}
-          <footer className={cn("flex items-center justify-center")}>
-            <div
-              className={cn(
-                "rounded-3xl border-2 border-seasalt-400/40 bg-seasalt-800/70 p-10 shadow-xl backdrop-blur-md",
-              )}
-            >
-              <div className={cn("flex items-center gap-11")}>
+          <footer className="flex items-center justify-center">
+            <div className="rounded-3xl border-2 border-seasalt-400/40 bg-seasalt-800/70 p-10 shadow-xl backdrop-blur-md">
+              <div className="flex items-center gap-11">
                 {/* QR Code */}
-                <div className={cn("flex shrink-0 flex-col items-center gap-2")}>
-                  <div
-                    className={cn(
-                      "grid size-60 place-items-center rounded-[10px] border-2 border-seasalt-400/60 bg-white p-3 shadow-sm",
-                    )}
-                  >
+                <div className="flex shrink-0 flex-col items-center gap-2">
+                  <div className="grid size-60 place-items-center rounded-[10px] border-2 border-seasalt-400/60 bg-white p-3 shadow-sm">
                     <Image
                       src="/qr-booking.svg"
                       alt="Scan to book"
                       width={150}
                       height={150}
-                      className={cn("h-full w-full")}
+                      className="h-full w-full"
                     />
                   </div>
-                  <span className={cn("text-center text-[34px] font-semibold text-rich-black")}>
+                  <span className="text-center text-[34px] font-semibold text-rich-black">
                     Scan to Book
                   </span>
                 </div>
 
                 {/* Contact Info */}
-                <div className={cn("flex flex-col gap-6")}>
+                <div className="flex flex-col gap-6">
                   <a
                     href="tel:+64212971237"
-                    className={cn(
-                      "flex items-center gap-4 text-[44px] font-semibold text-russian-violet",
-                    )}
+                    className="flex items-center gap-4 text-[44px] font-semibold text-russian-violet"
                   >
-                    <FaPhone className={cn("h-10 w-10 shrink-0")} aria-hidden />
+                    <FaPhone className="h-10 w-10 shrink-0" aria-hidden />
                     <span>021 297 1237</span>
                   </a>
 
                   <a
                     href="mailto:harrison@tothepoint.co.nz"
-                    className={cn(
-                      "flex items-center gap-4 text-[44px] font-semibold text-russian-violet",
-                    )}
+                    className="flex items-center gap-4 text-[44px] font-semibold text-russian-violet"
                   >
-                    <FaEnvelope className={cn("h-11 w-11 shrink-0")} aria-hidden />
+                    <FaEnvelope className="h-11 w-11 shrink-0" aria-hidden />
                     <span>harrison@tothepoint.co.nz</span>
                   </a>
 
-                  <div className={cn("flex items-center gap-4 text-[44px] font-semibold")}>
-                    <FaGlobe className={cn("h-11 w-11 shrink-0 text-russian-violet")} aria-hidden />
-                    <p className={cn("text-russian-violet")}>tothepoint.co.nz</p>
+                  <div className="flex items-center gap-4 text-[44px] font-semibold">
+                    <FaGlobe className="h-11 w-11 shrink-0 text-russian-violet" aria-hidden />
+                    <p className="text-russian-violet">tothepoint.co.nz</p>
                   </div>
                 </div>
               </div>

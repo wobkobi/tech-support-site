@@ -1341,12 +1341,8 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
       )}
 
       {/* Job date - drives the public-holiday + promo lookup for this job. */}
-      <div
-        className={cn(
-          "mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3",
-        )}
-      >
-        <label htmlFor="job-date" className={cn("text-sm font-semibold text-slate-700")}>
+      <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+        <label htmlFor="job-date" className="text-sm font-semibold text-slate-700">
           Job date
         </label>
         <input
@@ -1354,19 +1350,13 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
           type="date"
           value={jobDate}
           onChange={(e) => setJobDate(e.target.value || todayNZDate())}
-          className={cn(
-            "rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-          )}
+          className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
         />
-        <span className={cn("text-xs text-slate-500")}>
+        <span className="text-xs text-slate-500">
           Sets which promo and public-holiday rate apply.
         </span>
         {holiday.name && (
-          <span
-            className={cn(
-              "rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800",
-            )}
-          >
+          <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800">
             {holiday.name} - labour +{Math.round(holiday.uplift * 100)}%
           </span>
         )}
@@ -1374,37 +1364,29 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
 
       {/* Promo chip with per-job skip toggle. */}
       {activePromo && (
-        <div
-          className={cn(
-            "mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3",
-          )}
-        >
-          <div className={cn("flex items-center gap-2 text-sm text-amber-800")}>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <div className="flex items-center gap-2 text-sm text-amber-800">
             <span aria-hidden="true">⚡</span>
-            <span className={cn("font-semibold")}>Promo: {activePromo.title}</span>
-            <span className={cn("text-xs text-amber-700")}>
-              ({summariseForBanner(activePromo)})
-            </span>
-            {skipPromo && <span className={cn("text-xs italic")}>- skipped for this job</span>}
+            <span className="font-semibold">Promo: {activePromo.title}</span>
+            <span className="text-xs text-amber-700">({summariseForBanner(activePromo)})</span>
+            {skipPromo && <span className="text-xs italic">- skipped for this job</span>}
           </div>
-          <label className={cn("flex items-center gap-2 text-xs text-amber-800")}>
+          <label className="flex items-center gap-2 text-xs text-amber-800">
             <input
               type="checkbox"
               checked={skipPromo}
               onChange={(e) => setSkipPromo(e.target.checked)}
-              className={cn("h-3.5 w-3.5")}
+              className="h-3.5 w-3.5"
             />
             Skip promo for this job
           </label>
         </div>
       )}
 
-      <div className={cn("mb-4 flex justify-end")}>
+      <div className="mb-4 flex justify-end">
         <button
           onClick={() => setShowRates((p) => !p)}
-          className={cn(
-            "rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50",
-          )}
+          className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
         >
           {showRates ? "Hide rates" : "Manage rates"}
         </button>
@@ -1426,14 +1408,12 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
         />
       )}
 
-      <div className={cn("grid gap-6 lg:grid-cols-2")}>
+      <div className="grid gap-6 lg:grid-cols-2">
         {/* LEFT column */}
-        <div className={cn("space-y-5")}>
+        <div className="space-y-5">
           {/* AI input */}
-          <div className={cn("rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}>
-            <h2 className={cn("mb-3 text-sm font-semibold text-russian-violet")}>
-              Describe the job
-            </h2>
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h2 className="mb-3 text-sm font-semibold text-russian-violet">Describe the job</h2>
             <textarea
               value={aiInput}
               onChange={(e) => {
@@ -1445,28 +1425,22 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
               }}
               rows={6}
               placeholder="e.g. Was at Dave's for 2 hours, removed some malware, set up his new router, had to drive out to Papakura"
-              className={cn(
-                "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-              )}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
             />
-            {parseError && <p className={cn("mt-1 text-xs text-red-600")}>{parseError}</p>}
-            <div className={cn("mt-3 flex gap-2")}>
+            {parseError && <p className="mt-1 text-xs text-red-600">{parseError}</p>}
+            <div className="mt-3 flex gap-2">
               <button
                 onClick={() => void handleParse()}
                 suppressHydrationWarning
                 disabled={parsing || !aiInput.trim()}
-                className={cn(
-                  "rounded-lg bg-russian-violet px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50",
-                )}
+                className="rounded-lg bg-russian-violet px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
               >
                 {parsing ? "Parsing..." : hasParsed ? "Re-parse" : "Parse with AI"}
               </button>
-              <span className={cn("self-center text-xs text-slate-400")}>
-                or build manually below
-              </span>
+              <span className="self-center text-xs text-slate-400">or build manually below</span>
             </div>
             {parseResult && !parseError && (
-              <div className={cn("mt-3")}>
+              <div className="mt-3">
                 <ParseConfidenceBanner
                   confidence={parseResult.confidence}
                   warnings={parseResult.warnings}
@@ -1475,14 +1449,14 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
               </div>
             )}
             {clarifyQuestions.length > 0 && (
-              <div className={cn("mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4")}>
-                <p className={cn("mb-3 text-xs font-medium text-amber-800")}>
+              <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
+                <p className="mb-3 text-xs font-medium text-amber-800">
                   A few quick questions to fill in the gaps:
                 </p>
-                <div className={cn("space-y-3")}>
+                <div className="space-y-3">
                   {clarifyQuestions.map((q) => (
                     <div key={q.id}>
-                      <label className={cn("mb-1 block text-xs font-medium text-slate-700")}>
+                      <label className="mb-1 block text-xs font-medium text-slate-700">
                         {q.question}
                       </label>
                       <input
@@ -1492,20 +1466,16 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
                         onChange={(e) =>
                           setClarifyAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))
                         }
-                        className={cn(
-                          "w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-                        )}
+                        className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
                       />
                     </div>
                   ))}
                 </div>
-                <div className={cn("mt-3 flex gap-2")}>
+                <div className="mt-3 flex gap-2">
                   <button
                     onClick={() => void handleParse(clarifyAnswers)}
                     disabled={parsing}
-                    className={cn(
-                      "rounded-lg bg-russian-violet px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50",
-                    )}
+                    className="rounded-lg bg-russian-violet px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
                   >
                     {parsing ? "Parsing..." : "Submit answers"}
                   </button>
@@ -1514,9 +1484,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
                       setClarifyQuestions([]);
                       setClarifyAnswers({});
                     }}
-                    className={cn(
-                      "rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50",
-                    )}
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
                   >
                     Skip
                   </button>
@@ -1589,22 +1557,20 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
           />
 
           {/* Notes */}
-          <div className={cn("rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}>
-            <label className={cn("mb-1 block text-xs font-medium text-slate-600")}>Notes</label>
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <label className="mb-1 block text-xs font-medium text-slate-600">Notes</label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
-              className={cn(
-                "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-              )}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
             />
           </div>
         </div>
 
         {/* RIGHT column - live invoice preview (replaces the legacy Summary
             panel - same totals, just inside the actual invoice layout). */}
-        <div className={cn("space-y-4")}>
+        <div className="space-y-4">
           {/* Client - moved above the preview so it stays in reach without
               scrolling past the full A4-sized invoice render. */}
           <ClientPickerSection
@@ -1640,77 +1606,59 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
           />
 
           {/* Half off labour when ticked (couldn't fix AND couldn't diagnose). */}
-          <div className={cn("rounded-xl border border-slate-200 bg-white p-3 shadow-sm")}>
+          <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
             <label
-              className={cn("flex cursor-pointer items-start gap-2 text-sm")}
+              className="flex cursor-pointer items-start gap-2 text-sm"
               title="Tick only when you left with neither a fix nor a diagnosis."
             >
               <input
                 type="checkbox"
                 checked={unsuccessful}
                 onChange={(e) => setUnsuccessful(e.target.checked)}
-                className={cn(
-                  "mt-0.5 h-4 w-4 rounded border-slate-300 text-russian-violet focus:ring-russian-violet/30",
-                )}
+                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-russian-violet focus:ring-russian-violet/30"
               />
               <span>
-                <span className={cn("font-medium text-slate-700")}>
+                <span className="font-medium text-slate-700">
                   Mark as unsuccessful (half-price labour)
                 </span>
-                <span className={cn("mt-0.5 block text-xs text-slate-500")}>
+                <span className="mt-0.5 block text-xs text-slate-500">
                   Half off the labour portion. Travel + parts unchanged.
                 </span>
               </span>
             </label>
             {unsuccessful && totals.unsuccessfulDiscount > 0 && (
-              <p className={cn("mt-2 text-xs font-semibold text-amber-700")}>
+              <p className="mt-2 text-xs font-semibold text-amber-700">
                 -${totals.unsuccessfulDiscount.toFixed(2)} applied to labour
               </p>
             )}
           </div>
 
           {/* Actions */}
-          <div className={cn("space-y-2")}>
+          <div className="space-y-2">
             {draftRestoredAt !== null && (
-              <div
-                className={cn(
-                  "flex items-center justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-800",
-                )}
-              >
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-800">
                 <span>Draft restored - last edited {timeAgo(draftRestoredAt, mountedAt)}.</span>
                 <button
                   type="button"
                   onClick={resetFormState}
-                  className={cn("font-semibold text-blue-700 hover:underline")}
+                  className="font-semibold text-blue-700 hover:underline"
                 >
                   Discard
                 </button>
               </div>
             )}
             {incomeToast && (
-              <div
-                className={cn(
-                  "rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-700",
-                )}
-              >
+              <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-700">
                 {incomeToast}
               </div>
             )}
             {sheetSyncToast && (
-              <div
-                className={cn(
-                  "rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800",
-                )}
-              >
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
                 {sheetSyncToast}
               </div>
             )}
             {saveInvoiceError && (
-              <p
-                className={cn(
-                  "rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700",
-                )}
-              >
+              <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
                 {saveInvoiceError}
               </p>
             )}
@@ -1718,9 +1666,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
               onClick={() => void handleSaveInvoice()}
               disabled={savingInvoice || parsing}
               suppressHydrationWarning
-              className={cn(
-                "w-full rounded-lg bg-russian-violet px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50",
-              )}
+              className="w-full rounded-lg bg-russian-violet px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
             >
               {savingInvoice ? "Saving..." : "Save invoice"}
             </button>
@@ -1729,17 +1675,13 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
               suppressHydrationWarning
               disabled={savingIncome || totals.subtotal === 0 || savingInvoice}
               title="For cash jobs handled outside the invoice flow."
-              className={cn(
-                "w-full rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-50",
-              )}
+              className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-50"
             >
               {savingIncome ? "Saving..." : "Save as income entry"}
             </button>
             <button
               onClick={resetFormState}
-              className={cn(
-                "w-full rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-500 hover:bg-slate-50",
-              )}
+              className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-500 hover:bg-slate-50"
             >
               Clear
             </button>
@@ -1819,9 +1761,7 @@ function TaskTimeWarning({
         <button
           type="button"
           onClick={onFix}
-          className={cn(
-            "rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100",
-          )}
+          className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100"
         >
           Fix - rebalance tasks
         </button>

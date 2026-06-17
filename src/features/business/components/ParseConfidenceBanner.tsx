@@ -52,8 +52,8 @@ export function ParseConfidenceBanner({
 
   return (
     <div className={cn("rounded-lg border px-4 py-3", bg)}>
-      <div className={cn("flex items-start justify-between gap-2")}>
-        <div className={cn("flex items-start gap-2")}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-start gap-2">
           <Icon className={cn("mt-0.5 h-4 w-4 shrink-0", text)} aria-hidden />
           <p className={cn("text-sm font-medium", text)}>{message}</p>
         </div>

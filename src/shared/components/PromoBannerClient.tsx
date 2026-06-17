@@ -132,13 +132,13 @@ export function PromoBannerClient({ promo }: Props): React.ReactElement {
       <Link
         href="/pricing"
         aria-label="See pricing details for the current offer"
-        className={cn("block hover:underline focus:outline-none focus-visible:underline")}
+        className="block hover:underline focus:outline-none focus-visible:underline"
       >
         <FaBolt
-          className={cn("mr-2 inline-block h-4 w-4 text-russian-violet-500 sm:h-5 sm:w-5")}
+          className="mr-2 inline-block h-4 w-4 text-russian-violet-500 sm:h-5 sm:w-5"
           aria-hidden="true"
         />
-        <span className={cn("font-bold")}>Limited offer:</span> {summariseForBanner(promo)}
+        <span className="font-bold">Limited offer:</span> {summariseForBanner(promo)}
       </Link>
       <button
         type="button"
@@ -157,7 +157,7 @@ export function PromoBannerClient({ promo }: Props): React.ReactElement {
           "transition-all duration-200 ease-out",
         )}
       >
-        <FaXmark className={cn("h-4 w-4")} aria-hidden="true" />
+        <FaXmark className="h-4 w-4" aria-hidden="true" />
       </button>
     </div>
   );

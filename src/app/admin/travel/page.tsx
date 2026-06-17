@@ -6,7 +6,6 @@ import {
   type TravelBlockRow,
 } from "@/features/admin/components/TravelBlockAdminList";
 import { requireAdminAuth } from "@/shared/lib/auth";
-import { cn } from "@/shared/lib/cn";
 import { prisma } from "@/shared/lib/prisma";
 import type { Metadata } from "next";
 import type React from "react";
@@ -103,11 +102,11 @@ export default async function AdminTravelPage(): Promise<React.ReactElement> {
 
   return (
     <AdminPageLayout current="travel">
-      <h1 className={cn("mb-6 text-2xl font-extrabold text-russian-violet")}>Travel blocks</h1>
+      <h1 className="mb-6 text-2xl font-extrabold text-russian-violet">Travel blocks</h1>
 
-      <div className={cn("rounded-xl border border-slate-200 bg-white p-6 shadow-sm")}>
-        <div className={cn("mb-5 flex flex-wrap items-center justify-between gap-4")}>
-          <p className={cn("text-sm text-slate-500")}>
+      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
+          <p className="text-sm text-slate-500">
             Travel time blocks computed for calendar events with a location. Refreshed every 15
             minutes by the cron job.
           </p>

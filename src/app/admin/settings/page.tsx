@@ -2,7 +2,6 @@
 import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
 import { SettingsView } from "@/features/admin/components/settings/SettingsView";
 import { requireAdminAuth } from "@/shared/lib/auth";
-import { cn } from "@/shared/lib/cn";
 import { DEFAULT_SETTINGS } from "@/shared/lib/settings/defaults";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import type { Metadata } from "next";
@@ -27,8 +26,8 @@ export default async function SettingsPage(): Promise<React.ReactElement> {
 
   return (
     <AdminPageLayout current="settings">
-      <h1 className={cn("mb-1 text-2xl font-extrabold text-russian-violet")}>Settings</h1>
-      <p className={cn("mb-6 text-sm text-slate-500")}>
+      <h1 className="mb-1 text-2xl font-extrabold text-russian-violet">Settings</h1>
+      <p className="mb-6 text-sm text-slate-500">
         Change the values your site runs on without editing code. Each field explains what it does;
         edits go live as soon as you save.
       </p>

@@ -223,28 +223,24 @@ export function SendReviewLinkForm({
             resetState();
             clearFields();
           }}
-          className={cn(
-            "w-full text-left text-sm font-semibold text-russian-violet hover:underline",
-          )}
+          className="w-full text-left text-sm font-semibold text-russian-violet hover:underline"
         >
           {open ? "Hide form" : "+ Send review link to past client"}
         </button>
       )}
 
       {open && (
-        <div className={cn("mt-4 flex flex-col gap-3")}>
+        <div className="mt-4 flex flex-col gap-3">
           {/* Contact picker - only shown when there are suggestions */}
           {contactSuggestions.length > 0 && (
             <div
               ref={pickerRef}
-              className={cn("relative flex flex-col gap-1")}
+              className="relative flex flex-col gap-1"
               onBlur={(e) => {
                 if (!pickerRef.current?.contains(e.relatedTarget as Node)) setListOpen(false);
               }}
             >
-              <label className={cn("text-xs font-medium text-slate-500")}>
-                Pick an existing contact
-              </label>
+              <label className="text-xs font-medium text-slate-500">Pick an existing contact</label>
               <input
                 type="search"
                 placeholder="Search by name, address or email…"
@@ -254,16 +250,10 @@ export function SendReviewLinkForm({
                   setContactSearch(e.target.value);
                   setListOpen(true);
                 }}
-                className={cn(
-                  "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
-                )}
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:ring-1 focus:ring-russian-violet/30 focus:outline-none"
               />
               {listOpen && (
-                <div
-                  className={cn(
-                    "absolute top-full z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg",
-                  )}
-                >
+                <div className="absolute top-full z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
                   {contactSuggestions
                     .filter((c) => {
                       const q = contactSearch.toLowerCase();
@@ -286,15 +276,11 @@ export function SendReviewLinkForm({
                           setContactSearch("");
                           setListOpen(false);
                         }}
-                        className={cn(
-                          "flex w-full flex-col gap-0.5 px-3 py-2.5 text-left hover:bg-slate-50",
-                        )}
+                        className="flex w-full flex-col gap-0.5 px-3 py-2.5 text-left hover:bg-slate-50"
                       >
-                        <span className={cn("text-sm font-medium text-slate-800")}>{c.name}</span>
-                        {c.address && (
-                          <span className={cn("text-xs text-slate-500")}>{c.address}</span>
-                        )}
-                        <span className={cn("text-xs text-slate-400")}>
+                        <span className="text-sm font-medium text-slate-800">{c.name}</span>
+                        {c.address && <span className="text-xs text-slate-500">{c.address}</span>}
+                        <span className="text-xs text-slate-400">
                           {[c.email, c.phone].filter(Boolean).join(" · ") || "No contact info"}
                         </span>
                       </button>
@@ -309,7 +295,7 @@ export function SendReviewLinkForm({
                       c.phone?.includes(q)
                     );
                   }).length === 0 && (
-                    <p className={cn("px-3 py-2.5 text-xs text-slate-400")}>No contacts found</p>
+                    <p className="px-3 py-2.5 text-xs text-slate-400">No contacts found</p>
                   )}
                 </div>
               )}
@@ -317,7 +303,7 @@ export function SendReviewLinkForm({
           )}
 
           {/* Mode toggle */}
-          <div className={cn("flex gap-2")}>
+          <div className="flex gap-2">
             {(["email", "sms"] as const).map((m) => (
               <button
                 key={m}
@@ -340,8 +326,8 @@ export function SendReviewLinkForm({
 
           {/* Email mode: form > preview > confirm send */}
           {mode === "email" && !previewHtml && (
-            <form onSubmit={handlePreview} className={cn("flex flex-col gap-3")}>
-              <div className={cn("flex flex-col gap-2")}>
+            <form onSubmit={handlePreview} className="flex flex-col gap-3">
+              <div className="flex flex-col gap-2">
                 <input
                   type="text"
                   autoComplete="off"
@@ -349,9 +335,7 @@ export function SendReviewLinkForm({
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Full name"
                   required
-                  className={cn(
-                    "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
-                  )}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:ring-1 focus:ring-russian-violet/30 focus:outline-none"
                 />
                 <EmailInput
                   id="srl-email"
@@ -360,19 +344,17 @@ export function SendReviewLinkForm({
                   placeholder="Email address"
                   autoComplete="off"
                   required
-                  className={cn("rounded-lg")}
+                  className="rounded-lg"
                 />
               </div>
-              {error && <p className={cn("text-xs text-coquelicot-400")}>{error}</p>}
+              {error && <p className="text-xs text-coquelicot-400">{error}</p>}
               {success && (
-                <p className={cn("text-xs text-moonstone-600")}>Review link sent successfully.</p>
+                <p className="text-xs text-moonstone-600">Review link sent successfully.</p>
               )}
               <button
                 type="submit"
                 disabled={loading}
-                className={cn(
-                  "self-start rounded-lg bg-moonstone-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-moonstone-700 disabled:cursor-not-allowed disabled:opacity-50",
-                )}
+                className="self-start rounded-lg bg-moonstone-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-moonstone-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {loading ? "Loading preview..." : "Preview email"}
               </button>
@@ -381,26 +363,24 @@ export function SendReviewLinkForm({
 
           {/* Email preview */}
           {mode === "email" && previewHtml && (
-            <div className={cn("flex flex-col gap-3")}>
-              <p className={cn("text-xs font-semibold tracking-wide text-slate-500 uppercase")}>
+            <div className="flex flex-col gap-3">
+              <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
                 Preview - sending to {email}
               </p>
               <iframe
                 srcDoc={previewHtml}
                 title="Email preview"
-                className={cn("w-full rounded-lg border border-slate-200")}
+                className="w-full rounded-lg border border-slate-200"
                 style={{ height: "480px" }}
                 sandbox="allow-same-origin"
               />
-              {error && <p className={cn("text-xs text-coquelicot-400")}>{error}</p>}
-              <div className={cn("flex gap-2")}>
+              {error && <p className="text-xs text-coquelicot-400">{error}</p>}
+              <div className="flex gap-2">
                 <button
                   type="button"
                   disabled={loading}
                   onClick={() => void handleSend()}
-                  className={cn(
-                    "rounded-lg bg-moonstone-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-moonstone-700 disabled:cursor-not-allowed disabled:opacity-50",
-                  )}
+                  className="rounded-lg bg-moonstone-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-moonstone-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {loading ? "Sending..." : "Send email"}
                 </button>
@@ -410,11 +390,9 @@ export function SendReviewLinkForm({
                     setPreviewHtml(null);
                     setError(null);
                   }}
-                  className={cn(
-                    "inline-flex items-center gap-1 rounded-lg border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-600 transition-colors hover:border-slate-400",
-                  )}
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-600 transition-colors hover:border-slate-400"
                 >
-                  <FaCaretLeft className={cn("h-4 w-4")} aria-hidden />
+                  <FaCaretLeft className="h-4 w-4" aria-hidden />
                   Back
                 </button>
               </div>
@@ -423,8 +401,8 @@ export function SendReviewLinkForm({
 
           {/* SMS mode */}
           {mode === "sms" && (
-            <form onSubmit={handleSmsSubmit} className={cn("flex flex-col gap-3")}>
-              <div className={cn("flex flex-col gap-2")}>
+            <form onSubmit={handleSmsSubmit} className="flex flex-col gap-3">
+              <div className="flex flex-col gap-2">
                 <input
                   type="text"
                   autoComplete="off"
@@ -432,9 +410,7 @@ export function SendReviewLinkForm({
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Full name"
                   required
-                  className={cn(
-                    "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
-                  )}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:ring-1 focus:ring-russian-violet/30 focus:outline-none"
                 />
                 <PhoneInput
                   id="srl-phone"
@@ -443,7 +419,7 @@ export function SendReviewLinkForm({
                   autoComplete="off"
                   required
                   hideError
-                  className={cn("rounded-lg")}
+                  className="rounded-lg"
                 />
               </div>
               {phoneInput && (
@@ -456,13 +432,11 @@ export function SendReviewLinkForm({
                   {phoneValid ? `Stored as: ${phoneE164}` : "Invalid phone number"}
                 </p>
               )}
-              {error && <p className={cn("text-xs text-coquelicot-400")}>{error}</p>}
+              {error && <p className="text-xs text-coquelicot-400">{error}</p>}
               <button
                 type="submit"
                 disabled={loading || (!!phoneInput && !phoneValid)}
-                className={cn(
-                  "self-start rounded-lg bg-moonstone-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-moonstone-700 disabled:cursor-not-allowed disabled:opacity-50",
-                )}
+                className="self-start rounded-lg bg-moonstone-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-moonstone-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {loading ? "Generating..." : "Generate text"}
               </button>
@@ -471,34 +445,26 @@ export function SendReviewLinkForm({
 
           {/* Existing link - already sent to this client before */}
           {existingUrl && (
-            <div className={cn("rounded-lg border border-slate-200 bg-slate-50 p-3")}>
-              <p
-                className={cn(
-                  "mb-2 text-xs font-semibold tracking-wide text-coquelicot-500 uppercase",
-                )}
-              >
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <p className="mb-2 text-xs font-semibold tracking-wide text-coquelicot-500 uppercase">
                 Already sent - here is their existing link
               </p>
-              <p className={cn("mb-3 text-xs break-all text-slate-500")}>{existingUrl}</p>
+              <p className="mb-3 text-xs break-all text-slate-500">{existingUrl}</p>
               <CopyLinkButton url={existingUrl} />
             </div>
           )}
 
           {/* SMS copy box */}
           {smsText && (
-            <div className={cn("rounded-lg border border-slate-200 bg-slate-50 p-3")}>
-              <p
-                className={cn("mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase")}
-              >
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <p className="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
                 Copy and send from your phone
               </p>
-              <p className={cn("mb-3 text-sm leading-relaxed text-slate-700")}>{smsText}</p>
+              <p className="mb-3 text-sm leading-relaxed text-slate-700">{smsText}</p>
               <button
                 type="button"
                 onClick={handleCopy}
-                className={cn(
-                  "rounded-lg bg-moonstone-600 px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-moonstone-700",
-                )}
+                className="rounded-lg bg-moonstone-600 px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-moonstone-700"
               >
                 {copied ? "Copied!" : "Copy message"}
               </button>

@@ -10,7 +10,6 @@ import {
   SendReviewLinkForm,
   type ContactSuggestion,
 } from "@/features/reviews/components/admin/SendReviewLinkForm";
-import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
 import type React from "react";
 import { useState } from "react";
@@ -107,70 +106,58 @@ export function DashboardQuickActions({
   }
 
   return (
-    <div className={cn("mb-8 grid grid-cols-1 gap-4 lg:grid-cols-2")}>
+    <div className="mb-8 grid grid-cols-1 gap-4 lg:grid-cols-2">
       {/* Send review link */}
-      <div className={cn("rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}>
-        <h2 className={cn("mb-4 text-sm font-semibold text-slate-700")}>Send review link</h2>
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <h2 className="mb-4 text-sm font-semibold text-slate-700">Send review link</h2>
         <SendReviewLinkForm contactSuggestions={contactSuggestions} defaultOpen />
       </div>
 
       {/* Complete events */}
-      <div className={cn("rounded-xl border border-slate-200 bg-white shadow-sm")}>
-        <div className={cn("border-b border-slate-100 px-5 py-4")}>
-          <h2 className={cn("text-sm font-semibold text-slate-700")}>
+      <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-100 px-5 py-4">
+          <h2 className="text-sm font-semibold text-slate-700">
             Complete events
             {bookings.length > 0 && (
-              <span
-                className={cn(
-                  "ml-2 rounded-full bg-coquelicot-500/15 px-2 py-0.5 text-xs font-semibold text-coquelicot-400",
-                )}
-              >
+              <span className="ml-2 rounded-full bg-coquelicot-500/15 px-2 py-0.5 text-xs font-semibold text-coquelicot-400">
                 {bookings.length}
               </span>
             )}
           </h2>
-          <p className={cn("mt-0.5 text-xs text-slate-400")}>
+          <p className="mt-0.5 text-xs text-slate-400">
             Past confirmed bookings - mark complete and send review
           </p>
         </div>
 
         {bookings.length === 0 ? (
-          <p className={cn("px-5 py-6 text-sm text-slate-400")}>
-            No events waiting to be completed.
-          </p>
+          <p className="px-5 py-6 text-sm text-slate-400">No events waiting to be completed.</p>
         ) : (
-          <ul className={cn("divide-y divide-slate-100")}>
+          <ul className="divide-y divide-slate-100">
             {bookings.map((b) => {
               const isDone = done.has(b.id);
               const isRunning = completing === b.id;
               const err = errors[b.id];
               return (
-                <li key={b.id} className={cn("flex items-center justify-between gap-3 px-5 py-3")}>
-                  <div className={cn("min-w-0")}>
-                    <p className={cn("truncate text-sm font-medium text-slate-700")}>{b.name}</p>
-                    <p className={cn("text-xs text-slate-400")}>
+                <li key={b.id} className="flex items-center justify-between gap-3 px-5 py-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-slate-700">{b.name}</p>
+                    <p className="text-xs text-slate-400">
                       {formatDateShort(b.startAt)}
                       {b.email ? ` · ${b.email}` : " · no email"}
                     </p>
-                    {err && <p className={cn("text-xs text-coquelicot-400")}>{err}</p>}
+                    {err && <p className="text-xs text-coquelicot-400">{err}</p>}
                   </div>
                   {isDone ? (
-                    <span
-                      className={cn(
-                        "inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-moonstone-600",
-                      )}
-                    >
+                    <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-moonstone-600">
                       Done
-                      <FaCheck className={cn("h-3 w-3")} aria-hidden />
+                      <FaCheck className="h-3 w-3" aria-hidden />
                     </span>
                   ) : (
                     <button
                       type="button"
                       disabled={isRunning}
                       onClick={() => handleComplete(b.id)}
-                      className={cn(
-                        "shrink-0 rounded-lg bg-russian-violet px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-russian-violet/90 disabled:opacity-50",
-                      )}
+                      className="shrink-0 rounded-lg bg-russian-violet px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-russian-violet/90 disabled:opacity-50"
                     >
                       {isRunning
                         ? "Working…"

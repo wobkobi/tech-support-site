@@ -177,24 +177,22 @@ export function ReviewLinkHistoryTable({
     : entries;
 
   if (entries.length === 0) {
-    return <p className={cn("text-sm text-slate-400")}>No review links sent yet.</p>;
+    return <p className="text-sm text-slate-400">No review links sent yet.</p>;
   }
 
   return (
-    <div className={cn("flex flex-col gap-3")}>
+    <div className="flex flex-col gap-3">
       <input
         type="search"
         placeholder="Search name, email, phone…"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        className={cn(
-          "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
-        )}
+        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:ring-1 focus:ring-russian-violet/30 focus:outline-none"
       />
       {visibleEntries.length === 0 ? (
-        <p className={cn("text-sm text-slate-400")}>No matching entries.</p>
+        <p className="text-sm text-slate-400">No matching entries.</p>
       ) : (
-        <div className={cn("flex max-h-128 flex-col gap-2 overflow-y-auto")}>
+        <div className="flex max-h-128 flex-col gap-2 overflow-y-auto">
           {visibleEntries.map((entry) => {
             const key = entryKey(entry);
             const isEditing = key !== null && editingKey === key;
@@ -228,20 +226,20 @@ export function ReviewLinkHistoryTable({
             return (
               <div
                 key={key ?? entry.reviewUrl}
-                className={cn("rounded-lg border border-slate-200 bg-white p-3")}
+                className="rounded-lg border border-slate-200 bg-white p-3"
               >
                 {/* Name row */}
-                <div className={cn("flex items-start justify-between gap-2")}>
-                  <div className={cn("min-w-0")}>
-                    <div className={cn("flex flex-wrap items-center gap-1.5")}>
-                      <span className={cn("truncate text-sm font-medium text-slate-800")}>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="truncate text-sm font-medium text-slate-800">
                         {entry.name}
                       </span>
                       {sourceBadge}
                     </div>
-                    <p className={cn("mt-0.5 text-xs text-slate-500")}>
+                    <p className="mt-0.5 text-xs text-slate-500">
                       {contact ?? (
-                        <span className={cn("text-slate-400 italic")}>
+                        <span className="text-slate-400 italic">
                           {entry.source === "Legacy" ? "no contact info" : "SMS only"}
                         </span>
                       )}
@@ -253,9 +251,7 @@ export function ReviewLinkHistoryTable({
                     <button
                       type="button"
                       onClick={() => openEdit(entry)}
-                      className={cn(
-                        "shrink-0 text-slate-400 transition-colors hover:text-russian-violet",
-                      )}
+                      className="shrink-0 text-slate-400 transition-colors hover:text-russian-violet"
                       aria-label="Edit contact details"
                     >
                       ✎
@@ -268,17 +264,13 @@ export function ReviewLinkHistoryTable({
                   (() => {
                     const phoneValid = isValidPhone(toE164NZ(editPhoneInput));
                     return (
-                      <div
-                        className={cn("mt-2 flex flex-col gap-2 border-t border-slate-100 pt-2")}
-                      >
+                      <div className="mt-2 flex flex-col gap-2 border-t border-slate-100 pt-2">
                         <input
                           type="email"
                           value={editEmail}
                           onChange={(e) => setEditEmail(e.target.value)}
                           placeholder="Email (optional)"
-                          className={cn(
-                            "w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-700 focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
-                          )}
+                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-700 focus:ring-1 focus:ring-russian-violet/30 focus:outline-none"
                         />
                         <input
                           type="tel"
@@ -303,26 +295,20 @@ export function ReviewLinkHistoryTable({
                               : "Invalid phone number"}
                           </p>
                         )}
-                        {saveError && (
-                          <p className={cn("text-xs text-coquelicot-400")}>{saveError}</p>
-                        )}
-                        <div className={cn("flex gap-2")}>
+                        {saveError && <p className="text-xs text-coquelicot-400">{saveError}</p>}
+                        <div className="flex gap-2">
                           <button
                             type="button"
                             disabled={saving || (!!editPhoneInput && !phoneValid)}
                             onClick={() => handleSave(entry)}
-                            className={cn(
-                              "rounded-lg bg-moonstone-600 px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-moonstone-700 disabled:opacity-50",
-                            )}
+                            className="rounded-lg bg-moonstone-600 px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-moonstone-700 disabled:opacity-50"
                           >
                             {saving ? "Saving…" : "Save"}
                           </button>
                           <button
                             type="button"
                             onClick={cancelEdit}
-                            className={cn(
-                              "text-xs text-slate-500 transition-colors hover:text-slate-700",
-                            )}
+                            className="text-xs text-slate-500 transition-colors hover:text-slate-700"
                           >
                             Cancel
                           </button>
@@ -333,33 +319,25 @@ export function ReviewLinkHistoryTable({
 
                 {/* Actions row */}
                 {!isEditing && (
-                  <div
-                    className={cn("mt-2 flex items-center gap-3 border-t border-slate-100 pt-2")}
-                  >
+                  <div className="mt-2 flex items-center gap-3 border-t border-slate-100 pt-2">
                     {entry.reviewed ? (
-                      <span
-                        className={cn(
-                          "inline-flex items-center gap-1 text-xs font-medium text-moonstone-600",
-                        )}
-                      >
+                      <span className="inline-flex items-center gap-1 text-xs font-medium text-moonstone-600">
                         Reviewed
-                        <FaCheck className={cn("h-3 w-3")} aria-hidden />
+                        <FaCheck className="h-3 w-3" aria-hidden />
                       </span>
                     ) : (
-                      <span className={cn("text-xs text-slate-400")}>Not reviewed</span>
+                      <span className="text-xs text-slate-400">Not reviewed</span>
                     )}
                     <CopyLinkButton url={entry.reviewUrl} />
                     {entry.id &&
                       !entry.reviewed &&
                       (confirmRevokeKey === key ? (
-                        <div className={cn("flex items-center gap-2")}>
+                        <div className="flex items-center gap-2">
                           <button
                             type="button"
                             disabled={revoking}
                             onClick={() => handleRevoke(entry)}
-                            className={cn(
-                              "text-xs font-semibold text-coquelicot-500 transition-colors hover:text-coquelicot-600 disabled:opacity-50",
-                            )}
+                            className="text-xs font-semibold text-coquelicot-500 transition-colors hover:text-coquelicot-600 disabled:opacity-50"
                           >
                             {revoking ? "Revoking…" : "Confirm revoke"}
                           </button>
@@ -369,9 +347,7 @@ export function ReviewLinkHistoryTable({
                               setConfirmRevokeKey(null);
                               setRevokeError(null);
                             }}
-                            className={cn(
-                              "text-xs text-slate-400 transition-colors hover:text-slate-600",
-                            )}
+                            className="text-xs text-slate-400 transition-colors hover:text-slate-600"
                           >
                             Cancel
                           </button>
@@ -380,16 +356,12 @@ export function ReviewLinkHistoryTable({
                         <button
                           type="button"
                           onClick={() => setConfirmRevokeKey(key)}
-                          className={cn(
-                            "ml-auto text-xs text-slate-400 transition-colors hover:text-coquelicot-500",
-                          )}
+                          className="ml-auto text-xs text-slate-400 transition-colors hover:text-coquelicot-500"
                         >
                           Revoke
                         </button>
                       ))}
-                    {revokeError && (
-                      <p className={cn("text-xs text-coquelicot-400")}>{revokeError}</p>
-                    )}
+                    {revokeError && <p className="text-xs text-coquelicot-400">{revokeError}</p>}
                   </div>
                 )}
               </div>

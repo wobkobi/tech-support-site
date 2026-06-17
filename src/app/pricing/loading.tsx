@@ -20,48 +20,46 @@ export default function PricingLoading(): React.ReactElement {
     <PageShell>
       <FrostedSection>
         <div
-          className={cn("flex flex-col gap-6 sm:gap-8")}
+          className="flex flex-col gap-6 sm:gap-8"
           role="status"
           aria-live="polite"
           aria-label="Loading pricing page"
         >
           {/* Heading card */}
           <section className={cn(CARD)}>
-            <Bone className={cn("mb-4 h-9 w-72 sm:h-10")} />
-            <Bone className={cn("h-6 w-full max-w-xl")} />
+            <Bone className="mb-4 h-9 w-72 sm:h-10" />
+            <Bone className="h-6 w-full max-w-xl" />
           </section>
 
           {/* Rate card */}
           <section className={cn(CARD)}>
-            <Bone className={cn("mb-4 h-7 w-48")} />
-            <div className={cn("flex flex-wrap items-end gap-3")}>
-              <Bone className={cn("h-12 w-28")} />
-              <Bone className={cn("h-6 w-40")} />
+            <Bone className="mb-4 h-7 w-48" />
+            <div className="flex flex-wrap items-end gap-3">
+              <Bone className="h-12 w-28" />
+              <Bone className="h-6 w-40" />
             </div>
           </section>
 
           {/* No surprises + accordion details */}
           <section className={cn(CARD)}>
-            <Bone className={cn("mb-4 h-7 w-44")} />
-            <div className={cn("mb-5 flex flex-col gap-3")}>
+            <Bone className="mb-4 h-7 w-44" />
+            <div className="mb-5 flex flex-col gap-3">
               {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className={cn("flex gap-3")}>
-                  <Bone className={cn("mt-1 size-4 shrink-0 rounded-full")} />
-                  <Bone className={cn("h-5 max-w-lg flex-1")} />
+                <div key={i} className="flex gap-3">
+                  <Bone className="mt-1 size-4 shrink-0 rounded-full" />
+                  <Bone className="h-5 max-w-lg flex-1" />
                 </div>
               ))}
             </div>
-            <Bone className={cn("mb-3 h-6 w-36")} />
-            <div className={cn("space-y-3")}>
+            <Bone className="mb-3 h-6 w-36" />
+            <div className="space-y-3">
               {Array.from({ length: 7 }).map((_, i) => (
                 <div
-                  className={cn(
-                    "flex items-center justify-between gap-3 rounded-xl border border-seasalt-400/80 bg-seasalt-900/60 p-3 sm:p-4",
-                  )}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-seasalt-400/80 bg-seasalt-900/60 p-3 sm:p-4"
                   key={i}
                 >
-                  <Bone className={cn("h-5 w-40")} />
-                  <Bone className={cn("size-4 shrink-0 rounded-full")} />
+                  <Bone className="h-5 w-40" />
+                  <Bone className="size-4 shrink-0 rounded-full" />
                 </div>
               ))}
             </div>
@@ -69,16 +67,16 @@ export default function PricingLoading(): React.ReactElement {
 
           {/* Next steps */}
           <section className={cn(CARD)}>
-            <Bone className={cn("h-6 w-full max-w-lg")} />
+            <Bone className="h-6 w-full max-w-lg" />
           </section>
 
           {/* Estimate */}
           <section className={cn(CARD)}>
-            <Bone className={cn("mb-2 h-7 w-56")} />
-            <Bone className={cn("h-5 w-full max-w-md")} />
+            <Bone className="mb-2 h-7 w-56" />
+            <Bone className="h-5 w-full max-w-md" />
           </section>
 
-          <span className={cn("sr-only")}>Loading pricing page...</span>
+          <span className="sr-only">Loading pricing page...</span>
         </div>
       </FrostedSection>
     </PageShell>

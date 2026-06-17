@@ -79,15 +79,13 @@ export function TasksSection({
   jobUnsuccessful,
 }: Props): React.ReactElement {
   return (
-    <div
-      className={cn("space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5")}
-    >
-      <div className={cn("flex items-center justify-between gap-2")}>
-        <h2 className={cn("text-sm font-semibold text-russian-violet")}>Tasks</h2>
+    <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-russian-violet">Tasks</h2>
         <button
           type="button"
           onClick={onManageTags}
-          className={cn("text-xs font-medium text-slate-500 underline hover:text-slate-700")}
+          className="text-xs font-medium text-slate-500 underline hover:text-slate-700"
         >
           Manage tags
         </button>
@@ -105,17 +103,15 @@ export function TasksSection({
         return (
           <div
             key={idx}
-            className={cn("rounded-lg border border-slate-200 bg-slate-50/60 p-3 sm:bg-white")}
+            className="rounded-lg border border-slate-200 bg-slate-50/60 p-3 sm:bg-white"
           >
             {isFlatRate ? (
               /* Flat-rate row (Travel etc.): rate dropdown + qty/price/total/delete inline. */
-              <div className={cn("flex flex-col gap-2 sm:flex-row sm:items-center")}>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <select
                   value={`rate:${task.rateConfigId}`}
                   onChange={(e) => onUpdateTask(idx, "rateConfigId", e.target.value.slice(5))}
-                  className={cn(
-                    "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none sm:w-40 sm:py-2 sm:text-xs",
-                  )}
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none sm:w-40 sm:py-2 sm:text-xs"
                 >
                   {flatRates.map((r) => (
                     <option key={r.id} value={`rate:${r.id}`}>
@@ -123,11 +119,7 @@ export function TasksSection({
                     </option>
                   ))}
                 </select>
-                <p
-                  className={cn(
-                    "truncate text-sm text-slate-600 sm:flex-1 sm:text-xs sm:text-slate-500",
-                  )}
-                >
+                <p className="truncate text-sm text-slate-600 sm:flex-1 sm:text-xs sm:text-slate-500">
                   {task.description}
                 </p>
                 <TaskTotalsRow
@@ -139,8 +131,8 @@ export function TasksSection({
               </div>
             ) : (
               /* Task row: Device + Action comboboxes, optional details input, composed preview, qty/price/total/delete. */
-              <div className={cn("flex flex-col gap-2")}>
-                <div className={cn("grid grid-cols-1 gap-2 sm:grid-cols-3")}>
+              <div className="flex flex-col gap-2">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                   <Combobox
                     value={task.device ?? ""}
                     onChange={(v) => {
@@ -231,9 +223,7 @@ export function TasksSection({
                     }}
                     placeholder="Details (optional)"
                     aria-label="Details"
-                    className={cn(
-                      "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none sm:py-2 sm:text-xs",
-                    )}
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none sm:py-2 sm:text-xs"
                   />
                 </div>
                 <p
@@ -245,14 +235,12 @@ export function TasksSection({
                 >
                   {composed || "Pick device + action"}
                 </p>
-                <div className={cn("flex flex-wrap items-center gap-1.5")}>
+                <div className="flex flex-wrap items-center gap-1.5">
                   <select
                     value={task.baseRateId ?? ""}
                     onChange={(e) => onSetTaskBase(idx, e.target.value || null)}
                     aria-label="Base rate"
-                    className={cn(
-                      "rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-                    )}
+                    className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
                   >
                     <option value="">No base</option>
                     {baseRates.map((r) => (
@@ -314,7 +302,7 @@ export function TasksSection({
                   >
                     Didn&apos;t finish
                   </button>
-                  <span className={cn("ml-auto text-xs font-semibold text-slate-700")}>
+                  <span className="ml-auto text-xs font-semibold text-slate-700">
                     = {formatNZD(task.unitPrice)}/hr
                   </span>
                 </div>
@@ -332,9 +320,7 @@ export function TasksSection({
       })}
       <button
         onClick={onAddTask}
-        className={cn(
-          "inline-flex h-11 items-center text-sm text-slate-500 underline hover:text-russian-violet sm:h-auto sm:text-xs",
-        )}
+        className="inline-flex h-11 items-center text-sm text-slate-500 underline hover:text-russian-violet sm:h-auto sm:text-xs"
       >
         + Add task
       </button>
@@ -377,10 +363,8 @@ function TaskTotalsRow({
           : "sm:flex sm:flex-none sm:items-center sm:gap-2",
       )}
     >
-      <label className={cn("flex flex-col gap-0.5 sm:contents")}>
-        <span
-          className={cn("text-[10px] font-medium tracking-wide text-slate-400 uppercase sm:hidden")}
-        >
+      <label className="flex flex-col gap-0.5 sm:contents">
+        <span className="text-[10px] font-medium tracking-wide text-slate-400 uppercase sm:hidden">
           Hrs
         </span>
         <input
@@ -391,16 +375,12 @@ function TaskTotalsRow({
           value={task.qty}
           onChange={(e) => onQty(parseFloat(e.target.value) || 0)}
           aria-label="Quantity"
-          className={cn(
-            "number-input-clean w-full rounded-lg border border-slate-200 bg-white px-2 py-2.5 text-right text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none sm:w-20 sm:py-2 sm:text-xs",
-          )}
+          className="number-input-clean w-full rounded-lg border border-slate-200 bg-white px-2 py-2.5 text-right text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none sm:w-20 sm:py-2 sm:text-xs"
         />
       </label>
-      {spread && <span className={cn("hidden text-xs text-slate-400 sm:inline")}>hrs</span>}
-      <label className={cn("flex flex-col gap-0.5 sm:contents")}>
-        <span
-          className={cn("text-[10px] font-medium tracking-wide text-slate-400 uppercase sm:hidden")}
-        >
+      {spread && <span className="hidden text-xs text-slate-400 sm:inline">hrs</span>}
+      <label className="flex flex-col gap-0.5 sm:contents">
+        <span className="text-[10px] font-medium tracking-wide text-slate-400 uppercase sm:hidden">
           {spread ? "$/hr" : "$/unit"}
         </span>
         <input
@@ -411,12 +391,10 @@ function TaskTotalsRow({
           value={task.unitPrice || ""}
           onChange={(e) => onPrice(parseFloat(e.target.value) || 0)}
           aria-label="Unit price"
-          className={cn(
-            "number-input-clean w-full rounded-lg border border-slate-200 bg-white px-2 py-2.5 text-right text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none sm:w-24 sm:py-2 sm:text-xs",
-          )}
+          className="number-input-clean w-full rounded-lg border border-slate-200 bg-white px-2 py-2.5 text-right text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none sm:w-24 sm:py-2 sm:text-xs"
         />
       </label>
-      {spread && <span className={cn("hidden text-xs text-slate-400 sm:inline")}>$/hr</span>}
+      {spread && <span className="hidden text-xs text-slate-400 sm:inline">$/hr</span>}
       <span
         className={cn(
           "self-end text-right text-sm font-semibold text-slate-700 sm:w-24 sm:self-center sm:text-xs",
@@ -430,9 +408,7 @@ function TaskTotalsRow({
         type="button"
         onClick={onDelete}
         aria-label="Remove task"
-        className={cn(
-          "inline-flex h-11 w-11 items-center justify-center rounded-lg text-xl leading-none text-slate-400 hover:bg-red-50 hover:text-red-500 sm:h-9 sm:w-9 sm:rounded-lg sm:text-lg sm:hover:bg-red-50",
-        )}
+        className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-xl leading-none text-slate-400 hover:bg-red-50 hover:text-red-500 sm:h-9 sm:w-9 sm:rounded-lg sm:text-lg sm:hover:bg-red-50"
       >
         ×
       </button>
