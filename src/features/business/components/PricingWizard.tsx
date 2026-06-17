@@ -1,7 +1,7 @@
 "use client";
 
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
-import { priceRangeFor } from "@/features/business/lib/estimate-range";
+import { priceRangeFor, remoteRateDelta } from "@/features/business/lib/estimate-range";
 import { calcTravelCharge } from "@/features/business/lib/pricing-policy";
 import {
   applyPromoToHourlyRate,
@@ -180,11 +180,7 @@ export function PricingWizard({
         rates.find((r) => r.ratePerHour !== null && r.isDefault)?.ratePerHour ??
         rates.find((r) => r.ratePerHour !== null)?.ratePerHour ??
         65;
-      const remoteDelta =
-        meeting === "remote"
-          ? (rates.find((r) => r.label === "Remote" && r.hourlyDelta !== null)?.hourlyDelta ?? 0)
-          : 0;
-      fullRate = baseStandard + remoteDelta;
+      fullRate = baseStandard + remoteRateDelta(rates, meeting);
     }
 
     // Travel rate is decoupled from labour; Remote/promo never touch it.

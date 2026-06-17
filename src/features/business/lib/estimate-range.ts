@@ -9,6 +9,33 @@
 
 import type { EstimateConfidence, EstimatorRange } from "@/shared/lib/settings/types";
 
+/** Minimal rate shape the remote-discount lookup needs (subset of PublicRate). */
+interface RemoteRateLike {
+  label: string;
+  hourlyDelta: number | null;
+}
+
+/**
+ * Resolves the remote-meeting discount delta ($/hr, normally negative) from the
+ * live public rates. Matches any hourly modifier whose label contains "remote"
+ * (case-insensitive) rather than the exact string "Remote", so renaming the
+ * rate to e.g. "Remote support" still applies the discount; only a rename that
+ * drops the word "remote" entirely would miss it. The base rate (keyed off
+ * isDefault) and travel rate (keyed off unit) already survive renames - this
+ * keeps the remote modifier in step. Returns 0 for in-person meetings or when
+ * no remote modifier exists, so the caller just adds it to the base rate.
+ * @param rates - Live public rate rows.
+ * @param meeting - Meeting mode; only the literal "remote" applies the discount (callers spell in-person differently: "on-site" vs "in-person").
+ * @returns The remote modifier's hourlyDelta, or 0 when not applicable.
+ */
+export function remoteRateDelta(rates: RemoteRateLike[], meeting: string): number {
+  if (meeting !== "remote") return 0;
+  const remote = rates.find(
+    (r) => r.hourlyDelta !== null && r.label.toLowerCase().includes("remote"),
+  );
+  return remote?.hourlyDelta ?? 0;
+}
+
 /**
  * Builds a whole-dollar low/high price band for one visit slice. The band
  * widens (and the low end drops faster than the high end rises) as confidence

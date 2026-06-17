@@ -303,6 +303,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         const target = label.trim().toLowerCase();
         return ratesForLookup.find((r) => r.label.toLowerCase() === target) ?? null;
       };
+      // Modifier labels the AI emitted that match no live rate (stale name, a
+      // since-renamed modifier, or a hallucinated label). Collected so the
+      // operator gets a warning instead of the modifier silently vanishing.
+      const unresolvedModifierLabels = new Set<string>();
       parsed.tasks = parsed.tasks.map((task) => {
         const t = task as typeof task & {
           action?: string | null;
@@ -323,7 +327,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           ratesForLookup.find((r) => r.ratePerHour !== null) ??
           null;
         const modifierIds = (t.modifierLabels ?? [])
-          .map((label) => findRateByLabel(label))
+          .map((label) => {
+            const rate = findRateByLabel(label);
+            if (!rate) unresolvedModifierLabels.add(label);
+            return rate;
+          })
           .filter((r): r is RateConfig => r !== null && r.hourlyDelta !== null)
           .map((r) => r.id);
 
@@ -345,6 +353,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           unitPrice,
         };
       });
+      if (unresolvedModifierLabels.size > 0) {
+        parsed.warnings = [
+          ...(parsed.warnings ?? []),
+          `Dropped unrecognised modifier label(s): ${[...unresolvedModifierLabels].join(
+            ", ",
+          )}. None match a current rate - check the modifier labels in Settings > Pricing.`,
+        ];
+      }
     }
 
     // Attach the operator-stated ranges so the calculator can render one row

@@ -8,7 +8,7 @@
  * to capture an id the booking can snapshot.
  */
 
-import { priceRangeFor } from "@/features/business/lib/estimate-range";
+import { priceRangeFor, remoteRateDelta } from "@/features/business/lib/estimate-range";
 import { calcTravelCharge } from "@/features/business/lib/pricing-policy";
 import { applyPromoToHourlyRate, type ActivePromo } from "@/features/business/lib/promos";
 import type { PublicRate } from "@/features/business/types/pricing";
@@ -102,11 +102,7 @@ export async function fetchQuickEstimate(input: QuickEstimateInput): Promise<Qui
       rates.find((r) => r.ratePerHour !== null && r.isDefault)?.ratePerHour ??
       rates.find((r) => r.ratePerHour !== null)?.ratePerHour ??
       65;
-    const remoteDelta =
-      meeting === "remote"
-        ? (rates.find((r) => r.label === "Remote" && r.hourlyDelta !== null)?.hourlyDelta ?? 0)
-        : 0;
-    fullRate = baseStandard + remoteDelta;
+    fullRate = baseStandard + remoteRateDelta(rates, meeting);
   }
 
   const travelRatePerHour =
