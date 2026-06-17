@@ -586,7 +586,11 @@ export function NavBar(): React.ReactElement | null {
         aria-label="Mobile navigation"
         role={mobileMenuOpen ? "dialog" : undefined}
         aria-modal={mobileMenuOpen ? true : undefined}
-        aria-hidden={mobileMenuOpen ? undefined : true}
+        // `inert` removes the off-screen drawer and its links from the tab order
+        // and accessibility tree while closed, so they cannot be focused. It also
+        // supersedes aria-hidden here, which on its own would leave the inner
+        // links focusable (the audit flags aria-hidden that contains focusables).
+        inert={!mobileMenuOpen}
       >
         <div className={cn("flex h-full flex-col gap-2 p-4")}>
           {NAV_ITEMS.map((item) => {
