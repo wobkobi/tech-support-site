@@ -142,6 +142,11 @@ function validatePricing(p: PricingSettings): FieldError[] {
     errors.push({ field: "cancellation.travelChargeHours", message: "Must be 0 or more hours." });
   if (!nonNeg(p.cancellation?.callOutFee))
     errors.push({ field: "cancellation.callOutFee", message: "Must be 0 or more dollars." });
+  if (typeof p.cancellation?.autoSendCancellationInvoice !== "boolean")
+    errors.push({
+      field: "cancellation.autoSendCancellationInvoice",
+      message: "Must be on or off.",
+    });
   if (!nonNeg(p.reschedule?.cutoffHours))
     errors.push({ field: "reschedule.cutoffHours", message: "Must be 0 or more hours (0 = off)." });
   if (p.reschedule?.maxReschedules !== null && !nonNeg(p.reschedule?.maxReschedules))

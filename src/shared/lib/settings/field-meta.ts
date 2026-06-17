@@ -363,6 +363,11 @@ export const PRICING_FIELD_META: Record<string, FieldMeta> = {
     description: "Flat fee charged when a cancellation lands inside the free-cancellation window.",
     unit: "$",
   },
+  "cancellation.autoSendCancellationInvoice": {
+    title: "Auto-send fee invoice",
+    description:
+      "When a customer cancels their own booking on the website inside the fee window, email the fee invoice straight away instead of leaving it as a draft. No-show and operator cancels always stay drafts for you to review.",
+  },
   "reschedule.cutoffHours": {
     title: "Reschedule cutoff",
     description: "Customers can't reschedule within this many hours of the appointment.",

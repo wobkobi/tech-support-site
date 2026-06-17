@@ -134,11 +134,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       },
     });
 
-    // Fire-and-forget so a draft failure never blocks the cancel response.
+    // Fire-and-forget so a draft (or send) failure never blocks the cancel response.
     if (lateCancellation) {
       void createDraftCancellationInvoice(updated, {
         includeTravel: travelChargeApplies,
         reason: "late-cancellation",
+        // Auto-send only on this customer self-cancel path; no-show / operator
+        // cancels stay drafts for review (see admin/bookings/[id]/route.ts).
+        autoSend: CANCELLATION.autoSendCancellationInvoice,
       }).catch((err) =>
         console.error("[booking/cancel] Failed to draft cancellation invoice:", err),
       );

@@ -54,7 +54,12 @@ export const DEFAULT_SETTINGS: Settings = {
     billingIncrementMins: 5,
     publicHolidayUplift: 0.25,
     minTravelCharge: 10,
-    cancellation: { freeNoticeHours: 12, travelChargeHours: 2, callOutFee: 30 },
+    cancellation: {
+      freeNoticeHours: 12,
+      travelChargeHours: 2,
+      callOutFee: 30,
+      autoSendCancellationInvoice: true,
+    },
     reschedule: { cutoffHours: 0, maxReschedules: null },
   },
 

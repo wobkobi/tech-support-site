@@ -143,6 +143,21 @@ export function PricingTab({ initial, defaults }: Props): React.ReactElement {
             setDraft((p) => ({ ...p, cancellation: { ...p.cancellation, callOutFee: v ?? 0 } }))
           }
         />
+        <ToggleField
+          id="autoSendCancellationInvoice"
+          meta={m["cancellation.autoSendCancellationInvoice"]}
+          value={draft.cancellation.autoSendCancellationInvoice}
+          customised={
+            draft.cancellation.autoSendCancellationInvoice !==
+            defaults.cancellation.autoSendCancellationInvoice
+          }
+          onChange={(v) =>
+            setDraft((p) => ({
+              ...p,
+              cancellation: { ...p.cancellation, autoSendCancellationInvoice: v },
+            }))
+          }
+        />
       </div>
 
       <h3 className={cn("mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase")}>

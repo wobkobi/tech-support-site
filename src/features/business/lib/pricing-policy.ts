@@ -75,12 +75,15 @@ export interface CancellationPolicy {
   travelChargeHours: number;
   /** Flat fee applied when a cancellation lands inside freeNoticeHours. */
   callOutFee: number;
+  /** When true, a customer self-cancel via the website auto-sends the fee invoice instead of leaving it as a draft. */
+  autoSendCancellationInvoice: boolean;
 }
 
 export const CANCELLATION: CancellationPolicy = {
   freeNoticeHours: 12,
   travelChargeHours: 2,
   callOutFee: 30,
+  autoSendCancellationInvoice: true,
 };
 
 export interface TravelChargeBreakdown {
