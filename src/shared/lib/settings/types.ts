@@ -56,6 +56,8 @@ export interface CancellationSettings {
   travelChargeHours: number;
   /** Flat call-out fee inside the free-notice window. */
   callOutFee: number;
+  /** When true, a customer self-cancel via the website auto-sends the fee invoice instead of leaving it as a draft. */
+  autoSendCancellationInvoice: boolean;
 }
 
 export interface RescheduleSettings {

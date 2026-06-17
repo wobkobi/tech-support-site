@@ -8,25 +8,30 @@
  */
 
 import { calcInvoiceTotals } from "@/features/business/lib/business";
+import { uploadInvoicePdf } from "@/features/business/lib/google-drive";
 import {
   getNextInvoiceNumber,
   writeBackInvoiceCounter,
 } from "@/features/business/lib/invoice-numbering";
+import { extractYearCode, generateInvoicePdf } from "@/features/business/lib/invoice-pdf";
 import { calcTravelCharge, FALLBACK_TRAVEL_RATE } from "@/features/business/lib/pricing-policy";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { lookupDriveDistance } from "@/features/business/lib/travel-distance";
 import type { LineItem } from "@/features/business/types/business";
 import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-create";
+import { sendInvoiceEmail } from "@/features/reviews/lib/email";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { formatDateShort } from "@/shared/lib/date-format";
 import { prisma } from "@/shared/lib/prisma";
-import type { Booking } from "@prisma/client";
+import type { Booking, Invoice } from "@prisma/client";
 
 export interface DraftCancellationInvoiceOptions {
   /** True when the cancel lands inside CANCELLATION.travelChargeHours and round-trip travel should be billed. */
   includeTravel: boolean;
   /** Hint shown in the auto-draft's customer-facing notes (e.g. "Late cancellation" / "No-show"). */
   reason?: "late-cancellation" | "no-show";
+  /** When true, email the invoice and flip it to SENT instead of leaving it DRAFT. Best-effort: a send failure leaves the draft intact. */
+  autoSend?: boolean;
 }
 
 /**
@@ -115,7 +120,7 @@ export async function createDraftCancellationInvoice(
       ? `Charge for missing the appointment originally booked for ${formatDateShort(booking.startAt)}.`
       : `Late cancellation fee for the appointment originally booked for ${formatDateShort(booking.startAt)}.`;
 
-  await prisma.invoice.create({
+  const invoice = await prisma.invoice.create({
     data: {
       number,
       clientName: booking.name,
@@ -139,4 +144,89 @@ export async function createDraftCancellationInvoice(
   );
 
   await writeBackInvoiceCounter(sheetNextCount);
+
+  // Auto-send is best-effort: any failure logs and leaves the invoice DRAFT so
+  // the operator can still send it by hand from the admin invoices list.
+  if (options.autoSend) {
+    await sendCancellationInvoice(invoice, reason);
+  }
+}
+
+/**
+ * Emails a freshly-drafted cancellation invoice and flips it to SENT. Mirrors
+ * the operator send path (PDF > email > status > Drive sync) but omits the
+ * review-link ask - a fee invoice is not the moment to request a review.
+ * Swallows all errors: the booking is already cancelled and the draft stands.
+ * @param invoice - The DRAFT cancellation invoice row just created.
+ * @param reason - Drives the email body wording.
+ */
+async function sendCancellationInvoice(
+  invoice: Invoice,
+  reason: "late-cancellation" | "no-show",
+): Promise<void> {
+  if (!invoice.clientEmail) {
+    console.warn(`[cancellation-invoice] No client email on ${invoice.number}; left as draft.`);
+    return;
+  }
+
+  const customBody =
+    reason === "no-show"
+      ? `This invoice covers the fee for missing the appointment we'd booked. Please see the attached PDF for the details.`
+      : `This invoice covers the late-cancellation fee for the appointment you cancelled inside the notice window. Please see the attached PDF for the details.`;
+
+  try {
+    const pdfBytes = await generateInvoicePdf({
+      ...invoice,
+      issueDate: invoice.issueDate.toISOString(),
+      dueDate: invoice.dueDate.toISOString(),
+      createdAt: invoice.createdAt.toISOString(),
+      updatedAt: invoice.updatedAt.toISOString(),
+    });
+
+    const ok = await sendInvoiceEmail({
+      invoice: {
+        number: invoice.number,
+        clientName: invoice.clientName,
+        clientEmail: invoice.clientEmail,
+        issueDate: invoice.issueDate,
+        dueDate: invoice.dueDate,
+        total: invoice.total,
+        driveWebUrl: invoice.driveWebUrl,
+      },
+      pdfBytes,
+      reviewUrl: null,
+      customBody,
+    });
+    if (!ok) {
+      console.warn(
+        `[cancellation-invoice] Email send failed for ${invoice.number}; left as draft.`,
+      );
+      return;
+    }
+
+    await prisma.invoice.update({ where: { id: invoice.id }, data: { status: "SENT" } });
+    console.log(`[cancellation-invoice] Auto-sent ${invoice.number}.`);
+
+    // Sync the sent PDF to Drive so the archive matches what the client got.
+    // Drive failure is non-fatal - the email already went out.
+    try {
+      const yearCode = extractYearCode(invoice.number);
+      const drive = await uploadInvoicePdf(
+        pdfBytes,
+        invoice.number,
+        yearCode,
+        invoice.driveFileId ?? undefined,
+      );
+      if (drive.fileId !== invoice.driveFileId || drive.webUrl !== invoice.driveWebUrl) {
+        await prisma.invoice.update({
+          where: { id: invoice.id },
+          data: { driveFileId: drive.fileId, driveWebUrl: drive.webUrl },
+        });
+      }
+    } catch (err) {
+      console.error(`[cancellation-invoice] Drive sync failed for ${invoice.number}:`, err);
+    }
+  } catch (err) {
+    console.error(`[cancellation-invoice] Auto-send failed for ${invoice.number}:`, err);
+  }
 }

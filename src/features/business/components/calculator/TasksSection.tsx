@@ -408,7 +408,7 @@ function TaskTotalsRow({
           min="0"
           step="0.01"
           inputMode="decimal"
-          value={task.unitPrice}
+          value={task.unitPrice || ""}
           onChange={(e) => onPrice(parseFloat(e.target.value) || 0)}
           aria-label="Unit price"
           className={cn(
