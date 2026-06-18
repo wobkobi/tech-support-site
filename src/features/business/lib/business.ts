@@ -196,9 +196,8 @@ export function collapseToWindow(
   const flat = tasks.filter((t) => t.baseRateId == null);
   if (hourlyIn.length === 0) return { tasks, dropped: 0, rescaled: false };
 
-  // Tasks already fit the window. Still park any 2 dp qty rounding remainder so
-  // an even split (1h / 3 = 0.33h x 3 = 0.99h) bills the full window, not $0.65
-  // short. Reconciling qty alone keeps the lines footing, so no rescale toast.
+  // Already fits; just park 2 dp qty drift (see {@link parkHourRemainder}). No
+  // rescale toast since only qty representation moves.
   if (sumTaskMinutes(hourlyIn) <= windowMin) {
     return { tasks: parkHourRemainder(tasks, windowMin), dropped: 0, rescaled: false };
   }
@@ -284,20 +283,15 @@ export function collapseToWindow(
 }
 
 /**
- * Parks the decimal-hour rounding remainder on the largest hourly task so the
- * task quantities sum back to the billed window exactly.
- *
- * Tasks store `qty` as hours rounded to 2 dp, but the invoice bills
- * `qty * unitPrice` per line. An even split (1h across 3 tasks > 20min each >
- * 0.33h) sums to 0.99h, so the lines under-bill by a cent of time apiece
- * ($64.35 instead of $65 at $65/hr). The minute-level balancing is correct;
- * only the 2 dp qty representation drifts, so nudge the biggest task's qty by
- * the difference. Only reconciles when the tasks already fill the window
- * (minute sum within one {@link TASK_QTY_SNAP_MIN} of it) so a genuine
- * under-estimate is left untouched rather than silently inflated.
+ * Nudges the largest hourly task's `qty` so the line quantities sum back to the
+ * billed window. Invoice lines bill `qty * unitPrice`, and `qty` is hours at
+ * 2 dp - an even split (1h / 3 > 0.33h x 3 = 0.99h) under-bills by a cent of
+ * time apiece ($64.35 instead of $65 at $65/hr). Only fires when the
+ * minute-level totals already fill the window (within one
+ * {@link TASK_QTY_SNAP_MIN}), so a genuine under-estimate isn't inflated.
  * @param tasks - Task lines (`qty` in decimal hours); flat-rate lines pass through.
  * @param windowMin - Billed window in minutes (`durationMins`).
- * @returns Task list with the remainder parked, or the input unchanged when nothing needs adjusting.
+ * @returns Task list with the remainder parked, or the input unchanged.
  */
 function parkHourRemainder(tasks: TaskLine[], windowMin: number): TaskLine[] {
   if (windowMin <= 0) return tasks;
@@ -424,11 +418,9 @@ export function effectiveHourlyRate(
 /**
  * Converts a job calculation into a flat array of invoice line items.
  * Emits one Labour row (when hours + rate are set), one row per task, one row
- * per part, and a single Travel row summed from `travelEntries`. Must stay in
- * lockstep with {@link calcJobTotal}: the labour row applies the same
- * {@link floorBillableMins} minimum, and the Travel row applies the same
- * {@link MIN_TRAVEL_CHARGE} floor, so the issued invoice never under-bills the
- * operator's on-screen total.
+ * per part, and a single Travel row summed from `travelEntries`. Mirrors
+ * {@link calcJobTotal}'s {@link floorBillableMins} and {@link MIN_TRAVEL_CHARGE}
+ * floors so the issued invoice matches the operator's on-screen total.
  * @param job - Job calculation with time, tasks, parts.
  * @param incrementMins - Billing increment (live pricing setting); defaults to the code const.
  * @param holidayUplift - Public-holiday labour uplift fraction (0 = none); adds a surcharge line.
@@ -494,9 +486,7 @@ export function jobToLineItems(
     });
   }
 
-  // Auto entries trigger the minimum-charge floor; manual-only entries
-  // (parking, ferry, etc.) don't. Mirrors calcJobTotal so the issued invoice
-  // matches the operator's on-screen total.
+  // Auto entries trigger the floor; manual-only entries (parking, etc.) don't.
   const rawTravelTotal = travelEntriesTotal(job.travelEntries);
   const hasAutoEntry = job.travelEntries.some((e) => e.isAuto && e.cost > 0);
   const travelTotal =
