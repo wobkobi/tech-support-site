@@ -88,7 +88,7 @@
     "prisma": "6.19.3",
     "puppeteer": "^25.1.0",
     "qr-code-styling": "^1.9.2",
-    "sharp": "^0.35.1",
+    "sharp": "^0.35.2",
     "simple-git-hooks": "^2.13.1",
     "tailwindcss": "^4.3.1",
     "tsx": "^4.22.4",
