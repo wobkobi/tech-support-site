@@ -51,7 +51,7 @@ export default async function InvoiceViewPage({
       />
 
       {/* Invoice preview - mirrors the trimmed PDF layout. */}
-      <div className="rounded-xl border border-slate-200 bg-white p-8 shadow-sm print:border-0 print:shadow-none">
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8 print:border-0 print:shadow-none">
         {/* Header row: chip + wordmark (left), INVOICE block (right). */}
         <div className="mb-8 flex items-start justify-between gap-4">
           <Image
@@ -59,11 +59,11 @@ export default async function InvoiceViewPage({
             alt="To The Point Tech"
             width={2000}
             height={674}
-            className="h-20 w-auto"
+            className="h-12 w-auto sm:h-20"
             priority
           />
           <div className="text-right">
-            <p className="text-2xl leading-none font-extrabold text-russian-violet">
+            <p className="text-xl leading-none font-extrabold text-russian-violet sm:text-2xl">
               {identity.gstNumber ? "TAX INVOICE" : "INVOICE"}
             </p>
             <p className="mt-2 font-mono text-sm font-semibold text-slate-700">{invoice.number}</p>
@@ -119,21 +119,25 @@ export default async function InvoiceViewPage({
         <table className="mb-0 w-full text-sm">
           <thead>
             <tr className="border-b-2 border-russian-violet text-slate-800">
-              <th className="w-[67%] px-3 py-2 text-left font-bold">Description</th>
-              <th className="w-[9%] px-3 py-2 text-center font-bold">Qty</th>
-              <th className="w-[11%] px-3 py-2 text-center font-bold">Price</th>
-              <th className="w-[13%] px-3 py-2 text-center font-bold">Total</th>
+              <th className="w-[67%] px-2 py-2 text-left font-bold sm:px-3">Description</th>
+              <th className="w-[9%] px-2 py-2 text-center font-bold sm:px-3">Qty</th>
+              <th className="w-[11%] px-2 py-2 text-center font-bold sm:px-3">Price</th>
+              <th className="w-[13%] px-2 py-2 text-center font-bold sm:px-3">Total</th>
             </tr>
           </thead>
           <tbody>
             {invoice.lineItems.map((item, idx) => (
               <tr key={idx} className={cn(idx % 2 === 1 ? "bg-slate-50" : "bg-white")}>
-                <td className="px-3 py-2 align-top text-slate-700">{item.description}</td>
-                <td className="px-3 py-2 text-right align-top text-slate-700">{item.qty}</td>
-                <td className="px-3 py-2 text-right align-top text-slate-700">
+                <td className="px-2 py-2 align-top wrap-break-word text-slate-700 sm:px-3">
+                  {item.description}
+                </td>
+                <td className="px-2 py-2 text-right align-top text-slate-700 sm:px-3">
+                  {item.qty}
+                </td>
+                <td className="px-2 py-2 text-right align-top whitespace-nowrap text-slate-700 sm:px-3">
                   {formatNZD(item.unitPrice)}
                 </td>
-                <td className="px-3 py-2 text-right align-top font-bold text-slate-800">
+                <td className="px-2 py-2 text-right align-top font-bold whitespace-nowrap text-slate-800 sm:px-3">
                   {formatNZD(item.lineTotal)}
                 </td>
               </tr>

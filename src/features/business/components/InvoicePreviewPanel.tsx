@@ -71,7 +71,7 @@ function InvoicePreviewPanelImpl({
         "print:static print:aspect-auto print:overflow-visible print:rounded-none print:border-0 print:shadow-none",
       )}
     >
-      <div className="flex flex-1 flex-col px-10 pt-10 pb-10">
+      <div className="flex flex-1 flex-col px-5 pt-6 pb-6 sm:px-10 sm:pt-10 sm:pb-10">
         {/* Header row: chip + wordmark on the left, INVOICE block on the right. */}
         <div className="mb-8 flex items-start justify-between gap-4">
           <Image
@@ -79,11 +79,11 @@ function InvoicePreviewPanelImpl({
             alt="To The Point Tech"
             width={2000}
             height={674}
-            className="h-20 w-auto"
+            className="h-12 w-auto sm:h-20"
             priority
           />
           <div className="text-right">
-            <p className="text-2xl leading-none font-extrabold text-russian-violet">
+            <p className="text-xl leading-none font-extrabold text-russian-violet sm:text-2xl">
               {identity.gstNumber ? "TAX INVOICE" : "INVOICE"}
             </p>
             <p className="mt-2 font-mono text-sm text-slate-700">{number || "TTP-XXXX-0000"}</p>
@@ -124,16 +124,18 @@ function InvoicePreviewPanelImpl({
         <div className="mb-0 h-px bg-slate-300" />
 
         {/* Line items table - no zebra striping (matches the PDF + Xero/QuickBooks).
-            `table-fixed` enforces the <th> percentage widths even at narrow
-            viewports so long descriptions wrap inside their cell instead of
-            blowing out the column. */}
+            `table-fixed` enforces the <th> percentage widths so long descriptions
+            wrap inside their cell instead of blowing out the column. At sm+ the
+            widths mirror the PDF (Description 67% / Qty 9% / Price 11% / Total 13%);
+            below sm those numeric columns widen so the right-aligned figures don't
+            overflow their cell and collide on a narrow phone. */}
         <table className="mb-0 w-full table-fixed text-xs">
           <thead>
             <tr className="border-b-2 border-russian-violet text-slate-800">
-              <th className="w-[67%] px-2 py-2 text-left font-bold">Description</th>
-              <th className="w-[9%] px-2 py-2 text-center font-bold">Qty</th>
-              <th className="w-[11%] px-2 py-2 text-center font-bold">Price</th>
-              <th className="w-[13%] px-2 py-2 text-center font-bold">Total</th>
+              <th className="w-[46%] px-2 py-2 text-left font-bold sm:w-[67%]">Description</th>
+              <th className="w-[10%] px-1 py-2 text-center font-bold sm:w-[9%] sm:px-2">Qty</th>
+              <th className="w-[20%] px-1 py-2 text-center font-bold sm:w-[11%] sm:px-2">Price</th>
+              <th className="w-[24%] px-1 py-2 text-center font-bold sm:w-[13%] sm:px-2">Total</th>
             </tr>
           </thead>
           <tbody>
@@ -157,11 +159,13 @@ function InvoicePreviewPanelImpl({
                       <span className="text-slate-300 italic">(line description)</span>
                     )}
                   </td>
-                  <td className="px-2 py-2 text-right align-top text-slate-700">{item.qty}</td>
-                  <td className="px-2 py-2 text-right align-top text-slate-700">
+                  <td className="px-1 py-2 text-right align-top text-slate-700 sm:px-2">
+                    {item.qty}
+                  </td>
+                  <td className="px-1 py-2 text-right align-top whitespace-nowrap text-slate-700 sm:px-2">
                     {formatNZD(item.unitPrice)}
                   </td>
-                  <td className="px-2 py-2 text-right align-top font-bold text-slate-700">
+                  <td className="px-1 py-2 text-right align-top font-bold whitespace-nowrap text-slate-700 sm:px-2">
                     {formatNZD(item.lineTotal)}
                   </td>
                 </tr>

@@ -28,7 +28,7 @@ export default function ConflictsLoading(): React.ReactElement {
               {Array.from({ length: 2 }).map((_, j) => (
                 <div key={j} className="rounded-lg border border-slate-100 p-3">
                   <Bone className="mb-2 h-3 w-20 bg-slate-200 opacity-60" />
-                  <Bone className="h-5 w-full max-w-[12rem] bg-slate-200" />
+                  <Bone className="h-5 w-full max-w-48 bg-slate-200" />
                 </div>
               ))}
             </div>
