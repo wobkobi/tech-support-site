@@ -253,13 +253,9 @@ export function BookingAdminList({
   const FILTERS: StatusFilter[] = ["all", "confirmed", "held", "completed", "cancelled"];
 
   return (
-    <div className={cn("flex flex-col gap-4")}>
+    <div className="flex flex-col gap-4">
       {/* Status filter */}
-      <div
-        className={cn(
-          "inline-flex flex-wrap rounded-lg border border-slate-200 bg-slate-100 p-0.5",
-        )}
-      >
+      <div className="inline-flex flex-wrap rounded-lg border border-slate-200 bg-slate-100 p-0.5">
         {FILTERS.map((f) => {
           const label = f === "all" ? "All" : f.charAt(0).toUpperCase() + f.slice(1);
           const count = f === "all" ? bookings.length : counts[f as keyof typeof counts];
@@ -284,9 +280,9 @@ export function BookingAdminList({
         })}
       </div>
 
-      {filtered.length === 0 && <p className={cn("text-sm text-slate-400")}>No bookings found.</p>}
+      {filtered.length === 0 && <p className="text-sm text-slate-400">No bookings found.</p>}
 
-      <div className={cn("flex flex-col gap-3")}>
+      <div className="flex flex-col gap-3">
         {filtered.map((b) => {
           const isExpanded = expandedId === b.id;
           const edit = edits[b.id] ?? {
@@ -300,13 +296,11 @@ export function BookingAdminList({
           const isResending = resending === b.id;
 
           return (
-            <div key={b.id} className={cn("rounded-xl border border-slate-200 bg-white p-4")}>
-              <div
-                className={cn("flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between")}
-              >
-                <div className={cn("flex min-w-0 flex-col gap-1")}>
-                  <div className={cn("flex min-w-0 flex-wrap items-center gap-2")}>
-                    <span className={cn("min-w-0 truncate font-semibold text-russian-violet")}>
+            <div key={b.id} className="rounded-xl border border-slate-200 bg-white p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex min-w-0 flex-col gap-1">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <span className="min-w-0 truncate font-semibold text-russian-violet">
                       {b.name}
                     </span>
                     <span
@@ -318,20 +312,20 @@ export function BookingAdminList({
                       {b.status}
                     </span>
                   </div>
-                  <span className={cn("text-xs break-all text-slate-500")}>{b.email}</span>
-                  {b.phone && <span className={cn("text-xs text-slate-500")}>{b.phone}</span>}
-                  <span className={cn("text-xs text-slate-500")}>
+                  <span className="text-xs break-all text-slate-500">{b.email}</span>
+                  {b.phone && <span className="text-xs text-slate-500">{b.phone}</span>}
+                  <span className="text-xs text-slate-500">
                     {formatDateTimeShort(b.startAt)} &ndash; {formatDateTimeShort(b.endAt)}
                   </span>
                   {b.quotedLow != null && b.quotedHigh != null && (
-                    <span className={cn("text-xs text-slate-500")}>
-                      <span className={cn("text-slate-400")}>Quoted: </span>${b.quotedLow} &ndash; $
+                    <span className="text-xs text-slate-500">
+                      <span className="text-slate-400">Quoted: </span>${b.quotedLow} &ndash; $
                       {b.quotedHigh}
                     </span>
                   )}
                 </div>
 
-                <div className={cn("flex flex-wrap gap-2 sm:shrink-0")}>
+                <div className="flex flex-wrap gap-2 sm:shrink-0">
                   {b.name.toLowerCase().includes("test") && (
                     <button
                       onClick={() => {
@@ -342,9 +336,7 @@ export function BookingAdminList({
                         }
                       }}
                       disabled={isSaving}
-                      className={cn(
-                        "rounded-lg bg-red-500/20 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-500/30 disabled:opacity-50",
-                      )}
+                      className="rounded-lg bg-red-500/20 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-500/30 disabled:opacity-50"
                     >
                       Delete
                     </button>
@@ -356,18 +348,14 @@ export function BookingAdminList({
                           href={`/booking/edit?token=${b.cancelToken}`}
                           target="_blank"
                           rel="noreferrer"
-                          className={cn(
-                            "rounded-lg bg-russian-violet/10 px-3 py-1.5 text-xs font-medium text-russian-violet transition-colors hover:bg-russian-violet/20",
-                          )}
+                          className="rounded-lg bg-russian-violet/10 px-3 py-1.5 text-xs font-medium text-russian-violet transition-colors hover:bg-russian-violet/20"
                         >
                           Reschedule
                         </a>
                       )}
                       <button
                         onClick={() => (isExpanded ? setExpandedId(null) : openEdit(b))}
-                        className={cn(
-                          "rounded-lg bg-russian-violet/10 px-3 py-1.5 text-xs font-medium text-russian-violet transition-colors hover:bg-russian-violet/20",
-                        )}
+                        className="rounded-lg bg-russian-violet/10 px-3 py-1.5 text-xs font-medium text-russian-violet transition-colors hover:bg-russian-violet/20"
                       >
                         {isExpanded ? "Close" : "Edit"}
                       </button>
@@ -377,39 +365,33 @@ export function BookingAdminList({
               </div>
 
               {isExpanded && (
-                <div className={cn("mt-4 flex flex-col gap-3 border-t border-slate-100 pt-4")}>
-                  <p className={cn("text-xs text-slate-400")}>
+                <div className="mt-4 flex flex-col gap-3 border-t border-slate-100 pt-4">
+                  <p className="text-xs text-slate-400">
                     Booked on {formatDateTimeShort(b.createdAt)}
                   </p>
-                  <div className={cn("grid gap-3 sm:grid-cols-2")}>
-                    <label className={cn("flex flex-col gap-1")}>
-                      <span className={cn("text-xs font-semibold text-russian-violet")}>Name</span>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="flex flex-col gap-1">
+                      <span className="text-xs font-semibold text-russian-violet">Name</span>
                       <input
-                        className={cn(
-                          "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
-                        )}
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none"
                         value={edit.name}
                         onChange={(e) => setField(b.id, "name", e.target.value)}
                       />
                     </label>
-                    <label className={cn("flex flex-col gap-1")}>
-                      <span className={cn("text-xs font-semibold text-russian-violet")}>Email</span>
+                    <label className="flex flex-col gap-1">
+                      <span className="text-xs font-semibold text-russian-violet">Email</span>
                       <input
                         type="email"
-                        className={cn(
-                          "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
-                        )}
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none"
                         value={edit.email}
                         onChange={(e) => setField(b.id, "email", e.target.value)}
                       />
                     </label>
-                    <label className={cn("flex flex-col gap-1")}>
-                      <span className={cn("text-xs font-semibold text-russian-violet")}>Phone</span>
+                    <label className="flex flex-col gap-1">
+                      <span className="text-xs font-semibold text-russian-violet">Phone</span>
                       <input
                         type="tel"
-                        className={cn(
-                          "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
-                        )}
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none"
                         value={edit.phone}
                         onChange={(e) => setField(b.id, "phone", e.target.value)}
                         placeholder="Phone number"
@@ -418,10 +400,8 @@ export function BookingAdminList({
                   </div>
 
                   {edit.address !== undefined && edit.address !== "" && (
-                    <div className={cn("flex flex-col gap-1")}>
-                      <span className={cn("text-xs font-semibold text-russian-violet")}>
-                        Address
-                      </span>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs font-semibold text-russian-violet">Address</span>
                       <AddressAutocomplete
                         id={`edit-address-${b.id}`}
                         value={edit.address}
@@ -431,26 +411,22 @@ export function BookingAdminList({
                     </div>
                   )}
 
-                  <label className={cn("flex flex-col gap-1")}>
-                    <span className={cn("text-xs font-semibold text-russian-violet")}>Notes</span>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-semibold text-russian-violet">Notes</span>
                     <textarea
-                      className={cn(
-                        "min-h-25 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
-                      )}
+                      className="min-h-25 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none"
                       value={edit.notes}
                       onChange={(e) => setField(b.id, "notes", e.target.value)}
                     />
                   </label>
 
-                  {errors[b.id] && <p className={cn("text-xs text-red-500")}>{errors[b.id]}</p>}
+                  {errors[b.id] && <p className="text-xs text-red-500">{errors[b.id]}</p>}
 
-                  <div className={cn("flex flex-wrap gap-2")}>
+                  <div className="flex flex-wrap gap-2">
                     <button
                       onClick={() => saveEdit(b)}
                       disabled={isSaving}
-                      className={cn(
-                        "rounded-lg bg-russian-violet px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-russian-violet/90 disabled:opacity-50",
-                      )}
+                      className="rounded-lg bg-russian-violet px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-russian-violet/90 disabled:opacity-50"
                     >
                       {isSaving ? "Saving\u2026" : "Save changes"}
                     </button>
@@ -459,9 +435,7 @@ export function BookingAdminList({
                       <button
                         onClick={() => changeStatus(b.id, "completed")}
                         disabled={isSaving}
-                        className={cn(
-                          "rounded-lg bg-green-500/20 px-4 py-2 text-xs font-medium text-green-700 transition-colors hover:bg-green-500/30 disabled:opacity-50",
-                        )}
+                        className="rounded-lg bg-green-500/20 px-4 py-2 text-xs font-medium text-green-700 transition-colors hover:bg-green-500/30 disabled:opacity-50"
                       >
                         Mark completed
                       </button>
@@ -480,9 +454,7 @@ export function BookingAdminList({
                             }
                           }}
                           disabled={isSaving}
-                          className={cn(
-                            "rounded-lg bg-slate-200 px-4 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-300 disabled:opacity-50",
-                          )}
+                          className="rounded-lg bg-slate-200 px-4 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-300 disabled:opacity-50"
                           title="Operator cancel (sick, scheduling clash, etc.) - never charges the customer"
                         >
                           Cancel (my call)
@@ -498,9 +470,7 @@ export function BookingAdminList({
                             }
                           }}
                           disabled={isSaving}
-                          className={cn(
-                            "rounded-lg bg-red-500/20 px-4 py-2 text-xs font-medium text-red-600 transition-colors hover:bg-red-500/30 disabled:opacity-50",
-                          )}
+                          className="rounded-lg bg-red-500/20 px-4 py-2 text-xs font-medium text-red-600 transition-colors hover:bg-red-500/30 disabled:opacity-50"
                           title="Customer-initiated cancel they phoned/emailed in - uses the standard fee rules"
                         >
                           Cancel for customer
@@ -517,9 +487,7 @@ export function BookingAdminList({
                               }
                             }}
                             disabled={isSaving}
-                            className={cn(
-                              "rounded-lg bg-amber-500/20 px-4 py-2 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-500/30 disabled:opacity-50",
-                            )}
+                            className="rounded-lg bg-amber-500/20 px-4 py-2 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-500/30 disabled:opacity-50"
                             title="Customer didn't show up - bills the full call-out + travel"
                           >
                             Mark no-show
@@ -532,9 +500,7 @@ export function BookingAdminList({
                       <button
                         onClick={() => void resendReview(b.id)}
                         disabled={isSaving || isResending}
-                        className={cn(
-                          "rounded-lg bg-moonstone-600/15 px-4 py-2 text-xs font-medium text-moonstone-700 transition-colors hover:bg-moonstone-600/25 disabled:opacity-50",
-                        )}
+                        className="rounded-lg bg-moonstone-600/15 px-4 py-2 text-xs font-medium text-moonstone-700 transition-colors hover:bg-moonstone-600/25 disabled:opacity-50"
                       >
                         {isResending
                           ? "Sending\u2026"

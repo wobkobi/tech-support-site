@@ -58,9 +58,8 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-const linkStyle = cn(
-  "text-coquelicot-500 hover:text-coquelicot-600 underline-offset-4 hover:underline",
-);
+const linkStyle =
+  "text-coquelicot-500 hover:text-coquelicot-600 underline-offset-4 hover:underline";
 
 /**
  * Renders `**…**` segments from pricing-policy copy as `<strong>` spans.
@@ -74,17 +73,15 @@ function renderEmphasised(text: string): React.ReactNode[] {
   });
 }
 
-const ACCORDION_DETAILS = cn(
-  "group rounded-xl border border-seasalt-400/60 bg-seasalt-900/40 p-0 open:bg-white open:shadow-sm",
-);
+const ACCORDION_DETAILS =
+  "group rounded-xl border border-seasalt-400/60 bg-seasalt-900/40 p-0 open:bg-white open:shadow-sm";
 const ACCORDION_SUMMARY = cn(
   "text-russian-violet flex cursor-pointer items-center justify-between gap-3 rounded-xl px-5 py-4 text-base font-semibold sm:text-lg",
   "hover:bg-white/60 marker:hidden",
   "[&::-webkit-details-marker]:hidden",
 );
-const ACCORDION_BODY = cn(
-  "text-rich-black/90 space-y-3 whitespace-pre-line px-5 pb-5 pt-1 text-base sm:text-lg",
-);
+const ACCORDION_BODY =
+  "text-rich-black/90 space-y-3 whitespace-pre-line px-5 pb-5 pt-1 text-base sm:text-lg";
 
 /**
  * Pricing page; fetches live rates + the active promo server-side so a single
@@ -108,17 +105,15 @@ export default async function PricingPage(): Promise<React.ReactElement> {
         ]}
       />
       <FrostedSection>
-        <div className={cn("flex flex-col gap-6 sm:gap-8")}>
+        <div className="flex flex-col gap-6 sm:gap-8">
           <section aria-labelledby="pricing-heading" className={cn(CARD, "animate-fade-in")}>
             <h1
               id="pricing-heading"
-              className={cn(
-                "mb-4 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl",
-              )}
+              className="mb-4 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl"
             >
               Pricing
             </h1>
-            <p className={cn("mb-4 text-base text-rich-black sm:text-lg")}>
+            <p className="mb-4 text-base text-rich-black sm:text-lg">
               Simple, transparent pricing. You'll always know the cost before work begins, and
               there's no pressure to buy anything you don't need.
             </p>
@@ -128,43 +123,39 @@ export default async function PricingPage(): Promise<React.ReactElement> {
             aria-label="Rates"
             className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}
           >
-            <h2 className={cn("mb-3 text-xl font-bold text-russian-violet sm:text-2xl")}>Rates</h2>
+            <h2 className="mb-3 text-xl font-bold text-russian-violet sm:text-2xl">Rates</h2>
 
             {promo ? (
               <>
-                <div className={cn("rounded-lg border border-mustard-400 bg-mustard-900 p-5")}>
-                  <p className={cn("mb-1 text-lg text-rich-black/60 line-through sm:text-xl")}>
+                <div className="rounded-lg border border-mustard-400 bg-mustard-900 p-5">
+                  <p className="mb-1 text-lg text-rich-black/60 line-through sm:text-xl">
                     ${baseRate}/hr
                   </p>
-                  <p className={cn("mb-2 text-3xl font-bold text-russian-violet sm:text-4xl")}>
+                  <p className="mb-2 text-3xl font-bold text-russian-violet sm:text-4xl">
                     ${applyPromoToHourlyRate(baseRate, promo).toFixed(0)}/hr
                   </p>
-                  <p className={cn("text-base text-rich-black/80 sm:text-lg")}>
+                  <p className="text-base text-rich-black/80 sm:text-lg">
                     One rate for every job - troubleshooting, setup, software, tune-ups, Wi-Fi,
                     backups, data recovery, hardware repairs, and more.
                   </p>
                 </div>
 
-                <div
-                  className={cn(
-                    "mt-4 rounded-lg bg-mustard-500 px-4 py-3 text-center text-russian-violet-500",
-                  )}
-                >
-                  <p className={cn("text-base font-bold sm:text-lg")}>
+                <div className="mt-4 rounded-lg bg-mustard-500 px-4 py-3 text-center text-russian-violet-500">
+                  <p className="text-base font-bold sm:text-lg">
                     ⚡ Limited offer: {promo.title}
                     {promo.description ? ` - ${promo.description}` : ""}
                   </p>
-                  <p className={cn("mt-1 text-base text-russian-violet-500 sm:text-lg")}>
+                  <p className="mt-1 text-base text-russian-violet-500 sm:text-lg">
                     Until {formatDateShort(promo.endAt)}.
                   </p>
                 </div>
               </>
             ) : (
-              <div className={cn("rounded-lg border border-seasalt-400/60 bg-seasalt-900/40 p-5")}>
-                <p className={cn("mb-2 text-3xl font-bold text-russian-violet sm:text-4xl")}>
+              <div className="rounded-lg border border-seasalt-400/60 bg-seasalt-900/40 p-5">
+                <p className="mb-2 text-3xl font-bold text-russian-violet sm:text-4xl">
                   ${baseRate}/hr
                 </p>
-                <p className={cn("text-base text-rich-black/80 sm:text-lg")}>
+                <p className="text-base text-rich-black/80 sm:text-lg">
                   One rate for every job - troubleshooting, setup, software, tune-ups, Wi-Fi,
                   backups, data recovery, hardware repairs, and more.
                 </p>
@@ -173,23 +164,23 @@ export default async function PricingPage(): Promise<React.ReactElement> {
 
             <GetEstimateButton />
 
-            <div className={cn("mt-5 space-y-3")}>
-              <p className={cn("flex gap-3 text-base text-rich-black/90 sm:text-lg")}>
-                <FaCheck className={cn("mt-1.5 h-4 w-4 shrink-0 text-moonstone-600")} aria-hidden />
+            <div className="mt-5 space-y-3">
+              <p className="flex gap-3 text-base text-rich-black/90 sm:text-lg">
+                <FaCheck className="mt-1.5 h-4 w-4 shrink-0 text-moonstone-600" aria-hidden />
                 <span>
                   <strong>Quick calls and emails are free.</strong> A "remote session" is when I log
                   in and start working on your machine.
                 </span>
               </p>
-              <p className={cn("flex gap-3 text-base text-rich-black/90 sm:text-lg")}>
-                <FaCheck className={cn("mt-1.5 h-4 w-4 shrink-0 text-moonstone-600")} aria-hidden />
+              <p className="flex gap-3 text-base text-rich-black/90 sm:text-lg">
+                <FaCheck className="mt-1.5 h-4 w-4 shrink-0 text-moonstone-600" aria-hidden />
                 <span>
                   <strong>Most jobs take 1 to 2 hours.</strong> I'll give you a time estimate before
                   we start.
                 </span>
               </p>
-              <p className={cn("flex gap-3 text-base text-rich-black/90 sm:text-lg")}>
-                <FaCheck className={cn("mt-1.5 h-4 w-4 shrink-0 text-moonstone-600")} aria-hidden />
+              <p className="flex gap-3 text-base text-rich-black/90 sm:text-lg">
+                <FaCheck className="mt-1.5 h-4 w-4 shrink-0 text-moonstone-600" aria-hidden />
                 <span>
                   <strong>Not sure which rate applies?</strong> Just ask - I'll confirm before
                   starting.
@@ -202,30 +193,30 @@ export default async function PricingPage(): Promise<React.ReactElement> {
             aria-label="How pricing works"
             className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-200")}
           >
-            <h2 className={cn("mb-3 text-xl font-bold text-russian-violet sm:text-2xl")}>
+            <h2 className="mb-3 text-xl font-bold text-russian-violet sm:text-2xl">
               On-site vs Remote
             </h2>
 
-            <div className={cn("grid gap-5 sm:grid-cols-2")}>
+            <div className="grid gap-5 sm:grid-cols-2">
               <div className={cn(SOFT_CARD)}>
-                <h3 className={cn("mb-3 text-lg font-semibold text-russian-violet sm:text-xl")}>
+                <h3 className="mb-3 text-lg font-semibold text-russian-violet sm:text-xl">
                   On-site visits
                 </h3>
-                <ul className={cn("space-y-2.5 text-base text-rich-black sm:text-lg")}>
-                  <li className={cn("flex gap-3")}>
-                    <span className={cn("mt-1 text-lg text-moonstone-600")}>•</span>
+                <ul className="space-y-2.5 text-base text-rich-black sm:text-lg">
+                  <li className="flex gap-3">
+                    <span className="mt-1 text-lg text-moonstone-600">•</span>
                     <span>Hourly rate (${baseRate}/hr)</span>
                   </li>
-                  <li className={cn("flex gap-3")}>
-                    <span className={cn("mt-1 text-lg text-moonstone-600")}>•</span>
+                  <li className="flex gap-3">
+                    <span className="mt-1 text-lg text-moonstone-600">•</span>
                     <span>
                       <strong>One round trip</strong> billed at{" "}
                       <strong>${pricing.travelRatePerHour}/hr</strong> (lower than the hourly rate),{" "}
                       <strong>$10 minimum</strong>
                     </span>
                   </li>
-                  <li className={cn("flex gap-3")}>
-                    <span className={cn("mt-1 text-lg text-moonstone-600")}>•</span>
+                  <li className="flex gap-3">
+                    <span className="mt-1 text-lg text-moonstone-600">•</span>
                     <span>
                       Best for: Wi-Fi setup, printers, smart TVs, physical hardware, anything
                       needing hands-on work
@@ -235,20 +226,20 @@ export default async function PricingPage(): Promise<React.ReactElement> {
               </div>
 
               <div className={cn(SOFT_CARD)}>
-                <h3 className={cn("mb-3 text-lg font-semibold text-russian-violet sm:text-xl")}>
+                <h3 className="mb-3 text-lg font-semibold text-russian-violet sm:text-xl">
                   Remote support
                 </h3>
-                <ul className={cn("space-y-2.5 text-base text-rich-black sm:text-lg")}>
-                  <li className={cn("flex gap-3")}>
-                    <span className={cn("mt-1 text-lg text-moonstone-600")}>•</span>
+                <ul className="space-y-2.5 text-base text-rich-black sm:text-lg">
+                  <li className="flex gap-3">
+                    <span className="mt-1 text-lg text-moonstone-600">•</span>
                     <span>Discounted rate, no travel charge</span>
                   </li>
-                  <li className={cn("flex gap-3")}>
-                    <span className={cn("mt-1 text-lg text-moonstone-600")}>•</span>
+                  <li className="flex gap-3">
+                    <span className="mt-1 text-lg text-moonstone-600">•</span>
                     <span>No drive time means quicker turnaround</span>
                   </li>
-                  <li className={cn("flex gap-3")}>
-                    <span className={cn("mt-1 text-lg text-moonstone-600")}>•</span>
+                  <li className="flex gap-3">
+                    <span className="mt-1 text-lg text-moonstone-600">•</span>
                     <span>
                       Best for: account issues, software setup, email problems, quick fixes,
                       follow-up support
@@ -265,27 +256,27 @@ export default async function PricingPage(): Promise<React.ReactElement> {
           >
             <h2
               id="no-surprises-heading"
-              className={cn("mb-3 text-xl font-bold text-russian-violet sm:text-2xl")}
+              className="mb-3 text-xl font-bold text-russian-violet sm:text-2xl"
             >
               No surprises
             </h2>
 
-            <ul className={cn("mb-5 space-y-2.5 text-base text-rich-black sm:text-lg")}>
-              <li className={cn("flex gap-3")}>
-                <span className={cn("mt-1 text-lg text-moonstone-600")}>•</span>
+            <ul className="mb-5 space-y-2.5 text-base text-rich-black sm:text-lg">
+              <li className="flex gap-3">
+                <span className="mt-1 text-lg text-moonstone-600">•</span>
                 <span>
                   <strong>No hidden fees.</strong> The price I quote is the price you pay.
                 </span>
               </li>
-              <li className={cn("flex gap-3")}>
-                <span className={cn("mt-1 text-lg text-moonstone-600")}>•</span>
+              <li className="flex gap-3">
+                <span className="mt-1 text-lg text-moonstone-600">•</span>
                 <span>
                   <strong>No upselling.</strong> I don't sell hardware or earn commission on
                   products.
                 </span>
               </li>
-              <li className={cn("flex gap-3")}>
-                <span className={cn("mt-1 text-lg text-moonstone-600")}>•</span>
+              <li className="flex gap-3">
+                <span className="mt-1 text-lg text-moonstone-600">•</span>
                 <span>
                   <strong>Clear communication.</strong> If a job is taking longer than expected,
                   I'll let you know before continuing.
@@ -293,19 +284,17 @@ export default async function PricingPage(): Promise<React.ReactElement> {
               </li>
             </ul>
 
-            <h3 className={cn("mb-3 text-lg font-bold text-russian-violet sm:text-xl")}>
-              Full details
-            </h3>
-            <p className={cn("mb-4 text-base text-rich-black/70 sm:text-lg")}>
+            <h3 className="mb-3 text-lg font-bold text-russian-violet sm:text-xl">Full details</h3>
+            <p className="mb-4 text-base text-rich-black/70 sm:text-lg">
               The fine print, in plain English. Click any section to expand.
             </p>
 
-            <div className={cn("space-y-3")}>
+            <div className="space-y-3">
               <details className={ACCORDION_DETAILS}>
                 <summary className={ACCORDION_SUMMARY}>
                   <span>Rate modifiers</span>
                   <FaCaretDown
-                    className={cn("h-4 w-4 transition-transform group-open:rotate-180")}
+                    className="h-4 w-4 transition-transform group-open:rotate-180"
                     aria-hidden
                   />
                 </summary>
@@ -314,9 +303,9 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                     The hourly rate is the starting point. These modifiers can stack on top
                     depending on the job:
                   </p>
-                  <ul className={cn("space-y-2")}>
+                  <ul className="space-y-2">
                     {pricing.modifiers.map((mod) => (
-                      <li key={mod.label} className={cn("flex flex-col")}>
+                      <li key={mod.label} className="flex flex-col">
                         <span>
                           <strong>{mod.label}</strong> ({mod.deltaDescription} ={" "}
                           <strong>${mod.effectiveRate}/hr</strong>) - {mod.description}
@@ -331,7 +320,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                 <summary className={ACCORDION_SUMMARY}>
                   <span>Travel</span>
                   <FaCaretDown
-                    className={cn("h-4 w-4 transition-transform group-open:rotate-180")}
+                    className="h-4 w-4 transition-transform group-open:rotate-180"
                     aria-hidden
                   />
                 </summary>
@@ -346,7 +335,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                 <summary className={ACCORDION_SUMMARY}>
                   <span>Minimum charge</span>
                   <FaCaretDown
-                    className={cn("h-4 w-4 transition-transform group-open:rotate-180")}
+                    className="h-4 w-4 transition-transform group-open:rotate-180"
                     aria-hidden
                   />
                 </summary>
@@ -361,7 +350,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                 <summary className={ACCORDION_SUMMARY}>
                   <span>Cancellation</span>
                   <FaCaretDown
-                    className={cn("h-4 w-4 transition-transform group-open:rotate-180")}
+                    className="h-4 w-4 transition-transform group-open:rotate-180"
                     aria-hidden
                   />
                 </summary>
@@ -374,7 +363,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                 <summary className={ACCORDION_SUMMARY}>
                   <span>Unsuccessful work</span>
                   <FaCaretDown
-                    className={cn("h-4 w-4 transition-transform group-open:rotate-180")}
+                    className="h-4 w-4 transition-transform group-open:rotate-180"
                     aria-hidden
                   />
                 </summary>
@@ -385,7 +374,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                 <summary className={ACCORDION_SUMMARY}>
                   <span>Public holidays</span>
                   <FaCaretDown
-                    className={cn("h-4 w-4 transition-transform group-open:rotate-180")}
+                    className="h-4 w-4 transition-transform group-open:rotate-180"
                     aria-hidden
                   />
                 </summary>
@@ -398,7 +387,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                 <summary className={ACCORDION_SUMMARY}>
                   <span>GST</span>
                   <FaCaretDown
-                    className={cn("h-4 w-4 transition-transform group-open:rotate-180")}
+                    className="h-4 w-4 transition-transform group-open:rotate-180"
                     aria-hidden
                   />
                 </summary>
@@ -413,7 +402,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
             aria-label="Next steps"
             className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-400")}
           >
-            <p className={cn("text-base text-rich-black sm:text-lg")}>
+            <p className="text-base text-rich-black sm:text-lg">
               <Link href="/contact" className={linkStyle}>
                 Get in touch
               </Link>{" "}
@@ -431,11 +420,11 @@ export default async function PricingPage(): Promise<React.ReactElement> {
           >
             <h2
               id="estimate-heading"
-              className={cn("mb-1 scroll-mt-24 text-xl font-bold text-russian-violet sm:text-2xl")}
+              className="mb-1 scroll-mt-24 text-xl font-bold text-russian-violet sm:text-2xl"
             >
               Get a rough estimate
             </h2>
-            <p className={cn("mb-5 text-base text-rich-black/70 sm:text-lg")}>
+            <p className="mb-5 text-base text-rich-black/70 sm:text-lg">
               Answer a few quick questions to get a price range. No commitment required.
             </p>
             <PricingWizard
@@ -446,7 +435,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
           </section>
 
           {pricing.ratesUpdatedAt && (
-            <p className={cn("text-center text-sm text-rich-black/50 sm:text-base")}>
+            <p className="text-center text-sm text-rich-black/50 sm:text-base">
               Rates last updated on {formatDateShort(pricing.ratesUpdatedAt)}.
             </p>
           )}

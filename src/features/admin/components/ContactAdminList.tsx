@@ -13,7 +13,6 @@ import { validateEmail } from "@/features/booking/lib/booking";
 import { formatReviewerName } from "@/features/reviews/lib/formatting";
 import { EmailInput } from "@/shared/components/EmailInput";
 import { PhoneInput } from "@/shared/components/PhoneInput";
-import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
 import { formatNZPhone, validatePhone } from "@/shared/lib/normalise-phone";
 import type React from "react";
@@ -96,9 +95,7 @@ function renderNameField({ id, value, onChange }: FieldRenderProps): React.React
       type="text"
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className={cn(
-        "w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
-      )}
+      className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none"
     />
   );
 }
@@ -182,18 +179,18 @@ function ContactCard({
 }: ContactCardProps): React.ReactElement {
   if (edit) {
     return (
-      <div className={cn("flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4")}>
-        <div className={cn("flex flex-wrap items-center justify-between gap-2")}>
-          <span className={cn("text-xs font-semibold tracking-wide text-russian-violet uppercase")}>
+      <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="text-xs font-semibold tracking-wide text-russian-violet uppercase">
             Editing
           </span>
-          <span className={cn("text-xs text-slate-400")}>{formatDateShort(c.createdAt)}</span>
+          <span className="text-xs text-slate-400">{formatDateShort(c.createdAt)}</span>
         </div>
         {CONTACT_EDIT_FIELDS.map((f) => {
           const inputId = `edit-${f.key}-${c.id}`;
           return (
-            <div key={f.key} className={cn("flex flex-col gap-1")}>
-              <label className={cn("text-xs font-semibold text-russian-violet")} htmlFor={inputId}>
+            <div key={f.key} className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-russian-violet" htmlFor={inputId}>
                 {f.label}
               </label>
               {f.render({
@@ -204,25 +201,19 @@ function ContactCard({
             </div>
           );
         })}
-        {edit.error && (
-          <p className={cn("text-xs font-medium text-coquelicot-600")}>{edit.error}</p>
-        )}
-        <div className={cn("flex gap-2")}>
+        {edit.error && <p className="text-xs font-medium text-coquelicot-600">{edit.error}</p>}
+        <div className="flex gap-2">
           <button
             onClick={edit.save}
             disabled={edit.saving}
-            className={cn(
-              "rounded-lg bg-russian-violet px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-russian-violet/90 disabled:bg-russian-violet/40",
-            )}
+            className="rounded-lg bg-russian-violet px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-russian-violet/90 disabled:bg-russian-violet/40"
           >
             {edit.saving ? "Saving…" : "Save"}
           </button>
           <button
             onClick={edit.cancel}
             disabled={edit.saving}
-            className={cn(
-              "rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-200 disabled:opacity-40",
-            )}
+            className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-200 disabled:opacity-40"
           >
             Cancel
           </button>
@@ -232,45 +223,33 @@ function ContactCard({
   }
 
   return (
-    <div
-      className={cn(
-        "flex flex-col gap-1 overflow-hidden rounded-xl border border-slate-200 bg-white p-4",
-      )}
-    >
-      <div className={cn("flex min-w-0 flex-wrap items-center justify-between gap-2")}>
-        <span className={cn("min-w-0 truncate font-semibold text-russian-violet")}>{c.name}</span>
-        <div className={cn("flex items-center gap-2")}>
-          <span className={cn("text-xs text-slate-400")}>{formatDateShort(c.createdAt)}</span>
+    <div className="flex flex-col gap-1 overflow-hidden rounded-xl border border-slate-200 bg-white p-4">
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+        <span className="min-w-0 truncate font-semibold text-russian-violet">{c.name}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-slate-400">{formatDateShort(c.createdAt)}</span>
           {!c.googleContactId &&
             (isSyncing ? (
-              <span className={cn("text-xs text-slate-400")}>Syncing…</span>
+              <span className="text-xs text-slate-400">Syncing…</span>
             ) : isConfirmingSync ? (
-              <div
-                className={cn(
-                  "flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs",
-                )}
-              >
-                <p className={cn("font-medium text-slate-600")}>Sync to Google?</p>
-                <div className={cn("space-y-0.5 text-slate-500")}>
+              <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs">
+                <p className="font-medium text-slate-600">Sync to Google?</p>
+                <div className="space-y-0.5 text-slate-500">
                   <p>{c.name}</p>
                   {c.email && <p>{c.email}</p>}
                   {c.phone && <p>{formatNZPhone(c.phone)}</p>}
                   {c.address && <p>{c.address}</p>}
                 </div>
-                <div className={cn("flex gap-2")}>
+                <div className="flex gap-2">
                   <button
                     onClick={onConfirmSync}
-                    className={cn(
-                      "rounded bg-russian-violet px-2 py-0.5 text-xs font-semibold text-white transition-colors hover:bg-russian-violet/90",
-                    )}
+                    className="rounded bg-russian-violet px-2 py-0.5 text-xs font-semibold text-white transition-colors hover:bg-russian-violet/90"
                   >
                     Confirm
                   </button>
                   <button
                     onClick={onCancelSync}
-                    className={cn(
-                      "rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-200",
-                    )}
+                    className="rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-200"
                   >
                     Cancel
                   </button>
@@ -279,21 +258,17 @@ function ContactCard({
             ) : (
               <button
                 onClick={onRequestSync}
-                className={cn(
-                  "rounded px-1.5 py-0.5 text-xs font-medium text-russian-violet/70 transition-colors hover:text-russian-violet",
-                )}
+                className="rounded px-1.5 py-0.5 text-xs font-medium text-russian-violet/70 transition-colors hover:text-russian-violet"
               >
                 Sync to Google
               </button>
             ))}
           {c.googleContactId && (
-            <span className={cn("rounded px-1.5 py-0.5 text-xs text-slate-400")}>Synced</span>
+            <span className="rounded px-1.5 py-0.5 text-xs text-slate-400">Synced</span>
           )}
           <button
             onClick={onStartEdit}
-            className={cn(
-              "rounded px-1.5 py-0.5 text-xs font-medium text-russian-violet/70 transition-colors hover:text-russian-violet",
-            )}
+            className="rounded px-1.5 py-0.5 text-xs font-medium text-russian-violet/70 transition-colors hover:text-russian-violet"
           >
             Edit
           </button>
@@ -302,45 +277,41 @@ function ContactCard({
       {c.email ? (
         <a
           href={`mailto:${c.email}`}
-          className={cn(
-            "text-sm break-all text-moonstone-600 transition-colors hover:text-moonstone-700",
-          )}
+          className="text-sm break-all text-moonstone-600 transition-colors hover:text-moonstone-700"
         >
           {c.email}
         </a>
       ) : (
-        <span className={cn("text-sm text-slate-400 italic")}>No email</span>
+        <span className="text-sm text-slate-400 italic">No email</span>
       )}
       {c.phone && (
         <a
           href={`tel:${c.phone}`}
-          className={cn("text-sm text-slate-500 transition-colors hover:text-slate-700")}
+          className="text-sm text-slate-500 transition-colors hover:text-slate-700"
         >
           {formatNZPhone(c.phone)}
         </a>
       )}
-      {c.address && <p className={cn("text-sm wrap-break-word text-slate-500")}>{c.address}</p>}
+      {c.address && <p className="text-sm wrap-break-word text-slate-500">{c.address}</p>}
       {c.reviews.length > 0 && (
-        <div className={cn("mt-1")}>
+        <div className="mt-1">
           <button
             onClick={onToggleReviews}
-            className={cn(
-              "text-xs font-medium text-russian-violet/60 transition-colors hover:text-russian-violet",
-            )}
+            className="text-xs font-medium text-russian-violet/60 transition-colors hover:text-russian-violet"
           >
             {isReviewsExpanded
               ? "Hide reviews"
               : `${c.reviews.length} linked review${c.reviews.length === 1 ? "" : "s"}`}
           </button>
           {isReviewsExpanded && (
-            <div className={cn("mt-2 flex flex-col gap-1.5")}>
+            <div className="mt-2 flex flex-col gap-1.5">
               {c.reviews.map((rv) => (
                 <div
                   key={rv.id}
-                  className={cn("rounded-lg border border-slate-200 bg-slate-50 px-3 py-2")}
+                  className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
                 >
-                  <div className={cn("flex items-center justify-between gap-2")}>
-                    <span className={cn("text-xs font-medium text-russian-violet/70")}>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-medium text-russian-violet/70">
                       {formatReviewerName(rv)}
                     </span>
                     {rv.customerRef && (
@@ -348,15 +319,13 @@ function ContactCard({
                         href={`/review?token=${rv.customerRef}`}
                         target="_blank"
                         rel="noreferrer"
-                        className={cn(
-                          "shrink-0 text-xs font-medium text-moonstone-600 transition-colors hover:text-moonstone-700",
-                        )}
+                        className="shrink-0 text-xs font-medium text-moonstone-600 transition-colors hover:text-moonstone-700"
                       >
                         Review link ↗
                       </a>
                     )}
                   </div>
-                  <p className={cn("mt-0.5 text-xs leading-relaxed text-slate-500")}>
+                  <p className="mt-0.5 text-xs leading-relaxed text-slate-500">
                     {rv.text.length > 80 ? `${rv.text.slice(0, 80)}…` : rv.text}
                   </p>
                 </div>
@@ -656,31 +625,27 @@ export function ContactAdminList({
 
   if (contacts.length === 0) {
     return (
-      <p className={cn("text-sm text-slate-400")}>
+      <p className="text-sm text-slate-400">
         No contacts yet. They will appear here after customers book.
       </p>
     );
   }
 
   return (
-    <div className={cn("flex flex-col gap-6")}>
+    <div className="flex flex-col gap-6">
       {/* Search + export row */}
-      <div className={cn("flex items-center gap-3")}>
+      <div className="flex items-center gap-3">
         <input
           type="search"
           placeholder="Search name, email, phone, address…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className={cn(
-            "min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
-          )}
+          className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:ring-1 focus:ring-russian-violet/30 focus:outline-none"
         />
         <button
           type="button"
           onClick={() => void exportContacts()}
-          className={cn(
-            "shrink-0 text-xs font-medium text-moonstone-600 underline underline-offset-2 hover:text-moonstone-700",
-          )}
+          className="shrink-0 text-xs font-medium text-moonstone-600 underline underline-offset-2 hover:text-moonstone-700"
         >
           Export CSV
         </button>
@@ -688,18 +653,10 @@ export function ContactAdminList({
 
       {/* New contacts - added in the last 7 days */}
       {newContacts.length > 0 && (
-        <div className={cn("flex flex-col gap-3")}>
-          <h3
-            className={cn(
-              "flex items-center gap-2 text-xs font-semibold tracking-wide text-slate-700 uppercase",
-            )}
-          >
+        <div className="flex flex-col gap-3">
+          <h3 className="flex items-center gap-2 text-xs font-semibold tracking-wide text-slate-700 uppercase">
             New
-            <span
-              className={cn(
-                "rounded-full bg-moonstone-600/15 px-2 py-0.5 text-[10px] font-semibold text-moonstone-600",
-              )}
-            >
+            <span className="rounded-full bg-moonstone-600/15 px-2 py-0.5 text-[10px] font-semibold text-moonstone-600">
               {newContacts.length}
             </span>
           </h3>
@@ -711,8 +668,8 @@ export function ContactAdminList({
 
       {/* Unsynced contacts - shown prominently */}
       {unsynced.length > 0 ? (
-        <div className={cn("flex flex-col gap-3")}>
-          <h3 className={cn("text-xs font-semibold tracking-wide text-russian-violet uppercase")}>
+        <div className="flex flex-col gap-3">
+          <h3 className="text-xs font-semibold tracking-wide text-russian-violet uppercase">
             Needs syncing ({unsynced.length})
           </h3>
           {unsynced.map((c) => (
@@ -720,23 +677,23 @@ export function ContactAdminList({
           ))}
         </div>
       ) : (
-        <p className={cn("text-sm text-slate-400")}>All contacts are synced to Google.</p>
+        <p className="text-sm text-slate-400">All contacts are synced to Google.</p>
       )}
 
       {/* Synced contacts - collapsible */}
       {synced.length > 0 && (
-        <div className={cn("flex flex-col gap-3")}>
+        <div className="flex flex-col gap-3">
           <button
             onClick={() => setSyncedOpen((o) => !o)}
-            className={cn("flex items-center gap-2 text-left")}
+            className="flex items-center gap-2 text-left"
           >
-            <span className={cn("text-xs font-semibold tracking-wide text-slate-500 uppercase")}>
+            <span className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
               Synced contacts ({synced.length})
             </span>
-            <span className={cn("text-xs text-slate-400")}>{syncedOpen ? "▲" : "▼"}</span>
+            <span className="text-xs text-slate-400">{syncedOpen ? "▲" : "▼"}</span>
           </button>
           {syncedOpen && (
-            <div className={cn("flex flex-col gap-3")}>
+            <div className="flex flex-col gap-3">
               {synced.map((c) => (
                 <ContactCard key={c.id} c={c} {...buildCardProps(c)} />
               ))}

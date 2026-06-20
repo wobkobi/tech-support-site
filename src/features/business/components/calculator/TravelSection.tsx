@@ -3,7 +3,6 @@
 import { formatNZD, travelEntriesTotal } from "@/features/business/lib/business";
 import { breakdownTravelCharge } from "@/features/business/lib/pricing-policy";
 import type { TravelEntry } from "@/features/business/types/business";
-import { cn } from "@/shared/lib/cn";
 import { parseMoney } from "@/shared/lib/parse-money";
 import type React from "react";
 import type { RefObject } from "react";
@@ -76,9 +75,9 @@ export function TravelSection({
   }
 
   return (
-    <div className={cn("space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}>
-      <h2 className={cn("text-sm font-semibold text-russian-violet")}>Travel</h2>
-      <div className={cn("flex gap-2")}>
+    <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <h2 className="text-sm font-semibold text-russian-violet">Travel</h2>
+      <div className="flex gap-2">
         <input
           ref={addressInputRef}
           type="text"
@@ -91,25 +90,21 @@ export function TravelSection({
               onLookup();
             }
           }}
-          className={cn(
-            "flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-          )}
+          className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
         />
         <button
           type="button"
           onClick={onLookup}
           suppressHydrationWarning
           disabled={lookingUpTravel || !jobAddress.trim()}
-          className={cn(
-            "rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50",
-          )}
+          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
         >
           {lookingUpTravel ? "..." : "Look up"}
         </button>
       </div>
 
       {travelEntries.length > 0 && (
-        <div className={cn("space-y-2")}>
+        <div className="space-y-2">
           {travelEntries.map((entry, index) => {
             const showBreakdown =
               entry.isAuto &&
@@ -122,23 +117,17 @@ export function TravelSection({
               ? breakdownTravelCharge(oneWayMin, travelRatePerHour, minTravelCharge)
               : null;
             return (
-              <div key={index} className={cn("space-y-1")}>
-                <div className={cn("flex items-center gap-2")}>
+              <div key={index} className="space-y-1">
+                <div className="flex items-center gap-2">
                   <input
                     type="text"
                     value={entry.label}
                     placeholder={entry.isAuto ? "Lookup" : "e.g. Parking"}
                     onChange={(e) => patchEntry(index, { label: e.target.value, isAuto: false })}
-                    className={cn(
-                      "flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-                    )}
+                    className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
                   />
-                  <div className={cn("flex items-center")}>
-                    <span
-                      className={cn(
-                        "rounded-l-lg border border-r-0 border-slate-200 bg-slate-50 px-2 py-2 text-xs text-slate-500",
-                      )}
-                    >
+                  <div className="flex items-center">
+                    <span className="rounded-l-lg border border-r-0 border-slate-200 bg-slate-50 px-2 py-2 text-xs text-slate-500">
                       $
                     </span>
                     <input
@@ -167,64 +156,54 @@ export function TravelSection({
                           isAuto: false,
                         })
                       }
-                      className={cn(
-                        "w-24 rounded-r-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-                      )}
+                      className="w-24 rounded-r-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
                     />
                   </div>
                   <button
                     type="button"
                     onClick={() => removeEntry(index)}
                     aria-label={`Remove travel entry ${index + 1}`}
-                    className={cn(
-                      "rounded-lg border border-red-200 bg-white px-2 py-2 text-xs font-medium text-red-600 hover:bg-red-50",
-                    )}
+                    className="rounded-lg border border-red-200 bg-white px-2 py-2 text-xs font-medium text-red-600 hover:bg-red-50"
                   >
                     ×
                   </button>
                 </div>
                 {breakdown && (
-                  <ul
-                    className={cn(
-                      "ml-1 space-y-0.5 rounded-md border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-500",
-                    )}
-                  >
+                  <ul className="ml-1 space-y-0.5 rounded-md border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-500">
                     <li>
-                      <span className={cn("text-slate-400")}>Destination:</span>{" "}
-                      <span className={cn("text-slate-700")}>{entry.destination}</span>
+                      <span className="text-slate-400">Destination:</span>{" "}
+                      <span className="text-slate-700">{entry.destination}</span>
                     </li>
                     <li>
-                      <span className={cn("text-slate-400")}>There:</span> {oneWayMin} min
+                      <span className="text-slate-400">There:</span> {oneWayMin} min
                       {entry.distanceKmOneWay !== undefined && ` (${entry.distanceKmOneWay} km)`}
                     </li>
                     <li>
-                      <span className={cn("text-slate-400")}>Back:</span> {oneWayMin} min
+                      <span className="text-slate-400">Back:</span> {oneWayMin} min
                       {entry.distanceKmOneWay !== undefined && ` (${entry.distanceKmOneWay} km)`}
                     </li>
                     <li>
-                      <span className={cn("text-slate-400")}>Raw:</span> {roundTripMin} min round
-                      trip @ {formatNZD(travelRatePerHour)}/hr ={" "}
-                      <span className={cn("text-slate-700")}>{formatNZD(breakdown.rawCost)}</span>
+                      <span className="text-slate-400">Raw:</span> {roundTripMin} min round trip @{" "}
+                      {formatNZD(travelRatePerHour)}/hr ={" "}
+                      <span className="text-slate-700">{formatNZD(breakdown.rawCost)}</span>
                     </li>
                     {breakdown.roundedCost !== breakdown.rawCost && (
                       <li>
-                        <span className={cn("text-slate-400")}>Rounded to nearest $5:</span>{" "}
-                        <span className={cn("text-slate-700")}>
-                          {formatNZD(breakdown.roundedCost)}
-                        </span>
+                        <span className="text-slate-400">Rounded to nearest $5:</span>{" "}
+                        <span className="text-slate-700">{formatNZD(breakdown.roundedCost)}</span>
                       </li>
                     )}
                     {breakdown.minimumApplied && (
                       <li>
-                        <span className={cn("text-slate-400")}>
+                        <span className="text-slate-400">
                           {formatNZD(minTravelCharge)} minimum applied
                         </span>{" "}
                         (figure was under {formatNZD(minTravelCharge)}).
                       </li>
                     )}
                     <li>
-                      <span className={cn("text-slate-400")}>Final:</span>{" "}
-                      <span className={cn("font-medium text-slate-700")}>
+                      <span className="text-slate-400">Final:</span>{" "}
+                      <span className="font-medium text-slate-700">
                         {formatNZD(breakdown.finalCost)}
                       </span>
                     </li>
@@ -236,19 +215,17 @@ export function TravelSection({
         </div>
       )}
 
-      <div className={cn("flex items-center justify-between gap-3")}>
+      <div className="flex items-center justify-between gap-3">
         <button
           type="button"
           onClick={addEntry}
-          className={cn(
-            "rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50",
-          )}
+          className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
         >
           + Add travel
         </button>
         {travelEntries.length > 0 && (
-          <span className={cn("text-xs text-slate-500")}>
-            Total <span className={cn("font-medium text-slate-700")}>{formatNZD(total)}</span>
+          <span className="text-xs text-slate-500">
+            Total <span className="font-medium text-slate-700">{formatNZD(total)}</span>
           </span>
         )}
       </div>

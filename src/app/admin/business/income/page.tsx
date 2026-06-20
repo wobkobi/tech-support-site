@@ -1,7 +1,6 @@
 import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
 import { IncomeView } from "@/features/business/components/IncomeView";
 import { requireAdminAuth } from "@/shared/lib/auth";
-import { cn } from "@/shared/lib/cn";
 import type { Metadata } from "next";
 import type React from "react";
 
@@ -21,7 +20,7 @@ export default async function IncomePage(): Promise<React.ReactElement> {
 
   return (
     <AdminPageLayout current="business-income">
-      <h1 className={cn("mb-6 text-2xl font-extrabold text-russian-violet")}>Income</h1>
+      <h1 className="mb-6 text-2xl font-extrabold text-russian-violet">Income</h1>
       <IncomeView />
     </AdminPageLayout>
   );

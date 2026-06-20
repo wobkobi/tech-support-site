@@ -157,12 +157,12 @@ export function EmailInput({
         className={cn(DEFAULT_INPUT_CLASSES, activeError && "border-coquelicot-500/60", className)}
       />
       {!hideError && activeError && (
-        <p id={describedBy} className={cn("mt-1 text-xs text-coquelicot-600")}>
+        <p id={describedBy} className="mt-1 text-xs text-coquelicot-600">
           {activeError}
         </p>
       )}
       {!activeError && suggestion && (
-        <p className={cn("mt-1 text-sm text-rich-black/80")}>
+        <p className="mt-1 text-sm text-rich-black/80">
           Did you mean{" "}
           <button
             type="button"

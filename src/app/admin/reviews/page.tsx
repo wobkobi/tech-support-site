@@ -4,7 +4,6 @@ import { ReviewApprovalList } from "@/features/reviews/components/admin/ReviewAp
 import { ReviewLinkHistoryTable } from "@/features/reviews/components/admin/ReviewLinkHistoryTable";
 import { SendReviewLinkForm } from "@/features/reviews/components/admin/SendReviewLinkForm";
 import { requireAdminAuth } from "@/shared/lib/auth";
-import { cn } from "@/shared/lib/cn";
 import { toE164NZ } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
 import { getSiteUrl } from "@/shared/lib/site-url";
@@ -207,25 +206,21 @@ export default async function AdminReviewsPage(): Promise<React.ReactElement> {
 
   return (
     <AdminPageLayout current="reviews">
-      <h1 className={cn("mb-6 text-2xl font-extrabold text-russian-violet")}>
+      <h1 className="mb-6 text-2xl font-extrabold text-russian-violet">
         Reviews
         {pending.length > 0 && (
-          <span
-            className={cn(
-              "ml-3 rounded-full bg-coquelicot-500/20 px-2.5 py-0.5 text-sm font-semibold text-coquelicot-400",
-            )}
-          >
+          <span className="ml-3 rounded-full bg-coquelicot-500/20 px-2.5 py-0.5 text-sm font-semibold text-coquelicot-400">
             {pending.length} pending
           </span>
         )}
-        <span className={cn("ml-3 text-lg font-semibold text-slate-400")}>
+        <span className="ml-3 text-lg font-semibold text-slate-400">
           {approved.length} approved
         </span>
       </h1>
 
-      <div className={cn("grid grid-cols-1 gap-6 lg:grid-cols-3")}>
-        <div className={cn("flex flex-col gap-6 lg:col-span-2")}>
-          <div className={cn("rounded-xl border border-slate-200 bg-white p-6 shadow-sm")}>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="flex flex-col gap-6 lg:col-span-2">
+          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <ReviewApprovalList
               pending={pending}
               approved={approved}
@@ -235,17 +230,15 @@ export default async function AdminReviewsPage(): Promise<React.ReactElement> {
           </div>
         </div>
 
-        <div className={cn("flex flex-col gap-6")}>
-          <div className={cn("rounded-xl border border-slate-200 bg-white p-6 shadow-sm")}>
-            <h2 className={cn("mb-4 text-sm font-semibold text-russian-violet")}>
-              Send a review link
-            </h2>
+        <div className="flex flex-col gap-6">
+          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="mb-4 text-sm font-semibold text-russian-violet">Send a review link</h2>
             <SendReviewLinkForm contactSuggestions={contactSuggestions} />
           </div>
 
           {linkHistory.length > 0 && (
-            <div className={cn("rounded-xl border border-slate-200 bg-white p-6 shadow-sm")}>
-              <h2 className={cn("mb-4 text-sm font-semibold text-russian-violet")}>Link history</h2>
+            <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h2 className="mb-4 text-sm font-semibold text-russian-violet">Link history</h2>
               <ReviewLinkHistoryTable entries={linkHistory} />
             </div>
           )}

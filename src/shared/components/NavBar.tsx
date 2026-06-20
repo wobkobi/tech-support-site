@@ -429,7 +429,7 @@ export function NavBar(): React.ReactElement | null {
   return (
     <>
       {/* Spacer for fixed nav - grows via --promo-h when banner is shown. */}
-      <div aria-hidden="true" className={cn("app-nav-spacer")} />
+      <div aria-hidden="true" className="app-nav-spacer" />
 
       <header
         ref={headerRef}
@@ -464,9 +464,7 @@ export function NavBar(): React.ReactElement | null {
         >
           <Link
             href="/"
-            className={cn(
-              "flex min-w-0 shrink-0 items-center gap-2.5 transition-transform hover:scale-105",
-            )}
+            className="flex min-w-0 shrink-0 items-center gap-2.5 transition-transform hover:scale-105"
           >
             <Image
               src="/source/logo.svg"
@@ -477,16 +475,14 @@ export function NavBar(): React.ReactElement | null {
               height={40}
               priority
               // Rem-sized so it scales with the root font-size on bigger screens.
-              className={cn("h-10 w-10 shrink-0 select-none")}
+              className="h-10 w-10 shrink-0 select-none"
             />
-            <span
-              className={cn("text-lg font-bold whitespace-nowrap text-russian-violet sm:text-xl")}
-            >
+            <span className="text-lg font-bold whitespace-nowrap text-russian-violet sm:text-xl">
               To The Point Tech
             </span>
           </Link>
 
-          <nav className={cn("hidden items-center gap-1 lg:flex")} aria-label="Primary navigation">
+          <nav className="hidden items-center gap-1 lg:flex" aria-label="Primary navigation">
             {NAV_ITEMS.map((item) => {
               const active = isActivePrefix(pathname, item.activePrefix);
 
@@ -508,12 +504,12 @@ export function NavBar(): React.ReactElement | null {
             })}
           </nav>
 
-          <div className={cn("flex shrink-0 items-center gap-2")}>
+          <div className="flex shrink-0 items-center gap-2">
             <Button
               href="/booking"
               variant="primary"
               size="lg"
-              className={cn("hidden shrink-0 lg:inline-flex xl:text-xl")}
+              className="hidden shrink-0 lg:inline-flex xl:text-xl"
               aria-current={bookingActive ? "page" : undefined}
             >
               Book now
@@ -523,7 +519,7 @@ export function NavBar(): React.ReactElement | null {
               href="/contact"
               variant="ghost"
               size="lg"
-              className={cn("hidden shrink-0 lg:inline-flex xl:text-xl")}
+              className="hidden shrink-0 lg:inline-flex xl:text-xl"
               aria-current={contactActive ? "page" : undefined}
             >
               Contact
@@ -531,14 +527,12 @@ export function NavBar(): React.ReactElement | null {
 
             <button
               onClick={toggleMobileMenu}
-              className={cn(
-                "flex h-11 w-11 items-center justify-center rounded-lg bg-seasalt-900/20 transition-all hover:bg-seasalt-900/30 lg:hidden",
-              )}
+              className="flex h-11 w-11 items-center justify-center rounded-lg bg-seasalt-900/20 transition-all hover:bg-seasalt-900/30 lg:hidden"
               aria-label="Toggle mobile menu"
               aria-expanded={mobileMenuOpen}
               aria-controls="mobile-nav"
             >
-              <div className={cn("flex h-5 w-5 flex-col justify-center gap-1")}>
+              <div className="flex h-5 w-5 flex-col justify-center gap-1">
                 <span
                   className={cn(
                     "h-0.5 w-full rounded-full bg-russian-violet transition-all",
@@ -586,9 +580,13 @@ export function NavBar(): React.ReactElement | null {
         aria-label="Mobile navigation"
         role={mobileMenuOpen ? "dialog" : undefined}
         aria-modal={mobileMenuOpen ? true : undefined}
-        aria-hidden={mobileMenuOpen ? undefined : true}
+        // `inert` removes the off-screen drawer and its links from the tab order
+        // and accessibility tree while closed, so they cannot be focused. It also
+        // supersedes aria-hidden here, which on its own would leave the inner
+        // links focusable (the audit flags aria-hidden that contains focusables).
+        inert={!mobileMenuOpen}
       >
-        <div className={cn("flex h-full flex-col gap-2 p-4")}>
+        <div className="flex h-full flex-col gap-2 p-4">
           {NAV_ITEMS.map((item) => {
             const active = isActivePrefix(pathname, item.activePrefix);
 
@@ -610,7 +608,7 @@ export function NavBar(): React.ReactElement | null {
             );
           })}
 
-          <div className={cn("mt-4 flex flex-col gap-2 border-t border-seasalt-400/40 pt-4")}>
+          <div className="mt-4 flex flex-col gap-2 border-t border-seasalt-400/40 pt-4">
             <Button
               href="/booking"
               variant="primary"

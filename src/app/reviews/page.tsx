@@ -31,9 +31,8 @@ export const metadata: Metadata = {
 // Long fallback avoids waking a cold DB on a fixed timer.
 export const revalidate = 86400;
 
-const linkStyle = cn(
-  "text-coquelicot-500 hover:text-coquelicot-600 underline-offset-4 hover:underline",
-);
+const linkStyle =
+  "text-coquelicot-500 hover:text-coquelicot-600 underline-offset-4 hover:underline";
 
 /**
  * Reviews page component.
@@ -72,17 +71,15 @@ export default async function ReviewsPage(): Promise<React.ReactElement> {
         ]}
       />
       <FrostedSection>
-        <div className={cn("flex flex-col gap-6 sm:gap-8")}>
+        <div className="flex flex-col gap-6 sm:gap-8">
           <section aria-labelledby="reviews-heading" className={cn(CARD, "animate-fade-in")}>
             <h1
               id="reviews-heading"
-              className={cn(
-                "mb-4 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl",
-              )}
+              className="mb-4 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl"
             >
               What clients say
             </h1>
-            <p className={cn("text-base text-rich-black/80 sm:text-lg")}>
+            <p className="text-base text-rich-black/80 sm:text-lg">
               Feedback from people I've helped.
             </p>
           </section>
@@ -94,11 +91,11 @@ export default async function ReviewsPage(): Promise<React.ReactElement> {
             >
               <h2
                 id="no-reviews-heading"
-                className={cn("mb-2 text-xl font-bold text-russian-violet sm:text-2xl")}
+                className="mb-2 text-xl font-bold text-russian-violet sm:text-2xl"
               >
                 No reviews yet
               </h2>
-              <p className={cn("text-base text-rich-black/70 sm:text-lg")}>
+              <p className="text-base text-rich-black/70 sm:text-lg">
                 Be the first!{" "}
                 <Link href="/booking" className={linkStyle}>
                   Book an appointment
@@ -109,32 +106,23 @@ export default async function ReviewsPage(): Promise<React.ReactElement> {
           ) : (
             <section
               aria-label="Client reviews"
-              className={cn("animate-slide-up animate-fill-both animate-delay-100")}
+              className="animate-slide-up animate-fill-both animate-delay-100"
             >
               {/* Two balanced masonry columns (see splitReviewsIntoColumns). On mobile both
                   <ul>s collapse via display:contents into one flex column, where the CSS
                   `order` (date index) restores a single newest-first list. */}
-              <div className={cn("flex flex-col gap-4 sm:flex-row sm:items-start")}>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
                 {[reviewColumns.left, reviewColumns.right].map((column, columnIndex) => (
-                  <ul
-                    key={columnIndex}
-                    className={cn("contents sm:flex sm:flex-1 sm:flex-col sm:gap-4")}
-                  >
+                  <ul key={columnIndex} className="contents sm:flex sm:flex-1 sm:flex-col sm:gap-4">
                     {column.map(({ review: r, order }) => (
                       <li
                         key={r.id}
                         id={`review-${r.id}`}
                         style={{ order }}
-                        className={cn(
-                          "flex flex-col rounded-lg border-2 border-seasalt-400/60 bg-seasalt-800/80 p-4 sm:p-5",
-                        )}
+                        className="flex flex-col rounded-lg border-2 border-seasalt-400/60 bg-seasalt-800/80 p-4 sm:p-5"
                       >
-                        <p className={cn("text-base text-rich-black sm:text-lg")}>{r.text}</p>
-                        <p
-                          className={cn(
-                            "pt-3 text-right text-base font-semibold text-russian-violet sm:text-lg",
-                          )}
-                        >
+                        <p className="text-base text-rich-black sm:text-lg">{r.text}</p>
+                        <p className="pt-3 text-right text-base font-semibold text-russian-violet sm:text-lg">
                           - {formatReviewerName(r)}
                         </p>
                       </li>
@@ -149,7 +137,7 @@ export default async function ReviewsPage(): Promise<React.ReactElement> {
             aria-label="Leave a review"
             className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-200")}
           >
-            <p className={cn("text-base text-rich-black sm:text-lg")}>
+            <p className="text-base text-rich-black sm:text-lg">
               Had an appointment? You'll receive a review link by email after your visit. Or{" "}
               <Link href="/booking" className={linkStyle}>
                 book now

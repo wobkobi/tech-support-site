@@ -3,7 +3,6 @@ import { CalculatorView } from "@/features/business/components/CalculatorView";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { getIdentity } from "@/shared/lib/business-identity.server";
-import { cn } from "@/shared/lib/cn";
 import type { Metadata } from "next";
 import type React from "react";
 import { Suspense } from "react";
@@ -27,11 +26,12 @@ export default async function CalculatorPage(): Promise<React.ReactElement> {
     gstRegistered: policy.GST_REGISTERED,
     minTravelCharge: policy.MIN_TRAVEL_CHARGE,
     billingIncrementMins: policy.BILLING_INCREMENT_MINS,
+    minBillableMins: policy.MIN_BILLABLE_MINS,
   };
 
   return (
     <AdminPageLayout current="business-calculator">
-      <h1 className={cn("mb-6 text-2xl font-extrabold text-russian-violet")}>Job calculator</h1>
+      <h1 className="mb-6 text-2xl font-extrabold text-russian-violet">Job calculator</h1>
       <Suspense>
         <CalculatorView identity={identity} pricing={pricing} />
       </Suspense>

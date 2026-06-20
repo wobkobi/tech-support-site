@@ -8,7 +8,6 @@
  * Google. Once resolved, the row disappears from the list.
  */
 
-import { cn } from "@/shared/lib/cn";
 import { formatDateTimeShort } from "@/shared/lib/date-format";
 import Link from "next/link";
 import type React from "react";
@@ -75,18 +74,16 @@ export function ContactConflictsView({ initial }: ContactConflictsViewProps): Re
 
   if (rows.length === 0) {
     return (
-      <div className={cn("rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm")}>
-        <p className={cn("text-sm font-medium text-slate-700")}>No conflicts to review.</p>
-        <p className={cn("mt-1 text-xs text-slate-400")}>
+      <div className="rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+        <p className="text-sm font-medium text-slate-700">No conflicts to review.</p>
+        <p className="mt-1 text-xs text-slate-400">
           All contact fields are in sync between the site and Google Contacts.
         </p>
         <Link
           href={`/admin/contacts`}
-          className={cn(
-            "mt-4 inline-flex items-center gap-1 text-sm font-semibold text-slate-600 hover:underline",
-          )}
+          className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-slate-600 hover:underline"
         >
-          <FaCaretLeft className={cn("h-4 w-4")} aria-hidden />
+          <FaCaretLeft className="h-4 w-4" aria-hidden />
           Back to Contacts
         </Link>
       </div>
@@ -94,85 +91,70 @@ export function ContactConflictsView({ initial }: ContactConflictsViewProps): Re
   }
 
   return (
-    <div className={cn("flex flex-col gap-4")}>
+    <div className="flex flex-col gap-4">
       <Link
         href={`/admin/contacts`}
-        className={cn(
-          "inline-flex w-fit items-center gap-1 text-sm font-semibold text-slate-600 hover:underline",
-        )}
+        className="inline-flex w-fit items-center gap-1 text-sm font-semibold text-slate-600 hover:underline"
       >
-        <FaCaretLeft className={cn("h-4 w-4")} aria-hidden />
+        <FaCaretLeft className="h-4 w-4" aria-hidden />
         Back to Contacts
       </Link>
 
-      <ul className={cn("flex flex-col gap-3")}>
+      <ul className="flex flex-col gap-3">
         {rows.map((c) => {
           const isResolving = resolving === c.id;
           const err = errors[c.id];
           return (
-            <li
-              key={c.id}
-              className={cn("rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}
-            >
-              <div className={cn("mb-3 flex items-baseline justify-between gap-3")}>
-                <div className={cn("min-w-0")}>
-                  <p className={cn("truncate text-base font-semibold text-russian-violet")}>
+            <li key={c.id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="mb-3 flex items-baseline justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-base font-semibold text-russian-violet">
                     {c.contactName}
                   </p>
                   {c.contactEmail && (
-                    <p className={cn("truncate text-xs text-slate-400")}>{c.contactEmail}</p>
+                    <p className="truncate text-xs text-slate-400">{c.contactEmail}</p>
                   )}
                 </div>
-                <span
-                  className={cn(
-                    "shrink-0 rounded-full bg-coquelicot-500/10 px-2.5 py-0.5 text-xs font-semibold text-coquelicot-500 uppercase",
-                  )}
-                >
+                <span className="shrink-0 rounded-full bg-coquelicot-500/10 px-2.5 py-0.5 text-xs font-semibold text-coquelicot-500 uppercase">
                   {c.field}
                 </span>
               </div>
 
-              <div className={cn("grid grid-cols-1 gap-3 md:grid-cols-2")}>
-                <div className={cn("rounded-lg border border-slate-200 bg-slate-50 p-3")}>
-                  <p className={cn("mb-1 text-xs font-semibold text-slate-400 uppercase")}>
-                    Site value
-                  </p>
-                  <p className={cn("text-sm font-medium text-slate-800")}>
-                    {c.siteValue || <span className={cn("text-slate-400 italic")}>empty</span>}
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <p className="mb-1 text-xs font-semibold text-slate-400 uppercase">Site value</p>
+                  <p className="text-sm font-medium text-slate-800">
+                    {c.siteValue || <span className="text-slate-400 italic">empty</span>}
                   </p>
                   <button
                     type="button"
                     onClick={() => void resolve(c.id, "site")}
                     disabled={isResolving}
-                    className={cn(
-                      "mt-3 w-full rounded-lg bg-russian-violet px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-russian-violet/90 disabled:opacity-50",
-                    )}
+                    className="mt-3 w-full rounded-lg bg-russian-violet px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-russian-violet/90 disabled:opacity-50"
                   >
                     {isResolving ? "Saving…" : "Use site value"}
                   </button>
                 </div>
-                <div className={cn("rounded-lg border border-slate-200 bg-slate-50 p-3")}>
-                  <p className={cn("mb-1 text-xs font-semibold text-slate-400 uppercase")}>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <p className="mb-1 text-xs font-semibold text-slate-400 uppercase">
                     Google value
                   </p>
-                  <p className={cn("text-sm font-medium text-slate-800")}>
-                    {c.googleValue || <span className={cn("text-slate-400 italic")}>empty</span>}
+                  <p className="text-sm font-medium text-slate-800">
+                    {c.googleValue || <span className="text-slate-400 italic">empty</span>}
                   </p>
                   <button
                     type="button"
                     onClick={() => void resolve(c.id, "google")}
                     disabled={isResolving}
-                    className={cn(
-                      "mt-3 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50",
-                    )}
+                    className="mt-3 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
                   >
                     {isResolving ? "Saving…" : "Use Google value"}
                   </button>
                 </div>
               </div>
 
-              {err && <p className={cn("mt-3 text-xs text-coquelicot-500")}>{err}</p>}
-              <p className={cn("mt-3 text-xs text-slate-400")}>
+              {err && <p className="mt-3 text-xs text-coquelicot-500">{err}</p>}
+              <p className="mt-3 text-xs text-slate-400">
                 Detected {formatDateTimeShort(c.createdAt)}
               </p>
             </li>

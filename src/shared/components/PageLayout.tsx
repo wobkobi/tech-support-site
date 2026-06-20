@@ -7,13 +7,10 @@
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
 
-export const CARD = cn(
-  "border-seasalt-400/80 bg-seasalt-800 rounded-xl border p-5 shadow-sm sm:p-6",
-);
+export const CARD = "border-seasalt-400/80 bg-seasalt-800 rounded-xl border p-5 shadow-sm sm:p-6";
 
-export const SOFT_CARD = cn(
-  "border-seasalt-400/80 bg-seasalt-900/60 rounded-xl border p-3 text-base sm:p-4 sm:text-lg",
-);
+export const SOFT_CARD =
+  "border-seasalt-400/80 bg-seasalt-900/60 rounded-xl border p-3 text-base sm:p-4 sm:text-lg";
 
 /** Props for PageShell. */
 export interface PageShellProps {
@@ -29,8 +26,8 @@ export interface PageShellProps {
  */
 export function PageShell({ children }: PageShellProps): React.ReactElement {
   return (
-    <main id="main" className={cn("relative min-h-[calc(100dvh-4rem)] overflow-hidden")}>
-      <div className={cn("pointer-events-none fixed inset-0 -z-10 overflow-hidden")}>
+    <main id="main" className="relative min-h-[calc(100dvh-4rem)] overflow-hidden">
+      <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
         {/* Vanilla <picture> not <Image>: the AVIF + WebP variants are pre-built
             by build:icons; Next's re-transcode reintroduced gradient blocking.
             WebP source carries iOS 15 / older Safari users who lack AVIF. */}
@@ -41,7 +38,7 @@ export function PageShell({ children }: PageShellProps): React.ReactElement {
             alt=""
             fetchPriority="high"
             decoding="async"
-            className={cn("absolute inset-0 h-full w-full scale-110 transform-gpu object-cover")}
+            className="absolute inset-0 h-full w-full scale-110 transform-gpu object-cover"
           />
         </picture>
       </div>
@@ -78,11 +75,7 @@ export function FrostedSection({
       className={cn("mx-auto w-full px-4 py-6 sm:px-6 sm:py-8 md:px-8 md:py-10", className)}
       style={{ maxWidth }}
     >
-      <div
-        className={cn(
-          "rounded-2xl border border-seasalt-400/40 bg-seasalt-800/60 p-4 shadow-lg backdrop-blur-md sm:p-6 md:p-8",
-        )}
-      >
+      <div className="rounded-2xl border border-seasalt-400/40 bg-seasalt-800/60 p-4 shadow-lg backdrop-blur-md sm:p-6 md:p-8">
         {children}
       </div>
     </div>

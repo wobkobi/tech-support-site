@@ -90,7 +90,7 @@ export function IncomeView(): React.ReactElement {
   return (
     <div>
       {/* Totals bar - stacks on mobile so three values stay readable below ~480px. */}
-      <div className={cn("mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3")}>
+      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
         {[
           { label: "Total income", value: formatNZD(totalIncome), color: "text-green-600" },
           { label: "Entries", value: String(entries.length), color: "text-slate-700" },
@@ -98,10 +98,10 @@ export function IncomeView(): React.ReactElement {
         ].map((c) => (
           <div
             key={c.label}
-            className={cn("rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm")}
+            className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm"
           >
             <p className={cn("text-xl font-extrabold", c.color)}>{c.value}</p>
-            <p className={cn("text-xs text-slate-500")}>{c.label}</p>
+            <p className="text-xs text-slate-500">{c.label}</p>
           </div>
         ))}
       </div>
@@ -109,10 +109,10 @@ export function IncomeView(): React.ReactElement {
       {/* Add form */}
       <form
         onSubmit={handleAdd}
-        className={cn("mb-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}
+        className="mb-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
       >
-        <h2 className={cn("mb-4 text-sm font-semibold text-russian-violet")}>Add income</h2>
-        <div className={cn("grid gap-3 sm:grid-cols-2")}>
+        <h2 className="mb-4 text-sm font-semibold text-russian-violet">Add income</h2>
+        <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Date" htmlFor="inc-date" required>
             <input
               id="inc-date"
@@ -177,64 +177,41 @@ export function IncomeView(): React.ReactElement {
             />
           </Field>
         </div>
-        {error && <p className={cn("mt-2 text-xs text-red-600")}>{error}</p>}
-        <Button
-          type="submit"
-          variant="secondary"
-          size="sm"
-          disabled={saving}
-          className={cn("mt-4")}
-        >
+        {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+        <Button type="submit" variant="secondary" size="sm" disabled={saving} className="mt-4">
           {saving ? "Saving..." : "Add income"}
         </Button>
       </form>
 
       {/* Mobile card list - stacks each entry so the date/amount/description
           stay readable below ~640px where the table would overflow. */}
-      <div className={cn("space-y-2 lg:hidden")}>
+      <div className="space-y-2 lg:hidden">
         {loading ? (
-          <p
-            className={cn(
-              "rounded-xl border border-slate-200 bg-white px-5 py-6 text-sm text-slate-400 shadow-sm",
-            )}
-          >
+          <p className="rounded-xl border border-slate-200 bg-white px-5 py-6 text-sm text-slate-400 shadow-sm">
             Loading...
           </p>
         ) : entries.length === 0 ? (
-          <p
-            className={cn(
-              "rounded-xl border border-slate-200 bg-white px-5 py-6 text-sm text-slate-400 shadow-sm",
-            )}
-          >
+          <p className="rounded-xl border border-slate-200 bg-white px-5 py-6 text-sm text-slate-400 shadow-sm">
             No income entries yet.
           </p>
         ) : (
           entries.map((e) => (
-            <div
-              key={e.id}
-              className={cn("rounded-xl border border-slate-200 bg-white p-3 shadow-sm")}
-            >
-              <div className={cn("flex items-start justify-between gap-2")}>
-                <div className={cn("min-w-0 flex-1")}>
-                  <p className={cn("truncate text-sm font-medium text-slate-700")}>{e.customer}</p>
-                  <p className={cn("truncate text-xs text-slate-500")}>{e.description}</p>
+            <div key={e.id} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-slate-700">{e.customer}</p>
+                  <p className="truncate text-xs text-slate-500">{e.description}</p>
                 </div>
-                <p className={cn("shrink-0 text-sm font-semibold text-green-600")}>
+                <p className="shrink-0 text-sm font-semibold text-green-600">
                   {formatNZD(e.amount)}
                 </p>
               </div>
-              <div
-                className={cn(
-                  "mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs",
-                )}
-              >
-                <span className={cn("text-slate-500")}>{formatDateShort(e.date)}</span>
-                <span className={cn("text-slate-400")}>{e.method}</span>
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs">
+                <span className="text-slate-500">{formatDateShort(e.date)}</span>
+                <span className="text-slate-400">{e.method}</span>
                 <button
                   onClick={() => handleDelete(e.id)}
-                  className={cn(
-                    "ml-auto inline-flex h-8 items-center text-red-400 hover:text-red-600",
-                  )}
+                  className="ml-auto inline-flex h-8 items-center text-red-400 hover:text-red-600"
                 >
                   Delete
                 </button>
@@ -245,45 +222,38 @@ export function IncomeView(): React.ReactElement {
       </div>
 
       {/* Desktop table */}
-      <div
-        className={cn(
-          "hidden overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm lg:block",
-        )}
-      >
+      <div className="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm lg:block">
         {loading ? (
-          <p className={cn("px-5 py-6 text-sm text-slate-400")}>Loading...</p>
+          <p className="px-5 py-6 text-sm text-slate-400">Loading...</p>
         ) : entries.length === 0 ? (
-          <p className={cn("px-5 py-6 text-sm text-slate-400")}>No income entries yet.</p>
+          <p className="px-5 py-6 text-sm text-slate-400">No income entries yet.</p>
         ) : (
-          <table className={cn("w-full text-sm")}>
-            <thead className={cn("border-b border-slate-100 bg-slate-50")}>
+          <table className="w-full text-sm">
+            <thead className="border-b border-slate-100 bg-slate-50">
               <tr>
                 {["Date", "Customer", "Description", "Amount", "Method", ""].map((h) => (
-                  <th
-                    key={h}
-                    className={cn("px-4 py-3 text-left text-xs font-semibold text-slate-500")}
-                  >
+                  <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-500">
                     {h}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className={cn("divide-y divide-slate-100")}>
+            <tbody className="divide-y divide-slate-100">
               {entries.map((e) => (
-                <tr key={e.id} className={cn("hover:bg-slate-50")}>
-                  <td className={cn("px-4 py-3 text-xs whitespace-nowrap text-slate-500")}>
+                <tr key={e.id} className="hover:bg-slate-50">
+                  <td className="px-4 py-3 text-xs whitespace-nowrap text-slate-500">
                     {formatDateShort(e.date)}
                   </td>
-                  <td className={cn("px-4 py-3 font-medium text-slate-700")}>{e.customer}</td>
-                  <td className={cn("px-4 py-3 text-slate-500")}>{e.description}</td>
-                  <td className={cn("px-4 py-3 font-semibold whitespace-nowrap text-green-600")}>
+                  <td className="px-4 py-3 font-medium text-slate-700">{e.customer}</td>
+                  <td className="px-4 py-3 text-slate-500">{e.description}</td>
+                  <td className="px-4 py-3 font-semibold whitespace-nowrap text-green-600">
                     {formatNZD(e.amount)}
                   </td>
-                  <td className={cn("px-4 py-3 text-xs text-slate-400")}>{e.method}</td>
-                  <td className={cn("px-4 py-3")}>
+                  <td className="px-4 py-3 text-xs text-slate-400">{e.method}</td>
+                  <td className="px-4 py-3">
                     <button
                       onClick={() => handleDelete(e.id)}
-                      className={cn("text-xs text-red-400 hover:text-red-600")}
+                      className="text-xs text-red-400 hover:text-red-600"
                     >
                       Delete
                     </button>

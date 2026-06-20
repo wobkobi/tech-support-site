@@ -106,22 +106,22 @@ export function ClientPickerSection({
   }
 
   return (
-    <div className={cn("space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}>
-      <div className={cn("flex items-center justify-between")}>
-        <h2 className={cn("text-sm font-semibold text-russian-violet")}>Client</h2>
+    <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-russian-violet">Client</h2>
         {pickedContactName && (
           <button
             type="button"
             onClick={onClearContact}
-            className={cn("text-xs text-slate-500 underline hover:text-russian-violet")}
+            className="text-xs text-slate-500 underline hover:text-russian-violet"
           >
             x Clear
           </button>
         )}
       </div>
       {pickedContactName && (
-        <div className={cn("flex flex-wrap items-center gap-2")}>
-          <span className={cn("text-xs font-medium text-slate-600")}>Address to:</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-slate-600">Address to:</span>
           {(["name", "company", "custom"] as const).map((mode) => {
             const disabled = mode === "company" && !pickedContactCompany;
             const active = addressMode === mode;
@@ -147,7 +147,7 @@ export function ClientPickerSection({
           })}
         </div>
       )}
-      <div className={cn("relative")}>
+      <div className="relative">
         <input
           type="text"
           placeholder="Name"
@@ -169,11 +169,7 @@ export function ClientPickerSection({
           )}
         />
         {suggestions.length > 0 && (
-          <div
-            className={cn(
-              "absolute top-full right-0 left-0 z-20 mt-1 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg",
-            )}
-          >
+          <div className="absolute top-full right-0 left-0 z-20 mt-1 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
             {suggestions.map((c, i) => {
               const active = i === highlight;
               return (
@@ -192,12 +188,12 @@ export function ClientPickerSection({
                     active ? "bg-russian-violet/10" : "hover:bg-slate-50",
                   )}
                 >
-                  <span className={cn("font-medium text-rich-black")}>{c.name || c.email}</span>
+                  <span className="font-medium text-rich-black">{c.name || c.email}</span>
                   {c.email && c.name && (
-                    <span className={cn("ml-2 text-xs text-rich-black/50")}>{c.email}</span>
+                    <span className="ml-2 text-xs text-rich-black/50">{c.email}</span>
                   )}
                   {c.company && (
-                    <span className={cn("ml-2 text-xs text-rich-black/40")}>{c.company}</span>
+                    <span className="ml-2 text-xs text-rich-black/40">{c.company}</span>
                   )}
                 </button>
               );
@@ -210,9 +206,7 @@ export function ClientPickerSection({
         placeholder="Email"
         value={clientEmail}
         onChange={(e) => onClientEmailChange(e.target.value)}
-        className={cn(
-          "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-        )}
+        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
       />
     </div>
   );

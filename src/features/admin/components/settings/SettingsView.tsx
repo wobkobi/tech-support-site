@@ -174,7 +174,7 @@ export function SettingsView({
         <SettingsSearch onJump={handleJump} />
 
         {/* Tab bar - horizontally scrollable on phones. */}
-        <div className={cn("mb-6 flex gap-1 overflow-x-auto border-b border-slate-200")}>
+        <div className="mb-6 flex gap-1 overflow-x-auto border-b border-slate-200">
           {TAB_ORDER.map((group) => {
             const isActive = group === active;
             const ready = IMPLEMENTED.has(group);
@@ -197,10 +197,10 @@ export function SettingsView({
           })}
         </div>
 
-        <div className={cn("rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6")}>
-          <h2 className={cn("text-lg font-bold text-russian-violet")}>{meta.title}</h2>
-          <p className={cn("mt-1 text-sm text-slate-500")}>{meta.blurb}</p>
-          <div className={cn("mt-4")}>
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <h2 className="text-lg font-bold text-russian-violet">{meta.title}</h2>
+          <p className="mt-1 text-sm text-slate-500">{meta.blurb}</p>
+          <div className="mt-4">
             {active === "availability" ? (
               <AvailabilityTab initial={availability} defaults={availabilityDefaults} />
             ) : active === "pricing" ? (
@@ -220,7 +220,7 @@ export function SettingsView({
             ) : active === "scheduling" ? (
               <SchedulingTab initial={scheduling} defaults={schedulingDefaults} />
             ) : (
-              <p className={cn("py-8 text-center text-sm text-slate-400")}>
+              <p className="py-8 text-center text-sm text-slate-400">
                 This section is still managed in code - its editor is coming in a later step.
               </p>
             )}

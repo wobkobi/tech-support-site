@@ -7,7 +7,6 @@
  * are mandatory the same way the public booking/review forms do.
  */
 
-import { cn } from "@/shared/lib/cn";
 import type React from "react";
 
 /**
@@ -51,11 +50,11 @@ export function Field({
 }: FieldProps): React.ReactElement {
   return (
     <div className={className}>
-      <label htmlFor={htmlFor} className={cn("mb-1 block text-xs font-semibold text-slate-600")}>
+      <label htmlFor={htmlFor} className="mb-1 block text-xs font-semibold text-slate-600">
         {label}
-        {required && <span className={cn("ml-0.5 text-coquelicot-500")}>*</span>}
+        {required && <span className="ml-0.5 text-coquelicot-500">*</span>}
         {!required && optional && (
-          <span className={cn("ml-1 font-normal text-slate-400")}>(optional)</span>
+          <span className="ml-1 font-normal text-slate-400">(optional)</span>
         )}
       </label>
       {children}

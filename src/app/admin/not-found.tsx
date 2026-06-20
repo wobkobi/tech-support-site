@@ -7,7 +7,6 @@
  */
 
 import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
-import { cn } from "@/shared/lib/cn";
 import Link from "next/link";
 import type React from "react";
 
@@ -18,17 +17,15 @@ import type React from "react";
 export default function AdminNotFound(): React.ReactElement {
   return (
     <AdminPageLayout current="dashboard">
-      <div className={cn("mx-auto max-w-md py-16 text-center")}>
-        <p className={cn("text-5xl font-extrabold text-russian-violet")}>404</p>
-        <h1 className={cn("mt-3 text-xl font-bold text-russian-violet")}>Page not found</h1>
-        <p className={cn("mt-2 text-sm text-slate-500")}>
+      <div className="mx-auto max-w-md py-16 text-center">
+        <p className="text-5xl font-extrabold text-russian-violet">404</p>
+        <h1 className="mt-3 text-xl font-bold text-russian-violet">Page not found</h1>
+        <p className="mt-2 text-sm text-slate-500">
           That admin page or record does not exist or has been removed.
         </p>
         <Link
           href="/admin"
-          className={cn(
-            "mt-6 inline-block rounded-lg bg-russian-violet px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90",
-          )}
+          className="mt-6 inline-block rounded-lg bg-russian-violet px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
         >
           Back to dashboard
         </Link>

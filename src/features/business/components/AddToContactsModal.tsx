@@ -9,7 +9,6 @@
  * doesn't already exist in the DB.
  */
 
-import { cn } from "@/shared/lib/cn";
 import type React from "react";
 import { useEffect, useState } from "react";
 
@@ -99,55 +98,45 @@ export function AddToContactsModal({
 
   return (
     <div
-      className={cn(
-        "fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm",
-      )}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
       onClick={() => onClose(null)}
       role="dialog"
       aria-modal="true"
       aria-label="Add to contacts"
     >
       <div
-        className={cn(
-          "w-full max-w-md overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl",
-        )}
+        className="w-full max-w-md overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div
-          className={cn("flex items-center justify-between border-b border-slate-200 px-5 py-4")}
-        >
-          <h2 className={cn("text-base font-semibold text-russian-violet")}>Add to contacts?</h2>
+        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+          <h2 className="text-base font-semibold text-russian-violet">Add to contacts?</h2>
           <button
             type="button"
             onClick={() => onClose(null)}
-            className={cn(
-              "text-2xl leading-none text-slate-400 transition-colors hover:text-slate-700",
-            )}
+            className="text-2xl leading-none text-slate-400 transition-colors hover:text-slate-700"
             aria-label="Close"
           >
             ×
           </button>
         </div>
 
-        <div className={cn("space-y-3 px-5 py-4 text-sm text-slate-700")}>
+        <div className="space-y-3 px-5 py-4 text-sm text-slate-700">
           <p>
-            <span className={cn("font-semibold")}>{name}</span>
+            <span className="font-semibold">{name}</span>
             {
               " isn't in your contacts yet. Add them so you can send review links and pre-fill future invoices?"
             }
           </p>
-          <p className={cn("text-xs text-slate-500")}>{email}</p>
-          {error && <p className={cn("text-xs text-coquelicot-500")}>{error}</p>}
+          <p className="text-xs text-slate-500">{email}</p>
+          {error && <p className="text-xs text-coquelicot-500">{error}</p>}
         </div>
 
-        <div className={cn("flex justify-end gap-2 border-t border-slate-200 px-5 py-3")}>
+        <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
           <button
             type="button"
             onClick={() => onClose(null)}
             disabled={saving}
-            className={cn(
-              "rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50",
-            )}
+            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
           >
             Not now
           </button>
@@ -155,9 +144,7 @@ export function AddToContactsModal({
             type="button"
             onClick={() => void handleConfirm()}
             disabled={saving}
-            className={cn(
-              "rounded-lg bg-moonstone-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-moonstone-700 disabled:cursor-not-allowed disabled:opacity-50",
-            )}
+            className="rounded-lg bg-moonstone-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-moonstone-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {saving ? "Adding..." : "Yes, add"}
           </button>

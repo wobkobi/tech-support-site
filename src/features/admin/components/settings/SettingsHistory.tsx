@@ -9,7 +9,6 @@
  * a revert is just another tracked change.
  */
 
-import { cn } from "@/shared/lib/cn";
 import { formatDateTimeLong } from "@/shared/lib/date-format";
 import type { SettingsGroup } from "@/shared/lib/settings/types";
 import type React from "react";
@@ -88,32 +87,32 @@ export function SettingsHistory<T>({ group, onRestore }: Props<T>): React.ReactE
   };
 
   return (
-    <div className={cn("mt-6 border-t border-slate-100 pt-4")}>
+    <div className="mt-6 border-t border-slate-100 pt-4">
       <button
         type="button"
         onClick={toggle}
-        className={cn("text-sm font-medium text-russian-violet hover:underline")}
+        className="text-sm font-medium text-russian-violet hover:underline"
       >
         {open ? "Hide change history" : "Change history"}
       </button>
 
       {open && (
-        <div className={cn("mt-3")}>
-          {loading && <p className={cn("text-sm text-slate-400")}>Loading...</p>}
-          {error && <p className={cn("text-sm text-red-600")}>{error}</p>}
+        <div className="mt-3">
+          {loading && <p className="text-sm text-slate-400">Loading...</p>}
+          {error && <p className="text-sm text-red-600">{error}</p>}
           {entries && entries.length === 0 && (
-            <p className={cn("text-sm text-slate-400")}>No changes recorded yet.</p>
+            <p className="text-sm text-slate-400">No changes recorded yet.</p>
           )}
           {entries && entries.length > 0 && (
-            <ul className={cn("divide-y divide-slate-100")}>
+            <ul className="divide-y divide-slate-100">
               {entries.map((e, i) => (
-                <li key={e.id} className={cn("flex items-center justify-between gap-3 py-2")}>
-                  <div className={cn("min-w-0")}>
-                    <p className={cn("text-sm text-slate-700")}>
+                <li key={e.id} className="flex items-center justify-between gap-3 py-2">
+                  <div className="min-w-0">
+                    <p className="text-sm text-slate-700">
                       {formatDateTimeLong(new Date(e.changedAt))}
-                      {i === 0 && <span className={cn("text-slate-400")}> - current</span>}
+                      {i === 0 && <span className="text-slate-400"> - current</span>}
                     </p>
-                    <p className={cn("truncate text-xs text-slate-500")}>
+                    <p className="truncate text-xs text-slate-500">
                       {e.isInitial
                         ? "First saved"
                         : e.changedKeys.length > 0
@@ -125,9 +124,7 @@ export function SettingsHistory<T>({ group, onRestore }: Props<T>): React.ReactE
                     <button
                       type="button"
                       onClick={() => restore(e)}
-                      className={cn(
-                        "shrink-0 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50",
-                      )}
+                      className="shrink-0 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
                     >
                       {restoredId === e.id ? "Loaded" : "Restore"}
                     </button>
@@ -137,7 +134,7 @@ export function SettingsHistory<T>({ group, onRestore }: Props<T>): React.ReactE
             </ul>
           )}
           {restoredId && (
-            <p className={cn("mt-2 text-xs text-emerald-600")}>
+            <p className="mt-2 text-xs text-emerald-600">
               Loaded into the form above - review the values and Save to apply.
             </p>
           )}

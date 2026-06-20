@@ -15,9 +15,8 @@ import Link from "next/link";
 import type React from "react";
 import { useEffect, useState } from "react";
 
-const SOFT_CARD = cn(
-  "border-seasalt-400/80 bg-seasalt-900/60 rounded-xl border p-3 text-base sm:p-4 sm:text-lg",
-);
+const SOFT_CARD =
+  "border-seasalt-400/80 bg-seasalt-900/60 rounded-xl border p-3 text-base sm:p-4 sm:text-lg";
 
 type Step = "issue" | "meeting" | "address" | "results";
 type MeetingMode = "on-site" | "remote";
@@ -509,15 +508,9 @@ export function PricingWizard({
               {formatPriceRound(result.low)} – {formatPriceRound(result.high)}
             </p>
             {result.promoLabel && (
-              <p className={cn("mt-2 text-sm font-semibold text-amber-700")}>
-                ⚡ {result.promoLabel}
-              </p>
+              <p className="mt-2 text-sm font-semibold text-amber-700">⚡ {result.promoLabel}</p>
             )}
-            <p
-              className={cn(
-                "mt-4 rounded-lg border border-coquelicot/30 bg-coquelicot/5 px-3 py-2 text-base font-bold text-coquelicot-500",
-              )}
-            >
+            <p className="mt-4 rounded-lg border border-coquelicot/30 bg-coquelicot/5 px-3 py-2 text-base font-bold text-coquelicot-500">
               You're charged for the actual time worked at the agreed hourly rate. Jobs that turn
               out more involved than described will cost more than this estimate.
             </p>

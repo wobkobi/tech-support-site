@@ -27,9 +27,8 @@ export const metadata: Metadata = {
   },
 };
 
-const linkStyle = cn(
-  "text-coquelicot-500 hover:text-coquelicot-600 underline-offset-4 hover:underline",
-);
+const linkStyle =
+  "text-coquelicot-500 hover:text-coquelicot-600 underline-offset-4 hover:underline";
 
 /**
  * About page component.
@@ -64,24 +63,22 @@ export default function AboutPage(): React.ReactElement {
         ]}
       />
       <FrostedSection>
-        <div className={cn("flex flex-col gap-6 sm:gap-8")}>
+        <div className="flex flex-col gap-6 sm:gap-8">
           <section aria-labelledby="about-hero-heading" className={cn(CARD, "animate-fade-in")}>
             <h1
               id="about-hero-heading"
-              className={cn(
-                "mb-4 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl",
-              )}
+              className="mb-4 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl"
             >
               About To The Point Tech
             </h1>
 
-            <p className={cn("mb-4 text-base text-rich-black sm:text-lg")}>
+            <p className="mb-4 text-base text-rich-black sm:text-lg">
               I'm Harrison Raynes, a computer science graduate based in Auckland. I started To The
               Point Tech because I saw how many people struggle with everyday technology problems
               but don't have anyone reliable to call.
             </p>
 
-            <p className={cn("text-base text-rich-black/80 sm:text-lg")}>
+            <p className="text-base text-rich-black/80 sm:text-lg">
               My focus is on practical fixes and clear explanations. I want to leave your tech in a
               better state than I found it, and make sure you understand what changed and why.
             </p>
@@ -93,35 +90,35 @@ export default function AboutPage(): React.ReactElement {
           >
             <h2
               id="about-approach-heading"
-              className={cn("mb-3 text-xl font-bold text-russian-violet sm:text-2xl")}
+              className="mb-3 text-xl font-bold text-russian-violet sm:text-2xl"
             >
               My approach
             </h2>
 
-            <ul className={cn("mb-4 space-y-2.5 text-base text-rich-black sm:text-lg")}>
-              <li className={cn("flex gap-3")}>
-                <span className={cn("mt-1 text-lg text-moonstone-600")}>•</span>
+            <ul className="mb-4 space-y-2.5 text-base text-rich-black sm:text-lg">
+              <li className="flex gap-3">
+                <span className="mt-1 text-lg text-moonstone-600">•</span>
                 <span>
                   <strong>Listen first.</strong> I start with a quick chat to understand what's
                   happening and what you want to achieve.
                 </span>
               </li>
-              <li className={cn("flex gap-3")}>
-                <span className={cn("mt-1 text-lg text-moonstone-600")}>•</span>
+              <li className="flex gap-3">
+                <span className="mt-1 text-lg text-moonstone-600">•</span>
                 <span>
                   <strong>Explain before acting.</strong> You'll know what I'm planning to do and
                   roughly how long it should take before I touch anything.
                 </span>
               </li>
-              <li className={cn("flex gap-3")}>
-                <span className={cn("mt-1 text-lg text-moonstone-600")}>•</span>
+              <li className="flex gap-3">
+                <span className="mt-1 text-lg text-moonstone-600">•</span>
                 <span>
                   <strong>Work transparently.</strong> I make changes in small steps so you can see
                   what's happening and ask questions.
                 </span>
               </li>
-              <li className={cn("flex gap-3")}>
-                <span className={cn("mt-1 text-lg text-moonstone-600")}>•</span>
+              <li className="flex gap-3">
+                <span className="mt-1 text-lg text-moonstone-600">•</span>
                 <span>
                   <strong>Leave clear notes.</strong> After every visit, you get a simple summary of
                   what changed and any tips for next time.
@@ -129,7 +126,7 @@ export default function AboutPage(): React.ReactElement {
               </li>
             </ul>
 
-            <p className={cn("text-base text-rich-black/80 sm:text-lg")}>
+            <p className="text-base text-rich-black/80 sm:text-lg">
               I'm happy to work with you directly, alongside family members, or with a small
               business owner. If you prefer, we can start with email and move to a visit once you're
               comfortable.
@@ -142,34 +139,34 @@ export default function AboutPage(): React.ReactElement {
           >
             <h2
               id="about-who-heading"
-              className={cn("mb-3 text-xl font-bold text-russian-violet sm:text-2xl")}
+              className="mb-3 text-xl font-bold text-russian-violet sm:text-2xl"
             >
               Who I help
             </h2>
 
-            <p className={cn("mb-4 text-base text-rich-black sm:text-lg")}>
+            <p className="mb-4 text-base text-rich-black sm:text-lg">
               I mainly work with households and small businesses across Auckland who want their tech
               to just work, without wading through jargon or sales pitches.
             </p>
 
-            <ul className={cn("mb-4 space-y-2.5 text-base text-rich-black sm:text-lg")}>
-              <li className={cn("flex gap-3")}>
-                <span className={cn("mt-1 text-lg text-moonstone-600")}>•</span>
+            <ul className="mb-4 space-y-2.5 text-base text-rich-black sm:text-lg">
+              <li className="flex gap-3">
+                <span className="mt-1 text-lg text-moonstone-600">•</span>
                 <span>Home users wanting reliable Wi-Fi, secure accounts, and proper backups.</span>
               </li>
-              <li className={cn("flex gap-3")}>
-                <span className={cn("mt-1 text-lg text-moonstone-600")}>•</span>
+              <li className="flex gap-3">
+                <span className="mt-1 text-lg text-moonstone-600">•</span>
                 <span>Families helping parents or grandparents get comfortable with devices.</span>
               </li>
-              <li className={cn("flex gap-3")}>
-                <span className={cn("mt-1 text-lg text-moonstone-600")}>•</span>
+              <li className="flex gap-3">
+                <span className="mt-1 text-lg text-moonstone-600">•</span>
                 <span>
                   Sole traders and small teams who need occasional IT support without a contract.
                 </span>
               </li>
             </ul>
 
-            <p className={cn("text-base text-rich-black/80 sm:text-lg")}>
+            <p className="text-base text-rich-black/80 sm:text-lg">
               See the{" "}
               <Link href="/services" className={linkStyle}>
                 services page

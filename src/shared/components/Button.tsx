@@ -100,11 +100,11 @@ function getVariantClasses(variant: ButtonVariant): string {
 function getSizeClasses(size: ButtonSize): string {
   switch (size) {
     case "sm":
-      return cn("h-9 px-4 text-sm");
+      return "h-9 px-4 text-sm";
     case "md":
-      return cn("h-12 px-5 text-base");
+      return "h-12 px-5 text-base";
     case "lg":
-      return cn("h-14 px-6 text-lg");
+      return "h-14 px-6 text-lg";
   }
 }
 

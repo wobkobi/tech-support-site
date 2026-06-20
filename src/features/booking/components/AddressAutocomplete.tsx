@@ -189,7 +189,7 @@ export default function AddressAutocomplete({
   const showWarning = apiKeyMissing || scriptError;
 
   return (
-    <div ref={wrapperRef} className={cn("flex w-full flex-col gap-1")}>
+    <div ref={wrapperRef} className="flex w-full flex-col gap-1">
       <input
         ref={inputRef}
         type="text"
@@ -212,8 +212,8 @@ export default function AddressAutocomplete({
       />
 
       {apiKeyMissing && (
-        <p className={cn("flex items-start gap-1 text-sm text-yellow-800")}>
-          <FaTriangleExclamation className={cn("mt-0.5 h-4 w-4 shrink-0")} aria-hidden />
+        <p className="flex items-start gap-1 text-sm text-yellow-800">
+          <FaTriangleExclamation className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           <span>
             Address autocomplete unavailable. Please type your full address manually. (API key not
             configured)
@@ -222,8 +222,8 @@ export default function AddressAutocomplete({
       )}
 
       {scriptError && (
-        <p className={cn("flex items-start gap-1 text-sm text-yellow-800")}>
-          <FaTriangleExclamation className={cn("mt-0.5 h-4 w-4 shrink-0")} aria-hidden />
+        <p className="flex items-start gap-1 text-sm text-yellow-800">
+          <FaTriangleExclamation className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           <span>
             Address autocomplete unavailable. Please type your full address manually. (Failed to
             load Google Maps)

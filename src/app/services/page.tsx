@@ -160,23 +160,21 @@ export default async function ServicesPage(): Promise<React.ReactElement> {
         ]}
       />
       <FrostedSection>
-        <div className={cn("flex flex-col gap-6 sm:gap-8")}>
+        <div className="flex flex-col gap-6 sm:gap-8">
           <section aria-labelledby="services-heading" className={cn(CARD, "animate-fade-in")}>
             <h1
               id="services-heading"
-              className={cn(
-                "mb-4 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl",
-              )}
+              className="mb-4 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl"
             >
               Services
             </h1>
 
-            <p className={cn("mb-4 text-base text-rich-black sm:text-lg")}>
+            <p className="mb-4 text-base text-rich-black sm:text-lg">
               I help with the everyday tech problems no matter how big or small. The goal is to get
               things working reliably and leave you with a setup you understand.
             </p>
 
-            <p className={cn("text-base text-rich-black/90 sm:text-lg")}>
+            <p className="text-base text-rich-black/90 sm:text-lg">
               Every job includes clear explanations, and I can leave notes so you know what changed
               and how to handle things next time.
             </p>
@@ -188,39 +186,31 @@ export default async function ServicesPage(): Promise<React.ReactElement> {
           >
             <h2
               id="areas-heading"
-              className={cn("mb-3 text-xl font-bold text-russian-violet sm:text-2xl")}
+              className="mb-3 text-xl font-bold text-russian-violet sm:text-2xl"
             >
               What I help with
             </h2>
 
-            <div
-              className={cn("grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4")}
-            >
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
               {serviceAreas.map((area) => (
                 <div
                   key={area.label}
-                  className={cn(
-                    "rounded-lg border border-seasalt-400/60 bg-seasalt-800 p-3 shadow-sm transition-all hover:shadow-md",
-                  )}
+                  className="rounded-lg border border-seasalt-400/60 bg-seasalt-800 p-3 shadow-sm transition-all hover:shadow-md"
                 >
-                  <div className={cn("mb-2 flex items-center gap-2")}>
-                    <span
-                      className={cn(
-                        "grid size-10 shrink-0 place-items-center rounded-lg border border-moonstone-500/40 bg-moonstone-600/20",
-                      )}
-                    >
-                      <span className={cn("text-2xl text-moonstone-600")} aria-hidden>
+                  <div className="mb-2 flex items-center gap-2">
+                    <span className="grid size-10 shrink-0 place-items-center rounded-lg border border-moonstone-500/40 bg-moonstone-600/20">
+                      <span className="text-2xl text-moonstone-600" aria-hidden>
                         {area.icon}
                       </span>
                     </span>
-                    <h3 className={cn("text-lg font-semibold text-rich-black sm:text-xl")}>
+                    <h3 className="text-lg font-semibold text-rich-black sm:text-xl">
                       {area.label}
                     </h3>
                   </div>
-                  <ul className={cn("space-y-1 text-base text-rich-black/80 sm:text-lg")}>
+                  <ul className="space-y-1 text-base text-rich-black/80 sm:text-lg">
                     {area.examples.map((example) => (
-                      <li key={example} className={cn("flex gap-2")}>
-                        <span className={cn("mt-0.5 text-moonstone-600")}>•</span>
+                      <li key={example} className="flex gap-2">
+                        <span className="mt-0.5 text-moonstone-600">•</span>
                         <span>{example}</span>
                       </li>
                     ))}
@@ -229,51 +219,51 @@ export default async function ServicesPage(): Promise<React.ReactElement> {
               ))}
             </div>
 
-            <p className={cn("mt-6 text-base text-rich-black/90 sm:text-lg")}>
+            <p className="mt-6 text-base text-rich-black/90 sm:text-lg">
               Not sure which category your problem fits? That's fine. Just describe what's happening
               and I'll figure out the best approach.
             </p>
           </section>
 
-          <div className={cn("grid gap-5 md:grid-cols-2")}>
+          <div className="grid gap-5 md:grid-cols-2">
             <section
               aria-labelledby="home-heading"
               className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-200")}
             >
               <h2
                 id="home-heading"
-                className={cn("mb-3 text-xl font-bold text-russian-violet sm:text-2xl")}
+                className="mb-3 text-xl font-bold text-russian-violet sm:text-2xl"
               >
                 For home users
               </h2>
 
-              <p className={cn("mb-3 text-base text-rich-black sm:text-lg")}>
+              <p className="mb-3 text-base text-rich-black sm:text-lg">
                 Common home visits include:
               </p>
 
-              <ul className={cn("space-y-2 text-base text-rich-black/90 sm:text-lg")}>
-                <li className={cn("flex gap-2")}>
-                  <span className={cn("mt-1 text-moonstone-600")}>•</span>
+              <ul className="space-y-2 text-base text-rich-black/90 sm:text-lg">
+                <li className="flex gap-2">
+                  <span className="mt-1 text-moonstone-600">•</span>
                   <span>Setting up a new laptop, phone, or tablet with all your accounts</span>
                 </li>
-                <li className={cn("flex gap-2")}>
-                  <span className={cn("mt-1 text-moonstone-600")}>•</span>
+                <li className="flex gap-2">
+                  <span className="mt-1 text-moonstone-600">•</span>
                   <span>Fixing Wi-Fi dead spots or unreliable connections</span>
                 </li>
-                <li className={cn("flex gap-2")}>
-                  <span className={cn("mt-1 text-moonstone-600")}>•</span>
+                <li className="flex gap-2">
+                  <span className="mt-1 text-moonstone-600">•</span>
                   <span>Organising and backing up photos to the cloud</span>
                 </li>
-                <li className={cn("flex gap-2")}>
-                  <span className={cn("mt-1 text-moonstone-600")}>•</span>
+                <li className="flex gap-2">
+                  <span className="mt-1 text-moonstone-600">•</span>
                   <span>Helping parents or grandparents get comfortable with devices</span>
                 </li>
-                <li className={cn("flex gap-2")}>
-                  <span className={cn("mt-1 text-moonstone-600")}>•</span>
+                <li className="flex gap-2">
+                  <span className="mt-1 text-moonstone-600">•</span>
                   <span>Sorting out email and account login issues</span>
                 </li>
-                <li className={cn("flex gap-2")}>
-                  <span className={cn("mt-1 text-moonstone-600")}>•</span>
+                <li className="flex gap-2">
+                  <span className="mt-1 text-moonstone-600">•</span>
                   <span>Removing unwanted software, scams, or malware</span>
                 </li>
               </ul>
@@ -285,39 +275,39 @@ export default async function ServicesPage(): Promise<React.ReactElement> {
             >
               <h2
                 id="business-heading"
-                className={cn("mb-3 text-xl font-bold text-russian-violet sm:text-2xl")}
+                className="mb-3 text-xl font-bold text-russian-violet sm:text-2xl"
               >
                 For small businesses
               </h2>
 
-              <p className={cn("mb-3 text-base text-rich-black sm:text-lg")}>
+              <p className="mb-3 text-base text-rich-black sm:text-lg">
                 Light IT support for sole traders and small teams:
               </p>
 
-              <ul className={cn("space-y-2 text-base text-rich-black/90 sm:text-lg")}>
-                <li className={cn("flex gap-2")}>
-                  <span className={cn("mt-1 text-moonstone-600")}>•</span>
+              <ul className="space-y-2 text-base text-rich-black/90 sm:text-lg">
+                <li className="flex gap-2">
+                  <span className="mt-1 text-moonstone-600">•</span>
                   <span>Setting up workstations, email, and shared files</span>
                 </li>
-                <li className={cn("flex gap-2")}>
-                  <span className={cn("mt-1 text-moonstone-600")}>•</span>
+                <li className="flex gap-2">
+                  <span className="mt-1 text-moonstone-600">•</span>
                   <span>Basic network and Wi-Fi improvements</span>
                 </li>
-                <li className={cn("flex gap-2")}>
-                  <span className={cn("mt-1 text-moonstone-600")}>•</span>
+                <li className="flex gap-2">
+                  <span className="mt-1 text-moonstone-600">•</span>
                   <span>Backup and security checks</span>
                 </li>
-                <li className={cn("flex gap-2")}>
-                  <span className={cn("mt-1 text-moonstone-600")}>•</span>
+                <li className="flex gap-2">
+                  <span className="mt-1 text-moonstone-600">•</span>
                   <span>New staff device setup</span>
                 </li>
-                <li className={cn("flex gap-2")}>
-                  <span className={cn("mt-1 text-moonstone-600")}>•</span>
+                <li className="flex gap-2">
+                  <span className="mt-1 text-moonstone-600">•</span>
                   <span>One-off projects like office moves</span>
                 </li>
               </ul>
 
-              <p className={cn("mt-3 text-base text-rich-black/90 sm:text-lg")}>
+              <p className="mt-3 text-base text-rich-black/90 sm:text-lg">
                 No ongoing contracts required. You call when you need help.
               </p>
             </section>
@@ -327,8 +317,8 @@ export default async function ServicesPage(): Promise<React.ReactElement> {
             aria-label="Next steps"
             className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-400 text-center")}
           >
-            <p className={cn("mb-4 text-base text-rich-black sm:text-lg")}>Ready to get started?</p>
-            <div className={cn("flex flex-wrap items-center justify-center gap-3")}>
+            <p className="mb-4 text-base text-rich-black sm:text-lg">Ready to get started?</p>
+            <div className="flex flex-wrap items-center justify-center gap-3">
               <Button href="/pricing" variant="ghost" size="md">
                 View pricing
               </Button>

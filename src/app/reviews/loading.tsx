@@ -20,31 +20,29 @@ export default function ReviewsLoading(): React.ReactElement {
     <PageShell>
       <FrostedSection>
         <div
-          className={cn("flex flex-col gap-6 sm:gap-8")}
+          className="flex flex-col gap-6 sm:gap-8"
           role="status"
           aria-live="polite"
           aria-label="Loading reviews page"
         >
           {/* Heading card */}
           <section className={cn(CARD)}>
-            <Bone className={cn("mb-4 h-9 w-72 sm:h-10")} />
-            <Bone className={cn("h-6 w-64 max-w-full")} />
+            <Bone className="mb-4 h-9 w-72 sm:h-10" />
+            <Bone className="h-6 w-64 max-w-full" />
           </section>
 
           {/* Review card grid */}
           <section>
-            <ul className={cn("grid gap-4 sm:grid-cols-2")}>
+            <ul className="grid gap-4 sm:grid-cols-2">
               {Array.from({ length: 6 }).map((_, i) => (
                 <li
                   key={i}
-                  className={cn(
-                    "flex flex-col rounded-lg border-2 border-seasalt-400/60 bg-seasalt-800/80 p-4 sm:p-5",
-                  )}
+                  className="flex flex-col rounded-lg border-2 border-seasalt-400/60 bg-seasalt-800/80 p-4 sm:p-5"
                 >
-                  <Bone className={cn("mb-2 h-5 w-full")} />
-                  <Bone className={cn("mb-2 h-5 w-full")} />
-                  <Bone className={cn("mb-4 h-5 w-2/3")} />
-                  <Bone className={cn("ml-auto h-5 w-32")} />
+                  <Bone className="mb-2 h-5 w-full" />
+                  <Bone className="mb-2 h-5 w-full" />
+                  <Bone className="mb-4 h-5 w-2/3" />
+                  <Bone className="ml-auto h-5 w-32" />
                 </li>
               ))}
             </ul>
@@ -52,10 +50,10 @@ export default function ReviewsLoading(): React.ReactElement {
 
           {/* Leave a review */}
           <section className={cn(CARD)}>
-            <Bone className={cn("h-5 w-full max-w-lg")} />
+            <Bone className="h-5 w-full max-w-lg" />
           </section>
 
-          <span className={cn("sr-only")}>Loading reviews page...</span>
+          <span className="sr-only">Loading reviews page...</span>
         </div>
       </FrostedSection>
     </PageShell>

@@ -174,35 +174,29 @@ export function ManualBookingModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="manual-booking-title"
-      className={cn(
-        "fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center",
-      )}
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center"
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className={cn("max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white shadow-xl")}
+        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white shadow-xl"
       >
-        <div
-          className={cn("flex items-center justify-between border-b border-slate-200 px-5 py-4")}
-        >
-          <h2 id="manual-booking-title" className={cn("text-lg font-bold text-russian-violet")}>
+        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+          <h2 id="manual-booking-title" className="text-lg font-bold text-russian-violet">
             New booking
           </h2>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className={cn(
-              "inline-flex h-8 w-8 items-center justify-center rounded text-slate-500 hover:bg-slate-100",
-            )}
+            className="inline-flex h-8 w-8 items-center justify-center rounded text-slate-500 hover:bg-slate-100"
           >
             <FaXmark />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className={cn("space-y-4 px-5 py-5")}>
-          <div className={cn("grid grid-cols-2 gap-3")}>
+        <form onSubmit={handleSubmit} className="space-y-4 px-5 py-5">
+          <div className="grid grid-cols-2 gap-3">
             <Field label="Start" htmlFor="mb-start" required>
               <input
                 id="mb-start"
@@ -229,7 +223,7 @@ export function ManualBookingModal({
           <Field label="Customer name" htmlFor="mb-name" required>
             <div
               ref={nameWrapRef}
-              className={cn("relative")}
+              className="relative"
               onBlur={(e) => {
                 if (!nameWrapRef.current?.contains(e.relatedTarget as Node)) {
                   setNameListOpen(false);
@@ -266,11 +260,7 @@ export function ManualBookingModal({
                   });
                   if (matches.length === 0) return null;
                   return (
-                    <div
-                      className={cn(
-                        "absolute top-full right-0 left-0 z-20 mt-1 max-h-64 overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg",
-                      )}
-                    >
+                    <div className="absolute top-full right-0 left-0 z-20 mt-1 max-h-64 overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg">
                       {matches.slice(0, 30).map((c) => (
                         <button
                           key={c.id}
@@ -289,15 +279,11 @@ export function ManualBookingModal({
                             }
                             setNameListOpen(false);
                           }}
-                          className={cn(
-                            "flex w-full flex-col gap-0.5 px-3 py-2 text-left hover:bg-slate-50",
-                          )}
+                          className="flex w-full flex-col gap-0.5 px-3 py-2 text-left hover:bg-slate-50"
                         >
-                          <span className={cn("text-sm font-medium text-slate-800")}>{c.name}</span>
-                          {c.address && (
-                            <span className={cn("text-xs text-slate-500")}>{c.address}</span>
-                          )}
-                          <span className={cn("text-xs text-slate-400")}>
+                          <span className="text-sm font-medium text-slate-800">{c.name}</span>
+                          {c.address && <span className="text-xs text-slate-500">{c.address}</span>}
+                          <span className="text-xs text-slate-400">
                             {[c.email, c.phone ? formatNZPhone(c.phone) : null]
                               .filter(Boolean)
                               .join(" · ") || "No contact info"}
@@ -310,7 +296,7 @@ export function ManualBookingModal({
             </div>
           </Field>
 
-          <div className={cn("grid grid-cols-2 gap-3")}>
+          <div className="grid grid-cols-2 gap-3">
             <Field label="Phone" htmlFor="mb-phone" optional>
               <PhoneInput id="mb-phone" value={phone} onChange={setPhone} />
             </Field>
@@ -325,7 +311,7 @@ export function ManualBookingModal({
             </Field>
           </div>
 
-          <div className={cn("grid grid-cols-3 gap-3")}>
+          <div className="grid grid-cols-3 gap-3">
             <Field label="Apt / Unit" htmlFor="mb-unit" optional>
               <input
                 id="mb-unit"
@@ -338,7 +324,7 @@ export function ManualBookingModal({
                 className={textInputClasses}
               />
             </Field>
-            <div className={cn("col-span-2")}>
+            <div className="col-span-2">
               <Field label="Address" htmlFor="mb-address" optional>
                 <AddressAutocomplete
                   id="mb-address"
@@ -362,12 +348,12 @@ export function ManualBookingModal({
             />
           </Field>
 
-          <label className={cn("flex items-center gap-2 text-sm text-slate-700")}>
+          <label className="flex items-center gap-2 text-sm text-slate-700">
             <input
               type="checkbox"
               checked={sendConfirmation}
               onChange={(e) => setSendConfirmation(e.target.checked)}
-              className={cn("h-4 w-4 rounded border-slate-300")}
+              className="h-4 w-4 rounded border-slate-300"
             />
             Send confirmation email to customer
           </label>
@@ -375,15 +361,13 @@ export function ManualBookingModal({
           {error && (
             <p
               role="alert"
-              className={cn(
-                "rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700",
-              )}
+              className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
             >
               {error}
             </p>
           )}
 
-          <div className={cn("flex justify-end gap-2 pt-2")}>
+          <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={submitting}>
               Cancel
             </Button>

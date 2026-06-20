@@ -91,59 +91,45 @@ export function ContactsAdminView({
   }, []);
 
   return (
-    <div className={cn("grid grid-cols-1 items-start gap-6 lg:grid-cols-3")}>
+    <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
       {/* Left column: conflicts + contact list */}
-      <div className={cn("flex flex-col gap-6 lg:col-span-2")}>
+      <div className="flex flex-col gap-6 lg:col-span-2">
         {/* Conflicts */}
         {conflicts.length > 0 && (
-          <div className={cn("rounded-xl border border-amber-200 bg-amber-50 p-5")}>
-            <p className={cn("mb-3 text-sm font-semibold text-amber-700")}>
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-5">
+            <p className="mb-3 text-sm font-semibold text-amber-700">
               {conflicts.length} data conflict{conflicts.length === 1 ? "" : "s"} need your
               attention
             </p>
-            <div className={cn("flex flex-col gap-3")}>
+            <div className="flex flex-col gap-3">
               {conflicts.map((conflict) => (
                 <div
                   key={conflict.sourceId}
-                  className={cn("rounded-lg border border-amber-200 bg-white p-4")}
+                  className="rounded-lg border border-amber-200 bg-white p-4"
                 >
-                  <div className={cn("mb-2 flex flex-wrap items-center gap-2")}>
-                    <span className={cn("text-sm font-medium text-slate-700")}>
+                  <div className="mb-2 flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-medium text-slate-700">
                       {conflict.contactName}
                     </span>
-                    <span
-                      className={cn(
-                        "rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-500",
-                      )}
-                    >
+                    <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-500">
                       {conflict.contactEmail ?? conflict.contactPhone ?? "Unknown"}
                     </span>
-                    <span
-                      className={cn(
-                        "rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700",
-                      )}
-                    >
+                    <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700">
                       {conflict.source === "Booking" ? "Booking" : "Review"}
                     </span>
                   </div>
-                  <div className={cn("space-y-3")}>
+                  <div className="space-y-3">
                     {conflict.conflictFields.includes("name") && (
-                      <div className={cn("space-y-1.5")}>
-                        <p
-                          className={cn(
-                            "text-xs font-medium tracking-wide text-slate-400 uppercase",
-                          )}
-                        >
+                      <div className="space-y-1.5">
+                        <p className="text-xs font-medium tracking-wide text-slate-400 uppercase">
                           Name - pick one
                         </p>
-                        <div className={cn("flex flex-wrap gap-2")}>
+                        <div className="flex flex-wrap gap-2">
                           <button
                             onClick={() =>
                               void resolveConflict(conflict, conflict.contactName, null)
                             }
-                            className={cn(
-                              "rounded border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-russian-violet hover:text-russian-violet",
-                            )}
+                            className="rounded border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-russian-violet hover:text-russian-violet"
                           >
                             {conflict.contactName}
                           </button>
@@ -151,9 +137,7 @@ export function ContactsAdminView({
                             onClick={() =>
                               void resolveConflict(conflict, conflict.sourceName, null)
                             }
-                            className={cn(
-                              "rounded border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-russian-violet hover:text-russian-violet",
-                            )}
+                            className="rounded border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-russian-violet hover:text-russian-violet"
                           >
                             {conflict.sourceName}
                           </button>
@@ -161,22 +145,16 @@ export function ContactsAdminView({
                       </div>
                     )}
                     {conflict.conflictFields.includes("phone") && (
-                      <div className={cn("space-y-1.5")}>
-                        <p
-                          className={cn(
-                            "text-xs font-medium tracking-wide text-slate-400 uppercase",
-                          )}
-                        >
+                      <div className="space-y-1.5">
+                        <p className="text-xs font-medium tracking-wide text-slate-400 uppercase">
                           Phone - pick one
                         </p>
-                        <div className={cn("flex flex-wrap gap-2")}>
+                        <div className="flex flex-wrap gap-2">
                           <button
                             onClick={() =>
                               void resolveConflict(conflict, null, conflict.contactPhone)
                             }
-                            className={cn(
-                              "rounded border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-russian-violet hover:text-russian-violet",
-                            )}
+                            className="rounded border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-russian-violet hover:text-russian-violet"
                           >
                             {conflict.contactPhone ?? "-"}
                           </button>
@@ -184,9 +162,7 @@ export function ContactsAdminView({
                             onClick={() =>
                               void resolveConflict(conflict, null, conflict.sourcePhone)
                             }
-                            className={cn(
-                              "rounded border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-russian-violet hover:text-russian-violet",
-                            )}
+                            className="rounded border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-russian-violet hover:text-russian-violet"
                           >
                             {conflict.sourcePhone}
                           </button>
@@ -194,12 +170,10 @@ export function ContactsAdminView({
                       </div>
                     )}
                   </div>
-                  <div className={cn("mt-3 flex justify-end")}>
+                  <div className="mt-3 flex justify-end">
                     <button
                       onClick={() => skipConflict(conflict.sourceId)}
-                      className={cn(
-                        "rounded px-2 py-1 text-xs font-semibold text-slate-400 transition-colors hover:text-slate-600",
-                      )}
+                      className="rounded px-2 py-1 text-xs font-semibold text-slate-400 transition-colors hover:text-slate-600"
                     >
                       Skip
                     </button>
@@ -211,19 +185,19 @@ export function ContactsAdminView({
         )}
 
         {/* Contact list */}
-        <div className={cn("rounded-xl border border-slate-200 bg-white p-6 shadow-sm")}>
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <ContactAdminList contacts={contacts} />
         </div>
       </div>
       {/* end left column */}
 
       {/* Right column: Google sync */}
-      <div className={cn("lg:sticky lg:top-8")}>
-        <div className={cn("rounded-xl border border-slate-200 bg-white p-6 shadow-sm")}>
-          <div className={cn("flex flex-wrap items-center justify-between gap-4")}>
+      <div className="lg:sticky lg:top-8">
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <p className={cn("text-sm font-semibold text-slate-700")}>Google Contacts sync</p>
-              <p className={cn("mt-0.5 text-xs text-slate-400")}>
+              <p className="text-sm font-semibold text-slate-700">Google Contacts sync</p>
+              <p className="mt-0.5 text-xs text-slate-400">
                 {syncedCount} synced · {unsyncedCount} not yet in Google
               </p>
             </div>
@@ -242,11 +216,9 @@ export function ContactsAdminView({
           </div>
 
           {syncConfirmPending && (
-            <div className={cn("mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4")}>
-              <p className={cn("mb-2 text-sm font-medium text-slate-700")}>
-                Confirm sync with Google?
-              </p>
-              <ul className={cn("mb-3 space-y-1 text-xs text-slate-500")}>
+            <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <p className="mb-2 text-sm font-medium text-slate-700">Confirm sync with Google?</p>
+              <ul className="mb-3 space-y-1 text-xs text-slate-500">
                 <li>• {unsyncedCount} contacts will be created in Google Contacts</li>
                 <li>
                   • {syncedCount} contacts will have their email, phone, and address pushed to
@@ -254,20 +226,16 @@ export function ContactsAdminView({
                 </li>
                 <li>• Google contacts not in your local DB will be imported</li>
               </ul>
-              <div className={cn("flex gap-2")}>
+              <div className="flex gap-2">
                 <button
                   onClick={() => void runSync()}
-                  className={cn(
-                    "rounded-lg bg-russian-violet px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-russian-violet/90",
-                  )}
+                  className="rounded-lg bg-russian-violet px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-russian-violet/90"
                 >
                   Confirm
                 </button>
                 <button
                   onClick={() => setSyncConfirmPending(false)}
-                  className={cn(
-                    "rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-300",
-                  )}
+                  className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-300"
                 >
                   Cancel
                 </button>
@@ -275,7 +243,7 @@ export function ContactsAdminView({
             </div>
           )}
 
-          {syncResult && <p className={cn("mt-3 text-xs text-slate-500")}>{syncResult}</p>}
+          {syncResult && <p className="mt-3 text-xs text-slate-500">{syncResult}</p>}
         </div>
       </div>
       {/* end right column */}

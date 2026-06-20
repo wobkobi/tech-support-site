@@ -67,21 +67,21 @@ export function BenchmarkListField({
     );
 
   return (
-    <div className={cn("py-4")}>
-      <p className={cn("text-sm font-semibold text-russian-violet")}>{meta.title}</p>
-      <p className={cn("mt-0.5 text-sm text-slate-500")}>{meta.description}</p>
+    <div className="py-4">
+      <p className="text-sm font-semibold text-russian-violet">{meta.title}</p>
+      <p className="mt-0.5 text-sm text-slate-500">{meta.description}</p>
 
       {fieldErrors.benchmarks && (
-        <p className={cn("mt-1 text-xs font-medium text-red-600")}>{fieldErrors.benchmarks}</p>
+        <p className="mt-1 text-xs font-medium text-red-600">{fieldErrors.benchmarks}</p>
       )}
 
-      <div className={cn("mt-3 space-y-2")}>
+      <div className="mt-3 space-y-2">
         {benchmarks.map((b, i) => {
           const labelErr = fieldErrors[`benchmarks.${i}.label`];
           const minsErr = fieldErrors[`benchmarks.${i}.mins`];
           return (
             <div key={i}>
-              <div className={cn("flex items-center gap-2")}>
+              <div className="flex items-center gap-2">
                 <input
                   aria-label={`Benchmark ${i + 1} task`}
                   type="text"
@@ -103,20 +103,18 @@ export function BenchmarkListField({
                   }}
                   className={cn(inputClass(minsErr), "w-24")}
                 />
-                <span className={cn("text-sm text-slate-500")}>{meta.unit}</span>
+                <span className="text-sm text-slate-500">{meta.unit}</span>
                 <button
                   type="button"
                   aria-label={`Remove ${b.label || "benchmark"}`}
                   onClick={() => remove(i)}
-                  className={cn(
-                    "shrink-0 rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-500 hover:bg-red-50 hover:text-red-600",
-                  )}
+                  className="shrink-0 rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-500 hover:bg-red-50 hover:text-red-600"
                 >
                   Remove
                 </button>
               </div>
               {(labelErr || minsErr) && (
-                <p className={cn("mt-1 text-xs font-medium text-red-600")}>{labelErr ?? minsErr}</p>
+                <p className="mt-1 text-xs font-medium text-red-600">{labelErr ?? minsErr}</p>
               )}
             </div>
           );
@@ -126,9 +124,7 @@ export function BenchmarkListField({
       <button
         type="button"
         onClick={add}
-        className={cn(
-          "mt-3 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50",
-        )}
+        className="mt-3 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
       >
         + Add benchmark
       </button>

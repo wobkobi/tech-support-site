@@ -2,7 +2,6 @@ import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
 import { ExpensesView } from "@/features/business/components/ExpensesView";
 import { SubscriptionsView } from "@/features/business/components/SubscriptionsView";
 import { requireAdminAuth } from "@/shared/lib/auth";
-import { cn } from "@/shared/lib/cn";
 import type { Metadata } from "next";
 import type React from "react";
 
@@ -22,7 +21,7 @@ export default async function ExpensesPage(): Promise<React.ReactElement> {
 
   return (
     <AdminPageLayout current="business-expenses">
-      <h1 className={cn("mb-6 text-2xl font-extrabold text-russian-violet")}>Expenses</h1>
+      <h1 className="mb-6 text-2xl font-extrabold text-russian-violet">Expenses</h1>
       <ExpensesView />
       <div className="mt-10">
         <SubscriptionsView />

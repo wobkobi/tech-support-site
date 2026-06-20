@@ -37,7 +37,7 @@ export function RecalculateButton(): React.ReactElement {
   }, [router]);
 
   return (
-    <div className={cn("flex flex-wrap items-center gap-3")}>
+    <div className="flex flex-wrap items-center gap-3">
       <button
         onClick={() => void run()}
         disabled={recalculating}
@@ -50,7 +50,7 @@ export function RecalculateButton(): React.ReactElement {
       >
         {recalculating ? "Recalculating…" : "Recalculate travel times"}
       </button>
-      {result && <p className={cn("text-xs text-slate-500")}>{result}</p>}
+      {result && <p className="text-xs text-slate-500">{result}</p>}
     </div>
   );
 }

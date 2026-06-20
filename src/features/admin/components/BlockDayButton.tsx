@@ -100,11 +100,7 @@ export function BlockDayButton({
             : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
         )}
       >
-        {isBlocked ? (
-          <FaCircleCheck className={cn("h-4 w-4")} />
-        ) : (
-          <FaBan className={cn("h-4 w-4")} />
-        )}
+        {isBlocked ? <FaCircleCheck className="h-4 w-4" /> : <FaBan className="h-4 w-4" />}
         {isBlocked ? "Unblock day" : hasBookings ? "Day has bookings" : "Block day"}
       </button>
     );
@@ -123,11 +119,7 @@ export function BlockDayButton({
         isBlocked && "text-red-500 hover:bg-red-100 hover:text-red-700",
       )}
     >
-      {isBlocked ? (
-        <FaCircleCheck className={cn("h-3 w-3")} />
-      ) : (
-        <FaBan className={cn("h-3 w-3")} />
-      )}
+      {isBlocked ? <FaCircleCheck className="h-3 w-3" /> : <FaBan className="h-3 w-3" />}
     </button>
   );
 }

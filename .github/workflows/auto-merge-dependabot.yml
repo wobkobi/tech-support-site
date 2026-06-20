@@ -29,19 +29,25 @@ jobs:
               if (pr.draft) continue;
               if (pr.head.sha !== headSha) continue;
 
-              // Wait briefly for mergeability to compute
-              let full = pr;
-              for (let i = 0; i < 5 && (full.mergeable_state === 'unknown' || full.mergeable == null); i++) {
-                await new Promise(r => setTimeout(r, 2000));
-                full = (await github.rest.pulls.get({ owner, repo, pull_number: pr.number })).data;
-              }
+              await github.rest.pulls.createReview({
+                owner, repo, pull_number: pr.number, event: 'APPROVE',
+              });
 
-              if (full.mergeable && (full.mergeable_state === 'clean' || full.mergeable_state === 'blocked')) {
-                await github.rest.pulls.createReview({
-                  owner, repo, pull_number: pr.number, event: 'APPROVE',
-                });
-                await github.rest.pulls.merge({
-                  owner, repo, pull_number: pr.number, merge_method: 'squash',
-                });
+              // Queue the squash merge instead of merging immediately. GitHub
+              // runs it once every required check passes (CodeQL / Vercel /
+              // type-check), so this no longer races the still-pending Vercel
+              // deployment - an immediate merge here returns 405 "Required
+              // status check Vercel is pending" and fails the job.
+              try {
+                await github.graphql(
+                  `mutation($id: ID!) {
+                    enablePullRequestAutoMerge(input: { pullRequestId: $id, mergeMethod: SQUASH }) {
+                      clientMutationId
+                    }
+                  }`,
+                  { id: pr.node_id },
+                );
+              } catch (e) {
+                core.warning(`Could not enable auto-merge for #${pr.number}: ${e.message}`);
               }
             }

@@ -43,9 +43,8 @@ interface FaqItem {
   plainAnswer: string;
 }
 
-const linkStyle = cn(
-  "text-coquelicot-500 hover:text-coquelicot-600 underline-offset-4 hover:underline",
-);
+const linkStyle =
+  "text-coquelicot-500 hover:text-coquelicot-600 underline-offset-4 hover:underline";
 
 /**
  * Strips `**…**` markers for JSON-LD plain-text contexts.
@@ -89,7 +88,7 @@ export default async function FaqPage(): Promise<React.ReactElement> {
             I work across the wider Auckland area - Central, North Shore, East, South, and out West.
             For most addresses around the city I can come to you.
           </p>
-          <p className={cn("mt-2 text-rich-black/80")}>
+          <p className="mt-2 text-rich-black/80">
             Not quite sure if you're in range? Drop me a message with your suburb and I'll let you
             know.
           </p>
@@ -106,7 +105,7 @@ export default async function FaqPage(): Promise<React.ReactElement> {
             Yes - a lot of software, account, and setup work can be done remotely once you've given
             me access, which usually means a faster turnaround and a lower bill.
           </p>
-          <p className={cn("mt-2 text-rich-black/80")}>
+          <p className="mt-2 text-rich-black/80">
             If it turns out the issue really needs hands on a router, printer, or cable, we can
             switch to an on-site visit instead.
           </p>
@@ -125,7 +124,7 @@ export default async function FaqPage(): Promise<React.ReactElement> {
             and smart home gear. After a few years of doing this I can usually pick up something new
             quickly.
           </p>
-          <p className={cn("mt-2 text-rich-black/80")}>
+          <p className="mt-2 text-rich-black/80">
             If you have something unusual or specialised, just tell me the make and model up front
             and I'll let you know whether I can help or point you to the right person.
           </p>
@@ -142,12 +141,12 @@ export default async function FaqPage(): Promise<React.ReactElement> {
             setup, data recovery, hardware repairs, the lot. I confirm the expected cost before any
             work starts, so there are no surprises on the invoice.
           </p>
-          <p className={cn("mt-2 text-rich-black/80")}>
+          <p className="mt-2 text-rich-black/80">
             On-site visits also include one round trip billed at{" "}
             <strong>${pricing.travelRatePerHour}/hr</strong> (the dedicated Travel rate, lower than
             labour), with a $10 minimum when there's any travel at all.
           </p>
-          <p className={cn("mt-2 text-rich-black/80")}>
+          <p className="mt-2 text-rich-black/80">
             The full breakdown lives on the{" "}
             <Link href="/pricing" className={linkStyle}>
               pricing page
@@ -171,11 +170,11 @@ export default async function FaqPage(): Promise<React.ReactElement> {
             No - I don't resell hardware and don't earn commission on anything, so there's no
             incentive to push extras. The aim is to get the gear you already have working properly.
           </p>
-          <p className={cn("mt-2 text-rich-black/80")}>
+          <p className="mt-2 text-rich-black/80">
             If a replacement part or an upgrade genuinely makes sense, I'll lay out the options and
             trade-offs and you decide whether it's worth doing.
           </p>
-          <p className={cn("mt-2 text-rich-black/80")}>
+          <p className="mt-2 text-rich-black/80">
             If you're not sure what to buy - whether it's a part, cable, new device, or any other
             piece of tech - I can suggest the right thing to get, or pick it up and bring it along
             so you don't end up with the wrong product.
@@ -200,7 +199,7 @@ export default async function FaqPage(): Promise<React.ReactElement> {
             </Link>{" "}
             by phone or email if you'd rather chat through it first.
           </p>
-          <p className={cn("mt-2 text-rich-black/80")}>
+          <p className="mt-2 text-rich-black/80">
             For anything urgent, a phone call works best - I can usually slot you in sooner that
             way.
           </p>
@@ -216,7 +215,7 @@ export default async function FaqPage(): Promise<React.ReactElement> {
             Every booking confirmation email has cancel and reschedule links. Use those, or just
             reply to the email and I'll sort it out.
           </p>
-          <p className={cn("mt-2 text-rich-black/80")}>{renderEmphasised(cancellationText)}</p>
+          <p className="mt-2 text-rich-black/80">{renderEmphasised(cancellationText)}</p>
         </>
       ),
     },
@@ -226,7 +225,7 @@ export default async function FaqPage(): Promise<React.ReactElement> {
       answer: (
         <>
           <p>{renderEmphasised(cancellationText)}</p>
-          <p className={cn("mt-2 text-rich-black/80")}>
+          <p className="mt-2 text-rich-black/80">
             The cancel page itself shows you which window you're in (free / $30 callout / $30 +
             travel) before you confirm, so there's no surprise.
           </p>
@@ -243,7 +242,7 @@ export default async function FaqPage(): Promise<React.ReactElement> {
             No-shows are billed as late cancellations - the call-out fee plus the round-trip travel
             I would have made to your address.
           </p>
-          <p className={cn("mt-2 text-rich-black/80")}>
+          <p className="mt-2 text-rich-black/80">
             If you realise you can't make it, let me know any time before the appointment to skip
             the travel charge; with 12+ hours notice there's no fee at all.
           </p>
@@ -255,7 +254,7 @@ export default async function FaqPage(): Promise<React.ReactElement> {
       plainAnswer: stripEmphasis(unsuccessfulText),
       answer: (
         <>
-          <p className={cn("whitespace-pre-line")}>{renderEmphasised(unsuccessfulText)}</p>
+          <p className="whitespace-pre-line">{renderEmphasised(unsuccessfulText)}</p>
         </>
       ),
     },
@@ -293,17 +292,15 @@ export default async function FaqPage(): Promise<React.ReactElement> {
         ]}
       />
       <FrostedSection>
-        <div className={cn("flex flex-col gap-6 sm:gap-8")}>
+        <div className="flex flex-col gap-6 sm:gap-8">
           <section aria-labelledby="faq-heading" className={cn(CARD, "animate-fade-in")}>
             <h1
               id="faq-heading"
-              className={cn(
-                "mb-4 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl",
-              )}
+              className="mb-4 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl"
             >
               Frequently asked questions
             </h1>
-            <p className={cn("text-base text-rich-black/80 sm:text-lg")}>
+            <p className="text-base text-rich-black/80 sm:text-lg">
               Quick answers to common questions. Don't see yours?{" "}
               <Link href="/contact" className={linkStyle}>
                 Get in touch
@@ -316,10 +313,10 @@ export default async function FaqPage(): Promise<React.ReactElement> {
             aria-label="FAQ list"
             className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}
           >
-            <div className={cn("flex flex-col gap-4 sm:flex-row sm:items-start")}>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
               {[faqItems.filter((_, i) => i % 2 === 0), faqItems.filter((_, i) => i % 2 !== 0)].map(
                 (col, colIdx) => (
-                  <div key={colIdx} className={cn("flex flex-1 flex-col gap-4")}>
+                  <div key={colIdx} className="flex flex-1 flex-col gap-4">
                     {col.map((item) => (
                       <details key={item.question} className={cn(SOFT_CARD, "group")}>
                         <summary
@@ -330,15 +327,13 @@ export default async function FaqPage(): Promise<React.ReactElement> {
                         >
                           <span>{item.question}</span>
                           <span
-                            className={cn(
-                              "shrink-0 text-lg text-moonstone-600 transition-transform duration-200 group-open:rotate-180",
-                            )}
+                            className="shrink-0 text-lg text-moonstone-600 transition-transform duration-200 group-open:rotate-180"
                             aria-hidden
                           >
                             ▾
                           </span>
                         </summary>
-                        <div className={cn("mt-3 text-base text-rich-black/90 sm:text-lg")}>
+                        <div className="mt-3 text-base text-rich-black/90 sm:text-lg">
                           {item.answer}
                         </div>
                       </details>
@@ -353,7 +348,7 @@ export default async function FaqPage(): Promise<React.ReactElement> {
             aria-label="Next steps"
             className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-200")}
           >
-            <p className={cn("text-base text-rich-black sm:text-lg")}>
+            <p className="text-base text-rich-black sm:text-lg">
               Ready to get started?{" "}
               <Link href="/booking" className={linkStyle}>
                 Book online

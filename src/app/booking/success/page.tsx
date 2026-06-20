@@ -66,10 +66,10 @@ export default async function BookingSuccessPage({
   const { CANCELLATION } = await getPolicy();
 
   return (
-    <main className={cn("relative min-h-dvh overflow-hidden")}>
+    <main className="relative min-h-dvh overflow-hidden">
       <BookingConversion />
       {/* Backdrop */}
-      <div className={cn("pointer-events-none absolute inset-0 -z-10 overflow-hidden")}>
+      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
         <picture>
           <source type="image/avif" srcSet="/source/backdrop-blur.avif" />
           <img
@@ -77,40 +77,32 @@ export default async function BookingSuccessPage({
             alt=""
             fetchPriority="high"
             decoding="async"
-            className={cn("absolute inset-0 h-full w-full scale-110 transform-gpu object-cover")}
+            className="absolute inset-0 h-full w-full scale-110 transform-gpu object-cover"
           />
         </picture>
       </div>
 
       {/* Frosted container */}
-      <div className={cn("mx-auto my-5 w-full max-w-[min(100vw-2rem,56rem)] sm:my-10")}>
-        <div
-          className={cn(
-            "rounded-2xl border border-seasalt-400/40 bg-seasalt-800/60 p-5 shadow-lg backdrop-blur-xl sm:p-10",
-          )}
-        >
-          <div className={cn("flex flex-col gap-4 sm:gap-5")}>
+      <div className="mx-auto my-5 w-full max-w-[min(100vw-2rem,56rem)] sm:my-10">
+        <div className="rounded-2xl border border-seasalt-400/40 bg-seasalt-800/60 p-5 shadow-lg backdrop-blur-xl sm:p-10">
+          <div className="flex flex-col gap-4 sm:gap-5">
             <section className={cn(CARD, "text-center")}>
-              <div className={cn("mb-4 flex justify-center")}>
-                <FaCircleCheck className={cn("h-16 w-16 text-moonstone-600")} aria-hidden />
+              <div className="mb-4 flex justify-center">
+                <FaCircleCheck className="h-16 w-16 text-moonstone-600" aria-hidden />
               </div>
 
-              <h1
-                className={cn(
-                  "mb-3 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl",
-                )}
-              >
+              <h1 className="mb-3 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl">
                 Booking confirmed!
               </h1>
 
-              <p className={cn("mb-6 text-sm text-rich-black/80 sm:text-base")}>
+              <p className="mb-6 text-sm text-rich-black/80 sm:text-base">
                 Your appointment is confirmed. Check your email for the details and a Google
                 Calendar invite - if you don't see it within a few minutes, check your spam folder.
               </p>
 
-              <div className={cn("flex flex-wrap justify-center gap-3")}>
+              <div className="flex flex-wrap justify-center gap-3">
                 <Button href="/" variant="secondary" size="sm">
-                  <FaHouse className={cn("h-4 w-4")} aria-hidden />
+                  <FaHouse className="h-4 w-4" aria-hidden />
                   Back to home
                 </Button>
                 {cancelToken && (
@@ -119,7 +111,7 @@ export default async function BookingSuccessPage({
                     variant="ghost"
                     size="sm"
                   >
-                    <FaPenToSquare className={cn("h-4 w-4")} aria-hidden />
+                    <FaPenToSquare className="h-4 w-4" aria-hidden />
                     Edit booking
                   </Button>
                 )}
@@ -136,14 +128,10 @@ export default async function BookingSuccessPage({
             </section>
 
             <section className={cn(CARD)}>
-              <h2 className={cn("mb-2 text-lg font-bold text-russian-violet sm:text-xl")}>
+              <h2 className="mb-2 text-lg font-bold text-russian-violet sm:text-xl">
                 What happens next?
               </h2>
-              <ol
-                className={cn(
-                  "list-inside list-decimal space-y-1 text-sm text-rich-black/80 sm:text-base",
-                )}
-              >
+              <ol className="list-inside list-decimal space-y-1 text-sm text-rich-black/80 sm:text-base">
                 <li>A confirmation email has been sent to you with the appointment details</li>
                 <li>
                   A Google Calendar invite has been sent - accept it to add it to your calendar
@@ -156,17 +144,13 @@ export default async function BookingSuccessPage({
             </section>
 
             {promoTitle && (
-              <section
-                className={cn(
-                  "flex items-start gap-3 rounded-xl border border-mustard-400 bg-mustard-900 p-5 shadow-sm sm:p-6",
-                )}
-              >
-                <FaTag className={cn("mt-1 h-5 w-5 shrink-0 text-russian-violet")} aria-hidden />
+              <section className="flex items-start gap-3 rounded-xl border border-mustard-400 bg-mustard-900 p-5 shadow-sm sm:p-6">
+                <FaTag className="mt-1 h-5 w-5 shrink-0 text-russian-violet" aria-hidden />
                 <div>
-                  <h2 className={cn("mb-1 text-base font-bold text-russian-violet sm:text-lg")}>
+                  <h2 className="mb-1 text-base font-bold text-russian-violet sm:text-lg">
                     Rate locked in: {promoTitle}
                   </h2>
-                  <p className={cn("text-sm text-rich-black/80 sm:text-base")}>
+                  <p className="text-sm text-rich-black/80 sm:text-base">
                     This rate applies to your appointment even if the offer ends before your visit.
                   </p>
                 </div>
@@ -174,10 +158,10 @@ export default async function BookingSuccessPage({
             )}
 
             <section className={cn(CARD)}>
-              <h2 className={cn("mb-2 text-lg font-bold text-russian-violet sm:text-xl")}>
+              <h2 className="mb-2 text-lg font-bold text-russian-violet sm:text-xl">
                 Cancellation policy
               </h2>
-              <p className={cn("text-sm text-rich-black/80 sm:text-base")}>
+              <p className="text-sm text-rich-black/80 sm:text-base">
                 {renderEmphasised(cancellationCopy(CANCELLATION))}
               </p>
             </section>

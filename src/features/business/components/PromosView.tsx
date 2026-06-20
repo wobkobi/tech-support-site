@@ -286,83 +286,73 @@ export function PromosView({ initial }: Props): React.ReactElement {
   }
 
   return (
-    <div className={cn("space-y-6")}>
+    <div className="space-y-6">
       {/* Inline form */}
       <form
         onSubmit={(e) => void handleSubmit(e)}
-        className={cn("space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}
+        className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
       >
-        <h2 className={cn("text-sm font-semibold text-russian-violet")}>
+        <h2 className="text-sm font-semibold text-russian-violet">
           {editingId ? "Edit promo" : "New promo"}
         </h2>
 
-        <div className={cn("grid gap-3 sm:grid-cols-2")}>
-          <label className={cn("flex flex-col gap-1")}>
-            <span className={cn("text-xs font-medium text-slate-600")}>Title</span>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-slate-600">Title</span>
             <input
               type="text"
               required
               value={form.title}
               onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
               placeholder="e.g. Soft launch"
-              className={cn(
-                "rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-              )}
+              className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
             />
           </label>
-          <label className={cn("flex flex-col gap-1")}>
-            <span className={cn("text-xs font-medium text-slate-600")}>Description (optional)</span>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-slate-600">Description (optional)</span>
             <input
               type="text"
               value={form.description}
               onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
               placeholder="Shown on the pricing page"
-              className={cn(
-                "rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-              )}
+              className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
             />
           </label>
-          <label className={cn("flex flex-col gap-1")}>
-            <span className={cn("text-xs font-medium text-slate-600")}>Starts</span>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-slate-600">Starts</span>
             <input
               type="date"
               required
               value={form.startDate}
               onChange={(e) => setForm((p) => ({ ...p, startDate: e.target.value }))}
-              className={cn(
-                "rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-              )}
+              className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
             />
           </label>
-          <label className={cn("flex flex-col gap-1")}>
-            <span className={cn("text-xs font-medium text-slate-600")}>Ends (inclusive)</span>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-slate-600">Ends (inclusive)</span>
             <input
               type="date"
               required
               value={form.endDate}
               onChange={(e) => setForm((p) => ({ ...p, endDate: e.target.value }))}
-              className={cn(
-                "rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-              )}
+              className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
             />
           </label>
-          <label className={cn("flex flex-col gap-1")}>
-            <span className={cn("text-xs font-medium text-slate-600")}>Type</span>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-slate-600">Type</span>
             <select
               value={form.type}
               onChange={(e) =>
                 setForm((p) => ({ ...p, type: e.target.value as PromoType, amount: "" }))
               }
-              className={cn(
-                "rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-              )}
+              className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
             >
               <option value="flat">Flat $/hr</option>
               <option value="percent">% discount</option>
             </select>
           </label>
-          <label className={cn("flex flex-col gap-1")}>
-            <span className={cn("text-xs font-medium text-slate-600")}>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-slate-600">
               {form.type === "flat" ? "Amount ($/hr)" : "Discount (%)"}
             </span>
             <input
@@ -374,32 +364,28 @@ export function PromosView({ initial }: Props): React.ReactElement {
               value={form.amount}
               onChange={(e) => setForm((p) => ({ ...p, amount: e.target.value }))}
               placeholder={form.type === "flat" ? "50" : "20"}
-              className={cn(
-                "rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-              )}
+              className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
             />
           </label>
         </div>
 
-        <label className={cn("flex items-center gap-2 text-sm text-slate-600")}>
+        <label className="flex items-center gap-2 text-sm text-slate-600">
           <input
             type="checkbox"
             checked={form.isActive}
             onChange={(e) => setForm((p) => ({ ...p, isActive: e.target.checked }))}
-            className={cn("h-4 w-4")}
+            className="h-4 w-4"
           />
           Active (uncheck to keep the promo on file but pause it)
         </label>
 
-        {error && <p className={cn("rounded bg-red-50 px-3 py-2 text-xs text-red-600")}>{error}</p>}
+        {error && <p className="rounded bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>}
 
-        <div className={cn("flex gap-2")}>
+        <div className="flex gap-2">
           <button
             type="submit"
             disabled={busy}
-            className={cn(
-              "rounded-lg bg-russian-violet px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50",
-            )}
+            className="rounded-lg bg-russian-violet px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
           >
             {busy ? "Saving..." : editingId ? "Update promo" : "Create promo"}
           </button>
@@ -407,9 +393,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
             <button
               type="button"
               onClick={resetForm}
-              className={cn(
-                "rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50",
-              )}
+              className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
             >
               Cancel
             </button>
@@ -419,11 +403,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
 
       {/* Overlap warning */}
       {overlaps.size > 0 && (
-        <div
-          className={cn(
-            "rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800",
-          )}
-        >
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
           <strong>Heads up:</strong> {overlaps.size} active promos have overlapping date ranges.
           Customers will see whichever was created most recently. Consider disabling or shortening
           one to avoid surprise behaviour.
@@ -432,51 +412,45 @@ export function PromosView({ initial }: Props): React.ReactElement {
 
       {/* Promo list */}
       {promos.length === 0 ? (
-        <p className={cn("rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-400")}>
+        <p className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-400">
           No promos yet. Create one above to surface an offer in the site banner, pricing wizard,
           and admin calculator.
         </p>
       ) : (
         <>
           {/* Desktop: table */}
-          <div
-            className={cn(
-              "hidden overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm sm:block",
-            )}
-          >
-            <table className={cn("w-full text-sm")}>
-              <thead className={cn("bg-slate-50 text-xs text-slate-500 uppercase")}>
+          <div className="hidden overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm sm:block">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 text-xs text-slate-500 uppercase">
                 <tr>
-                  <th className={cn("px-4 py-2 text-left")}>Title</th>
-                  <th className={cn("px-4 py-2 text-left")}>Period</th>
-                  <th className={cn("px-4 py-2 text-left")}>Type</th>
-                  <th className={cn("px-4 py-2 text-left")}>Status</th>
-                  <th className={cn("px-4 py-2 text-right")}>Actions</th>
+                  <th className="px-4 py-2 text-left">Title</th>
+                  <th className="px-4 py-2 text-left">Period</th>
+                  <th className="px-4 py-2 text-left">Type</th>
+                  <th className="px-4 py-2 text-left">Status</th>
+                  <th className="px-4 py-2 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className={cn("divide-y divide-slate-100")}>
+              <tbody className="divide-y divide-slate-100">
                 {promos.map((p) => {
                   const status = getStatus(p);
                   const overlapping = overlaps.has(p.id);
                   return (
                     <tr key={p.id} className={cn(overlapping && "bg-amber-50/50")}>
-                      <td className={cn("px-4 py-3")}>
-                        <p className={cn("font-medium text-slate-700")}>{p.title}</p>
-                        {p.description && (
-                          <p className={cn("text-xs text-slate-400")}>{p.description}</p>
-                        )}
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-slate-700">{p.title}</p>
+                        {p.description && <p className="text-xs text-slate-400">{p.description}</p>}
                       </td>
-                      <td className={cn("px-4 py-3 text-xs text-slate-500")}>
+                      <td className="px-4 py-3 text-xs text-slate-500">
                         {formatDateShort(p.startAt)} – {formatDateShort(p.endAt)}
                       </td>
-                      <td className={cn("px-4 py-3 text-xs text-slate-700")}>
+                      <td className="px-4 py-3 text-xs text-slate-700">
                         {p.flatHourlyRate !== null
                           ? `${formatNZD(p.flatHourlyRate)}/hr`
                           : p.percentDiscount !== null
                             ? `${Math.round(p.percentDiscount * 100)}% off`
                             : "-"}
                       </td>
-                      <td className={cn("px-4 py-3")}>
+                      <td className="px-4 py-3">
                         <span
                           className={cn(
                             "rounded-full px-2 py-0.5 text-xs font-semibold",
@@ -489,23 +463,23 @@ export function PromosView({ initial }: Props): React.ReactElement {
                           {status[0].toUpperCase() + status.slice(1)}
                         </span>
                       </td>
-                      <td className={cn("px-4 py-3 text-right text-xs")}>
-                        <div className={cn("flex justify-end gap-3")}>
+                      <td className="px-4 py-3 text-right text-xs">
+                        <div className="flex justify-end gap-3">
                           <button
                             onClick={() => void toggleActive(p)}
-                            className={cn("text-slate-500 hover:text-slate-700")}
+                            className="text-slate-500 hover:text-slate-700"
                           >
                             {p.isActive ? "Disable" : "Enable"}
                           </button>
                           <button
                             onClick={() => startEdit(p)}
-                            className={cn("text-slate-500 hover:text-slate-700")}
+                            className="text-slate-500 hover:text-slate-700"
                           >
                             Edit
                           </button>
                           <button
                             onClick={() => void deletePromo(p)}
-                            className={cn("text-red-500 hover:text-red-700")}
+                            className="text-red-500 hover:text-red-700"
                           >
                             Delete
                           </button>
@@ -519,7 +493,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
           </div>
 
           {/* Mobile: stacked cards */}
-          <div className={cn("space-y-3 sm:hidden")}>
+          <div className="space-y-3 sm:hidden">
             {promos.map((p) => {
               const status = getStatus(p);
               const overlapping = overlaps.has(p.id);
@@ -531,11 +505,11 @@ export function PromosView({ initial }: Props): React.ReactElement {
                     overlapping && "border-amber-300 bg-amber-50/40",
                   )}
                 >
-                  <div className={cn("flex items-start justify-between gap-3")}>
-                    <div className={cn("min-w-0 flex-1")}>
-                      <p className={cn("text-base font-semibold text-slate-700")}>{p.title}</p>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-base font-semibold text-slate-700">{p.title}</p>
                       {p.description && (
-                        <p className={cn("mt-0.5 text-sm text-slate-500")}>{p.description}</p>
+                        <p className="mt-0.5 text-sm text-slate-500">{p.description}</p>
                       )}
                     </div>
                     <span
@@ -551,13 +525,13 @@ export function PromosView({ initial }: Props): React.ReactElement {
                     </span>
                   </div>
 
-                  <dl className={cn("mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm")}>
-                    <dt className={cn("text-slate-400")}>Period</dt>
-                    <dd className={cn("text-slate-700")}>
+                  <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+                    <dt className="text-slate-400">Period</dt>
+                    <dd className="text-slate-700">
                       {formatDateShort(p.startAt)} – {formatDateShort(p.endAt)}
                     </dd>
-                    <dt className={cn("text-slate-400")}>Type</dt>
-                    <dd className={cn("text-slate-700")}>
+                    <dt className="text-slate-400">Type</dt>
+                    <dd className="text-slate-700">
                       {p.flatHourlyRate !== null
                         ? `${formatNZD(p.flatHourlyRate)}/hr`
                         : p.percentDiscount !== null
@@ -566,28 +540,22 @@ export function PromosView({ initial }: Props): React.ReactElement {
                     </dd>
                   </dl>
 
-                  <div className={cn("mt-4 flex flex-wrap gap-2")}>
+                  <div className="mt-4 flex flex-wrap gap-2">
                     <button
                       onClick={() => void toggleActive(p)}
-                      className={cn(
-                        "rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50",
-                      )}
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
                     >
                       {p.isActive ? "Disable" : "Enable"}
                     </button>
                     <button
                       onClick={() => startEdit(p)}
-                      className={cn(
-                        "rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50",
-                      )}
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
                     >
                       Edit
                     </button>
                     <button
                       onClick={() => void deletePromo(p)}
-                      className={cn(
-                        "rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50",
-                      )}
+                      className="rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
                     >
                       Delete
                     </button>

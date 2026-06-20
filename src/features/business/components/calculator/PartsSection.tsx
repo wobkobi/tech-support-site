@@ -24,18 +24,16 @@ interface Props {
  */
 export function PartsSection({ parts, onPartsChange, show, onToggle }: Props): React.ReactElement {
   return (
-    <div className={cn("rounded-xl border border-slate-200 bg-white p-5 shadow-sm")}>
+    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
       <button
         onClick={onToggle}
-        className={cn(
-          "flex w-full items-center justify-between text-left text-sm font-semibold text-russian-violet",
-        )}
+        className="flex w-full items-center justify-between text-left text-sm font-semibold text-russian-violet"
       >
         Parts / materials
-        <span className={cn("text-xs text-slate-400")}>{show ? "▲" : "▼"}</span>
+        <span className="text-xs text-slate-400">{show ? "▲" : "▼"}</span>
       </button>
       {show && (
-        <div className={cn("mt-3 space-y-2")}>
+        <div className="mt-3 space-y-2">
           {parts.map((part, idx) => (
             <div
               key={idx}
@@ -55,9 +53,7 @@ export function PartsSection({ parts, onPartsChange, show, onToggle }: Props): R
                     return n;
                   })
                 }
-                className={cn(
-                  "col-span-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none sm:col-span-1 sm:py-2 sm:text-xs",
-                )}
+                className="col-span-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none sm:col-span-1 sm:py-2 sm:text-xs"
               />
               <input
                 type="number"
@@ -87,16 +83,12 @@ export function PartsSection({ parts, onPartsChange, show, onToggle }: Props): R
                     return n;
                   })
                 }
-                className={cn(
-                  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none sm:py-2 sm:text-xs",
-                )}
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none sm:py-2 sm:text-xs"
               />
               <button
                 onClick={() => onPartsChange((p) => p.filter((_, i) => i !== idx))}
                 aria-label="Remove part"
-                className={cn(
-                  "inline-flex h-11 w-11 items-center justify-center rounded-lg text-xl leading-none text-slate-400 hover:bg-red-50 hover:text-red-500 sm:h-auto sm:w-auto sm:rounded-none sm:text-lg sm:hover:bg-transparent",
-                )}
+                className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-xl leading-none text-slate-400 hover:bg-red-50 hover:text-red-500 sm:h-auto sm:w-auto sm:rounded-none sm:text-lg sm:hover:bg-transparent"
               >
                 ×
               </button>
@@ -104,9 +96,7 @@ export function PartsSection({ parts, onPartsChange, show, onToggle }: Props): R
           ))}
           <button
             onClick={() => onPartsChange((p) => [...p, { description: "", cost: 0 }])}
-            className={cn(
-              "inline-flex h-11 items-center text-sm text-slate-500 underline hover:text-russian-violet sm:h-auto sm:text-xs",
-            )}
+            className="inline-flex h-11 items-center text-sm text-slate-500 underline hover:text-russian-violet sm:h-auto sm:text-xs"
           >
             + Add part
           </button>

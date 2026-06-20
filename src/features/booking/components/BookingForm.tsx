@@ -695,7 +695,7 @@ export default function BookingForm({
       // `noValidate` so the JS error-summary takes over from native browser
       // tooltips; required + aria-required stay for assistive tech.
       noValidate
-      className={cn("flex flex-col gap-8")}
+      className="flex flex-col gap-8"
       autoComplete="off"
     >
       {/* Honeypot: visually hidden + off-screen + tab-skipped + aria-hidden.
@@ -724,17 +724,15 @@ export default function BookingForm({
         />
       </div>
       {/* ── Section 1: Scheduling ── */}
-      <fieldset className={cn("flex flex-col gap-6")}>
-        <legend className={cn("mb-1 text-xl font-bold text-russian-violet sm:text-2xl")}>
-          Schedule
-        </legend>
+      <fieldset className="flex flex-col gap-6">
+        <legend className="mb-1 text-xl font-bold text-russian-violet sm:text-2xl">Schedule</legend>
 
         {/* Duration */}
         <div id="booking-duration">
-          <label className={cn("mb-2 block text-base font-semibold text-rich-black")}>
-            How long do you need? <span className={cn("text-coquelicot-500")}>*</span>
+          <label className="mb-2 block text-base font-semibold text-rich-black">
+            How long do you need? <span className="text-coquelicot-500">*</span>
           </label>
-          <div className={cn("grid gap-3 sm:grid-cols-2")}>
+          <div className="grid gap-3 sm:grid-cols-2">
             {durationOptions.map((opt) => (
               <button
                 key={opt.value}
@@ -747,16 +745,16 @@ export default function BookingForm({
                     : "border-seasalt-400/60 bg-seasalt hover:border-russian-violet/40",
                 )}
               >
-                <div className={cn("flex items-start justify-between")}>
+                <div className="flex items-start justify-between">
                   <div>
-                    <p className={cn("text-base font-semibold text-rich-black")}>{opt.label}</p>
-                    <p className={cn("mt-1 text-base text-rich-black/70")}>{opt.description}</p>
+                    <p className="text-base font-semibold text-rich-black">{opt.label}</p>
+                    <p className="mt-1 text-base text-rich-black/70">{opt.description}</p>
                   </div>
                 </div>
               </button>
             ))}
           </div>
-          <p className={cn("mt-2 text-base text-rich-black/60")}>
+          <p className="mt-2 text-base text-rich-black/60">
             Duration is just an estimate for scheduling. Most appointments are 1 hour. Choose 2
             hours if you have multiple issues or complex setup needs.
           </p>
@@ -764,40 +762,26 @@ export default function BookingForm({
 
         {/* Day Selection */}
         <div id="booking-day">
-          <label className={cn("mb-2 block text-base font-semibold text-rich-black")}>
-            Choose a day
-          </label>
+          <label className="mb-2 block text-base font-semibold text-rich-black">Choose a day</label>
 
           {!availableDays.some((d) => d.hasAnySlots) ? (
-            <p className={cn("text-base text-rich-black/70")}>
+            <p className="text-base text-rich-black/70">
               No availability in the next two weeks. Please call or text me directly.
             </p>
           ) : (
-            <div className={cn("space-y-3")}>
+            <div className="space-y-3">
               {weekdays.length > 0 && (
                 <div>
-                  <p
-                    className={cn(
-                      "mb-1.5 text-base font-medium tracking-wide text-rich-black/60 uppercase",
-                    )}
-                  >
+                  <p className="mb-1.5 text-base font-medium tracking-wide text-rich-black/60 uppercase">
                     Weekdays
                   </p>
                   {/* pt-5 reserves space above the first row for the
                       Today/Tomorrow labels that sit fully outside their button. */}
-                  <div
-                    className={cn(
-                      "grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-x-2 gap-y-3 pt-5",
-                    )}
-                  >
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-x-2 gap-y-3 pt-5">
                     {weekdays.map((day) => (
-                      <div key={day.dateKey} className={cn("relative")}>
+                      <div key={day.dateKey} className="relative">
                         {(day.isToday || day.isTomorrow) && day.hasAnySlots && (
-                          <span
-                            className={cn(
-                              "absolute -top-5 right-0 left-0 text-center text-[10px] font-bold tracking-wide text-coquelicot-600 uppercase",
-                            )}
-                          >
+                          <span className="absolute -top-5 right-0 left-0 text-center text-[10px] font-bold tracking-wide text-coquelicot-600 uppercase">
                             {day.isToday ? "Today" : "Tomorrow"}
                           </span>
                         )}
@@ -828,26 +812,14 @@ export default function BookingForm({
 
               {weekends.length > 0 && (
                 <div>
-                  <p
-                    className={cn(
-                      "mb-1.5 text-base font-medium tracking-wide text-rich-black/60 uppercase",
-                    )}
-                  >
+                  <p className="mb-1.5 text-base font-medium tracking-wide text-rich-black/60 uppercase">
                     Weekends
                   </p>
-                  <div
-                    className={cn(
-                      "grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-x-2 gap-y-3 pt-3",
-                    )}
-                  >
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-x-2 gap-y-3 pt-3">
                     {weekends.map((day) => (
-                      <div key={day.dateKey} className={cn("relative")}>
+                      <div key={day.dateKey} className="relative">
                         {(day.isToday || day.isTomorrow) && day.hasAnySlots && (
-                          <span
-                            className={cn(
-                              "absolute -top-5 right-0 left-0 text-center text-[10px] font-bold tracking-wide text-coquelicot-600 uppercase",
-                            )}
-                          >
+                          <span className="absolute -top-5 right-0 left-0 text-center text-[10px] font-bold tracking-wide text-coquelicot-600 uppercase">
                             {day.isToday ? "Today" : "Tomorrow"}
                           </span>
                         )}
@@ -883,19 +855,19 @@ export default function BookingForm({
         {selectedDay && (
           <div
             id="booking-time"
-            className={cn("flex flex-col gap-3")}
+            className="flex flex-col gap-3"
             aria-live="polite"
             aria-atomic="false"
           >
-            <label className={cn("block text-base font-semibold text-rich-black")}>
+            <label className="block text-base font-semibold text-rich-black">
               Start time for {selectedDay.fullLabel}
             </label>
 
             {selectedDay.timeWindows.every((w) =>
               duration === "short" ? !w.availableShort : !w.availableLong,
             ) ? (
-              <div className={cn("rounded-lg border border-seasalt-400/80 bg-seasalt-900/30 p-4")}>
-                <p className={cn("text-base text-rich-black/70")}>
+              <div className="rounded-lg border border-seasalt-400/80 bg-seasalt-900/30 p-4">
+                <p className="text-base text-rich-black/70">
                   Sorry, no {duration === "short" ? "1-hour" : "2-hour"} slots available on this
                   day.
                   {duration === "long" && " Try selecting 1 hour instead, or choose another day."}
@@ -904,7 +876,7 @@ export default function BookingForm({
             ) : (
               <>
                 {/* Hour picker */}
-                <div className={cn("grid grid-cols-[repeat(auto-fill,minmax(5rem,1fr))] gap-2")}>
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(5rem,1fr))] gap-2">
                   {selectedDay.timeWindows.map((window) => {
                     const available =
                       duration === "short" ? window.availableShort : window.availableLong;
@@ -945,7 +917,7 @@ export default function BookingForm({
                     );
                     if (!activeWindow) return null;
                     return (
-                      <div className={cn("flex flex-wrap gap-2")}>
+                      <div className="flex flex-wrap gap-2">
                         {SUB_SLOT_MINUTES.map((minute) => {
                           const sub = activeWindow.subSlots.find((s) => s.minute === minute)!;
                           const available =
@@ -980,18 +952,18 @@ export default function BookingForm({
       </fieldset>
 
       {/* Divider */}
-      <hr className={cn("border-seasalt-400/80")} />
+      <hr className="border-seasalt-400/80" />
 
       {/* ── Section 2: Your details ── */}
-      <fieldset className={cn("flex flex-col gap-6")}>
-        <legend className={cn("mb-1 text-xl font-bold text-russian-violet sm:text-2xl")}>
+      <fieldset className="flex flex-col gap-6">
+        <legend className="mb-1 text-xl font-bold text-russian-violet sm:text-2xl">
           Your details
         </legend>
 
-        <div className={cn("grid gap-4 sm:grid-cols-2")}>
-          <div className={cn("flex flex-col gap-1.5")}>
-            <label htmlFor="booking-name" className={cn("text-base font-semibold text-rich-black")}>
-              Name <span className={cn("text-coquelicot-500")}>*</span>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="booking-name" className="text-base font-semibold text-rich-black">
+              Name <span className="text-coquelicot-500">*</span>
             </label>
             <input
               id="booking-name"
@@ -1011,18 +983,15 @@ export default function BookingForm({
               )}
             />
             {fieldErrors.name && (
-              <p id="booking-name-error" className={cn("text-sm text-coquelicot-600")}>
+              <p id="booking-name-error" className="text-sm text-coquelicot-600">
                 {fieldErrors.name}
               </p>
             )}
           </div>
 
-          <div className={cn("flex flex-col gap-1.5")}>
-            <label
-              htmlFor="booking-email"
-              className={cn("text-base font-semibold text-rich-black")}
-            >
-              Email <span className={cn("text-coquelicot-500")}>*</span>
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="booking-email" className="text-base font-semibold text-rich-black">
+              Email <span className="text-coquelicot-500">*</span>
             </label>
             <EmailInput
               id="booking-email"
@@ -1042,17 +1011,17 @@ export default function BookingForm({
                 "focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30",
               )}
             />
-            {contactHint && <p className={cn("text-sm text-rich-black/70")}>{contactHint}</p>}
+            {contactHint && <p className="text-sm text-rich-black/70">{contactHint}</p>}
           </div>
         </div>
 
-        <div id="booking-phone-wrap" className={cn("flex flex-col gap-1.5")}>
-          <label htmlFor="booking-phone" className={cn("text-base font-semibold text-rich-black")}>
+        <div id="booking-phone-wrap" className="flex flex-col gap-1.5">
+          <label htmlFor="booking-phone" className="text-base font-semibold text-rich-black">
             Phone{" "}
             {meetingType === "in-person" ? (
-              <span className={cn("text-coquelicot-500")}>*</span>
+              <span className="text-coquelicot-500">*</span>
             ) : (
-              <span className={cn("text-base text-rich-black/70")}>(optional)</span>
+              <span className="text-base text-rich-black/70">(optional)</span>
             )}
           </label>
           <PhoneInput
@@ -1071,18 +1040,18 @@ export default function BookingForm({
             )}
           />
           {meetingType === "in-person" && (
-            <p className={cn("text-sm text-rich-black/60")}>
+            <p className="text-sm text-rich-black/60">
               Needed so I can contact you on arrival (running late, gate codes, etc.).
             </p>
           )}
         </div>
 
         {/* Meeting Type */}
-        <div id="booking-meeting-type" className={cn("flex flex-col gap-2")}>
-          <label className={cn("text-base font-semibold text-rich-black")}>
-            Meeting type <span className={cn("text-coquelicot-500")}>*</span>
+        <div id="booking-meeting-type" className="flex flex-col gap-2">
+          <label className="text-base font-semibold text-rich-black">
+            Meeting type <span className="text-coquelicot-500">*</span>
           </label>
-          <div className={cn("grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-2")}>
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-2">
             <button
               type="button"
               onClick={() => setMeetingType("in-person")}
@@ -1120,17 +1089,17 @@ export default function BookingForm({
           )}
         >
           <div className={cn(meetingType === "in-person" ? "overflow-visible" : "overflow-hidden")}>
-            <div className={cn("pt-0.5 pb-0.5")}>
-              <div className={cn("mb-2 block text-base font-semibold text-rich-black")}>
-                Address <span className={cn("text-coquelicot-500")}>*</span>
+            <div className="pt-0.5 pb-0.5">
+              <div className="mb-2 block text-base font-semibold text-rich-black">
+                Address <span className="text-coquelicot-500">*</span>
               </div>
               {/* Only mount when in-person so Google Maps script never loads for remote sessions */}
               {meetingType === "in-person" && (
-                <div className={cn("flex flex-col gap-2 sm:flex-row sm:items-start")}>
-                  <div className={cn("flex flex-col gap-1 sm:w-44")}>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+                  <div className="flex flex-col gap-1 sm:w-44">
                     <label
                       htmlFor="booking-unit"
-                      className={cn("truncate text-sm font-medium text-rich-black/80")}
+                      className="truncate text-sm font-medium text-rich-black/80"
                     >
                       Apt / Unit (optional)
                     </label>
@@ -1154,10 +1123,10 @@ export default function BookingForm({
                       )}
                     />
                   </div>
-                  <div className={cn("flex flex-1 flex-col gap-1")}>
+                  <div className="flex flex-1 flex-col gap-1">
                     <label
                       htmlFor="booking-address"
-                      className={cn("text-sm font-medium text-rich-black/80")}
+                      className="text-sm font-medium text-rich-black/80"
                     >
                       Street address
                     </label>
@@ -1192,7 +1161,7 @@ export default function BookingForm({
                       aria-describedby={fieldErrors.address ? "booking-address-error" : undefined}
                     />
                     {fieldErrors.address && (
-                      <p id="booking-address-error" className={cn("text-sm text-coquelicot-600")}>
+                      <p id="booking-address-error" className="text-sm text-coquelicot-600">
                         {fieldErrors.address}
                       </p>
                     )}
@@ -1205,10 +1174,10 @@ export default function BookingForm({
                             "flex items-center gap-1",
                           )}
                         >
-                          <FaCheck className={cn("h-4 w-4")} aria-hidden /> Address verified
+                          <FaCheck className="h-4 w-4" aria-hidden /> Address verified
                         </p>
                       ) : (
-                        <p className={cn("text-sm text-slate-600")}>
+                        <p className="text-sm text-slate-600">
                           Pick a suggestion from the dropdown to verify your address.
                         </p>
                       ))}
@@ -1221,17 +1190,17 @@ export default function BookingForm({
       </fieldset>
 
       {/* Divider */}
-      <hr className={cn("border-seasalt-400/80")} />
+      <hr className="border-seasalt-400/80" />
 
       {/* ── Section 3: Describe the issue ── */}
-      <fieldset className={cn("flex flex-col gap-6")}>
-        <legend className={cn("mb-1 text-xl font-bold text-russian-violet sm:text-2xl")}>
+      <fieldset className="flex flex-col gap-6">
+        <legend className="mb-1 text-xl font-bold text-russian-violet sm:text-2xl">
           Describe the issue
         </legend>
 
-        <div className={cn("flex flex-col gap-1.5")}>
-          <label htmlFor="booking-notes" className={cn("text-base font-semibold text-rich-black")}>
-            What do you need help with? <span className={cn("text-coquelicot-500")}>*</span>
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="booking-notes" className="text-base font-semibold text-rich-black">
+            What do you need help with? <span className="text-coquelicot-500">*</span>
           </label>
           <textarea
             id="booking-notes"
@@ -1267,7 +1236,7 @@ export default function BookingForm({
           />
           <div
             id="booking-notes-counter"
-            className={cn("flex items-center justify-between gap-3 text-sm")}
+            className="flex items-center justify-between gap-3 text-sm"
           >
             <span
               className={cn(pasteTrimmed ? "text-coquelicot-600" : "text-rich-black/60")}
@@ -1289,26 +1258,24 @@ export default function BookingForm({
             </span>
           </div>
           {fieldErrors.notes && (
-            <p id="booking-notes-error" className={cn("text-sm text-coquelicot-600")}>
+            <p id="booking-notes-error" className="text-sm text-coquelicot-600">
               {fieldErrors.notes}
             </p>
           )}
         </div>
 
         {canInlineEstimate && (
-          <div className={cn("flex flex-col gap-2")}>
+          <div className="flex flex-col gap-2">
             <button
               type="button"
               onClick={() => void runInlineEstimate()}
               disabled={estimating || notes.trim().length < BOOKING_FIELD_LIMITS.notesMin}
-              className={cn(
-                "self-start rounded-md border border-russian-violet/40 px-4 py-2 text-sm font-semibold text-russian-violet transition-colors hover:bg-russian-violet/5 disabled:opacity-50",
-              )}
+              className="self-start rounded-md border border-russian-violet/40 px-4 py-2 text-sm font-semibold text-russian-violet transition-colors hover:bg-russian-violet/5 disabled:opacity-50"
             >
               {estimating ? "Estimating..." : "Get a rough estimate"}
             </button>
             {quote && (
-              <p className={cn("text-sm text-rich-black")}>
+              <p className="text-sm text-rich-black">
                 Rough estimate:{" "}
                 <strong>
                   ${quote.low} &ndash; ${quote.high}
@@ -1316,7 +1283,7 @@ export default function BookingForm({
                 . A ballpark from your description - the final cost is confirmed before any work.
               </p>
             )}
-            {quoteError && <p className={cn("text-sm text-coquelicot-600")}>{quoteError}</p>}
+            {quoteError && <p className="text-sm text-coquelicot-600">{quoteError}</p>}
           </div>
         )}
       </fieldset>
@@ -1337,12 +1304,10 @@ export default function BookingForm({
         return (
           <section
             aria-label="Your appointment so far"
-            className={cn(
-              "flex flex-col gap-2 rounded-lg border border-moonstone-500/30 bg-moonstone-600/5 p-4",
-            )}
+            className="flex flex-col gap-2 rounded-lg border border-moonstone-500/30 bg-moonstone-600/5 p-4"
           >
-            <div className={cn("flex items-start justify-between gap-3")}>
-              <h3 className={cn("text-base font-bold text-russian-violet sm:text-lg")}>
+            <div className="flex items-start justify-between gap-3">
+              <h3 className="text-base font-bold text-russian-violet sm:text-lg">
                 Your appointment
               </h3>
               {draftRestored && (
@@ -1358,43 +1323,43 @@ export default function BookingForm({
                 </button>
               )}
             </div>
-            <dl className={cn("grid grid-cols-[7rem_1fr] gap-x-3 gap-y-1.5 text-base")}>
-              <dt className={cn("text-rich-black/60")}>Length</dt>
-              <dd className={cn("text-rich-black")}>
-                {durationLabel ?? <span className={cn("text-rich-black/50")}>—</span>}
+            <dl className="grid grid-cols-[7rem_1fr] gap-x-3 gap-y-1.5 text-base">
+              <dt className="text-rich-black/60">Length</dt>
+              <dd className="text-rich-black">
+                {durationLabel ?? <span className="text-rich-black/50">—</span>}
               </dd>
 
-              <dt className={cn("text-rich-black/60")}>Date</dt>
-              <dd className={cn("text-rich-black")}>
+              <dt className="text-rich-black/60">Date</dt>
+              <dd className="text-rich-black">
                 {selectedDay ? (
                   selectedDay.fullLabel
                 ) : (
-                  <span className={cn("text-rich-black/50")}>—</span>
+                  <span className="text-rich-black/50">—</span>
                 )}
               </dd>
 
-              <dt className={cn("text-rich-black/60")}>Time</dt>
-              <dd className={cn("text-rich-black")}>
-                {timeLabel ? timeLabel : <span className={cn("text-rich-black/50")}>—</span>}
+              <dt className="text-rich-black/60">Time</dt>
+              <dd className="text-rich-black">
+                {timeLabel ? timeLabel : <span className="text-rich-black/50">—</span>}
               </dd>
 
-              <dt className={cn("text-rich-black/60")}>Meeting</dt>
-              <dd className={cn("text-rich-black capitalize")}>
+              <dt className="text-rich-black/60">Meeting</dt>
+              <dd className="text-rich-black capitalize">
                 {meetingType ? (
                   meetingType.replace("-", " ")
                 ) : (
-                  <span className={cn("text-rich-black/50")}>—</span>
+                  <span className="text-rich-black/50">—</span>
                 )}
               </dd>
 
               {meetingType === "in-person" && (
                 <>
-                  <dt className={cn("text-rich-black/60")}>Address</dt>
-                  <dd className={cn("wrap-break-word text-rich-black")}>
+                  <dt className="text-rich-black/60">Address</dt>
+                  <dd className="wrap-break-word text-rich-black">
                     {combinedAddress.trim() ? (
                       combinedAddress
                     ) : (
-                      <span className={cn("text-rich-black/50")}>—</span>
+                      <span className="text-rich-black/50">—</span>
                     )}
                   </dd>
                 </>
@@ -1406,13 +1371,13 @@ export default function BookingForm({
 
       {/* Cancellation / rescheduling policy - keeps expectations clear so a
           customer who later wants to change their booking knows it's easy. */}
-      <p className={cn("text-sm text-rich-black/70")}>
+      <p className="text-sm text-rich-black/70">
         Need to change or cancel? Use the link in the confirmation email any time before your
         appointment, or text/call directly.
       </p>
 
       {/* Submit */}
-      <div ref={errorSummaryRef} className={cn("flex flex-col gap-8 empty:hidden")}>
+      <div ref={errorSummaryRef} className="flex flex-col gap-8 empty:hidden">
         {slotStale && (
           <div
             role="alert"
@@ -1421,10 +1386,10 @@ export default function BookingForm({
               "flex flex-col gap-2",
             )}
           >
-            <p className={cn("text-base font-medium text-coquelicot-700")}>
+            <p className="text-base font-medium text-coquelicot-700">
               That time slot was just taken by another customer.
             </p>
-            <p className={cn("text-sm text-rich-black/70")}>
+            <p className="text-sm text-rich-black/70">
               Tap below to load the up-to-date availability - your form details will stay where they
               are.
             </p>
@@ -1445,12 +1410,10 @@ export default function BookingForm({
           <div
             role="alert"
             aria-live="assertive"
-            className={cn(
-              "rounded-md border border-coquelicot-500/50 bg-coquelicot-500/10 p-4 text-rich-black",
-            )}
+            className="rounded-md border border-coquelicot-500/50 bg-coquelicot-500/10 p-4 text-rich-black"
           >
-            <p className={cn("text-base font-semibold")}>Please fix the following:</p>
-            <ul className={cn("mt-1 list-disc space-y-0.5 pl-5 text-base")}>
+            <p className="text-base font-semibold">Please fix the following:</p>
+            <ul className="mt-1 list-disc space-y-0.5 pl-5 text-base">
               {Object.entries(fieldErrors).map(([key, msg]) => {
                 const anchors: Record<string, string> = {
                   duration: "booking-duration",
@@ -1467,7 +1430,7 @@ export default function BookingForm({
                 return (
                   <li key={key}>
                     {anchor ? (
-                      <a href={`#${anchor}`} className={cn("underline")}>
+                      <a href={`#${anchor}`} className="underline">
                         {msg}
                       </a>
                     ) : (
@@ -1480,7 +1443,7 @@ export default function BookingForm({
           </div>
         )}
         {error && (
-          <p className={cn("text-base font-medium text-coquelicot-600")} role="alert">
+          <p className="text-base font-medium text-coquelicot-600" role="alert">
             {error}
           </p>
         )}
@@ -1513,7 +1476,7 @@ export default function BookingForm({
         {Object.keys(fieldErrors).length > 0 && (
           <a
             href="#booking-duration"
-            className={cn("text-sm font-medium text-coquelicot-600 underline sm:hidden")}
+            className="text-sm font-medium text-coquelicot-600 underline sm:hidden"
           >
             {Object.keys(fieldErrors).length} issue
             {Object.keys(fieldErrors).length === 1 ? "" : "s"} - tap to review

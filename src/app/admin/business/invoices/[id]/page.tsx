@@ -51,28 +51,22 @@ export default async function InvoiceViewPage({
       />
 
       {/* Invoice preview - mirrors the trimmed PDF layout. */}
-      <div
-        className={cn(
-          "rounded-xl border border-slate-200 bg-white p-8 shadow-sm print:border-0 print:shadow-none",
-        )}
-      >
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8 print:border-0 print:shadow-none">
         {/* Header row: chip + wordmark (left), INVOICE block (right). */}
-        <div className={cn("mb-8 flex items-start justify-between gap-4")}>
+        <div className="mb-8 flex items-start justify-between gap-4">
           <Image
             src="/source/logo-wordmark.svg"
             alt="To The Point Tech"
             width={2000}
             height={674}
-            className={cn("h-20 w-auto")}
+            className="h-12 w-auto sm:h-20"
             priority
           />
-          <div className={cn("text-right")}>
-            <p className={cn("text-2xl leading-none font-extrabold text-russian-violet")}>
+          <div className="text-right">
+            <p className="text-xl leading-none font-extrabold text-russian-violet sm:text-2xl">
               {identity.gstNumber ? "TAX INVOICE" : "INVOICE"}
             </p>
-            <p className={cn("mt-2 font-mono text-sm font-semibold text-slate-700")}>
-              {invoice.number}
-            </p>
+            <p className="mt-2 font-mono text-sm font-semibold text-slate-700">{invoice.number}</p>
             <p
               className={cn(
                 "mt-1 text-xs",
@@ -88,37 +82,33 @@ export default async function InvoiceViewPage({
               {invoice.status}
             </p>
             {invoice.status === "VOIDED" && invoice.voidedAt && (
-              <p className={cn("mt-0.5 text-xs text-slate-400")}>
+              <p className="mt-0.5 text-xs text-slate-400">
                 Voided {formatDateShort(invoice.voidedAt)}
               </p>
             )}
             {identity.gstNumber && (
-              <p className={cn("mt-1 text-xs text-slate-500")}>GST# {identity.gstNumber}</p>
+              <p className="mt-1 text-xs text-slate-500">GST# {identity.gstNumber}</p>
             )}
           </div>
         </div>
 
         {/* Bill to (left) + dates (right) - mirrors PDF layout. */}
-        <div className={cn("mb-6 flex items-start justify-between gap-6")}>
+        <div className="mb-6 flex items-start justify-between gap-6">
           <div>
-            <p className={cn("mb-1 text-xs font-bold tracking-wider text-slate-400 uppercase")}>
+            <p className="mb-1 text-xs font-bold tracking-wider text-slate-400 uppercase">
               Bill to
             </p>
-            <p className={cn("text-base font-bold text-slate-800")}>{invoice.clientName}</p>
-            <p className={cn("text-sm text-slate-500")}>{invoice.clientEmail}</p>
+            <p className="text-base font-bold text-slate-800">{invoice.clientName}</p>
+            <p className="text-sm text-slate-500">{invoice.clientEmail}</p>
           </div>
-          <div className={cn("space-y-1 text-sm")}>
-            <p className={cn("flex justify-between gap-4")}>
-              <span className={cn("text-slate-500")}>Issued:</span>
-              <span className={cn("font-bold text-slate-800")}>
-                {formatDateShort(invoice.issueDate)}
-              </span>
+          <div className="space-y-1 text-sm">
+            <p className="flex justify-between gap-4">
+              <span className="text-slate-500">Issued:</span>
+              <span className="font-bold text-slate-800">{formatDateShort(invoice.issueDate)}</span>
             </p>
-            <p className={cn("flex justify-between gap-4")}>
-              <span className={cn("text-slate-500")}>Due:</span>
-              <span className={cn("font-bold text-slate-800")}>
-                {formatDateShort(invoice.dueDate)}
-              </span>
+            <p className="flex justify-between gap-4">
+              <span className="text-slate-500">Due:</span>
+              <span className="font-bold text-slate-800">{formatDateShort(invoice.dueDate)}</span>
             </p>
           </div>
         </div>
@@ -126,91 +116,85 @@ export default async function InvoiceViewPage({
         {/* Clean table (matches PDF): bold dark headers on white with a brand-coloured
             bottom border. Column widths in % match the PDF: Description 67%, Qty 9%,
             Unit price 11%, Total 13%. */}
-        <table className={cn("mb-0 w-full text-sm")}>
+        <table className="mb-0 w-full text-sm">
           <thead>
-            <tr className={cn("border-b-2 border-russian-violet text-slate-800")}>
-              <th className={cn("w-[67%] px-3 py-2 text-left font-bold")}>Description</th>
-              <th className={cn("w-[9%] px-3 py-2 text-center font-bold")}>Qty</th>
-              <th className={cn("w-[11%] px-3 py-2 text-center font-bold")}>Price</th>
-              <th className={cn("w-[13%] px-3 py-2 text-center font-bold")}>Total</th>
+            <tr className="border-b-2 border-russian-violet text-slate-800">
+              <th className="w-[67%] px-2 py-2 text-left font-bold sm:px-3">Description</th>
+              <th className="w-[9%] px-2 py-2 text-center font-bold sm:px-3">Qty</th>
+              <th className="w-[11%] px-2 py-2 text-center font-bold sm:px-3">Price</th>
+              <th className="w-[13%] px-2 py-2 text-center font-bold sm:px-3">Total</th>
             </tr>
           </thead>
           <tbody>
             {invoice.lineItems.map((item, idx) => (
               <tr key={idx} className={cn(idx % 2 === 1 ? "bg-slate-50" : "bg-white")}>
-                <td className={cn("px-3 py-2 align-top text-slate-700")}>{item.description}</td>
-                <td className={cn("px-3 py-2 text-right align-top text-slate-700")}>{item.qty}</td>
-                <td className={cn("px-3 py-2 text-right align-top text-slate-700")}>
+                <td className="px-2 py-2 align-top wrap-break-word text-slate-700 sm:px-3">
+                  {item.description}
+                </td>
+                <td className="px-2 py-2 text-right align-top text-slate-700 sm:px-3">
+                  {item.qty}
+                </td>
+                <td className="px-2 py-2 text-right align-top whitespace-nowrap text-slate-700 sm:px-3">
                   {formatNZD(item.unitPrice)}
                 </td>
-                <td className={cn("px-3 py-2 text-right align-top font-bold text-slate-800")}>
+                <td className="px-2 py-2 text-right align-top font-bold whitespace-nowrap text-slate-800 sm:px-3">
                   {formatNZD(item.lineTotal)}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-        <div className={cn("mt-4 mb-6 h-px bg-slate-300")} />
+        <div className="mt-4 mb-6 h-px bg-slate-300" />
 
-        <div className={cn("mb-6 ml-auto w-3/5 space-y-1 text-sm")}>
-          <div className={cn("flex justify-between gap-3")}>
-            <span className={cn("text-slate-500")}>Subtotal</span>
-            <span className={cn("font-medium whitespace-nowrap text-slate-700")}>
+        <div className="mb-6 ml-auto w-3/5 space-y-1 text-sm">
+          <div className="flex justify-between gap-3">
+            <span className="text-slate-500">Subtotal</span>
+            <span className="font-medium whitespace-nowrap text-slate-700">
               {formatNZD(invoice.subtotal)}
             </span>
           </div>
           {invoice.promoDiscount && invoice.promoDiscount > 0 && (
-            <div className={cn("flex justify-between gap-3 text-amber-700")}>
+            <div className="flex justify-between gap-3 text-amber-700">
               <span>Promo (labor only){invoice.promoTitle ? `: ${invoice.promoTitle}` : ""}</span>
-              <span className={cn("whitespace-nowrap")}>-{formatNZD(invoice.promoDiscount)}</span>
+              <span className="whitespace-nowrap">-{formatNZD(invoice.promoDiscount)}</span>
             </div>
           )}
           {invoice.unsuccessfulDiscount && invoice.unsuccessfulDiscount > 0 && (
-            <div className={cn("flex justify-between gap-3 text-amber-700")}>
+            <div className="flex justify-between gap-3 text-amber-700">
               <span>Unsuccessful-visit discount (half off labour)</span>
-              <span className={cn("whitespace-nowrap")}>
-                -{formatNZD(invoice.unsuccessfulDiscount)}
-              </span>
+              <span className="whitespace-nowrap">-{formatNZD(invoice.unsuccessfulDiscount)}</span>
             </div>
           )}
           {invoice.gstAmount > 0 && (
-            <div className={cn("flex justify-between gap-3")}>
-              <span className={cn("text-slate-500")}>Includes GST</span>
-              <span className={cn("font-medium whitespace-nowrap text-slate-700")}>
+            <div className="flex justify-between gap-3">
+              <span className="text-slate-500">Includes GST</span>
+              <span className="font-medium whitespace-nowrap text-slate-700">
                 {formatNZD(invoice.gstAmount)}
               </span>
             </div>
           )}
-          <div className={cn("flex justify-between gap-3 border-t border-slate-200 pt-1")}>
-            <span className={cn("font-semibold text-slate-800")}>Total</span>
-            <span className={cn("font-extrabold whitespace-nowrap text-russian-violet")}>
+          <div className="flex justify-between gap-3 border-t border-slate-200 pt-1">
+            <span className="font-semibold text-slate-800">Total</span>
+            <span className="font-extrabold whitespace-nowrap text-russian-violet">
               {formatNZD(invoice.total)}
             </span>
           </div>
         </div>
 
-        <div
-          className={cn(
-            "rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500",
-          )}
-        >
-          <p className={cn("mb-1 text-sm font-bold text-russian-violet")}>Bank transfer</p>
+        <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">
+          <p className="mb-1 text-sm font-bold text-russian-violet">Bank transfer</p>
           <p>Payee: {identity.name}</p>
-          <p className={cn("font-semibold text-slate-700")}>Account: {identity.bankAccount}</p>
-          <p className={cn("font-semibold text-slate-700")}>Reference: {invoice.number}</p>
+          <p className="font-semibold text-slate-700">Account: {identity.bankAccount}</p>
+          <p className="font-semibold text-slate-700">Reference: {invoice.number}</p>
           <p>
             Due within {identity.paymentTermsDays} days of issue (by{" "}
             {formatDateShort(invoice.dueDate)}).
           </p>
         </div>
-        {invoice.notes && (
-          <p className={cn("mt-3 text-xs text-slate-500 italic")}>{invoice.notes}</p>
-        )}
+        {invoice.notes && <p className="mt-3 text-xs text-slate-500 italic">{invoice.notes}</p>}
 
         {/* Sender contact footer (matches the page-bottom footer in the PDF). */}
-        <div
-          className={cn("mt-8 border-t border-slate-200 pt-3 text-center text-xs text-slate-500")}
-        >
+        <div className="mt-8 border-t border-slate-200 pt-3 text-center text-xs text-slate-500">
           {identity.email} &nbsp;·&nbsp; {identity.phone} &nbsp;·&nbsp; {identity.website}
           &nbsp;·&nbsp; {identity.location}
         </div>

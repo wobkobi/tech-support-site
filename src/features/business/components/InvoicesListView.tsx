@@ -118,36 +118,28 @@ export function InvoicesListView(): React.ReactElement {
 
   return (
     <div>
-      <div className={cn("mb-4 flex items-center justify-between gap-3")}>
-        <div className={cn("flex gap-2")}>
-          {syncToast && (
-            <span className={cn("self-center text-xs text-slate-500")}>{syncToast}</span>
-          )}
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="flex gap-2">
+          {syncToast && <span className="self-center text-xs text-slate-500">{syncToast}</span>}
         </div>
-        <div className={cn("flex gap-2")}>
+        <div className="flex gap-2">
           <button
             onClick={() => void handleImportDrive()}
             disabled={syncing}
-            className={cn(
-              "rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50",
-            )}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
           >
             {syncing ? "Working..." : "Import from Drive"}
           </button>
           <button
             onClick={() => void handleSyncDrive()}
             disabled={syncing}
-            className={cn(
-              "rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50",
-            )}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
           >
             {syncing ? "Syncing..." : "Sync Drive"}
           </button>
           <Link
             href={`/admin/business/calculator`}
-            className={cn(
-              "rounded-lg bg-russian-violet px-4 py-2 text-sm font-medium text-white hover:opacity-90",
-            )}
+            className="rounded-lg bg-russian-violet px-4 py-2 text-sm font-medium text-white hover:opacity-90"
           >
             New invoice
           </Link>
@@ -156,21 +148,13 @@ export function InvoicesListView(): React.ReactElement {
 
       {/* Mobile card list - below lg the table is hard to read; stack each row
           as a tap-to-open card with the same status select inline. */}
-      <div className={cn("space-y-2 lg:hidden")}>
+      <div className="space-y-2 lg:hidden">
         {loading ? (
-          <p
-            className={cn(
-              "rounded-xl border border-slate-200 bg-white px-5 py-6 text-sm text-slate-400 shadow-sm",
-            )}
-          >
+          <p className="rounded-xl border border-slate-200 bg-white px-5 py-6 text-sm text-slate-400 shadow-sm">
             Loading...
           </p>
         ) : invoices.length === 0 ? (
-          <p
-            className={cn(
-              "rounded-xl border border-slate-200 bg-white px-5 py-6 text-sm text-slate-400 shadow-sm",
-            )}
-          >
+          <p className="rounded-xl border border-slate-200 bg-white px-5 py-6 text-sm text-slate-400 shadow-sm">
             No invoices yet.
           </p>
         ) : (
@@ -182,10 +166,10 @@ export function InvoicesListView(): React.ReactElement {
                 "transition-colors hover:border-russian-violet/30",
               )}
             >
-              <div className={cn("flex items-center justify-between gap-2")}>
+              <div className="flex items-center justify-between gap-2">
                 <Link
                   href={`/admin/business/invoices/${inv.id}`}
-                  className={cn("font-mono text-xs font-semibold text-slate-700")}
+                  className="font-mono text-xs font-semibold text-slate-700"
                 >
                   {inv.number}
                 </Link>
@@ -205,25 +189,19 @@ export function InvoicesListView(): React.ReactElement {
               </div>
               <Link
                 href={`/admin/business/invoices/${inv.id}`}
-                className={cn("mt-1 block text-sm font-medium text-slate-700")}
+                className="mt-1 block text-sm font-medium text-slate-700"
               >
                 {inv.clientName}
               </Link>
-              <div
-                className={cn(
-                  "mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs",
-                )}
-              >
-                <span className={cn("text-slate-500")}>{formatDateShort(inv.issueDate)}</span>
-                <span className={cn("font-semibold text-slate-700")}>{formatNZD(inv.total)}</span>
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs">
+                <span className="text-slate-500">{formatDateShort(inv.issueDate)}</span>
+                <span className="font-semibold text-slate-700">{formatNZD(inv.total)}</span>
                 {inv.driveWebUrl ? (
                   <a
                     href={inv.driveWebUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className={cn(
-                      "ml-auto inline-flex h-8 items-center text-blue-500 hover:text-blue-700",
-                    )}
+                    className="ml-auto inline-flex h-8 items-center text-blue-500 hover:text-blue-700"
                   >
                     PDF ↗
                   </a>
@@ -235,47 +213,40 @@ export function InvoicesListView(): React.ReactElement {
       </div>
 
       {/* Desktop table - unchanged column set; hidden below lg. */}
-      <div
-        className={cn(
-          "hidden overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm lg:block",
-        )}
-      >
+      <div className="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm lg:block">
         {loading ? (
-          <p className={cn("px-5 py-6 text-sm text-slate-400")}>Loading...</p>
+          <p className="px-5 py-6 text-sm text-slate-400">Loading...</p>
         ) : invoices.length === 0 ? (
-          <p className={cn("px-5 py-6 text-sm text-slate-400")}>No invoices yet.</p>
+          <p className="px-5 py-6 text-sm text-slate-400">No invoices yet.</p>
         ) : (
-          <table className={cn("w-full text-sm")}>
-            <thead className={cn("border-b border-slate-100 bg-slate-50")}>
+          <table className="w-full text-sm">
+            <thead className="border-b border-slate-100 bg-slate-50">
               <tr>
                 {["Number", "Client", "Date", "Total", "Status", "PDF", ""].map((h) => (
-                  <th
-                    key={h}
-                    className={cn("px-4 py-3 text-left text-xs font-semibold text-slate-500")}
-                  >
+                  <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-500">
                     {h}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className={cn("divide-y divide-slate-100")}>
+            <tbody className="divide-y divide-slate-100">
               {invoices.map((inv) => (
                 <tr
                   key={inv.id}
                   onClick={() => router.push(`/admin/business/invoices/${inv.id}`)}
-                  className={cn("cursor-pointer hover:bg-slate-50")}
+                  className="cursor-pointer hover:bg-slate-50"
                 >
-                  <td className={cn("px-4 py-3 font-mono text-xs font-semibold text-slate-700")}>
+                  <td className="px-4 py-3 font-mono text-xs font-semibold text-slate-700">
                     {inv.number}
                   </td>
-                  <td className={cn("px-4 py-3 font-medium text-slate-700")}>{inv.clientName}</td>
-                  <td className={cn("px-4 py-3 text-xs whitespace-nowrap text-slate-500")}>
+                  <td className="px-4 py-3 font-medium text-slate-700">{inv.clientName}</td>
+                  <td className="px-4 py-3 text-xs whitespace-nowrap text-slate-500">
                     {formatDateShort(inv.issueDate)}
                   </td>
-                  <td className={cn("px-4 py-3 font-semibold whitespace-nowrap text-slate-700")}>
+                  <td className="px-4 py-3 font-semibold whitespace-nowrap text-slate-700">
                     {formatNZD(inv.total)}
                   </td>
-                  <td className={cn("px-4 py-3")} onClick={(e) => e.stopPropagation()}>
+                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                     <select
                       value={inv.status}
                       onChange={(e) => updateStatus(inv.id, e.target.value as InvoiceStatus)}
@@ -290,30 +261,28 @@ export function InvoicesListView(): React.ReactElement {
                       <option value="VOIDED">Voided</option>
                     </select>
                   </td>
-                  <td className={cn("px-4 py-3")} onClick={(e) => e.stopPropagation()}>
+                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                     {inv.driveWebUrl ? (
                       <a
                         href={inv.driveWebUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className={cn("text-xs text-blue-500 hover:text-blue-700")}
+                        className="text-xs text-blue-500 hover:text-blue-700"
                       >
                         PDF ↗
                       </a>
                     ) : (
-                      <span className={cn("text-xs text-slate-300")}>-</span>
+                      <span className="text-xs text-slate-300">-</span>
                     )}
                   </td>
-                  <td className={cn("px-4 py-3")}>
+                  <td className="px-4 py-3">
                     <Link
                       href={`/admin/business/invoices/${inv.id}`}
                       onClick={(e) => e.stopPropagation()}
-                      className={cn(
-                        "inline-flex items-center gap-1 text-xs text-slate-400 hover:text-slate-700",
-                      )}
+                      className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-slate-700"
                     >
                       View
-                      <FaCaretRight className={cn("h-3 w-3")} aria-hidden />
+                      <FaCaretRight className="h-3 w-3" aria-hidden />
                     </Link>
                   </td>
                 </tr>

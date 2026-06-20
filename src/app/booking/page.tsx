@@ -190,11 +190,10 @@ async function getAvailableDays(): Promise<{
   };
 }
 
-const STEP_ICON = cn(
-  "border-moonstone-500/40 bg-moonstone-600/20 grid size-9 shrink-0 place-items-center rounded-lg border",
-);
+const STEP_ICON =
+  "border-moonstone-500/40 bg-moonstone-600/20 grid size-9 shrink-0 place-items-center rounded-lg border";
 
-const SKELETON_BLOCK = cn("bg-seasalt-900/40 rounded-lg");
+const SKELETON_BLOCK = "bg-seasalt-900/40 rounded-lg";
 
 /**
  * Async island that fetches slot data inside the {@link Suspense} boundary. Renders
@@ -210,12 +209,10 @@ async function BookingFormIsland(): Promise<React.ReactElement> {
     return (
       <div
         role="status"
-        className={cn(
-          "flex flex-col gap-2 rounded-lg border-2 border-mustard-500/60 bg-mustard-900/40 p-5 text-rich-black",
-        )}
+        className="flex flex-col gap-2 rounded-lg border-2 border-mustard-500/60 bg-mustard-900/40 p-5 text-rich-black"
       >
-        <p className={cn("text-base font-semibold")}>Online booking is paused</p>
-        <p className={cn("text-sm sm:text-base")}>{closedMessage}</p>
+        <p className="text-base font-semibold">Online booking is paused</p>
+        <p className="text-sm sm:text-base">{closedMessage}</p>
       </div>
     );
   }
@@ -223,28 +220,20 @@ async function BookingFormIsland(): Promise<React.ReactElement> {
     return (
       <div
         role="alert"
-        className={cn(
-          "bg-coquelicot-50 flex flex-col gap-3 rounded-lg border-2 border-coquelicot-500/60 p-5 text-rich-black",
-        )}
+        className="bg-coquelicot-50 flex flex-col gap-3 rounded-lg border-2 border-coquelicot-500/60 p-5 text-rich-black"
       >
-        <p className={cn("text-base font-semibold sm:text-lg")}>
-          Availability isn't loading right now.
-        </p>
-        <p className={cn("text-base sm:text-lg")}>
+        <p className="text-base font-semibold sm:text-lg">Availability isn't loading right now.</p>
+        <p className="text-base sm:text-lg">
           Please refresh the page in a minute, or call/text me directly and I'll get you booked in.
         </p>
       </div>
     );
   }
   return (
-    <div className={cn("flex flex-col gap-5")}>
+    <div className="flex flex-col gap-5">
       {sameDayClosed && (
-        <div
-          className={cn(
-            "rounded-lg border border-moonstone-500/40 bg-moonstone-600/10 p-4 text-rich-black",
-          )}
-        >
-          <p className={cn("text-base")}>
+        <div className="rounded-lg border border-moonstone-500/40 bg-moonstone-600/10 p-4 text-rich-black">
+          <p className="text-base">
             Same-day bookings are closed for today (2 hours notice required, 6pm cut-off). The
             earliest available time is tomorrow.
           </p>
@@ -269,29 +258,29 @@ async function BookingFormIsland(): Promise<React.ReactElement> {
 function BookingFormSkeleton(): React.ReactElement {
   return (
     <div
-      className={cn("flex animate-pulse flex-col gap-8")}
+      className="flex animate-pulse flex-col gap-8"
       role="status"
       aria-live="polite"
       aria-label="Loading booking form"
     >
       {/* Schedule header */}
-      <div className={cn("flex flex-col gap-6")}>
+      <div className="flex flex-col gap-6">
         <div className={cn(SKELETON_BLOCK, "h-7 w-32")} />
 
         {/* Duration */}
-        <div className={cn("flex flex-col gap-2")}>
+        <div className="flex flex-col gap-2">
           <div className={cn(SKELETON_BLOCK, "h-5 w-48")} />
-          <div className={cn("grid gap-3 sm:grid-cols-2")}>
+          <div className="grid gap-3 sm:grid-cols-2">
             <div className={cn(SKELETON_BLOCK, "h-20")} />
             <div className={cn(SKELETON_BLOCK, "h-20")} />
           </div>
         </div>
 
         {/* Days */}
-        <div className={cn("flex flex-col gap-2")}>
+        <div className="flex flex-col gap-2">
           <div className={cn(SKELETON_BLOCK, "h-5 w-32")} />
           <div className={cn(SKELETON_BLOCK, "h-4 w-20")} />
-          <div className={cn("grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-2")}>
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-2">
             {Array.from({ length: 10 }).map((_, i) => (
               <div key={i} className={cn(SKELETON_BLOCK, "h-12")} />
             ))}
@@ -299,9 +288,9 @@ function BookingFormSkeleton(): React.ReactElement {
         </div>
 
         {/* Times */}
-        <div className={cn("flex flex-col gap-2")}>
+        <div className="flex flex-col gap-2">
           <div className={cn(SKELETON_BLOCK, "h-5 w-40")} />
-          <div className={cn("grid grid-cols-[repeat(auto-fill,minmax(5rem,1fr))] gap-2")}>
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(5rem,1fr))] gap-2">
             {Array.from({ length: 8 }).map((_, i) => (
               <div key={i} className={cn(SKELETON_BLOCK, "h-11")} />
             ))}
@@ -309,26 +298,26 @@ function BookingFormSkeleton(): React.ReactElement {
         </div>
       </div>
 
-      <hr className={cn("border-seasalt-400/80")} />
+      <hr className="border-seasalt-400/80" />
 
       {/* Your details */}
-      <div className={cn("flex flex-col gap-6")}>
+      <div className="flex flex-col gap-6">
         <div className={cn(SKELETON_BLOCK, "h-7 w-36")} />
-        <div className={cn("grid gap-4 sm:grid-cols-2")}>
+        <div className="grid gap-4 sm:grid-cols-2">
           <div className={cn(SKELETON_BLOCK, "h-12")} />
           <div className={cn(SKELETON_BLOCK, "h-12")} />
         </div>
         <div className={cn(SKELETON_BLOCK, "h-12 sm:max-w-sm")} />
-        <div className={cn("grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-2")}>
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-2">
           <div className={cn(SKELETON_BLOCK, "h-11")} />
           <div className={cn(SKELETON_BLOCK, "h-11")} />
         </div>
       </div>
 
-      <hr className={cn("border-seasalt-400/80")} />
+      <hr className="border-seasalt-400/80" />
 
       {/* Notes */}
-      <div className={cn("flex flex-col gap-2")}>
+      <div className="flex flex-col gap-2">
         <div className={cn(SKELETON_BLOCK, "h-5 w-56")} />
         <div className={cn(SKELETON_BLOCK, "h-28")} />
       </div>
@@ -336,7 +325,7 @@ function BookingFormSkeleton(): React.ReactElement {
       {/* Submit */}
       <div className={cn(SKELETON_BLOCK, "h-12 w-44")} />
 
-      <span className={cn("sr-only")}>Loading available appointment times...</span>
+      <span className="sr-only">Loading available appointment times...</span>
     </div>
   );
 }
@@ -355,17 +344,13 @@ export default function BookingPage(): React.ReactElement {
         ]}
       />
       <FrostedSection>
-        <div className={cn("flex flex-col gap-6 sm:gap-8")}>
+        <div className="flex flex-col gap-6 sm:gap-8">
           {/* Header */}
           <section className={cn(CARD, "animate-fade-in")}>
-            <h1
-              className={cn(
-                "mb-3 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl",
-              )}
-            >
+            <h1 className="mb-3 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl">
               Request an appointment
             </h1>
-            <p className={cn("text-sm text-rich-black sm:text-base")}>
+            <p className="text-sm text-rich-black sm:text-base">
               Pick a time that works for you and tell me what you need help with. I'll confirm the
               details and send you a calendar invite.
               <br />
@@ -374,7 +359,7 @@ export default function BookingPage(): React.ReactElement {
           </section>
 
           {/* Two-column: Form + Sidebar */}
-          <div className={cn("grid gap-6 sm:gap-8 lg:grid-cols-[1fr_20rem]")}>
+          <div className="grid gap-6 sm:gap-8 lg:grid-cols-[1fr_20rem]">
             {/* Form Card - data island streams in inside the Suspense boundary */}
             <section
               className={cn(
@@ -388,56 +373,47 @@ export default function BookingPage(): React.ReactElement {
             </section>
 
             {/* Sidebar */}
-            <aside
-              className={cn(
-                "sticky order-1 flex flex-col gap-6 sm:gap-8 lg:top-24 lg:order-2 lg:self-start",
-              )}
-            >
+            <aside className="sticky order-1 flex flex-col gap-6 sm:gap-8 lg:top-24 lg:order-2 lg:self-start">
               {/* How it works */}
               <div className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-200")}>
-                <h2 className={cn("mb-4 text-xl font-bold text-russian-violet sm:text-2xl")}>
+                <h2 className="mb-4 text-xl font-bold text-russian-violet sm:text-2xl">
                   How it works
                 </h2>
-                <ol className={cn("space-y-5")}>
-                  <li className={cn("flex gap-3")}>
+                <ol className="space-y-5">
+                  <li className="flex gap-3">
                     <span className={STEP_ICON}>
-                      <FaClock className={cn("text-base text-moonstone-600")} aria-hidden />
+                      <FaClock className="text-base text-moonstone-600" aria-hidden />
                     </span>
                     <div>
-                      <p className={cn("text-base font-semibold text-rich-black")}>Choose length</p>
-                      <p className={cn("text-base text-rich-black/70")}>1 or 2 hours</p>
+                      <p className="text-base font-semibold text-rich-black">Choose length</p>
+                      <p className="text-base text-rich-black/70">1 or 2 hours</p>
                     </div>
                   </li>
-                  <li className={cn("flex gap-3")}>
+                  <li className="flex gap-3">
                     <span className={STEP_ICON}>
-                      <FaCalendarCheck className={cn("text-base text-moonstone-600")} aria-hidden />
+                      <FaCalendarCheck className="text-base text-moonstone-600" aria-hidden />
                     </span>
                     <div>
-                      <p className={cn("text-base font-semibold text-rich-black")}>Pick a time</p>
-                      <p className={cn("text-base text-rich-black/70")}>Day and start time</p>
+                      <p className="text-base font-semibold text-rich-black">Pick a time</p>
+                      <p className="text-base text-rich-black/70">Day and start time</p>
                     </div>
                   </li>
-                  <li className={cn("flex gap-3")}>
+                  <li className="flex gap-3">
                     <span className={STEP_ICON}>
-                      <FaListCheck className={cn("text-base text-moonstone-600")} aria-hidden />
+                      <FaListCheck className="text-base text-moonstone-600" aria-hidden />
                     </span>
                     <div>
-                      <p className={cn("text-base font-semibold text-rich-black")}>
-                        Describe the issue
-                      </p>
-                      <p className={cn("text-base text-rich-black/70")}>What you need help with</p>
+                      <p className="text-base font-semibold text-rich-black">Describe the issue</p>
+                      <p className="text-base text-rich-black/70">What you need help with</p>
                     </div>
                   </li>
-                  <li className={cn("flex gap-3")}>
+                  <li className="flex gap-3">
                     <span className={STEP_ICON}>
-                      <FaEnvelopeOpenText
-                        className={cn("text-base text-moonstone-600")}
-                        aria-hidden
-                      />
+                      <FaEnvelopeOpenText className="text-base text-moonstone-600" aria-hidden />
                     </span>
                     <div>
-                      <p className={cn("text-base font-semibold text-rich-black")}>Get confirmed</p>
-                      <p className={cn("text-base text-rich-black/70")}>Calendar invite by email</p>
+                      <p className="text-base font-semibold text-rich-black">Get confirmed</p>
+                      <p className="text-base text-rich-black/70">Calendar invite by email</p>
                     </div>
                   </li>
                 </ol>
@@ -447,7 +423,7 @@ export default function BookingPage(): React.ReactElement {
               <div
                 className={cn(SOFT_CARD, "animate-slide-up animate-fill-both animate-delay-300")}
               >
-                <p className={cn("text-base leading-relaxed text-rich-black/80")}>
+                <p className="text-base leading-relaxed text-rich-black/80">
                   <strong>Timing is flexible.</strong> Most appointments are 1 hour. Choose 2 hours
                   if you have multiple issues or need more time. Actual time may be shorter or
                   longer as needed.

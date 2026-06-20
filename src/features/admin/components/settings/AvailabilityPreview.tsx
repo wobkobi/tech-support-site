@@ -60,18 +60,18 @@ export function AvailabilityPreview({ config }: Props): React.ReactElement {
   }, [config]);
 
   return (
-    <div className={cn("mt-6 rounded-lg border border-slate-200 bg-slate-50 p-4")}>
-      <h3 className={cn("text-xs font-bold tracking-wide text-russian-violet uppercase")}>
+    <div className="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-4">
+      <h3 className="text-xs font-bold tracking-wide text-russian-violet uppercase">
         Live preview
       </h3>
 
       {!config.acceptingBookings && (
-        <p className={cn("mt-2 text-sm text-amber-700")}>
+        <p className="mt-2 text-sm text-amber-700">
           Online booking is switched off - customers see the paused message instead of slots.
         </p>
       )}
 
-      <div className={cn("mt-3 grid grid-cols-7 gap-1")}>
+      <div className="mt-3 grid grid-cols-7 gap-1">
         {DAY_ORDER.map(({ index, name }) => {
           const d = config.schedule[index];
           const open = d?.enabled === true;
@@ -80,20 +80,20 @@ export function AvailabilityPreview({ config }: Props): React.ReactElement {
               key={index}
               className={cn("rounded-md p-2 text-center", open ? "bg-emerald-50" : "bg-slate-100")}
             >
-              <p className={cn("text-xs font-semibold text-slate-700")}>{name}</p>
+              <p className="text-xs font-semibold text-slate-700">{name}</p>
               {open ? (
                 <>
-                  <p className={cn("text-[11px] text-emerald-700")}>
+                  <p className="text-[11px] text-emerald-700">
                     {fmtHour(d.open)}-{fmtHour(d.close)}
                   </p>
                   {d.break && (
-                    <p className={cn("text-[11px] text-slate-400")}>
+                    <p className="text-[11px] text-slate-400">
                       break {fmtHour(d.break.start)}-{fmtHour(d.break.end)}
                     </p>
                   )}
                 </>
               ) : (
-                <p className={cn("text-[11px] text-slate-400")}>Closed</p>
+                <p className="text-[11px] text-slate-400">Closed</p>
               )}
             </div>
           );
@@ -101,7 +101,7 @@ export function AvailabilityPreview({ config }: Props): React.ReactElement {
       </div>
 
       {config.acceptingBookings && (
-        <p className={cn("mt-3 text-sm text-slate-600")}>
+        <p className="mt-3 text-sm text-slate-600">
           {nextBookable
             ? `Next bookable day: ${nextBookable}`
             : `No bookable days in the next ${config.maxAdvanceDays} days with these settings.`}

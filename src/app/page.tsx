@@ -87,9 +87,7 @@ const supportItems: ReadonlyArray<SupportItem> = [
   { label: "Photo Storage", icon: FaImages },
 ];
 
-const CARD = cn(
-  "border-seasalt-400/60 bg-seasalt-800 rounded-xl border p-5 shadow-sm sm:p-6 md:p-7",
-);
+const CARD = "border-seasalt-400/60 bg-seasalt-800 rounded-xl border p-5 shadow-sm sm:p-6 md:p-7";
 
 /**
  * Home page component
@@ -117,10 +115,10 @@ export default async function Home(): Promise<React.ReactElement> {
   return (
     <PageShell>
       <FrostedSection>
-        <div className={cn("flex flex-col gap-6 sm:gap-8")}>
+        <div className="flex flex-col gap-6 sm:gap-8">
           {/* Hero Section */}
-          <section aria-labelledby="hero-heading" className={cn("text-center")}>
-            <div className={cn("mb-6 grid place-items-center")}>
+          <section aria-labelledby="hero-heading" className="text-center">
+            <div className="mb-6 grid place-items-center">
               <Image
                 src="/source/logo-full.svg"
                 alt="To The Point Tech - computer and IT support in Auckland"
@@ -129,63 +127,53 @@ export default async function Home(): Promise<React.ReactElement> {
                 priority
                 fetchPriority="high"
                 draggable={false}
-                className={cn("h-auto w-70 sm:w-95 md:w-120 lg:w-140")}
+                className="h-auto w-70 sm:w-95 md:w-120 lg:w-140"
               />
             </div>
 
             <h1
               id="hero-heading"
-              className={cn(
-                "mx-auto mb-4 max-w-5xl text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl",
-              )}
+              className="mx-auto mb-4 max-w-5xl text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl"
             >
               Computer & IT Support in Auckland
             </h1>
 
-            <p
-              className={cn(
-                "mx-auto mb-8 max-w-7xl text-lg font-medium text-rich-black sm:text-xl md:text-2xl",
-              )}
-            >
+            <p className="mx-auto mb-8 max-w-7xl text-lg font-medium text-rich-black sm:text-xl md:text-2xl">
               Friendly tech help across Auckland. Clear explanations, no jargon, and solutions that
               actually work.
             </p>
 
-            <div className={cn("flex flex-wrap items-center justify-center gap-4")}>
-              <Button href="/booking" variant="primary" size="md" className={cn("h-12")}>
-                <FaCalendarCheck className={cn("h-5 w-5")} aria-hidden />
+            <div className="flex flex-wrap items-center justify-center gap-4">
+              <Button href="/booking" variant="primary" size="md" className="h-12">
+                <FaCalendarCheck className="h-5 w-5" aria-hidden />
                 Book appointment
               </Button>
               <Button href="tel:+64212971237" variant="secondary" size="md">
-                <FaPhone className={cn("h-4 w-4")} aria-hidden />
+                <FaPhone className="h-4 w-4" aria-hidden />
                 021 297 1237
               </Button>
             </div>
 
-            <p className={cn("mt-6 text-base text-rich-black/70 sm:text-lg")}>
+            <p className="mt-6 text-base text-rich-black/70 sm:text-lg">
               Same day appointments available • Evening & weekend hours • Remote support options
             </p>
           </section>
 
           {/* Trust Indicators */}
-          <section aria-label="Why choose us" className={cn("grid gap-4 sm:grid-cols-3 sm:gap-5")}>
+          <section aria-label="Why choose us" className="grid gap-4 sm:grid-cols-3 sm:gap-5">
             <div
               className={cn(
                 CARD,
                 "animate-slide-up animate-fill-both animate-delay-100 text-center",
               )}
             >
-              <div
-                className={cn(
-                  "mx-auto mb-3 grid size-16 place-items-center rounded-full border-2 border-moonstone-500/50 bg-moonstone-600/30",
-                )}
-              >
-                <FaCircleCheck className={cn("h-8 w-8 text-moonstone-600")} aria-hidden />
+              <div className="mx-auto mb-3 grid size-16 place-items-center rounded-full border-2 border-moonstone-500/50 bg-moonstone-600/30">
+                <FaCircleCheck className="h-8 w-8 text-moonstone-600" aria-hidden />
               </div>
-              <h3 className={cn("mb-2 text-xl font-bold text-russian-violet sm:text-2xl")}>
+              <h3 className="mb-2 text-xl font-bold text-russian-violet sm:text-2xl">
                 Computer Science Graduate
               </h3>
-              <p className={cn("text-base text-rich-black/80 sm:text-lg")}>
+              <p className="text-base text-rich-black/80 sm:text-lg">
                 University-trained with real-world experience
               </p>
             </div>
@@ -196,17 +184,13 @@ export default async function Home(): Promise<React.ReactElement> {
                 "animate-slide-up animate-fill-both animate-delay-200 text-center",
               )}
             >
-              <div
-                className={cn(
-                  "mx-auto mb-3 grid size-16 place-items-center rounded-full border-2 border-moonstone-500/50 bg-moonstone-600/30",
-                )}
-              >
-                <FaMapLocationDot className={cn("h-8 w-8 text-moonstone-600")} aria-hidden />
+              <div className="mx-auto mb-3 grid size-16 place-items-center rounded-full border-2 border-moonstone-500/50 bg-moonstone-600/30">
+                <FaMapLocationDot className="h-8 w-8 text-moonstone-600" aria-hidden />
               </div>
-              <h3 className={cn("mb-2 text-xl font-bold text-russian-violet sm:text-2xl")}>
+              <h3 className="mb-2 text-xl font-bold text-russian-violet sm:text-2xl">
                 Proudly Local
               </h3>
-              <p className={cn("text-base text-rich-black/80 sm:text-lg")}>
+              <p className="text-base text-rich-black/80 sm:text-lg">
                 Born and raised here, serving the community
               </p>
             </div>
@@ -217,17 +201,13 @@ export default async function Home(): Promise<React.ReactElement> {
                 "animate-slide-up animate-fill-both animate-delay-300 text-center",
               )}
             >
-              <div
-                className={cn(
-                  "mx-auto mb-3 grid size-16 place-items-center rounded-full border-2 border-moonstone-500/50 bg-moonstone-600/30",
-                )}
-              >
-                <FaHandshake className={cn("h-8 w-8 text-moonstone-600")} aria-hidden />
+              <div className="mx-auto mb-3 grid size-16 place-items-center rounded-full border-2 border-moonstone-500/50 bg-moonstone-600/30">
+                <FaHandshake className="h-8 w-8 text-moonstone-600" aria-hidden />
               </div>
-              <h3 className={cn("mb-2 text-xl font-bold text-russian-violet sm:text-2xl")}>
+              <h3 className="mb-2 text-xl font-bold text-russian-violet sm:text-2xl">
                 No Upselling
               </h3>
-              <p className={cn("text-base text-rich-black/80 sm:text-lg")}>
+              <p className="text-base text-rich-black/80 sm:text-lg">
                 Honest advice, fair pricing, clear communication
               </p>
             </div>
@@ -236,46 +216,32 @@ export default async function Home(): Promise<React.ReactElement> {
           {/* Services Grid */}
           <section
             aria-labelledby="services-heading"
-            className={cn("animate-slide-up animate-fill-both animate-delay-200 text-center")}
+            className="animate-slide-up animate-fill-both animate-delay-200 text-center"
           >
             <h2
               id="services-heading"
-              className={cn("mb-8 text-3xl font-bold text-rich-black sm:text-4xl md:text-5xl")}
+              className="mb-8 text-3xl font-bold text-rich-black sm:text-4xl md:text-5xl"
             >
               What I can help with
             </h2>
 
-            <ul
-              className={cn(
-                "mx-auto grid max-w-6xl grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4",
-              )}
-            >
+            <ul className="mx-auto grid max-w-6xl grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
               {supportItems.map(({ label, icon: Icon }) => (
                 <li
                   key={label}
-                  className={cn(
-                    "flex items-center gap-3 rounded-xl border border-seasalt-400/60 bg-seasalt-800 p-3 shadow-sm transition-all hover:shadow-md",
-                  )}
+                  className="flex items-center gap-3 rounded-xl border border-seasalt-400/60 bg-seasalt-800 p-3 shadow-sm transition-all hover:shadow-md"
                 >
-                  <span
-                    className={cn(
-                      "grid size-12 shrink-0 place-items-center rounded-lg border border-moonstone-500/50 bg-moonstone-600/30 sm:size-14",
-                    )}
-                  >
-                    <Icon className={cn("h-7 w-7 text-moonstone-600 sm:h-8 sm:w-8")} aria-hidden />
+                  <span className="grid size-12 shrink-0 place-items-center rounded-lg border border-moonstone-500/50 bg-moonstone-600/30 sm:size-14">
+                    <Icon className="h-7 w-7 text-moonstone-600 sm:h-8 sm:w-8" aria-hidden />
                   </span>
-                  <span
-                    className={cn(
-                      "line-clamp-2 text-left text-base leading-tight font-medium text-rich-black sm:text-lg",
-                    )}
-                  >
+                  <span className="line-clamp-2 text-left text-base leading-tight font-medium text-rich-black sm:text-lg">
                     {label}
                   </span>
                 </li>
               ))}
             </ul>
 
-            <div className={cn("mt-8 text-center")}>
+            <div className="mt-8 text-center">
               <Button href="/services" variant="tertiary" size="md">
                 View all services
               </Button>
@@ -283,56 +249,39 @@ export default async function Home(): Promise<React.ReactElement> {
           </section>
 
           {/* About & Approach */}
-          <section
-            aria-label="About and approach"
-            className={cn("grid gap-5 md:grid-cols-2 md:gap-6")}
-          >
+          <section aria-label="About and approach" className="grid gap-5 md:grid-cols-2 md:gap-6">
             <article className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-300")}>
-              <h2 className={cn("mb-4 text-2xl font-bold text-russian-violet sm:text-3xl")}>
-                About Me
-              </h2>
-              <p className={cn("mb-4 text-base text-rich-black sm:text-lg")}>
+              <h2 className="mb-4 text-2xl font-bold text-russian-violet sm:text-3xl">About Me</h2>
+              <p className="mb-4 text-base text-rich-black sm:text-lg">
                 Hi, I'm Harrison, a computer science graduate based in Auckland. I started To The
                 Point Tech to give locals a reliable, friendly person to call when technology acts
                 up.
               </p>
-              <p className={cn("text-base text-rich-black/90 sm:text-lg")}>
+              <p className="text-base text-rich-black/90 sm:text-lg">
                 I focus on practical fixes and clear explanations, leaving with your problems
                 solved.
               </p>
             </article>
 
             <article className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-400")}>
-              <h2 className={cn("mb-4 text-2xl font-bold text-russian-violet sm:text-3xl")}>
+              <h2 className="mb-4 text-2xl font-bold text-russian-violet sm:text-3xl">
                 My approach
               </h2>
-              <ul className={cn("space-y-3 text-base text-rich-black sm:text-lg")}>
-                <li className={cn("flex gap-3")}>
-                  <FaCircleCheck
-                    className={cn("mt-1 h-5 w-5 shrink-0 text-moonstone-600")}
-                    aria-hidden
-                  />
+              <ul className="space-y-3 text-base text-rich-black sm:text-lg">
+                <li className="flex gap-3">
+                  <FaCircleCheck className="mt-1 h-5 w-5 shrink-0 text-moonstone-600" aria-hidden />
                   <span>Listen first, understand your needs</span>
                 </li>
-                <li className={cn("flex gap-3")}>
-                  <FaCircleCheck
-                    className={cn("mt-1 h-5 w-5 shrink-0 text-moonstone-600")}
-                    aria-hidden
-                  />
+                <li className="flex gap-3">
+                  <FaCircleCheck className="mt-1 h-5 w-5 shrink-0 text-moonstone-600" aria-hidden />
                   <span>Explain everything as clearly as possible</span>
                 </li>
-                <li className={cn("flex gap-3")}>
-                  <FaCircleCheck
-                    className={cn("mt-1 h-5 w-5 shrink-0 text-moonstone-600")}
-                    aria-hidden
-                  />
+                <li className="flex gap-3">
+                  <FaCircleCheck className="mt-1 h-5 w-5 shrink-0 text-moonstone-600" aria-hidden />
                   <span>Leave clear notes you can refer back to</span>
                 </li>
-                <li className={cn("flex gap-3")}>
-                  <FaCircleCheck
-                    className={cn("mt-1 h-5 w-5 shrink-0 text-moonstone-600")}
-                    aria-hidden
-                  />
+                <li className="flex gap-3">
+                  <FaCircleCheck className="mt-1 h-5 w-5 shrink-0 text-moonstone-600" aria-hidden />
                   <span>Transparent pricing, no hidden fees</span>
                 </li>
               </ul>
@@ -344,30 +293,19 @@ export default async function Home(): Promise<React.ReactElement> {
             aria-labelledby="flyer-heading"
             className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-500")}
           >
-            <div
-              className={cn(
-                "flex flex-col items-center gap-4 text-center sm:flex-row sm:items-center sm:text-left",
-              )}
-            >
-              <div
-                className={cn(
-                  "grid size-16 shrink-0 place-items-center rounded-full border-2 border-moonstone-500/50 bg-moonstone-600/30",
-                )}
-              >
-                <FaDownload
-                  className={cn("h-8 w-8 -translate-y-0.5 text-moonstone-600")}
-                  aria-hidden
-                />
+            <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-center sm:text-left">
+              <div className="grid size-16 shrink-0 place-items-center rounded-full border-2 border-moonstone-500/50 bg-moonstone-600/30">
+                <FaDownload className="h-8 w-8 -translate-y-0.5 text-moonstone-600" aria-hidden />
               </div>
 
-              <div className={cn("flex-1")}>
+              <div className="flex-1">
                 <h2
                   id="flyer-heading"
-                  className={cn("mb-1 text-xl font-bold text-russian-violet sm:text-2xl")}
+                  className="mb-1 text-xl font-bold text-russian-violet sm:text-2xl"
                 >
                   Know someone who needs tech help?
                 </h2>
-                <p className={cn("text-base text-rich-black/80 sm:text-lg")}>
+                <p className="text-base text-rich-black/80 sm:text-lg">
                   Download this flyer to share with neighbours or pin to a noticeboard.
                 </p>
               </div>
@@ -377,7 +315,7 @@ export default async function Home(): Promise<React.ReactElement> {
                 download="to-the-point-tech-flyer.pdf"
                 variant="tertiary"
                 size="md"
-                className={cn("shrink-0")}
+                className="shrink-0"
               >
                 Download flyer
               </Button>
@@ -388,7 +326,7 @@ export default async function Home(): Promise<React.ReactElement> {
 
       {/* Reviews Section */}
       {hasReviews && (
-        <div className={cn("animate-fade-in animate-delay-500 animate-fill-both pb-6 sm:pb-8")}>
+        <div className="animate-fade-in animate-delay-500 animate-fill-both pb-6 sm:pb-8">
           <FrostedSection>
             <Reviews items={items} />
           </FrostedSection>
@@ -396,31 +334,23 @@ export default async function Home(): Promise<React.ReactElement> {
       )}
 
       {/* Contact Footer */}
-      <footer className={cn("mx-auto mb-6 w-fit max-w-[calc(100vw-2rem)] sm:mb-8")}>
-        <div
-          className={cn(
-            "flex flex-col items-center gap-1 rounded-xl border border-seasalt-400/40 bg-seasalt-800/70 p-4 shadow-lg backdrop-blur-md sm:flex-row sm:gap-8 sm:px-6 sm:py-4",
-          )}
-        >
+      <footer className="mx-auto mb-6 w-fit max-w-[calc(100vw-2rem)] sm:mb-8">
+        <div className="flex flex-col items-center gap-1 rounded-xl border border-seasalt-400/40 bg-seasalt-800/70 p-4 shadow-lg backdrop-blur-md sm:flex-row sm:gap-8 sm:px-6 sm:py-4">
           <a
             href="tel:+64212971237"
-            className={cn(
-              "flex items-center gap-3 rounded-md px-4 py-2 text-base font-bold text-russian-violet transition-colors hover:text-coquelicot-500 sm:text-lg",
-            )}
+            className="flex items-center gap-3 rounded-md px-4 py-2 text-base font-bold text-russian-violet transition-colors hover:text-coquelicot-500 sm:text-lg"
           >
-            <FaPhone className={cn("h-4 w-4 shrink-0 sm:h-6 sm:w-6")} aria-hidden />
+            <FaPhone className="h-4 w-4 shrink-0 sm:h-6 sm:w-6" aria-hidden />
             <span>021 297 1237</span>
           </a>
 
-          <div className={cn("hidden h-6 w-px bg-seasalt-400/50 sm:block")} />
+          <div className="hidden h-6 w-px bg-seasalt-400/50 sm:block" />
 
           <a
             href="mailto:harrison@tothepoint.co.nz"
-            className={cn(
-              "flex items-center gap-3 rounded-md px-4 py-2 text-base font-bold text-russian-violet transition-colors hover:text-coquelicot-500 sm:text-lg",
-            )}
+            className="flex items-center gap-3 rounded-md px-4 py-2 text-base font-bold text-russian-violet transition-colors hover:text-coquelicot-500 sm:text-lg"
           >
-            <FaEnvelope className={cn("h-6 w-6 shrink-0 sm:h-7 sm:w-7")} aria-hidden />
+            <FaEnvelope className="h-6 w-6 shrink-0 sm:h-7 sm:w-7" aria-hidden />
             <span>harrison@tothepoint.co.nz</span>
           </a>
         </div>

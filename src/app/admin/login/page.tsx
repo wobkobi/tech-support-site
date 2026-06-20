@@ -7,7 +7,6 @@
  */
 
 import { LoginForm } from "@/features/admin/components/LoginForm";
-import { cn } from "@/shared/lib/cn";
 import type { Metadata } from "next";
 import type React from "react";
 
@@ -36,15 +35,13 @@ export default async function AdminLoginPage({
   const nextPath = next && next.startsWith("/admin") ? next : "/admin";
 
   return (
-    <div className={cn("flex min-h-screen items-center justify-center bg-slate-50 p-6")}>
-      <div
-        className={cn("w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 shadow-sm")}
-      >
-        <h1 className={cn("text-xl font-extrabold text-russian-violet")}>Admin sign-in</h1>
-        <p className={cn("mt-1 text-sm text-slate-500")}>
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
+      <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h1 className="text-xl font-extrabold text-russian-violet">Admin sign-in</h1>
+        <p className="mt-1 text-sm text-slate-500">
           Enter the admin secret to access the operator panel.
         </p>
-        <div className={cn("mt-5")}>
+        <div className="mt-5">
           <LoginForm nextPath={nextPath} />
         </div>
       </div>

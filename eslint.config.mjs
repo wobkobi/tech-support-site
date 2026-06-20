@@ -4,6 +4,7 @@ import nextTs from "eslint-config-next/typescript";
 import prettier from "eslint-config-prettier/flat";
 import jsdoc from "eslint-plugin-jsdoc";
 import prettierPlugin from "eslint-plugin-prettier/recommended";
+import tailwindCanonical from "eslint-plugin-tailwind-canonical-classes";
 import { defineConfig, globalIgnores } from "eslint/config";
 import globals from "globals";
 
@@ -83,6 +84,21 @@ export default defineConfig([
             MethodDefinition: false,
           },
         },
+      ],
+    },
+  },
+
+  // Tailwind class hygiene. Prettier (via prettier-plugin-tailwindcss) only
+  // sorts classes; this rule collapses arbitrary values that have a scale
+  // equivalent (max-w-[12rem] > max-w-48) via Tailwind v4's own
+  // canonicalizeCandidates API, reading the theme from the CSS entry.
+  {
+    files: ["**/*.{js,jsx,ts,tsx}"],
+    plugins: { "tailwind-canonical-classes": tailwindCanonical },
+    rules: {
+      "tailwind-canonical-classes/tailwind-canonical-classes": [
+        "warn",
+        { cssPath: "src/app/globals.css" },
       ],
     },
   },

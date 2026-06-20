@@ -8,7 +8,6 @@
  * distinguished from a rate-limited one (defence-in-depth).
  */
 
-import { cn } from "@/shared/lib/cn";
 import { useRouter } from "next/navigation";
 import type React from "react";
 import { useState } from "react";
@@ -64,9 +63,9 @@ export function LoginForm({ nextPath }: LoginFormProps): React.ReactElement {
   }
 
   return (
-    <form onSubmit={handleSubmit} className={cn("flex flex-col gap-3")}>
-      <label className={cn("flex flex-col gap-1")}>
-        <span className={cn("text-xs font-semibold text-slate-600")}>Admin secret</span>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+      <label className="flex flex-col gap-1">
+        <span className="text-xs font-semibold text-slate-600">Admin secret</span>
         <input
           type="password"
           autoComplete="current-password"
@@ -75,26 +74,18 @@ export function LoginForm({ nextPath }: LoginFormProps): React.ReactElement {
           value={secret}
           onChange={(e) => setSecret(e.target.value)}
           disabled={busy}
-          className={cn(
-            "rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
-          )}
+          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none"
         />
       </label>
       {error && (
-        <p
-          className={cn(
-            "rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700",
-          )}
-        >
+        <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
           {error}
         </p>
       )}
       <button
         type="submit"
         disabled={busy || secret.length === 0}
-        className={cn(
-          "inline-flex h-11 items-center justify-center rounded-lg bg-russian-violet px-4 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50",
-        )}
+        className="inline-flex h-11 items-center justify-center rounded-lg bg-russian-violet px-4 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
       >
         {busy ? "Signing in..." : "Sign in"}
       </button>
