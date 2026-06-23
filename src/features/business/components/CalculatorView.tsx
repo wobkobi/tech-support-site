@@ -283,14 +283,16 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
 
   // Lazy-read the saved draft once at mount. Non-meaningful drafts (just the
   // auto-seeded "now" times from a previous session, nothing the operator
-  // typed) are treated as "no draft" - that way a refresh after a Clear gets
-  // fresh times instead of restoring stale 5-min-old timestamps.
+  // typed) are treated as "no draft" so a refresh after Clear gets
+  // fresh times instead of restoring stale timestamps.
   const initialDraft = useMemo(() => {
     const d = loadDraft();
-    if (!d) return null;
-    if (!isMeaningfulDraft(d)) return null;
+    if (!d || !isMeaningfulDraft(d)) return null;
     return d;
   }, []);
+  // True when a meaningful draft was loaded; readable inside async .then()
+  // callbacks without being a React dependency.
+  const draftLoadedRef = useRef(initialDraft !== null);
   // Captured once to keep timeAgo() pure for the toast label.
   const [mountedAt] = useState(() => Date.now());
   const [draftRestoredAt, setDraftRestoredAt] = useState<number | null>(
@@ -496,12 +498,12 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
       ]) => {
         // Skip the "now" + default-rate seeding when a draft was restored on
         // mount - the draft's values are the source of truth in that case.
-        if (!initialDraft) {
+        if (!draftLoadedRef.current) {
           setTimeRanges([{ startTime: now, endTime: addHour(now) }]);
         }
         if (ratesData.ok) {
           setRates(ratesData.rates);
-          if (!initialDraft) {
+          if (!draftLoadedRef.current) {
             const def = ratesData.rates.find((r) => r.isDefault);
             if (def) setHourlyRateId(def.id);
           }
@@ -1583,7 +1585,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
 
         {/* RIGHT column - live invoice preview (replaces the legacy Summary
             panel - same totals, just inside the actual invoice layout). */}
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           {/* Client - moved above the preview so it stays in reach without
               scrolling past the full A4-sized invoice render. */}
           <ClientPickerSection

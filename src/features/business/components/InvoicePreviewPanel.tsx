@@ -225,8 +225,7 @@ function InvoicePreviewPanelImpl({
 
         {/* Sender contact footer. */}
         <div className="mt-auto border-t border-slate-200 pt-3 text-center text-[10px] text-slate-500">
-          {identity.email} &nbsp;·&nbsp; {identity.phone} &nbsp;·&nbsp; {identity.website}
-          &nbsp;·&nbsp; {identity.location}
+          {identity.email} · {identity.phone} · {identity.website} · {identity.location}
         </div>
       </div>
     </div>
