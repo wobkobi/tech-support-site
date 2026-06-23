@@ -196,7 +196,7 @@ export function ManualBookingModal({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 px-5 py-5">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Start" htmlFor="mb-start" required>
               <input
                 id="mb-start"
@@ -296,7 +296,7 @@ export function ManualBookingModal({
             </div>
           </Field>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Phone" htmlFor="mb-phone" optional>
               <PhoneInput id="mb-phone" value={phone} onChange={setPhone} />
             </Field>

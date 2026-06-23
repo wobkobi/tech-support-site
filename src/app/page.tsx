@@ -225,7 +225,7 @@ export default async function Home(): Promise<React.ReactElement> {
               What I can help with
             </h2>
 
-            <ul className="mx-auto grid max-w-6xl grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+            <ul className="mx-auto grid max-w-6xl grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
               {supportItems.map(({ label, icon: Icon }) => (
                 <li
                   key={label}
