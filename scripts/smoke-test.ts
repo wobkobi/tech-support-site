@@ -16,6 +16,7 @@
 
 import { execSync, spawn, type ChildProcess } from "child_process";
 import fs from "fs";
+import net from "net";
 import path from "path";
 import puppeteer, { type Browser } from "puppeteer";
 
@@ -183,13 +184,30 @@ function routeToName(route: string): string {
 }
 
 /**
- * Parses `--flag` and `--flag=value` CLI arguments.
- * @returns Parsed flags.
+ * Resolves to a free TCP port chosen by the OS, avoiding conflicts with any
+ * already-running server (e.g. `next dev` on 3000).
+ * @returns Available port number.
  */
-function parseArgs(): { skipBuild: boolean; port: number } {
+function getFreePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const srv = net.createServer();
+    srv.listen(0, "127.0.0.1", () => {
+      const { port } = srv.address() as net.AddressInfo;
+      srv.close(() => resolve(port));
+    });
+    srv.on("error", reject);
+  });
+}
+
+/**
+ * Parses `--flag` and `--flag=value` CLI arguments.
+ * @returns Parsed flags. `port` is `null` when not specified - caller should
+ *   call {@link getFreePort} to pick an available port automatically.
+ */
+function parseArgs(): { skipBuild: boolean; port: number | null } {
   const args = process.argv.slice(2);
   let skipBuild = false;
-  let port = 3000;
+  let port: number | null = null;
 
   for (const arg of args) {
     if (arg === "--skip-build") skipBuild = true;
@@ -418,7 +436,8 @@ function printTable(results: PageResult[]): void {
 /* ------------------------------------------------------------------ main */
 
 (async () => {
-  const { skipBuild, port } = parseArgs();
+  const { skipBuild, port: rawPort } = parseArgs();
+  const port = rawPort ?? (await getFreePort());
   const baseUrl = `http://localhost:${port}`;
   let server: ChildProcess | null = null;
   let browser: Browser | null = null;
