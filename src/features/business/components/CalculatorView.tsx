@@ -437,13 +437,14 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
     const apiKey = process.env.GOOGLE_MAPS_API_KEY;
     if (!apiKey || !addressInputRef.current) return;
 
+    const inputEl = addressInputRef.current;
     let cancelled = false;
     let listener: google.maps.MapsEventListener | null = null;
 
     loadPlacesLibrary(apiKey)
       .then(() => {
-        if (cancelled || !addressInputRef.current) return;
-        const autocomplete = new google.maps.places.Autocomplete(addressInputRef.current, {
+        if (cancelled || !inputEl) return;
+        const autocomplete = new google.maps.places.Autocomplete(inputEl, {
           componentRestrictions: { country: "nz" },
           fields: ["formatted_address", "address_components"],
           types: ["geocode"],

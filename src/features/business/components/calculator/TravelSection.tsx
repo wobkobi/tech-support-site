@@ -83,6 +83,7 @@ export function TravelSection({
           type="text"
           placeholder="Client address or suburb"
           value={jobAddress}
+          autoComplete="off"
           onChange={(e) => onJobAddressChange(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") {

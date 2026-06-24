@@ -311,6 +311,7 @@ export function TravelBlockAdminList({
                     <input
                       type="text"
                       value={originInput}
+                      autoComplete="off"
                       onChange={(e) => setOriginInput(e.target.value)}
                       placeholder={b.detectedOrigin ?? "Enter address…"}
                       className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs focus:border-slate-400 focus:outline-none"
