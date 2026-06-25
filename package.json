@@ -43,7 +43,7 @@
     "@swc/helpers": "^0.5.23",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
-    "autoprefixer": "^10.5.1",
+    "autoprefixer": "^10.5.2",
     "clsx": "^2.1.1",
     "date-holidays": "^3.30.2",
     "googleapis": "^173.0.0",
