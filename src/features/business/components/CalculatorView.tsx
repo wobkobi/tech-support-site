@@ -1,5 +1,6 @@
 "use client";
 
+import { validateEmail } from "@/features/booking/lib/booking";
 import { AddToContactsModal } from "@/features/business/components/AddToContactsModal";
 import { InvoicePreviewPanel } from "@/features/business/components/InvoicePreviewPanel";
 import { ParseConfidenceBanner } from "@/features/business/components/ParseConfidenceBanner";
@@ -972,8 +973,20 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
       setSaveInvoiceError("Client name is required.");
       return;
     }
-    if (!clientEmail.trim()) {
+    // Validate the email format before the POST so a malformed address blocks
+    // invoice creation entirely. Otherwise the draft saves first and the bad
+    // email only surfaces later when the add-to-contacts step rejects it.
+    const emailCheck = validateEmail(clientEmail);
+    if (emailCheck === "empty") {
       setSaveInvoiceError("Client email is required.");
+      return;
+    }
+    if (emailCheck === "invalid") {
+      setSaveInvoiceError("Enter a valid email address.");
+      return;
+    }
+    if (emailCheck === "too-long") {
+      setSaveInvoiceError("Email is too long.");
       return;
     }
     if (totals.subtotal <= 0) {

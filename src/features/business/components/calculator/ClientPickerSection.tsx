@@ -2,6 +2,7 @@
 
 import type { GoogleContact } from "@/features/business/types/business";
 import { filterContacts } from "@/features/contacts/lib/contact-search";
+import { EmailInput } from "@/shared/components/EmailInput";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
 import { useMemo, useRef, useState } from "react";
@@ -201,12 +202,12 @@ export function ClientPickerSection({
           </div>
         )}
       </div>
-      <input
-        type="email"
+      <EmailInput
+        id="calculator-client-email"
         placeholder="Email"
         value={clientEmail}
-        onChange={(e) => onClientEmailChange(e.target.value)}
-        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+        onChange={onClientEmailChange}
+        className="rounded-lg border-slate-200"
       />
     </div>
   );
