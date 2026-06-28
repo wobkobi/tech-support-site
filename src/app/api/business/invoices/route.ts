@@ -1,4 +1,4 @@
-import { calcInvoiceTotals } from "@/features/business/lib/business";
+import { calcInvoiceTotals, isValidLineItem } from "@/features/business/lib/business";
 import { uploadInvoicePdf } from "@/features/business/lib/google-drive";
 import {
   getNextInvoiceNumber,
@@ -68,6 +68,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   if (!clientName || !clientEmail || !Array.isArray(lineItems)) {
     return errorResponse("Missing required fields", 400);
+  }
+  // Guard each item before it reaches calcInvoiceTotals / prisma.create - a
+  // non-finite qty/unitPrice/lineTotal would persist NaN totals.
+  if (!lineItems.every(isValidLineItem)) {
+    return errorResponse("Invalid line item", 400);
   }
 
   // Default issue + due dates server-side so the calculator's direct-save path

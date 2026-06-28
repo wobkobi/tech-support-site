@@ -1,4 +1,4 @@
-import { calcInvoiceTotals } from "@/features/business/lib/business";
+import { calcInvoiceTotals, isValidLineItem } from "@/features/business/lib/business";
 import { uploadInvoicePdf } from "@/features/business/lib/google-drive";
 import { extractYearCode, generateInvoicePdf } from "@/features/business/lib/invoice-pdf";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
@@ -135,6 +135,14 @@ export async function PATCH(
       );
     }
     const { clientName, clientEmail, issueDate, dueDate, lineItems, notes, status } = body;
+    // Validate replacement line items before they reach calcInvoiceTotals /
+    // prisma.update - a non-finite numeric would persist NaN totals.
+    if (
+      lineItems !== undefined &&
+      (!Array.isArray(lineItems) || !lineItems.every(isValidLineItem))
+    ) {
+      return errorResponse("Invalid line item", 400);
+    }
     if (status !== undefined) {
       const err = validateTransition(current.status, status as InvoiceStatus);
       if (err) return errorResponse(err, 409);
