@@ -311,13 +311,10 @@ function parseLegacyInvoiceText(text: string): ParsedInvoiceData {
   }
 
   if (!clientName) {
-    const snippet = billToPos >= 0 ? text.slice(billToPos, billToPos + 300) : "(Bill To not found)";
-    console.log(
-      "[import-drive] name miss. billToPos=%d email=%j snippet=%j",
-      billToPos,
-      clientEmail,
-      snippet,
-    );
+    // Diagnostic only - do not log the email or the raw "Bill To" snippet; both
+    // carry customer PII (name/address) into server logs. billToPos alone is
+    // enough to tell whether the marker was found.
+    console.log("[import-drive] name miss. billToPos=%d", billToPos);
   }
 
   // Extract issue and due dates

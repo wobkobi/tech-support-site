@@ -177,10 +177,7 @@ export default async function AdminReviewsPage(): Promise<React.ReactElement> {
       sentAt: c.reviewLinkSentAt!.toISOString(),
       reviewed: !!c.reviewLinkSubmittedAt,
       source: (c.reviewLinkSentMode === "sms" ? "Manual SMS" : "Manual email") as
-        | "Auto"
-        | "Manual email"
-        | "Manual SMS"
-        | "Legacy",
+        "Auto" | "Manual email" | "Manual SMS" | "Legacy",
       reviewUrl: c.reviewToken ? `${siteUrl}/review?token=${c.reviewToken}` : "",
     })),
     ...legacyReviews.map((r) => {

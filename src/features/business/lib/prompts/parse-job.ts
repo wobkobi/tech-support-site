@@ -60,6 +60,7 @@ DEVICE vocabulary (suggested, but extensible — invent a similarly short generi
 ACTION vocabulary (starting points — extend as needed):
 - Bare verbs: "Setup", "Configuration", "Repair", "Troubleshooting", "Cleanup", "Recovery", "Transfer", "Migration", "Security", "Training", "Maintenance", "Diagnosis".
 - Specific verb-phrases: "Corruption repair", "Windows repair", "Operating system reinstall", "Battery replacement", "Screen replacement", "Password reset", "Account recovery", "Data transfer", "Photo transfer", "Driver update", "Virus removal".
+- SPECIFICITY GATE for transfers/migrations: only narrow to a payload-specific variant ("Photo transfer", "Data transfer", "Single file transfer") when the source NAMES what moved (photos, files, contacts, a count). For a bare unqualified "transfer" with no stated payload, use the generic action "Transfer", or "Migration" when it reads as moving a whole device's content to a new one (e.g. "new phone setup and transfer"). NEVER assume "photos" just because the device is a phone.
 - Phrasing → action: "explained" / "guided" / "showed how to use" / "walkthrough" / "went through" → "Training" (don't invent "Explanation" / "Tuition" variants).
 
 DETAILS (optional qualifier — use sparingly):

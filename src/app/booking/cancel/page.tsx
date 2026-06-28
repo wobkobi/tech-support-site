@@ -36,10 +36,7 @@ type LoadState =
   | { kind: "error"; message: string };
 
 type SubmitState =
-  | { kind: "idle" }
-  | { kind: "submitting" }
-  | { kind: "done" }
-  | { kind: "error"; message: string };
+  { kind: "idle" } | { kind: "submitting" } | { kind: "done" } | { kind: "error"; message: string };
 
 /**
  * Pre-cancellation fee banner. Green = no fee, amber = call-out fee,

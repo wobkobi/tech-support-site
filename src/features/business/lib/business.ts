@@ -90,6 +90,29 @@ export function calcInvoiceTotals(
 }
 
 /**
+ * Validates one untrusted line-item payload before it reaches
+ * {@link calcInvoiceTotals} or the database. Rejects non-object items, blank
+ * descriptions, and non-finite numerics (which would otherwise yield NaN totals
+ * or a malformed persisted invoice).
+ * @param item - Candidate line item from a request body.
+ * @returns True when the item has a non-empty description and finite qty, unit price, and line total.
+ */
+export function isValidLineItem(item: unknown): item is LineItem {
+  if (!item || typeof item !== "object") return false;
+  const { description, qty, unitPrice, lineTotal } = item as Record<string, unknown>;
+  return (
+    typeof description === "string" &&
+    description.trim().length > 0 &&
+    typeof qty === "number" &&
+    Number.isFinite(qty) &&
+    typeof unitPrice === "number" &&
+    Number.isFinite(unitPrice) &&
+    typeof lineTotal === "number" &&
+    Number.isFinite(lineTotal)
+  );
+}
+
+/**
  * Generates the next sequential invoice number in TTP-YYYY-XXXX format.
  * @param lastNumber - Last used invoice number, or null for first
  * @param yearCode - Financial year code (e.g. "2627")
