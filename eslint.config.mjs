@@ -63,31 +63,6 @@ export default defineConfig([
     },
   },
 
-  // Test files - relax some rules but keep JSDoc for named helper functions
-  {
-    files: ["tests/**/*.{ts,tsx}"],
-    rules: {
-      "@typescript-eslint/no-explicit-any": "off",
-      // Allow @severity custom tag used in test file headers
-      "jsdoc/check-tag-names": ["error", { definedTags: ["severity"] }],
-      // Helper functions in tests don't need return type annotations
-      "@typescript-eslint/explicit-function-return-type": "off",
-      // Only require JSDoc on named function declarations (e.g. createMockReview),
-      // not on inline arrow functions used in vi.mock callbacks or object literals.
-      "jsdoc/require-jsdoc": [
-        "error",
-        {
-          require: {
-            FunctionDeclaration: true,
-            FunctionExpression: false,
-            ArrowFunctionExpression: false,
-            MethodDefinition: false,
-          },
-        },
-      ],
-    },
-  },
-
   // Tailwind class hygiene. Prettier (via prettier-plugin-tailwindcss) only
   // sorts classes; this rule collapses arbitrary values that have a scale
   // equivalent (max-w-[12rem] > max-w-48) via Tailwind v4's own
@@ -120,8 +95,10 @@ export default defineConfig([
     "coverage/**",
     ".turbo/**",
     ".eslintcache",
-    "next.config.mjs",
-    "postcss.config.js",
+    "next.config.ts",
+    "postcss.config.mjs",
+    "prettier.config.ts",
+    "prisma.config.ts",
     "eslint.config.mjs",
   ]),
 ]);
