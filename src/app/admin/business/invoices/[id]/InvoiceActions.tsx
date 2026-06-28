@@ -189,8 +189,7 @@ export function InvoiceActions({
         }),
       });
       const d = (await res.json()) as
-        | { ok: true; subject: string; html: string; to: string }
-        | { error: string };
+        { ok: true; subject: string; html: string; to: string } | { error: string };
       if ("error" in d) throw new Error(d.error);
       setVoidPreview({ subject: d.subject, html: d.html, to: d.to });
     } catch (err) {
