@@ -1,6 +1,6 @@
 {
   "name": "tech-support-site",
-  "version": "1.114.4",
+  "version": "3.123.12",
   "private": true,
   "type": "module",
   "scripts": {
@@ -21,7 +21,7 @@
   },
   "simple-git-hooks": {
     "pre-commit": "npm install && git add package-lock.json && npx lint-staged",
-    "pre-push": "npm run build && npm run smoke"
+    "pre-push": "npm run lint && npm run build && npm run smoke"
   },
   "lint-staged": {
     "**/*.{js,jsx,ts,tsx}": [
