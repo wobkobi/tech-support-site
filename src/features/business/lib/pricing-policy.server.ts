@@ -1,6 +1,5 @@
 // src/features/business/lib/pricing-policy.server.ts
 /**
- * @file pricing-policy.server.ts
  * @description Server-only helpers that need Prisma access. Kept separate from
  * pricing-policy.ts so the client-safe module stays importable everywhere
  * without dragging Prisma into the browser bundle.

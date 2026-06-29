@@ -1,6 +1,5 @@
 // src/app/api/admin/contacts/[id]/clear-review-link/route.ts
 /**
- * @file route.ts
  * @description Admin endpoint to revoke a Contact's manual review-link send.
  * Clears reviewToken, reviewLinkSentAt, reviewLinkSentMode and
  * reviewLinkSubmittedAt so the contact disappears from the link history

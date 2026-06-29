@@ -1,7 +1,6 @@
 "use client";
 // src/shared/components/GoogleTag.tsx
 /**
- * @file GoogleTag.tsx
  * @description Loads gtag.js for GA4 + Google Ads and reports tel: link taps.
  */
 

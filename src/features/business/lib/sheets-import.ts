@@ -1,3 +1,9 @@
+// src/features/business/lib/sheets-import.ts
+/**
+ * @description Imports Cashbook (income) and Expenses rows from Google Sheets
+ * into the database. Tolerant parsers for dates, amounts, and GST rates; counts
+ * imported vs skipped per sheet. {@link runSheetsImport} supports a dry run.
+ */
 import { calcGstFromInclusive } from "@/features/business/lib/business";
 import { listSpreadsheetsInFolder } from "@/features/business/lib/google-drive";
 import { getSheetId, getSheetsClient } from "@/features/business/lib/google-sheets";

@@ -1,4 +1,9 @@
 "use client";
+// src/features/business/components/ParseConfidenceBanner.tsx
+/**
+ * @description Dismissible banner showing the AI parse confidence (high / medium
+ * / low) and any warnings, with colour and icon keyed off the level.
+ */
 
 import { cn } from "@/shared/lib/cn";
 import type React from "react";

@@ -1,6 +1,5 @@
 // src/app/booking/cancel/loading.tsx
 /**
- * @file loading.tsx
  * @description Streaming skeleton for the booking cancel page. Matches the
  * page's own frosted container (not PageShell) so it doesn't inherit the
  * booking-form skeleton: a single card with the heading, detail lines, a fee

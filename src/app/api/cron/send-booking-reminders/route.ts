@@ -1,6 +1,5 @@
 // src/app/api/cron/send-booking-reminders/route.ts
 /**
- * @file route.ts
  * @description Cron that sends a 24h-out email reminder for confirmed bookings.
  *
  * Window: bookings starting in 13-25 hours from now, not previously emailed.

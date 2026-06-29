@@ -1,6 +1,5 @@
 // src/shared/lib/rate-limit.ts
 /**
- * @file rate-limit.ts
  * @description In-memory fixed-window rate limiter for public POST routes.
  *
  * Vercel serverless instances each hold their own bucket map, so the effective

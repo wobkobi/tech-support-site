@@ -1,6 +1,5 @@
 // src/features/business/lib/travel-distance.ts
 /**
- * @file travel-distance.ts
  * @description One-way driving distance + duration lookup against the Google
  * Distance Matrix API, from HOME_ADDRESS to a free-text destination. Used
  * by /api/pricing/travel-time (returned to the public estimator) and the

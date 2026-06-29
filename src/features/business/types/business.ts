@@ -1,3 +1,10 @@
+// src/features/business/types/business.ts
+/**
+ * @description Shared type definitions for the business feature - rate config,
+ * line items, invoices and their status, plus the ledger and job-calculation
+ * shapes consumed by the calculator, invoice, and importer code.
+ */
+
 export interface RateConfig {
   id: string;
   label: string;

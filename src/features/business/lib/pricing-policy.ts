@@ -1,6 +1,5 @@
 // src/features/business/lib/pricing-policy.ts
 /**
- * @file pricing-policy.ts
  * @description Single source of truth for every billable rule customers and
  * operators see: travel-charge math, cancellation windows, minimum billable
  * time, GST mode, plus the copy shared by the pricing page, booking

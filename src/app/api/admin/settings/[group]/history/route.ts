@@ -1,6 +1,5 @@
 // src/app/api/admin/settings/[group]/history/route.ts
 /**
- * @file route.ts
  * @description Admin read of the change history for one settings group. Returns
  * the most recent `SettingAudit` rows (newest first) with the set of top-level
  * keys that changed in each, plus the raw post-change value so the panel can

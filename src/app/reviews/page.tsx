@@ -1,6 +1,5 @@
 // src/app/reviews/page.tsx
 /**
- * @file page.tsx
  * @description Public reviews page showing all approved client reviews.
  */
 

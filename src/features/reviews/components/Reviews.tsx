@@ -1,6 +1,5 @@
 // src/features/reviews/components/Reviews.tsx
 /**
- * @file Reviews.tsx
  * @description Reviews module with responsive rows (1-3 items) or marquee scroll (4+ items).
  */
 

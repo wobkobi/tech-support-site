@@ -1,6 +1,5 @@
 // src/app/review/loading.tsx
 /**
- * @file loading.tsx
  * @description Streaming skeleton for the review page.
  * Shown immediately while the server validates the token and fetches review data.
  * Turns a 6s FCP into a near-instant render by streaming the shell first.

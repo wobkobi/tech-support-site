@@ -1,5 +1,11 @@
 "use client";
-
+// src/features/business/components/calculator/TasksSection.tsx
+/**
+ * @description Tasks list - the core of the job calculator. Each row is either
+ * a flat-rate line (Travel etc.) or a device + action task whose pricing is
+ * looked up from a saved {@link TaskTemplate}. Modifier chips nudge the
+ * effective hourly rate; {@link TaskTotalsRow} renders the shared qty/price/total strip.
+ */
 import { Combobox } from "@/features/business/components/Combobox";
 import { composeDescription, formatNZD } from "@/features/business/lib/business";
 import type { RateConfig, TaskLine, TaskTemplate } from "@/features/business/types/business";

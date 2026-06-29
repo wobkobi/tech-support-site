@@ -1,7 +1,6 @@
 "use client";
 // src/features/reviews/components/admin/ReviewLinkHistoryTable.tsx
 /**
- * @file ReviewLinkHistoryTable.tsx
  * @description Table of review link history with inline editing for ReviewRequest entries.
  */
 

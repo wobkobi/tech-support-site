@@ -1,3 +1,9 @@
+// src/features/business/lib/google-drive.ts
+/**
+ * @description Google Drive v3 helpers for invoice storage. Finds or creates the
+ * "Invoices > {year}" folder tree (cached per yearCode), uploads/lists invoice
+ * PDFs, and reads spreadsheets for the sheets importer.
+ */
 import { getOAuth2Client } from "@/features/calendar/lib/google-calendar";
 import { google } from "googleapis";
 import { Readable } from "stream";

@@ -1,6 +1,5 @@
 // src/shared/lib/settings/defaults.ts
 /**
- * @file defaults.ts
  * @description Canonical default for every settings group, transcribed from the
  * constants that lived in code before the settings panel. `get-settings.ts`
  * merges DB overrides on top of these, so an empty/missing/unreachable Setting

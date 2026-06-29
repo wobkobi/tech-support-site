@@ -1,4 +1,9 @@
 // src/features/reviews/lib/revalidate.ts
+/**
+ * @description ISR revalidation for the public review pages. Call after any
+ * review status change so the home page and review routes pick up the latest
+ * approved reviews.
+ */
 import { revalidatePath, revalidateTag } from "next/cache";
 
 /**

@@ -1,6 +1,5 @@
 // src/features/admin/lib/week.ts
 /**
- * @file week.ts
  * @description Week-range helpers for the admin schedule view.
  */
 

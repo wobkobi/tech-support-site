@@ -1,6 +1,5 @@
 // src/app/api/reviews/[id]/route.ts
 /**
- * @file route.ts
  * @description PATCH /api/reviews/[id] - Allows a customer to edit their review (with valid customerRef), resets status to pending.
  */
 

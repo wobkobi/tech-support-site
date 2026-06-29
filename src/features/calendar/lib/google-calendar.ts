@@ -1,6 +1,5 @@
 // src/features/calendar/lib/google-calendar.ts
 /**
- * @file google-calendar.ts
  * @description Google Calendar API integration - multi-calendar without list permission.
  */
 

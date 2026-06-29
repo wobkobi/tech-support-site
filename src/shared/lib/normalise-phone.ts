@@ -1,6 +1,5 @@
 // src/shared/lib/normalise-phone.ts
 /**
- * @file normalise-phone.ts
  * @description Shared phone number normalisation and validation utilities.
  */
 

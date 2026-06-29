@@ -1,3 +1,8 @@
+// src/app/admin/business/invoices/page.tsx
+/**
+ * @description Admin invoices list page. Renders {@link InvoicesListView}, which
+ * loads and lists saved invoices.
+ */
 import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
 import { InvoicesListView } from "@/features/business/components/InvoicesListView";
 import { requireAdminAuth } from "@/shared/lib/auth";

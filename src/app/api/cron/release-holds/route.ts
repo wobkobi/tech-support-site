@@ -1,6 +1,5 @@
 // src/app/api/cron/release-holds/route.ts
 /**
- * @file route.ts
  * @description Cron endpoint to release expired booking holds.
  * Called externally via cron-job.org every 15 minutes.
  */

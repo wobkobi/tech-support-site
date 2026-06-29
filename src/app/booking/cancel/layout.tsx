@@ -1,6 +1,5 @@
 // src/app/booking/cancel/layout.tsx
 /**
- * @file layout.tsx
  * @description Metadata holder for the cancel page. The page itself is a
  * client component ("use client"), which cannot export metadata, so the
  * noindex rule lives here.

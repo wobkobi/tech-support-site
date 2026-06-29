@@ -1,3 +1,9 @@
+// src/app/admin/business/expenses/page.tsx
+/**
+ * @description Admin expenses page. Renders {@link ExpensesView} for recording
+ * and viewing expense entries, with {@link SubscriptionsView} below for
+ * recurring subscription costs.
+ */
 import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
 import { ExpensesView } from "@/features/business/components/ExpensesView";
 import { SubscriptionsView } from "@/features/business/components/SubscriptionsView";

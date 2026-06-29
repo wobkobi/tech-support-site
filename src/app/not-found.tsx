@@ -1,6 +1,5 @@
 // src/app/not-found.tsx
 /**
- * @file not-found.tsx
  * @description Themed 404 page. Matches site styling.
  */
 

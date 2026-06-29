@@ -1,3 +1,11 @@
+// src/app/api/business/subscriptions/[id]/record/route.ts
+/**
+ * @description Admin endpoint to record a single subscription payment. POST
+ * creates an ExpenseEntry with the GST split, advances the subscription's
+ * nextDue, and appends a row to the Expenses Google Sheet. Sheet-append failures
+ * are non-fatal and surface as a sheetSyncWarning flag in the response.
+ */
+
 import {
   advanceNextDue,
   calcGstFromInclusive,

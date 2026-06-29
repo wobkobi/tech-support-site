@@ -1,6 +1,5 @@
 // src/app/api/admin/settings/[group]/route.ts
 /**
- * @file route.ts
  * @description Admin read/write for one settings group. GET returns the resolved
  * group (defaults + DB override); PUT validates the payload, runs cross-setting
  * guardrails on the full proposed settings, then persists. Guardrail BLOCKs

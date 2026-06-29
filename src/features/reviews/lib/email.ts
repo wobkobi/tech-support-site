@@ -1,6 +1,5 @@
 // src/features/reviews/lib/email.ts
 /**
- * @file email.ts
  * @description Shared Resend utility for sending transactional emails.
  */
 

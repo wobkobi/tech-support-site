@@ -1,6 +1,5 @@
 // src/app/page.tsx
 /**
- * @file page.tsx
  * @description Main landing page for tech support company.
  */
 

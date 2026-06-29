@@ -1,6 +1,5 @@
 // src/app/api/admin/reviews/route.ts
 /**
- * @file route.ts
  * @description Admin API for manually creating reviews (for past clients).
  */
 

@@ -1,4 +1,10 @@
 // src/app/admin/reviews/page.tsx
+/**
+ * @description Admin reviews page. Loads reviews plus booking and contact
+ * review-link sends (soft-capped at 1000 each), joins them into a unified link
+ * history, and renders the {@link ReviewApprovalList}, {@link SendReviewLinkForm},
+ * and {@link ReviewLinkHistoryTable}.
+ */
 import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
 import { ReviewApprovalList } from "@/features/reviews/components/admin/ReviewApprovalList";
 import { ReviewLinkHistoryTable } from "@/features/reviews/components/admin/ReviewLinkHistoryTable";

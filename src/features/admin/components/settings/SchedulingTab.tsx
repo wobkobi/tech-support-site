@@ -1,7 +1,6 @@
 "use client";
 // src/features/admin/components/settings/SchedulingTab.tsx
 /**
- * @file SchedulingTab.tsx
  * @description Editor for the advanced scheduling group: the travel-block
  * heuristics used by the calendar travel engine (rounding buffer, minimum home
  * dwell, travel-back departure buffer, smart-origin lookahead). Marked advanced

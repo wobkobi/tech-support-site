@@ -1,6 +1,5 @@
 // src/app/api/booking/contact-lookup/route.ts
 /**
- * @file route.ts
  * @description Looks up a contact by email so the booking form can pre-fill name/phone/address.
  */
 

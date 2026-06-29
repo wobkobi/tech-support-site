@@ -1,6 +1,5 @@
 // src/features/booking/components/AddressAutocomplete.tsx
 /**
- * @file AddressAutocomplete.tsx
  * @description Address input backed by the legacy google.maps.places.Autocomplete
  * widget attached to a component-owned <input>. Lazy-loads on visibility and
  * falls back to a plain text input when the API key is missing or the loader

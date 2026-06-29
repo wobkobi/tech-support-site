@@ -1,7 +1,6 @@
 "use client";
 // src/features/booking/components/admin/BookingAdminList.tsx
 /**
- * @file BookingAdminList.tsx
  * @description Interactive admin component for viewing and editing bookings.
  */
 

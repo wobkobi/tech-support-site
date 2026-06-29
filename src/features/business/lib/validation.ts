@@ -1,5 +1,4 @@
 /**
- * @file validation.ts
  * @description Shared input parsers for business write routes.
  * Reject non-finite, out-of-range, or otherwise nonsensical numeric values
  * before they reach Prisma so accounting reports stay coherent.

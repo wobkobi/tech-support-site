@@ -1,7 +1,6 @@
 "use client";
 // src/features/admin/components/settings/AvailabilityTab.tsx
 /**
- * @file AvailabilityTab.tsx
  * @description Editor for the availability group: the master accepting-bookings
  * switch + paused message, the per-weekday hours (with optional midday break and
  * day-off), the booking-window rules, job durations, and daily caps. Saves

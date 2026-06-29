@@ -1,6 +1,5 @@
 // src/features/admin/components/AdminListSkeleton.tsx
 /**
- * @file AdminListSkeleton.tsx
  * @description Loading skeleton for the admin data-table views (Bookings,
  * Income, Expenses, Invoices, Contacts, Travel, Promos, Price-estimates):
  * heading + filter chips + the card-on-mobile / table-on-desktop card list.

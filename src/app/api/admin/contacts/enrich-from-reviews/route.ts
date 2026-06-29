@@ -1,6 +1,5 @@
 // src/app/api/admin/contacts/enrich-from-reviews/route.ts
 /**
- * @file route.ts
  * @description Enriches Contact records by comparing them against Review data.
  * Returns a list of name conflicts where review-supplied names differ from the
  * Contact's stored name so the admin can resolve them manually. The standalone

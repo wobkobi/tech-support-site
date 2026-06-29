@@ -1,6 +1,5 @@
 // src/features/business/lib/quick-estimate.ts
 /**
- * @file quick-estimate.ts
  * @description Client-safe one-shot price estimate used by the booking form's
  * inline "get a rough estimate" affordance (for customers who skipped the
  * /pricing wizard). Orchestrates the same public endpoints the wizard uses and

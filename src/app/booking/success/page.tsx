@@ -1,6 +1,5 @@
 // src/app/booking/success/page.tsx
 /**
- * @file page.tsx
  * @description Booking request success page.
  */
 

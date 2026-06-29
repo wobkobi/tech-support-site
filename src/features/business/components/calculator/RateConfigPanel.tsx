@@ -1,5 +1,11 @@
 "use client";
-
+// src/features/business/components/calculator/RateConfigPanel.tsx
+/**
+ * @description Admin-only rate management panel. Lists every {@link RateConfig}
+ * (stacked cards on mobile, table at lg+) with edit/delete, plus a form to
+ * create or update one and a "Reset to defaults" action. Purely presentational
+ * - all state and handlers live in the parent.
+ */
 import type { RateConfig } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";

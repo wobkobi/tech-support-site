@@ -1,7 +1,6 @@
 "use client";
 // src/features/admin/components/settings/TaxTab.tsx
 /**
- * @file TaxTab.tsx
  * @description Editor for the tax-planner group: the income-tax / ACC /
  * KiwiSaver reserve rates (stored as fractions) and the weekly transfer
  * amounts. These feed the dashboard tax planner and the per-FY tax reserve;

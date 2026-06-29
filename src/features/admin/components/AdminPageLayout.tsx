@@ -1,3 +1,9 @@
+// src/features/admin/components/AdminPageLayout.tsx
+/**
+ * @description Shared layout wrapper for admin pages - renders {@link AdminSidebar}
+ * and the content area. Reserves the sidebar width at lg+ and guards against
+ * wide content blowing out the column; print mode drops the chrome.
+ */
 import { AdminSidebar, type AdminPage } from "@/features/admin/components/AdminSidebar";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";

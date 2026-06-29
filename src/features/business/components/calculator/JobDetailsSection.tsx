@@ -1,5 +1,11 @@
 "use client";
-
+// src/features/business/components/calculator/JobDetailsSection.tsx
+/**
+ * @description Time + hourly-rate card. Multiple Start/End slots sum into one
+ * Labour line, with {@link slotIssue} flagging zero-length or cross-midnight
+ * slots. A manual duration override wins over the slot sum, and a billed-
+ * rounding hint shows only when a charging rate is selected.
+ */
 import {
   billableMins,
   formatNZD,

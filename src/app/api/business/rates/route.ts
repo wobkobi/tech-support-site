@@ -1,3 +1,12 @@
+// src/app/api/business/rates/route.ts
+/**
+ * @description Admin rate-config collection endpoint. GET returns every rate,
+ * seeding any missing DEFAULTS and running passive migrations (drop Student /
+ * Complex, convert legacy per-km Travel to time-based, backfill updatedAt).
+ * POST creates a rate (clearing other defaults when isDefault is set); DELETE
+ * wipes all rows and reseeds the DEFAULTS.
+ */
+
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";

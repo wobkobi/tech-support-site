@@ -1,7 +1,6 @@
 "use client";
 // src/features/business/components/BreakdownModal.tsx
 /**
- * @file BreakdownModal.tsx
  * @description Modal that explains how a dashboard total was computed - either by
  * listing the entries that summed to it, or by showing the calculation steps.
  */

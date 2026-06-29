@@ -1,6 +1,5 @@
 // src/shared/lib/google-maps-loader.ts
 /**
- * @file google-maps-loader.ts
  * @description Loads the Maps JS API + Places library exactly once.
  */
 

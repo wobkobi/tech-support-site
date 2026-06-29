@@ -1,6 +1,5 @@
 // src/app/api/cron/refresh-calendar-cache/route.ts
 /**
- * @file route.ts
  * @description Cron endpoint to refresh cached calendar events.
  * Called externally via cron-job.org every 15 minutes.
  */

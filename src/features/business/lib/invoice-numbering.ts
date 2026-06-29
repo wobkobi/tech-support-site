@@ -1,6 +1,5 @@
 // src/features/business/lib/invoice-numbering.ts
 /**
- * @file invoice-numbering.ts
  * @description Shared invoice-numbering helper. Both the admin invoice
  * create flow and the auto-drafted late-cancellation invoice flow have to
  * agree on the next number so they never collide on the unique

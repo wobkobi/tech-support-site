@@ -1,7 +1,6 @@
 "use client";
 // src/features/business/components/AddToContactsModal.tsx
 /**
- * @file AddToContactsModal.tsx
  * @description Post-action prompt asking the operator whether to save the
  * current client to the DB Contact table (and Google Contacts via the
  * fire-and-forget sync). Triggered after an invoice save succeeds or when

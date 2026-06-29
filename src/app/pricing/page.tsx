@@ -1,6 +1,5 @@
 // src/app/pricing/page.tsx
 /**
- * @file page.tsx
  * @description Pricing page. Rates come from RateConfig (shared with the
  * calculator and wizard); accordion copy comes from pricing-policy.ts so the
  * page, booking emails, and FAQ stay aligned.

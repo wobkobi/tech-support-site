@@ -1,6 +1,5 @@
 // src/shared/lib/cn.ts
 /**
- * @file cn.ts
  * @description Merge conditional class names with Tailwind conflict resolution.
  */
 

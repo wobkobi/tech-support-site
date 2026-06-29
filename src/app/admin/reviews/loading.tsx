@@ -1,6 +1,5 @@
 // src/app/admin/reviews/loading.tsx
 /**
- * @file loading.tsx
  * @description Loading skeleton for the reviews moderation page: heading with
  * count chips and the 3-column layout - the approval list (2 cols) beside the
  * send-link and link-history cards.

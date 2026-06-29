@@ -1,3 +1,12 @@
+// src/app/api/pricing/estimate-duration/route.ts
+/**
+ * @description Public, rate-limited endpoint that estimates job duration from a
+ * plain-English description. POST builds a cache-friendly OpenAI prompt from
+ * live rates and benchmarks via {@link buildEstimateContext}, parses the model's
+ * JSON, then rebalances the per-task split with {@link rebalanceTasks} so the
+ * task minutes sum exactly to estimatedMins.
+ */
+
 import { getPublicPricing } from "@/features/business/lib/pricing-policy.server";
 import { errorResponse } from "@/shared/lib/api-response";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";

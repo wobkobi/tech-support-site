@@ -1,6 +1,5 @@
 // src/app/pricing/loading.tsx
 /**
- * @file loading.tsx
  * @description Streaming skeleton for the pricing page: heading card, a rate
  * card, the "no surprises" + accordion details card, and the closing
  * next-steps and estimate cards. Shown while the live pricing policy loads.

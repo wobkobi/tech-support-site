@@ -1,6 +1,5 @@
 // src/features/calendar/lib/travel-time.ts
 /**
- * @file travel-time.ts
  * @description Calculates public-transport travel time using the Google Maps Distance Matrix API.
  */
 

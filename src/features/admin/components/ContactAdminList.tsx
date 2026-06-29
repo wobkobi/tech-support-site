@@ -1,7 +1,6 @@
 "use client";
 // src/features/admin/components/ContactAdminList.tsx
 /**
- * @file ContactAdminList.tsx
  * @description Admin component listing contacts saved from booking submissions,
  * with inline editing and Google Places autocomplete for the address field.
  * Contacts are split into two sections: unsynced (needs attention) and synced

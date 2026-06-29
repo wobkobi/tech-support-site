@@ -1,6 +1,5 @@
 // src/shared/components/NavBar.tsx
 /**
- * @file NavBar.tsx
  * @description Navigation bar with mobile-first scroll reveal behaviour.
  */
 

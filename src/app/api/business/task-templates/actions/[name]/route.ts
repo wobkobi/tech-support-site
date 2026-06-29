@@ -1,3 +1,11 @@
+// src/app/api/business/task-templates/actions/[name]/route.ts
+/**
+ * @description Admin endpoint to retire a task-template action tag. DELETE
+ * clears the action (sets it to null, case-insensitive match) on every
+ * TaskTemplate labelled with the given name, leaving the rows intact for the
+ * next parse-job to retag, and returns the count of rows updated.
+ */
+
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";

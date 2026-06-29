@@ -1,3 +1,9 @@
+// src/app/api/business/expenses/[id]/route.ts
+/**
+ * @description Admin endpoint for a single expense entry. DELETE removes the
+ * expense entry identified by the route id.
+ */
+
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";

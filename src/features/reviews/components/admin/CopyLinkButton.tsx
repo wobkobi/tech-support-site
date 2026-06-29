@@ -1,7 +1,6 @@
 "use client";
 // src/features/reviews/components/admin/CopyLinkButton.tsx
 /**
- * @file CopyLinkButton.tsx
  * @description Button that copies a review link to the clipboard.
  */
 

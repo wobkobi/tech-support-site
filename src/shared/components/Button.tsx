@@ -1,6 +1,5 @@
 // src/shared/components/Button.tsx
 /**
- * @file Button.tsx
  * @description Polymorphic button component with consistent variants and sizes.
  */
 

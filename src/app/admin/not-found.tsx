@@ -1,6 +1,5 @@
 // src/app/admin/not-found.tsx
 /**
- * @file not-found.tsx
  * @description Admin-styled 404 for /admin/* routes. Keeps the operator inside
  * the admin shell (sidebar + slate chrome) instead of dropping to the public
  * root 404, so a missing invoice/record still has the nav to recover from.

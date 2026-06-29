@@ -1,3 +1,11 @@
+// src/app/api/business/task-templates/taxonomy/route.ts
+/**
+ * @description Admin task-template taxonomy endpoint. GET returns the distinct
+ * device and action values in use across all templates, sorted alphabetically
+ * (case-insensitive), to power the Calculator combobox suggestions and the
+ * manage-tags modal.
+ */
+
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";

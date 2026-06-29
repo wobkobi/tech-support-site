@@ -1,6 +1,5 @@
 // src/app/api/admin/blocked-days/[eventId]/route.ts
 /**
- * @file route.ts
  * @description Admin endpoint to remove an all-day "Busy" block by deleting the
  * underlying Google Calendar event.
  */

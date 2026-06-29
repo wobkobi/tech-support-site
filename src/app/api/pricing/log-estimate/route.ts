@@ -1,3 +1,12 @@
+// src/app/api/pricing/log-estimate/route.ts
+/**
+ * @description Public, rate-limited endpoint that logs what the price estimator
+ * showed a user (raw description, AI interpretation, final range). POST
+ * sanitises the untrusted {@link LogBody}, cleans the task list via
+ * {@link cleanTasks}, persists a PriceEstimateLog, and returns its id so the
+ * booking flow can snapshot which quote the customer saw.
+ */
+
 import { errorResponse } from "@/shared/lib/api-response";
 import { prisma } from "@/shared/lib/prisma";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";

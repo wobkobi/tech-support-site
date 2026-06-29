@@ -1,6 +1,5 @@
 // src/app/api/admin/contacts/[id]/route.ts
 /**
- * @file route.ts
  * @description Admin API route for updating individual contacts.
  */
 

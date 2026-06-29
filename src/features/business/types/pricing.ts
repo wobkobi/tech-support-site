@@ -1,3 +1,10 @@
+// src/features/business/types/pricing.ts
+/**
+ * @description Type definitions for the public pricing estimator - rate and
+ * service shapes plus the price-range breakdown (low/high, travel, after-hours,
+ * and promo) rendered by the pricing wizard.
+ */
+
 export interface PublicRate {
   label: string;
   ratePerHour: number | null;

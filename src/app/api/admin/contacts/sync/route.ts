@@ -1,6 +1,5 @@
 // src/app/api/admin/contacts/sync/route.ts
 /**
- * @file route.ts
  * @description Admin API route for two-way Google Contacts sync.
  * Imports all Google contacts into the local DB, then pushes all local contacts to Google.
  */

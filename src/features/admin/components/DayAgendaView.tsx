@@ -1,7 +1,6 @@
 "use client";
 // src/features/admin/components/DayAgendaView.tsx
 /**
- * @file DayAgendaView.tsx
  * @description Mobile-friendly single-day schedule view. Renders one NZ day at
  * a time as a vertical agenda list with prev/today/next-day navigation, swipe
  * gestures, and the same booking/block/travel data as the desktop week grid.

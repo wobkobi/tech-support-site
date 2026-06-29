@@ -1,6 +1,5 @@
 // src/app/global-error.tsx
 /**
- * @file global-error.tsx
  * @description Global error boundary. Must render <html> and <body>.
  */
 

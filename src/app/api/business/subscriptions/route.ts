@@ -1,3 +1,10 @@
+// src/app/api/business/subscriptions/route.ts
+/**
+ * @description Admin subscription collection endpoint. GET lists all
+ * subscriptions ordered by nextDue ascending; POST validates required fields,
+ * frequency, amount, and GST rate, then creates an active subscription.
+ */
+
 import { VALID_FREQUENCIES } from "@/features/business/lib/constants";
 import { parseAmount, parseRate } from "@/features/business/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";

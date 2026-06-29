@@ -1,6 +1,5 @@
 // src/shared/lib/settings/get-settings.ts
 /**
- * @file get-settings.ts
  * @description Server-only accessor that resolves the full, typed settings:
  * code defaults with DB overrides merged on top, then defensively clamped so a
  * hand-edited bad row can never break the public booking/pricing pages. Cached

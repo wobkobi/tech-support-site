@@ -1,6 +1,5 @@
 // src/shared/components/PageLayout.tsx
 /**
- * @file PageLayout.tsx
  * @description Reusable layout components with frosted glass effect.
  */
 

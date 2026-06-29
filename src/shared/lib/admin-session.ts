@@ -1,6 +1,5 @@
 // src/shared/lib/admin-session.ts
 /**
- * @file admin-session.ts
  * @description Signed session-cookie helpers for the admin panel. Uses the
  * Web Crypto API so the same helpers work in both Node (server components,
  * API routes) and Edge (Next.js proxy). The cookie value is

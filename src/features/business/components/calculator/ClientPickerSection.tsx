@@ -1,5 +1,11 @@
 "use client";
-
+// src/features/business/components/calculator/ClientPickerSection.tsx
+/**
+ * @description Right-rail "Client" card. Typing the name inline-searches saved
+ * contacts via {@link filterContacts}; picking one fills name + email and locks
+ * it. A Name/Company/Custom segmented control appears after a pick, and "Clear"
+ * resets so the operator can search again.
+ */
 import type { GoogleContact } from "@/features/business/types/business";
 import { filterContacts } from "@/features/contacts/lib/contact-search";
 import { EmailInput } from "@/shared/components/EmailInput";

@@ -1,6 +1,5 @@
 // src/app/robots.ts
 /**
- * @file robots.ts
  * @description robots.txt generator. Allows public routes, blocks admin/API/preview.
  */
 

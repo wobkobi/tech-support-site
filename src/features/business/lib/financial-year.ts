@@ -1,6 +1,5 @@
 // src/features/business/lib/financial-year.ts
 /**
- * @file financial-year.ts
  * @description NZ financial year (1 April - 31 March) bucketing for the business
  * dashboard. The FY containing a date is named after the START year; e.g. dates
  * in Apr 2025 - Mar 2026 belong to "FY 2025-26".

@@ -1,6 +1,5 @@
 // src/app/api/admin/travel/[id]/route.ts
 /**
- * @file route.ts
  * @description Admin endpoint to update a TravelBlock's transport mode, custom
  * origin, or custom travel-back destination. Setting any clears cached raw
  * minutes so the next refresh recalculates.

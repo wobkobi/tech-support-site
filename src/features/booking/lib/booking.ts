@@ -1,6 +1,5 @@
 // src/features/booking/lib/booking.ts
 /**
- * @file booking.ts
  * @description Booking system with duration selection (1hr quick jobs vs 2hr standard jobs).
  */
 

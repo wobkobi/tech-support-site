@@ -1,6 +1,5 @@
 // src/app/services/loading.tsx
 /**
- * @file loading.tsx
  * @description Streaming skeleton for the services page: heading card, the
  * "What I help with" card with its service-area grid, the home/business pair
  * and the closing CTA. Shown while the live pricing lookup runs.

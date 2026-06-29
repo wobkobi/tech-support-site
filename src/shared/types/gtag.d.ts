@@ -1,6 +1,5 @@
 // src/shared/types/gtag.d.ts
 /**
- * @file gtag.d.ts
  * @description Global type augmentation for the Google tag (gtag.js) on window.
  */
 

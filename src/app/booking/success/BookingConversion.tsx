@@ -1,7 +1,6 @@
 "use client";
 // src/app/booking/success/BookingConversion.tsx
 /**
- * @file BookingConversion.tsx
  * @description Reports a completed booking to Google Ads on the success page.
  */
 

@@ -1,6 +1,5 @@
 // src/app/api/admin/bookings/route.ts
 /**
- * @file route.ts
  * @description Admin endpoint to create a booking manually (phone/email bookings
  * captured from the /admin/schedule grid). Accepts arbitrary startAt + duration
  * instead of the public slot model.

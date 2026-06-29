@@ -1,6 +1,5 @@
 // src/app/admin/price-estimates/loading.tsx
 /**
- * @file loading.tsx
  * @description Price-estimates list-view loading skeleton (shared admin list shape).
  */
 

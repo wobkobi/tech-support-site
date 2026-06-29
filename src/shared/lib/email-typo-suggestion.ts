@@ -1,6 +1,5 @@
 // src/shared/lib/email-typo-suggestion.ts
 /**
- * @file email-typo-suggestion.ts
  * @description Suggests a corrected email when the domain looks like a typo of
  * a popular one (gmail / hotmail / yahoo / etc.). Pure function with no
  * dependencies.

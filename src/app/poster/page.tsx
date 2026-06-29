@@ -1,6 +1,5 @@
 // src/app/poster/page.tsx
 /**
- * @file page.tsx
  * @description Poster page - A5 at 300 DPI (1748x2480px).
  * Pass ?mode=print to add a 3mm bleed on all edges (viewport 1818x2550px).
  */

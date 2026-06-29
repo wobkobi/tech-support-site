@@ -1,6 +1,5 @@
 // src/features/business/lib/tax-settings.ts
 /**
- * @file tax-settings.ts
  * @description Reads the planner configuration cells from a per-FY workbook's
  * SETTINGS tab. Some cells are at fixed positions (rates and weekly amounts);
  * the auto-transfer start date is found by scanning column A for its label so

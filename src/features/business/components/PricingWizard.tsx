@@ -1,4 +1,10 @@
 "use client";
+// src/features/business/components/PricingWizard.tsx
+/**
+ * @description Public multi-step price-estimate wizard. Gathers a job
+ * description, location, and meeting type, uses the AI duration estimator to
+ * predict job length, and shows a price range with travel and after-hours.
+ */
 
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import { priceRangeFor, remoteRateDelta } from "@/features/business/lib/estimate-range";

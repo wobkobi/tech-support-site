@@ -1,3 +1,10 @@
+// src/app/api/cron/sync-sheets/route.ts
+/**
+ * @description Cron endpoint (Bearer-authorised) that imports new rows from the
+ * Cashbook and Expenses Google Sheets tabs into MongoDB via {@link runSheetsImport}.
+ * GET runs hourly via cron-job.org and returns 503 when the sync fails.
+ */
+
 import { runSheetsImport } from "@/features/business/lib/sheets-import";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isCronAuthorized } from "@/shared/lib/auth";

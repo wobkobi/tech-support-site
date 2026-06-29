@@ -1,6 +1,5 @@
 // src/app/admin/settings/loading.tsx
 /**
- * @file loading.tsx
  * @description Loading skeleton for the settings panel: heading + intro, the
  * horizontal tab strip and a form card of labelled field rows with a save bar.
  */

@@ -1,7 +1,6 @@
 "use client";
 // src/features/admin/components/settings/SettingsHistory.tsx
 /**
- * @file SettingsHistory.tsx
  * @description Collapsible per-group change-history panel shared by every
  * settings tab. Lazily fetches the recent SettingAudit rows on first open and
  * lets the operator load a prior version back into the editor draft (via

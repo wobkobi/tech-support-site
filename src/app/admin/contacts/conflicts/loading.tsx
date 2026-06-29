@@ -1,6 +1,5 @@
 // src/app/admin/contacts/conflicts/loading.tsx
 /**
- * @file loading.tsx
  * @description Loading skeleton for the contact-conflicts page: heading + intro
  * and a list of conflict cards (field label + the two candidate values to pick
  * between).

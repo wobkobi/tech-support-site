@@ -1,7 +1,6 @@
 "use client";
 // src/features/business/components/BusinessDashboardCards.tsx
 /**
- * @file BusinessDashboardCards.tsx
  * @description Renders the overview stat cards for the business dashboard,
  * scoped to whatever FY (or "All time") was selected by the parent page. Each
  * card is a button that opens a BreakdownModal listing the contributing rows

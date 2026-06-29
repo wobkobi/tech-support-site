@@ -1,6 +1,5 @@
 // src/app/api/admin/contacts/conflicts/[id]/route.ts
 /**
- * @file route.ts
  * @description Admin endpoint to resolve a ContactConflict by picking a
  * winner (site / google / custom). Writes the chosen value to the site
  * Contact row, marks the conflict resolved, and triggers a fresh sync to

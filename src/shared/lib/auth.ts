@@ -1,6 +1,5 @@
 // src/shared/lib/auth.ts
 /**
- * @file auth.ts
  * @description Shared authentication utilities for admin routes and pages.
  * Browser sessions go through a signed cookie (see `admin-session.ts`);
  * scripts + cron still pass the header so curl / cron-job.org keep working.

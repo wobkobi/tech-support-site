@@ -1,3 +1,11 @@
+// src/app/api/business/sheets/invoice-counter/route.ts
+/**
+ * @description Admin invoice-counter endpoint backed by the Google Sheet. GET
+ * reads the next invoice number (last, next, year code, formatted value, prefix);
+ * POST validates a non-negative integer newCount and writes it back. Both return
+ * 503 when the sheet is unavailable.
+ */
+
 import { getInvoiceCounter, setInvoiceCounter } from "@/features/business/lib/google-sheets";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";

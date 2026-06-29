@@ -1,4 +1,10 @@
 "use client";
+// src/app/admin/business/invoices/[id]/InvoiceActions.tsx
+/**
+ * @description Action bar for the invoice detail page: back, print, open Drive
+ * PDF, and send-to-client. The send flow opens a preview modal with an editable
+ * email body and greeting, plus an optional review link based on eligibility.
+ */
 
 import { AddToContactsModal } from "@/features/business/components/AddToContactsModal";
 import type { InvoiceReviewEligibility } from "@/features/business/lib/contact-review-token";

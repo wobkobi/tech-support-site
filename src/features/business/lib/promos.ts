@@ -1,6 +1,5 @@
 // src/features/business/lib/promos.ts
 /**
- * @file promos.ts
  * @description Active-promo lookup + helpers. Cached 60s; admin writes revalidate.
  */
 

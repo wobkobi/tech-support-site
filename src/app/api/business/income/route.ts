@@ -1,3 +1,11 @@
+// src/app/api/business/income/route.ts
+/**
+ * @description Admin income-ledger endpoint. GET lists every income entry
+ * (newest first); POST creates one and best-effort appends a matching row to
+ * the per-financial-year Cashbook sheet, storing the returned sheet row key.
+ * Sheet failures are logged and swallowed so DB recording is never blocked.
+ */
+
 import {
   appendRowWithSyncId,
   formatDateForSheet,

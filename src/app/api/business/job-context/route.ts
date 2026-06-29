@@ -1,6 +1,5 @@
 // src/app/api/business/job-context/route.ts
 /**
- * @file route.ts
  * @description GET /api/business/job-context?date=YYYY-MM-DD - admin-only.
  * Given the date a job was actually done, returns whether it was an NZ public
  * holiday (with the live labour uplift) and which promo was live that day, so

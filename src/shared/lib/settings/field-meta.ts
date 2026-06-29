@@ -1,6 +1,5 @@
 // src/shared/lib/settings/field-meta.ts
 /**
- * @file field-meta.ts
  * @description UI metadata for the settings panel - the plain-English title,
  * description, unit, and (for optional rules) the "what happens when it's off"
  * note shown above each field. Kept here, beside the defaults and validators,

@@ -1,3 +1,11 @@
+// src/app/api/business/rates/[id]/route.ts
+/**
+ * @description Admin single-rate endpoint. PATCH applies a sparse update,
+ * clearing the default flag on other rows when isDefault is set; DELETE removes
+ * the rate but blocks deletion of the last remaining one. Both return 404 when
+ * the rate does not exist.
+ */
+
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";

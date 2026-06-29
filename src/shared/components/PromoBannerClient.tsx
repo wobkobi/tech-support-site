@@ -1,7 +1,6 @@
 "use client";
 // src/shared/components/PromoBannerClient.tsx
 /**
- * @file PromoBannerClient.tsx
  * @description Banner with 24h dismissal, first-load delay, and navbar offset coordination.
  */
 

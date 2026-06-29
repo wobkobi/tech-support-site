@@ -1,3 +1,9 @@
+// src/app/admin/business/invoices/[id]/page.tsx
+/**
+ * @description View page for a single saved invoice. Loads the invoice by route
+ * id (404 when missing), renders the {@link InvoiceActions} bar, and shows an
+ * on-screen preview that mirrors the generated PDF layout.
+ */
 import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
 import { formatNZD } from "@/features/business/lib/business";
 import { requireAdminAuth } from "@/shared/lib/auth";

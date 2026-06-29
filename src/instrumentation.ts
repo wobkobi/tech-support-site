@@ -1,6 +1,5 @@
 // src/instrumentation.ts
 /**
- * @file instrumentation.ts
  * @description Next.js startup hook. Validates the environment on the Node.js
  * runtime so a misconfigured deploy fails fast at boot rather than mid-request.
  */

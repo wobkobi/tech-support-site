@@ -1,6 +1,5 @@
 // src/shared/lib/business-identity.server.ts
 /**
- * @file business-identity.server.ts
  * @description Server-only accessor for the live business identity (defaults +
  * settings override). The constants in `business-identity.ts` stay the defaults
  * (and remain client-safe); server consumers read `getIdentity()` so an operator

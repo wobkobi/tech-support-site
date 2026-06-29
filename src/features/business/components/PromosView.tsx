@@ -1,7 +1,6 @@
 "use client";
 // src/features/business/components/PromosView.tsx
 /**
- * @file PromosView.tsx
  * @description Admin promo CRUD - form-on-top + table-below + overlap warning.
  */
 

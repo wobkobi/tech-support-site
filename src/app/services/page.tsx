@@ -1,6 +1,5 @@
 // src/app/services/page.tsx
 /**
- * @file page.tsx
  * @description Services page: full list of service categories.
  */
 

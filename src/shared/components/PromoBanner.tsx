@@ -1,6 +1,5 @@
 // src/shared/components/PromoBanner.tsx
 /**
- * @file PromoBanner.tsx
  * @description Server wrapper - fetches the active promo, hands it to the client banner.
  */
 

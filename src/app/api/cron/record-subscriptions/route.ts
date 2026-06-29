@@ -1,3 +1,12 @@
+// src/app/api/cron/record-subscriptions/route.ts
+/**
+ * @description Cron endpoint (Bearer-authorised) that records every active
+ * subscription due today or earlier in NZ time. GET creates an ExpenseEntry per
+ * subscription, advances nextDue with a CAS guard so concurrent runs stay
+ * idempotent, and appends each row to the Expenses Google Sheet. Run daily at
+ * 8am NZ time via cron-job.org.
+ */
+
 import {
   advanceNextDue,
   calcGstFromInclusive,

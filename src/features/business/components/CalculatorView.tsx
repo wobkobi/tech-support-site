@@ -1,4 +1,10 @@
 "use client";
+// src/features/business/components/CalculatorView.tsx
+/**
+ * @description Job-pricing calculator and invoice builder. Assembles client,
+ * tasks, parts, travel, and rate config into line items, supports AI parsing of
+ * a plain-English job description, and renders a live invoice preview.
+ */
 
 import { validateEmail } from "@/features/booking/lib/booking";
 import { AddToContactsModal } from "@/features/business/components/AddToContactsModal";

@@ -1,6 +1,5 @@
 // src/shared/lib/parse-money.ts
 /**
- * @file parse-money.ts
  * @description Shared helpers for turning loosely-formatted money text (e.g. a
  * price copied off a shop page) into a plain number for numeric inputs.
  */

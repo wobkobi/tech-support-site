@@ -1,5 +1,9 @@
 "use client";
 // src/features/admin/components/RecalculateButton.tsx
+/**
+ * @description Client button that POSTs to the travel recalculation API, then
+ * shows the cached-event count or an error and refreshes the route.
+ */
 import { cn } from "@/shared/lib/cn";
 import { useRouter } from "next/navigation";
 import type React from "react";

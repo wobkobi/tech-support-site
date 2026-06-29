@@ -1,6 +1,5 @@
 // src/shared/lib/timezone-utils.ts
 /**
- * @file timezone-utils.ts
  * @description Timezone utility functions for Pacific/Auckland timezone calculations.
  */
 

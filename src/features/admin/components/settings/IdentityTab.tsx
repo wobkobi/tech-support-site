@@ -1,7 +1,6 @@
 "use client";
 // src/features/admin/components/settings/IdentityTab.tsx
 /**
- * @file IdentityTab.tsx
  * @description Editor for the business identity group: contact details, the
  * unified base address (which also drives the travel origin + SEO once wired),
  * payment terms, GST number, bank account, and invoice prefix. Sensitive fields

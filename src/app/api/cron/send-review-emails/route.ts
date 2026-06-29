@@ -1,6 +1,5 @@
 // src/app/api/cron/send-review-emails/route.ts
 /**
- * @file route.ts
  * @description Cron job that sends review request emails 30 minutes after appointments.
  * Called externally via cron-job.org every 15 minutes.
  */

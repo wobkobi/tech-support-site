@@ -1,6 +1,5 @@
 // src/app/api/booking/cancel/route.ts
 /**
- * @file route.ts
  * @description Cancel a booking by cancel token. GET returns startAt +
  * status so the cancel page can render the fee banner before firing. POST
  * cancels, stamps cancellation flags from the server clock, and auto-drafts

@@ -1,6 +1,5 @@
 // src/features/admin/components/AdminSkeletonShell.tsx
 /**
- * @file AdminSkeletonShell.tsx
  * @description Shared loading-skeleton frame for /admin/* routes: the sidebar
  * placeholder plus the content padding that mirrors AdminPageLayout, so every
  * admin route-loading file only has to supply its own content bones.

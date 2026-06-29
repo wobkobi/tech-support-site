@@ -1,3 +1,10 @@
+// src/app/api/pricing/rates/route.ts
+/**
+ * @description Public rates endpoint (no auth). GET returns the rate configs
+ * stripped to the customer-safe fields (label, ratePerHour, flatRate,
+ * hourlyDelta, unit, isDefault), ordered by label.
+ */
+
 import { prisma } from "@/shared/lib/prisma";
 import { NextResponse } from "next/server";
 

@@ -1,6 +1,5 @@
 // src/app/api/admin/travel/recalculate/route.ts
 /**
- * @file route.ts
  * @description Admin endpoint to force-recalculate all travel blocks.
  * Clears stored TravelBlock records so the next cache refresh recomputes fresh travel times.
  */

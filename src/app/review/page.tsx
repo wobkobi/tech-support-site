@@ -1,6 +1,5 @@
 // src/app/review/page.tsx
 /**
- * @file page.tsx
  * @description Protected review page - requires token OR allows public reviews.
  */
 

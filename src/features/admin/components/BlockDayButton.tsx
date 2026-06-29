@@ -1,7 +1,6 @@
 "use client";
 // src/features/admin/components/BlockDayButton.tsx
 /**
- * @file BlockDayButton.tsx
  * @description Toggles an all-day "Busy" event on the booking calendar for a
  * given NZ date. Two visual variants: a compact icon used in the week-grid day
  * header, and a full-width labelled button used by the mobile day-agenda view.

@@ -1,4 +1,11 @@
 // src/app/api/business/promos/[id]/route.ts
+/**
+ * @description Admin single-promo endpoint. PATCH applies a sparse update (only
+ * fields present in the body are written); DELETE removes the promo while
+ * invoice snapshots stay intact. Both revalidate the active-promo cache tag and
+ * return 404 when the promo does not exist.
+ */
+
 import { ACTIVE_PROMO_TAG } from "@/features/business/lib/promos";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";

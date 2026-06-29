@@ -1,6 +1,5 @@
 // src/app/(email-previews)/page.tsx
 /**
- * @file page.tsx
  * @description Dev-only email preview placeholder so the project compiles.
  */
 

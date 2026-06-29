@@ -1,6 +1,5 @@
 // src/app/api/admin/contacts/import/route.ts
 /**
- * @file route.ts
  * @description Admin API route to import contacts from Google Contacts.
  */
 

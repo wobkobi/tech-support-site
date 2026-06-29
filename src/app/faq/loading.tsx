@@ -1,6 +1,5 @@
 // src/app/faq/loading.tsx
 /**
- * @file loading.tsx
  * @description Streaming skeleton for the FAQ page: a heading card plus the
  * two-column stack of collapsed accordion rows and a next-steps card.
  */

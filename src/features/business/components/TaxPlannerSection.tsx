@@ -1,4 +1,10 @@
 // src/features/business/components/TaxPlannerSection.tsx
+/**
+ * @description "Tax Planner (NZ Sole Trader)" dashboard panel. Summarises FY
+ * income, expenses, and profit, then shows profit-based set-asides (income tax,
+ * ACC, KiwiSaver), weekly/monthly targets, and a GST roll-up. Targets only -
+ * Payment-log actuals are omitted. Server component.
+ */
 import { formatNZD } from "@/features/business/lib/business";
 import {
   computeTaxPlan,

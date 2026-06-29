@@ -1,7 +1,6 @@
 "use client";
 // src/features/admin/components/EventActionSheet.tsx
 /**
- * @file EventActionSheet.tsx
  * @description Bottom-sheet of quick mutations for a booking event, opened by
  * a long-press on a booking card in DayAgendaView: complete, cancel
  * (operator/on-behalf), no-show, reschedule, resend review email, delete

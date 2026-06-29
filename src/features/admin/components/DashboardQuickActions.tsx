@@ -1,7 +1,6 @@
 "use client";
 // src/features/admin/components/DashboardQuickActions.tsx
 /**
- * @file DashboardQuickActions.tsx
  * @description Quick-action panels shown on the admin dashboard:
  * send a review link to a past client, or mark a completed event and send its review.
  */

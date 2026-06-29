@@ -1,6 +1,5 @@
 // src/app/contact/page.tsx
 /**
- * @file page.tsx
  * @description Contact page: how to get in touch.
  */
 

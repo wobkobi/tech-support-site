@@ -1,6 +1,5 @@
 // src/app/api/admin/contacts/backfill/route.ts
 /**
- * @file route.ts
  * @description One-time backfill: upserts a Contact for every unique email in
  * Booking history. The standalone ReviewRequest model was retired; bookings
  * are the only remaining seed for backfill.

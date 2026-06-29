@@ -1,4 +1,9 @@
 "use client";
+// src/features/business/components/ExpensesView.tsx
+/**
+ * @description Records and lists expense entries against /api/business/expenses,
+ * with a GST-from-inclusive preview and running excl/GST totals.
+ */
 
 import { calcGstFromInclusive, formatNZD, todayISO } from "@/features/business/lib/business";
 import { EXPENSE_CATEGORIES, PAYMENT_METHODS } from "@/features/business/lib/constants";

@@ -1,3 +1,12 @@
+// src/app/api/business/invoices/route.ts
+/**
+ * @description Admin invoices collection endpoint. GET lists every invoice
+ * (newest issue date first). POST creates one: validates line items, allocates
+ * the next TTP-YYYY-XXXX number, computes totals via {@link calcInvoiceTotals}
+ * (promo + unsuccessful-work discounts reduce the taxable amount), writes back
+ * the Sheets counter, then fire-and-forget renders the PDF and uploads it to Drive.
+ */
+
 import { calcInvoiceTotals, isValidLineItem } from "@/features/business/lib/business";
 import { uploadInvoicePdf } from "@/features/business/lib/google-drive";
 import {
