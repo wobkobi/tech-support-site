@@ -1,6 +1,6 @@
 {
   "name": "tech-support-site",
-  "version": "3.123.14",
+  "version": "3.123.15",
   "private": true,
   "type": "module",
   "scripts": {
@@ -26,7 +26,7 @@
   "lint-staged": {
     "**/*.{js,jsx,ts,tsx}": [
       "prettier --write",
-      "eslint --fix --max-warnings=0"
+      "eslint --fix --max-warnings=0 --no-warn-ignored"
     ],
     "**/*.{css,html,json,md,mjs,yml,yaml}": "prettier --write"
   },
@@ -37,7 +37,7 @@
     "edge >= 93"
   ],
   "overrides": {
-    "postcss": "^8.5.15"
+    "postcss": "^8.5.16"
   },
   "dependencies": {
     "@swc/helpers": "^0.5.23",
@@ -45,7 +45,7 @@
     "@vercel/speed-insights": "^2.0.0",
     "autoprefixer": "^10.5.2",
     "clsx": "^2.1.1",
-    "date-holidays": "^3.30.2",
+    "date-holidays": "^3.32.0",
     "googleapis": "^173.0.0",
     "next": "^16.2.9",
     "openai": "^6.45.0",
@@ -82,7 +82,7 @@
     "lint-staged": "^17.0.8",
     "pdf-lib": "^1.17.1",
     "png-to-ico": "^3.0.1",
-    "postcss": "^8.5.15",
+    "postcss": "^8.5.16",
     "prettier": "^3.9.1",
     "prettier-plugin-organize-imports": "^4.3.0",
     "prettier-plugin-packagejson": "^3.0.2",

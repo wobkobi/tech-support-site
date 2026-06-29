@@ -280,17 +280,19 @@ export interface BackdropVariant {
 }
 
 export const BACKDROP_VARIANTS: BackdropVariant[] = [
-  // Primary backdrop served to AVIF-capable browsers via <picture>. q90 +
-  // effort=9 is visually lossless on the pre-blurred gradient.
-  { name: "backdrop-blur", width: 2560, quality: 90, format: "avif" },
+  // Primary backdrop served to AVIF-capable browsers via <picture>. The image
+  // is a full-viewport, heavily-blurred (radius 35) decorative backdrop scaled
+  // 110%, so 1440px upscales invisibly on wide screens while ~quartering the
+  // byte cost of a 2560px source. q90 + effort=9 stays visually lossless.
+  { name: "backdrop-blur", width: 1440, quality: 90, format: "avif" },
   // WebP fallback for iOS 15 / older Safari (iPhone 7 etc.) - no AVIF support
   // there. Higher quality since the audience that hits this is small.
-  { name: "backdrop-blur", width: 2560, quality: 90, format: "webp" },
+  { name: "backdrop-blur", width: 1440, quality: 90, format: "webp" },
   // JPEG fallback for the static old-browser page (public/legacy.html). High
   // Sierra Safari and other ancient browsers decode neither AVIF nor WebP, so
   // the fallback page needs a universally-decodable backdrop. Smaller width +
   // lower quality since it is heavily blurred and serves low-spec devices.
-  { name: "backdrop-blur", width: 1920, quality: 80, format: "jpeg" },
+  { name: "backdrop-blur", width: 1280, quality: 80, format: "jpeg" },
 ];
 
 /* ---------- QR Code Specs ---------- */
