@@ -1,4 +1,10 @@
 // src/app/admin/page.tsx
+/**
+ * @description Admin dashboard. Runs a batch of parallel Prisma queries for
+ * booking, review, contact, invoice, and income stats, then renders stat cards,
+ * {@link DashboardQuickActions}, and live data panels (upcoming bookings,
+ * pending reviews, recent contacts, outstanding invoices).
+ */
 import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
 import { DashboardQuickActions } from "@/features/admin/components/DashboardQuickActions";
 import { formatNZD } from "@/features/business/lib/business";

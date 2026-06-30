@@ -1,6 +1,5 @@
 // src/features/business/lib/sheets-sync.ts
 /**
- * @file sheets-sync.ts
  * @description Site > Google Sheet write-back. Hidden Sync ID at column Z
  * carries a UUID so edits/deletes can find rows. Failures are non-fatal.
  */

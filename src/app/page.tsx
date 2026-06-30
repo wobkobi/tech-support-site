@@ -1,6 +1,5 @@
 // src/app/page.tsx
 /**
- * @file page.tsx
  * @description Main landing page for tech support company.
  */
 
@@ -160,7 +159,12 @@ export default async function Home(): Promise<React.ReactElement> {
           </section>
 
           {/* Trust Indicators */}
-          <section aria-label="Why choose us" className="grid gap-4 sm:grid-cols-3 sm:gap-5">
+          <section aria-labelledby="trust-heading" className="grid gap-4 sm:grid-cols-3 sm:gap-5">
+            {/* Visually hidden: gives the card h3s an h2 parent so heading order
+                does not skip from the hero h1 straight to h3. */}
+            <h2 id="trust-heading" className="sr-only">
+              Why choose us
+            </h2>
             <div
               className={cn(
                 CARD,

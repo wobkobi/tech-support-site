@@ -1,6 +1,5 @@
 // src/shared/lib/site-url.ts
 /**
- * @file site-url.ts
  * @description Single source of truth for the public site origin. Reads
  *   `NEXT_PUBLIC_SITE_URL` and falls back to the canonical www host so
  *   canonical tags, sitemap, robots, JSON-LD and email links all agree on

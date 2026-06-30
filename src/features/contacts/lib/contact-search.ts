@@ -1,3 +1,10 @@
+// src/features/contacts/lib/contact-search.ts
+/**
+ * @description Token-scored contact search shared by the picker modal and
+ * inline autocomplete. {@link scoreContactToken} ranks a token per field
+ * (name > email > company > phone; exact > prefix > substring) and
+ * {@link filterContacts} requires every token to match some field, sorted best-first.
+ */
 import type { GoogleContact } from "@/features/business/types/business";
 
 /**

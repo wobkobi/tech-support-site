@@ -1,4 +1,13 @@
 // src/app/api/business/invoices/[id]/void/route.ts
+/**
+ * @description Admin endpoint that voids an invoice. POST flips status to VOIDED
+ * and stamps voidedAt (idempotent for already-voided invoices, preserving the
+ * original timestamp), regenerates the PDF with the VOID watermark, optionally
+ * emails the client a void notice, counts linked income entries for the operator
+ * warning, and re-syncs the stamped PDF to Drive. Email and Drive sync are
+ * best-effort; the status change is authoritative and never rolls back.
+ */
+
 import { uploadInvoicePdf } from "@/features/business/lib/google-drive";
 import { extractYearCode, generateInvoicePdf } from "@/features/business/lib/invoice-pdf";
 import { sendVoidNotification } from "@/features/reviews/lib/email";

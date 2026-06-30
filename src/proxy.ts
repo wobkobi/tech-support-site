@@ -1,6 +1,5 @@
 // src/proxy.ts
 /**
- * @file proxy.ts
  * @description Edge chokepoint for admin/business routes (Next.js 16 proxy,
  * formerly `middleware.ts`). Accepts EITHER a signed session cookie (browser
  * path, set on /admin/login) OR the `x-admin-secret` header (scripts + cron).

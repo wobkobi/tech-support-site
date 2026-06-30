@@ -1,6 +1,5 @@
 // src/features/business/lib/estimate-range.ts
 /**
- * @file estimate-range.ts
  * @description Shared, client-safe price-range math for the public estimator.
  * Turns a point time estimate + hourly rate into a customer-facing low/high
  * band whose width scales with the AI's confidence. Used by both the pricing

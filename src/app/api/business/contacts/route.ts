@@ -1,3 +1,10 @@
+// src/app/api/business/contacts/route.ts
+/**
+ * @description Admin endpoint for the contact picker. GET fetches the operator's
+ * Google Contacts via the People API and returns a sanitised list (name, email,
+ * phone, company), dropping any entry with no id or no name/email.
+ */
+
 import type { GoogleContact } from "@/features/business/types/business";
 import { getOAuth2Client } from "@/features/calendar/lib/google-calendar";
 import { errorResponse } from "@/shared/lib/api-response";

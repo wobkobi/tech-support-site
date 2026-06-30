@@ -1,6 +1,5 @@
 // src/app/admin/business/invoices/loading.tsx
 /**
- * @file loading.tsx
  * @description Invoices list-view loading skeleton (shared admin list shape).
  */
 

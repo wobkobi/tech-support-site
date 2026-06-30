@@ -1,6 +1,5 @@
 // src/app/api/cron/refresh-public-holidays/route.ts
 /**
- * @file route.ts
  * @description Cron endpoint to refresh the `PublicHoliday` table from
  * Google's public NZ holidays calendar. Called monthly via cron-job.org.
  */

@@ -1,6 +1,5 @@
 // src/features/admin/lib/schedule-types.tsx
 /**
- * @file schedule-types.tsx
  * @description Shared types, styles, and formatters used by both the desktop
  * week grid and the mobile day-agenda view.
  */

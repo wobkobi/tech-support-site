@@ -1,6 +1,5 @@
 // src/shared/lib/api-response.ts
 /**
- * @file api-response.ts
  * @description Shared JSON response helpers so every API route returns a
  * consistent discriminated shape. Errors are always `{ ok: false, error }` and
  * successes always carry `ok: true`, so clients branch on `ok` instead of

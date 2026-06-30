@@ -1,7 +1,6 @@
 "use client";
 // src/shared/components/PhoneInput.tsx
 /**
- * @file PhoneInput.tsx
  * @description Shared NZ phone input. On blur, formats the value with
  * formatNZPhone and runs validatePhone so every form on the site behaves
  * identically. Per-form wording can be customised via errorMessages.

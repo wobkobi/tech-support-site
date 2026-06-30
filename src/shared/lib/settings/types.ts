@@ -1,6 +1,5 @@
 // src/shared/lib/settings/types.ts
 /**
- * @file types.ts
  * @description Shape of the admin-editable settings, one interface per group.
  * Every value here was a hardcoded constant before the settings panel; the
  * matching defaults live in `defaults.ts` and DB overrides merge on top in

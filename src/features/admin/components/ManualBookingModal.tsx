@@ -1,7 +1,6 @@
 "use client";
 // src/features/admin/components/ManualBookingModal.tsx
 /**
- * @file ManualBookingModal.tsx
  * @description Modal for adding a booking from the admin schedule view. Used when
  * Harrison takes a booking over the phone or by email - prefills date/time from
  * the clicked slot and POSTs to the admin booking-create endpoint.

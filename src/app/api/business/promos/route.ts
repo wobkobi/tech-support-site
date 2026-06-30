@@ -1,4 +1,11 @@
 // src/app/api/business/promos/route.ts
+/**
+ * @description Admin promo collection endpoint. GET lists every promo newest
+ * start first; POST validates a {@link PromoBody} via {@link validatePromo}
+ * (XOR of flatHourlyRate/percentDiscount, startAt before endAt), creates the
+ * promo, and revalidates the active-promo cache tag.
+ */
+
 import { ACTIVE_PROMO_TAG } from "@/features/business/lib/promos";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";

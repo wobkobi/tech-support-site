@@ -1,5 +1,10 @@
 "use client";
-
+// src/features/business/components/calculator/PartsSection.tsx
+/**
+ * @description Collapsible "Parts / materials" card. Each row is a description
+ * + cost; cost pastes carrying "$"/commas route through {@link parseMoney}.
+ * Collapsed with an empty list is the default - parts are opt-in per job.
+ */
 import type { PartLine } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
 import { parseMoney } from "@/shared/lib/parse-money";

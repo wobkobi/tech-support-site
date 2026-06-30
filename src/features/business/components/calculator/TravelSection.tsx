@@ -1,5 +1,11 @@
 "use client";
-
+// src/features/business/components/calculator/TravelSection.tsx
+/**
+ * @description Travel address input + per-entry cost list. Lookup populates one
+ * auto entry; operators can add manual entries (parking, ferry), all lumped
+ * into a single "Travel" invoice line. Auto entries show a step-by-step
+ * {@link breakdownTravelCharge} (there/back > raw > rounded > final).
+ */
 import { formatNZD, travelEntriesTotal } from "@/features/business/lib/business";
 import { breakdownTravelCharge } from "@/features/business/lib/pricing-policy";
 import type { TravelEntry } from "@/features/business/types/business";

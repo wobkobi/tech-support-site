@@ -1,6 +1,5 @@
 // src/app/admin/schedule/loading.tsx
 /**
- * @file loading.tsx
  * @description Loading skeleton for the schedule: a day-agenda placeholder on
  * mobile and the week grid (toolbar + 7 day columns) from lg up, matching the
  * DayAgendaView / WeekView split.

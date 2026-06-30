@@ -1,6 +1,5 @@
 // src/app/api/admin/contacts/export/route.ts
 /**
- * @file route.ts
  * @description Exports all contacts as a Google Contacts-compatible CSV file.
  * Column layout matches the format produced by Google Contacts own export tool.
  */

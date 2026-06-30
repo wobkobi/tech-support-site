@@ -1,7 +1,6 @@
 "use client";
 // src/features/admin/components/TravelBlockAdminList.tsx
 /**
- * @file TravelBlockAdminList.tsx
  * @description Read-only admin view of travel time blocks computed for calendar events,
  * with per-event transport mode selector and custom origin override.
  */

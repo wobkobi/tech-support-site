@@ -1,6 +1,5 @@
 // src/app/api/pricing/public-holiday/route.ts
 /**
- * @file route.ts
  * @description Public endpoint exposing the NZ-local stat-day lookup so the
  * wizard can auto-apply the Public Holiday modifier when the customer's
  * chosen booking time falls on a holiday.

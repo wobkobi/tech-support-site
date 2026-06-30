@@ -1,6 +1,5 @@
 // src/shared/lib/prisma.ts
 /**
- * @file prisma.ts
  * @description Prisma client singleton for server components and routes.
  */
 import { PrismaClient } from "@prisma/client";

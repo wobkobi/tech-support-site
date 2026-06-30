@@ -1,6 +1,5 @@
 // src/features/reviews/lib/formatting.ts
 /**
- * @file formatting.ts
  * @description Shared formatting utilities for review display.
  */
 

@@ -1,5 +1,11 @@
 "use client";
-
+// src/features/reviews/components/ReviewScrollHandler.tsx
+/**
+ * @description Centres a hash-targeted review card with a smooth scroll from
+ * the top, then plays a soft outer-glow halo on arrival. Uses the Web
+ * Animations API so the flash survives the global prefers-reduced-motion CSS.
+ * Re-runs on hashchange; renders nothing.
+ */
 import { useEffect } from "react";
 
 const COQ = "243, 66, 19";

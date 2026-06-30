@@ -1,6 +1,5 @@
 // src/shared/lib/env.ts
 /**
- * @file env.ts
  * @description Required environment variable access plus a startup validation
  * pass. Most secrets in this app are read lazily and degrade gracefully (email
  * skips, calendar throws on first use), so only the handful the server cannot

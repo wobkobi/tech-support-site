@@ -1,6 +1,5 @@
 // src/features/contacts/lib/google-contacts.ts
 /**
- * @file google-contacts.ts
  * @description Google People API bidirectional sync. Phones merge as a union
  * (never overwrite). Single-value fields (name, email, address) are latest-wins
  * via `lastSyncedAt` + `lastGoogleEtag`; if both sides changed and differ, a

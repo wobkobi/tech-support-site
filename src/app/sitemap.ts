@@ -1,6 +1,5 @@
 // src/app/sitemap.ts
 /**
- * @file sitemap.ts
  * @description Dynamic sitemap for search engines. Lists all crawlable public routes.
  */
 

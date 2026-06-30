@@ -1,6 +1,5 @@
 // src/app/api/admin/blocked-days/route.ts
 /**
- * @file route.ts
  * @description Admin endpoint to create an all-day "Busy" block on the booking
  * calendar. Refuses the request when a confirmed/held booking already exists
  * on the chosen NZ day - personal-calendar events on the day are ignored.

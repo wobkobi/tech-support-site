@@ -1,6 +1,5 @@
 // src/app/api/admin/reviews/[id]/route.ts
 /**
- * @file route.ts
  * @description Admin API for approving, revoking, and deleting reviews.
  * Protected by ADMIN_SECRET via constant-time comparison.
  */

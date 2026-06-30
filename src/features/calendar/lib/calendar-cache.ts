@@ -1,6 +1,5 @@
 // src/features/calendar/lib/calendar-cache.ts
 /**
- * @file calendar-cache.ts
  * @description Background task to fetch and cache Google Calendar events.
  */
 

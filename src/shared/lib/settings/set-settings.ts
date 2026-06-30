@@ -1,6 +1,5 @@
 // src/shared/lib/settings/set-settings.ts
 /**
- * @file set-settings.ts
  * @description Server-only writer for a single settings group. Upserts the
  * `settings:<group>` row, records an append-only `SettingAudit` entry for the
  * change, then busts the `settings` cache tag so the change is live

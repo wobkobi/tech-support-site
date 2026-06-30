@@ -1,3 +1,10 @@
+// src/app/api/business/expenses/route.ts
+/**
+ * @description Admin expense-ledger endpoint. GET lists every expense entry
+ * (newest first); POST creates one, computing GST and the excl-GST amount
+ * server-side from the GST-inclusive amount and rate.
+ */
+
 import { GST_RATE } from "@/features/business/lib/pricing-policy";
 import { parseAmount, parseRate } from "@/features/business/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";

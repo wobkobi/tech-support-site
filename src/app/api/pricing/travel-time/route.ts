@@ -1,3 +1,12 @@
+// src/app/api/pricing/travel-time/route.ts
+/**
+ * @description Public, rate-limited travel-time endpoint. POST looks up the
+ * drive time and distance from HOME_ADDRESS to a destination via
+ * {@link lookupDriveDistance}, with an optional departureTimeIso for
+ * traffic-aware quoting. Returns durationMins 0 for no match, 503 on misconfig,
+ * and 502 on upstream errors.
+ */
+
 import { lookupDriveDistance } from "@/features/business/lib/travel-distance";
 import { errorResponse } from "@/shared/lib/api-response";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";

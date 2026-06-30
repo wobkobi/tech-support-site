@@ -1,6 +1,6 @@
 {
   "name": "tech-support-site",
-  "version": "3.123.14",
+  "version": "3.123.17",
   "private": true,
   "type": "module",
   "scripts": {
@@ -26,7 +26,7 @@
   "lint-staged": {
     "**/*.{js,jsx,ts,tsx}": [
       "prettier --write",
-      "eslint --fix --max-warnings=0"
+      "eslint --fix --max-warnings=0 --no-warn-ignored"
     ],
     "**/*.{css,html,json,md,mjs,yml,yaml}": "prettier --write"
   },
@@ -37,7 +37,7 @@
     "edge >= 93"
   ],
   "overrides": {
-    "postcss": "^8.5.15"
+    "postcss": "$postcss"
   },
   "dependencies": {
     "@swc/helpers": "^0.5.23",
@@ -66,8 +66,8 @@
     "@types/node": "^26.0.1",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
-    "@typescript-eslint/eslint-plugin": "8.62.0",
-    "@typescript-eslint/parser": "8.62.0",
+    "@typescript-eslint/eslint-plugin": "8.62.1",
+    "@typescript-eslint/parser": "8.62.1",
     "canvas": "^3.2.3",
     "dotenv-cli": "^11.0.0",
     "eslint": "^9.39.4",
@@ -82,7 +82,7 @@
     "lint-staged": "^17.0.8",
     "pdf-lib": "^1.17.1",
     "png-to-ico": "^3.0.1",
-    "postcss": "^8.5.15",
+    "postcss": "^8.5.16",
     "prettier": "^3.9.3",
     "prettier-plugin-organize-imports": "^4.3.0",
     "prettier-plugin-packagejson": "^3.0.2",

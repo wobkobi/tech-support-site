@@ -1,7 +1,6 @@
 "use client";
 // src/features/admin/components/settings/useSettingsForm.ts
 /**
- * @file useSettingsForm.ts
  * @description Shared client state for one settings tab: holds the draft, tracks
  * dirty state, and saves to `/api/admin/settings/[group]`, mapping the route's
  * responses (400 field errors, 409 warnings, 422 blocks) into UI state. Reused

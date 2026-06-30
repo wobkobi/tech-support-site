@@ -1,7 +1,6 @@
 "use client";
 // src/features/admin/components/settings/SettingsSearch.tsx
 /**
- * @file SettingsSearch.tsx
  * @description Filter box that searches every setting's title + description
  * (and its group title) across all tabs. Selecting a result asks the parent to
  * jump to that field's tab and focus it. The index is built once from the

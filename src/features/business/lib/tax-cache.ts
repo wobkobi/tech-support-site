@@ -1,6 +1,5 @@
 // src/features/business/lib/tax-cache.ts
 /**
- * @file tax-cache.ts
  * @description Per-scope cache of tax-planner inputs in the Setting table.
  */
 

@@ -1,6 +1,5 @@
 // src/app/api/admin/contacts/resolve-conflict/route.ts
 /**
- * @file route.ts
  * @description Resolves a contact conflict by applying a chosen value to both
  * the contact and the source record (Booking or Review).
  */

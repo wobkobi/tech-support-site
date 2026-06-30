@@ -1,6 +1,5 @@
 // src/features/admin/lib/auto-maintain.ts
 /**
- * @file auto-maintain.ts
  * @description Server-side maintenance tasks that run on every admin page load.
  * Operations are idempotent and fast when there is nothing to do.
  */

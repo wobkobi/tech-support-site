@@ -1,5 +1,11 @@
 "use client";
 // src/features/admin/components/AdminSidebar.tsx
+/**
+ * @description Admin navigation sidebar. Fixed on the left at lg+; below lg it
+ * collapses behind a hamburger and slides in as a drawer over a backdrop,
+ * auto-closing on navigation. Auth rides the admin session cookie, so no token
+ * threads through the hrefs.
+ */
 import { cn } from "@/shared/lib/cn";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";

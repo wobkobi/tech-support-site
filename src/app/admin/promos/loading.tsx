@@ -1,6 +1,5 @@
 // src/app/admin/promos/loading.tsx
 /**
- * @file loading.tsx
  * @description Promos list-view loading skeleton (shared admin list shape).
  */
 

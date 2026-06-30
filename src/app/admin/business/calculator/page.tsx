@@ -1,3 +1,9 @@
+// src/app/admin/business/calculator/page.tsx
+/**
+ * @description Job calculator page. Resolves business identity and pricing
+ * policy server-side, then hands the GST, travel, and billing-increment values
+ * to {@link CalculatorView} for AI job parsing and time-tracked quoting.
+ */
 import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
 import { CalculatorView } from "@/features/business/components/CalculatorView";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";

@@ -1,7 +1,6 @@
 "use client";
 // src/features/business/components/GetEstimateButton.tsx
 /**
- * @file GetEstimateButton.tsx
  * @description The "Get a rough estimate" CTA on the pricing page. Smooth-scrolls
  * to the estimator section instead of a hard anchor jump, which would land the
  * heading under the sticky navbar (the `scroll-mt-*` on the target keeps it

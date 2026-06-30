@@ -1,3 +1,9 @@
+// src/features/business/lib/prompts/parse-job.ts
+/**
+ * @description Prompt builders for the AI job parser. {@link buildParseJobPrompt}
+ * is the static, cache-friendly system prompt (rules, structure, output schema);
+ * {@link buildParseJobContext} appends live per-call data to the user message.
+ */
 import type { RateConfig, TaskTemplate } from "@/features/business/types/business";
 
 /**

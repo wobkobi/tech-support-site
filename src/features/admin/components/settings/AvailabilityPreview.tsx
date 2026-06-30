@@ -1,7 +1,6 @@
 "use client";
 // src/features/admin/components/settings/AvailabilityPreview.tsx
 /**
- * @file AvailabilityPreview.tsx
  * @description Live preview for the availability tab. Shows the weekly pattern
  * the draft produces (open hours / break / day-off per weekday) and, by running
  * the same buildAvailableDays engine the booking page uses, the next day a

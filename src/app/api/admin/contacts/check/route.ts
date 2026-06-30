@@ -1,6 +1,5 @@
 // src/app/api/admin/contacts/check/route.ts
 /**
- * @file route.ts
  * @description Lightweight existence check by email, used by the post-save
  * "Add to contacts?" popup to decide whether to prompt the operator.
  */

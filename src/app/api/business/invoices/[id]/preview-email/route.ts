@@ -1,4 +1,11 @@
 // src/app/api/business/invoices/[id]/preview-email/route.ts
+/**
+ * @description Admin endpoint that renders the invoice email for review without
+ * sending it. POST builds the subject + HTML body, applying optional operator
+ * overrides (greetingName, customBody, includeReview), and decides whether to
+ * include the review link based on the override or the eligibility check.
+ */
+
 import { getInvoiceReviewEligibility } from "@/features/business/lib/contact-review-token";
 import { buildInvoiceEmail } from "@/features/reviews/lib/email";
 import { errorResponse } from "@/shared/lib/api-response";

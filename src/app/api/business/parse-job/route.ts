@@ -1,3 +1,13 @@
+// src/app/api/business/parse-job/route.ts
+/**
+ * @description Admin endpoint that turns a plain-English job description into a
+ * structured quote. POST pre-computes the worked-minutes total from time ranges,
+ * sends a prompt to the model, then resolves task templates and rates, attaches
+ * round-trip travel from the extracted destination, caps durationMins to the
+ * wall-clock span, and rebalances floating task quantities to match billable
+ * hours. May instead return clarification questions when the input is ambiguous.
+ */
+
 import { composeDescription, effectiveHourlyRate } from "@/features/business/lib/business";
 import { floorBillableMins } from "@/features/business/lib/pricing-policy";
 import {

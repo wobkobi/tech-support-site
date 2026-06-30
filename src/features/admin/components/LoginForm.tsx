@@ -1,7 +1,6 @@
 "use client";
 // src/features/admin/components/LoginForm.tsx
 /**
- * @file LoginForm.tsx
  * @description Client-side form for the admin login page. POSTs the secret
  * to /api/admin/login and navigates back to the requested `next` path on
  * success. Generic error on failure so a wrong password can't be

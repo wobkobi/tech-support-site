@@ -1,3 +1,11 @@
+// src/app/api/business/sheets/import/route.ts
+/**
+ * @description Admin Google Sheets import endpoint. GET runs {@link runSheetsImport}
+ * in dry-run mode to preview which cashbook and expense rows would be imported;
+ * POST performs the real import into MongoDB. Both return 503 when the upstream
+ * sheet read or import fails.
+ */
+
 import { runSheetsImport } from "@/features/business/lib/sheets-import";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";

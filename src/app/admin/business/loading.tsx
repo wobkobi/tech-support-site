@@ -1,6 +1,5 @@
 // src/app/admin/business/loading.tsx
 /**
- * @file loading.tsx
  * @description Loading skeleton for the business dashboard: FY scope tabs, the
  * overview stat cards, the tax-planner panel and the action-link row.
  */

@@ -1,7 +1,6 @@
 "use client";
 // src/features/admin/components/settings/HoldsTab.tsx
 /**
- * @file HoldsTab.tsx
  * @description Editor for the booking form & holds group. Currently just the
  * slot-hold expiry; the job-notes length limits stay structural code consts.
  */

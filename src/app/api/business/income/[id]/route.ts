@@ -1,3 +1,9 @@
+// src/app/api/business/income/[id]/route.ts
+/**
+ * @description Admin endpoint for a single income entry. DELETE removes the
+ * income entry identified by the route id.
+ */
+
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";

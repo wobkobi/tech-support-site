@@ -1,6 +1,5 @@
 // src/shared/components/BreadcrumbJsonLd.tsx
 /**
- * @file BreadcrumbJsonLd.tsx
  * @description Emits a BreadcrumbList JSON-LD script for the current page.
  *   Including breadcrumbs lets Google show a hierarchy in search results
  *   instead of just the bare URL.

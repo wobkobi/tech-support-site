@@ -1,3 +1,13 @@
+// src/app/api/business/invoices/import-drive/route.ts
+/**
+ * @description Admin endpoint that back-fills invoice records from archived Drive
+ * PDFs. POST scans every invoice PDF in Drive, extracts text (decoding the legacy
+ * Google Sheets 2-byte shifted font encoding), and parses client name, email,
+ * dates and totals. Drive files with no DB match create a new PAID invoice; stub
+ * records (zero total / garbled name, no line items) are re-parsed and updated in
+ * place. Returns counts of created, updated, skipped and errored records.
+ */
+
 import { downloadDriveFile, searchAllInvoicePdfs } from "@/features/business/lib/google-drive";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";

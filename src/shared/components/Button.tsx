@@ -1,6 +1,5 @@
 // src/shared/components/Button.tsx
 /**
- * @file Button.tsx
  * @description Polymorphic button component with consistent variants and sizes.
  */
 
@@ -68,7 +67,9 @@ export type ButtonProps = ButtonAsLink | ButtonAsButton;
 function getVariantClasses(variant: ButtonVariant): string {
   switch (variant) {
     case "primary":
-      return cn("bg-coquelicot-500 text-seasalt", "hover:bg-coquelicot-600", "transition-colors");
+      // coquelicot-400 on seasalt clears WCAG AA (4.5:1) for the 16px label;
+      // coquelicot-500 fails at ~3.5:1. Hover lightens one step, as before.
+      return cn("bg-coquelicot-400 text-seasalt", "hover:bg-coquelicot-500", "transition-colors");
     case "secondary":
       return cn(
         "bg-russian-violet text-seasalt",

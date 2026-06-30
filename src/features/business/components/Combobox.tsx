@@ -1,7 +1,6 @@
 "use client";
 // src/features/business/components/Combobox.tsx
 /**
- * @file Combobox.tsx
  * @description Open-vocabulary text input with a suggestions panel. Type to
  * filter the suggestions; press Enter, click a suggestion, or just keep typing
  * a brand-new value. The dropdown opens on focus and closes on blur, Escape,

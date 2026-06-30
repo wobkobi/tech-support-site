@@ -1,6 +1,5 @@
 // src/shared/lib/settings/validate.ts
 /**
- * @file validate.ts
  * @description Write-path validation for the settings panel. Two layers:
  *   1. {@link validateGroup} - per-field shape + bounds for one group (rejects garbage
  *      before it is stored).

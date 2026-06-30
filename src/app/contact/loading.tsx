@@ -1,6 +1,5 @@
 // src/app/contact/loading.tsx
 /**
- * @file loading.tsx
  * @description Streaming skeleton for the contact page: centred heading with
  * call/email buttons, service-area card, what-to-include list and a CTA card.
  */

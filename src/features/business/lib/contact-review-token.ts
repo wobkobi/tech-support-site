@@ -1,6 +1,5 @@
 // src/features/business/lib/contact-review-token.ts
 /**
- * @file contact-review-token.ts
  * @description Lazy generator for the per-contact review token used in invoice emails.
  */
 

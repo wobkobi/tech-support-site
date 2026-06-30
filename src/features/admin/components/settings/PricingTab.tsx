@@ -1,7 +1,6 @@
 "use client";
 // src/features/admin/components/settings/PricingTab.tsx
 /**
- * @file PricingTab.tsx
  * @description Editor for the pricing & cancellation group. Renders each field
  * from {@link PRICING_FIELD_META}, tracks dirty state via {@link useSettingsForm}, and saves
  * to the admin settings route - surfacing inline field errors, guardrail blocks,

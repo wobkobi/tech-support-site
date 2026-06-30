@@ -1,6 +1,5 @@
 // src/app/api/admin/bookings/[id]/resend-review/route.ts
 /**
- * @file route.ts
  * @description Admin API to manually (re)send a review request email for a booking.
  */
 

@@ -1,7 +1,6 @@
 "use client";
 // src/features/reviews/components/admin/ReviewCard.tsx
 /**
- * @file ReviewCard.tsx
  * @description Single review card with approve/revoke/delete actions.
  */
 

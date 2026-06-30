@@ -1,3 +1,11 @@
+// src/app/api/business/summary/route.ts
+/**
+ * @description Admin business summary endpoint. GET aggregates total income,
+ * GST-exclusive expenses, claimable GST, profit, and a tax reserve, plus the
+ * current month's income and expenses, and per-NZ-financial-year breakdowns via
+ * {@link aggregateByFinancialYear} (most recent year first).
+ */
+
 import { aggregateByFinancialYear } from "@/features/business/lib/financial-year";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";

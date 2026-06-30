@@ -1,4 +1,11 @@
 // src/app/api/business/invoices/[id]/send-email/route.ts
+/**
+ * @description Admin endpoint that emails an invoice to the client. POST
+ * re-generates the PDF, sends it (with the review link when the customer is
+ * eligible and the operator left it on), flips the invoice status to SENT, stamps
+ * reviewLinkSentAt when the review line was included, and re-syncs the PDF to Drive.
+ */
+
 import { getInvoiceReviewEligibility } from "@/features/business/lib/contact-review-token";
 import { uploadInvoicePdf } from "@/features/business/lib/google-drive";
 import { extractYearCode, generateInvoicePdf } from "@/features/business/lib/invoice-pdf";

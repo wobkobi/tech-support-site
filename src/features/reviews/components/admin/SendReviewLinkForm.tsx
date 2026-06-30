@@ -1,7 +1,6 @@
 "use client";
 // src/features/reviews/components/admin/SendReviewLinkForm.tsx
 /**
- * @file SendReviewLinkForm.tsx
  * @description Form for sending a review link to a past client via email or SMS.
  */
 

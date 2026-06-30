@@ -1,6 +1,5 @@
 // src/shared/lib/date-format.ts
 /**
- * @file date-format.ts
  * @description Canonical NZ date/time formatters (Pacific/Auckland for clocked outputs).
  */
 

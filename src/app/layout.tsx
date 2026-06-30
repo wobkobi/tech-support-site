@@ -1,6 +1,5 @@
 // src/app/layout.tsx
 /**
- * @file layout.tsx
  * @description Root layout for the App Router. Injects global styles, metadata, and JSON-LD.
  */
 

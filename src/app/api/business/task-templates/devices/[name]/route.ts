@@ -1,3 +1,11 @@
+// src/app/api/business/task-templates/devices/[name]/route.ts
+/**
+ * @description Admin endpoint to retire a task-template device tag. DELETE
+ * clears the device (sets it to null, case-insensitive match) on every matching
+ * TaskTemplate, leaving the rows intact for the next parse-job to retag, and
+ * returns the count of rows updated.
+ */
+
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";

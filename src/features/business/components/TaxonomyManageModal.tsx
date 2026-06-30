@@ -1,7 +1,6 @@
 "use client";
 // src/features/business/components/TaxonomyManageModal.tsx
 /**
- * @file TaxonomyManageModal.tsx
  * @description Lightweight modal for the Calculator that lists every distinct
  * device + category currently in use and lets the operator clear individual
  * tags via the bulk-delete API. Tasks themselves stay; only the tag is unset.

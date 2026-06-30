@@ -1,4 +1,9 @@
 // src/app/admin/contacts/page.tsx
+/**
+ * @description Admin contacts hub. Runs {@link autoMaintain} on load to surface
+ * sync conflicts, counts pending conflicts, loads all contacts plus their
+ * linked reviews, and renders the {@link ContactsAdminView} list.
+ */
 import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
 import { ContactsAdminView } from "@/features/admin/components/ContactsAdminView";
 import { autoMaintain } from "@/features/admin/lib/auto-maintain";

@@ -1,6 +1,5 @@
 // src/app/api/reviews/route.ts
 /**
- * @file route.ts
  * @description API routes for reviews with verification support.
  */
 

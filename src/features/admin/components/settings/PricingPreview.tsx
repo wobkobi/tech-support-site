@@ -1,7 +1,6 @@
 "use client";
 // src/features/admin/components/settings/PricingPreview.tsx
 /**
- * @file PricingPreview.tsx
  * @description Live worked-example for the pricing tab - renders the draft
  * cancellation policy, billing rounding, surcharge, and GST status as the
  * plain-English lines a customer or invoice would reflect, so the abstract

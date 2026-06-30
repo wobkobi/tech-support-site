@@ -1,4 +1,9 @@
 "use client";
+// src/features/business/components/IncomeView.tsx
+/**
+ * @description Records and lists income entries against /api/business/income,
+ * showing a running income total and a 20% tax-reserve estimate.
+ */
 
 import { formatNZD, todayISO } from "@/features/business/lib/business";
 import { INCOME_METHODS } from "@/features/business/lib/constants";

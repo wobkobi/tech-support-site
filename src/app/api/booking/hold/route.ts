@@ -1,6 +1,5 @@
 // src/app/api/booking/hold/route.ts
 /**
- * @file route.ts
  * @description API route to create a booking hold with Google Calendar integration.
  */
 

@@ -1,7 +1,6 @@
 "use client";
 // src/shared/components/EmailInput.tsx
 /**
- * @file EmailInput.tsx
  * @description Shared email input with consistent blur-validation and inline
  * error display, keeping validation and typo-suggestion behaviour identical
  * across every email field even when wording differs.

@@ -1,6 +1,5 @@
 // src/app/api/admin/contacts/route.ts
 /**
- * @file route.ts
  * @description Admin API for listing and creating contacts.
  */
 

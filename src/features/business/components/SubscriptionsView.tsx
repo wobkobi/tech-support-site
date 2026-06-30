@@ -1,4 +1,9 @@
 "use client";
+// src/features/business/components/SubscriptionsView.tsx
+/**
+ * @description Records and lists recurring subscription expenses (description,
+ * supplier, amount, GST, frequency, next due) and flags overdue ones.
+ */
 
 import { formatNZD, todayISO } from "@/features/business/lib/business";
 import {

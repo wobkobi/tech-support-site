@@ -1,6 +1,5 @@
 // src/app/error.tsx
 /**
- * @file error.tsx
  * @description Themed error boundary. Matches site styling.
  */
 

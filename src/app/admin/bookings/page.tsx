@@ -1,4 +1,9 @@
 // src/app/admin/bookings/page.tsx
+/**
+ * @description Admin bookings list. Loads the most recent 1000 bookings (soft
+ * cap to avoid unbounded scans), maps them to {@link AdminBookingRow}s, derives
+ * per-status counts, and renders the filterable {@link BookingAdminList}.
+ */
 import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
 import {
   BookingAdminList,

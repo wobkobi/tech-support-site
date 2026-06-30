@@ -1,6 +1,5 @@
 // src/app/admin/login/page.tsx
 /**
- * @file page.tsx
  * @description Admin login. Single password field, posts to /api/admin/login,
  * follows the `?next=` query param on success (defaults to /admin). Plain
  * server component shell; the form is a tiny client component below.

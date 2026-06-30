@@ -1,3 +1,9 @@
+// src/features/business/lib/google-sheets.ts
+/**
+ * @description Google Sheets v4 helpers for the invoice counter. Reads the
+ * prefix, financial year, and last-issued number from the SETTINGS tab and
+ * writes back the incremented counter. Cell layout matches the current template.
+ */
 import { getOAuth2Client } from "@/features/calendar/lib/google-calendar";
 import { google } from "googleapis";
 

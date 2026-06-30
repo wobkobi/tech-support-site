@@ -1,6 +1,5 @@
 // src/app/api/admin/bookings/[id]/route.ts
 /**
- * @file route.ts
  * @description Admin API for editing and cancelling bookings by ID.
  */
 

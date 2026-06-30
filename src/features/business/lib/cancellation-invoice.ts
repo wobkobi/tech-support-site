@@ -1,6 +1,5 @@
 // src/features/business/lib/cancellation-invoice.ts
 /**
- * @file cancellation-invoice.ts
  * @description Builds + writes the DRAFT invoice that covers a late
  * cancellation or no-show. Shared by /api/booking/cancel (customer) and
  * /api/admin/bookings/[id] (operator). Fire-and-forget callable; failures

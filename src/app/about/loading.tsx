@@ -1,6 +1,5 @@
 // src/app/about/loading.tsx
 /**
- * @file loading.tsx
  * @description Streaming skeleton for the about page: a heading card plus the
  * approach and "Who I help" list cards.
  */

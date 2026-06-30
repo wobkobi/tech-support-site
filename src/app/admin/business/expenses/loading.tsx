@@ -1,6 +1,5 @@
 // src/app/admin/business/expenses/loading.tsx
 /**
- * @file loading.tsx
  * @description Expenses list-view loading skeleton (shared admin list shape).
  */
 

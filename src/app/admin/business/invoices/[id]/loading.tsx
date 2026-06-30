@@ -1,6 +1,5 @@
 // src/app/admin/business/invoices/[id]/loading.tsx
 /**
- * @file loading.tsx
  * @description Loading skeleton for a single invoice: the actions bar plus the
  * invoice document card (wordmark + INVOICE block, parties, line items, totals)
  * in the same max-w-3xl column the page uses.

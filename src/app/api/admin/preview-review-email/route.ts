@@ -1,6 +1,5 @@
 // src/app/api/admin/preview-review-email/route.ts
 /**
- * @file route.ts
  * @description Admin endpoint that returns the rendered HTML preview for a past-client review email.
  */
 

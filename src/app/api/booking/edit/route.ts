@@ -1,6 +1,5 @@
 // src/app/api/booking/edit/route.ts
 /**
- * @file route.ts
  * @description API route to edit an existing booking by cancel token.
  */
 

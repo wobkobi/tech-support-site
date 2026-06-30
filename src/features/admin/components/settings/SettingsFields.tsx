@@ -1,7 +1,6 @@
 "use client";
 // src/features/admin/components/settings/SettingsFields.tsx
 /**
- * @file SettingsFields.tsx
  * @description Reusable settings inputs shared by every settings tab. Each field
  * renders its title, a plain-English description, the unit, an optional "what
  * off does" note, and an inline validation error - sourced from `field-meta`.

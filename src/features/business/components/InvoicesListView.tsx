@@ -1,4 +1,10 @@
 "use client";
+// src/features/business/components/InvoicesListView.tsx
+/**
+ * @description Lists all invoices with inline status controls. Status changes
+ * PATCH /api/business/invoices/{id}; voiding here is a silent status change and
+ * emails no client notification (use the invoice page for that).
+ */
 
 import { formatNZD } from "@/features/business/lib/business";
 import type { Invoice, InvoiceStatus } from "@/features/business/types/business";

@@ -1,5 +1,10 @@
 "use client";
 // src/features/admin/components/ContactsAdminView.tsx
+/**
+ * @description Client wrapper for the contacts page. Surfaces name/phone
+ * conflicts for one-click resolution and drives the Google Contacts sync
+ * (import + push) with a confirmation step and result message.
+ */
 import type { ConflictEntry } from "@/app/api/admin/contacts/enrich-from-reviews/route";
 import { cn } from "@/shared/lib/cn";
 import { useRouter } from "next/navigation";

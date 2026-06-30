@@ -1,7 +1,6 @@
 "use client";
 // src/features/admin/components/WeekView.tsx
 /**
- * @file WeekView.tsx
  * @description Admin week-grid view. Renders booking, work, personal, and travel
  * events for the requested week and opens a manual-booking modal when an empty
  * slot is clicked.

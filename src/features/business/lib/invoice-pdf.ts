@@ -1,3 +1,9 @@
+// src/features/business/lib/invoice-pdf.ts
+/**
+ * @description Generates the A4 invoice PDF with pdf-lib. Colours mirror the web
+ * Tailwind palette so the PDF reads as the same document as the on-screen
+ * InvoicePreviewPanel; keep the two layouts in sync.
+ */
 import type { Invoice } from "@/features/business/types/business";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { formatDateShort } from "@/shared/lib/date-format";

@@ -1,4 +1,11 @@
 // src/app/api/business/invoices/preview-pdf/route.ts
+/**
+ * @description Admin endpoint that renders the customer-facing PDF for an UNSAVED
+ * invoice. POST takes the builder's form state, forces status to DRAFT (so the
+ * VOID watermark stays off), and returns the same PDF bytes the customer would
+ * receive as an attachment download.
+ */
+
 import { generateInvoicePdf } from "@/features/business/lib/invoice-pdf";
 import type { Invoice, LineItem } from "@/features/business/types/business";
 import { errorResponse } from "@/shared/lib/api-response";

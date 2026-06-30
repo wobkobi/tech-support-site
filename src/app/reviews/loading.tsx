@@ -1,6 +1,5 @@
 // src/app/reviews/loading.tsx
 /**
- * @file loading.tsx
  * @description Streaming skeleton for the reviews page: a heading card, a
  * two-column grid of review-card placeholders and the leave-a-review card.
  * Shown while the approved-reviews query runs.

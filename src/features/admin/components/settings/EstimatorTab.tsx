@@ -1,7 +1,6 @@
 "use client";
 // src/features/admin/components/settings/EstimatorTab.tsx
 /**
- * @file EstimatorTab.tsx
  * @description Editor for the price-estimator group - the task-duration benchmark
  * list the public estimator uses. Tracks dirty state via {@link useSettingsForm} and
  * saves to the admin settings route, surfacing inline row errors, guardrail

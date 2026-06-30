@@ -1,6 +1,5 @@
 // src/app/admin/layout.tsx
 /**
- * @file layout.tsx
  * @description Admin route segment layout. Sets `Referrer-Policy: no-referrer`
  * so per-record customer tokens embedded in admin-rendered links
  * (`cancelToken`, `reviewToken`) don't leak via the Referer header when the

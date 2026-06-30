@@ -1,4 +1,10 @@
 // src/app/admin/contacts/conflicts/page.tsx
+/**
+ * @description Lists unresolved Google Contacts sync conflicts (fields that
+ * changed on both the site DB and Google since the last sync). Joins each
+ * conflict to its contact, maps to {@link ConflictRow}s, and renders
+ * {@link ContactConflictsView} so the operator can pick the winning value.
+ */
 import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
 import {
   ContactConflictsView,

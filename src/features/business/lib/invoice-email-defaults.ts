@@ -1,5 +1,4 @@
 /**
- * @file invoice-email-defaults.ts
  * @description Default copy for the invoice email's editable body. Lives in its
  * own file so both the server (`buildInvoiceEmail`) and the client (the Send
  * modal in InvoiceActions.tsx) can import it without dragging server-only

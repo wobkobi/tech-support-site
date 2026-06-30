@@ -1,6 +1,5 @@
 // src/app/api/admin/send-review-link/route.ts
 /**
- * @file route.ts
  * @description Admin endpoint to send a review request link to a past client.
  * Lands a Contact (creating one if needed), ensures Contact.reviewToken is set,
  * stamps Contact.reviewLinkSentAt, then sends the email/SMS. All send-state

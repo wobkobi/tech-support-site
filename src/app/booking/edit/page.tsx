@@ -1,6 +1,5 @@
 // src/app/booking/edit/page.tsx
 /**
- * @file page.tsx
  * @description Edit an existing booking using the cancel token.
  */
 

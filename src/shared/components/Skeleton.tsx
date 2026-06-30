@@ -1,6 +1,5 @@
 // src/shared/components/Skeleton.tsx
 /**
- * @file Skeleton.tsx
  * @description Shared loading-skeleton primitive ("bone") used by route-level
  * loading.tsx files so every page streams a placeholder in the same visual
  * language instead of a blank frame.

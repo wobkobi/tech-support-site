@@ -1,3 +1,12 @@
+// src/app/api/business/invoices/[id]/route.ts
+/**
+ * @description Admin endpoint for a single invoice. GET returns it. PATCH applies
+ * either a status-only change or a full field update, enforcing transition rules
+ * via {@link validateTransition} (VOIDED is terminal) and recomputing totals on
+ * line-item changes. DELETE removes DRAFT invoices only; SENT/PAID/VOIDED are
+ * audit-protected. Field-changing paths re-sync the PDF to Drive.
+ */
+
 import { calcInvoiceTotals, isValidLineItem } from "@/features/business/lib/business";
 import { uploadInvoicePdf } from "@/features/business/lib/google-drive";
 import { extractYearCode, generateInvoicePdf } from "@/features/business/lib/invoice-pdf";

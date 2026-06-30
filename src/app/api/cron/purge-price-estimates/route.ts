@@ -1,6 +1,5 @@
 // src/app/api/cron/purge-price-estimates/route.ts
 /**
- * @file route.ts
  * @description Cron endpoint to delete PriceEstimateLog rows older than 30 days.
  * Called externally via cron-job.org (daily cadence).
  */

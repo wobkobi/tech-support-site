@@ -1,3 +1,10 @@
+// src/features/business/lib/constants.ts
+/**
+ * @description Fixed enumerations for the business ledger - subscription
+ * frequencies, expense categories, and payment/income methods - used to
+ * populate form selects and validate entries.
+ */
+
 export const VALID_FREQUENCIES = [
   "weekly",
   "fortnightly",

@@ -1,6 +1,5 @@
 // src/app/booking/page.tsx
 /**
- * @file page.tsx
  * @description Booking page with duration-aware slot availability.
  *   The static shell (heading, sidebar, skeleton) renders immediately while
  *   the slot data is streamed in via a Suspense boundary, so TTFB stays

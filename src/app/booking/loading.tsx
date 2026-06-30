@@ -1,6 +1,5 @@
 // src/app/booking/loading.tsx
 /**
- * @file loading.tsx
  * @description Skeleton shown during navigation to /booking (and inherited by
  * /booking/edit, which reuses the same form).
  */

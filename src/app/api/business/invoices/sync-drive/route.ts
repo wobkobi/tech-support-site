@@ -1,3 +1,12 @@
+// src/app/api/business/invoices/sync-drive/route.ts
+/**
+ * @description Admin endpoint that links archived Drive PDFs to existing invoice
+ * records. POST scans every invoice PDF in Drive, matches each by filename to an
+ * invoice number, and back-fills driveFileId + driveWebUrl on the matched record.
+ * Unlike import-drive it never creates or re-parses records. Returns counts of
+ * matched, not-found and skipped (unparseable filename) files.
+ */
+
 import { searchAllInvoicePdfs } from "@/features/business/lib/google-drive";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";

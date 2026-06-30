@@ -1,6 +1,5 @@
 // src/features/business/lib/tax-planner.ts
 /**
- * @file tax-planner.ts
  * @description NZ sole-trader tax planner calculations - mirrors the user's
  * `Tax Planner` spreadsheet so the dashboard reserve numbers reconcile with
  * what's in the per-FY workbook.

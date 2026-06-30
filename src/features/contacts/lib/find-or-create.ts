@@ -1,6 +1,5 @@
 // src/features/contacts/lib/find-or-create.ts
 /**
- * @file find-or-create.ts
  * @description Shared find-or-create helpers for Contact records. Centralises
  * the pattern used by booking, review-request and admin flows that need to
  * land a Contact row when one doesn't already exist for an email or phone.

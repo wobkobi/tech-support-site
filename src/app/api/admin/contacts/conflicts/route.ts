@@ -1,6 +1,5 @@
 // src/app/api/admin/contacts/conflicts/route.ts
 /**
- * @file route.ts
  * @description Admin endpoint listing pending Google Contacts sync conflicts.
  */
 

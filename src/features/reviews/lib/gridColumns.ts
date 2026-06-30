@@ -1,6 +1,5 @@
 // src/features/reviews/lib/gridColumns.ts
 /**
- * @file gridColumns.ts
  * @description Splits newest-first reviews into two balanced columns for the
  * gap-free masonry grid on the reviews page.
  */
