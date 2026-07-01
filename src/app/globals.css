@@ -319,7 +319,7 @@ aside.app-admin-drawer {
 }
 
 .animate-marquee {
-  animation: marquee 120s linear infinite;
+  animation: marquee 190s linear infinite;
   will-change: transform;
 }
 
@@ -327,6 +327,28 @@ aside.app-admin-drawer {
 .animate-marquee:hover,
 .animate-marquee:focus-within {
   animation-play-state: paused;
+}
+
+/* Soft-fade the carousel viewport so cards dissolve as they reach the edges
+   instead of being hard-clipped. --marquee-fade sets how far in from each edge
+   the fade runs; a smaller value makes cards disappear closer to the edge.
+   Prefixed copy kept for WebKit; Firefox uses the unprefixed property. */
+.marquee-fade {
+  --marquee-fade: 3rem;
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    black var(--marquee-fade),
+    black calc(100% - var(--marquee-fade)),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    black var(--marquee-fade),
+    black calc(100% - var(--marquee-fade)),
+    transparent 100%
+  );
 }
 
 @keyframes fadeIn {

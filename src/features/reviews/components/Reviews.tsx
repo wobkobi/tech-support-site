@@ -118,7 +118,9 @@ export default function Reviews({ items = [] }: ReviewsProps): React.ReactElemen
   if (items.length > 3) {
     const track = [...items, ...items];
     return (
-      <section aria-labelledby="reviews-section" className="mx-auto w-full max-w-6xl">
+      // Full-width (no max-w cap) so the carousel edges line up with the
+      // full-width content column above rather than sitting in a narrower box.
+      <section aria-labelledby="reviews-section" className="w-full">
         <h2
           id="reviews-section"
           className="mb-2 text-center text-xl font-semibold text-rich-black sm:text-2xl"
@@ -128,10 +130,11 @@ export default function Reviews({ items = [] }: ReviewsProps): React.ReactElemen
 
         <div
           className={cn(
-            // Bleed all the way to the FrostedSection edge so the carousel sits flush against the page chrome.
-            "relative -mx-8 w-[calc(100%+4rem)] overflow-hidden rounded-xl",
-            "sm:-mx-12 sm:w-[calc(100%+6rem)]",
-            "md:-mx-16 md:w-[calc(100%+8rem)]",
+            // Sit within the FrostedSection padding so the carousel's edges line up
+            // with the content column above (hero, cards) instead of bleeding wider.
+            "relative w-full overflow-hidden rounded-xl",
+            // Dissolve cards near the left/right edges instead of hard-clipping them.
+            "marquee-fade",
           )}
         >
           <ul className="marquee-track animate-marquee flex w-max gap-3">
