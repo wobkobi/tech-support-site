@@ -7,6 +7,7 @@ import { getPublicPricing } from "@/features/business/lib/pricing-policy.server"
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
 import { Button } from "@/shared/components/Button";
 import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
+import { PixelEvent } from "@/shared/components/PixelEvent";
 import { cn } from "@/shared/lib/cn";
 import { getSiteUrl } from "@/shared/lib/site-url";
 import type { Metadata } from "next";
@@ -147,6 +148,7 @@ export default async function ServicesPage(): Promise<React.ReactElement> {
 
   return (
     <PageShell>
+      <PixelEvent event="ViewContent" />
       <script
         id="ld-services"
         type="application/ld+json"

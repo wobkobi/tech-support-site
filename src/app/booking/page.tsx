@@ -17,6 +17,7 @@ import {
 import { fetchAllCalendarEvents } from "@/features/calendar/lib/google-calendar";
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
 import { CARD, FrostedSection, PageShell, SOFT_CARD } from "@/shared/components/PageLayout";
+import { PixelEvent } from "@/shared/components/PixelEvent";
 import { cn } from "@/shared/lib/cn";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
@@ -336,6 +337,7 @@ function BookingFormSkeleton(): React.ReactElement {
 export default function BookingPage(): React.ReactElement {
   return (
     <PageShell>
+      <PixelEvent event="InitiateCheckout" />
       <BreadcrumbJsonLd
         crumbs={[
           { name: "Home", path: "/" },

@@ -14,9 +14,9 @@ const PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID;
 /**
  * Fires the booking conversions once on mount. This page renders only after a
  * booking is confirmed, so each event maps one-to-one to a real lead. Reports
- * an Ads conversion (when the Ads ID + label are set) and a Meta Pixel Schedule
- * event (when the pixel is set); each half no-ops until its IDs are configured.
- * Renders no markup.
+ * an Ads conversion (when the Ads ID + label are set) and the Meta Pixel `Lead`
+ * standard event (when the pixel is set), which matches the Leads campaign
+ * objective; each half no-ops until its IDs are configured. Renders no markup.
  * @returns Null - this component has no markup.
  */
 export function BookingConversion(): null {
@@ -25,7 +25,7 @@ export function BookingConversion(): null {
       window.gtag("event", "conversion", { send_to: `${ADS_ID}/${BOOKING_LABEL}` });
     }
     if (PIXEL_ID && typeof window.fbq === "function") {
-      window.fbq("track", "Schedule");
+      window.fbq("track", "Lead");
     }
   }, []);
 
