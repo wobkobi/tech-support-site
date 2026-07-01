@@ -23,6 +23,7 @@ import {
 } from "@/features/business/lib/promos";
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
 import { CARD, FrostedSection, PageShell, SOFT_CARD } from "@/shared/components/PageLayout";
+import { PixelEvent } from "@/shared/components/PixelEvent";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
 import { getSettings } from "@/shared/lib/settings/get-settings";
@@ -97,6 +98,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
   const baseRate = pricing.baseRate;
   return (
     <PageShell>
+      <PixelEvent event="ViewContent" />
       <BreadcrumbJsonLd
         crumbs={[
           { name: "Home", path: "/" },

@@ -2,7 +2,7 @@
 // src/shared/components/MetaPixel.tsx
 /**
  * @description Loads the Meta Pixel (fbevents.js), tracks PageView on load and
- * client-side route changes, and reports tel: link taps as Contact events.
+ * client-side route changes, and reports tel:/mailto: link taps as Contact events.
  */
 
 import { usePathname } from "next/navigation";
@@ -39,17 +39,17 @@ export function MetaPixel(): React.ReactElement | null {
     window.fbq("track", "PageView");
   }, [pathname]);
 
-  // One delegated listener reports every tel: link tap as a Contact event,
-  // mirroring how GoogleTag tracks phone clicks.
+  // One delegated listener reports every phone (tel:) or email (mailto:) link
+  // tap as a Contact event, mirroring how GoogleTag tracks phone clicks.
   useEffect(() => {
     if (!PIXEL_ID) return;
     /**
-     * Reports a tel: link tap to the Meta Pixel as a Contact event.
+     * Reports a tel: or mailto: link tap to the Meta Pixel as a Contact event.
      * @param event - The bubbled document click.
      */
     const onClick = (event: MouseEvent): void => {
       const origin = event.target as HTMLElement | null;
-      const link = origin?.closest?.('a[href^="tel:"]');
+      const link = origin?.closest?.('a[href^="tel:"], a[href^="mailto:"]');
       if (!link || typeof window.fbq !== "function") return;
       window.fbq("track", "Contact");
     };
