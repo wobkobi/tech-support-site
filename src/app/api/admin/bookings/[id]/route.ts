@@ -174,11 +174,12 @@ export async function PATCH(
     }
   }
 
-  // Sync contact details
+  // Sync contact details. Match case-insensitively and skip soft-deleted contacts
+  // so an edit lands on the live contact regardless of stored email casing.
   if (body.address !== undefined && booking.email) {
     try {
       await prisma.contact.updateMany({
-        where: { email: booking.email },
+        where: { email: { equals: booking.email, mode: "insensitive" }, deletedAt: null },
         data: { address: body.address.trim() || null },
       });
     } catch (err) {
@@ -189,7 +190,7 @@ export async function PATCH(
   if (body.phone !== undefined && booking.email) {
     try {
       await prisma.contact.updateMany({
-        where: { email: booking.email },
+        where: { email: { equals: booking.email, mode: "insensitive" }, deletedAt: null },
         data: { phone: toE164NZ(body.phone) || null },
       });
     } catch (err) {
@@ -233,6 +234,11 @@ export async function DELETE(
     }
   }
 
+  // Drop the dangling reference first: Review.bookingId is a bare ObjectId, not
+  // a relation, so deleting the booking would otherwise leave reviews pointing at
+  // a row that no longer exists. The review itself is kept (it stays linked to
+  // its contact via contactId/customerRef).
+  await prisma.review.updateMany({ where: { bookingId: id }, data: { bookingId: null } });
   await prisma.booking.delete({ where: { id } });
 
   revalidateTag(SCHEDULE_CALENDAR_TAG, {});

@@ -65,11 +65,22 @@ export async function mergePhoneOnlyContacts(): Promise<Set<string>> {
   for (const { withEmail, phoneOnly } of phoneBuckets.values()) {
     if (!withEmail || phoneOnly.length === 0) continue;
     for (const dup of phoneOnly) {
-      await prisma.review
-        .updateMany({ where: { contactId: dup.id }, data: { contactId: withEmail.id } })
-        .catch(() => null);
-      await prisma.contact.delete({ where: { id: dup.id } }).catch(() => null);
-      deletedIds.add(dup.id);
+      // Reassign-then-delete must be atomic: a hard delete without the review
+      // reassignment would orphan the phone-only contact's reviews onto a
+      // now-missing contactId (Review.contactId is a bare ObjectId, not a
+      // relation, so nothing cleans it up).
+      try {
+        await prisma.$transaction([
+          prisma.review.updateMany({
+            where: { contactId: dup.id },
+            data: { contactId: withEmail.id },
+          }),
+          prisma.contact.delete({ where: { id: dup.id } }),
+        ]);
+        deletedIds.add(dup.id);
+      } catch (err) {
+        console.error(`[contacts/maintenance] phone-only merge failed for ${dup.id}:`, err);
+      }
     }
   }
   return deletedIds;
