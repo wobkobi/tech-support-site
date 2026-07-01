@@ -1,10 +1,11 @@
 {
   "name": "tech-support-site",
-  "version": "3.124.0",
+  "version": "3.125.0",
   "private": true,
   "type": "module",
   "scripts": {
     "build": "next build --turbopack",
+    "build:ads": "tsx scripts/build-ads.ts",
     "build:all": "npm run build:icons && npm run build",
     "build:icons": "tsx scripts/build-icons/index.ts",
     "build:poster": "npx tsx scripts/export-poster-screenshot.ts",

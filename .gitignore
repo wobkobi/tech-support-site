@@ -72,5 +72,8 @@ next-env.d.ts
 /docs/
 google-tokens.txt
 
+# generated ad creatives (regenerate with `npm run build:ads`)
+/ad-creatives/
+
 # local reference material
 To the Point - Template.xlsx
