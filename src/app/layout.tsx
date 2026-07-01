@@ -8,6 +8,7 @@ import { GoogleTag } from "@/shared/components/GoogleTag";
 import { MetaPixel } from "@/shared/components/MetaPixel";
 import { NavBar } from "@/shared/components/NavBar";
 import { PromoBanner } from "@/shared/components/PromoBanner";
+import { SiteFooter } from "@/shared/components/SiteFooter";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import { getSiteUrl } from "@/shared/lib/site-url";
 import { Analytics } from "@vercel/analytics/next";
@@ -372,6 +373,7 @@ export default async function RootLayout({
         <PromoBanner />
         <NavBar />
         {children}
+        <SiteFooter />
 
         <Analytics />
         <SpeedInsights />
