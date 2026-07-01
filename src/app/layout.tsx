@@ -5,6 +5,7 @@
 
 import { getPublicPricing } from "@/features/business/lib/pricing-policy.server";
 import { GoogleTag } from "@/shared/components/GoogleTag";
+import { MetaPixel } from "@/shared/components/MetaPixel";
 import { NavBar } from "@/shared/components/NavBar";
 import { PromoBanner } from "@/shared/components/PromoBanner";
 import { getSettings } from "@/shared/lib/settings/get-settings";
@@ -375,6 +376,7 @@ export default async function RootLayout({
         <Analytics />
         <SpeedInsights />
         <GoogleTag />
+        <MetaPixel />
         <script
           id="ld-business"
           type="application/ld+json"
