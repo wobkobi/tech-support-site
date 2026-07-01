@@ -8,10 +8,11 @@
  */
 
 import { getOAuth2Client } from "@/features/calendar/lib/google-calendar";
-import { normalisePhone, toE164NZ } from "@/shared/lib/normalise-phone";
+import { normaliseContactPhone, toE164NZ } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
 import { google } from "googleapis";
 import { clearContactConflict, recordContactConflict } from "./contact-conflicts";
+import { splitName } from "./split-name";
 
 /**
  * Returns an authenticated Google People API client.
@@ -20,6 +21,20 @@ import { clearContactConflict, recordContactConflict } from "./contact-conflicts
 function getPeopleClient(): ReturnType<typeof google.people> {
   const auth = getOAuth2Client();
   return google.people({ version: "v1", auth });
+}
+
+/**
+ * Best-effort deletion of a Google contact by resource name. Used when a local
+ * contact is deleted or merged away so the Google side doesn't keep a stale row.
+ * Never throws - a failure here must not fail the local operation.
+ * @param resourceName - Google People API resource name (e.g. "people/c123").
+ */
+export async function deleteContactFromGoogle(resourceName: string): Promise<void> {
+  try {
+    await getPeopleClient().people.deleteContact({ resourceName });
+  } catch (err) {
+    console.error(`[google-contacts] deleteContactFromGoogle failed for ${resourceName}:`, err);
+  }
 }
 
 /**
@@ -36,12 +51,12 @@ export async function importFromGoogleContacts(): Promise<number> {
     // contacts can be matched to a known email and imported.
     const contactEmailByPhone = new Map<string, string>();
     const contactRows = await prisma.contact.findMany({
-      where: { phone: { not: null }, email: { not: null } },
+      where: { phone: { not: null }, email: { not: null }, deletedAt: null },
       select: { phone: true, email: true },
     });
     for (const c of contactRows) {
       if (!c.phone || !c.email) continue;
-      const norm = normalisePhone(toE164NZ(c.phone) || c.phone);
+      const norm = normaliseContactPhone(c.phone);
       if (norm && !contactEmailByPhone.has(norm)) contactEmailByPhone.set(norm, c.email);
     }
 
@@ -80,7 +95,7 @@ export async function importFromGoogleContacts(): Promise<number> {
         const emailEntry = person.emailAddresses?.[0]?.value?.trim().toLowerCase() ?? null;
         const rawPhone = person.phoneNumbers?.[0]?.value?.trim() ?? null;
         const phone = rawPhone ? toE164NZ(rawPhone) || rawPhone : null;
-        const normPhone = rawPhone ? normalisePhone(toE164NZ(rawPhone) || rawPhone) : null;
+        const normPhone = normaliseContactPhone(rawPhone);
         const name =
           person.names?.[0]?.displayName?.trim() ??
           person.names?.[0]?.givenName?.trim() ??
@@ -104,13 +119,13 @@ export async function importFromGoogleContacts(): Promise<number> {
       const [emailMatches, phoneMatches] = await Promise.all([
         emailsToCheck.length > 0
           ? prisma.contact.findMany({
-              where: { email: { in: emailsToCheck } },
+              where: { email: { in: emailsToCheck }, deletedAt: null },
               select: { id: true, email: true, name: true },
             })
           : Promise.resolve([] as { id: string; email: string | null; name: string }[]),
         phonesToCheck.length > 0
           ? prisma.contact.findMany({
-              where: { phone: { in: phonesToCheck } },
+              where: { phone: { in: phonesToCheck }, deletedAt: null },
               select: { id: true, phone: true, name: true },
             })
           : Promise.resolve([] as { id: string; phone: string | null; name: string }[]),
@@ -225,37 +240,6 @@ export async function importFromGoogleContacts(): Promise<number> {
 }
 
 /**
- * Splits a full display name into given (first) and family (last) name parts.
- * @param fullName - Full display name.
- * @returns Object with givenName and familyName strings.
- */
-function splitName(fullName: string): { givenName: string; familyName: string } {
-  const parts = (fullName ?? "").trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return { givenName: "", familyName: "" };
-  if (parts.length === 1) return { givenName: parts[0], familyName: "" };
-  return { givenName: parts.slice(0, -1).join(" "), familyName: parts[parts.length - 1] };
-}
-
-/**
- * Pushes every local contact to Google Contacts and returns the number synced.
- * Errors on individual contacts are logged and skipped.
- * @returns Number of contacts successfully synced.
- */
-export async function syncAllContactsToGoogle(): Promise<number> {
-  const contacts = await prisma.contact.findMany({ select: { id: true } });
-  let count = 0;
-  for (const { id } of contacts) {
-    try {
-      await syncContactToGoogle(id);
-      count++;
-    } catch (err) {
-      console.error(`[google-contacts] syncAllContactsToGoogle: failed for ${id}:`, err);
-    }
-  }
-  return count;
-}
-
-/**
  * Compares site + Google values of a single-value field, considering which
  * sides changed since the last sync, and returns the action the sync should
  * take. See file header for the policy.
@@ -299,14 +283,14 @@ function mergePhones(sitePhone: string | null, googlePhones: string[]): string[]
   for (const raw of googlePhones) {
     const trimmed = raw?.trim();
     if (!trimmed) continue;
-    const key = normalisePhone(toE164NZ(trimmed) || trimmed) ?? trimmed;
+    const key = normaliseContactPhone(trimmed) ?? trimmed;
     if (seen.has(key)) continue;
     seen.add(key);
     result.push(trimmed);
   }
   if (sitePhone?.trim()) {
     const trimmed = sitePhone.trim();
-    const key = normalisePhone(toE164NZ(trimmed) || trimmed) ?? trimmed;
+    const key = normaliseContactPhone(trimmed) ?? trimmed;
     if (!seen.has(key)) {
       seen.add(key);
       result.push(trimmed);

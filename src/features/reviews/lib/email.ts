@@ -442,15 +442,16 @@ export interface ReviewRequestData {
  * Sends a review request email to a customer shortly after their appointment.
  * Failures are caught and logged - never throws.
  * @param booking - Booking details for the customer.
- * @returns Promise that resolves when the email is sent (or silently fails).
+ * @returns True when the email was sent (or intentionally skipped because Resend
+ *   is not configured); false when the send failed and should be retried.
  */
-export async function sendCustomerReviewRequest(booking: ReviewRequestData): Promise<void> {
+export async function sendCustomerReviewRequest(booking: ReviewRequestData): Promise<boolean> {
   const from = process.env.EMAIL_FROM;
   const siteUrl = getSiteUrl();
 
   if (!from || !process.env.RESEND_API_KEY) {
     console.warn("[email] Resend not configured - skipping customer review request.");
-    return;
+    return true;
   }
 
   const identity = await getIdentity();
@@ -484,8 +485,10 @@ ${await buildEmailSignature(siteUrl)}
       subject: `Thanks for having me, ${firstName} - how did everything go?`,
       html,
     });
+    return true;
   } catch (error) {
     console.error(`[email] Failed to send review request for booking ${booking.id}:`, error);
+    return false;
   }
 }
 
@@ -526,15 +529,16 @@ ${await buildEmailSignature(siteUrl)}
  * Tone is tailored for clients who were seen days/weeks ago, mentioning
  * the site update and asking for a review. Failures are caught and logged.
  * @param booking - Past client details.
- * @returns Promise that resolves when the email is sent (or silently fails).
+ * @returns True when the email was sent (or intentionally skipped because Resend
+ *   is not configured); false when the send failed.
  */
-export async function sendPastClientReviewRequest(booking: ReviewRequestData): Promise<void> {
+export async function sendPastClientReviewRequest(booking: ReviewRequestData): Promise<boolean> {
   const from = process.env.EMAIL_FROM;
   const siteUrl = getSiteUrl();
 
   if (!from || !process.env.RESEND_API_KEY) {
     console.warn("[email] Resend not configured - skipping past client review request.");
-    return;
+    return true;
   }
 
   const reviewUrl = `${siteUrl}/review?token=${encodeURIComponent(booking.reviewToken)}`;
@@ -549,11 +553,13 @@ export async function sendPastClientReviewRequest(booking: ReviewRequestData): P
       subject: `Hi ${firstName}, it's Harrison from To The Point Tech`,
       html,
     });
+    return true;
   } catch (error) {
     console.error(
       `[email] Failed to send past client review request for request ${booking.id}:`,
       error,
     );
+    return false;
   }
 }
 

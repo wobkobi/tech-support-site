@@ -4,10 +4,12 @@
  * the contact and the source record (Booking or Review).
  */
 
+import { splitName } from "@/features/contacts/lib/split-name";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
-import { toE164NZ } from "@/shared/lib/normalise-phone";
+import { normaliseContactPhone } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 
 interface ResolveBody {
@@ -43,32 +45,41 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return errorResponse("Missing required fields.", 400);
   }
 
+  const normalisedPhone =
+    phone !== undefined ? normaliseContactPhone(phone) || phone.trim() || null : null;
+
   const contactUpdate: Record<string, string | null> = {};
   if (name !== undefined) contactUpdate.name = name.trim();
-  if (phone !== undefined) contactUpdate.phone = toE164NZ(phone) || phone.trim() || null;
+  if (phone !== undefined) contactUpdate.phone = normalisedPhone;
 
   try {
-    await prisma.contact.update({ where: { id: contactId }, data: contactUpdate });
+    // Contact + source must move together so a partial failure can't leave the
+    // two sides disagreeing about the value the admin just chose.
+    const writes: Prisma.PrismaPromise<unknown>[] = [
+      prisma.contact.update({ where: { id: contactId }, data: contactUpdate }),
+    ];
 
     if (source === "Booking") {
       const bookingUpdate: Record<string, string | null> = {};
       if (name !== undefined) bookingUpdate.name = name.trim();
-      if (phone !== undefined) bookingUpdate.phone = toE164NZ(phone) || phone.trim() || null;
+      if (phone !== undefined) bookingUpdate.phone = normalisedPhone;
       if (Object.keys(bookingUpdate).length > 0) {
-        await prisma.booking.update({ where: { id: sourceId }, data: bookingUpdate });
+        writes.push(prisma.booking.update({ where: { id: sourceId }, data: bookingUpdate }));
       }
     } else if (source === "Review") {
       // Reviews store name as firstName/lastName - only name conflicts arise from Reviews.
       if (name !== undefined) {
-        const parts = name.trim().split(/\s+/);
-        const firstName = parts.slice(0, -1).join(" ") || parts[0] || null;
-        const lastName = parts.length > 1 ? parts[parts.length - 1] : null;
-        await prisma.review.update({
-          where: { id: sourceId },
-          data: { firstName, lastName },
-        });
+        const { givenName, familyName } = splitName(name);
+        writes.push(
+          prisma.review.update({
+            where: { id: sourceId },
+            data: { firstName: givenName || null, lastName: familyName || null },
+          }),
+        );
       }
     }
+
+    await prisma.$transaction(writes);
 
     return NextResponse.json({ ok: true });
   } catch (error) {

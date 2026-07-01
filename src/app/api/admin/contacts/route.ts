@@ -24,6 +24,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   const contacts = await prisma.contact.findMany({
+    where: { deletedAt: null },
     orderBy: { createdAt: "desc" },
     select: {
       id: true,

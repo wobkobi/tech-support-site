@@ -3,7 +3,10 @@
  * @description Admin API route for updating individual contacts.
  */
 
-import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
+import {
+  deleteContactFromGoogle,
+  syncContactToGoogle,
+} from "@/features/contacts/lib/google-contacts";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { isValidPhone, normalisePhone, toE164NZ } from "@/shared/lib/normalise-phone";
@@ -48,7 +51,11 @@ export async function PATCH(
     }
     if (trimmedEmail) {
       const dupe = await prisma.contact.findFirst({
-        where: { email: trimmedEmail, id: { not: id } },
+        where: {
+          email: { equals: trimmedEmail, mode: "insensitive" },
+          id: { not: id },
+          deletedAt: null,
+        },
         select: { id: true },
       });
       if (dupe) {
@@ -80,4 +87,45 @@ export async function PATCH(
   }
 
   return NextResponse.json({ ok: true, contact });
+}
+
+/**
+ * DELETE /api/admin/contacts/[id]
+ * Soft-deletes a contact by stamping `deletedAt`. Soft (not hard) delete because
+ * backfillContacts would otherwise re-create the contact from its still-present
+ * booking on the next admin page load; the stamped row suppresses that. Removes
+ * the linked Google contact best-effort. Requires X-Admin-Secret header.
+ * @param request - Incoming request.
+ * @param params - Route parameters containing the contact ID.
+ * @param params.params - Promise resolving to the dynamic route params object.
+ * @returns JSON { ok: true } on success, or error.
+ */
+export async function DELETE(
+  request: NextRequest,
+  params: { params: Promise<{ id: string }> },
+): Promise<NextResponse> {
+  if (!(await isAdminRequest(request))) {
+    return errorResponse("Unauthorized", 401);
+  }
+
+  const { id } = await params.params;
+
+  const contact = await prisma.contact.findUnique({
+    where: { id },
+    select: { id: true, googleContactId: true, deletedAt: true },
+  });
+  if (!contact) {
+    return errorResponse("Contact not found.", 404);
+  }
+  if (contact.deletedAt) {
+    return NextResponse.json({ ok: true, alreadyDeleted: true });
+  }
+
+  await prisma.contact.update({ where: { id }, data: { deletedAt: new Date() } });
+
+  if (contact.googleContactId) {
+    await deleteContactFromGoogle(contact.googleContactId);
+  }
+
+  return NextResponse.json({ ok: true });
 }

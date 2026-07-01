@@ -65,7 +65,7 @@ export async function resolveInvoiceReviewUrl({
   if (trimmedEmail) {
     try {
       const match = await prisma.contact.findFirst({
-        where: { email: { equals: trimmedEmail, mode: "insensitive" } },
+        where: { email: { equals: trimmedEmail, mode: "insensitive" }, deletedAt: null },
         select: { id: true, reviewToken: true },
       });
       if (match) {
@@ -170,6 +170,7 @@ export async function getInvoiceReviewEligibility({
           where: {
             email: { equals: trimmedEmail, mode: "insensitive" },
             reviewLinkSentAt: { gte: cooldownStart },
+            deletedAt: null,
           },
           select: { reviewLinkSentAt: true },
           orderBy: { reviewLinkSentAt: "desc" },

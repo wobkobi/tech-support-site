@@ -48,8 +48,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return errorResponse("Unauthorized", 401);
   }
 
-  // Load all contacts
+  // Load all live contacts
   const contacts = await prisma.contact.findMany({
+    where: { deletedAt: null },
     orderBy: { name: "asc" },
     select: { name: true, email: true, phone: true, address: true },
   });

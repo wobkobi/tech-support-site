@@ -65,30 +65,24 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       bookingsToEmail.map((b) => ({ id: b.id, email: b.email })),
     );
 
-    if (bookingsToEmail.length === 0) {
-      return NextResponse.json({
-        ok: true,
-        found: 0,
-        suppressed: 0,
-        sent: 0,
-        failed: 0,
-        errors: [],
-      });
-    }
-
     // Deduplicate by email: skip bookings whose email already received a review request
     // (either from another booking or a manual Contact send via admin).
     // Only query emails that are actually in this batch to avoid full-table scans.
+    // Soft-deleted contacts don't count as "already emailed".
     const batchEmails = bookingsToEmail.map((b) => b.email);
     const [alreadyEmailedBookings, alreadyEmailedContacts] = await Promise.all([
-      prisma.booking.findMany({
-        where: { reviewSentAt: { not: null }, email: { in: batchEmails } },
-        select: { email: true },
-      }),
-      prisma.contact.findMany({
-        where: { reviewLinkSentAt: { not: null }, email: { in: batchEmails } },
-        select: { email: true },
-      }),
+      batchEmails.length > 0
+        ? prisma.booking.findMany({
+            where: { reviewSentAt: { not: null }, email: { in: batchEmails } },
+            select: { email: true },
+          })
+        : Promise.resolve([] as { email: string }[]),
+      batchEmails.length > 0
+        ? prisma.contact.findMany({
+            where: { reviewLinkSentAt: { not: null }, email: { in: batchEmails }, deletedAt: null },
+            select: { email: true },
+          })
+        : Promise.resolve([] as { email: string | null }[]),
     ]);
     const reviewedEmails = new Set([
       ...alreadyEmailedBookings.map((b) => b.email.toLowerCase()),
@@ -127,19 +121,25 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     for (const booking of toSend) {
       try {
-        // Mark as sent FIRST to prevent duplicate emails if send fails after DB update.
-        // Trade-off: a failed send stays marked (no retry), but this prevents spam.
+        // Mark as sent FIRST so a crash between the write and the send can never
+        // double-email. If the send itself reports failure we stamp
+        // reviewSendFailedAt so the retry pass below gives it exactly one more go.
         await prisma.booking.update({
           where: { id: booking.id },
-          data: {
-            reviewSentAt: now,
-          },
+          data: { reviewSentAt: now },
         });
 
-        // Send email SECOND (best-effort delivery; failures are logged)
-        await sendCustomerReviewRequest(booking);
-
-        results.sent++;
+        const ok = await sendCustomerReviewRequest(booking);
+        if (ok) {
+          results.sent++;
+        } else {
+          await prisma.booking.update({
+            where: { id: booking.id },
+            data: { reviewSendFailedAt: now },
+          });
+          results.failed++;
+          results.errors.push(`Booking ${booking.id}: send failed (will retry once)`);
+        }
       } catch (error) {
         console.error(`[review-email] Failed for booking ${booking.id}:`, error);
         results.failed++;
@@ -147,13 +147,36 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       }
     }
 
+    // Retry pass: bookings whose previous send reported failure get one more
+    // attempt. The flag is cleared either way (cap of one retry) so a persistent
+    // failure gives up rather than emailing forever.
+    const failedBookings = await prisma.booking.findMany({
+      where: { reviewSendFailedAt: { not: null } },
+      select: { id: true, name: true, email: true, reviewToken: true },
+    });
+    let retried = 0;
+    for (const booking of failedBookings) {
+      const ok = await sendCustomerReviewRequest(booking);
+      await prisma.booking.update({
+        where: { id: booking.id },
+        data: { reviewSendFailedAt: null },
+      });
+      if (ok) {
+        retried++;
+        results.sent++;
+      } else {
+        console.warn(`[review-email] Giving up on booking ${booking.id} after one retry.`);
+      }
+    }
+
     console.log(
-      `[cron/send-review-emails] done: sent=${results.sent} suppressed=${results.suppressed} failed=${results.failed}`,
+      `[cron/send-review-emails] done: sent=${results.sent} suppressed=${results.suppressed} failed=${results.failed} retried=${retried}`,
     );
 
     return NextResponse.json({
       ok: true,
       ...results,
+      retried,
     });
   } catch (error) {
     console.error("[review-email] Cron error:", error);

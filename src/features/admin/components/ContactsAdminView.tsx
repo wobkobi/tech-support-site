@@ -5,7 +5,7 @@
  * conflicts for one-click resolution and drives the Google Contacts sync
  * (import + push) with a confirmation step and result message.
  */
-import type { ConflictEntry } from "@/app/api/admin/contacts/enrich-from-reviews/route";
+import type { ConflictEntry } from "@/features/contacts/lib/maintenance";
 import { cn } from "@/shared/lib/cn";
 import { useRouter } from "next/navigation";
 import type React from "react";

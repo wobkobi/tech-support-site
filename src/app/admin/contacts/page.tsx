@@ -35,6 +35,7 @@ export default async function AdminContactsPage(): Promise<React.ReactElement> {
 
   const [allContacts, reviews] = await Promise.all([
     prisma.contact.findMany({
+      where: { deletedAt: null },
       orderBy: { createdAt: "desc" },
       select: {
         id: true,
