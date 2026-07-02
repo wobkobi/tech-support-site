@@ -238,6 +238,11 @@ model Contact {
   id              String    @id @default(auto()) @map("_id") @db.ObjectId
   name            String
   email           String?
+  // Additional email addresses this person uses (all lowercased). A booking or
+  // review under any of these resolves to this one contact - the fix for people
+  // who book under two emails at different times. `email` stays the primary
+  // (display + send address); merges fold the other contact's emails in here.
+  altEmails       String[]  @default([])
   phone           String?
   address         String?
   googleContactId String? // Google People API resource name (e.g. "people/c1234567890")

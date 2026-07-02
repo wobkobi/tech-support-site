@@ -64,8 +64,15 @@ export async function resolveInvoiceReviewUrl({
   const trimmedEmail = clientEmail?.trim();
   if (trimmedEmail) {
     try {
+      const lowerEmail = trimmedEmail.toLowerCase();
       const match = await prisma.contact.findFirst({
-        where: { email: { equals: trimmedEmail, mode: "insensitive" }, deletedAt: null },
+        where: {
+          OR: [
+            { email: { equals: trimmedEmail, mode: "insensitive" } },
+            { altEmails: { has: lowerEmail } },
+          ],
+          deletedAt: null,
+        },
         select: { id: true, reviewToken: true },
       });
       if (match) {
@@ -168,7 +175,10 @@ export async function getInvoiceReviewEligibility({
         }),
         prisma.contact.findFirst({
           where: {
-            email: { equals: trimmedEmail, mode: "insensitive" },
+            OR: [
+              { email: { equals: trimmedEmail, mode: "insensitive" } },
+              { altEmails: { has: trimmedEmail.toLowerCase() } },
+            ],
             reviewLinkSentAt: { gte: cooldownStart },
             deletedAt: null,
           },

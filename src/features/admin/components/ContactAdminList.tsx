@@ -21,6 +21,8 @@ export interface ContactRow {
   id: string;
   name: string;
   email: string | null;
+  /** Additional emails this person uses; a booking/review under any resolves here. */
+  altEmails: string[];
   phone: string | null;
   address: string | null;
   createdAt: string;
@@ -367,6 +369,9 @@ function ContactCard({
       ) : (
         <span className="text-sm text-slate-400 italic">No email</span>
       )}
+      {c.altEmails.length > 0 && (
+        <p className="text-xs break-all text-slate-400">also: {c.altEmails.join(", ")}</p>
+      )}
       {c.phone && (
         <a
           href={`tel:${c.phone}`}
@@ -490,6 +495,7 @@ export function ContactAdminList({
         (c) =>
           c.name.toLowerCase().includes(q) ||
           c.email?.toLowerCase().includes(q) ||
+          c.altEmails.some((e) => e.toLowerCase().includes(q)) ||
           c.phone?.includes(q) ||
           c.address?.toLowerCase().includes(q),
       )

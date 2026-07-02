@@ -326,16 +326,21 @@ export function InvoiceActions({
    * email exactly matches what'll be sent. Only shows the spinner on the
    * FIRST load - subsequent re-fetches (after editing greeting or body) keep
    * the existing preview visible so the modal doesn't flash/shrink.
+   * @param forceAdopt - Re-adopt the server's fresh eligibility verdict (and
+   * sync the review-link checkbox to it) instead of keeping the operator's
+   * current toggle; used after "add to contacts" so the checkbox unlocks.
    */
-  async function openPreview(): Promise<void> {
+  async function openPreview(forceAdopt = false): Promise<void> {
     setError(null);
     if (!preview) setLoading(true);
     setPreviewOpen(true);
     try {
-      // First open: send no includeReview override so the server defaults to
-      // whatever eligibility says, and that result is adopted into local state.
-      // On re-fetch (after edits), pass the current toggle so the preview matches.
-      const sendIncludeReview = eligibility !== null;
+      // First open (or forceAdopt, e.g. just after adding the contact): send no
+      // includeReview override so the server defaults to whatever eligibility
+      // says, and that fresh result is adopted into local state - re-enabling and
+      // auto-ticking the review-link checkbox. On ordinary re-fetches (after
+      // edits) pass the current toggle so the preview matches the operator's choice.
+      const sendIncludeReview = !forceAdopt && eligibility !== null;
       const res = await fetch(`/api/business/invoices/${invoiceId}/preview-email`, {
         method: "POST",
         headers,
@@ -846,11 +851,12 @@ export function InvoiceActions({
         <AddToContactsModal
           name={clientName}
           email={clientEmail}
-          onClose={() => {
+          onClose={(newContactId) => {
             setShowAddContact(false);
-            // Re-fetch eligibility so the review-link toggle unlocks once the
-            // contact exists.
-            void openPreview();
+            // When a contact was actually created, force a fresh eligibility
+            // adopt so the review-link checkbox re-enables and auto-ticks; on a
+            // plain dismiss (null) a normal re-fetch is enough.
+            void openPreview(Boolean(newContactId));
           }}
         />
       )}

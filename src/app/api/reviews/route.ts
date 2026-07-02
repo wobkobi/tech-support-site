@@ -116,9 +116,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         // live contact is found the review keeps its bookingId + customerRef so
         // matchReviewsToContacts can link it later.
         try {
+          const bookingEmail = booking.email.toLowerCase();
           const contact = await prisma.contact.findFirst({
             where: {
-              email: { equals: booking.email.toLowerCase(), mode: "insensitive" },
+              OR: [
+                { email: { equals: bookingEmail, mode: "insensitive" } },
+                { altEmails: { has: bookingEmail } },
+              ],
               deletedAt: null,
             },
             select: { id: true },

@@ -53,10 +53,27 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   // Fill only the primary's blanks from the secondary; the primary keeps its own
   // non-blank values and its reviewToken (moved reviews resolve by contactId).
-  const fill: Record<string, string> = {};
-  if (!primary.phone && secondary.phone) fill.phone = secondary.phone;
-  if (!primary.email && secondary.email) fill.email = secondary.email;
-  if (!primary.address && secondary.address) fill.address = secondary.address;
+  const data: {
+    phone?: string;
+    email?: string;
+    address?: string;
+    altEmails: { set: string[] };
+  } = { altEmails: { set: [] } };
+  if (!primary.phone && secondary.phone) data.phone = secondary.phone;
+  if (!primary.email && secondary.email) data.email = secondary.email;
+  if (!primary.address && secondary.address) data.address = secondary.address;
+
+  // Fold every email both contacts know into altEmails (minus the surviving
+  // primary address). This is what stops the pair re-splitting: a future booking
+  // or review under the secondary's email now resolves back to this one contact.
+  const survivingPrimaryEmail = (data.email ?? primary.email)?.toLowerCase() ?? null;
+  const alts = new Set<string>();
+  for (const e of [secondary.email, ...secondary.altEmails, ...primary.altEmails]) {
+    if (!e) continue;
+    const lc = e.toLowerCase();
+    if (lc !== survivingPrimaryEmail) alts.add(lc);
+  }
+  data.altEmails = { set: [...alts] };
 
   try {
     await prisma.$transaction([
@@ -64,9 +81,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         where: { contactId: secondaryId },
         data: { contactId: primaryId },
       }),
-      ...(Object.keys(fill).length > 0
-        ? [prisma.contact.update({ where: { id: primaryId }, data: fill })]
-        : []),
+      prisma.contact.update({ where: { id: primaryId }, data }),
       prisma.contact.update({ where: { id: secondaryId }, data: { deletedAt: new Date() } }),
     ]);
   } catch (error) {
@@ -74,8 +89,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return errorResponse("Failed to merge contacts.", 500);
   }
 
-  // Best-effort: remove the now-defunct secondary from Google Contacts.
-  if (secondary.googleContactId) {
+  // Best-effort: remove the now-defunct secondary from Google Contacts - but
+  // never when both rows point at the SAME Google contact (import artefacts do),
+  // as that would delete the keeper's Google entry.
+  if (secondary.googleContactId && secondary.googleContactId !== primary.googleContactId) {
     await deleteContactFromGoogle(secondary.googleContactId);
   }
 

@@ -8,6 +8,7 @@
  */
 
 import { getOAuth2Client } from "@/features/calendar/lib/google-calendar";
+import { normaliseAddress } from "@/shared/lib/normalise-address";
 import { normaliseContactPhone, toE164NZ } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
 import { google } from "googleapis";
@@ -116,28 +117,33 @@ export async function importFromGoogleContacts(): Promise<number> {
         new Set(resolved.filter((r) => !r.email && r.phone).map((r) => r.phone!)),
       );
 
+      interface MatchRow {
+        id: string;
+        name: string;
+        address: string | null;
+      }
       const [emailMatches, phoneMatches] = await Promise.all([
         emailsToCheck.length > 0
           ? prisma.contact.findMany({
               where: { email: { in: emailsToCheck }, deletedAt: null },
-              select: { id: true, email: true, name: true },
+              select: { id: true, email: true, name: true, address: true },
             })
-          : Promise.resolve([] as { id: string; email: string | null; name: string }[]),
+          : Promise.resolve([] as (MatchRow & { email: string | null })[]),
         phonesToCheck.length > 0
           ? prisma.contact.findMany({
               where: { phone: { in: phonesToCheck }, deletedAt: null },
-              select: { id: true, phone: true, name: true },
+              select: { id: true, phone: true, name: true, address: true },
             })
-          : Promise.resolve([] as { id: string; phone: string | null; name: string }[]),
+          : Promise.resolve([] as (MatchRow & { phone: string | null })[]),
       ]);
 
-      const contactByEmail = new Map<string, { id: string; name: string }>();
+      const contactByEmail = new Map<string, MatchRow>();
       for (const c of emailMatches) {
-        if (c.email) contactByEmail.set(c.email, { id: c.id, name: c.name });
+        if (c.email) contactByEmail.set(c.email, { id: c.id, name: c.name, address: c.address });
       }
-      const contactByPhone = new Map<string, { id: string; name: string }>();
+      const contactByPhone = new Map<string, MatchRow>();
       for (const c of phoneMatches) {
-        if (c.phone) contactByPhone.set(c.phone, { id: c.id, name: c.name });
+        if (c.phone) contactByPhone.set(c.phone, { id: c.id, name: c.name, address: c.address });
       }
 
       // Writes stay sequential so a page that contains the same email/phone twice
@@ -161,7 +167,12 @@ export async function importFromGoogleContacts(): Promise<number> {
               };
               if (r.name && r.name !== existing.name) updates.name = r.name;
               if (r.phone) updates.phone = r.phone;
-              if (r.address) updates.address = r.address;
+              // Canonicalise hand-typed Google addresses, but only when the
+              // value actually changed - keeps Geocoding calls near zero on
+              // repeat imports.
+              if (r.address && r.address !== existing.address) {
+                updates.address = (await normaliseAddress(r.address)) ?? r.address;
+              }
               await prisma.contact.update({
                 where: { id: existing.id },
                 data: updates,
@@ -172,14 +183,18 @@ export async function importFromGoogleContacts(): Promise<number> {
                   name: r.name ?? r.email,
                   email: r.email,
                   phone: r.phone,
-                  address: r.address,
+                  address: r.address ? ((await normaliseAddress(r.address)) ?? r.address) : null,
                   googleContactId: r.resourceName,
                   lastSyncedAt: new Date(),
                   lastGoogleEtag: r.etag,
                 },
-                select: { id: true, name: true },
+                select: { id: true, name: true, address: true },
               });
-              contactByEmail.set(r.email, { id: created.id, name: created.name });
+              contactByEmail.set(r.email, {
+                id: created.id,
+                name: created.name,
+                address: created.address,
+              });
             }
             count++;
           } catch (upsertError) {
@@ -201,7 +216,10 @@ export async function importFromGoogleContacts(): Promise<number> {
                 lastGoogleEtag: r.etag,
               };
               if (r.name && (namePlaceholder || r.name !== existing.name)) updates.name = r.name;
-              if (r.address) updates.address = r.address;
+              // Same changed-only address canonicalisation as the email branch.
+              if (r.address && r.address !== existing.address) {
+                updates.address = (await normaliseAddress(r.address)) ?? r.address;
+              }
               await prisma.contact.update({
                 where: { id: existing.id },
                 data: updates,
@@ -212,14 +230,18 @@ export async function importFromGoogleContacts(): Promise<number> {
                   name: r.name ?? r.phone,
                   email: null,
                   phone: r.phone,
-                  address: r.address,
+                  address: r.address ? ((await normaliseAddress(r.address)) ?? r.address) : null,
                   googleContactId: r.resourceName,
                   lastSyncedAt: new Date(),
                   lastGoogleEtag: r.etag,
                 },
-                select: { id: true, name: true },
+                select: { id: true, name: true, address: true },
               });
-              contactByPhone.set(r.phone, { id: created.id, name: created.name });
+              contactByPhone.set(r.phone, {
+                id: created.id,
+                name: created.name,
+                address: created.address,
+              });
             }
             count++;
           } catch (importError) {
@@ -472,7 +494,10 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
     };
     if (nameAction === "pull" && googleName) siteUpdate.name = googleName;
     if (emailAction === "pull" && googleEmail) siteUpdate.email = googleEmail;
-    if (addressAction === "pull" && googleAddress) siteUpdate.address = googleAddress;
+    if (addressAction === "pull" && googleAddress) {
+      // Canonicalise the hand-typed Google address before it lands on the site.
+      siteUpdate.address = (await normaliseAddress(googleAddress)) ?? googleAddress;
+    }
     // Keep the site's phone as the first phone in the merged list so the rest
     // of the app (which only reads the single Contact.phone field) sees the
     // primary number.

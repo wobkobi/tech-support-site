@@ -11,7 +11,9 @@ import {
   type ConflictEntry,
   enrichContactsFromBookings,
   matchReviewsToContacts,
+  mergeDuplicateEmailContacts,
   mergePhoneOnlyContacts,
+  normaliseSoftDeleteField,
 } from "@/features/contacts/lib/maintenance";
 
 /**
@@ -23,6 +25,10 @@ import {
  * @returns Array of conflict entries for admin resolution.
  */
 export async function autoMaintain(): Promise<ConflictEntry[]> {
+  // Normalise first: a contact missing the deletedAt field is invisible to
+  // every `deletedAt: null` reader below (MongoDB isSet gotcha).
+  await normaliseSoftDeleteField();
+  await mergeDuplicateEmailContacts();
   await mergePhoneOnlyContacts();
   await backfillContactsFromBookings();
   await matchReviewsToContacts();

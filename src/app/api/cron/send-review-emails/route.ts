@@ -79,14 +79,26 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         : Promise.resolve([] as { email: string }[]),
       batchEmails.length > 0
         ? prisma.contact.findMany({
-            where: { reviewLinkSentAt: { not: null }, email: { in: batchEmails }, deletedAt: null },
-            select: { email: true },
+            where: {
+              reviewLinkSentAt: { not: null },
+              deletedAt: null,
+              OR: [{ email: { in: batchEmails } }, { altEmails: { hasSome: batchEmails } }],
+            },
+            select: { email: true, altEmails: true },
           })
-        : Promise.resolve([] as { email: string | null }[]),
+        : Promise.resolve([] as { email: string | null; altEmails: string[] }[]),
     ]);
+    // A contact who was sent a link suppresses any batch booking under its
+    // primary OR alt emails, so a two-email person isn't asked twice.
+    const batchEmailSet = new Set(batchEmails.map((e) => e.toLowerCase()));
     const reviewedEmails = new Set([
       ...alreadyEmailedBookings.map((b) => b.email.toLowerCase()),
-      ...alreadyEmailedContacts.map((c) => c.email!.toLowerCase()),
+      ...alreadyEmailedContacts.flatMap((c) =>
+        [c.email, ...c.altEmails]
+          .filter((e): e is string => !!e)
+          .map((e) => e.toLowerCase())
+          .filter((e) => batchEmailSet.has(e)),
+      ),
     ]);
 
     // Within-batch dedup: only send once per email if multiple bookings for same person
