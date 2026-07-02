@@ -255,6 +255,10 @@ model Contact {
   // Not @unique because MongoDB's unique index rejects multiple null values
   // during backfill; UUID v4 collisions are vanishingly rare.
   reviewToken     String?
+  // Review tokens inherited from contacts merged into this one. Old review
+  // links sent under a merged-away contact keep working: the /review page,
+  // submission verify, and review matcher all accept primary OR alt tokens.
+  altReviewTokens String[]  @default([])
   // Bidirectional sync state: site changed iff updatedAt > lastSyncedAt,
   // Google changed iff current etag != lastGoogleEtag.
   lastSyncedAt    DateTime?

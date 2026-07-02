@@ -58,12 +58,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     phone?: string;
     email?: string;
     address?: string;
+    reviewToken?: string;
     altEmails: { set: string[] };
     altPhones: { set: string[] };
-  } = { altEmails: { set: [] }, altPhones: { set: [] } };
+    altReviewTokens: { set: string[] };
+  } = { altEmails: { set: [] }, altPhones: { set: [] }, altReviewTokens: { set: [] } };
   if (!primary.phone && secondary.phone) data.phone = secondary.phone;
   if (!primary.email && secondary.email) data.email = secondary.email;
   if (!primary.address && secondary.address) data.address = secondary.address;
+  if (!primary.reviewToken && secondary.reviewToken) data.reviewToken = secondary.reviewToken;
 
   // Fold every email both contacts know into altEmails (minus the surviving
   // primary address). This is what stops the pair re-splitting: a future booking
@@ -86,6 +89,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (key && key !== survivingPrimaryPhone) altPhones.add(key);
   }
   data.altPhones = { set: [...altPhones] };
+
+  // Fold review tokens the same way so links already sent under the secondary's
+  // token keep working (the /review page, submission verify, and review matcher
+  // all accept a contact's primary OR alt tokens).
+  const survivingToken = data.reviewToken ?? primary.reviewToken ?? null;
+  const altTokens = new Set<string>();
+  for (const t of [
+    secondary.reviewToken,
+    ...secondary.altReviewTokens,
+    ...primary.altReviewTokens,
+  ]) {
+    if (t && t !== survivingToken) altTokens.add(t);
+  }
+  data.altReviewTokens = { set: [...altTokens] };
 
   try {
     await prisma.$transaction([

@@ -73,6 +73,7 @@ export async function mergeDuplicateEmailContacts(): Promise<number> {
       altPhones: true,
       address: true,
       reviewToken: true,
+      altReviewTokens: true,
       createdAt: true,
     },
     orderBy: { createdAt: "asc" },
@@ -105,6 +106,16 @@ export async function mergeDuplicateEmailContacts(): Promise<number> {
         if (key && key !== keeperPrimary) altSet.add(key);
       }
       if (altSet.size !== keeper.altPhones.length) fill.altPhones = { set: [...altSet] };
+      // Fold the dup's review tokens too, so links already sent under the dup
+      // keep resolving to the keeper.
+      const keeperToken = (fill.reviewToken as string | undefined) ?? keeper.reviewToken ?? null;
+      const tokenSet = new Set(keeper.altReviewTokens);
+      for (const t of [dup.reviewToken, ...dup.altReviewTokens]) {
+        if (t && t !== keeperToken) tokenSet.add(t);
+      }
+      if (tokenSet.size !== keeper.altReviewTokens.length) {
+        fill.altReviewTokens = { set: [...tokenSet] };
+      }
       try {
         await prisma.$transaction([
           prisma.review.updateMany({
@@ -309,6 +320,7 @@ export async function matchReviewsToContacts(): Promise<number> {
         phone: true,
         altPhones: true,
         reviewToken: true,
+        altReviewTokens: true,
       },
     }),
   ]);
@@ -342,9 +354,13 @@ export async function matchReviewsToContacts(): Promise<number> {
       contactIdsByPhone.set(norm, list);
     }
   }
-  const contactIdByToken = new Map(
-    contacts.filter((c) => c.reviewToken).map((c) => [c.reviewToken!, c.id]),
-  );
+  // Index primary AND inherited (merge-folded) review tokens so reviews
+  // submitted under a merged-away contact's old link still resolve.
+  const contactIdByToken = new Map<string, string>();
+  for (const c of contacts) {
+    if (c.reviewToken) contactIdByToken.set(c.reviewToken, c.id);
+    for (const t of c.altReviewTokens) contactIdByToken.set(t, c.id);
+  }
 
   let linked = 0;
   await Promise.all(
@@ -543,11 +559,20 @@ export async function enrichContactsFromBookings(): Promise<ConflictEntry[]> {
 export async function enrichContactsFromReviews(): Promise<ConflictEntry[]> {
   const contacts = await prisma.contact.findMany({
     where: { deletedAt: null },
-    select: { id: true, name: true, email: true, phone: true, reviewToken: true },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      phone: true,
+      reviewToken: true,
+      altReviewTokens: true,
+    },
   });
-  const contactByToken = new Map(
-    contacts.filter((c) => c.reviewToken).map((c) => [c.reviewToken!, c]),
-  );
+  const contactByToken = new Map<string, (typeof contacts)[number]>();
+  for (const c of contacts) {
+    if (c.reviewToken) contactByToken.set(c.reviewToken, c);
+    for (const t of c.altReviewTokens) contactByToken.set(t, c);
+  }
 
   const reviews = await prisma.review.findMany({
     where: { customerRef: { not: null } },

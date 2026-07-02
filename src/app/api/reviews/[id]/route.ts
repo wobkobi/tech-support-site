@@ -50,7 +50,22 @@ export async function PATCH(
         headers: { "Content-Type": "application/json" },
       });
     }
-    if (!review.customerRef || review.customerRef !== customerRef) {
+    // Authorised when the supplied ref matches the review's stored ref, OR when
+    // it is one of the linked contact's tokens (primary or merge-inherited alt)
+    // - a person editing via a different link of theirs is still the same person.
+    const directMatch = !!review.customerRef && review.customerRef === customerRef;
+    let contactTokenMatch = false;
+    if (!directMatch && review.contactId && typeof customerRef === "string" && customerRef) {
+      const owner = await prisma.contact.findFirst({
+        where: {
+          id: review.contactId,
+          OR: [{ reviewToken: customerRef }, { altReviewTokens: { has: customerRef } }],
+        },
+        select: { id: true },
+      });
+      contactTokenMatch = !!owner;
+    }
+    if (!directMatch && !contactTokenMatch) {
       console.error("[PATCH] Unauthorized: returning 403");
       return new NextResponse(JSON.stringify({ error: "Unauthorized." }), {
         status: 403,
