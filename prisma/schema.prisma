@@ -449,7 +449,11 @@ model IncomeEntry {
   // Not @unique because MongoDB's unique index rejects multiple null values during
   // backfill; collisions are vanishingly unlikely with crypto.randomUUID().
   sheetRowKey String?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
+  // Nullable because legacy rows created before this field existed don't carry
+  // the value - Prisma cannot coerce a missing Mongo field to a non-nullable
+  // DateTime at read time. @updatedAt still stamps every write.
+  updatedAt   DateTime? @updatedAt
 
   @@index([sheetRowKey])
 }
@@ -469,7 +473,9 @@ model ExpenseEntry {
   // Stable identifier shared with the corresponding row in the per-FY Google Sheet
   // (Expenses tab, hidden column Z). See IncomeEntry.sheetRowKey for details.
   sheetRowKey String?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
+  // Nullable for legacy rows; see IncomeEntry.updatedAt.
+  updatedAt   DateTime? @updatedAt
 
   @@index([sheetRowKey])
 }

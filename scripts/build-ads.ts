@@ -162,7 +162,7 @@ const STYLES = `
   /* --- Vertical 9:16 (Stories/Reels) ---
      Meta overlays UI top ~14% / bottom ~35%; top:40% keeps content in the
      middle safe zone, clear of the profile bar and CTA. */
-  .tall.card { top: 43%; padding: 76px 72px; border-radius: 46px; gap: 40px; }
+  .tall.card { padding: 76px 72px; border-radius: 46px; gap: 40px; }
   .tall img.logo-sq { width: 640px; }
   .tall h1 { font-size: 58px; max-width: 900px; }
   .tall ul { gap: 32px; font-size: 43px; }

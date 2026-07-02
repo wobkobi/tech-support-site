@@ -69,7 +69,11 @@ export interface IncomeEntry {
   method: string;
   notes: string | null;
   invoiceId: string | null;
+  /** Sync ID shared with the matching sheet row (hidden column Z); null until first synced. */
+  sheetRowKey?: string | null;
   createdAt: string;
+  /** Null on legacy rows created before the field existed. */
+  updatedAt?: string | null;
 }
 
 export interface ExpenseEntry {
@@ -84,7 +88,11 @@ export interface ExpenseEntry {
   method: string;
   receipt: boolean;
   notes: string | null;
+  /** Sync ID shared with the matching sheet row (hidden column Z); null until first synced. */
+  sheetRowKey?: string | null;
   createdAt: string;
+  /** Null on legacy rows created before the field existed. */
+  updatedAt?: string | null;
 }
 
 export interface BusinessSummary {

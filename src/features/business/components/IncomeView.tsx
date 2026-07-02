@@ -1,8 +1,9 @@
 "use client";
 // src/features/business/components/IncomeView.tsx
 /**
- * @description Records and lists income entries against /api/business/income,
- * showing a running income total and a 20% tax-reserve estimate.
+ * @description Records, edits, and lists income entries against
+ * /api/business/income, showing a running income total and a 20% tax-reserve
+ * estimate. The form doubles as the edit form when an entry's Edit is clicked.
  */
 
 import { formatNZD, todayISO } from "@/features/business/lib/business";
@@ -13,7 +14,7 @@ import { Field } from "@/shared/components/Field";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const inputClasses = cn(
   "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm",
@@ -27,16 +28,19 @@ const inputClasses = cn(
 export function IncomeView(): React.ReactElement {
   const [entries, setEntries] = useState<IncomeEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState({
+  const emptyForm = {
     date: todayISO(),
     customer: "",
     description: "",
     amount: "",
     method: "Business Account",
     notes: "",
-  });
+  };
+  const [form, setForm] = useState(emptyForm);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
 
   const headers = {};
 
@@ -53,33 +57,58 @@ export function IncomeView(): React.ReactElement {
   const taxReserve = totalIncome * 0.2;
 
   /**
-   * Submits the add-income form and prepends the new entry to the list.
+   * Submits the form: POST creates and prepends a new entry; when editing,
+   * PUT updates the entry in place.
    * @param e - Form submit event
    */
-  async function handleAdd(e: React.SyntheticEvent<HTMLFormElement>): Promise<void> {
+  async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault();
     setSaving(true);
     setError(null);
-    const res = await fetch("/api/business/income", {
-      method: "POST",
+    const url = editingId ? `/api/business/income/${editingId}` : "/api/business/income";
+    const res = await fetch(url, {
+      method: editingId ? "PUT" : "POST",
       headers: { ...headers, "content-type": "application/json" },
       body: JSON.stringify({ ...form, amount: parseFloat(form.amount) }),
     });
     const d = await res.json();
     if (d.ok) {
-      setEntries((prev) => [d.entry, ...prev]);
-      setForm({
-        date: todayISO(),
-        customer: "",
-        description: "",
-        amount: "",
-        method: "Business Account",
-        notes: "",
-      });
+      if (editingId) {
+        setEntries((prev) => prev.map((en) => (en.id === editingId ? d.entry : en)));
+      } else {
+        setEntries((prev) => [d.entry, ...prev]);
+      }
+      setForm(emptyForm);
+      setEditingId(null);
     } else {
       setError(d.error ?? "Failed to save");
     }
     setSaving(false);
+  }
+
+  /**
+   * Loads an entry into the form for editing and scrolls the form into view.
+   * @param entry - The income entry to edit
+   */
+  function startEdit(entry: IncomeEntry): void {
+    setForm({
+      date: entry.date.slice(0, 10),
+      customer: entry.customer,
+      description: entry.description,
+      amount: String(entry.amount),
+      method: entry.method,
+      notes: entry.notes ?? "",
+    });
+    setEditingId(entry.id);
+    setError(null);
+    formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  /** Leaves edit mode and clears the form. */
+  function cancelEdit(): void {
+    setForm(emptyForm);
+    setEditingId(null);
+    setError(null);
   }
 
   /**
@@ -89,7 +118,10 @@ export function IncomeView(): React.ReactElement {
   async function handleDelete(id: string): Promise<void> {
     if (!confirm("Delete this income entry?")) return;
     const res = await fetch(`/api/business/income/${id}`, { method: "DELETE", headers });
-    if ((await res.json()).ok) setEntries((prev) => prev.filter((e) => e.id !== id));
+    if ((await res.json()).ok) {
+      setEntries((prev) => prev.filter((e) => e.id !== id));
+      if (editingId === id) cancelEdit();
+    }
   }
 
   return (
@@ -111,12 +143,15 @@ export function IncomeView(): React.ReactElement {
         ))}
       </div>
 
-      {/* Add form */}
+      {/* Add/edit form - doubles as the edit form when an entry's Edit is clicked. */}
       <form
-        onSubmit={handleAdd}
+        ref={formRef}
+        onSubmit={handleSubmit}
         className="mb-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
       >
-        <h2 className="mb-4 text-sm font-semibold text-russian-violet">Add income</h2>
+        <h2 className="mb-4 text-sm font-semibold text-russian-violet">
+          {editingId ? "Edit income" : "Add income"}
+        </h2>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Date" htmlFor="inc-date" required>
             <input
@@ -183,9 +218,20 @@ export function IncomeView(): React.ReactElement {
           </Field>
         </div>
         {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
-        <Button type="submit" variant="secondary" size="sm" disabled={saving} className="mt-4">
-          {saving ? "Saving..." : "Add income"}
-        </Button>
+        <div className="mt-4 flex items-center gap-3">
+          <Button type="submit" variant="secondary" size="sm" disabled={saving}>
+            {saving ? "Saving..." : editingId ? "Save changes" : "Add income"}
+          </Button>
+          {editingId && (
+            <button
+              type="button"
+              onClick={cancelEdit}
+              className="text-sm text-slate-500 hover:text-slate-700"
+            >
+              Cancel edit
+            </button>
+          )}
+        </div>
       </form>
 
       {/* Mobile card list - stacks each entry so the date/amount/description
@@ -215,8 +261,14 @@ export function IncomeView(): React.ReactElement {
                 <span className="text-slate-500">{formatDateShort(e.date)}</span>
                 <span className="text-slate-400">{e.method}</span>
                 <button
+                  onClick={() => startEdit(e)}
+                  className="ml-auto inline-flex h-8 items-center text-moonstone-600 hover:text-moonstone-700"
+                >
+                  Edit
+                </button>
+                <button
                   onClick={() => handleDelete(e.id)}
-                  className="ml-auto inline-flex h-8 items-center text-red-400 hover:text-red-600"
+                  className="inline-flex h-8 items-center text-red-400 hover:text-red-600"
                 >
                   Delete
                 </button>
@@ -256,12 +308,20 @@ export function IncomeView(): React.ReactElement {
                   </td>
                   <td className="px-4 py-3 text-xs text-slate-400">{e.method}</td>
                   <td className="px-4 py-3">
-                    <button
-                      onClick={() => handleDelete(e.id)}
-                      className="text-xs text-red-400 hover:text-red-600"
-                    >
-                      Delete
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => startEdit(e)}
+                        className="text-xs text-moonstone-600 hover:text-moonstone-700"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(e.id)}
+                        className="text-xs text-red-400 hover:text-red-600"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

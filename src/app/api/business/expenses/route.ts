@@ -6,6 +6,11 @@
  */
 
 import { GST_RATE } from "@/features/business/lib/pricing-policy";
+import {
+  appendRowWithSyncId,
+  buildExpenseCells,
+  resolveSheetIdForDate,
+} from "@/features/business/lib/sheets-sync";
 import { parseAmount, parseRate } from "@/features/business/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
@@ -72,5 +77,23 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     },
   });
 
-  return NextResponse.json({ ok: true, entry }, { status: 201 });
+  // Append to the per-FY Expenses sheet. Synchronous so the row is written
+  // before the response; failures are logged and swallowed - the sync cron
+  // self-heals entries left without a sheetRowKey.
+  let sheetRowKey: string | null = null;
+  try {
+    const spreadsheetId = await resolveSheetIdForDate(entry.date);
+    if (!spreadsheetId) {
+      console.warn(
+        `[expenses] No sheet found for ${entry.date.toISOString()} - cron self-heal will append later`,
+      );
+    } else {
+      sheetRowKey = await appendRowWithSyncId(spreadsheetId, "Expenses", buildExpenseCells(entry));
+      await prisma.expenseEntry.update({ where: { id: entry.id }, data: { sheetRowKey } });
+    }
+  } catch (err) {
+    console.error(`[expenses] Failed to append to sheet for entry ${entry.id}:`, err);
+  }
+
+  return NextResponse.json({ ok: true, entry: { ...entry, sheetRowKey } }, { status: 201 });
 }

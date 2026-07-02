@@ -1,16 +1,120 @@
 // src/app/api/business/expenses/[id]/route.ts
 /**
- * @description Admin endpoint for a single expense entry. DELETE removes the
- * expense entry identified by the route id.
+ * @description Admin endpoint for a single expense entry. PUT updates the entry
+ * (recomputing the GST split server-side) and writes the change through to its
+ * Expenses sheet row (by Sync ID); DELETE removes the entry and its sheet row.
+ * Sheet failures are logged and swallowed so DB changes are never blocked -
+ * the sync cron reconciles any drift.
  */
 
+import { GST_RATE } from "@/features/business/lib/pricing-policy";
+import {
+  appendRowWithSyncId,
+  buildExpenseCells,
+  deleteRowBySyncId,
+  resolveSheetIdForDate,
+  updateRowBySyncId,
+} from "@/features/business/lib/sheets-sync";
+import { parseAmount, parseRate } from "@/features/business/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
- * DELETE /api/business/expenses/[id] - Deletes an expense entry by ID.
+ * PUT /api/business/expenses/[id] - Updates an expense entry and its sheet row,
+ * recomputing GST and the excl-GST amount server-side.
+ * @param request - Incoming Next.js request with updated expense data in body
+ * @param root0 - Route context
+ * @param root0.params - Route params containing the expense entry ID
+ * @returns JSON with the updated entry
+ */
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+): Promise<NextResponse> {
+  if (!(await isAdminRequest(request))) {
+    return errorResponse("Unauthorized", 401);
+  }
+
+  const { id } = await params;
+  const body = await request.json();
+  const { date, supplier, description, category, amountIncl, gstRate, method, receipt, notes } =
+    body;
+
+  if (!date || !supplier || !description || !category || amountIncl === undefined || !method) {
+    return errorResponse("Missing required fields", 400);
+  }
+  const inclNum = parseAmount(amountIncl);
+  if (inclNum === null) {
+    return errorResponse("Invalid amount", 400);
+  }
+  const rate = gstRate === undefined ? GST_RATE : parseRate(gstRate);
+  if (rate === null) {
+    return errorResponse("Invalid GST rate", 400);
+  }
+
+  const existing = await prisma.expenseEntry.findUnique({ where: { id } });
+  if (!existing) {
+    return errorResponse("Expense entry not found", 404);
+  }
+
+  const gstAmount = Math.round(((inclNum * rate) / (1 + rate)) * 100) / 100;
+  const amountExcl = Math.round((inclNum - gstAmount) * 100) / 100;
+
+  const updated = await prisma.expenseEntry.update({
+    where: { id },
+    data: {
+      date: new Date(date),
+      supplier,
+      description,
+      category,
+      amountIncl: inclNum,
+      gstAmount,
+      amountExcl,
+      method,
+      receipt: receipt ?? false,
+      notes: notes ?? null,
+    },
+  });
+
+  // Write through to the sheet. If the edited date moved the entry into a
+  // different FY workbook, delete the row from the old sheet and append to the
+  // new one; otherwise update the existing row in place by Sync ID.
+  let sheetRowKey = existing.sheetRowKey;
+  try {
+    const newSheetId = await resolveSheetIdForDate(updated.date);
+    const oldSheetId = await resolveSheetIdForDate(existing.date);
+    if (sheetRowKey && oldSheetId && newSheetId !== oldSheetId) {
+      await deleteRowBySyncId(oldSheetId, "Expenses", sheetRowKey);
+      sheetRowKey = null;
+    }
+    if (newSheetId) {
+      if (sheetRowKey) {
+        const result = await updateRowBySyncId(
+          newSheetId,
+          "Expenses",
+          sheetRowKey,
+          buildExpenseCells(updated),
+        );
+        sheetRowKey = result.syncId;
+      } else {
+        sheetRowKey = await appendRowWithSyncId(newSheetId, "Expenses", buildExpenseCells(updated));
+      }
+    }
+    if (sheetRowKey !== existing.sheetRowKey) {
+      await prisma.expenseEntry.update({ where: { id }, data: { sheetRowKey } });
+    }
+  } catch (err) {
+    console.error(`[expenses] Failed to update sheet row for entry ${id}:`, err);
+    sheetRowKey = existing.sheetRowKey;
+  }
+
+  return NextResponse.json({ ok: true, entry: { ...updated, sheetRowKey } });
+}
+
+/**
+ * DELETE /api/business/expenses/[id] - Deletes an expense entry and its sheet row.
  * @param request - Incoming Next.js request
  * @param root0 - Route context
  * @param root0.params - Route params containing the expense entry ID
@@ -25,6 +129,24 @@ export async function DELETE(
   }
 
   const { id } = await params;
+  const existing = await prisma.expenseEntry.findUnique({ where: { id } });
+  if (!existing) {
+    return errorResponse("Expense entry not found", 404);
+  }
+
   await prisma.expenseEntry.delete({ where: { id } });
+
+  // Remove the matching sheet row so the import can't resurrect the entry.
+  if (existing.sheetRowKey) {
+    try {
+      const spreadsheetId = await resolveSheetIdForDate(existing.date);
+      if (spreadsheetId) {
+        await deleteRowBySyncId(spreadsheetId, "Expenses", existing.sheetRowKey);
+      }
+    } catch (err) {
+      console.error(`[expenses] Failed to delete sheet row for entry ${id}:`, err);
+    }
+  }
+
   return NextResponse.json({ ok: true });
 }
