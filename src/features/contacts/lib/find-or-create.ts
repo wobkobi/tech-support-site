@@ -82,7 +82,10 @@ export async function findOrCreateContactByPhone(
 ): Promise<FindOrCreateResult> {
   const normalisedPhone = normaliseContactPhone(phone) ?? phone;
   const existing = await prisma.contact.findFirst({
-    where: { phone: normalisedPhone, deletedAt: null },
+    where: {
+      OR: [{ phone: normalisedPhone }, { altPhones: { has: normalisedPhone } }],
+      deletedAt: null,
+    },
   });
   if (existing) return { contact: existing, created: false };
   const contact = await prisma.contact.create({

@@ -24,6 +24,8 @@ export interface ContactRow {
   /** Additional emails this person uses; a booking/review under any resolves here. */
   altEmails: string[];
   phone: string | null;
+  /** Additional phone numbers (canonical form); matched like the primary. */
+  altPhones: string[];
   address: string | null;
   createdAt: string;
   /** Google People API resource name if synced, or null */
@@ -380,6 +382,11 @@ function ContactCard({
           {formatNZPhone(c.phone)}
         </a>
       )}
+      {c.altPhones.length > 0 && (
+        <p className="text-xs text-slate-400">
+          also: {c.altPhones.map((p) => formatNZPhone(p)).join(", ")}
+        </p>
+      )}
       {c.address && <p className="text-sm wrap-break-word text-slate-500">{c.address}</p>}
       {c.reviews.length > 0 && (
         <div className="mt-1">
@@ -497,6 +504,7 @@ export function ContactAdminList({
           c.email?.toLowerCase().includes(q) ||
           c.altEmails.some((e) => e.toLowerCase().includes(q)) ||
           c.phone?.includes(q) ||
+          c.altPhones.some((p) => p.includes(q)) ||
           c.address?.toLowerCase().includes(q),
       )
     : contacts;

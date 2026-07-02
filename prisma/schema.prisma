@@ -244,6 +244,10 @@ model Contact {
   // (display + send address); merges fold the other contact's emails in here.
   altEmails       String[]  @default([])
   phone           String?
+  // Additional phone numbers (normaliseContactPhone keys). Phone matching
+  // checks primary OR alts; merges fold the losing contact's number in here
+  // and the Google sync stores the union tail (Google keeps the full list).
+  altPhones       String[]  @default([])
   address         String?
   googleContactId String? // Google People API resource name (e.g. "people/c1234567890")
   // Stable per-contact review URL token. Lazy-filled by ensureContactReviewToken

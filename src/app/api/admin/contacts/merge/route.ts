@@ -10,6 +10,7 @@
 import { deleteContactFromGoogle } from "@/features/contacts/lib/google-contacts";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
+import { normaliseContactPhone } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -58,7 +59,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     email?: string;
     address?: string;
     altEmails: { set: string[] };
-  } = { altEmails: { set: [] } };
+    altPhones: { set: string[] };
+  } = { altEmails: { set: [] }, altPhones: { set: [] } };
   if (!primary.phone && secondary.phone) data.phone = secondary.phone;
   if (!primary.email && secondary.email) data.email = secondary.email;
   if (!primary.address && secondary.address) data.address = secondary.address;
@@ -74,6 +76,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (lc !== survivingPrimaryEmail) alts.add(lc);
   }
   data.altEmails = { set: [...alts] };
+
+  // Same folding for phone numbers, keyed on the canonical form so a domestic
+  // and E.164 spelling of one number don't produce a phantom alt.
+  const survivingPrimaryPhone = normaliseContactPhone(data.phone ?? primary.phone);
+  const altPhones = new Set<string>();
+  for (const p of [secondary.phone, ...secondary.altPhones, ...primary.altPhones]) {
+    const key = normaliseContactPhone(p);
+    if (key && key !== survivingPrimaryPhone) altPhones.add(key);
+  }
+  data.altPhones = { set: [...altPhones] };
 
   try {
     await prisma.$transaction([

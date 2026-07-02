@@ -295,11 +295,11 @@ function compareSingleField(
  * Returns the union of site + Google phone numbers, deduplicated by
  * normalised E.164 form. The order is preserved: Google's existing phones
  * first (so its primary stays primary), then any new ones the site added.
- * @param sitePhone - Site's single phone field (may be null).
+ * @param sitePhones - Site's phone numbers (primary first, then alts; nulls skipped).
  * @param googlePhones - All values from Google's phoneNumbers array.
  * @returns Merged phone array suitable for pushing back to Google.
  */
-function mergePhones(sitePhone: string | null, googlePhones: string[]): string[] {
+function mergePhones(sitePhones: Array<string | null>, googlePhones: string[]): string[] {
   const seen = new Set<string>();
   const result: string[] = [];
   for (const raw of googlePhones) {
@@ -310,7 +310,8 @@ function mergePhones(sitePhone: string | null, googlePhones: string[]): string[]
     seen.add(key);
     result.push(trimmed);
   }
-  if (sitePhone?.trim()) {
+  for (const sitePhone of sitePhones) {
+    if (!sitePhone?.trim()) continue;
     const trimmed = sitePhone.trim();
     const key = normaliseContactPhone(trimmed) ?? trimmed;
     if (!seen.has(key)) {
@@ -436,7 +437,7 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
       .filter((v): v is string => !!v);
 
     // Phones - always merge as union. No conflict semantics.
-    const mergedPhones = mergePhones(contact.phone, googlePhoneList);
+    const mergedPhones = mergePhones([contact.phone, ...contact.altPhones], googlePhoneList);
     const phonesChanged =
       mergedPhones.length !== googlePhoneList.length ||
       mergedPhones.some((p, i) => p !== googlePhoneList[i]);
@@ -499,10 +500,24 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
       siteUpdate.address = (await normaliseAddress(googleAddress)) ?? googleAddress;
     }
     // Keep the site's phone as the first phone in the merged list so the rest
-    // of the app (which only reads the single Contact.phone field) sees the
-    // primary number.
+    // of the app (which reads Contact.phone as the primary) sees the primary
+    // number, and store the union tail as altPhones so every number the person
+    // uses is matchable locally. mergedPhones already unions site primary +
+    // alts + Google's list, so a plain set here loses nothing.
     if (mergedPhones[0] && mergedPhones[0] !== contact.phone) {
       siteUpdate.phone = mergedPhones[0];
+    }
+    const primaryKey = normaliseContactPhone(mergedPhones[0] ?? contact.phone);
+    const tailKeys = new Set<string>();
+    for (const p of mergedPhones.slice(1)) {
+      const key = normaliseContactPhone(p);
+      if (key && key !== primaryKey) tailKeys.add(key);
+    }
+    if (
+      tailKeys.size !== contact.altPhones.length ||
+      contact.altPhones.some((p) => !tailKeys.has(normaliseContactPhone(p) ?? p))
+    ) {
+      siteUpdate.altPhones = { set: [...tailKeys] };
     }
 
     await prisma.contact.update({ where: { id: contactId }, data: siteUpdate });
