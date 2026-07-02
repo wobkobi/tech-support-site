@@ -51,22 +51,29 @@ export default async function ReviewPage({
     isAnonymous: boolean;
   } | null = null;
 
-  // If token provided, validate against both Booking and Contact in parallel
+  // If token provided, validate against both Booking and Contact in parallel.
+  // The contact lookup accepts the primary reviewToken OR an inherited alt
+  // token (folded in by contact merges) and prefers the live contact, so a
+  // link sent before a merge still resolves to the surviving person.
   if (token) {
-    const [booking, contact, maybeExistingReview] = await Promise.all([
+    const contactSelect = {
+      id: true,
+      name: true,
+      email: true,
+      phone: true,
+      reviewLinkSubmittedAt: true,
+    } as const;
+    const [booking, liveContact, maybeExistingReview] = await Promise.all([
       prisma.booking.findFirst({
         where: { reviewToken: token },
         select: { id: true, name: true, email: true, reviewSubmittedAt: true },
       }),
       prisma.contact.findFirst({
-        where: { reviewToken: token },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          phone: true,
-          reviewLinkSubmittedAt: true,
+        where: {
+          OR: [{ reviewToken: token }, { altReviewTokens: { has: token } }],
+          deletedAt: null,
         },
+        select: contactSelect,
       }),
       // Fetch speculatively - only used if the token maps to an already-reviewed source
       prisma.review.findFirst({
@@ -74,6 +81,11 @@ export default async function ReviewPage({
         select: { id: true, text: true, firstName: true, lastName: true, isAnonymous: true },
       }),
     ]);
+    // Legacy fallback: a soft-deleted contact whose token was never folded into
+    // a live one still renders (submission handles the orphan case).
+    const contact =
+      liveContact ??
+      (await prisma.contact.findFirst({ where: { reviewToken: token }, select: contactSelect }));
 
     if (booking) {
       sourceId = booking.id;
@@ -93,7 +105,18 @@ export default async function ReviewPage({
     }
 
     if (tokenValid && alreadyReviewed) {
-      existingReview = maybeExistingReview;
+      // Contact-sourced reviews are keyed by contactId, not by which of the
+      // person's tokens they arrived through - so a review left via one link
+      // is found (and edited) when they open another of their links.
+      existingReview =
+        maybeExistingReview ??
+        (sourceType === "contact" && sourceId
+          ? await prisma.review.findFirst({
+              where: { contactId: sourceId },
+              orderBy: { createdAt: "desc" },
+              select: { id: true, text: true, firstName: true, lastName: true, isAnonymous: true },
+            })
+          : null);
     }
   }
 

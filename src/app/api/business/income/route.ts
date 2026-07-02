@@ -8,8 +8,8 @@
 
 import {
   appendRowWithSyncId,
-  formatDateForSheet,
-  getFySheetIdForDate,
+  buildCashbookCells,
+  resolveSheetIdForDate,
 } from "@/features/business/lib/sheets-sync";
 import { parseAmount } from "@/features/business/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";
@@ -72,24 +72,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // so a sheet outage never blocks income recording in the DB.
   let sheetRowKey: string | null = null;
   try {
-    const spreadsheetId = await getFySheetIdForDate(entryDate);
+    const spreadsheetId = await resolveSheetIdForDate(entryDate);
     if (!spreadsheetId) {
       console.warn(
-        `[income] No FY sheet found for ${entryDate.toISOString()} - skipping sheet append`,
+        `[income] No sheet found for ${entryDate.toISOString()} - cron self-heal will append later`,
       );
     } else {
-      // Cashbook columns A..H: Date, Customer, Description, Method, Amount, Cash Deposit Ref, Tax Put-Aside, Notes
-      const cells = [
-        formatDateForSheet(entryDate),
-        customer,
-        description,
-        method,
-        safeAmount,
-        "",
-        "",
-        notes ?? "",
-      ];
-      sheetRowKey = await appendRowWithSyncId(spreadsheetId, "Cashbook", cells);
+      sheetRowKey = await appendRowWithSyncId(spreadsheetId, "Cashbook", buildCashbookCells(entry));
       await prisma.incomeEntry.update({ where: { id: entry.id }, data: { sheetRowKey } });
     }
   } catch (err) {

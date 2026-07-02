@@ -6,12 +6,12 @@
  * are non-fatal and surface as a sheetSyncWarning flag in the response.
  */
 
+import { advanceNextDue, calcGstFromInclusive } from "@/features/business/lib/business";
 import {
-  advanceNextDue,
-  calcGstFromInclusive,
-  formatUTCDDMMYYYY,
-} from "@/features/business/lib/business";
-import { getSheetId, getSheetsClient } from "@/features/business/lib/google-sheets";
+  appendRowWithSyncId,
+  buildExpenseCells,
+  resolveSheetIdForDate,
+} from "@/features/business/lib/sheets-sync";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
@@ -66,34 +66,21 @@ export async function POST(
   const nextDue = advanceNextDue(sub.nextDue, sub.frequency);
   await prisma.subscription.update({ where: { id }, data: { nextDue } });
 
-  // 3. Append row to Expenses sheet
+  // 3. Append row to the per-FY Expenses sheet with a Sync ID so the row joins
+  // the two-way sync. Failures leave sheetRowKey null for the cron self-heal.
   let sheetSyncWarning = false;
   try {
-    const sheets = getSheetsClient();
-    const spreadsheetId = getSheetId();
-    const gstPct = `${Math.round(rate * 100)}%`;
-    await sheets.spreadsheets.values.append({
-      spreadsheetId,
-      range: "Expenses!A:K",
-      valueInputOption: "USER_ENTERED",
-      requestBody: {
-        values: [
-          [
-            formatUTCDDMMYYYY(today),
-            sub.supplier,
-            sub.description,
-            sub.category,
-            sub.method,
-            "No",
-            inclNum,
-            gstPct,
-            gstAmount,
-            amountExcl,
-            sub.notes ?? "",
-          ],
-        ],
-      },
-    });
+    const spreadsheetId = await resolveSheetIdForDate(today);
+    if (spreadsheetId) {
+      const sheetRowKey = await appendRowWithSyncId(
+        spreadsheetId,
+        "Expenses",
+        buildExpenseCells(expense),
+      );
+      await prisma.expenseEntry.update({ where: { id: expense.id }, data: { sheetRowKey } });
+    } else {
+      sheetSyncWarning = true;
+    }
   } catch (err) {
     console.error("[subscriptions/record] Sheet append failed:", err);
     sheetSyncWarning = true;

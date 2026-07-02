@@ -174,12 +174,22 @@ export async function PATCH(
     }
   }
 
-  // Sync contact details. Match case-insensitively and skip soft-deleted contacts
-  // so an edit lands on the live contact regardless of stored email casing.
-  if (body.address !== undefined && booking.email) {
+  // Sync contact details. Match on the primary OR any alt email, case-insensitively,
+  // and skip soft-deleted contacts so an edit lands on the live contact.
+  const contactEmailMatch = booking.email
+    ? {
+        OR: [
+          { email: { equals: booking.email, mode: "insensitive" as const } },
+          { altEmails: { has: booking.email.toLowerCase() } },
+        ],
+        deletedAt: null,
+      }
+    : null;
+
+  if (body.address !== undefined && contactEmailMatch) {
     try {
       await prisma.contact.updateMany({
-        where: { email: { equals: booking.email, mode: "insensitive" }, deletedAt: null },
+        where: contactEmailMatch,
         data: { address: body.address.trim() || null },
       });
     } catch (err) {
@@ -187,10 +197,10 @@ export async function PATCH(
     }
   }
 
-  if (body.phone !== undefined && booking.email) {
+  if (body.phone !== undefined && contactEmailMatch) {
     try {
       await prisma.contact.updateMany({
-        where: { email: { equals: booking.email, mode: "insensitive" }, deletedAt: null },
+        where: contactEmailMatch,
         data: { phone: toE164NZ(body.phone) || null },
       });
     } catch (err) {

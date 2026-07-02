@@ -238,7 +238,16 @@ model Contact {
   id              String    @id @default(auto()) @map("_id") @db.ObjectId
   name            String
   email           String?
+  // Additional email addresses this person uses (all lowercased). A booking or
+  // review under any of these resolves to this one contact - the fix for people
+  // who book under two emails at different times. `email` stays the primary
+  // (display + send address); merges fold the other contact's emails in here.
+  altEmails       String[]  @default([])
   phone           String?
+  // Additional phone numbers (normaliseContactPhone keys). Phone matching
+  // checks primary OR alts; merges fold the losing contact's number in here
+  // and the Google sync stores the union tail (Google keeps the full list).
+  altPhones       String[]  @default([])
   address         String?
   googleContactId String? // Google People API resource name (e.g. "people/c1234567890")
   // Stable per-contact review URL token. Lazy-filled by ensureContactReviewToken
@@ -246,6 +255,10 @@ model Contact {
   // Not @unique because MongoDB's unique index rejects multiple null values
   // during backfill; UUID v4 collisions are vanishingly rare.
   reviewToken     String?
+  // Review tokens inherited from contacts merged into this one. Old review
+  // links sent under a merged-away contact keep working: the /review page,
+  // submission verify, and review matcher all accept primary OR alt tokens.
+  altReviewTokens String[]  @default([])
   // Bidirectional sync state: site changed iff updatedAt > lastSyncedAt,
   // Google changed iff current etag != lastGoogleEtag.
   lastSyncedAt    DateTime?
@@ -449,7 +462,11 @@ model IncomeEntry {
   // Not @unique because MongoDB's unique index rejects multiple null values during
   // backfill; collisions are vanishingly unlikely with crypto.randomUUID().
   sheetRowKey String?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
+  // Nullable because legacy rows created before this field existed don't carry
+  // the value - Prisma cannot coerce a missing Mongo field to a non-nullable
+  // DateTime at read time. @updatedAt still stamps every write.
+  updatedAt   DateTime? @updatedAt
 
   @@index([sheetRowKey])
 }
@@ -469,7 +486,9 @@ model ExpenseEntry {
   // Stable identifier shared with the corresponding row in the per-FY Google Sheet
   // (Expenses tab, hidden column Z). See IncomeEntry.sheetRowKey for details.
   sheetRowKey String?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
+  // Nullable for legacy rows; see IncomeEntry.updatedAt.
+  updatedAt   DateTime? @updatedAt
 
   @@index([sheetRowKey])
 }

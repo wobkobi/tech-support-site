@@ -33,6 +33,8 @@ export async function POST(
       where: { id },
       data: {
         reviewToken: null,
+        // Revoke merge-inherited tokens too - clearing is a full revocation.
+        altReviewTokens: { set: [] },
         reviewLinkSentAt: null,
         reviewLinkSentMode: null,
         reviewLinkSubmittedAt: null,

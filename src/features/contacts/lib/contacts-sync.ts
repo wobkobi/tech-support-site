@@ -10,7 +10,9 @@ import { importFromGoogleContacts, syncContactToGoogle } from "./google-contacts
 import {
   backfillContactsFromBookings,
   matchReviewsToContacts,
+  mergeDuplicateEmailContacts,
   mergePhoneOnlyContacts,
+  normaliseSoftDeleteField,
 } from "./maintenance";
 
 /** Outcome counts from a {@link runContactsSync} pass. */
@@ -42,7 +44,11 @@ export interface ContactsSyncResult {
 export async function runContactsSync({
   full = false,
 }: { full?: boolean } = {}): Promise<ContactsSyncResult> {
-  // 1. Clean up locally so duplicates never propagate to Google.
+  // 1. Clean up locally so duplicates never propagate to Google. Normalise the
+  // deletedAt field first - a contact missing it is invisible to every
+  // `deletedAt: null` reader (MongoDB isSet gotcha).
+  await normaliseSoftDeleteField();
+  await mergeDuplicateEmailContacts();
   await mergePhoneOnlyContacts();
   await backfillContactsFromBookings();
   await matchReviewsToContacts();

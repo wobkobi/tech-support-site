@@ -46,7 +46,13 @@ export async function findOrCreateContactByEmail(
 ): Promise<FindOrCreateResult> {
   const normalisedEmail = email.trim().toLowerCase();
   const existing = await prisma.contact.findFirst({
-    where: { email: { equals: normalisedEmail, mode: "insensitive" }, deletedAt: null },
+    where: {
+      OR: [
+        { email: { equals: normalisedEmail, mode: "insensitive" } },
+        { altEmails: { has: normalisedEmail } },
+      ],
+      deletedAt: null,
+    },
   });
   if (existing) return { contact: existing, created: false };
   const contact = await prisma.contact.create({
@@ -76,7 +82,10 @@ export async function findOrCreateContactByPhone(
 ): Promise<FindOrCreateResult> {
   const normalisedPhone = normaliseContactPhone(phone) ?? phone;
   const existing = await prisma.contact.findFirst({
-    where: { phone: normalisedPhone, deletedAt: null },
+    where: {
+      OR: [{ phone: normalisedPhone }, { altPhones: { has: normalisedPhone } }],
+      deletedAt: null,
+    },
   });
   if (existing) return { contact: existing, created: false };
   const contact = await prisma.contact.create({

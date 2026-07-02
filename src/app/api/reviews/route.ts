@@ -108,6 +108,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       });
 
       if (booking) {
+        // One review per booking: a used link is an edit flow (PATCH), so a
+        // second POST for the same booking is a duplicate - refuse it.
+        const existing = await prisma.review.findFirst({
+          where: { bookingId: booking.id },
+          select: { id: true },
+        });
+        if (existing) {
+          return errorResponse(
+            "You've already left a review - open your review link to edit it.",
+            409,
+          );
+        }
         verified = true;
         bookingId = booking.id;
         customerRef = booking.reviewToken;
@@ -116,9 +128,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         // live contact is found the review keeps its bookingId + customerRef so
         // matchReviewsToContacts can link it later.
         try {
+          const bookingEmail = booking.email.toLowerCase();
           const contact = await prisma.contact.findFirst({
             where: {
-              email: { equals: booking.email.toLowerCase(), mode: "insensitive" },
+              OR: [
+                { email: { equals: bookingEmail, mode: "insensitive" } },
+                { altEmails: { has: bookingEmail } },
+              ],
               deletedAt: null,
             },
             select: { id: true },
@@ -141,14 +157,31 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     }
 
-    // Verify against a contact-level manual review link
+    // Verify against a contact-level manual review link. The token may be the
+    // contact's primary reviewToken or one inherited from a merged-away
+    // contact (altReviewTokens) - both prove the same person.
     if (!verified && body.contactId && body.reviewToken) {
       const contact = await prisma.contact.findFirst({
-        where: { id: body.contactId, reviewToken: body.reviewToken },
+        where: {
+          id: body.contactId,
+          OR: [{ reviewToken: body.reviewToken }, { altReviewTokens: { has: body.reviewToken } }],
+        },
         select: { id: true, email: true, phone: true, deletedAt: true },
       });
 
       if (contact && !contact.deletedAt) {
+        // One review per contact: a used link is an edit flow (PATCH), so a
+        // second POST for the same person is a duplicate - refuse it.
+        const existing = await prisma.review.findFirst({
+          where: { contactId: contact.id },
+          select: { id: true },
+        });
+        if (existing) {
+          return errorResponse(
+            "You've already left a review - open your review link to edit it.",
+            409,
+          );
+        }
         verified = true;
         customerRef = body.reviewToken;
         autoContactId = contact.id;

@@ -91,9 +91,16 @@ export async function PATCH(
           contactName = booking?.name ?? null;
         } else if (review.customerRef) {
           // Standalone reviews carry the token from the Contact magic link;
-          // look the contact up directly rather than going through email.
+          // look the contact up directly rather than going through email. The
+          // token may be a merge-inherited alt on the surviving contact.
           const linkedContact = await prisma.contact.findFirst({
-            where: { reviewToken: review.customerRef },
+            where: {
+              OR: [
+                { reviewToken: review.customerRef },
+                { altReviewTokens: { has: review.customerRef } },
+              ],
+              deletedAt: null,
+            },
             select: { id: true },
           });
           directContactId = linkedContact?.id ?? null;

@@ -1,8 +1,10 @@
 "use client";
 // src/features/business/components/ExpensesView.tsx
 /**
- * @description Records and lists expense entries against /api/business/expenses,
- * with a GST-from-inclusive preview and running excl/GST totals.
+ * @description Records, edits, and lists expense entries against
+ * /api/business/expenses, with a GST-from-inclusive preview and running
+ * excl/GST totals. The form doubles as the edit form when an entry's Edit is
+ * clicked.
  */
 
 import { calcGstFromInclusive, formatNZD, todayISO } from "@/features/business/lib/business";
@@ -13,7 +15,7 @@ import { Field } from "@/shared/components/Field";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const inputClasses = cn(
   "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm",
@@ -27,7 +29,7 @@ const inputClasses = cn(
 export function ExpensesView(): React.ReactElement {
   const [entries, setEntries] = useState<ExpenseEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState({
+  const emptyForm = {
     date: todayISO(),
     supplier: "",
     description: "",
@@ -37,9 +39,12 @@ export function ExpensesView(): React.ReactElement {
     method: "Business Account",
     receipt: false,
     notes: "",
-  });
+  };
+  const [form, setForm] = useState(emptyForm);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
 
   const headers = {};
 
@@ -60,36 +65,63 @@ export function ExpensesView(): React.ReactElement {
   const previewGst = calcGstFromInclusive(inclNum, rate);
 
   /**
-   * Submits the add-expense form and prepends the new entry to the list.
+   * Submits the form: POST creates and prepends a new entry; when editing,
+   * PUT updates the entry in place.
    * @param e - Form submit event
    */
-  async function handleAdd(e: React.SyntheticEvent<HTMLFormElement>): Promise<void> {
+  async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault();
     setSaving(true);
     setError(null);
-    const res = await fetch("/api/business/expenses", {
-      method: "POST",
+    const url = editingId ? `/api/business/expenses/${editingId}` : "/api/business/expenses";
+    const res = await fetch(url, {
+      method: editingId ? "PUT" : "POST",
       headers: { ...headers, "content-type": "application/json" },
       body: JSON.stringify({ ...form, amountIncl: inclNum, gstRate: rate }),
     });
     const d = await res.json();
     if (d.ok) {
-      setEntries((prev) => [d.entry, ...prev]);
-      setForm({
-        date: todayISO(),
-        supplier: "",
-        description: "",
-        category: "Other",
-        amountIncl: "",
-        gstRate: "0.15",
-        method: "Business Account",
-        receipt: false,
-        notes: "",
-      });
+      if (editingId) {
+        setEntries((prev) => prev.map((en) => (en.id === editingId ? d.entry : en)));
+      } else {
+        setEntries((prev) => [d.entry, ...prev]);
+      }
+      setForm(emptyForm);
+      setEditingId(null);
     } else {
       setError(d.error ?? "Failed to save");
     }
     setSaving(false);
+  }
+
+  /**
+   * Loads an entry into the form for editing and scrolls the form into view.
+   * The GST rate select is repopulated from the stored GST split (only 15% and
+   * 0% exist as options).
+   * @param entry - The expense entry to edit
+   */
+  function startEdit(entry: ExpenseEntry): void {
+    setForm({
+      date: entry.date.slice(0, 10),
+      supplier: entry.supplier,
+      description: entry.description,
+      category: entry.category,
+      amountIncl: String(entry.amountIncl),
+      gstRate: entry.gstAmount > 0 ? "0.15" : "0",
+      method: entry.method,
+      receipt: entry.receipt,
+      notes: entry.notes ?? "",
+    });
+    setEditingId(entry.id);
+    setError(null);
+    formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  /** Leaves edit mode and clears the form. */
+  function cancelEdit(): void {
+    setForm(emptyForm);
+    setEditingId(null);
+    setError(null);
   }
 
   /**
@@ -99,7 +131,10 @@ export function ExpensesView(): React.ReactElement {
   async function handleDelete(id: string): Promise<void> {
     if (!confirm("Delete this expense?")) return;
     const res = await fetch(`/api/business/expenses/${id}`, { method: "DELETE", headers });
-    if ((await res.json()).ok) setEntries((prev) => prev.filter((e) => e.id !== id));
+    if ((await res.json()).ok) {
+      setEntries((prev) => prev.filter((e) => e.id !== id));
+      if (editingId === id) cancelEdit();
+    }
   }
 
   return (
@@ -125,12 +160,15 @@ export function ExpensesView(): React.ReactElement {
         ))}
       </div>
 
-      {/* Add form */}
+      {/* Add/edit form - doubles as the edit form when an entry's Edit is clicked. */}
       <form
-        onSubmit={handleAdd}
+        ref={formRef}
+        onSubmit={handleSubmit}
         className="mb-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
       >
-        <h2 className="mb-4 text-sm font-semibold text-russian-violet">Add expense</h2>
+        <h2 className="mb-4 text-sm font-semibold text-russian-violet">
+          {editingId ? "Edit expense" : "Add expense"}
+        </h2>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Date" htmlFor="exp-date" required>
             <input
@@ -237,9 +275,20 @@ export function ExpensesView(): React.ReactElement {
           </div>
         </div>
         {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
-        <Button type="submit" variant="secondary" size="sm" disabled={saving} className="mt-4">
-          {saving ? "Saving..." : "Add expense"}
-        </Button>
+        <div className="mt-4 flex items-center gap-3">
+          <Button type="submit" variant="secondary" size="sm" disabled={saving}>
+            {saving ? "Saving..." : editingId ? "Save changes" : "Add expense"}
+          </Button>
+          {editingId && (
+            <button
+              type="button"
+              onClick={cancelEdit}
+              className="text-sm text-slate-500 hover:text-slate-700"
+            >
+              Cancel edit
+            </button>
+          )}
+        </div>
       </form>
 
       {/* Mobile card list - stacks each entry; below lg the table overflows. */}
@@ -268,8 +317,14 @@ export function ExpensesView(): React.ReactElement {
               <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs">
                 <span className="text-slate-500">{formatDateShort(e.date)}</span>
                 <button
+                  onClick={() => startEdit(e)}
+                  className="ml-auto inline-flex h-8 items-center text-moonstone-600 hover:text-moonstone-700"
+                >
+                  Edit
+                </button>
+                <button
                   onClick={() => handleDelete(e.id)}
-                  className="ml-auto inline-flex h-8 items-center text-red-400 hover:text-red-600"
+                  className="inline-flex h-8 items-center text-red-400 hover:text-red-600"
                 >
                   Delete
                 </button>
@@ -311,12 +366,20 @@ export function ExpensesView(): React.ReactElement {
                     {formatNZD(e.amountExcl)}
                   </td>
                   <td className="px-4 py-3">
-                    <button
-                      onClick={() => handleDelete(e.id)}
-                      className="text-xs text-red-400 hover:text-red-600"
-                    >
-                      Delete
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => startEdit(e)}
+                        className="text-xs text-moonstone-600 hover:text-moonstone-700"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(e.id)}
+                        className="text-xs text-red-400 hover:text-red-600"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

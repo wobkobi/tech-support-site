@@ -8,6 +8,7 @@
  */
 
 import { getOAuth2Client } from "@/features/calendar/lib/google-calendar";
+import { normaliseAddress } from "@/shared/lib/normalise-address";
 import { normaliseContactPhone, toE164NZ } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
 import { google } from "googleapis";
@@ -116,28 +117,33 @@ export async function importFromGoogleContacts(): Promise<number> {
         new Set(resolved.filter((r) => !r.email && r.phone).map((r) => r.phone!)),
       );
 
+      interface MatchRow {
+        id: string;
+        name: string;
+        address: string | null;
+      }
       const [emailMatches, phoneMatches] = await Promise.all([
         emailsToCheck.length > 0
           ? prisma.contact.findMany({
               where: { email: { in: emailsToCheck }, deletedAt: null },
-              select: { id: true, email: true, name: true },
+              select: { id: true, email: true, name: true, address: true },
             })
-          : Promise.resolve([] as { id: string; email: string | null; name: string }[]),
+          : Promise.resolve([] as (MatchRow & { email: string | null })[]),
         phonesToCheck.length > 0
           ? prisma.contact.findMany({
               where: { phone: { in: phonesToCheck }, deletedAt: null },
-              select: { id: true, phone: true, name: true },
+              select: { id: true, phone: true, name: true, address: true },
             })
-          : Promise.resolve([] as { id: string; phone: string | null; name: string }[]),
+          : Promise.resolve([] as (MatchRow & { phone: string | null })[]),
       ]);
 
-      const contactByEmail = new Map<string, { id: string; name: string }>();
+      const contactByEmail = new Map<string, MatchRow>();
       for (const c of emailMatches) {
-        if (c.email) contactByEmail.set(c.email, { id: c.id, name: c.name });
+        if (c.email) contactByEmail.set(c.email, { id: c.id, name: c.name, address: c.address });
       }
-      const contactByPhone = new Map<string, { id: string; name: string }>();
+      const contactByPhone = new Map<string, MatchRow>();
       for (const c of phoneMatches) {
-        if (c.phone) contactByPhone.set(c.phone, { id: c.id, name: c.name });
+        if (c.phone) contactByPhone.set(c.phone, { id: c.id, name: c.name, address: c.address });
       }
 
       // Writes stay sequential so a page that contains the same email/phone twice
@@ -161,7 +167,12 @@ export async function importFromGoogleContacts(): Promise<number> {
               };
               if (r.name && r.name !== existing.name) updates.name = r.name;
               if (r.phone) updates.phone = r.phone;
-              if (r.address) updates.address = r.address;
+              // Canonicalise hand-typed Google addresses, but only when the
+              // value actually changed - keeps Geocoding calls near zero on
+              // repeat imports.
+              if (r.address && r.address !== existing.address) {
+                updates.address = (await normaliseAddress(r.address)) ?? r.address;
+              }
               await prisma.contact.update({
                 where: { id: existing.id },
                 data: updates,
@@ -172,14 +183,18 @@ export async function importFromGoogleContacts(): Promise<number> {
                   name: r.name ?? r.email,
                   email: r.email,
                   phone: r.phone,
-                  address: r.address,
+                  address: r.address ? ((await normaliseAddress(r.address)) ?? r.address) : null,
                   googleContactId: r.resourceName,
                   lastSyncedAt: new Date(),
                   lastGoogleEtag: r.etag,
                 },
-                select: { id: true, name: true },
+                select: { id: true, name: true, address: true },
               });
-              contactByEmail.set(r.email, { id: created.id, name: created.name });
+              contactByEmail.set(r.email, {
+                id: created.id,
+                name: created.name,
+                address: created.address,
+              });
             }
             count++;
           } catch (upsertError) {
@@ -201,7 +216,10 @@ export async function importFromGoogleContacts(): Promise<number> {
                 lastGoogleEtag: r.etag,
               };
               if (r.name && (namePlaceholder || r.name !== existing.name)) updates.name = r.name;
-              if (r.address) updates.address = r.address;
+              // Same changed-only address canonicalisation as the email branch.
+              if (r.address && r.address !== existing.address) {
+                updates.address = (await normaliseAddress(r.address)) ?? r.address;
+              }
               await prisma.contact.update({
                 where: { id: existing.id },
                 data: updates,
@@ -212,14 +230,18 @@ export async function importFromGoogleContacts(): Promise<number> {
                   name: r.name ?? r.phone,
                   email: null,
                   phone: r.phone,
-                  address: r.address,
+                  address: r.address ? ((await normaliseAddress(r.address)) ?? r.address) : null,
                   googleContactId: r.resourceName,
                   lastSyncedAt: new Date(),
                   lastGoogleEtag: r.etag,
                 },
-                select: { id: true, name: true },
+                select: { id: true, name: true, address: true },
               });
-              contactByPhone.set(r.phone, { id: created.id, name: created.name });
+              contactByPhone.set(r.phone, {
+                id: created.id,
+                name: created.name,
+                address: created.address,
+              });
             }
             count++;
           } catch (importError) {
@@ -273,11 +295,11 @@ function compareSingleField(
  * Returns the union of site + Google phone numbers, deduplicated by
  * normalised E.164 form. The order is preserved: Google's existing phones
  * first (so its primary stays primary), then any new ones the site added.
- * @param sitePhone - Site's single phone field (may be null).
+ * @param sitePhones - Site's phone numbers (primary first, then alts; nulls skipped).
  * @param googlePhones - All values from Google's phoneNumbers array.
  * @returns Merged phone array suitable for pushing back to Google.
  */
-function mergePhones(sitePhone: string | null, googlePhones: string[]): string[] {
+function mergePhones(sitePhones: Array<string | null>, googlePhones: string[]): string[] {
   const seen = new Set<string>();
   const result: string[] = [];
   for (const raw of googlePhones) {
@@ -288,7 +310,8 @@ function mergePhones(sitePhone: string | null, googlePhones: string[]): string[]
     seen.add(key);
     result.push(trimmed);
   }
-  if (sitePhone?.trim()) {
+  for (const sitePhone of sitePhones) {
+    if (!sitePhone?.trim()) continue;
     const trimmed = sitePhone.trim();
     const key = normaliseContactPhone(trimmed) ?? trimmed;
     if (!seen.has(key)) {
@@ -414,7 +437,7 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
       .filter((v): v is string => !!v);
 
     // Phones - always merge as union. No conflict semantics.
-    const mergedPhones = mergePhones(contact.phone, googlePhoneList);
+    const mergedPhones = mergePhones([contact.phone, ...contact.altPhones], googlePhoneList);
     const phonesChanged =
       mergedPhones.length !== googlePhoneList.length ||
       mergedPhones.some((p, i) => p !== googlePhoneList[i]);
@@ -472,12 +495,29 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
     };
     if (nameAction === "pull" && googleName) siteUpdate.name = googleName;
     if (emailAction === "pull" && googleEmail) siteUpdate.email = googleEmail;
-    if (addressAction === "pull" && googleAddress) siteUpdate.address = googleAddress;
+    if (addressAction === "pull" && googleAddress) {
+      // Canonicalise the hand-typed Google address before it lands on the site.
+      siteUpdate.address = (await normaliseAddress(googleAddress)) ?? googleAddress;
+    }
     // Keep the site's phone as the first phone in the merged list so the rest
-    // of the app (which only reads the single Contact.phone field) sees the
-    // primary number.
+    // of the app (which reads Contact.phone as the primary) sees the primary
+    // number, and store the union tail as altPhones so every number the person
+    // uses is matchable locally. mergedPhones already unions site primary +
+    // alts + Google's list, so a plain set here loses nothing.
     if (mergedPhones[0] && mergedPhones[0] !== contact.phone) {
       siteUpdate.phone = mergedPhones[0];
+    }
+    const primaryKey = normaliseContactPhone(mergedPhones[0] ?? contact.phone);
+    const tailKeys = new Set<string>();
+    for (const p of mergedPhones.slice(1)) {
+      const key = normaliseContactPhone(p);
+      if (key && key !== primaryKey) tailKeys.add(key);
+    }
+    if (
+      tailKeys.size !== contact.altPhones.length ||
+      contact.altPhones.some((p) => !tailKeys.has(normaliseContactPhone(p) ?? p))
+    ) {
+      siteUpdate.altPhones = { set: [...tailKeys] };
     }
 
     await prisma.contact.update({ where: { id: contactId }, data: siteUpdate });

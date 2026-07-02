@@ -26,7 +26,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   const contact = await prisma.contact.findFirst({
-    where: { email: { equals: email, mode: "insensitive" }, deletedAt: null },
+    where: {
+      OR: [{ email: { equals: email, mode: "insensitive" } }, { altEmails: { has: email } }],
+      deletedAt: null,
+    },
     select: { name: true, phone: true, address: true },
   });
 

@@ -35,6 +35,111 @@ function parseAddressFromNotes(notes: string | null): string | null {
 }
 
 /**
+ * Stamps an explicit `deletedAt: null` on any contact missing the field.
+ * MongoDB gotcha: Prisma's `deletedAt: null` filter only matches documents
+ * where the field exists and equals null - docs created before the field was
+ * added (or via a raw path) have no field at all and vanish from every
+ * `deletedAt: null` reader. Cheap no-op when all docs are normalised.
+ * @returns The number of contacts normalised.
+ */
+export async function normaliseSoftDeleteField(): Promise<number> {
+  const res = await prisma.contact.updateMany({
+    where: { deletedAt: { isSet: false } },
+    data: { deletedAt: null },
+  });
+  if (res.count > 0) {
+    console.warn(`[contacts/maintenance] normalised deletedAt on ${res.count} contact(s)`);
+  }
+  return res.count;
+}
+
+/**
+ * Merges live contacts that share the same (case-insensitive) email into one:
+ * the oldest row is kept (it carries the original reviewToken and history),
+ * dupes' reviews are reassigned to it, its blank fields are filled from the
+ * dupes, and the dupes are hard-deleted. Guards against import artefacts -
+ * e.g. a sync that ran while contacts were invisible re-created every Google
+ * contact as a duplicate. Google is never touched here: dupes typically share
+ * the keeper's googleContactId, so a remote delete would remove the real one.
+ * @returns The number of duplicate contacts merged away.
+ */
+export async function mergeDuplicateEmailContacts(): Promise<number> {
+  const contacts = await prisma.contact.findMany({
+    where: { deletedAt: null, email: { not: null } },
+    select: {
+      id: true,
+      email: true,
+      phone: true,
+      altPhones: true,
+      address: true,
+      reviewToken: true,
+      altReviewTokens: true,
+      createdAt: true,
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  const byEmail = new Map<string, typeof contacts>();
+  for (const c of contacts) {
+    const key = c.email!.toLowerCase();
+    byEmail.set(key, [...(byEmail.get(key) ?? []), c]);
+  }
+
+  let merged = 0;
+  for (const rows of byEmail.values()) {
+    if (rows.length < 2) continue;
+    // Oldest first (orderBy above): the original row is the keeper.
+    const [keeper, ...dupes] = rows;
+    for (const dup of dupes) {
+      const fill: Record<string, unknown> = {};
+      if (!keeper.phone && dup.phone) fill.phone = dup.phone;
+      if (!keeper.address && dup.address) fill.address = dup.address;
+      if (!keeper.reviewToken && dup.reviewToken) fill.reviewToken = dup.reviewToken;
+      // Fold the dup's numbers into altPhones so the second number stays
+      // matchable locally (Google keeps the full union either way).
+      const keeperPrimary =
+        normaliseContactPhone(fill.phone as string | undefined) ??
+        normaliseContactPhone(keeper.phone);
+      const altSet = new Set(keeper.altPhones);
+      for (const p of [dup.phone, ...dup.altPhones]) {
+        const key = normaliseContactPhone(p);
+        if (key && key !== keeperPrimary) altSet.add(key);
+      }
+      if (altSet.size !== keeper.altPhones.length) fill.altPhones = { set: [...altSet] };
+      // Fold the dup's review tokens too, so links already sent under the dup
+      // keep resolving to the keeper.
+      const keeperToken = (fill.reviewToken as string | undefined) ?? keeper.reviewToken ?? null;
+      const tokenSet = new Set(keeper.altReviewTokens);
+      for (const t of [dup.reviewToken, ...dup.altReviewTokens]) {
+        if (t && t !== keeperToken) tokenSet.add(t);
+      }
+      if (tokenSet.size !== keeper.altReviewTokens.length) {
+        fill.altReviewTokens = { set: [...tokenSet] };
+      }
+      try {
+        await prisma.$transaction([
+          prisma.review.updateMany({
+            where: { contactId: dup.id },
+            data: { contactId: keeper.id },
+          }),
+          ...(Object.keys(fill).length > 0
+            ? [prisma.contact.update({ where: { id: keeper.id }, data: fill })]
+            : []),
+          prisma.contact.delete({ where: { id: dup.id } }),
+        ]);
+        merged++;
+      } catch (err) {
+        console.error(`[contacts/maintenance] email-dup merge failed for ${dup.id}:`, err);
+      }
+    }
+  }
+  if (merged > 0) {
+    console.warn(`[contacts/maintenance] merged ${merged} duplicate-email contact(s)`);
+  }
+  return merged;
+}
+
+/**
  * Merges phone-only contacts into their email-bearing counterpart when both
  * share the same normalised phone: migrates the phone-only contact's reviews
  * onto the email contact, then deletes the phone-only row. Runs before backfill
@@ -44,21 +149,24 @@ function parseAddressFromNotes(notes: string | null): string | null {
 export async function mergePhoneOnlyContacts(): Promise<Set<string>> {
   const contacts = await prisma.contact.findMany({
     where: { deletedAt: null },
-    select: { id: true, email: true, phone: true, name: true },
+    select: { id: true, email: true, phone: true, altPhones: true, name: true },
   });
 
-  // Bucket by normalised phone: one email-bearing "keeper" + any phone-only dups.
+  // Bucket by normalised phone (primary + alts): one email-bearing "keeper" +
+  // any phone-only dups.
   const phoneBuckets = new Map<
     string,
     { withEmail: (typeof contacts)[number] | null; phoneOnly: (typeof contacts)[number][] }
   >();
   for (const c of contacts) {
-    const norm = normaliseContactPhone(c.phone);
-    if (!norm) continue;
-    if (!phoneBuckets.has(norm)) phoneBuckets.set(norm, { withEmail: null, phoneOnly: [] });
-    const bucket = phoneBuckets.get(norm)!;
-    if (c.email) bucket.withEmail ??= c;
-    else bucket.phoneOnly.push(c);
+    const keys = [normaliseContactPhone(c.phone), ...c.altPhones.map(normaliseContactPhone)];
+    for (const norm of keys) {
+      if (!norm) continue;
+      if (!phoneBuckets.has(norm)) phoneBuckets.set(norm, { withEmail: null, phoneOnly: [] });
+      const bucket = phoneBuckets.get(norm)!;
+      if (c.email) bucket.withEmail ??= c;
+      else if (!bucket.phoneOnly.includes(c)) bucket.phoneOnly.push(c);
+    }
   }
 
   const deletedIds = new Set<string>();
@@ -100,15 +208,26 @@ export async function backfillContactsFromBookings(): Promise<number> {
       orderBy: { createdAt: "asc" },
       select: { name: true, email: true, phone: true, notes: true },
     }),
-    prisma.contact.findMany({ select: { id: true, email: true, phone: true, deletedAt: true } }),
+    prisma.contact.findMany({
+      select: { id: true, email: true, altEmails: true, phone: true, deletedAt: true },
+    }),
   ]);
 
   const live = allContacts.filter((c) => !c.deletedAt);
-  const liveEmails = new Set(live.filter((c) => c.email).map((c) => c.email!.toLowerCase()));
+  // Every email a live contact owns (primary + alts) - a booking under any of
+  // these already has a home, so don't create a duplicate.
+  const liveEmails = new Set<string>();
+  for (const c of live) {
+    if (c.email) liveEmails.add(c.email.toLowerCase());
+    for (const alt of c.altEmails) liveEmails.add(alt.toLowerCase());
+  }
   // Emails belonging to a soft-deleted contact - do NOT recreate these.
-  const suppressedEmails = new Set(
-    allContacts.filter((c) => c.deletedAt && c.email).map((c) => c.email!.toLowerCase()),
-  );
+  const suppressedEmails = new Set<string>();
+  for (const c of allContacts) {
+    if (!c.deletedAt) continue;
+    if (c.email) suppressedEmails.add(c.email.toLowerCase());
+    for (const alt of c.altEmails) suppressedEmails.add(alt.toLowerCase());
+  }
 
   const phoneOnlyByNorm = new Map<string, (typeof live)[number]>();
   for (const c of live) {
@@ -194,7 +313,15 @@ export async function matchReviewsToContacts(): Promise<number> {
       : Promise.resolve([]),
     prisma.contact.findMany({
       where: { deletedAt: null },
-      select: { id: true, email: true, phone: true, reviewToken: true },
+      select: {
+        id: true,
+        email: true,
+        altEmails: true,
+        phone: true,
+        altPhones: true,
+        reviewToken: true,
+        altReviewTokens: true,
+      },
     }),
   ]);
 
@@ -205,21 +332,35 @@ export async function matchReviewsToContacts(): Promise<number> {
     if (norm) bookingPhoneById.set(b.id, norm);
   }
 
-  const contactIdByEmail = new Map(
-    contacts.filter((c) => c.email).map((c) => [c.email!.toLowerCase(), c.id]),
-  );
-  // Collect ALL contact ids per phone so shared numbers can be flagged ambiguous.
+  // Index every email a contact owns (primary + alts) so a review from any of a
+  // person's addresses links to the one contact.
+  const contactIdByEmail = new Map<string, string>();
+  for (const c of contacts) {
+    if (c.email) contactIdByEmail.set(c.email.toLowerCase(), c.id);
+    for (const alt of c.altEmails) contactIdByEmail.set(alt.toLowerCase(), c.id);
+  }
+  // Collect ALL contact ids per phone (primary + alts) so shared numbers can be
+  // flagged ambiguous.
   const contactIdsByPhone = new Map<string, string[]>();
   for (const c of contacts) {
-    const norm = normaliseContactPhone(c.phone);
-    if (!norm) continue;
-    const list = contactIdsByPhone.get(norm) ?? [];
-    list.push(c.id);
-    contactIdsByPhone.set(norm, list);
+    const keys = new Set(
+      [normaliseContactPhone(c.phone), ...c.altPhones.map(normaliseContactPhone)].filter(
+        (k): k is string => !!k,
+      ),
+    );
+    for (const norm of keys) {
+      const list = contactIdsByPhone.get(norm) ?? [];
+      list.push(c.id);
+      contactIdsByPhone.set(norm, list);
+    }
   }
-  const contactIdByToken = new Map(
-    contacts.filter((c) => c.reviewToken).map((c) => [c.reviewToken!, c.id]),
-  );
+  // Index primary AND inherited (merge-folded) review tokens so reviews
+  // submitted under a merged-away contact's old link still resolve.
+  const contactIdByToken = new Map<string, string>();
+  for (const c of contacts) {
+    if (c.reviewToken) contactIdByToken.set(c.reviewToken, c.id);
+    for (const t of c.altReviewTokens) contactIdByToken.set(t, c.id);
+  }
 
   let linked = 0;
   await Promise.all(
@@ -266,7 +407,15 @@ export async function enrichContactsFromBookings(): Promise<ConflictEntry[]> {
   const [contacts, bookings] = await Promise.all([
     prisma.contact.findMany({
       where: { deletedAt: null },
-      select: { id: true, name: true, email: true, phone: true, address: true },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        altEmails: true,
+        phone: true,
+        altPhones: true,
+        address: true,
+      },
     }),
     prisma.booking.findMany({
       orderBy: { createdAt: "desc" },
@@ -274,13 +423,17 @@ export async function enrichContactsFromBookings(): Promise<ConflictEntry[]> {
     }),
   ]);
 
-  const contactByEmail = new Map(
-    contacts.filter((c) => c.email).map((c) => [c.email!.toLowerCase(), c]),
-  );
+  const contactByEmail = new Map<string, (typeof contacts)[number]>();
+  for (const c of contacts) {
+    if (c.email) contactByEmail.set(c.email.toLowerCase(), c);
+    for (const alt of c.altEmails) contactByEmail.set(alt.toLowerCase(), c);
+  }
   const contactByPhone = new Map<string, (typeof contacts)[0]>();
   for (const c of contacts) {
-    const norm = normaliseContactPhone(c.phone);
-    if (norm && !contactByPhone.has(norm)) contactByPhone.set(norm, c);
+    for (const raw of [c.phone, ...c.altPhones]) {
+      const norm = normaliseContactPhone(raw);
+      if (norm && !contactByPhone.has(norm)) contactByPhone.set(norm, c);
+    }
   }
 
   /**
@@ -355,7 +508,12 @@ export async function enrichContactsFromBookings(): Promise<ConflictEntry[]> {
       ) {
         conflictFields.push("name");
       }
-      if (proposedPhone && existingPhone && proposedPhone !== existingPhone) {
+      // A booking phone that matches ANY of the contact's numbers (primary or
+      // alt) is not a conflict - only a genuinely unknown number is flagged.
+      const knownPhones = new Set(
+        [existingPhone, ...contact.altPhones.map(normaliseContactPhone)].filter(Boolean),
+      );
+      if (proposedPhone && existingPhone && !knownPhones.has(proposedPhone)) {
         conflictFields.push("phone");
       }
       if (conflictFields.length > 0) {
@@ -401,11 +559,20 @@ export async function enrichContactsFromBookings(): Promise<ConflictEntry[]> {
 export async function enrichContactsFromReviews(): Promise<ConflictEntry[]> {
   const contacts = await prisma.contact.findMany({
     where: { deletedAt: null },
-    select: { id: true, name: true, email: true, phone: true, reviewToken: true },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      phone: true,
+      reviewToken: true,
+      altReviewTokens: true,
+    },
   });
-  const contactByToken = new Map(
-    contacts.filter((c) => c.reviewToken).map((c) => [c.reviewToken!, c]),
-  );
+  const contactByToken = new Map<string, (typeof contacts)[number]>();
+  for (const c of contacts) {
+    if (c.reviewToken) contactByToken.set(c.reviewToken, c);
+    for (const t of c.altReviewTokens) contactByToken.set(t, c);
+  }
 
   const reviews = await prisma.review.findMany({
     where: { customerRef: { not: null } },
