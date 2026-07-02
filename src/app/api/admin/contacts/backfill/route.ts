@@ -1,67 +1,35 @@
 // src/app/api/admin/contacts/backfill/route.ts
 /**
- * @description One-time backfill: upserts a Contact for every unique email in
- * Booking history. The standalone ReviewRequest model was retired; bookings
- * are the only remaining seed for backfill.
+ * @description Admin trigger for the booking-to-contact backfill. Merges phone-only
+ * duplicate contacts, then creates a Contact for every unique booking email that has
+ * no live contact yet. The logic lives in the shared contacts maintenance module so
+ * this route and the admin-page auto-maintain can never diverge.
  */
 
-import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-create";
+import {
+  backfillContactsFromBookings,
+  mergePhoneOnlyContacts,
+} from "@/features/contacts/lib/maintenance";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
-import { toE164NZ } from "@/shared/lib/normalise-phone";
-import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
 // Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
 export const maxDuration = 60;
 
 /**
- * Parse phone and address from structured booking notes.
- * @param notes - Raw booking notes string.
- * @returns Parsed phone and address fields.
- */
-function parseNotes(notes: string | null): { phone: string | null; address: string | null } {
-  if (!notes) return { phone: null, address: null };
-  const rawPhone = notes.match(/Phone:\s*(.+)/i)?.[1]?.trim() || null;
-  const phone = rawPhone ? toE164NZ(rawPhone) || rawPhone : null;
-  const address = notes.match(/Address:\s*(.+)/i)?.[1]?.trim() || null;
-  return { phone, address };
-}
-
-/**
  * POST /api/admin/contacts/backfill
- * Scans all Bookings and upserts a Contact for each unique email. For each
- * email, the most recent Booking is used as the source of truth. Existing
- * contacts are never overwritten - admin edits take precedence.
+ * Merges phone-only duplicates then upserts a Contact per unique booking email.
  * Requires X-Admin-Secret header.
  * @param request - Incoming request.
- * @returns JSON with upserted count.
+ * @returns JSON with the number of contacts created.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
     return errorResponse("Unauthorized", 401);
   }
 
-  const mergedByEmail = new Map<
-    string,
-    { name: string; email: string; phone: string | null; address: string | null }
-  >();
-
-  // Bookings sorted ascending - most recent overwrites earlier entries in the Map.
-  const bookings = await prisma.booking.findMany({
-    orderBy: { createdAt: "asc" },
-    select: { name: true, email: true, notes: true },
-  });
-  for (const b of bookings) {
-    const { phone, address } = parseNotes(b.notes);
-    mergedByEmail.set(b.email.toLowerCase(), { name: b.name, email: b.email, phone, address });
-  }
-
-  let upsertedCount = 0;
-  for (const { name, email, phone, address } of mergedByEmail.values()) {
-    const { created } = await findOrCreateContactByEmail(email, { name, phone, address });
-    if (created) upsertedCount++;
-  }
-
+  await mergePhoneOnlyContacts();
+  const upsertedCount = await backfillContactsFromBookings();
   return NextResponse.json({ ok: true, upsertedCount });
 }

@@ -53,6 +53,13 @@ interface EditFormState {
   cancel: () => void;
 }
 
+/**
+ * A card's role in an in-progress merge: "idle" (no merge running), "source"
+ * (this card is the one being merged away), or "target" (a candidate to merge
+ * the source into and keep).
+ */
+type MergeRole = "idle" | "source" | "target";
+
 interface ContactCardProps {
   c: ContactRow;
   /** Non-null only when this card is the one being edited. */
@@ -60,11 +67,20 @@ interface ContactCardProps {
   isSyncing: boolean;
   isConfirmingSync: boolean;
   isReviewsExpanded: boolean;
+  isConfirmingDelete: boolean;
+  isDeleting: boolean;
+  mergeRole: MergeRole;
   onStartEdit: () => void;
   onRequestSync: () => void;
   onConfirmSync: () => void;
   onCancelSync: () => void;
   onToggleReviews: () => void;
+  onRequestDelete: () => void;
+  onConfirmDelete: () => void;
+  onCancelDelete: () => void;
+  onStartMerge: () => void;
+  onMergeHere: () => void;
+  onCancelMerge: () => void;
 }
 
 interface FieldRenderProps {
@@ -157,11 +173,20 @@ const CONTACT_EDIT_FIELDS: ReadonlyArray<ContactEditField> = [
  * @param props.isSyncing - True while this contact is mid-sync to Google.
  * @param props.isConfirmingSync - True when the sync confirmation panel is open.
  * @param props.isReviewsExpanded - True when the linked-reviews panel is open.
+ * @param props.isConfirmingDelete - True when the delete confirmation panel is open.
+ * @param props.isDeleting - True while this contact is mid-delete.
+ * @param props.mergeRole - This card's role in an in-progress merge (idle/source/target).
  * @param props.onStartEdit - Opens the edit form for this contact.
  * @param props.onRequestSync - Opens the sync-to-Google confirmation.
  * @param props.onConfirmSync - Confirms and runs the sync.
  * @param props.onCancelSync - Cancels the pending sync confirmation.
  * @param props.onToggleReviews - Toggles the linked-reviews panel.
+ * @param props.onRequestDelete - Opens the delete confirmation for this contact.
+ * @param props.onConfirmDelete - Confirms and runs the soft-delete.
+ * @param props.onCancelDelete - Cancels the pending delete confirmation.
+ * @param props.onStartMerge - Selects this contact as the one to merge away.
+ * @param props.onMergeHere - Merges the selected source contact into this one.
+ * @param props.onCancelMerge - Cancels the in-progress merge.
  * @returns Contact card element.
  */
 function ContactCard({
@@ -170,11 +195,20 @@ function ContactCard({
   isSyncing,
   isConfirmingSync,
   isReviewsExpanded,
+  isConfirmingDelete,
+  isDeleting,
+  mergeRole,
   onStartEdit,
   onRequestSync,
   onConfirmSync,
   onCancelSync,
   onToggleReviews,
+  onRequestDelete,
+  onConfirmDelete,
+  onCancelDelete,
+  onStartMerge,
+  onMergeHere,
+  onCancelMerge,
 }: ContactCardProps): React.ReactElement {
   if (edit) {
     return (
@@ -265,14 +299,64 @@ function ContactCard({
           {c.googleContactId && (
             <span className="rounded px-1.5 py-0.5 text-xs text-slate-400">Synced</span>
           )}
-          <button
-            onClick={onStartEdit}
-            className="rounded px-1.5 py-0.5 text-xs font-medium text-russian-violet/70 transition-colors hover:text-russian-violet"
-          >
-            Edit
-          </button>
+          {mergeRole === "target" ? (
+            <button
+              onClick={onMergeHere}
+              className="rounded bg-russian-violet px-1.5 py-0.5 text-xs font-semibold text-white transition-colors hover:bg-russian-violet/90"
+            >
+              Keep this one
+            </button>
+          ) : mergeRole === "source" ? (
+            <button
+              onClick={onCancelMerge}
+              className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-200"
+            >
+              Merging - cancel
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={onStartEdit}
+                className="rounded px-1.5 py-0.5 text-xs font-medium text-russian-violet/70 transition-colors hover:text-russian-violet"
+              >
+                Edit
+              </button>
+              <button
+                onClick={onStartMerge}
+                className="rounded px-1.5 py-0.5 text-xs font-medium text-slate-400 transition-colors hover:text-russian-violet"
+              >
+                Merge
+              </button>
+              <button
+                onClick={onRequestDelete}
+                className="rounded px-1.5 py-0.5 text-xs font-medium text-slate-400 transition-colors hover:text-coquelicot-600"
+              >
+                Delete
+              </button>
+            </>
+          )}
         </div>
       </div>
+      {isConfirmingDelete && (
+        <div className="bg-coquelicot-50 mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-coquelicot-200 px-3 py-2 text-xs">
+          <span className="font-medium text-coquelicot-700">Delete {c.name}?</span>
+          <span className="text-slate-500">Linked reviews are kept.</span>
+          <button
+            onClick={onConfirmDelete}
+            disabled={isDeleting}
+            className="ml-auto rounded bg-coquelicot-600 px-2 py-0.5 font-semibold text-white transition-colors hover:bg-coquelicot-700 disabled:opacity-50"
+          >
+            {isDeleting ? "Deleting…" : "Delete"}
+          </button>
+          <button
+            onClick={onCancelDelete}
+            disabled={isDeleting}
+            className="rounded bg-slate-100 px-2 py-0.5 font-semibold text-slate-600 transition-colors hover:bg-slate-200 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
       {c.email ? (
         <a
           href={`mailto:${c.email}`}
@@ -372,6 +456,11 @@ export function ContactAdminList({
   const [expandedReviewsId, setExpandedReviewsId] = useState<string | null>(null);
   const [syncedOpen, setSyncedOpen] = useState(true);
   const [query, setQuery] = useState("");
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  // Contact currently selected to merge away; while set, every other card offers
+  // to become the survivor. Null when no merge is in progress.
+  const [mergeSourceId, setMergeSourceId] = useState<string | null>(null);
 
   const NEW_CONTACT_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -571,6 +660,54 @@ export function ContactAdminList({
   }
 
   /**
+   * Soft-deletes a contact via the admin API and drops it from the list.
+   * @param id - Contact ID to delete.
+   */
+  async function deleteContact(id: string): Promise<void> {
+    setDeletingId(id);
+    try {
+      const res = await fetch(`/api/admin/contacts/${id}`, { method: "DELETE", headers: {} });
+      const data = (await res.json()) as { ok: boolean };
+      if (data.ok) {
+        setContacts((prev) => prev.filter((c) => c.id !== id));
+      }
+    } catch (err) {
+      console.error("[ContactAdminList] Delete error:", err);
+    } finally {
+      setDeletingId(null);
+      setDeleteConfirmId(null);
+    }
+  }
+
+  /**
+   * Merges the selected source contact into the chosen primary, then drops the
+   * source (now soft-deleted) from the list.
+   * @param primaryId - The contact to keep.
+   */
+  async function mergeInto(primaryId: string): Promise<void> {
+    const secondaryId = mergeSourceId;
+    if (!secondaryId || secondaryId === primaryId) {
+      setMergeSourceId(null);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/admin/contacts/merge`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ primaryId, secondaryId }),
+      });
+      const data = (await res.json()) as { ok: boolean };
+      if (data.ok) {
+        setContacts((prev) => prev.filter((c) => c.id !== secondaryId));
+      }
+    } catch (err) {
+      console.error("[ContactAdminList] Merge error:", err);
+    } finally {
+      setMergeSourceId(null);
+    }
+  }
+
+  /**
    * Wraps saveEdit to return void for use as an event handler.
    * @param id - Contact ID to save.
    */
@@ -594,6 +731,22 @@ export function ContactAdminList({
   }
 
   /**
+   * Wraps deleteContact to return void for use as an event handler.
+   * @param id - Contact ID to delete.
+   */
+  function handleDeleteContact(id: string): void {
+    void deleteContact(id);
+  }
+
+  /**
+   * Wraps mergeInto to return void for use as an event handler.
+   * @param id - Contact ID to keep (the merge target).
+   */
+  function handleMergeInto(id: string): void {
+    void mergeInto(id);
+  }
+
+  /**
    * Builds the per-card props (everything except `c` itself).
    * @param c - Contact row this card is for.
    * @returns Card props excluding `c`.
@@ -614,11 +767,20 @@ export function ContactAdminList({
       isSyncing: syncingId === c.id,
       isConfirmingSync: confirmSyncId === c.id,
       isReviewsExpanded: expandedReviewsId === c.id,
+      isConfirmingDelete: deleteConfirmId === c.id,
+      isDeleting: deletingId === c.id,
+      mergeRole: mergeSourceId === null ? "idle" : mergeSourceId === c.id ? "source" : "target",
       onStartEdit: startEdit.bind(null, c),
       onRequestSync: setConfirmSyncId.bind(null, c.id),
       onConfirmSync: handleConfirmSyncToGoogle.bind(null, c.id),
       onCancelSync: handleCancelSyncToGoogle,
       onToggleReviews: toggleReviews.bind(null, c.id),
+      onRequestDelete: setDeleteConfirmId.bind(null, c.id),
+      onConfirmDelete: handleDeleteContact.bind(null, c.id),
+      onCancelDelete: setDeleteConfirmId.bind(null, null),
+      onStartMerge: setMergeSourceId.bind(null, c.id),
+      onMergeHere: handleMergeInto.bind(null, c.id),
+      onCancelMerge: setMergeSourceId.bind(null, null),
     };
   }
 
@@ -632,6 +794,23 @@ export function ContactAdminList({
 
   return (
     <div className="flex flex-col gap-6">
+      {mergeSourceId && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <span>
+            Merging{" "}
+            <strong>{contacts.find((c) => c.id === mergeSourceId)?.name ?? "contact"}</strong> -
+            pick the contact to keep by clicking &ldquo;Keep this one&rdquo;. Its reviews move over
+            and this duplicate is removed.
+          </span>
+          <button
+            onClick={() => setMergeSourceId(null)}
+            className="ml-auto font-semibold text-amber-700 underline underline-offset-2 hover:text-amber-900"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
       {/* Search + export row */}
       <div className="flex items-center gap-3">
         <input

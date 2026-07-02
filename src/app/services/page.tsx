@@ -35,7 +35,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Tech Support Services - To The Point Tech",
     description:
-      "Computer repair, Wi-Fi setup, data recovery, smart home, printers, email and more across Auckland's Inner West.",
+      "Computer repair, Wi-Fi setup, data recovery, smart home, printers, email and more across Auckland.",
     url: "/services",
   },
 };

@@ -24,7 +24,7 @@ export interface SettingsFormApi<G extends SettingsGroup> {
   setDraft: React.Dispatch<React.SetStateAction<Settings[G]>>;
   dirty: boolean;
   saving: boolean;
-  /** Field path -> message for inline errors. */
+  /** Field path > message for inline errors. */
   fieldErrors: Record<string, string>;
   /** Guardrail BLOCK messages (save refused). */
   blocks: string[];

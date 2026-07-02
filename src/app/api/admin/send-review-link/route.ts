@@ -94,23 +94,32 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     }
 
-    // Ensure the contact carries a stable review token and stamp the send.
+    // Ensure the contact carries a stable review token.
     const reviewToken = contact.reviewToken ?? randomUUID();
+    const reviewUrl = `${siteUrl}/review?token=${reviewToken}`;
+
+    if (mode === "sms") {
+      // SMS is not wired to a provider yet. Persist only the token (never the
+      // send-state) so the operator can copy the link and send it themselves.
+      // Stamping reviewLinkSentAt here would mark the customer as "review
+      // requested" and suppress them from future auto-sends while nothing was
+      // actually sent.
+      // TODO: wire a real SMS provider, then stamp send-state like the email path.
+      if (!contact.reviewToken) {
+        await prisma.contact.update({ where: { id: contact.id }, data: { reviewToken } });
+      }
+      return NextResponse.json({ ok: true, reviewUrl, copyOnly: true });
+    }
+
+    // Email path: stamp the send state and send the email.
     await prisma.contact.update({
       where: { id: contact.id },
       data: {
         reviewToken,
         reviewLinkSentAt: new Date(),
-        reviewLinkSentMode: mode === "email" ? ReviewLinkMode.email : ReviewLinkMode.sms,
+        reviewLinkSentMode: ReviewLinkMode.email,
       },
     });
-
-    // Build the link and send the email
-    const reviewUrl = `${siteUrl}/review?token=${reviewToken}`;
-
-    if (mode === "sms") {
-      return NextResponse.json({ ok: true, reviewUrl });
-    }
 
     await sendPastClientReviewRequest({
       id: contact.id,

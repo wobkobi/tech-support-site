@@ -18,6 +18,7 @@ import {
   deleteBookingEvent,
   fetchAllCalendarEvents,
 } from "@/features/calendar/lib/google-calendar";
+import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-create";
 import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
 import {
   sendCustomerBookingConfirmation,
@@ -285,32 +286,23 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // name/phone/address stay in step with the booking so edit-form
     // corrections propagate to Google Contacts.
     try {
-      const contactEmail = booking.email.toLowerCase();
-      const existing = await prisma.contact.findFirst({ where: { email: contactEmail } });
-      let contactId: string | null = existing?.id ?? null;
-      if (existing) {
-        await prisma.contact.update({
-          where: { id: existing.id },
-          data: {
-            name: name.trim(),
-            ...(phoneE164 !== undefined ? { phone: phoneE164 } : {}),
-            ...(meetingType === "in-person" && address ? { address: address.trim() } : {}),
-          },
-        });
-      } else {
-        const created = await prisma.contact.create({
-          data: {
-            name: name.trim(),
-            email: contactEmail,
-            phone: phoneE164,
-            address: meetingType === "in-person" && address ? address.trim() : null,
-          },
-        });
-        contactId = created.id;
-      }
-      if (contactId) {
-        await syncContactToGoogle(contactId);
-      }
+      // Route through the shared helper so matching is case-insensitive and
+      // soft-delete-aware (never resurrecting a deleted contact), then keep the
+      // contact's fields in step with the edited booking.
+      const { contact } = await findOrCreateContactByEmail(booking.email, {
+        name: name.trim(),
+        phone: phoneE164 ?? null,
+        address: meetingType === "in-person" && address ? address.trim() : null,
+      });
+      await prisma.contact.update({
+        where: { id: contact.id },
+        data: {
+          name: name.trim(),
+          ...(phoneE164 !== undefined ? { phone: phoneE164 } : {}),
+          ...(meetingType === "in-person" && address ? { address: address.trim() } : {}),
+        },
+      });
+      await syncContactToGoogle(contact.id);
     } catch (contactError) {
       console.error("[booking/edit] Failed to upsert/sync contact:", contactError);
     }

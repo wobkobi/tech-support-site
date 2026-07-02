@@ -149,7 +149,31 @@ export async function DELETE(
   const { id } = await params;
 
   try {
+    const review = await prisma.review.findUnique({
+      where: { id },
+      select: { bookingId: true, contactId: true },
+    });
     await prisma.review.delete({ where: { id } });
+
+    // Clear the source's "submitted" flag so review-send eligibility/cooldown
+    // don't suppress the customer for a review that no longer exists - but only
+    // when no other review still references that booking/contact.
+    if (review?.bookingId) {
+      const others = await prisma.review.count({ where: { bookingId: review.bookingId } });
+      if (others === 0) {
+        await prisma.booking
+          .update({ where: { id: review.bookingId }, data: { reviewSubmittedAt: null } })
+          .catch(() => null);
+      }
+    }
+    if (review?.contactId) {
+      const others = await prisma.review.count({ where: { contactId: review.contactId } });
+      if (others === 0) {
+        await prisma.contact
+          .update({ where: { id: review.contactId }, data: { reviewLinkSubmittedAt: null } })
+          .catch(() => null);
+      }
+    }
 
     // Trigger ISR revalidation so public pages update immediately
     revalidateReviewPaths();

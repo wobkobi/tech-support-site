@@ -27,7 +27,7 @@ export const metadata: Metadata = {
 export default async function AdminContactsPage(): Promise<React.ReactElement> {
   await requireAdminAuth();
 
-  const initialConflicts = await autoMaintain(prisma);
+  const initialConflicts = await autoMaintain();
 
   const pendingConflictsCount = await prisma.contactConflict.count({
     where: { resolvedAt: null },
@@ -35,6 +35,7 @@ export default async function AdminContactsPage(): Promise<React.ReactElement> {
 
   const [allContacts, reviews] = await Promise.all([
     prisma.contact.findMany({
+      where: { deletedAt: null },
       orderBy: { createdAt: "desc" },
       select: {
         id: true,

@@ -195,7 +195,7 @@ export default async function Home(): Promise<React.ReactElement> {
                 Proudly Local
               </h3>
               <p className="text-base text-rich-black/80 sm:text-lg">
-                Born and raised here, serving the community
+                Auckland born and raised, on-site across the city
               </p>
             </div>
 

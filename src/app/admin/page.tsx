@@ -62,12 +62,15 @@ export default async function AdminPage(): Promise<React.ReactElement> {
     prisma.review.count({ where: { status: "approved" } }),
     prisma.booking.count({ where: { status: "held" } }),
     prisma.booking.count({ where: { status: "confirmed" } }),
-    prisma.contact.count(),
+    prisma.contact.count({ where: { deletedAt: null } }),
     // MongoDB gotcha: contacts created before googleContactId existed in the
     // schema have no field at all, so `null` alone misses them. `isSet: false`
     // covers that case so the unsynced count is accurate.
     prisma.contact.count({
-      where: { OR: [{ googleContactId: null }, { googleContactId: { isSet: false } }] },
+      where: {
+        OR: [{ googleContactId: null }, { googleContactId: { isSet: false } }],
+        deletedAt: null,
+      },
     }),
     prisma.booking.findMany({
       where: { status: "confirmed", startAt: { gte: now } },
@@ -89,6 +92,7 @@ export default async function AdminPage(): Promise<React.ReactElement> {
       },
     }),
     prisma.contact.findMany({
+      where: { deletedAt: null },
       orderBy: { createdAt: "desc" },
       take: 5,
       select: { id: true, name: true, email: true, phone: true, createdAt: true },
@@ -100,10 +104,11 @@ export default async function AdminPage(): Promise<React.ReactElement> {
       select: { id: true, name: true, email: true, startAt: true, reviewSentAt: true },
     }),
     prisma.contact.findMany({
-      where: { reviewLinkSentAt: { not: null } },
+      where: { reviewLinkSentAt: { not: null }, deletedAt: null },
       select: { email: true, phone: true },
     }),
     prisma.contact.findMany({
+      where: { deletedAt: null },
       orderBy: { name: "asc" },
       select: { id: true, name: true, email: true, phone: true, address: true },
     }),

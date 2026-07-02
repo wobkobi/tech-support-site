@@ -86,6 +86,22 @@ export function toE164NZ(raw: string): string {
 }
 
 /**
+ * Canonical matching key for a contact/booking phone. Runs the raw value through
+ * E.164 conversion first (so "021 123 4567" and "+64211234567" collapse to the
+ * same key) then strips formatting. Returns null for blank/unparseable input so
+ * callers can skip it. This is the ONE normaliser every phone-based lookup must
+ * use - reimplementing the `toE164NZ` + `normalisePhone` combo inline is what let
+ * the site and Google matchers drift apart.
+ * @param raw - Raw phone input (may be null/undefined).
+ * @returns Normalised E.164 digit key, or null when there is nothing to match on.
+ */
+export function normaliseContactPhone(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const key = normalisePhone(toE164NZ(raw) || raw);
+  return key || null;
+}
+
+/**
  * Returns true when a normalised phone string looks like a valid phone number.
  * Requires 7-15 digits (E.164 max). The leading '+' is ignored for the count.
  * @param normalised - Already-normalised phone string (from {@link normalisePhone}).

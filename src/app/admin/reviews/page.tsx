@@ -66,7 +66,7 @@ export default async function AdminReviewsPage(): Promise<React.ReactElement> {
     // Contacts with manual review-link sends. Replaces the ReviewRequest
     // history table - one row per contact (most-recent send), not per send.
     prisma.contact.findMany({
-      where: { reviewLinkSentAt: { not: null } },
+      where: { reviewLinkSentAt: { not: null }, deletedAt: null },
       orderBy: { reviewLinkSentAt: "desc" },
       take: 1000,
       select: {
@@ -81,6 +81,7 @@ export default async function AdminReviewsPage(): Promise<React.ReactElement> {
       },
     }),
     prisma.contact.findMany({
+      where: { deletedAt: null },
       orderBy: { createdAt: "desc" },
       take: 1000,
       select: { id: true, name: true, email: true, phone: true, address: true },

@@ -26,6 +26,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: true, exists: false });
   }
 
-  const hit = await prisma.contact.findFirst({ where: { email }, select: { id: true } });
+  const hit = await prisma.contact.findFirst({
+    where: { email: { equals: email, mode: "insensitive" }, deletedAt: null },
+    select: { id: true },
+  });
   return NextResponse.json({ ok: true, exists: Boolean(hit) });
 }

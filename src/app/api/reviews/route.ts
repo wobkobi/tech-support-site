@@ -6,7 +6,7 @@
 import { sendOwnerReviewNotification } from "@/features/reviews/lib/email";
 import { reviewTextError } from "@/features/reviews/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";
-import { normalisePhone } from "@/shared/lib/normalise-phone";
+import { normaliseContactPhone } from "@/shared/lib/normalise-phone";
 import { prisma as prismaClient } from "@/shared/lib/prisma";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 import { getSettings } from "@/shared/lib/settings/get-settings";
@@ -111,10 +111,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         verified = true;
         bookingId = booking.id;
         customerRef = booking.reviewToken;
-        // Auto-link to Contact by booking email - best effort, never fails the submission.
+        // Auto-link to Contact by booking email - best effort, never fails the
+        // submission. Case-insensitive and skips soft-deleted contacts; when no
+        // live contact is found the review keeps its bookingId + customerRef so
+        // matchReviewsToContacts can link it later.
         try {
           const contact = await prisma.contact.findFirst({
-            where: { email: booking.email.toLowerCase() },
+            where: {
+              email: { equals: booking.email.toLowerCase(), mode: "insensitive" },
+              deletedAt: null,
+            },
             select: { id: true },
           });
           if (contact) autoContactId = contact.id;
@@ -125,6 +131,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           where: { id: booking.id },
           data: { reviewSubmittedAt: new Date() },
         });
+      } else {
+        // Token supplied but the booking is gone - keep the token so the review
+        // is still identifiable, and log rather than silently dropping it.
+        customerRef = body.reviewToken;
+        console.warn(
+          `[reviews] booking-token submission matched no booking (bookingId=${body.bookingId}); review kept with customerRef.`,
+        );
       }
     }
 
@@ -132,10 +145,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (!verified && body.contactId && body.reviewToken) {
       const contact = await prisma.contact.findFirst({
         where: { id: body.contactId, reviewToken: body.reviewToken },
-        select: { id: true, email: true, phone: true },
+        select: { id: true, email: true, phone: true, deletedAt: true },
       });
 
-      if (contact) {
+      if (contact && !contact.deletedAt) {
         verified = true;
         customerRef = body.reviewToken;
         autoContactId = contact.id;
@@ -143,13 +156,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         // Fill blanks on the Contact from any details the customer typed,
         // never overwriting an existing value.
         const submittedEmail = body.contactEmail?.trim().toLowerCase() || null;
-        const submittedPhone = body.contactPhone ? normalisePhone(body.contactPhone) : null;
+        const submittedPhone = normaliseContactPhone(body.contactPhone);
         const contactUpdate: { email?: string; phone?: string; reviewLinkSubmittedAt: Date } = {
           reviewLinkSubmittedAt: new Date(),
         };
         if (!contact.email && submittedEmail) contactUpdate.email = submittedEmail;
         if (!contact.phone && submittedPhone) contactUpdate.phone = submittedPhone;
         await prisma.contact.update({ where: { id: contact.id }, data: contactUpdate });
+      } else if (contact) {
+        // The token is valid but the contact was soft-deleted/merged away. Keep
+        // the token (so the review re-links if the contact returns) but don't
+        // mark it verified or link it to a dead row.
+        customerRef = body.reviewToken;
+        console.warn(
+          `[reviews] contact-token submission matched a soft-deleted contact (contactId=${body.contactId}); review kept with customerRef for later re-link.`,
+        );
       }
     }
 

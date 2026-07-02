@@ -1,13 +1,11 @@
 // src/app/api/admin/contacts/sync/route.ts
 /**
- * @description Admin API route for two-way Google Contacts sync.
- * Imports all Google contacts into the local DB, then pushes all local contacts to Google.
+ * @description Admin API route for the manual full two-way Google Contacts sync.
+ * Shares {@link runContactsSync} with the cron; the button force-pushes every
+ * contact (full mode) rather than just the changed ones.
  */
 
-import {
-  importFromGoogleContacts,
-  syncAllContactsToGoogle,
-} from "@/features/contacts/lib/google-contacts";
+import { runContactsSync } from "@/features/contacts/lib/contacts-sync";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
@@ -17,8 +15,8 @@ export const maxDuration = 60;
 
 /**
  * POST /api/admin/contacts/sync
- * Two-way sync: pulls all Google contacts into the local DB, then pushes all local contacts to Google.
- * Requires X-Admin-Secret header.
+ * Full two-way sync: dedup/merge locally, push every contact to Google, then pull
+ * Google contacts back in. Requires X-Admin-Secret header.
  * @param request - Incoming request.
  * @returns JSON with importedCount and syncedCount on success, or error on failure.
  */
@@ -28,11 +26,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    // Push local contacts to Google first so local edits are not overwritten by the import.
-    const syncedCount = await syncAllContactsToGoogle();
-    // Then pull new Google contacts in (existing records only get googleContactId linked).
-    const importedCount = await importFromGoogleContacts();
-    return NextResponse.json({ ok: true, importedCount, syncedCount });
+    const { pushed, imported } = await runContactsSync({ full: true });
+    return NextResponse.json({ ok: true, importedCount: imported, syncedCount: pushed });
   } catch (error) {
     console.error("[api/admin/contacts/sync] Error:", error);
     // Generic message to the client; the OAuth / Google API detail goes only

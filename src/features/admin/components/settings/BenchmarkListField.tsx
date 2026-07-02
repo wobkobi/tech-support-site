@@ -14,7 +14,7 @@ import type React from "react";
 
 interface Props {
   benchmarks: Benchmark[];
-  /** Field path -> message, e.g. "benchmarks.2.mins". */
+  /** Field path > message, e.g. "benchmarks.2.mins". */
   fieldErrors: Record<string, string>;
   onChange: (next: Benchmark[]) => void;
 }

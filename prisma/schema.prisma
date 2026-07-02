@@ -131,6 +131,9 @@ model Booking {
   // Review email tracking.
   reviewSentAt      DateTime? // When the review request email was sent
   reviewSubmittedAt DateTime? // When the client submitted a review
+  // Set when a send returned failure (Resend down/rate-limited) after reviewSentAt
+  // was optimistically stamped. Lets the cron attempt one capped retry next pass.
+  reviewSendFailedAt DateTime?
 
   // Reminder tracking. Stamped by /api/cron/send-booking-reminders so the
   // 24h-out email reminder fires at most once per booking.
@@ -253,6 +256,11 @@ model Contact {
   reviewLinkSentAt       DateTime?
   reviewLinkSentMode     ReviewLinkMode?
   reviewLinkSubmittedAt  DateTime?
+  // Soft-delete marker. Set by the admin delete action; every reader (list,
+  // sync, maintenance matchers, backfill) excludes rows where this is non-null.
+  // Soft (not hard) delete because backfillContacts would otherwise re-create
+  // the contact from its still-present booking on the next admin page load.
+  deletedAt       DateTime?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 

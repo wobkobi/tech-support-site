@@ -58,7 +58,7 @@ DEVICE vocabulary (suggested, but extensible — invent a similarly short generi
 - "Email account" = email service (Gmail, Outlook, iCloud Mail).
 - "Social media account" = social profile (Facebook, Instagram, WhatsApp).
 - "Streaming account" = streaming / music service (Netflix, Spotify, Disney+).
-- "Cloud storage" = cloud file storage / backup (iCloud, Dropbox, OneDrive, Google Drive).
+- "Cloud storage" = cloud file storage / backup (iCloud Drive, Dropbox, OneDrive, Google Drive) - use ONLY when the work is about files, backup, sync, or storage space. The Apple ID / Google account ITSELF (the login governing App Store / Play Store sign-in, purchases, or device activation) is NOT cloud storage even though the same login also unlocks iCloud/Drive - tag account-level work "Software" and put the account brand in details ("Apple ID, App Store"). Only tag "Cloud storage" when the customer's actual files or backup are the subject.
 - "Software" = an app or program not tied to one physical device (ChatGPT, Excel, Word, Finder, web browser).
 - "Banking" = online banking / payments (internet banking, bank login).
 - "Other" = genuine catch-all when nothing above fits; use sparingly.
@@ -99,6 +99,8 @@ EXAMPLES — multi-task splitting + specific actions + details:
   Tasks: [{device: "Laptop", action: "Driver repair", details: "Dell, blue screen"}]
 - Input: "explained and guided how to use ChatGPT, Excel, iCloud, Finder and more"  (general app tuition → one Software task, NOT "Other")
   Tasks: [{device: "Software", action: "Training", details: "ChatGPT, Excel, iCloud, Finder"}]
+- Input: "Apple App Store iCloud account fix"  (the Apple account/login itself - App Store sign-in + iCloud login - NOT file storage; do NOT tag Cloud storage)
+  Tasks: [{device: "Software", action: "Account recovery", details: "iCloud, App Store"}]
 - Input: "email not working - diagnosed delivery issues, fixed DNS/routing records across multiple providers, reconfigured Outlook POP3/SMTP for multiple accounts, fixed Gmail rejecting outbound mail due to missing SPF/DKIM"  (4 distinct services - do NOT collapse; Network for DNS work; DNS/POP3/SMTP are fine in output details; SPF/DKIM/MX appear in the input but stay out of output details per JARGON BAN; domain names and registrar names are forbidden; use positive outcome language not failure phrases)
   Tasks: [{device: "Email account", action: "Diagnosis", details: "not sending, not receiving"}, {device: "Network", action: "Configuration", details: "DNS, multiple providers"}, {device: "Email account", action: "Configuration", details: "Outlook, POP3/SMTP, multiple accounts"}, {device: "Email account", action: "Security", details: "Gmail, outbound mail"}]
 
