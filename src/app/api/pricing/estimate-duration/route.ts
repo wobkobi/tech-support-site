@@ -193,7 +193,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     parsed.tasks = rebalanceTasks(cleanTasks, parsed.estimatedMins, incrementMins);
 
-    // Coerce confidence to a known value; anything unexpected -> "medium".
+    // Coerce confidence to a known value; anything unexpected > "medium".
     parsed.confidence =
       parsed.confidence === "high" || parsed.confidence === "low" ? parsed.confidence : "medium";
 

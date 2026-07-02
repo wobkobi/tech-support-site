@@ -1,8 +1,9 @@
 // src/app/privacy/page.tsx
 /**
- * @description Privacy policy: what we collect, how we use it, the analytics/ad
- * tools we run (Google, Meta Pixel incl. hashed advanced matching), and the
- * visitor's rights under the NZ Privacy Act 2020.
+ * @description Privacy policy: what the site collects, how it is used, the
+ * analytics/ad tools it runs (Google, Meta Pixel incl. hashed advanced
+ * matching), sharing, retention, and visitors' rights under the NZ Privacy
+ * Act 2020.
  */
 
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
@@ -23,7 +24,7 @@ export const metadata: Metadata = {
   },
 };
 
-/** Plain hyphen, NZ English. Last reviewed date shown to visitors. */
+/** Date this policy was last reviewed; shown to visitors in the header. */
 const LAST_UPDATED = "2 July 2026";
 
 const H2 = "mb-3 text-xl font-bold text-russian-violet sm:text-2xl";

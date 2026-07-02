@@ -18,7 +18,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-/** Plain-data shape passed across the server -> client boundary. */
+/** Plain-data shape passed across the server > client boundary. */
 export interface PromoRow {
   id: string;
   title: string;
