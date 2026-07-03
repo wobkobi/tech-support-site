@@ -380,6 +380,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
   const [contacts, setContacts] = useState<GoogleContact[]>([]);
   const [savingIncome, setSavingIncome] = useState(false);
   const [incomeToast, setIncomeToast] = useState<string | null>(null);
+  const [incomeError, setIncomeError] = useState<string | null>(null);
 
   // Rate management
   const [showRates, setShowRates] = useState(false);
@@ -1075,25 +1076,35 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
    */
   async function handleSaveIncome(): Promise<void> {
     setSavingIncome(true);
-    await saveTaskTemplates(tasks);
-    const res = await fetch("/api/business/income", {
-      method: "POST",
-      headers: { ...headers, "content-type": "application/json" },
-      body: JSON.stringify({
-        date: new Date().toISOString().slice(0, 10),
-        customer: clientName || "Walk-in",
-        description: buildIncomeDescription(job),
-        amount: totals.subtotal,
-        method: "Business Account",
-      }),
-    });
-    const d = await res.json();
-    if (d.ok) {
-      setIncomeToast("Income entry saved.");
-      setTimeout(() => setIncomeToast(null), 3000);
-      resetFormState();
+    setIncomeError(null);
+    try {
+      await saveTaskTemplates(tasks);
+      const res = await fetch("/api/business/income", {
+        method: "POST",
+        headers: { ...headers, "content-type": "application/json" },
+        body: JSON.stringify({
+          // Record against the selected job date (NZ-local), not UTC "now",
+          // and store the discounted total the customer actually pays.
+          date: jobDate,
+          customer: clientName || "Walk-in",
+          description: buildIncomeDescription(job),
+          amount: totals.total,
+          method: "Business Account",
+        }),
+      });
+      const d = await res.json();
+      if (d.ok) {
+        setIncomeToast("Income entry saved.");
+        setTimeout(() => setIncomeToast(null), 3000);
+        resetFormState();
+      } else {
+        setIncomeError(d.error || "Could not save income entry.");
+      }
+    } catch {
+      setIncomeError("Could not save income entry. Please try again.");
+    } finally {
+      setSavingIncome(false);
     }
-    setSavingIncome(false);
   }
 
   /**
@@ -1685,6 +1696,11 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
             {incomeToast && (
               <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-700">
                 {incomeToast}
+              </div>
+            )}
+            {incomeError && (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+                {incomeError}
               </div>
             )}
             {sheetSyncToast && (
