@@ -56,7 +56,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   for (const sub of due) {
     try {
       // Compute GST split and next due date
-      const today = new Date();
       const rate = sub.gstRate;
       const inclNum = sub.amountIncl;
       const gstAmount = calcGstFromInclusive(inclNum, rate);
@@ -77,7 +76,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       // Record the expense entry
       const expense = await prisma.expenseEntry.create({
         data: {
-          date: today,
+          // Use the NZ calendar date (UTC midnight), not the raw UTC "now":
+          // the cron runs at 8am NZ when UTC is still the previous day, which
+          // would land the expense a day early.
+          date: todayNZ,
           supplier: sub.supplier,
           description: sub.description,
           category: sub.category,
@@ -94,7 +96,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       // the two-way sync. Failures leave sheetRowKey null; the sync cron
       // self-heals those by appending later.
       try {
-        const spreadsheetId = await resolveSheetIdForDate(today);
+        const spreadsheetId = await resolveSheetIdForDate(todayNZ);
         if (spreadsheetId) {
           const sheetRowKey = await appendRowWithSyncId(
             spreadsheetId,
