@@ -10,7 +10,6 @@ import {
   BOOKING_FIELD_LIMITS,
   combineUnitAndAddress,
   splitUnitFromAddress,
-  SUB_SLOT_MINUTES,
   validateEmail,
   type BookableDay,
   type JobDuration,
@@ -917,8 +916,8 @@ export default function BookingForm({
                     if (!activeWindow) return null;
                     return (
                       <div className="flex flex-wrap gap-2">
-                        {SUB_SLOT_MINUTES.map((minute) => {
-                          const sub = activeWindow.subSlots.find((s) => s.minute === minute)!;
+                        {activeWindow.subSlots.map((sub) => {
+                          const minute = sub.minute;
                           const available =
                             duration === "short" ? sub.availableShort : sub.availableLong;
                           return (

@@ -9,7 +9,6 @@ import BookingForm, {
 import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
 import {
   DURATION_OPTIONS,
-  SUB_SLOT_MINUTES,
   TIME_OF_DAY_OPTIONS,
   buildAvailableDays,
   type BookableDay,
@@ -172,6 +171,7 @@ export default async function EditBookingPage({
       id: true,
       name: true,
       email: true,
+      phone: true,
       notes: true,
       startAt: true,
       endAt: true,
@@ -192,7 +192,7 @@ export default async function EditBookingPage({
   // Minutes are timezone-independent - preserve the sub-slot offset
   const startMinute = (booking.startAt.getUTCMinutes() as StartMinute) ?? 0;
 
-  const { userNotes, meetingType, address, phone } = parseBookingNotes(booking.notes);
+  const { userNotes, meetingType, address } = parseBookingNotes(booking.notes);
 
   const initialValues: BookingFormInitialValues = {
     duration,
@@ -201,7 +201,10 @@ export default async function EditBookingPage({
     startMinute,
     name: booking.name,
     email: booking.email,
-    phone,
+    // Read the phone from the Booking column, not the notes: the original
+    // request route never writes a "Phone:" note line, so parsing it back would
+    // yield "" and blank the number on save.
+    phone: booking.phone ?? "",
     meetingType,
     address,
     notes: userNotes,
@@ -235,7 +238,7 @@ export default async function EditBookingPage({
       hasAnySlots: true,
       timeWindows: TIME_OF_DAY_OPTIONS.map((t) => {
         const isSelected = t.value === timeOfDay;
-        const subSlots = SUB_SLOT_MINUTES.map((m) => ({
+        const subSlots = availabilityConfig.subSlotMinutes.map((m) => ({
           minute: m,
           availableShort: isSelected && m === startMinute,
           availableLong:
