@@ -464,6 +464,7 @@ export function PricingWizard({
                 <button
                   key={option.value}
                   type="button"
+                  aria-pressed={selected}
                   onClick={() => setMeeting(option.value)}
                   className={cn(
                     "rounded-xl border p-4 text-left transition-all",

@@ -271,6 +271,7 @@ export default function ReviewFormProtected({
               <button
                 key={opt.value}
                 type="button"
+                aria-pressed={nameDisplay === opt.value}
                 disabled={loading}
                 onClick={() => setNameDisplay(opt.value)}
                 className={cn(

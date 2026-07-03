@@ -735,6 +735,7 @@ export default function BookingForm({
               <button
                 key={opt.value}
                 type="button"
+                aria-pressed={duration === opt.value}
                 onClick={() => handleDurationChange(opt.value)}
                 className={cn(
                   "rounded-lg border p-4 text-left transition-colors",
@@ -785,6 +786,7 @@ export default function BookingForm({
                         )}
                         <button
                           type="button"
+                          aria-pressed={selectedDay?.dateKey === day.dateKey}
                           disabled={!day.hasAnySlots}
                           onClick={() => handleDaySelect(day)}
                           className={cn(
@@ -823,6 +825,7 @@ export default function BookingForm({
                         )}
                         <button
                           type="button"
+                          aria-pressed={selectedDay?.dateKey === day.dateKey}
                           disabled={!day.hasAnySlots}
                           onClick={() => handleDaySelect(day)}
                           className={cn(
@@ -883,6 +886,7 @@ export default function BookingForm({
                       <button
                         key={window.value}
                         type="button"
+                        aria-pressed={isSelected}
                         disabled={!available}
                         onClick={() => {
                           setSelectedTime(window.value);
@@ -924,6 +928,7 @@ export default function BookingForm({
                             <button
                               key={minute}
                               type="button"
+                              aria-pressed={selectedMinute === minute}
                               disabled={!available}
                               onClick={() => setSelectedMinute(minute)}
                               className={cn(
@@ -1052,6 +1057,7 @@ export default function BookingForm({
           <div className="grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-2">
             <button
               type="button"
+              aria-pressed={meetingType === "in-person"}
               onClick={() => setMeetingType("in-person")}
               className={cn(
                 "rounded-lg border px-5 py-2.5 text-base font-medium whitespace-nowrap transition-colors",
@@ -1064,6 +1070,7 @@ export default function BookingForm({
             </button>
             <button
               type="button"
+              aria-pressed={meetingType === "remote"}
               onClick={() => setMeetingType("remote")}
               className={cn(
                 "rounded-lg border px-5 py-2.5 text-base font-medium whitespace-nowrap transition-colors",
