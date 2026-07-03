@@ -135,7 +135,8 @@ export const DEFAULT_SETTINGS: Settings = {
     priceEstimateRetentionDays: 30,
   },
 
-  // Source: booking/hold route. (Notes-length limits stay code consts in booking.ts.)
+  // Hold-expiry window (minutes) for "held" bookings, read by the release-holds
+  // cron. Currently inert - no route creates holds; bookings confirm directly.
   holds: {
     holdExpirationMinutes: 15,
   },
