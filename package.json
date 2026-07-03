@@ -1,6 +1,6 @@
 {
   "name": "tech-support-site",
-  "version": "3.130.1",
+  "version": "3.130.2",
   "private": true,
   "type": "module",
   "scripts": {
@@ -96,7 +96,7 @@
     "sharp": "^0.35.2",
     "simple-git-hooks": "^2.13.1",
     "tailwindcss": "^4.3.2",
-    "tsx": "^4.22.4",
+    "tsx": "^4.22.5",
     "typescript": "6.0.3"
   },
   "engines": {

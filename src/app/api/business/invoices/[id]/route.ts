@@ -1,7 +1,7 @@
 // src/app/api/business/invoices/[id]/route.ts
 /**
  * @description Admin endpoint for a single invoice. GET returns it. PATCH applies
- * either a status-only change or a full field update, enforcing transition rules
+ * a status-only change, a contactId backfill, or a full field update, enforcing transition rules
  * via {@link validateTransition} (VOIDED is terminal) and recomputing totals on
  * line-item changes. DELETE removes DRAFT invoices only; SENT/PAID/VOIDED are
  * audit-protected. Field-changing paths re-sync the PDF to Drive.
@@ -129,7 +129,7 @@ export async function PATCH(
   // stronger audit guarantee.
   const current = await prisma.invoice.findUnique({
     where: { id },
-    select: { status: true },
+    select: { status: true, promoDiscount: true, unsuccessfulDiscount: true },
   });
   if (!current) {
     return errorResponse("Invoice not found", 404);
@@ -160,7 +160,15 @@ export async function PATCH(
     // request body does not carry gst. gstAmount is non-zero once that flag
     // is on, stays 0 today.
     const { GST_REGISTERED } = await getPolicy();
-    const { subtotal, gstAmount, total } = calcInvoiceTotals(lineItems ?? [], 0, GST_REGISTERED);
+    // Preserve the invoice's stored discounts when recomputing on a line-item
+    // edit; recomputing with 0 would silently strip the promo / unsuccessful
+    // discount from the total charged.
+    const preservedDiscount = (current.promoDiscount ?? 0) + (current.unsuccessfulDiscount ?? 0);
+    const { subtotal, gstAmount, total } = calcInvoiceTotals(
+      lineItems ?? [],
+      preservedDiscount,
+      GST_REGISTERED,
+    );
     const statusPatch = status !== undefined ? statusDataFor(status as InvoiceStatus) : {};
     const invoice = await prisma.invoice.update({
       where: { id },
@@ -182,6 +190,18 @@ export async function PATCH(
     });
     // Any field change should be reflected in the Drive archive copy.
     await syncInvoicePdfToDrive(id);
+    return NextResponse.json({ ok: true, invoice });
+  }
+
+  // contactId-only backfill: the calculator links a freshly-saved invoice to a
+  // contact after the invoice is created. Handle it before the status branch so
+  // a contactId-only PATCH is not rejected as an invalid status.
+  if (body.contactId !== undefined && body.status === undefined) {
+    const contactId =
+      typeof body.contactId === "string" && /^[a-f0-9]{24}$/i.test(body.contactId)
+        ? body.contactId
+        : null;
+    const invoice = await prisma.invoice.update({ where: { id }, data: { contactId } });
     return NextResponse.json({ ok: true, invoice });
   }
 

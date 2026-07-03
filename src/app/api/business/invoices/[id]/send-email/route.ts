@@ -45,6 +45,11 @@ export async function POST(
   if (!invoice.clientEmail) {
     return errorResponse("Invoice has no client email", 400);
   }
+  // A voided invoice is cancelled; emailing its PDF (and flipping it back to
+  // SENT) would resurrect a terminal record. Issue a fresh invoice instead.
+  if (invoice.status === "VOIDED") {
+    return errorResponse("Cannot email a voided invoice; issue a new one instead.", 409);
+  }
 
   // Optional operator overrides (match the preview): greetingName targets a
   // person inside a company invoice, customBody replaces the intro paragraph,
@@ -114,10 +119,12 @@ export async function POST(
   // getInvoiceReviewEligibility. Resending the same invoice with the toggle
   // still on re-stamps it; sending with the toggle off leaves it alone (the
   // last actual send timestamp stands).
+  // Only promote a DRAFT to SENT on first send. Re-sending a SENT or PAID
+  // invoice (a receipt copy) must not regress its status back to SENT.
   const updated = await prisma.invoice.update({
     where: { id },
     data: {
-      status: "SENT",
+      ...(invoice.status === "DRAFT" ? { status: "SENT" } : {}),
       ...(includeReview ? { reviewLinkSentAt: new Date() } : {}),
     },
     select: { updatedAt: true },
