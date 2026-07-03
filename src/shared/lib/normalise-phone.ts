@@ -118,6 +118,19 @@ export function isValidPhone(normalised: string): boolean {
 }
 
 /**
+ * True when a normalised phone key is an NZ mobile (02x prefix). Mobiles are
+ * personal; landlines are often shared across a household, so only mobiles are
+ * safe to treat as a person-identity key when auto-merging contacts.
+ * @param key - A normalised phone key from {@link normaliseContactPhone} (E.164 "+642x...", or a domestic "02x" form).
+ * @returns Whether the number is an NZ mobile.
+ */
+export function isNZMobileKey(key: string | null | undefined): boolean {
+  if (!key) return false;
+  const digits = key.replace(/\D/g, "");
+  return /^64(21|22|27|28|29)\d/.test(digits) || /^02(1|2|7|8|9)\d/.test(digits);
+}
+
+/**
  * Discriminator returned by {@link validatePhone}. "empty" means the input is blank
  * (callers decide whether that's allowed based on whether the field is required).
  */

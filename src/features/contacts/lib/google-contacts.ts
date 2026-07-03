@@ -9,7 +9,7 @@
 
 import { getOAuth2Client } from "@/features/calendar/lib/google-calendar";
 import { normaliseAddress } from "@/shared/lib/normalise-address";
-import { normaliseContactPhone, toE164NZ } from "@/shared/lib/normalise-phone";
+import { isNZMobileKey, normaliseContactPhone, toE164NZ } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
 import { google } from "googleapis";
 import { clearContactConflict, recordContactConflict } from "./contact-conflicts";
@@ -58,7 +58,12 @@ export async function importFromGoogleContacts(): Promise<number> {
     for (const c of contactRows) {
       if (!c.phone || !c.email) continue;
       const norm = normaliseContactPhone(c.phone);
-      if (norm && !contactEmailByPhone.has(norm)) contactEmailByPhone.set(norm, c.email);
+      // Only resolve a phone-only Google contact to an email by a MOBILE match;
+      // landlines are often shared, so a landline hit would give the Google
+      // contact the wrong person's email (and merge them).
+      if (norm && isNZMobileKey(norm) && !contactEmailByPhone.has(norm)) {
+        contactEmailByPhone.set(norm, c.email);
+      }
     }
 
     let pageToken: string | undefined;
@@ -234,7 +239,16 @@ export async function importFromGoogleContacts(): Promise<number> {
                 lastSyncedAt: new Date(),
                 lastGoogleEtag: r.etag,
               };
-              if (r.name && (namePlaceholder || r.name !== existing.name)) updates.name = r.name;
+              // Fill a placeholder name freely, but only let a real Google name
+              // OVERWRITE a real local name when matched on a mobile - a name
+              // mismatch on a shared landline is likely a different household
+              // member, not a rename. Linking the id still avoids duplicates.
+              if (
+                r.name &&
+                (namePlaceholder || (r.name !== existing.name && isNZMobileKey(r.normPhone)))
+              ) {
+                updates.name = r.name;
+              }
               // Same changed-only address canonicalisation as the email branch.
               if (r.address && r.address !== existing.address) {
                 updates.address = (await normaliseAddress(r.address)) ?? r.address;

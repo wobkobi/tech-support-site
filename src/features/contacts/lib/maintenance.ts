@@ -6,7 +6,7 @@
 // here is what stops the two paths from drifting apart. Every reader excludes
 // soft-deleted contacts (deletedAt != null).
 
-import { normaliseContactPhone } from "@/shared/lib/normalise-phone";
+import { isNZMobileKey, normaliseContactPhone } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
 
 /** A single field divergence between a Contact and a source record (Booking or Review). */
@@ -161,7 +161,9 @@ export async function mergePhoneOnlyContacts(): Promise<Set<string>> {
   for (const c of contacts) {
     const keys = [normaliseContactPhone(c.phone), ...c.altPhones.map(normaliseContactPhone)];
     for (const norm of keys) {
-      if (!norm) continue;
+      // Only merge identity on a MOBILE match; a shared landline may belong to
+      // two different people (a household), so it must not collapse them into one.
+      if (!norm || !isNZMobileKey(norm)) continue;
       if (!phoneBuckets.has(norm)) phoneBuckets.set(norm, { withEmail: null, phoneOnly: [] });
       const bucket = phoneBuckets.get(norm)!;
       if (c.email) bucket.withEmail ??= c;
