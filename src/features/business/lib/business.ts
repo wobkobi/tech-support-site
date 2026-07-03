@@ -41,11 +41,13 @@ export function formatNZD(amount: number): string {
 }
 
 /**
- * Returns today's date as a YYYY-MM-DD string (local machine time).
- * @returns ISO date string for today
+ * Returns today's date as a YYYY-MM-DD string in NZ (Pacific/Auckland) time.
+ * The ledger/invoice forms that default to "today" run for a NZ operator, and
+ * UTC would show yesterday every NZ morning.
+ * @returns ISO date string for today in NZ.
  */
 export function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Pacific/Auckland" }).format(new Date());
 }
 
 /**
