@@ -156,8 +156,6 @@ interface Props {
  * @returns Promos view element.
  */
 export function PromosView({ initial }: Props): React.ReactElement {
-  const headers: Record<string, string> = {};
-
   const [promos, setPromos] = useState<PromoRow[]>(initial);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -232,7 +230,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
       const method = editingId ? "PATCH" : "POST";
       const res = await fetch(url, {
         method,
-        headers: { ...headers, "content-type": "application/json" },
+        headers: { "content-type": "application/json" },
         body: JSON.stringify(body),
       });
       if (!res.ok) {
@@ -241,12 +239,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
         return;
       }
       const d = (await res.json()) as { ok: boolean; promo: PromoRow };
-      const next: PromoRow = {
-        ...d.promo,
-        // Prisma returns Date objects; serialised via JSON they become strings already.
-        startAt: typeof d.promo.startAt === "string" ? d.promo.startAt : d.promo.startAt,
-        endAt: typeof d.promo.endAt === "string" ? d.promo.endAt : d.promo.endAt,
-      };
+      const next = d.promo;
       setPromos((prev) => {
         if (editingId) return prev.map((p) => (p.id === editingId ? next : p));
         return [next, ...prev];
@@ -264,7 +257,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
   async function toggleActive(p: PromoRow): Promise<void> {
     const res = await fetch(`/api/business/promos/${p.id}`, {
       method: "PATCH",
-      headers: { ...headers, "content-type": "application/json" },
+      headers: { "content-type": "application/json" },
       body: JSON.stringify({ isActive: !p.isActive }),
     });
     if (!res.ok) return;
@@ -278,7 +271,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
    */
   async function deletePromo(p: PromoRow): Promise<void> {
     if (!confirm(`Delete promo "${p.title}"? Past invoices keep their snapshot.`)) return;
-    const res = await fetch(`/api/business/promos/${p.id}`, { method: "DELETE", headers });
+    const res = await fetch(`/api/business/promos/${p.id}`, { method: "DELETE" });
     if (!res.ok) return;
     setPromos((prev) => prev.filter((x) => x.id !== p.id));
     if (editingId === p.id) resetForm();
@@ -440,7 +433,8 @@ export function PromosView({ initial }: Props): React.ReactElement {
                         {p.description && <p className="text-xs text-slate-400">{p.description}</p>}
                       </td>
                       <td className="px-4 py-3 text-xs text-slate-500">
-                        {formatDateShort(p.startAt)} – {formatDateShort(p.endAt)}
+                        {formatDateShort(p.startAt)} -{" "}
+                        {formatDateShort(endIsoToInclusiveDate(p.endAt))}
                       </td>
                       <td className="px-4 py-3 text-xs text-slate-700">
                         {p.flatHourlyRate !== null
@@ -527,7 +521,8 @@ export function PromosView({ initial }: Props): React.ReactElement {
                   <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
                     <dt className="text-slate-400">Period</dt>
                     <dd className="text-slate-700">
-                      {formatDateShort(p.startAt)} – {formatDateShort(p.endAt)}
+                      {formatDateShort(p.startAt)} -{" "}
+                      {formatDateShort(endIsoToInclusiveDate(p.endAt))}
                     </dd>
                     <dt className="text-slate-400">Type</dt>
                     <dd className="text-slate-700">

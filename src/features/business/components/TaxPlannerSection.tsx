@@ -120,12 +120,13 @@ export function TaxPlannerSection({
             <SmallStat label="Monthly target" value={formatNZD(plan.setAsides.kiwiSaver / 12)} />
           </div>
           <p className="mt-2 text-[11px] leading-snug text-slate-400">
-            Aim for at least $1,042.86/year to capture the full $521 govt contribution match.
-            Profit-based target ({formatNZD(plan.setAsides.kiwiSaver)}) is just the rate × profit.
+            Aim for at least $1,042.86/year to capture the full ~$260.72 govt contribution (25c per
+            $1, since 1 July 2025). Profit-based target ({formatNZD(plan.setAsides.kiwiSaver)}) is
+            just the rate × profit.
           </p>
         </div>
 
-        {/* GST - hidden until gstRegistered is flipped to true in tax-planner.ts */}
+        {/* GST - shown only when gstRegistered (live pricing setting) is true. */}
         {gstRegistered && (
           <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <h3 className="mb-3 text-sm font-bold tracking-wide text-russian-violet uppercase">

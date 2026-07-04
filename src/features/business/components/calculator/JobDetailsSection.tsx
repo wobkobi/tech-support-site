@@ -207,7 +207,12 @@ export function JobDetailsSection({
           min="0"
           step="5"
           value={durationMinsOverride ?? durationMins}
-          onChange={(e) => onDurationOverrideChange(parseInt(e.target.value) || 0)}
+          onChange={(e) => {
+            // Blank/NaN clears the override so the Duration reverts to the slot
+            // sum instead of collapsing to 0 (which would drop the Labour line).
+            const v = parseInt(e.target.value, 10);
+            onDurationOverrideChange(Number.isNaN(v) ? null : v);
+          }}
           className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
         />
         <p className="mt-1 text-xs text-slate-400">

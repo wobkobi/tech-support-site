@@ -51,8 +51,14 @@ export function ReviewScrollHandler(): null {
 
       // Brief beat so the user sees "we're at the top", then glide to target
       const target: HTMLElement = el;
+      // Respect reduced-motion: jump instead of gliding when the OS asks for it.
+      const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       setTimeout(() => {
-        target.scrollIntoView({ block: "center", inline: "nearest", behavior: "smooth" });
+        target.scrollIntoView({
+          block: "center",
+          inline: "nearest",
+          behavior: prefersReduced ? "auto" : "smooth",
+        });
 
         /**
          * Plays the halo flash on the targeted card.

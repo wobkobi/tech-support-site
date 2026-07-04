@@ -8,7 +8,11 @@
 
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import { priceRangeFor, remoteRateDelta } from "@/features/business/lib/estimate-range";
-import { calcTravelCharge } from "@/features/business/lib/pricing-policy";
+import {
+  calcTravelCharge,
+  FALLBACK_BASE_RATE,
+  FALLBACK_TRAVEL_RATE,
+} from "@/features/business/lib/pricing-policy";
 import {
   applyPromoToHourlyRate,
   summariseForBanner,
@@ -168,7 +172,7 @@ export function PricingWizard({
 
     // Fallback defaults when the AI estimate fails
     let estimatedMins = 60;
-    let fullRate = 65;
+    let fullRate = FALLBACK_BASE_RATE;
     let explanation = "";
     let confidence: EstimateConfidence = "medium";
     let tasks: { label: string; mins: number }[] = [];
@@ -184,13 +188,14 @@ export function PricingWizard({
       const baseStandard =
         rates.find((r) => r.ratePerHour !== null && r.isDefault)?.ratePerHour ??
         rates.find((r) => r.ratePerHour !== null)?.ratePerHour ??
-        65;
+        FALLBACK_BASE_RATE;
       fullRate = baseStandard + remoteRateDelta(rates, meeting);
     }
 
     // Travel rate is decoupled from labour; Remote/promo never touch it.
     const travelRatePerHour =
-      rates.find((r) => r.unit === "travel-hour" && r.ratePerHour !== null)?.ratePerHour ?? 40;
+      rates.find((r) => r.unit === "travel-hour" && r.ratePerHour !== null)?.ratePerHour ??
+      FALLBACK_TRAVEL_RATE;
 
     const promoRate = applyPromoToHourlyRate(fullRate, activePromo);
     const promoApplied = promoRate < fullRate;
@@ -425,6 +430,7 @@ export function PricingWizard({
             rows={4}
             value={issueDescription}
             onChange={(e) => setIssueDescription(e.target.value)}
+            aria-label="Describe the issue or job you need help with"
             placeholder="e.g. My laptop is running really slow and I think it has a virus. Also want to set up my new phone."
             className={cn(
               "w-full resize-none rounded-xl border px-4 py-3 text-base text-slate-700 transition-all outline-none",
@@ -492,6 +498,7 @@ export function PricingWizard({
           <AddressAutocomplete
             value={address}
             onChange={setAddress}
+            aria-label="Your address"
             placeholder="Start typing your address..."
           />
         </div>
@@ -499,7 +506,10 @@ export function PricingWizard({
 
       {step === "results" && result && (
         <div>
-          <div className="mb-4 rounded-2xl border border-russian-violet/20 bg-russian-violet/5 p-6 text-center">
+          <div
+            role="status"
+            className="mb-4 rounded-2xl border border-russian-violet/20 bg-russian-violet/5 p-6 text-center"
+          >
             {aiEstimatedMins > 0 && (
               <p className="mb-3 text-2xl font-bold text-rich-black sm:text-3xl">
                 {formatDuration(aiEstimatedMins)}
@@ -508,11 +518,11 @@ export function PricingWizard({
             <p className="mb-1 text-base font-medium text-slate-600">Estimated cost</p>
             {result.originalLow !== undefined && result.originalHigh !== undefined && (
               <p className="text-base text-slate-500 line-through sm:text-lg">
-                {formatPriceRound(result.originalLow)} – {formatPriceRound(result.originalHigh)}
+                {formatPriceRound(result.originalLow)} - {formatPriceRound(result.originalHigh)}
               </p>
             )}
             <p className="text-4xl font-extrabold text-russian-violet sm:text-5xl">
-              {formatPriceRound(result.low)} – {formatPriceRound(result.high)}
+              {formatPriceRound(result.low)} - {formatPriceRound(result.high)}
             </p>
             {result.promoLabel && (
               <p className="mt-2 text-sm font-semibold text-amber-700">⚡ {result.promoLabel}</p>
@@ -525,7 +535,7 @@ export function PricingWizard({
               {meeting === "remote"
                 ? "Remote session - no travel charge. "
                 : result.includesTravel
-                  ? "Includes round-trip drive time at the Travel rate, $10 minimum. "
+                  ? `Includes round-trip drive time at the Travel rate, ${formatPriceRound(minTravelCharge)} minimum. `
                   : addressNotFound
                     ? "Address not found - actual travel will be confirmed before work begins. "
                     : ""}

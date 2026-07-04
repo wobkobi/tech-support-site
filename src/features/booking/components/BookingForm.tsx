@@ -54,6 +54,7 @@ interface BookingDraft {
   meetingType: "in-person" | "remote" | "";
   unit: string;
   address: string;
+  addressVerified: boolean;
   notes: string;
   dateKey?: string;
   timeOfDay?: TimeOfDay;
@@ -370,7 +371,10 @@ export default function BookingForm({
       if (typeof draft.unit === "string") setUnit(draft.unit);
       if (typeof draft.address === "string" && draft.address) {
         setAddress(draft.address);
-        setAddressVerified(true);
+        // Only trust a restored address as verified when the draft recorded it
+        // as such (a Places pick or fallback mode) - a raw typed-but-unpicked
+        // address must still face the submit-time geocode gate.
+        setAddressVerified(draft.addressVerified === true);
       }
       if (typeof draft.notes === "string" && draft.notes) setNotes(draft.notes);
 
@@ -415,6 +419,7 @@ export default function BookingForm({
         meetingType,
         unit,
         address,
+        addressVerified,
         notes,
         dateKey: selectedDay?.dateKey,
         timeOfDay: selectedTime ?? undefined,
@@ -439,6 +444,7 @@ export default function BookingForm({
     meetingType,
     unit,
     address,
+    addressVerified,
     notes,
     selectedDay,
     selectedTime,

@@ -623,7 +623,9 @@ export async function buildInvoiceEmail({
     ? `<p style="margin:24px 0 0;font-size:14px;color:#555">If you've got a moment, I'd love to hear how it went: <a href="${escapeHtml(reviewUrl)}" style="color:#43bccd">share your experience</a>. Quick and anonymous if you prefer.</p>`
     : "";
 
-  const subject = `Your invoice from ${identity.company} (${invoice.number})`;
+  // Append " Tech" to match the signature and body brand name, so the subject
+  // and the rest of the same email show one consistent business name.
+  const subject = `Your invoice from ${identity.company} Tech (${invoice.number})`;
   const html = `<!doctype html>
 <html lang="en">
 <head><meta charset="utf-8" /></head>

@@ -51,6 +51,10 @@ export function useSettingsForm<G extends SettingsGroup>(
   defaults: Settings[G],
 ): SettingsFormApi<G> {
   const [draft, setDraft] = useState<Settings[G]>(initial);
+  // Dirty baseline. Starts at the server value and advances to the just-saved
+  // draft after each successful save, so the save bar clears and the "Saved"
+  // confirmation can show instead of staying permanently dirty.
+  const [baseline, setBaseline] = useState<Settings[G]>(initial);
   const [saving, setSaving] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [serverBlocks, setServerBlocks] = useState<string[]>([]);
@@ -81,10 +85,11 @@ export function useSettingsForm<G extends SettingsGroup>(
     [live.warns, serverWarns],
   );
 
-  const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
+  const dirty = JSON.stringify(draft) !== JSON.stringify(baseline);
 
   // Warn before a full-page unload (reload / close / external nav) with unsaved
-  // edits. In-app tab switches keep the draft in state, so they don't lose work.
+  // edits. This does not cover in-app settings tab switches: SettingsView renders
+  // only the active tab, so switching tabs unmounts the current draft.
   useEffect(() => {
     if (!dirty) return;
     /**
@@ -114,6 +119,7 @@ export function useSettingsForm<G extends SettingsGroup>(
         if (res.ok) {
           setSavedAt(Date.now());
           setServerWarns([]);
+          setBaseline(draft);
           return true;
         }
         const data = (await res.json().catch(() => ({}))) as {

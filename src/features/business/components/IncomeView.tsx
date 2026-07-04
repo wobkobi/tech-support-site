@@ -40,18 +40,19 @@ export function IncomeView(): React.ReactElement {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
-  const headers = {};
-
   useEffect(() => {
-    fetch("/api/business/income", { headers })
+    fetch("/api/business/income")
       .then((r) => r.json())
       .then((d) => {
         if (d.ok) setEntries(d.entries);
+        else setLoadError("Couldn't load income entries.");
       })
+      .catch(() => setLoadError("Couldn't load income entries. Check your connection and refresh."))
       .finally(() => setLoading(false));
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   const totalIncome = entries.reduce((s, e) => s + e.amount, 0);
   const taxReserve = totalIncome * 0.2;
@@ -66,24 +67,29 @@ export function IncomeView(): React.ReactElement {
     setSaving(true);
     setError(null);
     const url = editingId ? `/api/business/income/${editingId}` : "/api/business/income";
-    const res = await fetch(url, {
-      method: editingId ? "PUT" : "POST",
-      headers: { ...headers, "content-type": "application/json" },
-      body: JSON.stringify({ ...form, amount: parseFloat(form.amount) }),
-    });
-    const d = await res.json();
-    if (d.ok) {
-      if (editingId) {
-        setEntries((prev) => prev.map((en) => (en.id === editingId ? d.entry : en)));
+    try {
+      const res = await fetch(url, {
+        method: editingId ? "PUT" : "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ...form, amount: parseFloat(form.amount) }),
+      });
+      const d = await res.json();
+      if (d.ok) {
+        if (editingId) {
+          setEntries((prev) => prev.map((en) => (en.id === editingId ? d.entry : en)));
+        } else {
+          setEntries((prev) => [d.entry, ...prev]);
+        }
+        setForm(emptyForm);
+        setEditingId(null);
       } else {
-        setEntries((prev) => [d.entry, ...prev]);
+        setError(d.error ?? "Failed to save");
       }
-      setForm(emptyForm);
-      setEditingId(null);
-    } else {
-      setError(d.error ?? "Failed to save");
+    } catch {
+      setError("Couldn't save. Check your connection and try again.");
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   }
 
   /**
@@ -117,10 +123,17 @@ export function IncomeView(): React.ReactElement {
    */
   async function handleDelete(id: string): Promise<void> {
     if (!confirm("Delete this income entry?")) return;
-    const res = await fetch(`/api/business/income/${id}`, { method: "DELETE", headers });
-    if ((await res.json()).ok) {
-      setEntries((prev) => prev.filter((e) => e.id !== id));
-      if (editingId === id) cancelEdit();
+    try {
+      const res = await fetch(`/api/business/income/${id}`, { method: "DELETE" });
+      const d = await res.json();
+      if (d.ok) {
+        setEntries((prev) => prev.filter((e) => e.id !== id));
+        if (editingId === id) cancelEdit();
+      } else {
+        setError(d.error ?? "Couldn't delete entry.");
+      }
+    } catch {
+      setError("Couldn't delete entry. Check your connection and try again.");
     }
   }
 
@@ -241,6 +254,10 @@ export function IncomeView(): React.ReactElement {
           <p className="rounded-xl border border-slate-200 bg-white px-5 py-6 text-sm text-slate-400 shadow-sm">
             Loading...
           </p>
+        ) : loadError ? (
+          <p className="rounded-xl border border-red-200 bg-red-50 px-5 py-6 text-sm text-red-600 shadow-sm">
+            {loadError}
+          </p>
         ) : entries.length === 0 ? (
           <p className="rounded-xl border border-slate-200 bg-white px-5 py-6 text-sm text-slate-400 shadow-sm">
             No income entries yet.
@@ -262,13 +279,15 @@ export function IncomeView(): React.ReactElement {
                 <span className="text-slate-400">{e.method}</span>
                 <button
                   onClick={() => startEdit(e)}
-                  className="ml-auto inline-flex h-8 items-center text-moonstone-600 hover:text-moonstone-700"
+                  disabled={saving}
+                  className="ml-auto inline-flex h-8 items-center text-moonstone-600 hover:text-moonstone-700 disabled:opacity-50"
                 >
                   Edit
                 </button>
                 <button
                   onClick={() => handleDelete(e.id)}
-                  className="inline-flex h-8 items-center text-red-400 hover:text-red-600"
+                  disabled={saving}
+                  className="inline-flex h-8 items-center text-red-400 hover:text-red-600 disabled:opacity-50"
                 >
                   Delete
                 </button>
@@ -282,6 +301,8 @@ export function IncomeView(): React.ReactElement {
       <div className="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm lg:block">
         {loading ? (
           <p className="px-5 py-6 text-sm text-slate-400">Loading...</p>
+        ) : loadError ? (
+          <p className="px-5 py-6 text-sm text-red-600">{loadError}</p>
         ) : entries.length === 0 ? (
           <p className="px-5 py-6 text-sm text-slate-400">No income entries yet.</p>
         ) : (
@@ -311,13 +332,15 @@ export function IncomeView(): React.ReactElement {
                     <div className="flex items-center gap-3">
                       <button
                         onClick={() => startEdit(e)}
-                        className="text-xs text-moonstone-600 hover:text-moonstone-700"
+                        disabled={saving}
+                        className="text-xs text-moonstone-600 hover:text-moonstone-700 disabled:opacity-50"
                       >
                         Edit
                       </button>
                       <button
                         onClick={() => handleDelete(e.id)}
-                        className="text-xs text-red-400 hover:text-red-600"
+                        disabled={saving}
+                        className="text-xs text-red-400 hover:text-red-600 disabled:opacity-50"
                       >
                         Delete
                       </button>

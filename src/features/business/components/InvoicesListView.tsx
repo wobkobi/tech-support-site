@@ -33,16 +33,16 @@ export function InvoicesListView(): React.ReactElement {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [syncToast, setSyncToast] = useState<string | null>(null);
-  const headers = {};
 
   useEffect(() => {
-    fetch("/api/business/invoices", { headers })
+    fetch("/api/business/invoices")
       .then((r) => r.json())
       .then((d) => {
         if (d.ok) setInvoices(d.invoices);
       })
+      .catch(() => setSyncToast("Couldn't load invoices. Check your connection and refresh."))
       .finally(() => setLoading(false));
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   /**
    * Sends a PATCH request to update an invoice status and reflects the change locally.
@@ -60,13 +60,25 @@ export function InvoicesListView(): React.ReactElement {
     ) {
       return;
     }
-    const res = await fetch(`/api/business/invoices/${id}`, {
-      method: "PATCH",
-      headers: { ...headers, "content-type": "application/json" },
-      body: JSON.stringify({ status }),
-    });
-    const d = await res.json();
-    if (d.ok) setInvoices((prev) => prev.map((i) => (i.id === id ? { ...i, status } : i)));
+    try {
+      const res = await fetch(`/api/business/invoices/${id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      const d = await res.json();
+      if (d.ok) {
+        setInvoices((prev) => prev.map((i) => (i.id === id ? { ...i, status } : i)));
+      } else {
+        // Server rejects illegal transitions (e.g. anything out of VOIDED); the
+        // select snaps back to the persisted status since state never changed.
+        setSyncToast(d.error ?? "Couldn't update status.");
+        setTimeout(() => setSyncToast(null), 5000);
+      }
+    } catch {
+      setSyncToast("Couldn't update status. Check your connection and try again.");
+      setTimeout(() => setSyncToast(null), 5000);
+    }
   }
 
   /** Imports new invoices from Google Drive PDFs and refreshes the list. */
@@ -76,14 +88,13 @@ export function InvoicesListView(): React.ReactElement {
     try {
       const res = await fetch("/api/business/invoices/import-drive", {
         method: "POST",
-        headers,
       });
       const d = await res.json();
       if (d.ok) {
         setSyncToast(
           `Imported ${d.created} invoice${d.created !== 1 ? "s" : ""} from Drive.${d.errors ? ` ${d.errors} errors.` : ""}`,
         );
-        const r2 = await fetch("/api/business/invoices", { headers });
+        const r2 = await fetch("/api/business/invoices");
         const d2 = await r2.json();
         if (d2.ok) setInvoices(d2.invoices);
       } else {
@@ -103,13 +114,12 @@ export function InvoicesListView(): React.ReactElement {
     try {
       const res = await fetch("/api/business/invoices/sync-drive", {
         method: "POST",
-        headers,
       });
       const d = await res.json();
       if (d.ok) {
         setSyncToast(`Synced ${d.matched} invoice${d.matched !== 1 ? "s" : ""} from Drive.`);
         // Reload invoices to pick up newly populated driveWebUrl values
-        const r2 = await fetch("/api/business/invoices", { headers });
+        const r2 = await fetch("/api/business/invoices");
         const d2 = await r2.json();
         if (d2.ok) setInvoices(d2.invoices);
       } else {
@@ -181,7 +191,7 @@ export function InvoicesListView(): React.ReactElement {
                 </Link>
                 <select
                   value={inv.status}
-                  onChange={(e) => updateStatus(inv.id, e.target.value as InvoiceStatus)}
+                  onChange={(e) => void updateStatus(inv.id, e.target.value as InvoiceStatus)}
                   className={cn(
                     "cursor-pointer rounded-full border-0 px-2 py-1 text-xs font-semibold",
                     STATUS_COLORS[inv.status],
@@ -255,7 +265,7 @@ export function InvoicesListView(): React.ReactElement {
                   <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                     <select
                       value={inv.status}
-                      onChange={(e) => updateStatus(inv.id, e.target.value as InvoiceStatus)}
+                      onChange={(e) => void updateStatus(inv.id, e.target.value as InvoiceStatus)}
                       className={cn(
                         "cursor-pointer rounded-full border-0 px-2 py-0.5 text-xs font-semibold",
                         STATUS_COLORS[inv.status],

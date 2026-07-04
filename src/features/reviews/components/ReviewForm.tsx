@@ -56,11 +56,15 @@ export default function ReviewFormProtected({
   existingReview,
 }: ReviewFormProtectedProps): React.ReactElement {
   const router = useRouter();
-  const firstId = useId();
+  // Stable literal ids for fields the error summary links to, so the "#id"
+  // anchors are URL-safe fragments (useId tokens are not). Unlinked fields
+  // keep generated ids.
+  const firstId = "review-first-name";
   const lastId = useId();
-  const textId = useId();
+  const textId = "review-text";
   const emailId = useId();
-  const phoneId = useId();
+  const phoneId = "review-phone";
+  const counterId = `${textId}-counter`;
 
   const isEditing = !!existingReview;
   const isVerified = !!((bookingId || contactId) && token);
@@ -416,6 +420,7 @@ export default function ReviewFormProtected({
             Review <span className="text-coquelicot-500">*</span>
           </label>
           <span
+            id={counterId}
             className={cn(
               "tabular-nums transition-all duration-200",
               textCount > textMax
@@ -428,7 +433,6 @@ export default function ReviewFormProtected({
                       ? "text-sm text-coquelicot-500/80"
                       : "text-sm text-rich-black/70",
             )}
-            aria-live="polite"
           >
             {textCount}/{textMax}
             {textCount > 0 && textCount < textMin && ` (min ${textMin})`}
@@ -450,7 +454,7 @@ export default function ReviewFormProtected({
           required
           disabled={loading}
           aria-invalid={!!errors.text || undefined}
-          aria-describedby={errors.text ? `${textId}-error` : undefined}
+          aria-describedby={cn(counterId, errors.text && `${textId}-error`)}
         />
         {errors.text && (
           <p id={`${textId}-error`} className="mt-1 text-base text-coquelicot-500">
@@ -464,7 +468,7 @@ export default function ReviewFormProtected({
             variant="secondary"
             size="sm"
             aria-busy={loading}
-            disabled={loading || textCount < textMin || textCount > textMax || phoneInvalid}
+            disabled={loading}
           >
             {loading ? "Sending..." : isEditing ? "Update review" : "Send review"}
           </Button>

@@ -463,7 +463,7 @@ export function NavBar(): React.ReactElement | null {
         >
           <Link
             href="/"
-            className="flex min-w-0 shrink-0 items-center gap-2.5 transition-transform hover:scale-105"
+            className="flex min-w-0 shrink-0 items-center gap-2.5 transition-[scale] hover:scale-105"
           >
             <Image
               src="/source/logo.svg"

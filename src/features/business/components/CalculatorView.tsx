@@ -30,14 +30,14 @@ import {
   todayISO,
   type JobPricing,
 } from "@/features/business/lib/business";
-import { calcTravelCharge } from "@/features/business/lib/pricing-policy";
+import { calcTravelCharge, FALLBACK_TRAVEL_RATE } from "@/features/business/lib/pricing-policy";
 import { summariseForBanner, type ActivePromo } from "@/features/business/lib/promos";
 import type {
   GoogleContact,
   JobCalculation,
+  ParsedRange,
   ParseJobQuestion,
   ParseJobResponse,
-  ParsedRange,
   PartLine,
   RateConfig,
   TaskLine,
@@ -286,7 +286,6 @@ interface CalculatorViewProps {
  */
 export function CalculatorView({ identity, pricing }: CalculatorViewProps): React.ReactElement {
   const router = useRouter();
-  const headers = {};
 
   // Lazy-read the saved draft once at mount. Non-meaningful drafts (just the
   // auto-seeded "now" times from a previous session, nothing the operator
@@ -489,13 +488,17 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
   useEffect(() => {
     const now = nowTime();
     Promise.all([
-      fetch("/api/business/rates", { headers }).then((r) => r.json()),
-      fetch("/api/business/task-templates", { headers }).then((r) => r.json()),
+      fetch("/api/business/rates")
+        .then((r) => r.json())
+        .catch(() => ({ ok: false, rates: [] })),
+      fetch("/api/business/task-templates")
+        .then((r) => r.json())
+        .catch(() => ({ ok: false, templates: [] })),
       // Public; auto-applies any live promo to the Summary panel.
       fetch("/api/promos/active")
         .then((r) => r.json())
         .catch(() => ({ ok: false, promo: null })),
-      fetch("/api/business/contacts", { headers: {} })
+      fetch("/api/business/contacts")
         .then((r) => r.json())
         .catch(() => ({ ok: false, contacts: [] })),
     ]).then(
@@ -522,7 +525,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
         if (contactsData.ok) setContacts(contactsData.contacts);
       },
     );
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // Debounced draft writer. Any change to a persisted form field schedules a
   // write 500ms later; rapid edits coalesce into one localStorage hit.
@@ -745,7 +748,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
       if (result.travel && includeTravelDefault) {
         const travelRatePerHour =
           rateList.find((r) => r.unit === "travel-hour" && r.ratePerHour !== null)?.ratePerHour ??
-          40;
+          FALLBACK_TRAVEL_RATE;
         const cost = calcTravelCharge(
           result.travel.durationMins,
           travelRatePerHour,
@@ -806,7 +809,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
       if (answers && Object.keys(answers).length > 0) body.answers = answers;
       const res = await fetch("/api/business/parse-job", {
         method: "POST",
-        headers: { ...headers, "content-type": "application/json" },
+        headers: { "content-type": "application/json" },
         body: JSON.stringify(body),
       });
       const d = await res.json();
@@ -865,7 +868,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
       custom.map((t) =>
         fetch("/api/business/task-templates", {
           method: "POST",
-          headers: { ...headers, "content-type": "application/json" },
+          headers: { "content-type": "application/json" },
           body: JSON.stringify({
             defaultPrice: t.unitPrice,
             device: t.device,
@@ -925,7 +928,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
       try {
         await fetch(`/api/business/invoices/${invoiceId}`, {
           method: "PATCH",
-          headers: { ...headers, "content-type": "application/json" },
+          headers: { "content-type": "application/json" },
           body: JSON.stringify({ contactId: contactDbId }),
         });
       } catch {
@@ -970,8 +973,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
   /**
    * Direct save: POSTs the calculator state straight to the invoices API and
    * navigates to the detail page. Backdating / custom invoice number / custom
-   * due date is handled by editing a saved DRAFT after the fact (the [id]/edit
-   * route).
+   * due date is handled by editing a saved DRAFT after the fact.
    */
   async function handleSaveInvoice(): Promise<void> {
     // Validate required fields
@@ -1014,7 +1016,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
       const promoActive = activePromo && !skipPromo && totals.promoDiscount > 0;
       const res = await fetch("/api/business/invoices", {
         method: "POST",
-        headers: { ...headers, "content-type": "application/json" },
+        headers: { "content-type": "application/json" },
         body: JSON.stringify({
           clientName,
           clientEmail,
@@ -1047,7 +1049,6 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
         try {
           const checkRes = await fetch(
             `/api/admin/contacts/check?email=${encodeURIComponent(clientEmail.trim())}`,
-            { headers },
           );
           const checkData = (await checkRes.json()) as { exists?: boolean };
           if (checkRes.ok && checkData.exists === false) {
@@ -1081,7 +1082,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
       await saveTaskTemplates(tasks);
       const res = await fetch("/api/business/income", {
         method: "POST",
-        headers: { ...headers, "content-type": "application/json" },
+        headers: { "content-type": "application/json" },
         body: JSON.stringify({
           // Record against the selected job date (NZ-local), not UTC "now",
           // and store the discounted total the customer actually pays.
@@ -1132,7 +1133,8 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
       const d = (await res.json()) as { distanceKm?: number; durationMins?: number };
       if (d.durationMins && d.durationMins > 0) {
         const travelRatePerHour =
-          rates.find((r) => r.unit === "travel-hour" && r.ratePerHour !== null)?.ratePerHour ?? 40;
+          rates.find((r) => r.unit === "travel-hour" && r.ratePerHour !== null)?.ratePerHour ??
+          FALLBACK_TRAVEL_RATE;
         // calcTravelCharge doubles to round-trip internally and floors at
         // MIN_TRAVEL_CHARGE, so a 1-min drive still bills the $10 minimum.
         const cost = calcTravelCharge(d.durationMins, travelRatePerHour, pricing.minTravelCharge);
@@ -1194,7 +1196,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
    */
   async function refreshRates(): Promise<void> {
     try {
-      const res = await fetch("/api/business/rates", { headers });
+      const res = await fetch("/api/business/rates");
       if (!res.ok) return;
       const d = await res.json();
       if (d.ok && Array.isArray(d.rates)) setRates(d.rates);
@@ -1219,7 +1221,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
     handleCancelEdit();
     setResettingRates(true);
     try {
-      const res = await fetch("/api/business/rates", { method: "DELETE", headers });
+      const res = await fetch("/api/business/rates", { method: "DELETE" });
       if (!res.ok) {
         console.error("[calculator] reset rates failed with status", res.status);
         return;
@@ -1300,7 +1302,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
     if (editingRateId) {
       const res = await fetch(`/api/business/rates/${editingRateId}`, {
         method: "PATCH",
-        headers: { ...headers, "content-type": "application/json" },
+        headers: { "content-type": "application/json" },
         body: JSON.stringify(body),
       });
       // Bail safely on non-OK - 404 typically means the rate was wiped via
@@ -1323,7 +1325,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
     } else {
       const res = await fetch("/api/business/rates", {
         method: "POST",
-        headers: { ...headers, "content-type": "application/json" },
+        headers: { "content-type": "application/json" },
         body: JSON.stringify(body),
       });
       if (!res.ok) {
@@ -1349,7 +1351,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
    */
   async function handleDeleteRate(id: string): Promise<void> {
     if (!confirm("Delete this rate?")) return;
-    const res = await fetch(`/api/business/rates/${id}`, { method: "DELETE", headers });
+    const res = await fetch(`/api/business/rates/${id}`, { method: "DELETE" });
     if (!res.ok) {
       // 404 = already deleted server-side. Refresh so the row disappears
       // from the table and the user can move on.
@@ -1377,7 +1379,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
           onClose={() => setShowTaxonomyModal(false)}
           onChanged={() => {
             // Re-fetch templates so the picker dropdown reflects cleared tags.
-            void fetch("/api/business/task-templates", { headers })
+            void fetch("/api/business/task-templates")
               .then((r) => r.json())
               .then((d: { ok: boolean; templates: TaskTemplate[] }) => {
                 if (d.ok) setTaskTemplates(d.templates);
@@ -1563,7 +1565,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
             onLookup={() => void handleTravelLookup()}
             travelRatePerHour={
               rates.find((r) => r.unit === "travel-hour" && r.ratePerHour !== null)?.ratePerHour ??
-              40
+              FALLBACK_TRAVEL_RATE
             }
             minTravelCharge={pricing.minTravelCharge}
           />
@@ -1749,6 +1751,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
             dueDate={addDaysISO(identity.paymentTermsDays)}
             lineItems={previewLineItems}
             notes={notes}
+            gstRegistered={pricing.gstRegistered}
             unsuccessfulDiscount={totals.unsuccessfulDiscount}
             promoTitle={
               activePromo && !skipPromo && totals.promoDiscount > 0 ? activePromo.title : null

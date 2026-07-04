@@ -28,7 +28,7 @@ export interface LinkHistoryEntry {
   name: string;
   /** Email address, or null for SMS-only or legacy entries */
   email: string | null;
-  /** Phone number (normalized), or null if not stored */
+  /** Phone number (normalised), or null if not stored */
   phone: string | null;
   sentAt: string;
   reviewed: boolean;
