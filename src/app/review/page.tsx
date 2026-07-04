@@ -94,6 +94,7 @@ export default async function ReviewPage({
       prefillEmail = booking.email;
       tokenValid = true;
       alreadyReviewed = !!booking.reviewSubmittedAt;
+      if (alreadyReviewed) existingReview = maybeExistingReview;
     } else if (contact) {
       sourceId = contact.id;
       sourceType = "contact";
@@ -101,22 +102,22 @@ export default async function ReviewPage({
       prefillEmail = contact.email;
       prefillPhone = contact.phone;
       tokenValid = true;
-      alreadyReviewed = !!contact.reviewLinkSubmittedAt;
-    }
-
-    if (tokenValid && alreadyReviewed) {
-      // Contact-sourced reviews are keyed by contactId, not by which of the
-      // person's tokens they arrived through - so a review left via one link
-      // is found (and edited) when they open another of their links.
-      existingReview =
+      // Mirror the POST dedup guard (one review per contactId). A review left
+      // via a BOOKING link sets Review.contactId but leaves
+      // Contact.reviewLinkSubmittedAt null, so keying off that flag alone would
+      // render a create form that the POST then rejects with a 409. Contact
+      // reviews are keyed by contactId, not by which of the person's tokens the
+      // review arrived through, so an existing review is found (and edited) via
+      // any of their links.
+      const contactReview =
         maybeExistingReview ??
-        (sourceType === "contact" && sourceId
-          ? await prisma.review.findFirst({
-              where: { contactId: sourceId },
-              orderBy: { createdAt: "desc" },
-              select: { id: true, text: true, firstName: true, lastName: true, isAnonymous: true },
-            })
-          : null);
+        (await prisma.review.findFirst({
+          where: { contactId: contact.id },
+          orderBy: { createdAt: "desc" },
+          select: { id: true, text: true, firstName: true, lastName: true, isAnonymous: true },
+        }));
+      alreadyReviewed = !!contact.reviewLinkSubmittedAt || !!contactReview;
+      if (alreadyReviewed) existingReview = contactReview;
     }
   }
 
@@ -128,7 +129,7 @@ export default async function ReviewPage({
           {token && !tokenValid && (
             <section className={cn(CARD)}>
               <h1 className="mb-2 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl">
-                Invalid Review Link
+                Invalid review link
               </h1>
               <p className="mb-4 text-base text-rich-black/80">
                 This review link is invalid or has expired. If you recently had an appointment,
@@ -172,10 +173,10 @@ export default async function ReviewPage({
           {!token && (
             <section className={cn(CARD)}>
               <h1 className="mb-2 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl">
-                Review Link Required
+                Review link required
               </h1>
               <p className="mb-4 text-base text-rich-black/80">
-                To leave a review, please use the personalized review link sent to your email after
+                To leave a review, please use the personalised review link sent to your email after
                 your appointment.
               </p>
               <p className="mb-4 text-base text-rich-black/80">

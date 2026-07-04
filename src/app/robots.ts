@@ -1,6 +1,6 @@
 // src/app/robots.ts
 /**
- * @description robots.txt generator. Allows public routes, blocks admin/API/preview.
+ * @description robots.txt generator. Allows public routes, blocks the API only.
  */
 
 import { getSiteUrl } from "@/shared/lib/site-url";
@@ -17,12 +17,14 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: "*",
-        // Booking-flow, review-form and poster pages are deliberately NOT
-        // disallowed here: they carry a noindex meta tag instead, and Google
-        // only honours noindex on pages it is allowed to crawl. Blocking
-        // them in robots.txt would freeze whatever Google last indexed.
+        // Admin, booking-flow, review-form and poster pages are deliberately
+        // NOT disallowed here: they carry a noindex meta tag instead, and
+        // Google only honours noindex on pages it is allowed to crawl. Blocking
+        // /admin in robots.txt would let a bare, linked /admin URL still get
+        // index (URL-only) since the crawler could never fetch the noindex.
+        // Only the API (never a search surface) is blocked outright.
         allow: ["/"],
-        disallow: ["/admin", "/admin/", "/api/"],
+        disallow: ["/api/"],
       },
     ],
     sitemap: `${siteUrl}/sitemap.xml`,

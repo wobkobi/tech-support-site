@@ -28,10 +28,19 @@ export default function AdminDashboardLoading(): React.ReactElement {
         </div>
       </div>
 
-      {/* Quick actions row */}
-      <div className="mb-6 flex flex-wrap gap-3">
-        <Bone className="h-10 w-40 bg-slate-200" />
-        <Bone className="h-10 w-40 bg-slate-200" />
+      {/* Quick actions - two full card panels (review-link form + complete events) */}
+      <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {Array.from({ length: 2 }).map((_, i) => (
+          <div key={i} className="rounded-xl border border-slate-200 bg-white shadow-sm">
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+              <Bone className="h-4 w-40 bg-slate-200" />
+            </div>
+            <div className="px-5 py-4">
+              <Bone className="mb-3 h-10 w-full bg-slate-200" />
+              <Bone className="h-4 w-32 bg-slate-200 opacity-60" />
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Stat cards */}

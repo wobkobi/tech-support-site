@@ -4,6 +4,7 @@
  * Pass ?mode=print to add a 3mm bleed on all edges (viewport 1818x2550px).
  */
 
+import { getSettings } from "@/shared/lib/settings/get-settings";
 import type { Metadata } from "next";
 import Image from "next/image";
 import type React from "react";
@@ -67,6 +68,7 @@ export default async function PosterPage({
   searchParams: Promise<{ mode?: string }>;
 }): Promise<React.ReactElement> {
   const { mode } = await searchParams;
+  const { identity } = await getSettings();
   // 32px base + 35px bleed (3 mm at 300 DPI) = 67px
   const outerPadding = mode === "print" ? "67px" : "32px";
 
@@ -91,8 +93,11 @@ export default async function PosterPage({
           {/* Main frosted card - content-sized */}
           <div className="rounded-4xl border-[3px] border-seasalt-400/40 bg-seasalt-800/60 p-6 shadow-xl backdrop-blur-xl">
             <div className="flex flex-col gap-6">
-              {/* Logo */}
+              {/* Logo (doubles as the document's top-level heading for a11y). */}
               <div className="grid place-items-center">
+                <h1 className="sr-only">
+                  To The Point Tech - Computer &amp; IT support in Auckland
+                </h1>
                 <Image
                   src="/source/logo-full.svg"
                   alt="To The Point Tech"
@@ -214,24 +219,24 @@ export default async function PosterPage({
                 {/* Contact Info */}
                 <div className="flex flex-col gap-6">
                   <a
-                    href="tel:+64212971237"
+                    href={identity.phoneTel}
                     className="flex items-center gap-4 text-[44px] font-semibold text-russian-violet"
                   >
                     <FaPhone className="h-10 w-10 shrink-0" aria-hidden />
-                    <span>021 297 1237</span>
+                    <span>{identity.phone}</span>
                   </a>
 
                   <a
-                    href="mailto:harrison@tothepoint.co.nz"
+                    href={`mailto:${identity.email}`}
                     className="flex items-center gap-4 text-[44px] font-semibold text-russian-violet"
                   >
                     <FaEnvelope className="h-11 w-11 shrink-0" aria-hidden />
-                    <span>harrison@tothepoint.co.nz</span>
+                    <span>{identity.email}</span>
                   </a>
 
                   <div className="flex items-center gap-4 text-[44px] font-semibold">
                     <FaGlobe className="h-11 w-11 shrink-0 text-russian-violet" aria-hidden />
-                    <p className="text-russian-violet">tothepoint.co.nz</p>
+                    <p className="text-russian-violet">{identity.website}</p>
                   </div>
                 </div>
               </div>

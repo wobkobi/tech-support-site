@@ -29,11 +29,28 @@ import { getIdentity } from "@/shared/lib/business-identity.server";
 import { cn } from "@/shared/lib/cn";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
+import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 import type { Metadata } from "next";
 import Link from "next/link";
 import type React from "react";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * NZ (Pacific/Auckland) midnight for a calendar date, returned as the equivalent
+ * UTC instant. Vercel runs the server in UTC, so building the "This month"
+ * window from local Date parts would land on UTC midnight (12-13h off NZ) and,
+ * around the 1st, still show the previous month. Handles NZDT/NZST via
+ * {@link getPacificAucklandOffset}.
+ * @param year - Full year.
+ * @param month - Month 1-12 (overflow wraps, e.g. month 13 > January next year).
+ * @param day - Day of month.
+ * @returns UTC Date at NZ midnight of that date.
+ */
+function nzMidnightUtc(year: number, month: number, day: number): Date {
+  const offset = getPacificAucklandOffset(year, month, day);
+  return new Date(Date.UTC(year, month - 1, day, -offset, 0, 0));
+}
 
 export const metadata: Metadata = {
   title: "Business - Admin",
@@ -142,8 +159,15 @@ export default async function BusinessPage({
   if (forceRefresh) await clearTaxCache();
 
   const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  // "This month" window on NZ midnight boundaries, not the server's UTC midnight
+  // (Vercel runs in UTC, 12-13h behind NZ), so entries dated the 1st are not
+  // dropped and the window flips to the new month at NZ midnight.
+  const [nzYear, nzMonth] = now
+    .toLocaleDateString("en-CA", { timeZone: "Pacific/Auckland" })
+    .split("-")
+    .map(Number);
+  const monthStart = nzMidnightUtc(nzYear, nzMonth, 1);
+  const monthEnd = nzMidnightUtc(nzYear, nzMonth + 1, 1);
 
   // Business start date (from identity settings) drives the FY list + "(partial)" label.
   const startDate = new Date((await getIdentity()).startDateIso);

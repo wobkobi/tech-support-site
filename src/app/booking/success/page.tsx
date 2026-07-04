@@ -6,6 +6,7 @@
 import { cancellationCopy } from "@/features/business/lib/pricing-policy";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { Button } from "@/shared/components/Button";
+import { CARD } from "@/shared/components/PageLayout";
 import { cn } from "@/shared/lib/cn";
 import { prisma } from "@/shared/lib/prisma";
 import type { Metadata } from "next";
@@ -19,8 +20,6 @@ export const metadata: Metadata = {
   title: "Booking request received",
   robots: { index: false, follow: false },
 };
-
-const CARD = "border-seasalt-400/60 bg-seasalt-800 rounded-xl border p-5 shadow-sm sm:p-6";
 
 /**
  * Renders the `**…**` emphasis convention from pricing-policy.ts copy
@@ -65,7 +64,7 @@ export default async function BookingSuccessPage({
   const { CANCELLATION } = await getPolicy();
 
   return (
-    <main className="relative min-h-dvh overflow-hidden">
+    <main id="main" className="relative min-h-dvh overflow-hidden">
       <BookingConversion />
       {/* Backdrop */}
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
@@ -94,7 +93,7 @@ export default async function BookingSuccessPage({
                 Booking confirmed!
               </h1>
 
-              <p className="mb-6 text-sm text-rich-black/80 sm:text-base">
+              <p className="mb-6 text-base text-rich-black/80 sm:text-lg">
                 Your appointment is confirmed. Check your email for the details and a Google
                 Calendar invite - if you don't see it within a few minutes, check your spam folder.
               </p>
@@ -130,7 +129,7 @@ export default async function BookingSuccessPage({
               <h2 className="mb-2 text-lg font-bold text-russian-violet sm:text-xl">
                 What happens next?
               </h2>
-              <ol className="list-inside list-decimal space-y-1 text-sm text-rich-black/80 sm:text-base">
+              <ol className="list-inside list-decimal space-y-1 text-base text-rich-black/80 sm:text-lg">
                 <li>A confirmation email has been sent to you with the appointment details</li>
                 <li>
                   A Google Calendar invite has been sent - accept it to add it to your calendar
@@ -149,7 +148,7 @@ export default async function BookingSuccessPage({
                   <h2 className="mb-1 text-base font-bold text-russian-violet sm:text-lg">
                     Rate locked in: {promoTitle}
                   </h2>
-                  <p className="text-sm text-rich-black/80 sm:text-base">
+                  <p className="text-base text-rich-black/80 sm:text-lg">
                     This rate applies to your appointment even if the offer ends before your visit.
                   </p>
                 </div>
@@ -160,7 +159,7 @@ export default async function BookingSuccessPage({
               <h2 className="mb-2 text-lg font-bold text-russian-violet sm:text-xl">
                 Cancellation policy
               </h2>
-              <p className="text-sm text-rich-black/80 sm:text-base">
+              <p className="text-base text-rich-black/80 sm:text-lg">
                 {renderEmphasised(cancellationCopy(CANCELLATION))}
               </p>
             </section>

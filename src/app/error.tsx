@@ -9,7 +9,7 @@ import { Button } from "@/shared/components/Button";
 import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FaArrowRotateRight, FaHouse } from "react-icons/fa6";
 
 const MESSAGES = [
@@ -43,6 +43,13 @@ export default function Error({
 }): React.ReactElement {
   const msg = (error?.message || "").trim().slice(0, 300) || "An unexpected error occurred.";
   const [quip] = useState(() => MESSAGES[Math.floor(Math.random() * MESSAGES.length)]);
+  // Client-render exceptions aren't redacted by Next, so their message/stack
+  // are only shown in development; production logs them to the console instead.
+  const showDetails = process.env.NODE_ENV !== "production";
+
+  useEffect(() => {
+    console.error("[error boundary]:", error);
+  }, [error]);
 
   return (
     <PageShell>
@@ -59,13 +66,15 @@ export default function Error({
 
             <p className="mb-6 text-base text-rich-black sm:text-lg md:text-xl">{quip}</p>
 
-            <p
-              className="mb-6 text-sm wrap-break-word text-rich-black/70 italic sm:text-base"
-              role="status"
-              aria-live="polite"
-            >
-              {msg}
-            </p>
+            {showDetails && (
+              <p
+                className="mb-6 text-sm wrap-break-word text-rich-black/70 italic sm:text-base"
+                role="status"
+                aria-live="polite"
+              >
+                {msg}
+              </p>
+            )}
 
             <div className="flex flex-wrap items-center justify-center gap-3">
               <Button type="button" onClick={reset} variant="primary">
@@ -78,14 +87,16 @@ export default function Error({
               </Button>
             </div>
 
-            <details className="mt-6 text-base text-rich-black/80">
-              <summary className="cursor-pointer font-semibold hover:text-russian-violet">
-                Technical details (for the curious)
-              </summary>
-              <pre className="mt-3 max-w-full overflow-auto rounded-lg border border-seasalt-400/60 bg-seasalt-900/60 p-4 text-left text-base">
-                {String(error?.stack || error)}
-              </pre>
-            </details>
+            {showDetails && (
+              <details className="mt-6 text-base text-rich-black/80">
+                <summary className="cursor-pointer font-semibold hover:text-russian-violet">
+                  Technical details (for the curious)
+                </summary>
+                <pre className="mt-3 max-w-full overflow-auto rounded-lg border border-seasalt-400/60 bg-seasalt-900/60 p-4 text-left text-base">
+                  {String(error?.stack || error)}
+                </pre>
+              </details>
+            )}
           </section>
         </div>
       </FrostedSection>

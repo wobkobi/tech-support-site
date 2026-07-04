@@ -133,7 +133,8 @@ export default async function InvoiceViewPage({
           </thead>
           <tbody>
             {invoice.lineItems.map((item, idx) => (
-              <tr key={idx} className={cn(idx % 2 === 1 ? "bg-slate-50" : "bg-white")}>
+              // No zebra striping - matches the generated PDF and the builder preview panel.
+              <tr key={idx}>
                 <td className="px-2 py-2 align-top wrap-break-word text-slate-700 sm:px-3">
                   {item.description}
                 </td>
