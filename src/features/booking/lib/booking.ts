@@ -498,6 +498,13 @@ export function validateBookingRequest(
     return { valid: false, error: "Invalid time slot" };
   }
 
+  // startMinute arrives raw from the JSON body; only accept an offset the
+  // operator actually offers so off-grid, fractional, or negative minutes
+  // can't slip past the window check below or land on a phantom slot key.
+  if (!Number.isInteger(startMinute) || !config.subSlotMinutes.includes(startMinute)) {
+    return { valid: false, error: "Invalid time slot" };
+  }
+
   const durationMinutes = duration === "short" ? config.durations.short : config.durations.long;
 
   // The job must start no earlier than open, finish by close, and not straddle
@@ -507,7 +514,7 @@ export function validateBookingRequest(
   const inBreak = window.break
     ? startMins < window.break.end * 60 && endMins > window.break.start * 60
     : false;
-  if (startHour < window.open || endMins > window.close * 60 || inBreak) {
+  if (startMins < window.open * 60 || endMins > window.close * 60 || inBreak) {
     return { valid: false, error: "That time isn't within the day's hours" };
   }
 
@@ -533,6 +540,23 @@ export function validateBookingRequest(
 
   if (!isSlotFree(slotStart, slotEnd, existingBookings, calendarEvents, config.bufferMin)) {
     return { valid: false, error: "This time slot is no longer available" };
+  }
+
+  // Enforce the operator's daily caps server-side too - the day grid applies
+  // them when rendering, but a stale page (loaded before the day filled) or a
+  // direct API caller could otherwise book past the limit. Mirrors the
+  // cap logic in buildAvailableDays; for edits the current booking is already
+  // excluded from existingBookings, so it doesn't count against itself.
+  const dayBookings = existingBookings.filter(
+    (b) => b.startAt.toLocaleDateString("en-CA", { timeZone: config.timeZone }) === dateKey,
+  );
+  const jobsCapHit = !!config.maxJobsPerDay && dayBookings.length >= config.maxJobsPerDay;
+  const hoursCapHit =
+    !!config.maxBillableHoursPerDay &&
+    dayBookings.reduce((sum, b) => sum + (b.endAt.getTime() - b.startAt.getTime()) / 60000, 0) >=
+      config.maxBillableHoursPerDay * 60;
+  if (jobsCapHit || hoursCapHit) {
+    return { valid: false, error: "That day is fully booked." };
   }
 
   return { valid: true };

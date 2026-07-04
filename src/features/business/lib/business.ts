@@ -133,7 +133,9 @@ export function nextInvoiceNumber(
   prefix: string = "TTP",
 ): string {
   if (!lastNumber) return `${prefix}-${yearCode}-0001`;
-  const match = lastNumber.match(/-(\d{4})$/);
+  // Match 4+ trailing digits so a 5-digit counter (10000+) still increments
+  // instead of silently restarting the sequence at 0001.
+  const match = lastNumber.match(/-(\d{4,})$/);
   if (!match) return `${prefix}-${yearCode}-0001`;
   const next = parseInt(match[1], 10) + 1;
   return `${prefix}-${yearCode}-${String(next).padStart(4, "0")}`;
@@ -476,8 +478,11 @@ export function jobToLineItems(
     const hours = billed / 60;
     const rate = job.hourlyRate.ratePerHour ?? 0;
     const lineTotal = Math.round(hours * rate * 100) / 100;
+    // Whole rates render as "$150/hr" (no trailing cents) to match the site's
+    // pricing copy; fractional rates keep their cents.
+    const rateLabel = Number.isInteger(rate) ? `$${rate}` : formatNZD(rate);
     items.push({
-      description: `Labour - ${minsToHoursLabel(billed)} @ ${formatNZD(rate)}/hr`,
+      description: `Labour - ${minsToHoursLabel(billed)} @ ${rateLabel}/hr`,
       qty: 1,
       unitPrice: lineTotal,
       lineTotal,
@@ -554,7 +559,7 @@ export interface JobPricing {
 }
 
 /**
- * Promo discount on a job's labor only (time charge + hourly tasks).
+ * Promo discount on a job's labour only (time charge + hourly tasks).
  * @param job - Job calculation.
  * @param promo - Active promo or null.
  * @param incrementMins - Billing increment (live pricing setting); defaults to the code const.
@@ -580,22 +585,22 @@ export function computeJobPromoDiscount(
   const timeHours = billed / 60;
   const timeCharge = Math.round(timeHours * (job.hourlyRate?.ratePerHour ?? 0) * 100) / 100;
 
-  const laborSubtotal = timeCharge + hourlyTasksTotal;
-  if (laborSubtotal <= 0) return 0;
+  const labourSubtotal = timeCharge + hourlyTasksTotal;
+  if (labourSubtotal <= 0) return 0;
 
   if (promo.flatHourlyRate !== null) {
-    // Only count hours that actually contributed to laborSubtotal. When the
+    // Only count hours that actually contributed to labourSubtotal. When the
     // top-level rate is null, timeHours is "phantom" duration with no charge
     // behind it - including it inflates promoTotal and zeros the discount.
     const billedTimeHours = timeCharge > 0 ? timeHours : 0;
     const totalHours = billedTimeHours + hourlyTasksHours;
     const promoTotal = totalHours * promo.flatHourlyRate;
-    const discount = laborSubtotal - promoTotal;
+    const discount = labourSubtotal - promoTotal;
     return discount > 0 ? Math.round(discount * 100) / 100 : 0;
   }
   if (promo.percentDiscount !== null) {
     const pct = Math.max(0, Math.min(1, promo.percentDiscount));
-    return Math.round(laborSubtotal * pct * 100) / 100;
+    return Math.round(labourSubtotal * pct * 100) / 100;
   }
   return 0;
 }
@@ -699,7 +704,13 @@ export function calcJobTotal(
     unsuccessfulDiscount = Math.round(flaggedTasksTotal * 0.5 * 100) / 100;
   }
   // GST applied to the discounted amount per NZ IRD price-reduction treatment.
-  const taxableAmount = Math.round((subtotal - promoDiscount - unsuccessfulDiscount) * 100) / 100;
+  // Clamp at 0 (matching calcInvoiceTotals) so stacked promo + unsuccessful
+  // discounts can never drive the total negative and disagree with the persisted
+  // invoice, which the server floors to 0.
+  const taxableAmount = Math.max(
+    0,
+    Math.round((subtotal - promoDiscount - unsuccessfulDiscount) * 100) / 100,
+  );
   const gstAmount = pricing.gstRegistered ? calcGstFromInclusive(taxableAmount, GST_RATE) : 0;
   return {
     timeCharge,
@@ -717,7 +728,10 @@ export function calcJobTotal(
 
 /**
  * Advances a subscription's next due date by its frequency.
- * Uses UTC date methods to avoid DST issues.
+ * Uses UTC date methods to avoid DST issues. Month/year steps clamp to the last
+ * day of the target month when the source day doesn't exist there (e.g. 31 Jan
+ * monthly lands on 28/29 Feb, not 3 Mar), so a short target month can't roll the
+ * due date into the following month.
  * @param current - Current nextDue date
  * @param frequency - Billing frequency
  * @returns New nextDue date
@@ -732,16 +746,32 @@ export function advanceNextDue(current: Date, frequency: string): Date {
       d.setUTCDate(d.getUTCDate() + 14);
       break;
     case "monthly":
-      d.setUTCMonth(d.getUTCMonth() + 1);
+      addUTCMonthsClamped(d, 1);
       break;
     case "quarterly":
-      d.setUTCMonth(d.getUTCMonth() + 3);
+      addUTCMonthsClamped(d, 3);
       break;
     case "annually":
-      d.setUTCFullYear(d.getUTCFullYear() + 1);
+      addUTCMonthsClamped(d, 12);
       break;
   }
   return d;
+}
+
+/**
+ * Adds whole months to a date in UTC, clamping the day to the last valid day of
+ * the target month instead of letting {@link Date.setUTCMonth} overflow into the
+ * next month. Mutates `d` in place.
+ * @param d - Date to advance (mutated).
+ * @param months - Whole months to add.
+ */
+function addUTCMonthsClamped(d: Date, months: number): void {
+  const day = d.getUTCDate();
+  d.setUTCDate(1);
+  d.setUTCMonth(d.getUTCMonth() + months);
+  // Last day of the now-current month; clamp the original day down to it.
+  const lastDay = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+  d.setUTCDate(Math.min(day, lastDay));
 }
 
 /**

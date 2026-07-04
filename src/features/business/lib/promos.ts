@@ -148,31 +148,6 @@ export function applyPromoToHourlyRate(rate: number, promo: ActivePromo | null):
 }
 
 /**
- * Dollar discount to subtract from a labor subtotal for the active promo.
- * @param laborSubtotal - Time charge + hourly task totals.
- * @param laborHours - Billable labor hours (for flat-rate math).
- * @param promo - Active promo or null.
- * @returns Dollar discount.
- */
-export function computePromoDiscount(
-  laborSubtotal: number,
-  laborHours: number,
-  promo: ActivePromo | null,
-): number {
-  if (!promo || laborSubtotal <= 0) return 0;
-  if (promo.flatHourlyRate !== null) {
-    const promoTotal = laborHours * promo.flatHourlyRate;
-    const discount = laborSubtotal - promoTotal;
-    return discount > 0 ? Math.round(discount * 100) / 100 : 0;
-  }
-  if (promo.percentDiscount !== null) {
-    const pct = Math.max(0, Math.min(1, promo.percentDiscount));
-    return Math.round(laborSubtotal * pct * 100) / 100;
-  }
-  return 0;
-}
-
-/**
  * Friendly end-date phrase: "this Saturday" within a week, "Sat 16 May" beyond.
  * @param endIso - Promo `endAt` ISO timestamp.
  * @param now - Reference time (injected for tests).
@@ -182,9 +157,13 @@ function formatPromoEnd(endIso: string, now: Date = new Date()): string {
   const end = new Date(endIso);
   const diffDays = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
-  // Within a week: anchor on weekday ("I have until Friday").
+  // Within a week: anchor on weekday ("I have until Friday"). Pin to NZ time so
+  // a promo ending between NZ midnight and noon isn't labelled the prior day.
   if (diffDays <= 7 && diffDays > 0) {
-    const weekday = new Intl.DateTimeFormat("en-NZ", { weekday: "long" }).format(end);
+    const weekday = new Intl.DateTimeFormat("en-NZ", {
+      timeZone: "Pacific/Auckland",
+      weekday: "long",
+    }).format(end);
     return `this ${weekday}`;
   }
 

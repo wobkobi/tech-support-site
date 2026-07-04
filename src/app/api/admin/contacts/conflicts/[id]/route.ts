@@ -42,16 +42,10 @@ export async function POST(
   const customValue = typeof body.customValue === "string" ? body.customValue : null;
 
   if (winner !== "site" && winner !== "google" && winner !== "custom") {
-    return NextResponse.json(
-      { error: "winner must be 'site' | 'google' | 'custom'" },
-      { status: 400 },
-    );
+    return errorResponse("winner must be 'site' | 'google' | 'custom'", 400);
   }
   if (winner === "custom" && !customValue) {
-    return NextResponse.json(
-      { error: "customValue is required when winner is 'custom'" },
-      { status: 400 },
-    );
+    return errorResponse("customValue is required when winner is 'custom'", 400);
   }
 
   const conflict = await prisma.contactConflict.findUnique({ where: { id } });
@@ -70,6 +64,12 @@ export async function POST(
   // Write the chosen value to the site contact. conflict.field is the
   // ContactField enum so name/email/address are the only possible values.
   const field = conflict.field;
+
+  // Contact.name is a required column, so a null/blank chosen value for the name
+  // field would make Prisma throw and leave the conflict permanently unresolvable.
+  if (field === "name" && !chosenValue?.trim()) {
+    return errorResponse("A name value is required to resolve this conflict.", 400);
+  }
 
   try {
     await prisma.contact.update({

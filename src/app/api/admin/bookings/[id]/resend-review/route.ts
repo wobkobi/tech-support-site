@@ -15,9 +15,9 @@ export const maxDuration = 60;
 /**
  * POST /api/admin/bookings/[id]/resend-review
  * Sends (or resends) the review request email for a booking, bypassing the
- * reviewSentAt guard used by the cron. Updates reviewSentAt after the call.
- * Requires X-Admin-Secret header. {@link sendCustomerReviewRequest} never throws,
- * so reviewSentAt is always updated regardless of Resend delivery status.
+ * reviewSentAt guard used by the cron. Stamps reviewSentAt only when the send
+ * succeeds; a booking with no email is rejected with 400.
+ * Requires X-Admin-Secret header.
  * @param request - Incoming request.
  * @param params - Route params.
  * @param params.params - Destructured route params containing booking id.
@@ -41,8 +41,17 @@ export async function POST(
   if (!booking) {
     return errorResponse("Booking not found.", 404);
   }
+  if (!booking.email) {
+    return errorResponse("Booking has no email to send a review request to.", 400);
+  }
 
-  await sendCustomerReviewRequest(booking);
+  // sendCustomerReviewRequest returns false on a Resend failure rather than
+  // throwing; only stamp reviewSentAt when the send actually went out so a failed
+  // send stays retryable.
+  const sent = await sendCustomerReviewRequest(booking);
+  if (!sent) {
+    return errorResponse("Failed to send review request.", 502);
+  }
 
   await prisma.booking.update({
     where: { id },

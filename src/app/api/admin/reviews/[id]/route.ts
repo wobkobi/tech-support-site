@@ -29,19 +29,35 @@ export async function PATCH(
     return errorResponse("Unauthorized", 401);
   }
 
-  const body = (await request.json()) as {
+  const body = (await request.json().catch(() => null)) as {
     action?: string;
     contactId?: string | null;
-  };
+  } | null;
+  if (!body) {
+    return errorResponse("Invalid request body.", 400);
+  }
 
   // Contact-link flow.
   if ("contactId" in body) {
     const { id } = await params;
+    const newContactId = body.contactId ?? null;
 
     try {
+      // MongoDB has no FK enforcement, so a bad contactId would silently orphan
+      // the review (contact-scoped views drop it and matchReviewsToContacts only
+      // re-homes contactId==null rows). Require a live contact when linking.
+      if (newContactId) {
+        const target = await prisma.contact.findFirst({
+          where: { id: newContactId, deletedAt: null },
+          select: { id: true },
+        });
+        if (!target) {
+          return errorResponse("Contact not found.", 404);
+        }
+      }
       await prisma.review.update({
         where: { id },
-        data: { contactId: body.contactId ?? null },
+        data: { contactId: newContactId },
       });
       return NextResponse.json({ ok: true });
     } catch (error) {

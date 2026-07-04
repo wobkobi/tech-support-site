@@ -46,6 +46,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     };
     const { name, email, phone, mode = "email" } = body;
 
+    if (mode !== "email" && mode !== "sms") {
+      return errorResponse("mode must be 'email' or 'sms'.", 400);
+    }
     if (!name?.trim()) {
       return errorResponse("Name is required.", 400);
     }
@@ -111,7 +114,26 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ ok: true, reviewUrl, copyOnly: true });
     }
 
-    // Email path: stamp the send state and send the email.
+    // Email path: send first, then stamp the send-state only on a successful
+    // send. Stamping before the send would mark the customer as "review
+    // requested" even on a Resend failure, so every retry short-circuits at the
+    // dedup guard above without ever re-sending.
+    const sent = await sendPastClientReviewRequest({
+      id: contact.id,
+      name: name.trim(),
+      email: normalisedEmail!,
+      reviewToken,
+    });
+
+    if (!sent) {
+      // Persist the token so a retry reuses the same link, but leave the
+      // send-state unstamped so the retry actually re-sends.
+      if (!contact.reviewToken) {
+        await prisma.contact.update({ where: { id: contact.id }, data: { reviewToken } });
+      }
+      return errorResponse("Failed to send review link.", 502);
+    }
+
     await prisma.contact.update({
       where: { id: contact.id },
       data: {
@@ -119,13 +141,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         reviewLinkSentAt: new Date(),
         reviewLinkSentMode: ReviewLinkMode.email,
       },
-    });
-
-    await sendPastClientReviewRequest({
-      id: contact.id,
-      name: name.trim(),
-      email: normalisedEmail!,
-      reviewToken,
     });
 
     return NextResponse.json({ ok: true, reviewUrl });

@@ -38,25 +38,50 @@ export async function PATCH(
     isActive: boolean;
   }>;
 
-  try {
-    const promo = await prisma.promo.update({
-      where: { id },
-      data: {
-        ...(body.title !== undefined && { title: body.title }),
-        ...(body.description !== undefined && { description: body.description }),
-        ...(body.startAt !== undefined && { startAt: new Date(body.startAt) }),
-        ...(body.endAt !== undefined && { endAt: new Date(body.endAt) }),
-        ...(body.flatHourlyRate !== undefined && { flatHourlyRate: body.flatHourlyRate }),
-        ...(body.percentDiscount !== undefined && { percentDiscount: body.percentDiscount }),
-        ...(body.isActive !== undefined && { isActive: body.isActive }),
-      },
-    });
-    // Next 16's revalidateTag now requires a profile arg.
-    revalidateTag(ACTIVE_PROMO_TAG, "default");
-    return NextResponse.json({ ok: true, promo });
-  } catch {
+  const existing = await prisma.promo.findUnique({ where: { id } });
+  if (!existing) {
     return errorResponse("Promo not found", 404);
   }
+
+  // Merge the patched fields over the current row and re-validate before writing,
+  // mirroring POST's validatePromo. A sparse PATCH could otherwise leave the promo
+  // in a state POST would reject - both discount fields set, percentDiscount out of
+  // range, or endAt before startAt - which then flows straight into public pricing
+  // ("500% off", $0/hr).
+  const startAt = body.startAt !== undefined ? new Date(body.startAt) : existing.startAt;
+  const endAt = body.endAt !== undefined ? new Date(body.endAt) : existing.endAt;
+  const flatHourlyRate =
+    body.flatHourlyRate !== undefined ? body.flatHourlyRate : existing.flatHourlyRate;
+  const percentDiscount =
+    body.percentDiscount !== undefined ? body.percentDiscount : existing.percentDiscount;
+
+  if (startAt >= endAt) {
+    return errorResponse("startAt must be before endAt", 400);
+  }
+  const hasFlat = typeof flatHourlyRate === "number" && flatHourlyRate > 0;
+  const hasPct = typeof percentDiscount === "number" && percentDiscount > 0;
+  if (hasFlat === hasPct) {
+    return errorResponse("exactly one of flatHourlyRate or percentDiscount must be set", 400);
+  }
+  if (hasPct && (percentDiscount! <= 0 || percentDiscount! >= 1)) {
+    return errorResponse("percentDiscount must be between 0 and 1 (e.g. 0.20 for 20%)", 400);
+  }
+
+  const promo = await prisma.promo.update({
+    where: { id },
+    data: {
+      ...(body.title !== undefined && { title: body.title }),
+      ...(body.description !== undefined && { description: body.description }),
+      ...(body.startAt !== undefined && { startAt }),
+      ...(body.endAt !== undefined && { endAt }),
+      ...(body.flatHourlyRate !== undefined && { flatHourlyRate: body.flatHourlyRate }),
+      ...(body.percentDiscount !== undefined && { percentDiscount: body.percentDiscount }),
+      ...(body.isActive !== undefined && { isActive: body.isActive }),
+    },
+  });
+  // Next 16's revalidateTag requires a second CacheLifeConfig arg.
+  revalidateTag(ACTIVE_PROMO_TAG, {});
+  return NextResponse.json({ ok: true, promo });
 }
 
 /**
@@ -76,8 +101,8 @@ export async function DELETE(
   const { id } = await params;
   try {
     await prisma.promo.delete({ where: { id } });
-    // Next 16's revalidateTag now requires a profile arg.
-    revalidateTag(ACTIVE_PROMO_TAG, "default");
+    // Next 16's revalidateTag requires a second CacheLifeConfig arg.
+    revalidateTag(ACTIVE_PROMO_TAG, {});
     return NextResponse.json({ ok: true });
   } catch {
     return errorResponse("Promo not found", 404);

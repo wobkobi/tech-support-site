@@ -3,7 +3,7 @@
  * @description Google Calendar API integration - multi-calendar without list permission.
  */
 
-import { google } from "googleapis";
+import { google, type calendar_v3 } from "googleapis";
 import { unstable_cache } from "next/cache";
 
 import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
@@ -227,15 +227,26 @@ export async function fetchAllCalendarEvents(
   // Fetch events from each calendar ID
   for (const calendarId of calendarIds) {
     try {
-      const response = await calendar.events.list({
-        calendarId,
-        timeMin: startDate.toISOString(),
-        timeMax: endDate.toISOString(),
-        singleEvents: true,
-        orderBy: "startTime",
-      });
-
-      const events = response.data.items || [];
+      // Page through the calendar: events.list caps a page at 2500 (default 250)
+      // and returns nextPageToken when truncated. Without the loop a busy
+      // calendar (recurring series expanded by singleEvents over the booking
+      // horizon) would silently drop events past the first page, leaving those
+      // times treated as free.
+      const events: calendar_v3.Schema$Event[] = [];
+      let pageToken: string | undefined;
+      do {
+        const response = await calendar.events.list({
+          calendarId,
+          timeMin: startDate.toISOString(),
+          timeMax: endDate.toISOString(),
+          singleEvents: true,
+          orderBy: "startTime",
+          maxResults: 2500,
+          pageToken,
+        });
+        events.push(...(response.data.items ?? []));
+        pageToken = response.data.nextPageToken ?? undefined;
+      } while (pageToken);
       const isPersonal = Boolean(personalCalendarId) && calendarId === personalCalendarId;
       const processedEvents: CalendarEvent[] = [];
 
@@ -303,41 +314,6 @@ export async function fetchAllCalendarEvents(
     `[calendar] Total: ${allEvents.length} events across ${calendarIds.length} calendars`,
   );
   return allEvents;
-}
-
-/**
- * Creates a travel time blocking event in the booking calendar.
- * Unlike booking events, travel blocks have no attendees and send no notifications.
- * @param params - Event parameters.
- * @param params.summary - Event title (e.g. "Travel to: Dentist").
- * @param params.startAt - Block start time.
- * @param params.endAt - Block end time.
- * @param params.timeZone - Timezone for display.
- * @returns Created event ID.
- */
-export async function createTravelBlockEvent(params: {
-  summary: string;
-  startAt: Date;
-  endAt: Date;
-  timeZone: string;
-}): Promise<{ eventId: string }> {
-  const calendar = getCalendarClient();
-
-  const response = await calendar.events.insert({
-    calendarId: getBookingCalendarId(),
-    requestBody: {
-      summary: params.summary,
-      start: { dateTime: params.startAt.toISOString(), timeZone: params.timeZone },
-      end: { dateTime: params.endAt.toISOString(), timeZone: params.timeZone },
-    },
-    sendUpdates: "none",
-  });
-
-  if (!response.data.id) {
-    throw new Error("Failed to create travel block event - no event ID returned");
-  }
-
-  return { eventId: response.data.id };
 }
 
 /**

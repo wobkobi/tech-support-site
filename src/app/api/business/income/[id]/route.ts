@@ -19,6 +19,9 @@ import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
+// Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
+export const maxDuration = 60;
+
 /**
  * PUT /api/business/income/[id] - Updates an income entry and its sheet row.
  * @param request - Incoming Next.js request with updated entry data in body
@@ -68,6 +71,7 @@ export async function PUT(
   // different FY workbook, append to the new sheet BEFORE deleting the old row
   // so a failure can't strand the entry off-sheet; otherwise update in place.
   let sheetRowKey = existing.sheetRowKey;
+  let sheetSyncWarning = false;
   try {
     const newSheetId = await resolveSheetIdForDate(updated.date);
     const oldSheetId = await resolveSheetIdForDate(existing.date);
@@ -107,9 +111,13 @@ export async function PUT(
   } catch (err) {
     console.error(`[income] Failed to update sheet row for entry ${id}:`, err);
     sheetRowKey = existing.sheetRowKey;
+    // Signal the write-through failure so the admin knows the sheet (source of
+    // truth) still holds the old values; the sheet-wins cron would otherwise
+    // revert this DB edit on its next run with no visible warning.
+    sheetSyncWarning = true;
   }
 
-  return NextResponse.json({ ok: true, entry: { ...updated, sheetRowKey } });
+  return NextResponse.json({ ok: true, entry: { ...updated, sheetRowKey }, sheetSyncWarning });
 }
 
 /**

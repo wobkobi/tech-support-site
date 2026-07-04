@@ -64,23 +64,33 @@ export async function PATCH(
     safeRate = parsed;
   }
 
-  const subscription = await prisma.subscription.update({
-    where: { id },
-    data: {
-      ...(description !== undefined && { description }),
-      ...(supplier !== undefined && { supplier }),
-      ...(category !== undefined && { category }),
-      ...(safeAmount !== undefined && { amountIncl: safeAmount }),
-      ...(safeRate !== undefined && { gstRate: safeRate }),
-      ...(method !== undefined && { method }),
-      ...(frequency !== undefined && { frequency }),
-      ...(nextDue !== undefined && { nextDue: new Date(nextDue) }),
-      ...(isActive !== undefined && { isActive }),
-      ...(notes !== undefined && { notes }),
-    },
-  });
+  // Reject an unparseable nextDue before it reaches Prisma as an Invalid Date
+  // (which would surface as a 500 rather than a clean 400).
+  if (nextDue !== undefined && Number.isNaN(new Date(nextDue).getTime())) {
+    return errorResponse("Invalid nextDue date", 400);
+  }
 
-  return NextResponse.json({ ok: true, subscription });
+  try {
+    const subscription = await prisma.subscription.update({
+      where: { id },
+      data: {
+        ...(description !== undefined && { description }),
+        ...(supplier !== undefined && { supplier }),
+        ...(category !== undefined && { category }),
+        ...(safeAmount !== undefined && { amountIncl: safeAmount }),
+        ...(safeRate !== undefined && { gstRate: safeRate }),
+        ...(method !== undefined && { method }),
+        ...(frequency !== undefined && { frequency }),
+        ...(nextDue !== undefined && { nextDue: new Date(nextDue) }),
+        ...(isActive !== undefined && { isActive }),
+        ...(notes !== undefined && { notes }),
+      },
+    });
+    return NextResponse.json({ ok: true, subscription });
+  } catch {
+    // Missing/stale id (Prisma P2025) - match the 404 the other [id] routes return.
+    return errorResponse("Subscription not found", 404);
+  }
 }
 
 /**
@@ -99,6 +109,11 @@ export async function DELETE(
   }
 
   const { id } = await params;
-  await prisma.subscription.delete({ where: { id } });
-  return NextResponse.json({ ok: true });
+  try {
+    await prisma.subscription.delete({ where: { id } });
+    return NextResponse.json({ ok: true });
+  } catch {
+    // Missing/stale id (Prisma P2025) - match the 404 the other [id] routes return.
+    return errorResponse("Subscription not found", 404);
+  }
 }

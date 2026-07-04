@@ -15,11 +15,15 @@ import {
 } from "@/features/business/lib/invoice-numbering";
 import { extractYearCode, generateInvoicePdf } from "@/features/business/lib/invoice-pdf";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
+import { parseAmount } from "@/features/business/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
+
+// Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
+export const maxDuration = 60;
 
 /**
  * GET /api/business/invoices - Returns all invoices ordered by creation date descending.
@@ -93,11 +97,24 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     ? new Date(dueDate)
     : new Date(Date.now() + identity.paymentTermsDays * 24 * 60 * 60 * 1000);
 
+  // Validate the optional discount snapshots through the shared money parser so
+  // a non-finite or absurd magnitude (e.g. Infinity, 1e12) can't reach the
+  // persisted promoDiscount / unsuccessfulDiscount fields and print on the PDF.
+  let discount = 0;
+  if (promoDiscount != null) {
+    const parsed = parseAmount(promoDiscount);
+    if (parsed === null) return errorResponse("Invalid promo discount", 400);
+    discount = parsed;
+  }
+  let unsuccessfulDiscountValue = 0;
+  if (unsuccessfulDiscount != null) {
+    const parsed = parseAmount(unsuccessfulDiscount);
+    if (parsed === null) return errorResponse("Invalid unsuccessful-work discount", 400);
+    unsuccessfulDiscountValue = parsed;
+  }
+
   // Allocate the invoice number
   const { number, sheetNextCount, sheetSyncWarning } = await getNextInvoiceNumber();
-  const discount = typeof promoDiscount === "number" && promoDiscount > 0 ? promoDiscount : 0;
-  const unsuccessfulDiscountValue =
-    typeof unsuccessfulDiscount === "number" && unsuccessfulDiscount > 0 ? unsuccessfulDiscount : 0;
   // GST mode is driven by the live pricing settings (gstRegistered); the
   // request body does not carry gst. Promo + unsuccessful both reduce the
   // taxable amount before GST (per IRD treatment of price reductions); they
@@ -126,10 +143,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       promoTitle: discount > 0 && promoTitle ? promoTitle : null,
       promoDiscount: discount > 0 ? discount : null,
       unsuccessful: unsuccessful === true,
-      unsuccessfulDiscount:
-        typeof unsuccessfulDiscount === "number" && unsuccessfulDiscount > 0
-          ? unsuccessfulDiscount
-          : null,
+      unsuccessfulDiscount: unsuccessfulDiscountValue > 0 ? unsuccessfulDiscountValue : null,
       notes: notes ?? null,
       contactId: contactId ?? null,
     },
@@ -139,26 +153,29 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // so the just-saved invoice isn't compromised by a transient Sheets hiccup.
   await writeBackInvoiceCounter(sheetNextCount);
 
-  // Fire-and-forget: generate PDF and upload to Drive, then store the Drive URL
-  void (async () => {
-    try {
-      const pdfBuffer = await generateInvoicePdf({
-        ...invoice,
-        issueDate: invoice.issueDate.toISOString(),
-        dueDate: invoice.dueDate.toISOString(),
-        createdAt: invoice.createdAt.toISOString(),
-        updatedAt: invoice.updatedAt.toISOString(),
-      });
-      const yearCode = extractYearCode(invoice.number);
-      const { fileId, webUrl } = await uploadInvoicePdf(pdfBuffer, invoice.number, yearCode);
-      await prisma.invoice.update({
-        where: { id: invoice.id },
-        data: { driveFileId: fileId, driveWebUrl: webUrl },
-      });
-    } catch (err) {
-      console.error("[invoices] Drive PDF upload failed:", err);
-    }
-  })();
+  // Generate the PDF and upload to Drive, then store the Drive URL. Awaited (not
+  // fire-and-forget) so it completes before the response: Vercel freezes the
+  // function instance once the response is sent, so a detached promise may never
+  // run, leaving driveFileId / driveWebUrl null. maxDuration is raised above so
+  // the extra Google round-trips can't 504. Failures are logged and swallowed so
+  // a Drive hiccup never blocks invoice creation - sync-drive backfills later.
+  try {
+    const pdfBuffer = await generateInvoicePdf({
+      ...invoice,
+      issueDate: invoice.issueDate.toISOString(),
+      dueDate: invoice.dueDate.toISOString(),
+      createdAt: invoice.createdAt.toISOString(),
+      updatedAt: invoice.updatedAt.toISOString(),
+    });
+    const yearCode = extractYearCode(invoice.number);
+    const { fileId, webUrl } = await uploadInvoicePdf(pdfBuffer, invoice.number, yearCode);
+    await prisma.invoice.update({
+      where: { id: invoice.id },
+      data: { driveFileId: fileId, driveWebUrl: webUrl },
+    });
+  } catch (err) {
+    console.error("[invoices] Drive PDF upload failed:", err);
+  }
 
   return NextResponse.json({ ok: true, invoice, sheetSyncWarning }, { status: 201 });
 }

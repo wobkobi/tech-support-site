@@ -13,12 +13,19 @@ import { NextRequest, NextResponse } from "next/server";
 export const maxDuration = 60;
 
 /**
- * Escapes a value for CSV: wraps in double quotes and escapes inner quotes.
+ * Escapes a value for CSV: guards against formula injection, wraps in double
+ * quotes, and escapes inner quotes.
  * @param value - The string to escape.
  * @returns CSV-safe string.
  */
 function csvCell(value: string | null | undefined): string {
-  const str = value ?? "";
+  let str = value ?? "";
+  // Formula-injection guard: a leading =, +, -, or @ makes a spreadsheet app run
+  // the cell as a formula, and contact names/addresses originate from the public
+  // booking form. Prefix with a single quote so the value stays plain text.
+  if (/^[=+\-@]/.test(str)) {
+    str = `'${str}`;
+  }
   return `"${str.replace(/"/g, '""')}"`;
 }
 
@@ -52,10 +59,38 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const contacts = await prisma.contact.findMany({
     where: { deletedAt: null },
     orderBy: { name: "asc" },
-    select: { name: true, email: true, phone: true, address: true },
+    select: {
+      name: true,
+      email: true,
+      phone: true,
+      address: true,
+      altEmails: true,
+      altPhones: true,
+    },
   });
 
-  // Build the header row
+  // Flatten each contact's primary + alt values so the merged multi-email /
+  // multi-phone data survives an export/import round-trip. Google's CSV format
+  // carries alternates as repeated "E-mail N" / "Phone N" columns.
+  const emailLists = contacts.map((c) =>
+    [c.email, ...c.altEmails].filter((v): v is string => Boolean(v)),
+  );
+  const phoneLists = contacts.map((c) =>
+    [c.phone, ...c.altPhones].filter((v): v is string => Boolean(v)),
+  );
+  const maxEmails = Math.max(1, ...emailLists.map((l) => l.length));
+  const maxPhones = Math.max(1, ...phoneLists.map((l) => l.length));
+
+  // Build the header row - email/phone column counts grow to fit the contact
+  // with the most values.
+  const emailHeaders: string[] = [];
+  for (let i = 1; i <= maxEmails; i++) {
+    emailHeaders.push(`E-mail ${i} - Label`, `E-mail ${i} - Value`);
+  }
+  const phoneHeaders: string[] = [];
+  for (let i = 1; i <= maxPhones; i++) {
+    phoneHeaders.push(`Phone ${i} - Label`, `Phone ${i} - Value`);
+  }
   const headers = [
     "First Name",
     "Middle Name",
@@ -74,10 +109,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     "Notes",
     "Photo",
     "Labels",
-    "E-mail 1 - Label",
-    "E-mail 1 - Value",
-    "Phone 1 - Label",
-    "Phone 1 - Value",
+    ...emailHeaders,
+    ...phoneHeaders,
     "Address 1 - Label",
     "Address 1 - Formatted",
     "Address 1 - Street",
@@ -90,8 +123,23 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   ];
 
   // Build one row per contact
-  const rows = contacts.map((c) => {
+  const rows = contacts.map((c, idx) => {
     const { first, last } = splitName(c.name);
+    const emails = emailLists[idx];
+    const phones = phoneLists[idx];
+
+    // Emit a Label/Value pair per email slot; only the first (primary) carries
+    // the "* " primary marker, alternates get a blank label.
+    const emailCells: string[] = [];
+    for (let i = 0; i < maxEmails; i++) {
+      const value = emails[i] ?? "";
+      emailCells.push(csvCell(value && i === 0 ? "* " : ""), csvCell(value));
+    }
+    const phoneCells: string[] = [];
+    for (let i = 0; i < maxPhones; i++) {
+      phoneCells.push(csvCell(""), csvCell(phones[i] ?? ""));
+    }
+
     return [
       csvCell(first), // First Name
       csvCell(""), // Middle Name
@@ -110,10 +158,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       csvCell(""), // Notes
       csvCell(""), // Photo
       csvCell("* myContacts"), // Labels - places contact in the My Contacts group
-      csvCell(c.email ? "* " : ""), // E-mail 1 - Label (* = primary)
-      csvCell(c.email), // E-mail 1 - Value
-      csvCell(""), // Phone 1 - Label
-      csvCell(c.phone), // Phone 1 - Value
+      ...emailCells,
+      ...phoneCells,
       csvCell(""), // Address 1 - Label
       csvCell(c.address), // Address 1 - Formatted
       csvCell(""), // Address 1 - Street

@@ -83,7 +83,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     },
   });
 
-  // Next 16's revalidateTag now requires a profile arg.
-  revalidateTag(ACTIVE_PROMO_TAG, "default");
+  // Next 16's revalidateTag requires a second CacheLifeConfig arg.
+  revalidateTag(ACTIVE_PROMO_TAG, {});
   return NextResponse.json({ ok: true, promo }, { status: 201 });
 }

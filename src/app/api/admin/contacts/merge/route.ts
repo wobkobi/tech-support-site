@@ -36,7 +36,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return errorResponse("Unauthorized", 401);
   }
 
-  const { primaryId, secondaryId } = (await request.json()) as MergeBody;
+  const body = (await request.json().catch(() => null)) as MergeBody | null;
+  if (!body) {
+    return errorResponse("Invalid request body.", 400);
+  }
+  const { primaryId, secondaryId } = body;
   if (!primaryId || !secondaryId) {
     return errorResponse("Both primaryId and secondaryId are required.", 400);
   }
@@ -44,9 +48,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return errorResponse("Cannot merge a contact into itself.", 400);
   }
 
+  // Both sides must be live. Merging into a soft-deleted primary (dedupe self-heal
+  // or another tab deleted it between load and click) would move the secondary's
+  // reviews onto a hidden contact where matchReviewsToContacts can never resurface
+  // them.
   const [primary, secondary] = await Promise.all([
-    prisma.contact.findUnique({ where: { id: primaryId } }),
-    prisma.contact.findUnique({ where: { id: secondaryId } }),
+    prisma.contact.findFirst({ where: { id: primaryId, deletedAt: null } }),
+    prisma.contact.findFirst({ where: { id: secondaryId, deletedAt: null } }),
   ]);
   if (!primary || !secondary) {
     return errorResponse("Contact not found.", 404);

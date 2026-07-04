@@ -1,7 +1,8 @@
 // src/features/business/lib/google-retry.ts
 // Retry wrapper for googleapis calls. Transient failures (rate limits, 5xx,
-// connection resets) are retried with exponential backoff and full jitter;
-// permanent errors (bad range, auth, protected range) are rethrown immediately.
+// connection resets) are retried with exponential backoff plus a small additive
+// jitter; permanent errors (bad range, auth, protected range) are rethrown
+// immediately.
 
 /** HTTP statuses worth retrying: rate limit + server-side hiccups. */
 const TRANSIENT_STATUSES = new Set([429, 500, 502, 503, 504]);
@@ -69,7 +70,7 @@ function retryAfterMs(err: unknown): number | null {
 
 /**
  * Runs a googleapis call, retrying transient failures with exponential backoff
- * plus full jitter. Honours Retry-After on 429s. Wrap the individual API call,
+ * plus a small additive jitter. Honours Retry-After on 429s. Wrap the individual API call,
  * not a multi-step function, so a retry re-issues only the failed request.
  * @param fn - Thunk performing one API call.
  * @param opts - Retry tuning; see {@link RetryOpts}.

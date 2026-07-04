@@ -30,8 +30,13 @@ export async function PATCH(
   const body = await request.json();
   const { label, ratePerHour, flatRate, hourlyDelta, percentDelta, unit, isDefault } = body;
 
-  if (isDefault) {
-    await prisma.rateConfig.updateMany({ data: { isDefault: false } });
+  // Reject non-finite numerics before they reach Prisma (NaN from an empty form
+  // field, Infinity from a crafted body) - these values feed the public
+  // estimator and the AI calculator, so a bad rate must never persist.
+  for (const [key, val] of Object.entries({ ratePerHour, flatRate, hourlyDelta, percentDelta })) {
+    if (val !== undefined && val !== null && !Number.isFinite(val)) {
+      return errorResponse(`Invalid ${key}`, 400);
+    }
   }
 
   try {
@@ -47,6 +52,15 @@ export async function PATCH(
         ...(isDefault !== undefined && { isDefault }),
       },
     });
+    // Clear the default flag on the other rows only after the target update
+    // succeeds - a stale or deleted id must not wipe every default and then
+    // 404, leaving zero default rates for the public estimator to fall through.
+    if (isDefault) {
+      await prisma.rateConfig.updateMany({
+        where: { id: { not: id } },
+        data: { isDefault: false },
+      });
+    }
     return NextResponse.json({ ok: true, rate });
   } catch {
     return errorResponse("Rate not found", 404);

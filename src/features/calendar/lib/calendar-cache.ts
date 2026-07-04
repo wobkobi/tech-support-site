@@ -622,7 +622,9 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
       console.log(`[travel] Travel-to result: ${rawTravelToMinutes ?? "null (skipping)"} min`);
       console.log(`[travel] Travel-back result: ${rawTravelBackMinutes ?? "null (skipping)"} min`);
       if (chained) {
-        console.log(`[travel] Home->next result: ${rawHomeToNextMinutes ?? "null (skipping)"} min`);
+        console.log(
+          `[travel] Home → next result: ${rawHomeToNextMinutes ?? "null (skipping)"} min`,
+        );
       }
     }
 

@@ -4,6 +4,7 @@
  * Tailwind palette so the PDF reads as the same document as the on-screen
  * InvoicePreviewPanel; keep the two layouts in sync.
  */
+import { formatNZD } from "@/features/business/lib/business";
 import type { Invoice } from "@/features/business/types/business";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { formatDateShort } from "@/shared/lib/date-format";
@@ -43,15 +44,6 @@ interface LogoPath {
   fill: string;
   d: string;
   ty: number;
-}
-
-/**
- * Formats a number as a NZD dollar string with the sign before the dollar.
- * @param n - Amount to format (positive or negative).
- * @returns Formatted string like "$12.50" or "-$12.50".
- */
-function fmt(n: number): string {
-  return `${n < 0 ? "-" : ""}$${Math.abs(n).toFixed(2)}`;
 }
 
 /**
@@ -366,7 +358,7 @@ function drawLineItemsTable(ctx: PdfCtx, invoice: Invoice, y: number): number {
       color: DARK,
     });
 
-    const priceStr = fmt(item.unitPrice);
+    const priceStr = formatNZD(item.unitPrice);
     ctx.page.drawText(priceStr, {
       x: COL.total - ctx.font.widthOfTextAtSize(priceStr, CELL_SIZE) - 4,
       y: firstBaselineY,
@@ -375,7 +367,7 @@ function drawLineItemsTable(ctx: PdfCtx, invoice: Invoice, y: number): number {
       color: DARK,
     });
 
-    const totalStr = fmt(item.lineTotal);
+    const totalStr = formatNZD(item.lineTotal);
     ctx.page.drawText(totalStr, {
       x: MARGIN + CONTENT_W - ctx.font.widthOfTextAtSize(totalStr, CELL_SIZE) - 4,
       y: firstBaselineY,
@@ -455,25 +447,25 @@ function drawTotalsBlock(ctx: PdfCtx, invoice: Invoice, y: number): number {
     y -= isBold ? 26 : 19;
   };
 
-  drawRow("Subtotal", fmt(invoice.subtotal));
+  drawRow("Subtotal", formatNZD(invoice.subtotal));
   if (invoice.promoDiscount && invoice.promoDiscount > 0) {
     // Suffix clarifies the discount only applies to labour lines.
     const label = invoice.promoTitle
       ? `Promo (labor only): ${invoice.promoTitle}`
       : "Promo discount (labor only)";
-    drawRow(label, `-${fmt(invoice.promoDiscount)}`, { isPromo: true });
+    drawRow(label, `-${formatNZD(invoice.promoDiscount)}`, { isPromo: true });
   }
   if (invoice.unsuccessfulDiscount && invoice.unsuccessfulDiscount > 0) {
     drawRow(
       "Unsuccessful-visit discount (half off labour)",
-      `-${fmt(invoice.unsuccessfulDiscount)}`,
+      `-${formatNZD(invoice.unsuccessfulDiscount)}`,
       { isPromo: true },
     );
   }
   // Gate on gstAmount (not the legacy `gst` boolean) so the row lights up
   // automatically when GST_REGISTERED flips and the engine emits an inclusive amount.
   if (invoice.gstAmount > 0) {
-    drawRow("Includes GST", fmt(invoice.gstAmount));
+    drawRow("Includes GST", formatNZD(invoice.gstAmount));
     // IRD requires a GST number on the header when an invoice carries GST.
     if (!ctx.identity.gstNumber) {
       console.warn(
@@ -489,7 +481,7 @@ function drawTotalsBlock(ctx: PdfCtx, invoice: Invoice, y: number): number {
   });
   // Push Total below the divider so 14pt bold doesn't overlap the line.
   y -= 12;
-  drawRow("Total", fmt(invoice.total), { isBold: true });
+  drawRow("Total", formatNZD(invoice.total), { isBold: true });
 
   return y - 12;
 }

@@ -38,11 +38,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return errorResponse("Unauthorized", 401);
   }
 
-  const body = (await request.json()) as ResolveBody;
+  const body = (await request.json().catch(() => null)) as ResolveBody | null;
+  if (!body) {
+    return errorResponse("Invalid request body.", 400);
+  }
   const { contactId, sourceId, source, name, phone } = body;
 
   if (!contactId || !sourceId || !source) {
     return errorResponse("Missing required fields.", 400);
+  }
+  if (source !== "Booking" && source !== "Review") {
+    // Guard the union: an unknown source would update the Contact but silently
+    // skip the source-record write-back this route exists to keep in sync.
+    return errorResponse("source must be 'Booking' or 'Review'.", 400);
   }
 
   const normalisedPhone =

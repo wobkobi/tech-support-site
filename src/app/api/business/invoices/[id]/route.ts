@@ -28,9 +28,9 @@ export const maxDuration = 60;
  * @param next - Target InvoiceStatus.
  * @returns Partial update payload to splat into prisma.invoice.update data.
  */
-function statusDataFor(next: InvoiceStatus): { status: InvoiceStatus; voidedAt?: Date } {
+function statusDataFor(next: InvoiceStatus): { status: InvoiceStatus; voidedAt: Date | null } {
   if (next === "VOIDED") return { status: next, voidedAt: new Date() };
-  return { status: next };
+  return { status: next, voidedAt: null };
 }
 
 /**

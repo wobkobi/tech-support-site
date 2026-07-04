@@ -36,6 +36,6 @@ export async function POST(
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error(`[admin/contacts/${id}/sync-google] POST error:`, error);
-    return errorResponse("Sync failed", 200);
+    return errorResponse("Sync failed", 500);
   }
 }

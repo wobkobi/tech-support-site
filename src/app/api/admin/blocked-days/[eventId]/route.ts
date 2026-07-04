@@ -7,6 +7,7 @@
 import { deleteBookingEvent, SCHEDULE_CALENDAR_TAG } from "@/features/calendar/lib/google-calendar";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
+import { prisma } from "@/shared/lib/prisma";
 import { revalidateTag } from "next/cache";
 import { type NextRequest, NextResponse } from "next/server";
 
@@ -32,6 +33,18 @@ export async function DELETE(
   const { eventId } = await params;
   if (!eventId) {
     return errorResponse("Missing eventId.", 400);
+  }
+
+  // Refuse to delete a real booking's calendar event via the blocked-day route:
+  // that would strip the appointment off the calendar while the Booking row stays
+  // confirmed with a now-dangling calendarEventId. Blocked-day events are never
+  // referenced by a Booking.
+  const bookingUsingEvent = await prisma.booking.findFirst({
+    where: { calendarEventId: eventId },
+    select: { id: true },
+  });
+  if (bookingUsingEvent) {
+    return errorResponse("That event belongs to a booking, not a blocked day.", 409);
   }
 
   try {

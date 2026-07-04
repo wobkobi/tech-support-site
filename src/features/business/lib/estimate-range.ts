@@ -41,7 +41,7 @@ export function remoteRateDelta(rates: RemoteRateLike[], meeting: string): numbe
  * falls; it rounds to the nearest $5 and is never narrower than the configured
  * minimum spread.
  * @param mins - Billable minutes for this slice (already floored).
- * @param rate - Effective $/h for labour.
+ * @param rate - Effective $/hr for labour.
  * @param confidence - How confident the estimate is; selects the band width.
  * @param range - The live, settings-driven confidence band config.
  * @returns Whole-dollar `{ low, high }`.

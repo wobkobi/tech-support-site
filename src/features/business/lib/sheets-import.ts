@@ -1,13 +1,11 @@
 // src/features/business/lib/sheets-import.ts
-/**
- * @description Sheet > site reconciliation for the Cashbook (income) and
- * Expenses tabs. The sheet is the source of truth: rows are matched to DB
- * entries by the hidden column-Z Sync ID, differing fields are updated in the
- * DB, unmatched sheet rows are (re)created, and manually-typed rows get a Sync
- * ID backfilled so they join the two-way sync. {@link runSheetsImport} also
- * self-heals site entries whose sheet append failed, and takes a Setting-backed
- * lock so overlapping runs cannot double-write.
- */
+// Sheet > site reconciliation for the Cashbook (income) and Expenses tabs. The
+// sheet is the source of truth: rows are matched to DB entries by the hidden
+// column-Z Sync ID, differing fields are updated in the DB, unmatched sheet
+// rows are (re)created, and manually-typed rows get a Sync ID backfilled so
+// they join the two-way sync. runSheetsImport also self-heals site entries
+// whose sheet append failed, and takes a Setting-backed lock so overlapping
+// runs cannot double-write.
 import { calcGstFromInclusive } from "@/features/business/lib/business";
 import { listSpreadsheetsInFolder } from "@/features/business/lib/google-drive";
 import { withRetry } from "@/features/business/lib/google-retry";

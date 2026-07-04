@@ -69,9 +69,11 @@ export async function mergeDuplicateEmailContacts(): Promise<number> {
     select: {
       id: true,
       email: true,
+      altEmails: true,
       phone: true,
       altPhones: true,
       address: true,
+      googleContactId: true,
       reviewToken: true,
       altReviewTokens: true,
       createdAt: true,
@@ -106,6 +108,25 @@ export async function mergeDuplicateEmailContacts(): Promise<number> {
         if (key && key !== keeperPrimary) altSet.add(key);
       }
       if (altSet.size !== keeper.altPhones.length) fill.altPhones = { set: [...altSet] };
+      // Fold the dup's alternate emails into the keeper so any address only the
+      // dup knew stays matchable (the shared primary is excluded; all lowercased).
+      const keeperPrimaryEmail = keeper.email?.toLowerCase() ?? null;
+      const seenEmail = new Set<string>();
+      const mergedAltEmails: string[] = [];
+      for (const e of [...keeper.altEmails, ...dup.altEmails]) {
+        const lower = e.toLowerCase();
+        if (lower === keeperPrimaryEmail || seenEmail.has(lower)) continue;
+        seenEmail.add(lower);
+        mergedAltEmails.push(lower);
+      }
+      if (mergedAltEmails.length !== keeper.altEmails.length) {
+        fill.altEmails = { set: mergedAltEmails };
+      }
+      // Adopt the dup's Google link when the keeper has none, so a dup-only
+      // googleContactId isn't forgotten when the row is hard-deleted below.
+      if (!keeper.googleContactId && dup.googleContactId) {
+        fill.googleContactId = dup.googleContactId;
+      }
       // Fold the dup's review tokens too, so links already sent under the dup
       // keep resolving to the keeper.
       const keeperToken = (fill.reviewToken as string | undefined) ?? keeper.reviewToken ?? null;
@@ -238,7 +259,7 @@ export async function backfillContactsFromBookings(): Promise<number> {
     if (norm) phoneOnlyByNorm.set(norm, c);
   }
 
-  // Newest booking wins per email (Map overwrite as we iterate ascending).
+  // Newest booking wins per email (Map overwrite as the ascending scan proceeds).
   const toCreateByEmail = new Map<
     string,
     { name: string; email: string; phone: string | null; address: string | null }

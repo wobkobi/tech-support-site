@@ -50,7 +50,7 @@ export const GROUP_META: Record<SettingsGroup, { title: string; blurb: string }>
   },
   holds: {
     title: "Booking form & holds",
-    blurb: "Hold expiry and the job-description length limits.",
+    blurb: "How long a held slot stays reserved before it's released for others.",
   },
   scheduling: {
     title: "Scheduling & travel buffers",
@@ -58,7 +58,7 @@ export const GROUP_META: Record<SettingsGroup, { title: string; blurb: string }>
   },
   reviews: {
     title: "Reviews & reputation",
-    blurb: "Homepage review count, auto-approval, the review link, and request pacing.",
+    blurb: "Homepage review count, auto-approval, and request pacing.",
   },
 };
 
