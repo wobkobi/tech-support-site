@@ -1,6 +1,5 @@
 // scripts/build-icons/helpers.ts
 /**
- * @file helpers.ts
  * @description Helper functions for image manipulation during icon generation.
  */
 
@@ -51,6 +50,16 @@ export async function makeCoquelicotSvg(svgBuffer: Buffer): Promise<Buffer> {
   // future re-export with slightly different rounding (e.g. #0B093D)
   // still gets swapped without needing another entry here.
   svgString = svgString.replace(/#0[ABC]0[89A]3[9A-F]/gi, PALETTE.coquelicot500);
+
+  // Guard against a silent no-op: if the source logo is ever re-exported with a
+  // navy hex outside the range above, nothing gets swapped and the dark-mode
+  // favicon would ship still-navy. Fail loudly instead.
+  if (!svgString.toLowerCase().includes(PALETTE.coquelicot500.toLowerCase())) {
+    throw new Error(
+      `makeCoquelicotSvg: no navy fill matched - the source logo hex is outside ` +
+        `the expected range, so the dark-mode swap produced no change.`,
+    );
+  }
 
   return Buffer.from(svgString, "utf-8");
 }

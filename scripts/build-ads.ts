@@ -1,6 +1,5 @@
 // scripts/build-ads.ts
 /**
- * @file build-ads.ts
  * @description Generates Meta (Facebook/Instagram) ad creatives by rendering
  * branded HTML with Puppeteer and screenshotting it at the exact ad sizes
  * (1:1 Feed, 4:5 Feed, 9:16 Stories/Reels, 1.91:1 right column). Follows Meta's

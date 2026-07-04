@@ -1,6 +1,5 @@
 // scripts/smoke-test.ts
 /**
- * @file smoke-test.ts
  * @description Optionally builds the Next.js app, starts it, then visits every
  * public page with Puppeteer to collect console errors and navigation timing.
  *
@@ -50,9 +49,9 @@ interface PageSpec {
 const PAGE_OVERRIDES: Record<string, { name?: string; ignoreErrors?: string[] }> = {
   "/": { name: "Home" },
   "/booking/cancel": {
+    // With no token the page early-returns before any fetch and just renders
+    // the "Missing cancel token." message - no API call, no error to ignore.
     name: "Booking Cancel (no token)",
-    // Client fires cancel API immediately - no-token 400 is expected.
-    ignoreErrors: ["Missing cancel token", "Could not cancel"],
   },
   "/booking/success": { name: "Booking Success (no token)" },
   "/review": { name: "Review (no token)" },
@@ -335,6 +334,19 @@ async function checkPage(browser: Browser, baseUrl: string, spec: PageSpec): Pro
       const text = err instanceof Error ? err.message : String(err);
       if (spec.ignoreErrors?.some((s) => text.includes(s)) ?? false) return;
       errors.push(`[pageerror] ${text}`);
+    });
+
+    // Capture console.error output. React 19 hydration mismatches,
+    // error-boundary logging, and app-level console.error land on this channel
+    // (not pageerror), so a page can look fine to the checks above yet still be
+    // broken. Filter the same known-missing URLs and per-page ignores.
+    page.on("console", (msg) => {
+      if (msg.type() !== "error") return;
+      const text = msg.text();
+      const locUrl = msg.location().url ?? "";
+      if (IGNORE_404_URLS.some((s) => text.includes(s) || locUrl.includes(s))) return;
+      if (spec.ignoreErrors?.some((s) => text.includes(s) || locUrl.includes(s)) ?? false) return;
+      errors.push(`[console] ${text}`);
     });
 
     await page.goto(url, { waitUntil: "networkidle2", timeout: 30_000 });
