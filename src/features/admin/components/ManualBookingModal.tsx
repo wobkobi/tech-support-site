@@ -310,7 +310,10 @@ export function ManualBookingModal({
             </Field>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          {/* Stack below sm: the unit input + address autocomplete can't both
+              shrink to fit three tracks on a narrow phone, and this modal is
+              fixed-position so the page-level overflow clip doesn't contain it. */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <Field label="Apt / Unit" htmlFor="mb-unit" optional>
               <input
                 id="mb-unit"
@@ -323,7 +326,7 @@ export function ManualBookingModal({
                 className={textInputClasses}
               />
             </Field>
-            <div className="col-span-2">
+            <div className="sm:col-span-2">
               <Field label="Address" htmlFor="mb-address" optional>
                 <AddressAutocomplete
                   id="mb-address"

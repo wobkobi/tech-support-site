@@ -1257,15 +1257,38 @@ export default function BookingForm({
                 ? `Pasted text was trimmed to fit the ${BOOKING_FIELD_LIMITS.notes}-character limit.`
                 : " "}
             </span>
-            <span
-              className={cn(
-                "tabular-nums",
-                notes.length >= BOOKING_FIELD_LIMITS.notes - NOTES_WARN_GAP
-                  ? "font-medium text-coquelicot-600"
-                  : "text-rich-black/60",
+            <span className="flex items-center gap-3">
+              {/* Clear the description + the rough estimate it produced below.
+                  The description is draft-persisted, so restored text needs a
+                  one-tap way out on mobile. */}
+              {notes !== "" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNotes("");
+                    setQuote(null);
+                    setQuoteError(null);
+                    setPasteTrimmed(false);
+                  }}
+                  aria-label="Clear the issue description"
+                  className={cn(
+                    "text-sm text-rich-black/70 underline underline-offset-2",
+                    "rounded hover:text-rich-black focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
+                  )}
+                >
+                  Clear
+                </button>
               )}
-            >
-              {notes.length} / {BOOKING_FIELD_LIMITS.notes}
+              <span
+                className={cn(
+                  "tabular-nums",
+                  notes.length >= BOOKING_FIELD_LIMITS.notes - NOTES_WARN_GAP
+                    ? "font-medium text-coquelicot-600"
+                    : "text-rich-black/60",
+                )}
+              >
+                {notes.length} / {BOOKING_FIELD_LIMITS.notes}
+              </span>
             </span>
           </div>
           {fieldErrors.notes && (

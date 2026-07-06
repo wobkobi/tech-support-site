@@ -234,7 +234,7 @@ function InvoicePreviewPanelImpl({
         {notes && <p className="mb-6 text-[11px] text-slate-500">{notes}</p>}
 
         {/* Sender contact footer. */}
-        <div className="mt-auto border-t border-slate-200 pt-3 text-center text-[10px] text-slate-500">
+        <div className="mt-auto border-t border-slate-200 pt-3 text-center text-[10px] wrap-break-word text-slate-500">
           {identity.email} · {identity.phone} · {identity.website} · {identity.location}
         </div>
       </div>

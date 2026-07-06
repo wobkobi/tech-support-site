@@ -1456,9 +1456,27 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
         />
       )}
 
+      {/* Draft-restored banner sits above the grid so the Discard action is
+          visible without scrolling on mobile, where cached values otherwise
+          look like a mystery pre-filled form. */}
+      {draftRestoredAt !== null && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-800">
+          <span>Draft restored - last edited {timeAgo(draftRestoredAt, mountedAt)}.</span>
+          <button
+            type="button"
+            onClick={resetFormState}
+            className="font-semibold text-blue-700 hover:underline"
+          >
+            Discard
+          </button>
+        </div>
+      )}
+
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* LEFT column */}
-        <div className="space-y-5">
+        {/* LEFT column - min-w-0 stops intrinsically wide children (task rows,
+            travel breakdown) from blowing the grid track past the viewport;
+            mirrors the guard on the right column. */}
+        <div className="min-w-0 space-y-5">
           {/* AI input */}
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <h2 className="mb-3 text-sm font-semibold text-russian-violet">Describe the job</h2>
@@ -1476,7 +1494,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
             />
             {parseError && <p className="mt-1 text-xs text-red-600">{parseError}</p>}
-            <div className="mt-3 flex gap-2">
+            <div className="mt-3 flex flex-wrap gap-2">
               <button
                 onClick={() => void handleParse()}
                 suppressHydrationWarning
@@ -1485,6 +1503,26 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
               >
                 {parsing ? "Parsing..." : hasParsed ? "Re-parse" : "Parse with AI"}
               </button>
+              {/* Clear the cached description + parse session (the textarea is
+                  draft-persisted, so old text reappears on every visit).
+                  Parsed tasks/travel below stay - only the AI box resets. */}
+              {(aiInput.trim() !== "" || hasParsed || clarifyQuestions.length > 0) && (
+                <button
+                  onClick={() => {
+                    setAiInput("");
+                    setParseResult(null);
+                    setParseError(null);
+                    setHasParsed(false);
+                    setClarifyQuestions([]);
+                    setClarifyAnswers({});
+                  }}
+                  disabled={parsing}
+                  aria-label="Clear job description"
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Clear
+                </button>
+              )}
               <span className="self-center text-xs text-slate-400">or build manually below</span>
             </div>
             {parseResult && !parseError && (
@@ -1683,18 +1721,6 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
 
           {/* Actions */}
           <div className="space-y-2">
-            {draftRestoredAt !== null && (
-              <div className="flex items-center justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-800">
-                <span>Draft restored - last edited {timeAgo(draftRestoredAt, mountedAt)}.</span>
-                <button
-                  type="button"
-                  onClick={resetFormState}
-                  className="font-semibold text-blue-700 hover:underline"
-                >
-                  Discard
-                </button>
-              </div>
-            )}
             {incomeToast && (
               <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-700">
                 {incomeToast}

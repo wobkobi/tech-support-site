@@ -134,11 +134,13 @@ export function InvoicesListView(): React.ReactElement {
 
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between gap-3">
+      {/* flex-wrap: the three action buttons exceed a narrow phone's width;
+          let them wrap instead of clipping at the right edge. */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex gap-2">
           {syncToast && <span className="self-center text-xs text-slate-500">{syncToast}</span>}
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={() => void handleImportDrive()}
             disabled={syncing}
@@ -205,7 +207,7 @@ export function InvoicesListView(): React.ReactElement {
               </div>
               <Link
                 href={`/admin/business/invoices/${inv.id}`}
-                className="mt-1 block text-sm font-medium text-slate-700"
+                className="mt-1 block truncate text-sm font-medium text-slate-700"
               >
                 {inv.clientName}
               </Link>
