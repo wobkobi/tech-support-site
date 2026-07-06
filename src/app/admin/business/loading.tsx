@@ -24,12 +24,15 @@ export default function BusinessLoading(): React.ReactElement {
         ))}
       </div>
 
-      {/* Overview stat cards */}
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <Bone className="mb-3 h-4 w-28 bg-slate-200 opacity-60" />
-            <Bone className="h-8 w-32 bg-slate-200" />
+      {/* Scope line ("Showing: ...") */}
+      <Bone className="mb-4 h-4 w-40 bg-slate-200 opacity-60" />
+
+      {/* Overview stat cards - matches the real 2/sm:4 grid of 8 cards */}
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} className="rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+            <Bone className="mb-2 h-7 w-20 bg-slate-200" />
+            <Bone className="h-3 w-24 bg-slate-200 opacity-60" />
           </div>
         ))}
       </div>

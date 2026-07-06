@@ -10,7 +10,6 @@ import {
   BOOKING_FIELD_LIMITS,
   combineUnitAndAddress,
   splitUnitFromAddress,
-  SUB_SLOT_MINUTES,
   validateEmail,
   type BookableDay,
   type JobDuration,
@@ -55,6 +54,7 @@ interface BookingDraft {
   meetingType: "in-person" | "remote" | "";
   unit: string;
   address: string;
+  addressVerified: boolean;
   notes: string;
   dateKey?: string;
   timeOfDay?: TimeOfDay;
@@ -371,7 +371,10 @@ export default function BookingForm({
       if (typeof draft.unit === "string") setUnit(draft.unit);
       if (typeof draft.address === "string" && draft.address) {
         setAddress(draft.address);
-        setAddressVerified(true);
+        // Only trust a restored address as verified when the draft recorded it
+        // as such (a Places pick or fallback mode) - a raw typed-but-unpicked
+        // address must still face the submit-time geocode gate.
+        setAddressVerified(draft.addressVerified === true);
       }
       if (typeof draft.notes === "string" && draft.notes) setNotes(draft.notes);
 
@@ -416,6 +419,7 @@ export default function BookingForm({
         meetingType,
         unit,
         address,
+        addressVerified,
         notes,
         dateKey: selectedDay?.dateKey,
         timeOfDay: selectedTime ?? undefined,
@@ -440,6 +444,7 @@ export default function BookingForm({
     meetingType,
     unit,
     address,
+    addressVerified,
     notes,
     selectedDay,
     selectedTime,
@@ -736,6 +741,7 @@ export default function BookingForm({
               <button
                 key={opt.value}
                 type="button"
+                aria-pressed={duration === opt.value}
                 onClick={() => handleDurationChange(opt.value)}
                 className={cn(
                   "rounded-lg border p-4 text-left transition-colors",
@@ -786,6 +792,7 @@ export default function BookingForm({
                         )}
                         <button
                           type="button"
+                          aria-pressed={selectedDay?.dateKey === day.dateKey}
                           disabled={!day.hasAnySlots}
                           onClick={() => handleDaySelect(day)}
                           className={cn(
@@ -824,6 +831,7 @@ export default function BookingForm({
                         )}
                         <button
                           type="button"
+                          aria-pressed={selectedDay?.dateKey === day.dateKey}
                           disabled={!day.hasAnySlots}
                           onClick={() => handleDaySelect(day)}
                           className={cn(
@@ -884,6 +892,7 @@ export default function BookingForm({
                       <button
                         key={window.value}
                         type="button"
+                        aria-pressed={isSelected}
                         disabled={!available}
                         onClick={() => {
                           setSelectedTime(window.value);
@@ -917,14 +926,15 @@ export default function BookingForm({
                     if (!activeWindow) return null;
                     return (
                       <div className="flex flex-wrap gap-2">
-                        {SUB_SLOT_MINUTES.map((minute) => {
-                          const sub = activeWindow.subSlots.find((s) => s.minute === minute)!;
+                        {activeWindow.subSlots.map((sub) => {
+                          const minute = sub.minute;
                           const available =
                             duration === "short" ? sub.availableShort : sub.availableLong;
                           return (
                             <button
                               key={minute}
                               type="button"
+                              aria-pressed={selectedMinute === minute}
                               disabled={!available}
                               onClick={() => setSelectedMinute(minute)}
                               className={cn(
@@ -1053,6 +1063,7 @@ export default function BookingForm({
           <div className="grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-2">
             <button
               type="button"
+              aria-pressed={meetingType === "in-person"}
               onClick={() => setMeetingType("in-person")}
               className={cn(
                 "rounded-lg border px-5 py-2.5 text-base font-medium whitespace-nowrap transition-colors",
@@ -1065,6 +1076,7 @@ export default function BookingForm({
             </button>
             <button
               type="button"
+              aria-pressed={meetingType === "remote"}
               onClick={() => setMeetingType("remote")}
               className={cn(
                 "rounded-lg border px-5 py-2.5 text-base font-medium whitespace-nowrap transition-colors",
@@ -1245,15 +1257,38 @@ export default function BookingForm({
                 ? `Pasted text was trimmed to fit the ${BOOKING_FIELD_LIMITS.notes}-character limit.`
                 : " "}
             </span>
-            <span
-              className={cn(
-                "tabular-nums",
-                notes.length >= BOOKING_FIELD_LIMITS.notes - NOTES_WARN_GAP
-                  ? "font-medium text-coquelicot-600"
-                  : "text-rich-black/60",
+            <span className="flex items-center gap-3">
+              {/* Clear the description + the rough estimate it produced below.
+                  The description is draft-persisted, so restored text needs a
+                  one-tap way out on mobile. */}
+              {notes !== "" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNotes("");
+                    setQuote(null);
+                    setQuoteError(null);
+                    setPasteTrimmed(false);
+                  }}
+                  aria-label="Clear the issue description"
+                  className={cn(
+                    "text-sm text-rich-black/70 underline underline-offset-2",
+                    "rounded hover:text-rich-black focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
+                  )}
+                >
+                  Clear
+                </button>
               )}
-            >
-              {notes.length} / {BOOKING_FIELD_LIMITS.notes}
+              <span
+                className={cn(
+                  "tabular-nums",
+                  notes.length >= BOOKING_FIELD_LIMITS.notes - NOTES_WARN_GAP
+                    ? "font-medium text-coquelicot-600"
+                    : "text-rich-black/60",
+                )}
+              >
+                {notes.length} / {BOOKING_FIELD_LIMITS.notes}
+              </span>
             </span>
           </div>
           {fieldErrors.notes && (

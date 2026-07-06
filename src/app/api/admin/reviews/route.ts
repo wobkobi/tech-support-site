@@ -3,6 +3,7 @@
  * @description Admin API for manually creating reviews (for past clients).
  */
 
+import { revalidateReviewPaths } from "@/features/reviews/lib/revalidate";
 import { reviewTextError } from "@/features/reviews/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
@@ -57,6 +58,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         createdAt: true,
       },
     });
+
+    // Surface the newly-approved review on the public marquee / reviews page
+    // now, not after the 24h cache TTL.
+    revalidateReviewPaths();
 
     return NextResponse.json({ ok: true, review }, { status: 201 });
   } catch (error) {

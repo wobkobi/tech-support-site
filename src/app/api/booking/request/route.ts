@@ -19,6 +19,7 @@ import { getActivePromo } from "@/features/business/lib/promos";
 import { lookupDriveDistance } from "@/features/business/lib/travel-distance";
 import {
   createBookingEvent,
+  deleteBookingEvent,
   fetchAllCalendarEvents,
 } from "@/features/calendar/lib/google-calendar";
 import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-create";
@@ -158,8 +159,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       bufferAfterMin: b.bufferAfterMin,
     }));
 
-    // Calendar fetch failures are non-fatal; validation proceeds on DB bookings alone.
-    let calendarEvents: Array<{ id: string; start: string; end: string }> = [];
+    // Fail closed: the live calendar read is authoritative for real events, so
+    // if it errors we cannot rule out a collision - refuse the booking rather
+    // than risk a double-book against a manual calendar entry.
+    let calendarEvents: Array<{ id: string; start: string; end: string }>;
     try {
       const rawEvents = await fetchAllCalendarEvents(now, maxDate);
       calendarEvents = rawEvents.map((e) => ({
@@ -169,6 +172,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }));
     } catch (error) {
       console.error("[booking/request] Failed to fetch calendar events:", error);
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "We couldn't verify availability just now. Please try again in a moment, or contact us directly.",
+        },
+        { status: 503 },
+      );
     }
 
     // Validate with duration
@@ -407,6 +418,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           email: email.trim().toLowerCase(),
           timestamp: new Date().toISOString(),
         });
+        // The booking lost the slot race, so the calendar event created above
+        // is an orphan that already emailed the customer an invite. Best-effort
+        // delete it so no ghost event/invite lingers at the taken time.
+        if (calendarEventId) {
+          await deleteBookingEvent({ eventId: calendarEventId }).catch((err) =>
+            console.error("[booking/request] Failed to delete orphaned calendar event:", err),
+          );
+        }
         return NextResponse.json(
           { ok: false, error: "This time slot is no longer available." },
           { status: 409 },

@@ -116,6 +116,7 @@ export function TravelBlockAdminList({
   const [saving, setSaving] = useState<string | null>(null);
   const [editingOriginId, setEditingOriginId] = useState<string | null>(null);
   const [originInput, setOriginInput] = useState<string>("");
+  const [actionError, setActionError] = useState<string | null>(null);
 
   /**
    * Updates the transport mode for a block and clears stale travel minutes locally.
@@ -124,13 +125,17 @@ export function TravelBlockAdminList({
    */
   async function setMode(id: string, mode: TransportMode): Promise<void> {
     setSaving(id);
+    setActionError(null);
     try {
       const res = await fetch(`/api/admin/travel/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ transportMode: mode }),
       });
-      if (!res.ok) return;
+      if (!res.ok) {
+        setActionError("Couldn't update the transport mode - try again.");
+        return;
+      }
       setBlocks((prev) =>
         prev.map((b) =>
           b.id === id
@@ -145,6 +150,8 @@ export function TravelBlockAdminList({
             : b,
         ),
       );
+    } catch {
+      setActionError("Network error - the change wasn't saved.");
     } finally {
       setSaving(null);
     }
@@ -158,14 +165,20 @@ export function TravelBlockAdminList({
    */
   async function setIgnored(id: string, next: boolean): Promise<void> {
     setSaving(id);
+    setActionError(null);
     try {
       const res = await fetch(`/api/admin/travel/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ignored: next }),
       });
-      if (!res.ok) return;
+      if (!res.ok) {
+        setActionError("Couldn't update the ignore flag - try again.");
+        return;
+      }
       setBlocks((prev) => prev.map((b) => (b.id === id ? { ...b, ignored: next } : b)));
+    } catch {
+      setActionError("Network error - the change wasn't saved.");
     } finally {
       setSaving(null);
     }
@@ -178,13 +191,17 @@ export function TravelBlockAdminList({
    */
   async function saveOrigin(id: string, customOrigin: string | null): Promise<void> {
     setSaving(id);
+    setActionError(null);
     try {
       const res = await fetch(`/api/admin/travel/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ customOrigin }),
       });
-      if (!res.ok) return;
+      if (!res.ok) {
+        setActionError("Couldn't save the origin - try again.");
+        return;
+      }
       setBlocks((prev) =>
         prev.map((b) =>
           b.id === id
@@ -200,6 +217,8 @@ export function TravelBlockAdminList({
         ),
       );
       setEditingOriginId(null);
+    } catch {
+      setActionError("Network error - the change wasn't saved.");
     } finally {
       setSaving(null);
     }
@@ -214,219 +233,231 @@ export function TravelBlockAdminList({
   }
 
   return (
-    <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-      {blocks.map((b) => {
-        const currentMode = (b.transportMode ?? "driving") as TransportMode;
-        const isSaving = saving === b.id;
-        const isEditingOrigin = editingOriginId === b.id;
-        const effectiveOrigin = b.customOrigin ?? b.detectedOrigin ?? null;
+    <>
+      {actionError && (
+        <p
+          role="alert"
+          className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800"
+        >
+          {actionError}
+        </p>
+      )}
+      <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+        {blocks.map((b) => {
+          const currentMode = (b.transportMode ?? "driving") as TransportMode;
+          const isSaving = saving === b.id;
+          const isEditingOrigin = editingOriginId === b.id;
+          const effectiveOrigin = b.customOrigin ?? b.detectedOrigin ?? null;
 
-        return (
-          <div
-            key={b.id}
-            className={cn(
-              "rounded-xl border border-slate-200 p-4",
-              b.ignored ? "bg-slate-100/60 opacity-70" : "bg-white/50",
-            )}
-          >
-            <div className="flex flex-col gap-2">
-              {/* Header: event identity */}
-              <div className="flex min-w-0 flex-wrap items-center gap-2">
-                <span className="min-w-0 truncate text-sm font-semibold text-russian-violet">
-                  {b.summary ?? b.sourceEventId}
-                </span>
-                <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-400">
-                  {calendarLabels[b.calendarEmail] ?? b.calendarEmail}
-                </span>
-                {b.ignored && (
-                  <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700">
-                    Ignored - I have the car
-                  </span>
-                )}
-                {b.isCarEvent && (
-                  <label className="ml-auto flex shrink-0 cursor-pointer items-center gap-1.5 text-xs text-slate-600">
-                    <input
-                      type="checkbox"
-                      checked={b.ignored}
-                      disabled={isSaving}
-                      onChange={(e) => void setIgnored(b.id, e.target.checked)}
-                      className="h-3.5 w-3.5"
-                    />
-                    Ignore (I have the car)
-                  </label>
-                )}
-              </div>
-
-              {/* Event time */}
-              <p className="text-xs text-slate-600">
-                {formatEventTime(b.eventStartAt, b.eventEndAt)}
-              </p>
-
-              {/* Destination address - wrap long unbroken strings on mobile. */}
-              {b.destination && (
-                <p className="text-xs wrap-break-word text-slate-500">
-                  <span className="font-medium text-slate-400">To: </span>
-                  {b.destination}
-                </p>
+          return (
+            <div
+              key={b.id}
+              className={cn(
+                "rounded-xl border border-slate-200 p-4",
+                b.ignored ? "bg-slate-100/60 opacity-70" : "bg-white/50",
               )}
-
-              {/* Transport mode selector */}
-              <div>
-                <p className="mb-1 text-xs font-medium tracking-wide text-slate-400 uppercase">
-                  How I'm getting there
-                </p>
-                <div className="flex flex-wrap gap-1">
-                  {MODES.map((m) => (
-                    <button
-                      key={m.value}
-                      disabled={isSaving}
-                      onClick={() => void setMode(b.id, m.value)}
-                      className={cn(
-                        "rounded-lg px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50",
-                        currentMode === m.value
-                          ? "bg-russian-violet text-white"
-                          : "bg-slate-100 text-slate-500 hover:bg-slate-200",
-                      )}
-                    >
-                      {m.icon} {m.label}
-                    </button>
-                  ))}
-                </div>
-                {(b.rawTravelMinutes === null || b.rawTravelBackMinutes === null) &&
-                  b.transportMode !== null && (
-                    <p className="mt-1 text-xs text-amber-500">
-                      Mode changed - recalculate to update travel times
-                    </p>
+            >
+              <div className="flex flex-col gap-2">
+                {/* Header: event identity */}
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <span className="min-w-0 truncate text-sm font-semibold text-russian-violet">
+                    {b.summary ?? b.sourceEventId}
+                  </span>
+                  <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-400">
+                    {calendarLabels[b.calendarEmail] ?? b.calendarEmail}
+                  </span>
+                  {b.ignored && (
+                    <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700">
+                      Ignored - I have the car
+                    </span>
                   )}
-              </div>
-
-              {/* Origin */}
-              <div>
-                <p className="mb-1 text-xs font-medium tracking-wide text-slate-400 uppercase">
-                  Departing from
-                </p>
-                {isEditingOrigin ? (
-                  <div className="flex flex-col gap-1.5">
-                    <input
-                      type="text"
-                      value={originInput}
-                      autoComplete="off"
-                      onChange={(e) => setOriginInput(e.target.value)}
-                      placeholder={b.detectedOrigin ?? "Enter address…"}
-                      className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs focus:border-slate-400 focus:outline-none"
-                      disabled={isSaving}
-                    />
-                    <div className="flex flex-wrap gap-1">
-                      <button
-                        disabled={isSaving || !originInput.trim()}
-                        onClick={() => void saveOrigin(b.id, originInput.trim() || null)}
-                        className="rounded-lg bg-russian-violet px-2.5 py-1 text-xs font-medium text-white transition-colors disabled:opacity-50"
-                      >
-                        Save
-                      </button>
-                      <button
+                  {b.isCarEvent && (
+                    <label className="ml-auto flex shrink-0 cursor-pointer items-center gap-1.5 text-xs text-slate-600">
+                      <input
+                        type="checkbox"
+                        checked={b.ignored}
                         disabled={isSaving}
-                        onClick={() => setEditingOriginId(null)}
-                        className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500 hover:bg-slate-200 disabled:opacity-50"
+                        onChange={(e) => void setIgnored(b.id, e.target.checked)}
+                        className="h-3.5 w-3.5"
+                      />
+                      Ignore (I have the car)
+                    </label>
+                  )}
+                </div>
+
+                {/* Event time */}
+                <p className="text-xs text-slate-600">
+                  {formatEventTime(b.eventStartAt, b.eventEndAt)}
+                </p>
+
+                {/* Destination address - wrap long unbroken strings on mobile. */}
+                {b.destination && (
+                  <p className="text-xs wrap-break-word text-slate-500">
+                    <span className="font-medium text-slate-400">To: </span>
+                    {b.destination}
+                  </p>
+                )}
+
+                {/* Transport mode selector */}
+                <div>
+                  <p className="mb-1 text-xs font-medium tracking-wide text-slate-400 uppercase">
+                    How I'm getting there
+                  </p>
+                  <div className="flex flex-wrap gap-1">
+                    {MODES.map((m) => (
+                      <button
+                        key={m.value}
+                        disabled={isSaving}
+                        onClick={() => void setMode(b.id, m.value)}
+                        className={cn(
+                          "rounded-lg px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50",
+                          currentMode === m.value
+                            ? "bg-russian-violet text-white"
+                            : "bg-slate-100 text-slate-500 hover:bg-slate-200",
+                        )}
                       >
-                        Cancel
+                        {m.icon} {m.label}
                       </button>
-                      {b.customOrigin && (
+                    ))}
+                  </div>
+                  {(b.rawTravelMinutes === null || b.rawTravelBackMinutes === null) &&
+                    b.transportMode !== null && (
+                      <p className="mt-1 text-xs text-amber-500">
+                        Mode changed - recalculate to update travel times
+                      </p>
+                    )}
+                </div>
+
+                {/* Origin */}
+                <div>
+                  <p className="mb-1 text-xs font-medium tracking-wide text-slate-400 uppercase">
+                    Departing from
+                  </p>
+                  {isEditingOrigin ? (
+                    <div className="flex flex-col gap-1.5">
+                      <input
+                        type="text"
+                        value={originInput}
+                        autoComplete="off"
+                        onChange={(e) => setOriginInput(e.target.value)}
+                        placeholder={b.detectedOrigin ?? "Enter address…"}
+                        className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs focus:border-slate-400 focus:outline-none"
+                        disabled={isSaving}
+                      />
+                      <div className="flex flex-wrap gap-1">
+                        <button
+                          disabled={isSaving || !originInput.trim()}
+                          onClick={() => void saveOrigin(b.id, originInput.trim() || null)}
+                          className="rounded-lg bg-russian-violet px-2.5 py-1 text-xs font-medium text-white transition-colors disabled:opacity-50"
+                        >
+                          Save
+                        </button>
                         <button
                           disabled={isSaving}
-                          onClick={() => void saveOrigin(b.id, null)}
-                          className="rounded-lg bg-red-50 px-2.5 py-1 text-xs font-medium text-red-500 hover:bg-red-100 disabled:opacity-50"
+                          onClick={() => setEditingOriginId(null)}
+                          className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500 hover:bg-slate-200 disabled:opacity-50"
                         >
-                          Clear override
+                          Cancel
                         </button>
-                      )}
+                        {b.customOrigin && (
+                          <button
+                            disabled={isSaving}
+                            onClick={() => void saveOrigin(b.id, null)}
+                            className="rounded-lg bg-red-50 px-2.5 py-1 text-xs font-medium text-red-500 hover:bg-red-100 disabled:opacity-50"
+                          >
+                            Clear override
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-700">
-                      {effectiveOrigin ?? "Home (default)"}
-                    </span>
-                    {b.customOrigin ? (
-                      <span className="rounded bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-600">
-                        override
-                      </span>
-                    ) : b.detectedOrigin ? (
-                      <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-400">
-                        auto
-                      </span>
-                    ) : null}
-                    <button
-                      disabled={isSaving}
-                      onClick={() => {
-                        setEditingOriginId(b.id);
-                        setOriginInput(b.customOrigin ?? "");
-                      }}
-                      className="rounded px-1.5 py-0.5 text-xs text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-50"
-                    >
-                      Edit
-                    </button>
-                  </div>
-                )}
-                {(b.rawTravelMinutes === null || b.rawTravelBackMinutes === null) &&
-                  b.customOrigin !== null && (
-                    <p className="mt-1 text-xs text-amber-500">
-                      Origin changed - recalculate to update travel times
-                    </p>
-                  )}
-              </div>
-
-              {/* Travel times grid */}
-              <div className="grid gap-2 sm:grid-cols-2">
-                <div>
-                  <p className="mb-0.5 text-xs font-medium tracking-wide text-slate-400 uppercase">
-                    Travel there
-                  </p>
-                  <p className="text-sm text-slate-700">
-                    {formatMinutes(b.rawTravelMinutes, b.roundedMinutes)}
-                  </p>
-                  <p
-                    className={cn(
-                      "text-xs",
-                      !b.beforeExpiresAt || new Date(b.beforeExpiresAt) < new Date()
-                        ? "text-red-500"
-                        : "text-slate-400",
-                    )}
-                    suppressHydrationWarning
-                  >
-                    {formatExpiry(b.beforeExpiresAt)}
-                  </p>
-                </div>
-                <div>
-                  <p className="mb-0.5 text-xs font-medium tracking-wide text-slate-400 uppercase">
-                    Travel back
-                  </p>
-                  <p className="text-sm text-slate-700">
-                    {b.travelBackSuppressed
-                      ? "chained to next event"
-                      : formatMinutes(b.rawTravelBackMinutes, b.roundedBackMinutes)}
-                  </p>
-                  {b.travelBackSuppressed ? (
-                    <p className="text-xs text-slate-400">no return trip - suppressed by design</p>
                   ) : (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-700">
+                        {effectiveOrigin ?? "Home (default)"}
+                      </span>
+                      {b.customOrigin ? (
+                        <span className="rounded bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-600">
+                          override
+                        </span>
+                      ) : b.detectedOrigin ? (
+                        <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-400">
+                          auto
+                        </span>
+                      ) : null}
+                      <button
+                        disabled={isSaving}
+                        onClick={() => {
+                          setEditingOriginId(b.id);
+                          setOriginInput(b.customOrigin ?? "");
+                        }}
+                        className="rounded px-1.5 py-0.5 text-xs text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-50"
+                      >
+                        Edit
+                      </button>
+                    </div>
+                  )}
+                  {(b.rawTravelMinutes === null || b.rawTravelBackMinutes === null) &&
+                    b.customOrigin !== null && (
+                      <p className="mt-1 text-xs text-amber-500">
+                        Origin changed - recalculate to update travel times
+                      </p>
+                    )}
+                </div>
+
+                {/* Travel times grid */}
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div>
+                    <p className="mb-0.5 text-xs font-medium tracking-wide text-slate-400 uppercase">
+                      Travel there
+                    </p>
+                    <p className="text-sm text-slate-700">
+                      {formatMinutes(b.rawTravelMinutes, b.roundedMinutes)}
+                    </p>
                     <p
                       className={cn(
                         "text-xs",
-                        !b.afterExpiresAt || new Date(b.afterExpiresAt) < new Date()
+                        !b.beforeExpiresAt || new Date(b.beforeExpiresAt) < new Date()
                           ? "text-red-500"
                           : "text-slate-400",
                       )}
                       suppressHydrationWarning
                     >
-                      {formatExpiry(b.afterExpiresAt)}
+                      {formatExpiry(b.beforeExpiresAt)}
                     </p>
-                  )}
+                  </div>
+                  <div>
+                    <p className="mb-0.5 text-xs font-medium tracking-wide text-slate-400 uppercase">
+                      Travel back
+                    </p>
+                    <p className="text-sm text-slate-700">
+                      {b.travelBackSuppressed
+                        ? "chained to next event"
+                        : formatMinutes(b.rawTravelBackMinutes, b.roundedBackMinutes)}
+                    </p>
+                    {b.travelBackSuppressed ? (
+                      <p className="text-xs text-slate-400">
+                        no return trip - suppressed by design
+                      </p>
+                    ) : (
+                      <p
+                        className={cn(
+                          "text-xs",
+                          !b.afterExpiresAt || new Date(b.afterExpiresAt) < new Date()
+                            ? "text-red-500"
+                            : "text-slate-400",
+                        )}
+                        suppressHydrationWarning
+                      >
+                        {formatExpiry(b.afterExpiresAt)}
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        );
-      })}
-    </div>
+          );
+        })}
+      </div>
+    </>
   );
 }

@@ -1,8 +1,9 @@
 // src/shared/lib/settings/get-settings.ts
 /**
  * @description Server-only accessor that resolves the full, typed settings:
- * code defaults with DB overrides merged on top, then defensively clamped so a
- * hand-edited bad row can never break the public booking/pricing pages. Cached
+ * code defaults with DB overrides merged on top, with the booking window
+ * (maxAdvanceDays) defensively clamped so a hand-edited bad row can't push it
+ * out of range on the public booking/pricing pages. Cached
  * via {@link unstable_cache} with a tag: hot reads hit the data cache, and
  * `saveSettingsGroup` busts the tag so edits go live immediately. The 60s
  * revalidate is only a cross-instance safety net.
@@ -32,7 +33,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 /**
  * Overlays an override onto a base value. Plain objects merge recursively;
  * arrays and scalars (including an explicit `null`, used for "off") replace.
- * Unknown override keys are ignored against the typed base shape.
+ * Override keys not present in the base shape are preserved as-is.
  * @param base - Default value for this branch.
  * @param override - Stored override (may be partial or undefined).
  * @returns Merged value of the base's type.

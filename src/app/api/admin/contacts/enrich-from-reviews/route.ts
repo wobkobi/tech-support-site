@@ -18,7 +18,7 @@ export const maxDuration = 60;
  * Returns a name conflict per Contact whose reviewer display name differs from
  * the stored name. Requires X-Admin-Secret header.
  * @param request - Incoming request.
- * @returns JSON with enrichedCount and conflicts array.
+ * @returns JSON with a conflicts array for manual resolution.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
@@ -26,5 +26,5 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   const conflicts = await enrichContactsFromReviews();
-  return NextResponse.json({ ok: true, enrichedCount: 0, conflicts });
+  return NextResponse.json({ ok: true, conflicts });
 }

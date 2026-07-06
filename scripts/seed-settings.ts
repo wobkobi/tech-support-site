@@ -1,6 +1,5 @@
 // scripts/seed-settings.ts
 /**
- * @file seed-settings.ts
  * @description One-shot, idempotent seed for the env > DB business-identity
  * handoff. Creates the `settings:identity` row from the code defaults - which
  * read the current bank-account / GST# / HOME_ADDRESS env vars - ONLY when the
@@ -37,6 +36,10 @@ async function main(): Promise<void> {
   }
 
   const { identity } = DEFAULT_SETTINGS;
+  // Bare create with no SettingAudit row: this one-shot seed intentionally
+  // stays out of the audit trail (it records the env-derived starting point,
+  // not an operator edit). saveSettingsGroup - which does audit - can't be
+  // imported here because it pulls in next/cache.
   await db.setting.create({ data: { key, value: JSON.stringify(identity) } });
 
   console.log(`[seed-settings] Created ${key} from the current env defaults:`);

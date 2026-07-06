@@ -127,8 +127,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return errorResponse("label is required", 400);
   }
 
-  if (isDefault) {
-    await prisma.rateConfig.updateMany({ data: { isDefault: false } });
+  // Reject non-finite numerics before they reach Prisma (NaN from an empty form
+  // field, Infinity from a crafted body) - these values feed the public
+  // estimator and the AI calculator, so a bad rate must never persist.
+  for (const [key, val] of Object.entries({ ratePerHour, flatRate, hourlyDelta, percentDelta })) {
+    if (val !== undefined && val !== null && !Number.isFinite(val)) {
+      return errorResponse(`Invalid ${key}`, 400);
+    }
   }
 
   const rate = await prisma.rateConfig.create({
@@ -142,6 +147,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       isDefault: isDefault ?? false,
     },
   });
+
+  // Clear the default flag on the other rows only after the new row is created -
+  // a failed create must not wipe every default and leave zero default rates.
+  if (isDefault) {
+    await prisma.rateConfig.updateMany({
+      where: { id: { not: rate.id } },
+      data: { isDefault: false },
+    });
+  }
 
   return NextResponse.json({ ok: true, rate }, { status: 201 });
 }

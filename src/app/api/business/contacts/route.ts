@@ -9,7 +9,7 @@ import type { GoogleContact } from "@/features/business/types/business";
 import { getOAuth2Client } from "@/features/calendar/lib/google-calendar";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
-import { google } from "googleapis";
+import { google, type people_v1 } from "googleapis";
 import { NextRequest, NextResponse } from "next/server";
 
 // Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
@@ -29,13 +29,20 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const auth = getOAuth2Client();
     const people = google.people({ version: "v1", auth });
 
-    const res = await people.people.connections.list({
-      resourceName: "people/me",
-      pageSize: 100,
-      personFields: "names,emailAddresses,phoneNumbers,organizations",
-    });
-
-    const connections = res.data.connections ?? [];
+    // Page through every connection - a single 100-row page silently drops the
+    // operator's remaining contacts from the picker once they pass 100.
+    const connections: people_v1.Schema$Person[] = [];
+    let pageToken: string | undefined;
+    do {
+      const res = await people.people.connections.list({
+        resourceName: "people/me",
+        pageSize: 1000,
+        personFields: "names,emailAddresses,phoneNumbers,organizations",
+        ...(pageToken ? { pageToken } : {}),
+      });
+      if (res.data.connections) connections.push(...res.data.connections);
+      pageToken = res.data.nextPageToken ?? undefined;
+    } while (pageToken);
 
     const contacts: GoogleContact[] = connections
       .map((person) => ({

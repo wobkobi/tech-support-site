@@ -179,7 +179,7 @@ export function TravelSection({
                   <ul className="ml-1 space-y-0.5 rounded-md border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-500">
                     <li>
                       <span className="text-slate-400">Destination:</span>{" "}
-                      <span className="text-slate-700">{entry.destination}</span>
+                      <span className="wrap-break-word text-slate-700">{entry.destination}</span>
                     </li>
                     <li>
                       <span className="text-slate-400">There:</span> {oneWayMin} min

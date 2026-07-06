@@ -46,7 +46,7 @@ export async function generateMetadata(): Promise<Metadata> {
     : `$${pricing.baseRate}/hr for every job - no complex-work surcharge.`;
   return {
     title: promo
-      ? `Pricing - ${summariseForBanner(promo)} | To The Point Tech`
+      ? `Pricing - ${summariseForBanner(promo)}`
       : `Pricing - $${pricing.baseRate}/hr Tech Support in Auckland`,
     description: `Transparent tech support pricing in Auckland. ${rateBlurb} No hidden fees, no upselling. On-site and remote rates available.`,
     alternates: { canonical: "/pricing" },

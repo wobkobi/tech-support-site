@@ -6,6 +6,7 @@
 import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
 import {
   parseHourLabel,
+  splitUnitFromAddress,
   validateBookingPayloadFields,
   validateBookingRequest,
   type ExistingBooking,
@@ -13,6 +14,7 @@ import {
   type StartMinute,
   type TimeOfDay,
 } from "@/features/booking/lib/booking";
+import { lookupDriveDistance } from "@/features/business/lib/travel-distance";
 import {
   createBookingEvent,
   deleteBookingEvent,
@@ -254,6 +256,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // email notifications can show "was: <old time>".
     const previousStartAt = booking.startAt;
 
+    // Re-snapshot one-way drive time for the (possibly new) address so a late
+    // cancel bills the correct travel. Remote leaves it null so switching
+    // in-person > remote drops the old round-trip charge. Non-blocking on error.
+    let travelMinsAtBooking: number | null = null;
+    if (meetingType === "in-person" && address && address.trim()) {
+      try {
+        const drive = await lookupDriveDistance(address.trim());
+        if (drive.status === "ok") {
+          travelMinsAtBooking = drive.data.durationMins;
+        }
+      } catch (err) {
+        console.warn("[booking/edit] travel-time snapshot failed:", err);
+      }
+    }
+
     // Update the booking
     try {
       await prisma.booking.update({
@@ -268,11 +285,27 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           bufferAfterMin: config.bookingBufferAfterMin,
           rescheduleCount: { increment: 1 },
           ...(phoneE164 !== undefined ? { phone: phoneE164 } : {}),
+          // Keep the structured snapshots in step with the edit so the
+          // cancellation invoice reads the current address / meeting type /
+          // duration rather than the original booking's values.
+          address: address?.trim() ? splitUnitFromAddress(address.trim()).rest : null,
+          unit: address?.trim() ? splitUnitFromAddress(address.trim()).unit || null : null,
+          meetingType: meetingType === "in-person" ? "in_person" : "remote",
+          duration,
+          travelMinsAtBooking,
         },
       });
       console.log(`[booking/edit] Updated booking: ${booking.id}`);
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        // The update lost the slot race; the new calendar event created above is
+        // now an orphan (the old one was already deleted). Best-effort clean it
+        // up so no ghost invite sits at the rejected time.
+        if (calendarEventId) {
+          await deleteBookingEvent({ eventId: calendarEventId }).catch((err) =>
+            console.error("[booking/edit] Failed to delete orphaned calendar event:", err),
+          );
+        }
         return NextResponse.json(
           { ok: false, error: "This time slot is no longer available." },
           { status: 409 },

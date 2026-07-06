@@ -225,7 +225,7 @@ export default async function FaqPage(): Promise<React.ReactElement> {
         <>
           <p>{renderEmphasised(cancellationText)}</p>
           <p className="mt-2 text-rich-black/80">
-            The cancel page itself shows you which window you're in (free / $30 callout / $30 +
+            The cancel page itself shows you which window you're in (free / $30 call-out / $30 +
             travel) before you confirm, so there's no surprise.
           </p>
         </>

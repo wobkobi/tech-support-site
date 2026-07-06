@@ -4,8 +4,7 @@
  * @description Editor for the pricing & cancellation group. Renders each field
  * from {@link PRICING_FIELD_META}, tracks dirty state via {@link useSettingsForm}, and saves
  * to the admin settings route - surfacing inline field errors, guardrail blocks,
- * and warnings (with a "save anyway" confirm). The public site doesn't read
- * these yet; that wiring lands in the next part.
+ * and warnings (with a "save anyway" confirm).
  */
 
 import { PricingPreview } from "@/features/admin/components/settings/PricingPreview";

@@ -201,7 +201,13 @@ export function WeekView({
         <div>
           <h1 className="text-2xl font-extrabold text-russian-violet">Schedule</h1>
           <p className="mt-1 text-sm text-slate-500">
-            {days[0]?.subLabel} - {days[6]?.subLabel} ({days[0]?.date.getFullYear()})
+            {days[0]?.subLabel} - {days[6]?.subLabel} (
+            {days[0]?.date
+              ? new Intl.DateTimeFormat("en-NZ", { timeZone: NZ_TZ, year: "numeric" }).format(
+                  days[0].date,
+                )
+              : ""}
+            )
           </p>
         </div>
         <div className="flex items-center gap-2">

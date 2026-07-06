@@ -8,7 +8,7 @@
  */
 
 import { lookupDriveDistance } from "@/features/business/lib/travel-distance";
-import { errorResponse } from "@/shared/lib/api-response";
+import { errorResponse, okResponse } from "@/shared/lib/api-response";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -20,22 +20,26 @@ export const maxDuration = 60;
  * Optional `departureTimeIso` enables traffic-aware quoting; malformed/missing
  * values fall back to "now".
  * @param request - Body: `{ destination: string, departureTimeIso?: string }`.
- * @returns `{ durationMins, distanceKm }` on success, durationMins: 0 when
- *   unresolvable, 503 on misconfig / upstream errors so the operator notices.
+ * @returns `{ ok: true, durationMins, distanceKm }` on success, durationMins: 0
+ *   when unresolvable, and `{ ok: false, error }` with 503 on misconfig / 502 on
+ *   upstream errors so the operator notices.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const limited = rateLimitOrReject(request, "travel-time", 5, 60_000);
   if (limited) return limited;
 
-  const body = (await request.json()) as { destination?: unknown; departureTimeIso?: unknown };
-  const raw = body.destination;
+  const body = (await request.json().catch(() => null)) as {
+    destination?: unknown;
+    departureTimeIso?: unknown;
+  } | null;
+  const raw = body?.destination;
 
   if (!raw || typeof raw !== "string" || !raw.trim()) {
     return errorResponse("destination is required", 400);
   }
 
   let departureTime: Date | undefined;
-  if (typeof body.departureTimeIso === "string" && body.departureTimeIso.trim()) {
+  if (typeof body?.departureTimeIso === "string" && body.departureTimeIso.trim()) {
     const parsed = new Date(body.departureTimeIso);
     if (!isNaN(parsed.getTime())) departureTime = parsed;
   }
@@ -43,19 +47,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const result = await lookupDriveDistance(raw, departureTime);
   switch (result.status) {
     case "ok":
-      return NextResponse.json(result.data);
+      return okResponse({ ...result.data });
     case "no_match":
-      return NextResponse.json({ durationMins: 0 });
+      return okResponse({ durationMins: 0 });
     case "misconfig":
       console.error("[travel-time] HOME_ADDRESS or Google Maps key is not set");
-      return NextResponse.json(
-        { error: "Travel lookup is temporarily unavailable." },
-        { status: 503 },
-      );
+      return errorResponse("Travel lookup is temporarily unavailable.", 503);
     case "error":
-      return NextResponse.json(
-        { error: "Travel lookup failed. Please try again." },
-        { status: 502 },
-      );
+      return errorResponse("Travel lookup failed. Please try again.", 502);
   }
 }

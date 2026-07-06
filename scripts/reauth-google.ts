@@ -1,6 +1,5 @@
-#!/usr/bin/env npx ts-node --project tsconfig.json
+#!/usr/bin/env -S npx tsx
 /**
- * @file reauth-google.ts
  * @description Re-authorise Google OAuth for both dev and prod redirect URIs.
  * Generates two refresh tokens and writes them to google-tokens.txt.
  *

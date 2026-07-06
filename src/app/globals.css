@@ -5,8 +5,8 @@
 /* Design tokens */
 @theme inline {
   --font-sans:
-    var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, SegoeUI, Roboto, "NotoSans",
-    Arial, "AppleColorEmoji", "SegoeUIEmoji";
+    var(--font-exo), ui-sans-serif, system-ui, -apple-system, SegoeUI, Roboto, "NotoSans", Arial,
+    "AppleColorEmoji", "SegoeUIEmoji";
 
   /* rich-black */
   --color-rich-black: #001514;
@@ -92,36 +92,6 @@ html,
 body {
   height: 100%;
   overflow-x: clip;
-}
-
-/* ============================================
-   Responsive root font-size
-   ============================================
-   Scales every rem-based unit on the site - text, spacing, sizing - so
-   the layout breathes on larger displays without per-element media
-   queries. Tailwind v4's utilities are all rem-based, so changing the
-   root font-size shifts the whole design system in one place.
-
-   Breakpoints chosen for common monitor classes:
-   - <1536px:  default 16px (laptops, 1080p windowed, mobile)
-   - 1536px+:  17px (+6%) - 1440p, large laptop full-screen
-   - 1920px+:  18px (+12%) - 1080p full-width, small 4K
-   - 2560px+:  19px (+19%) - 27" 4K, 1440p ultrawide
-*/
-@media (min-width: 1536px) {
-  html {
-    font-size: 17px;
-  }
-}
-@media (min-width: 1920px) {
-  html {
-    font-size: 18px;
-  }
-}
-@media (min-width: 2560px) {
-  html {
-    font-size: 19px;
-  }
 }
 
 /* Force transparency to defeat dark-mode extensions painting body */
@@ -269,6 +239,17 @@ aside.app-admin-drawer {
   *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  /* The nav/drawer transitions declare !important on higher-specificity
+     selectors, so among equally-important declarations the universal override
+     above loses on specificity and they keep animating. Repeat the override
+     with matching selectors so reduced-motion actually stops them. */
+  div.app-nav-spacer,
+  header.app-nav-header,
+  nav.app-mobile-drawer,
+  aside.app-admin-drawer {
     transition-duration: 0.01ms !important;
   }
 }
@@ -505,10 +486,10 @@ html {
    Large-screen typography scaling
    --------------------------------------------
    The site is designed at 16px root and looks "right" on 1080p (1920px wide).
-   On bigger viewports we want it to look the same proportionally - the
-   formula below pins 16px at 1920px and scales linearly to 26px at 3840px
-   (4K), with a floor at 16px for anything narrower. Everything Tailwind
-   sizes in rem (text, padding, gaps, max-widths) follows automatically.
+   On bigger viewports the layout should scale proportionally - the formula
+   below pins 16px at 1920px and scales linearly to 26px at 3840px (4K), with
+   a floor at 16px for anything narrower. Everything Tailwind sizes in rem
+   (text, padding, gaps, max-widths) follows automatically.
    ============================================ */
 html {
   font-size: clamp(16px, calc(6px + 0.521vw), 26px);

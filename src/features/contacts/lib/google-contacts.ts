@@ -9,7 +9,7 @@
 
 import { getOAuth2Client } from "@/features/calendar/lib/google-calendar";
 import { normaliseAddress } from "@/shared/lib/normalise-address";
-import { normaliseContactPhone, toE164NZ } from "@/shared/lib/normalise-phone";
+import { isNZMobileKey, normaliseContactPhone, toE164NZ } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
 import { google } from "googleapis";
 import { clearContactConflict, recordContactConflict } from "./contact-conflicts";
@@ -58,7 +58,12 @@ export async function importFromGoogleContacts(): Promise<number> {
     for (const c of contactRows) {
       if (!c.phone || !c.email) continue;
       const norm = normaliseContactPhone(c.phone);
-      if (norm && !contactEmailByPhone.has(norm)) contactEmailByPhone.set(norm, c.email);
+      // Only resolve a phone-only Google contact to an email by a MOBILE match;
+      // landlines are often shared, so a landline hit would give the Google
+      // contact the wrong person's email (and merge them).
+      if (norm && isNZMobileKey(norm) && !contactEmailByPhone.has(norm)) {
+        contactEmailByPhone.set(norm, c.email);
+      }
     }
 
     let pageToken: string | undefined;
@@ -125,25 +130,44 @@ export async function importFromGoogleContacts(): Promise<number> {
       const [emailMatches, phoneMatches] = await Promise.all([
         emailsToCheck.length > 0
           ? prisma.contact.findMany({
-              where: { email: { in: emailsToCheck }, deletedAt: null },
-              select: { id: true, email: true, name: true, address: true },
+              where: {
+                deletedAt: null,
+                OR: [{ email: { in: emailsToCheck } }, { altEmails: { hasSome: emailsToCheck } }],
+              },
+              select: { id: true, email: true, altEmails: true, name: true, address: true },
             })
-          : Promise.resolve([] as (MatchRow & { email: string | null })[]),
+          : Promise.resolve([] as (MatchRow & { email: string | null; altEmails: string[] })[]),
         phonesToCheck.length > 0
           ? prisma.contact.findMany({
-              where: { phone: { in: phonesToCheck }, deletedAt: null },
-              select: { id: true, phone: true, name: true, address: true },
+              where: {
+                deletedAt: null,
+                OR: [{ phone: { in: phonesToCheck } }, { altPhones: { hasSome: phonesToCheck } }],
+              },
+              select: { id: true, phone: true, altPhones: true, name: true, address: true },
             })
-          : Promise.resolve([] as (MatchRow & { phone: string | null })[]),
+          : Promise.resolve([] as (MatchRow & { phone: string | null; altPhones: string[] })[]),
       ]);
 
+      // Key the lookup by every address the contact owns that appears in this
+      // page (primary + alts), so a Google contact matching an alt email/phone
+      // updates the existing record instead of creating a duplicate.
+      const emailSet = new Set(emailsToCheck);
       const contactByEmail = new Map<string, MatchRow>();
       for (const c of emailMatches) {
-        if (c.email) contactByEmail.set(c.email, { id: c.id, name: c.name, address: c.address });
+        for (const e of [c.email, ...c.altEmails]) {
+          if (e && emailSet.has(e) && !contactByEmail.has(e)) {
+            contactByEmail.set(e, { id: c.id, name: c.name, address: c.address });
+          }
+        }
       }
+      const phoneSet = new Set(phonesToCheck);
       const contactByPhone = new Map<string, MatchRow>();
       for (const c of phoneMatches) {
-        if (c.phone) contactByPhone.set(c.phone, { id: c.id, name: c.name, address: c.address });
+        for (const p of [c.phone, ...c.altPhones]) {
+          if (p && phoneSet.has(p) && !contactByPhone.has(p)) {
+            contactByPhone.set(p, { id: c.id, name: c.name, address: c.address });
+          }
+        }
       }
 
       // Writes stay sequential so a page that contains the same email/phone twice
@@ -215,7 +239,16 @@ export async function importFromGoogleContacts(): Promise<number> {
                 lastSyncedAt: new Date(),
                 lastGoogleEtag: r.etag,
               };
-              if (r.name && (namePlaceholder || r.name !== existing.name)) updates.name = r.name;
+              // Fill a placeholder name freely, but only let a real Google name
+              // OVERWRITE a real local name when matched on a mobile - a name
+              // mismatch on a shared landline is likely a different household
+              // member, not a rename. Linking the id still avoids duplicates.
+              if (
+                r.name &&
+                (namePlaceholder || (r.name !== existing.name && isNZMobileKey(r.normPhone)))
+              ) {
+                updates.name = r.name;
+              }
               // Same changed-only address canonicalisation as the email branch.
               if (r.address && r.address !== existing.address) {
                 updates.address = (await normaliseAddress(r.address)) ?? r.address;
@@ -473,6 +506,10 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
       updateFields.push("addresses");
     }
 
+    // Track push success so a failed write to Google is not stamped as synced,
+    // which would drop the contact from the dirty set and strand the admin's
+    // local edit (never retrying the push).
+    let pushOk = true;
     if (updateFields.length > 0 && currentEtag) {
       try {
         const updated = await people.people.updateContact({
@@ -484,15 +521,18 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
         googlePerson.etag = updated.data.etag ?? currentEtag;
       } catch (err) {
         console.error(`[google-contacts] updateContact failed for ${resourceName}:`, err);
+        pushOk = false;
       }
     }
 
     // Build the site update from pull actions + the merged phones
     const siteUpdate: Record<string, unknown> = {
       googleContactId: resourceName,
-      lastSyncedAt: new Date(),
       lastGoogleEtag: googlePerson.etag ?? currentEtag,
     };
+    // Only mark the local edit as synced when the push actually succeeded;
+    // otherwise leave lastSyncedAt so the dirty-set retries the push next run.
+    if (pushOk) siteUpdate.lastSyncedAt = new Date();
     if (nameAction === "pull" && googleName) siteUpdate.name = googleName;
     if (emailAction === "pull" && googleEmail) siteUpdate.email = googleEmail;
     if (addressAction === "pull" && googleAddress) {

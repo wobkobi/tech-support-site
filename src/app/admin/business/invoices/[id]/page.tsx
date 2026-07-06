@@ -133,7 +133,8 @@ export default async function InvoiceViewPage({
           </thead>
           <tbody>
             {invoice.lineItems.map((item, idx) => (
-              <tr key={idx} className={cn(idx % 2 === 1 ? "bg-slate-50" : "bg-white")}>
+              // No zebra striping - matches the generated PDF and the builder preview panel.
+              <tr key={idx}>
                 <td className="px-2 py-2 align-top wrap-break-word text-slate-700 sm:px-3">
                   {item.description}
                 </td>
@@ -200,7 +201,7 @@ export default async function InvoiceViewPage({
         {invoice.notes && <p className="mt-3 text-xs text-slate-500 italic">{invoice.notes}</p>}
 
         {/* Sender contact footer (matches the page-bottom footer in the PDF). */}
-        <div className="mt-8 border-t border-slate-200 pt-3 text-center text-xs text-slate-500">
+        <div className="mt-8 border-t border-slate-200 pt-3 text-center text-xs wrap-break-word text-slate-500">
           {identity.email} &nbsp;·&nbsp; {identity.phone} &nbsp;·&nbsp; {identity.website}
           &nbsp;·&nbsp; {identity.location}
         </div>

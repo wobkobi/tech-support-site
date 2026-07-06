@@ -50,10 +50,21 @@ export async function getInvoiceCounter(): Promise<InvoiceCounterData> {
   });
   const ranges = res.data.valueRanges ?? [];
   const prefix = (ranges[0]?.values?.[0]?.[0] as string | undefined) ?? "TTP";
-  const yearRaw = (ranges[1]?.values?.[0]?.[0] as string | undefined) ?? "";
+  const yearRaw = ((ranges[1]?.values?.[0]?.[0] as string | undefined) ?? "").trim();
   const lastRaw = ranges[2]?.values?.[0]?.[0];
   const yearCode = yearRaw.replace("-", "");
-  const lastNumber = lastRaw ? parseInt(String(lastRaw), 10) : 0;
+  // Guard against manually-mistyped SETTINGS cells (a blank B11, a "#REF!"
+  // error, or a stray non-numeric B19). Throwing here hands off to the Prisma
+  // fallback in getNextInvoiceNumber rather than minting a poisoned number like
+  // "TTP--0001" or "TTP-...-0NaN" that would then be written back to the sheet.
+  if (!/^\d{4,6}$/.test(yearCode)) {
+    throw new Error(`Invoice counter: SETTINGS!B11 financial year is malformed ("${yearRaw}")`);
+  }
+  const lastNumber =
+    lastRaw != null && String(lastRaw).trim() !== "" ? parseInt(String(lastRaw), 10) : 0;
+  if (!Number.isInteger(lastNumber) || lastNumber < 0) {
+    throw new Error(`Invoice counter: SETTINGS!B19 is not a valid number ("${String(lastRaw)}")`);
+  }
   const nextNumber = lastNumber + 1;
   const nextFormatted = `${prefix}-${yearCode}-${String(nextNumber).padStart(4, "0")}`;
   return { prefix, yearCode, lastNumber, nextNumber, nextFormatted };

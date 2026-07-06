@@ -3,6 +3,8 @@
  * @description PATCH /api/reviews/[id] - Allows a customer to edit their review (with valid customerRef), resets status to pending.
  */
 
+import { revalidateReviewPaths } from "@/features/reviews/lib/revalidate";
+import { reviewTextError } from "@/features/reviews/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";
 import { prisma } from "@/shared/lib/prisma";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
@@ -11,35 +13,26 @@ import { NextRequest, NextResponse } from "next/server";
 /**
  * PATCH /api/reviews/[id] - Allows a customer to edit their review.
  * @param request - The incoming request with review data and customerRef.
- * @param root0 - Route params wrapper.
- * @param root0.params - Route segment params.
- * @param root0.params.id - The review ID.
+ * @param root0 - Route context.
+ * @param root0.params - Resolved route params containing the review ID.
  * @returns JSON response indicating success or failure.
  */
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   const limited = rateLimitOrReject(request, "review-edit", 5, 60_000);
   if (limited) return limited;
 
   try {
-    const { id } = params;
+    const { id } = await params;
     const body = await request.json();
     const { text, firstName, lastName, isAnonymous, customerRef } = body;
 
-    if (!text || text.trim().length < 10) {
-      return NextResponse.json(
-        { error: "Review must be at least 10 characters." },
-        { status: 400 },
-      );
-    }
-    if (text.length > 600) {
-      return NextResponse.json(
-        { error: "Review must be 600 characters or less." },
-        { status: 400 },
-      );
-    }
+    // Same 10-1000 char rule as the create path (reviewTextError), so a review
+    // that was accepted on submit can always be edited.
+    const textErr = reviewTextError(text);
+    if (textErr) return errorResponse(textErr, 400);
 
     // Find review and check customerRef
     const review = await prisma.review.findUnique({ where: { id } });
@@ -84,6 +77,10 @@ export async function PATCH(
         status: "pending",
       },
     });
+
+    // The edit flips the review back to pending, so it must drop off the public
+    // marquee / reviews page immediately rather than after the 24h cache TTL.
+    revalidateReviewPaths();
 
     // Fire-and-forget: notify owner of edit
     try {

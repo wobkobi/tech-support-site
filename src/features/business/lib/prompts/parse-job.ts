@@ -191,7 +191,7 @@ TASK SPLITTING — purely about identifying distinct tasks. Time distribution li
 
 OTHER RULES:
 - tasks[].rateConfigId should always be null for work tasks.
-- tasks[].baseRateLabel should always be "Standard". tasks[].modifierLabels picked per the modifier rules above (empty array if none).
+- tasks[].baseRateLabel: use the current name of the base hourly rate from the "Current rates" list (the row with a ratePerHour set - normally "Standard", but its renamed label if it was renamed). tasks[].modifierLabels picked per the modifier rules above (empty array if none).
 - DO NOT emit a unitPrice field on tasks - the server computes it from baseRateLabel + modifierLabels.
 - Only include parts if the user explicitly mentions a physical component they supplied. Do not invent parts.
 - parts[].description: rewrite the product title into the SHORTEST name by which a non-technical client would still recognise exactly what was bought.
@@ -242,7 +242,7 @@ Return this exact JSON shape (when not asking for clarification):
   "tasks": [
     {
       "rateConfigId": null,
-      "baseRateLabel": "Standard",
+      "baseRateLabel": string,
       "modifierLabels": string[],
       "device": string,
       "action": string,

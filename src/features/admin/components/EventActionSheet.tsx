@@ -13,9 +13,8 @@ import type {
   WeekEventBooking,
 } from "@/features/admin/lib/schedule-types";
 import { cn } from "@/shared/lib/cn";
-import { useRouter } from "next/navigation";
 import type React from "react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface EventActionSheetProps {
   /**
@@ -46,12 +45,36 @@ export function EventActionSheet({
   onChanged,
   onClose,
 }: EventActionSheetProps): React.ReactElement {
-  const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<ToastState>(null);
   // Stable "now" so the past/future booking checks don't get flagged for
   // calling an impure function during render.
   const [renderedAt] = useState(() => Date.now());
+
+  // Keep the latest onClose without re-running the dialog effect (parent passes
+  // a fresh closure each render). Updated in an effect so the ref is never
+  // written during render.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
+
+  // Close on Escape and restore focus to the opener when the sheet unmounts.
+  useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
+    /**
+     * Closes the sheet when Escape is pressed.
+     * @param e - Keydown event.
+     */
+    function onKey(e: KeyboardEvent): void {
+      if (e.key === "Escape") onCloseRef.current();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      opener?.focus?.();
+    };
+  }, []);
 
   const booking = event.booking;
   const status: BookingStatus = booking.status;
@@ -104,9 +127,7 @@ export function EventActionSheet({
   async function handleComplete(): Promise<void> {
     const ok = await patch({ status: "completed" });
     if (ok) {
-      showToast("Marked completed.");
       onChanged();
-      router.refresh();
       onClose();
     }
   }
@@ -124,9 +145,7 @@ export function EventActionSheet({
     if (!window.confirm(confirmMsg)) return;
     const ok = await patch({ status: "cancelled", cancelMode: mode });
     if (ok) {
-      showToast("Cancelled.");
       onChanged();
-      router.refresh();
       onClose();
     }
   }
@@ -141,9 +160,7 @@ export function EventActionSheet({
       return;
     const ok = await patch({ markNoShow: true });
     if (ok) {
-      showToast("Marked no-show.");
       onChanged();
-      router.refresh();
       onClose();
     }
   }
@@ -161,7 +178,6 @@ export function EventActionSheet({
         showToast(data.error ?? "Failed to send.", "warn");
         return;
       }
-      showToast("Review email sent.");
       onChanged();
       onClose();
     } catch (err) {
@@ -186,9 +202,7 @@ export function EventActionSheet({
         showToast(data.error ?? "Delete failed.", "warn");
         return;
       }
-      showToast("Deleted.");
       onChanged();
-      router.refresh();
       onClose();
     } catch (err) {
       console.error("[EventActionSheet] DELETE failed", err);

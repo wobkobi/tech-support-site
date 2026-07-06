@@ -10,6 +10,7 @@ import {
   type ContactSuggestion,
 } from "@/features/reviews/components/admin/SendReviewLinkForm";
 import { formatDateShort } from "@/shared/lib/date-format";
+import { useRouter } from "next/navigation";
 import type React from "react";
 import { useState } from "react";
 import { FaCheck } from "react-icons/fa6";
@@ -51,6 +52,7 @@ export function DashboardQuickActions({
   pastConfirmedBookings: initial,
   contactSuggestions,
 }: DashboardQuickActionsProps): React.ReactElement {
+  const router = useRouter();
   const [bookings, setBookings] = useState<PastBookingRow[]>(initial);
   const [completing, setCompleting] = useState<string | null>(null);
   const [done, setDone] = useState<Set<string>>(new Set());
@@ -77,6 +79,9 @@ export function DashboardQuickActions({
       }
 
       setDone((prev) => new Set(prev).add(id));
+      // Re-render the server components so the dashboard stat cards (Confirmed
+      // bookings, Pending reviews) reflect the completion.
+      router.refresh();
       // Remove from list after a short delay so the user sees the success state
       setTimeout(() => {
         setBookings((prev) => prev.filter((b) => b.id !== id));

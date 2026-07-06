@@ -10,6 +10,7 @@ import { Button } from "@/shared/components/Button";
 import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
+import { useEffect } from "react";
 import { FaArrowRotateRight, FaCalendarDays } from "react-icons/fa6";
 
 /**
@@ -26,7 +27,11 @@ export default function BookingError({
   error: Error;
   reset: () => void;
 }): React.ReactElement {
-  const msg = (error?.message || "").trim().slice(0, 300) || "An unexpected error occurred.";
+  // Log the raw error for debugging rather than showing it to the customer -
+  // client-render exceptions carry library internals/URLs that aren't redacted.
+  useEffect(() => {
+    console.error("[booking] error boundary:", error);
+  }, [error]);
 
   return (
     <PageShell>
@@ -44,14 +49,6 @@ export default function BookingError({
             <p className="mb-6 text-base text-rich-black sm:text-lg md:text-xl">
               Nothing has been booked yet, so you haven&apos;t lost anything. Give it another go, or
               get in touch and I&apos;ll sort it out.
-            </p>
-
-            <p
-              className="mb-6 text-sm wrap-break-word text-rich-black/70 italic sm:text-base"
-              role="status"
-              aria-live="polite"
-            >
-              {msg}
             </p>
 
             <div className="flex flex-wrap items-center justify-center gap-3">

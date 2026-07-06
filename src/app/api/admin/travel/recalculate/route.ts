@@ -10,6 +10,11 @@ import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { type NextRequest, NextResponse } from "next/server";
 
+// Raise the serverless ceiling: this route nulls every TravelBlock then makes up
+// to 3 Distance Matrix calls per future event sequentially inside the refresh, so
+// it is the heaviest admin route and must not be killed on the default timeout.
+export const maxDuration = 60;
+
 /**
  * Force-deletes all TravelBlock records and runs a full calendar cache refresh
  * so stale travel times are replaced with freshly-fetched values.

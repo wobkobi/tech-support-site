@@ -33,6 +33,8 @@ interface Props {
   promoDiscount: number;
   /** Half-price labour discount when operator ticked unsuccessful; rendered when > 0. */
   unsuccessfulDiscount?: number;
+  /** Live GST-registration flag; controls the "Includes GST" line so the preview matches the saved invoice. */
+  gstRegistered?: boolean;
 }
 
 /**
@@ -50,6 +52,7 @@ interface Props {
  * @param props.promoTitle - Promo title (when discount > 0).
  * @param props.promoDiscount - Promo discount in dollars; renders the line when > 0.
  * @param props.unsuccessfulDiscount - Half-price labour discount; renders the line when > 0.
+ * @param props.gstRegistered - Live GST-registration flag; controls the "Includes GST" line.
  * @returns Invoice preview element.
  */
 function InvoicePreviewPanelImpl({
@@ -64,8 +67,9 @@ function InvoicePreviewPanelImpl({
   promoTitle,
   promoDiscount,
   unsuccessfulDiscount = 0,
+  gstRegistered,
 }: Props): React.ReactElement {
-  const totals = calcInvoiceTotals(lineItems, promoDiscount + unsuccessfulDiscount);
+  const totals = calcInvoiceTotals(lineItems, promoDiscount + unsuccessfulDiscount, gstRegistered);
   const showPromoLine = promoDiscount > 0;
   const showUnsuccessfulLine = unsuccessfulDiscount > 0;
   return (
@@ -190,7 +194,7 @@ function InvoicePreviewPanelImpl({
           </div>
           {showPromoLine && (
             <div className="flex justify-between gap-3 text-amber-700">
-              <span>Promo (labor only){promoTitle ? `: ${promoTitle}` : ""}</span>
+              <span>Promo (labour only){promoTitle ? `: ${promoTitle}` : ""}</span>
               <span className="whitespace-nowrap">-{formatNZD(promoDiscount)}</span>
             </div>
           )}
@@ -230,7 +234,7 @@ function InvoicePreviewPanelImpl({
         {notes && <p className="mb-6 text-[11px] text-slate-500">{notes}</p>}
 
         {/* Sender contact footer. */}
-        <div className="mt-auto border-t border-slate-200 pt-3 text-center text-[10px] text-slate-500">
+        <div className="mt-auto border-t border-slate-200 pt-3 text-center text-[10px] wrap-break-word text-slate-500">
           {identity.email} · {identity.phone} · {identity.website} · {identity.location}
         </div>
       </div>

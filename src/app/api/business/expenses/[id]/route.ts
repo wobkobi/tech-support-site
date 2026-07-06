@@ -79,17 +79,26 @@ export async function PUT(
   });
 
   // Write through to the sheet. If the edited date moved the entry into a
-  // different FY workbook, delete the row from the old sheet and append to the
-  // new one; otherwise update the existing row in place by Sync ID.
+  // different FY workbook, append to the new sheet BEFORE deleting the old row
+  // so a failure can't strand the entry off-sheet; otherwise update in place.
   let sheetRowKey = existing.sheetRowKey;
   try {
     const newSheetId = await resolveSheetIdForDate(updated.date);
     const oldSheetId = await resolveSheetIdForDate(existing.date);
-    if (sheetRowKey && oldSheetId && newSheetId !== oldSheetId) {
-      await deleteRowBySyncId(oldSheetId, "Expenses", sheetRowKey);
-      sheetRowKey = null;
-    }
-    if (newSheetId) {
+    if (sheetRowKey && oldSheetId && newSheetId && newSheetId !== oldSheetId) {
+      // Cross-FY move: create the new row first and persist its key, then
+      // remove the old row best-effort. A failed append leaves the old row
+      // intact (outer catch); a failed delete leaves a logged stray, not a
+      // lost entry.
+      const oldKey = sheetRowKey;
+      sheetRowKey = await appendRowWithSyncId(newSheetId, "Expenses", buildExpenseCells(updated));
+      await prisma.expenseEntry.update({ where: { id }, data: { sheetRowKey } });
+      try {
+        await deleteRowBySyncId(oldSheetId, "Expenses", oldKey);
+      } catch (delErr) {
+        console.error(`[expenses] Cross-FY move: old row delete failed for ${id}:`, delErr);
+      }
+    } else if (newSheetId) {
       if (sheetRowKey) {
         const result = await updateRowBySyncId(
           newSheetId,
@@ -101,9 +110,9 @@ export async function PUT(
       } else {
         sheetRowKey = await appendRowWithSyncId(newSheetId, "Expenses", buildExpenseCells(updated));
       }
-    }
-    if (sheetRowKey !== existing.sheetRowKey) {
-      await prisma.expenseEntry.update({ where: { id }, data: { sheetRowKey } });
+      if (sheetRowKey !== existing.sheetRowKey) {
+        await prisma.expenseEntry.update({ where: { id }, data: { sheetRowKey } });
+      }
     }
   } catch (err) {
     console.error(`[expenses] Failed to update sheet row for entry ${id}:`, err);

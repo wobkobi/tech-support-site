@@ -1,6 +1,5 @@
 // scripts/build-icons/config.ts
 /**
- * @file config.ts
  * @description Configuration and specifications for icon/image generation.
  */
 
@@ -313,6 +312,9 @@ export const QR_CODE_SPECS: QRCodeSpec[] = [
   {
     name: "qr-booking",
     displayName: "Booking QR Code",
-    url: "tothepoint.co.nz/booking", // Shorter URL without https://
+    // Canonical www origin (matches getSiteUrl) so the scan lands on the real
+    // host, not an apex > www redirect hop. Scheme omitted to keep the encode
+    // short - phones prepend https:// automatically.
+    url: "www.tothepoint.co.nz/booking",
   },
 ];

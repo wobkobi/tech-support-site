@@ -36,7 +36,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return errorResponse("Unauthorized", 401);
   }
 
-  const body = (await request.json()) as BlockedDayPayload;
+  const body = (await request.json().catch(() => null)) as BlockedDayPayload | null;
+  if (!body) {
+    return errorResponse("Invalid request body.", 400);
+  }
   const dateKey = body.dateKey?.trim() ?? "";
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {

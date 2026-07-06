@@ -55,7 +55,10 @@ export async function PATCH(
   }
 
   const { id } = await params;
-  const body = (await request.json()) as PatchPayload;
+  const body = (await request.json().catch(() => null)) as PatchPayload | null;
+  if (!body) {
+    return errorResponse("Invalid request body.", 400);
+  }
 
   // Load the booking
   const booking = await prisma.booking.findUnique({ where: { id } });
@@ -76,6 +79,12 @@ export async function PATCH(
     const newAddress = body.address.trim();
     if (/^Address:\s*/im.test(currentNotes)) {
       data.notes = currentNotes.replace(/^(Address:\s*).*$/im, newAddress ? `$1${newAddress}` : "");
+    } else if (newAddress) {
+      // No existing Address: line (e.g. a remote booking being made in-person) -
+      // append one rather than dropping the edit, so notes and the contact agree.
+      data.notes = currentNotes
+        ? `${currentNotes}\nAddress: ${newAddress}`
+        : `Address: ${newAddress}`;
     }
   }
 

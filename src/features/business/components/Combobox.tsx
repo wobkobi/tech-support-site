@@ -53,7 +53,6 @@ export function Combobox({
   inputClassName,
 }: Props): React.ReactElement {
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
   const listId = useId();
   const [open, setOpen] = useState(false);
   const [rawHighlight, setHighlight] = useState(0);
@@ -95,7 +94,7 @@ export function Combobox({
   }, []);
 
   /**
-   * Selects an option by value, closes the panel, and refocuses the input.
+   * Selects an option by value and closes the panel.
    * @param next - The chosen value.
    */
   function select(next: string): void {
@@ -128,12 +127,14 @@ export function Combobox({
   return (
     <div ref={wrapperRef} className={cn("relative", className)}>
       <input
-        ref={inputRef}
         type="text"
         role="combobox"
         aria-autocomplete="list"
         aria-expanded={open}
         aria-controls={listId}
+        aria-activedescendant={
+          open && options.length > 0 ? `${listId}-opt-${highlight}` : undefined
+        }
         aria-label={ariaLabel}
         value={value}
         placeholder={placeholder}
@@ -158,6 +159,7 @@ export function Combobox({
           {options.map((opt, i) => (
             <li
               key={`${opt.isCreate ? "__create__" : "s"}:${opt.value}`}
+              id={`${listId}-opt-${i}`}
               role="option"
               aria-selected={i === highlight}
               onMouseEnter={() => setHighlight(i)}

@@ -12,6 +12,7 @@ import {
 } from "@/features/booking/lib/booking";
 import {
   createBookingEvent,
+  deleteBookingEvent,
   fetchAllCalendarEvents,
   SCHEDULE_CALENDAR_TAG,
 } from "@/features/calendar/lib/google-calendar";
@@ -55,7 +56,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   // Parse the payload; trim free-text fields and lowercase the email
-  const body = (await request.json()) as AdminBookingPayload;
+  const body = (await request.json().catch(() => null)) as AdminBookingPayload | null;
+  if (!body) {
+    return errorResponse("Invalid request body.", 400);
+  }
   const name = body.name?.trim() ?? "";
   const email = body.email?.trim().toLowerCase() ?? "";
   const phoneRaw = body.phone?.trim() || null;
@@ -191,6 +195,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         name,
         email,
         phone: phoneE164,
+        // Persist the address to its own column (not only inside the notes text)
+        // so the schedule agenda's "Open in Maps" link and the cancellation-invoice
+        // draft can read booking.address for manually-created bookings too.
+        address,
         notes: bookingNotes,
         startAt,
         endAt,
@@ -233,6 +241,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     revalidateTag(SCHEDULE_CALENDAR_TAG, {});
     return NextResponse.json({ ok: true, bookingId: booking.id });
   } catch (err) {
+    // Roll back the calendar event created before the insert so a failed insert
+    // (slot race or otherwise) doesn't leave an orphan event on the calendar.
+    if (calendarEventId) {
+      try {
+        await deleteBookingEvent({ eventId: calendarEventId });
+      } catch (cleanupErr) {
+        console.error("[admin/bookings] Failed to clean up orphan calendar event:", cleanupErr);
+      }
+    }
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
       return errorResponse("This slot was just taken.", 409);
     }

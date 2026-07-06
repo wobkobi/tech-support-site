@@ -21,7 +21,7 @@ const exo = Exo({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700", "800"],
   display: "swap",
-  variable: "--font-geist-sans",
+  variable: "--font-exo",
 });
 
 const siteUrl = getSiteUrl();

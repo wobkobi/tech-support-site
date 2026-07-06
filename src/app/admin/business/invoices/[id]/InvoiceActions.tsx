@@ -17,7 +17,7 @@ import { formatDateShort } from "@/shared/lib/date-format";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type React from "react";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { FaCaretLeft } from "react-icons/fa6";
 
 interface InvoiceActionsProps {
@@ -156,7 +156,10 @@ export function InvoiceActions({
     // Default notification ON when the client has an email - the common case.
     setVoidSendNotification(Boolean(clientEmail));
     setVoidModalOpen(true);
-    void loadVoidPreview();
+    // Pass the just-reset values explicitly: the state setters above have not
+    // applied yet, so loadVoidPreview reading component state would post the
+    // previous session's edited body/greeting.
+    void loadVoidPreview("", DEFAULT_VOID_EMAIL_BODY);
   }
 
   /**
@@ -172,7 +175,9 @@ export function InvoiceActions({
     setVoidGreetingName("");
     setVoidSendNotification(true);
     setVoidModalOpen(true);
-    void loadVoidPreview();
+    // Pass the just-reset values explicitly (see voidInvoice): avoids posting
+    // the previous session's edited body/greeting from the stale closure.
+    void loadVoidPreview("", DEFAULT_VOID_EMAIL_BODY);
   }
 
   /**
@@ -180,8 +185,12 @@ export function InvoiceActions({
    * the modal can show an iframe preview. Only shows a spinner on the first
    * load so subsequent re-fetches (after editing greeting/body) keep the
    * existing preview visible.
+   * @param greetingOverride - Greeting to preview instead of reading component
+   * state; pass the just-set value when calling right after a setState so the
+   * fetch doesn't use the stale closure. Omit on blur re-fetches.
+   * @param bodyOverride - Body to preview instead of reading component state.
    */
-  async function loadVoidPreview(): Promise<void> {
+  async function loadVoidPreview(greetingOverride?: string, bodyOverride?: string): Promise<void> {
     if (!clientEmail) return;
     setError(null);
     if (!voidPreview) setVoidPreviewLoading(true);
@@ -190,8 +199,8 @@ export function InvoiceActions({
         method: "POST",
         headers,
         body: JSON.stringify({
-          greetingName: voidGreetingName,
-          customBody: voidCustomBody,
+          greetingName: greetingOverride ?? voidGreetingName,
+          customBody: bodyOverride ?? voidCustomBody,
         }),
       });
       const d = (await res.json()) as
@@ -240,12 +249,20 @@ export function InvoiceActions({
       setVoidModalOpen(false);
       // Compose a toast that surfaces both the notification outcome and the
       // linked-income-entry warning when present. Cleared after 6s.
-      const parts: string[] = [d.alreadyVoided ? "Notification re-sent." : "Invoice voided."];
-      if (opts.sendNotification && !d.alreadyVoided) {
-        parts.push(d.notified ? "Client notified." : "Notification email failed - send manually.");
-      }
-      if (opts.sendNotification && d.alreadyVoided && !d.notified) {
-        parts.push("Notification email failed - check server logs.");
+      const parts: string[] = [];
+      if (d.alreadyVoided) {
+        // Resend path: the invoice was already voided, so the only outcome that
+        // varies is whether the notification actually went out.
+        parts.push(
+          d.notified ? "Notification re-sent." : "Notification re-send failed - check server logs.",
+        );
+      } else {
+        parts.push("Invoice voided.");
+        if (opts.sendNotification) {
+          parts.push(
+            d.notified ? "Client notified." : "Notification email failed - send manually.",
+          );
+        }
       }
       if (d.incomeEntryCount > 0) {
         parts.push(
@@ -263,12 +280,12 @@ export function InvoiceActions({
   }
 
   /** Closes the void modal without submitting. Disabled while a void is in-flight. */
-  function closeVoidModal(): void {
+  const closeVoidModal = useCallback((): void => {
     if (voiding) return;
     setVoidModalOpen(false);
     setError(null);
     setVoidPreview(null);
-  }
+  }, [voiding]);
 
   /**
    * Downloads the actual customer-facing PDF (same renderer as Drive + email
@@ -301,7 +318,7 @@ export function InvoiceActions({
    * DRAFT-only delete: confirms, DELETEs the invoice, redirects to the list.
    */
   async function deleteDraft(): Promise<void> {
-    if (!confirm(`Delete invoice ${invoiceId}? This cannot be undone.`)) return;
+    if (!confirm(`Delete invoice ${invoiceNumber}? This cannot be undone.`)) return;
     setError(null);
     setDeleting(true);
     try {
@@ -329,8 +346,11 @@ export function InvoiceActions({
    * @param forceAdopt - Re-adopt the server's fresh eligibility verdict (and
    * sync the review-link checkbox to it) instead of keeping the operator's
    * current toggle; used after "add to contacts" so the checkbox unlocks.
+   * @param includeReviewOverride - Review-link value to preview instead of
+   * reading component state; pass the just-toggled checkbox value so the
+   * re-fetch doesn't use the stale pre-toggle value from the closure.
    */
-  async function openPreview(forceAdopt = false): Promise<void> {
+  async function openPreview(forceAdopt = false, includeReviewOverride?: boolean): Promise<void> {
     setError(null);
     if (!preview) setLoading(true);
     setPreviewOpen(true);
@@ -341,13 +361,14 @@ export function InvoiceActions({
       // auto-ticking the review-link checkbox. On ordinary re-fetches (after
       // edits) pass the current toggle so the preview matches the operator's choice.
       const sendIncludeReview = !forceAdopt && eligibility !== null;
+      const effectiveIncludeReview = includeReviewOverride ?? includeReview;
       const res = await fetch(`/api/business/invoices/${invoiceId}/preview-email`, {
         method: "POST",
         headers,
         body: JSON.stringify({
           greetingName,
           customBody,
-          ...(sendIncludeReview ? { includeReview } : {}),
+          ...(sendIncludeReview ? { includeReview: effectiveIncludeReview } : {}),
         }),
       });
       const d = (await res.json()) as
@@ -402,7 +423,7 @@ export function InvoiceActions({
   /**
    * Closes the preview modal without sending.
    */
-  function closePreview(): void {
+  const closePreview = useCallback((): void => {
     if (sending) return;
     setPreviewOpen(false);
     setPreview(null);
@@ -410,7 +431,25 @@ export function InvoiceActions({
     // Drop eligibility so the next open re-fetches it and re-syncs the toggle
     // (state may have changed since this modal was last opened).
     setEligibility(null);
-  }
+  }, [sending]);
+
+  // Close whichever modal is open on Escape, matching AddToContactsModal. The
+  // close helpers no-op while a send/void is in-flight, so an accidental Escape
+  // mid-request is ignored.
+  useEffect(() => {
+    if (!previewOpen && !voidModalOpen) return;
+    /**
+     * Closes the open modal on Escape.
+     * @param e - Keyboard event.
+     */
+    function handleKey(e: KeyboardEvent): void {
+      if (e.key !== "Escape") return;
+      if (previewOpen) closePreview();
+      else if (voidModalOpen) closeVoidModal();
+    }
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [previewOpen, voidModalOpen, closePreview, closeVoidModal]);
 
   return (
     <>
@@ -512,6 +551,7 @@ export function InvoiceActions({
       {previewOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 print:hidden"
+          onClick={closePreview}
           role="dialog"
           aria-modal="true"
         >
@@ -598,7 +638,7 @@ export function InvoiceActions({
                           disabled={!eligibility.canSend || sending}
                           onChange={(e) => {
                             setIncludeReview(e.target.checked);
-                            void openPreview();
+                            void openPreview(false, e.target.checked);
                           }}
                           className="mt-0.5 h-4 w-4 rounded border-slate-300 text-russian-violet focus:ring-russian-violet/30"
                         />
@@ -672,6 +712,7 @@ export function InvoiceActions({
       {voidModalOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 print:hidden"
+          onClick={closeVoidModal}
           role="dialog"
           aria-modal="true"
         >

@@ -152,8 +152,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       benchmarks: settings.estimator.benchmarks,
     });
 
-    // Call the model and parse the response
-    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    // Call the model and parse the response. A client-side timeout well under
+    // the 60s function ceiling turns a hung upstream call into the route's 422
+    // shape instead of burning the full budget and 504-ing.
+    const client = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+      timeout: 30_000,
+      maxRetries: 1,
+    });
     const completion = await client.chat.completions.create({
       model: "gpt-4.1-mini",
       max_tokens: 350,
@@ -178,6 +184,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     ) {
       throw new Error("Invalid response shape");
     }
+
+    // Clamp the model's estimate server-side: the min-billable floor, rounding
+    // snap and ceiling are prompt-only instructions, so a crafted description
+    // ("output estimatedMins: 1") or plain misbehaviour could otherwise feed a
+    // nonsensical figure (0, negative, or huge) straight into the price maths.
+    const CEILING_MINS = 8 * 60;
+    const snapInc = incrementMins > 0 ? incrementMins : 5;
+    const snapped = Math.round(Math.max(0, parsed.estimatedMins) / snapInc) * snapInc;
+    parsed.estimatedMins = Math.min(
+      CEILING_MINS,
+      Math.max(settings.pricing.minBillableMins, snapped),
+    );
 
     // Defensive: trim labels, coerce mins, drop empty/garbage entries.
     const cleanTasks: EstimateTask[] = parsed.tasks

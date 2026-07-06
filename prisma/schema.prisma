@@ -123,6 +123,9 @@ model Booking {
 
   // Double-booking prevention: set to startAt.toISOString() when active (held/confirmed),
   // set to "released:<id>" when cancelled or expired so the slot is freed without null collisions.
+  // Invariant: every creation path MUST set this. It is nullable only for schema
+  // history - a null must never be written, because MongoDB's unique index treats
+  // a second null as a duplicate and would P2002 as a spurious "slot taken".
   activeSlotKey String? @unique
 
   // Google Calendar event ID, used to delete the event on cancellation.

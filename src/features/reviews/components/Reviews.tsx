@@ -54,22 +54,31 @@ function ReviewText({ text }: { text: string }): React.ReactElement {
  * @param props.r - The review item.
  * @param props.className - Additional class names for the card.
  * @param props.style - Optional inline styles for the card.
+ * @param [props.decorative] - True for the duplicated marquee copy: hidden from
+ * assistive tech and removed from the tab order so each review is announced once.
  * @returns A list item card linking to the reviews page.
  */
 function ReviewCard({
   r,
   className,
   style,
+  decorative = false,
 }: {
   r: ReviewItem;
   className: string;
   style?: React.CSSProperties;
+  decorative?: boolean;
 }): React.ReactElement {
   return (
-    <li className={cn("cursor-pointer", className)} style={style}>
+    <li
+      className={cn("cursor-pointer", className)}
+      style={style}
+      aria-hidden={decorative || undefined}
+    >
       <Link
         href={`/reviews#review-${r.id}`}
         scroll={false}
+        tabIndex={decorative ? -1 : undefined}
         className="flex h-full flex-col p-4 text-inherit no-underline sm:p-5"
       >
         <p className="line-clamp-4">
@@ -109,11 +118,6 @@ export default function Reviews({ items = [] }: ReviewsProps): React.ReactElemen
     "border-seasalt-400/60 hover:border-coquelicot-500/60 transition-colors",
   );
 
-  const marqueeCardBase = cn(
-    "bg-seasalt-800/80 flex flex-col rounded-lg border-2",
-    "border-seasalt-400/60 hover:border-coquelicot-500/60 transition-colors",
-  );
-
   // Marquee when more than three reviews
   if (items.length > 3) {
     const track = [...items, ...items];
@@ -123,7 +127,7 @@ export default function Reviews({ items = [] }: ReviewsProps): React.ReactElemen
       <section aria-labelledby="reviews-section" className="w-full">
         <h2
           id="reviews-section"
-          className="mb-2 text-center text-xl font-semibold text-rich-black sm:text-2xl"
+          className="mb-2 text-center text-xl font-bold text-russian-violet sm:text-2xl"
         >
           What People Say
         </h2>
@@ -142,8 +146,9 @@ export default function Reviews({ items = [] }: ReviewsProps): React.ReactElemen
               <ReviewCard
                 key={`${r.name}-${i}`}
                 r={r}
+                decorative={i >= items.length}
                 className={cn(
-                  marqueeCardBase,
+                  cardBase,
                   "w-[min(26rem,calc(100vw-3rem))] shrink-0 sm:w-md",
                   i < items.length && "animate-fade-in animate-fill-both",
                 )}
@@ -161,7 +166,7 @@ export default function Reviews({ items = [] }: ReviewsProps): React.ReactElemen
     <section aria-labelledby="reviews-section" className="mx-auto w-full max-w-6xl">
       <h2
         id="reviews-section"
-        className="mb-2 text-center text-xl font-semibold text-rich-black sm:text-2xl"
+        className="mb-2 text-center text-xl font-bold text-russian-violet sm:text-2xl"
       >
         What People Say
       </h2>

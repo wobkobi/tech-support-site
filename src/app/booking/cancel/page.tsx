@@ -13,13 +13,12 @@ import {
   isWithinTravelWindow,
 } from "@/features/business/lib/pricing-policy";
 import { Button } from "@/shared/components/Button";
+import { CARD } from "@/shared/components/PageLayout";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
 import { useSearchParams } from "next/navigation";
 import type React from "react";
 import { Suspense, useEffect, useState } from "react";
-
-const CARD = "border-seasalt-400/60 bg-seasalt-800 rounded-xl border p-5 shadow-sm sm:p-6";
 
 /** Live cancellation figures handed down from the cancel-info API. */
 interface CancellationInfo {
@@ -59,7 +58,7 @@ function FeeBanner({
     return (
       <div
         role="alert"
-        className="bg-coquelicot-50 rounded-lg border-2 border-coquelicot-500/60 p-4 text-sm text-rich-black sm:text-base"
+        className="bg-coquelicot-50 rounded-lg border-2 border-coquelicot-500/60 p-4 text-base text-rich-black sm:text-lg"
       >
         <strong>${policy.callOutFee} call-out fee plus round-trip travel</strong> will apply - we're
         inside the {policy.travelChargeHours}-hour window when I would normally be on the way to
@@ -71,7 +70,7 @@ function FeeBanner({
     return (
       <div
         role="alert"
-        className="rounded-lg border-2 border-mustard-500/60 bg-mustard-900/40 p-4 text-sm text-rich-black sm:text-base"
+        className="rounded-lg border-2 border-mustard-500/60 bg-mustard-900/40 p-4 text-base text-rich-black sm:text-lg"
       >
         <strong>${policy.callOutFee} call-out fee</strong> will apply - you're inside the{" "}
         {policy.freeNoticeHours}-hour cancellation window.
@@ -79,7 +78,7 @@ function FeeBanner({
     );
   }
   return (
-    <div className="rounded-lg border-2 border-moonstone-500/50 bg-moonstone-600/10 p-4 text-sm text-rich-black sm:text-base">
+    <div className="rounded-lg border-2 border-moonstone-500/50 bg-moonstone-600/10 p-4 text-base text-rich-black sm:text-lg">
       <strong>No fee</strong> applies for this cancellation - thanks for the heads up.
     </div>
   );
@@ -167,7 +166,7 @@ function CancelContent(): React.ReactElement {
   }
 
   return (
-    <main className="relative min-h-dvh overflow-hidden">
+    <main id="main" className="relative min-h-dvh overflow-hidden">
       {/* Backdrop */}
       <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
         <picture>
@@ -187,7 +186,7 @@ function CancelContent(): React.ReactElement {
         <div className="rounded-2xl border border-seasalt-400/40 bg-seasalt-800/60 p-5 shadow-lg backdrop-blur-xl sm:p-10">
           <div className="flex flex-col gap-4 sm:gap-5">
             <section className={cn(CARD)}>
-              <h1 className="mb-3 text-2xl font-extrabold text-russian-violet sm:text-3xl">
+              <h1 className="mb-3 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl">
                 Cancel booking
               </h1>
 

@@ -39,7 +39,27 @@ export async function PATCH(
   }
 
   const { id } = await params.params;
-  const body = (await request.json()) as ContactPatchBody;
+  const body = (await request.json().catch(() => null)) as ContactPatchBody | null;
+  if (!body) {
+    return errorResponse("Invalid request body.", 400);
+  }
+
+  // Reject unknown/malformed ids and soft-deleted contacts up front so a missing
+  // row returns 404 (not a P2025 500) and a PATCH can't edit or re-sync a hidden
+  // contact.
+  let existing: { id: string } | null;
+  try {
+    existing = await prisma.contact.findFirst({
+      where: { id, deletedAt: null },
+      select: { id: true },
+    });
+  } catch {
+    // A malformed ObjectId throws P2023; treat it as not found.
+    return errorResponse("Contact not found.", 404);
+  }
+  if (!existing) {
+    return errorResponse("Contact not found.", 404);
+  }
 
   if (body.name !== undefined && !body.name.trim()) {
     return errorResponse("Name is required.", 400);
@@ -52,9 +72,14 @@ export async function PATCH(
     if (trimmedEmail) {
       const dupe = await prisma.contact.findFirst({
         where: {
-          email: { equals: trimmedEmail, mode: "insensitive" },
           id: { not: id },
           deletedAt: null,
+          // Collide against another contact's primary OR alt emails so the same
+          // address can't live as a primary on one contact and an alt on another.
+          OR: [
+            { email: { equals: trimmedEmail, mode: "insensitive" } },
+            { altEmails: { has: trimmedEmail } },
+          ],
         },
         select: { id: true },
       });

@@ -11,6 +11,7 @@ import BookingForm from "@/features/booking/components/BookingForm";
 import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
 import {
   buildAvailableDays,
+  hourLabel,
   type BookableDay,
   type ExistingBooking,
 } from "@/features/booking/lib/booking";
@@ -134,6 +135,8 @@ async function getAvailableDays(): Promise<{
   acceptingBookings: boolean;
   closedMessage: string;
   durations: { short: number; long: number };
+  minHoursNotice: number;
+  sameDayCutoffHour: number | null;
 }> {
   const now = new Date();
   const { config, acceptingBookings, closedMessage } = await getAvailabilityConfig();
@@ -147,6 +150,8 @@ async function getAvailableDays(): Promise<{
       acceptingBookings: false,
       closedMessage,
       durations: config.durations,
+      minHoursNotice: config.minHoursNotice,
+      sameDayCutoffHour: config.sameDayCutoffHour,
     };
   }
 
@@ -187,6 +192,8 @@ async function getAvailableDays(): Promise<{
     acceptingBookings: true,
     closedMessage,
     durations: config.durations,
+    minHoursNotice: config.minHoursNotice,
+    sameDayCutoffHour: config.sameDayCutoffHour,
   };
 }
 
@@ -201,10 +208,28 @@ const SKELETON_BLOCK = "bg-seasalt-900/40 rounded-lg";
  * @returns Booking form or an unavailable banner.
  */
 async function BookingFormIsland(): Promise<React.ReactElement> {
-  const { days, degraded, sameDayClosed, acceptingBookings, closedMessage, durations } =
-    await getAvailableDays();
+  const {
+    days,
+    degraded,
+    sameDayClosed,
+    acceptingBookings,
+    closedMessage,
+    durations,
+    minHoursNotice,
+    sameDayCutoffHour,
+  } = await getAvailableDays();
   // Pricing context for the inline "get a rough estimate" affordance.
   const settings = await getSettings();
+  // Explain the same-day closure from the live availability settings rather
+  // than baked-in defaults, so editing either value updates the banner.
+  const sameDayReasons: string[] = [];
+  if (minHoursNotice > 0) {
+    sameDayReasons.push(`${minHoursNotice} hour${minHoursNotice === 1 ? "" : "s"} notice required`);
+  }
+  if (sameDayCutoffHour !== null) {
+    sameDayReasons.push(`${hourLabel(sameDayCutoffHour)} cut-off`);
+  }
+  const sameDayDetail = sameDayReasons.length ? ` (${sameDayReasons.join(", ")})` : "";
   if (!acceptingBookings) {
     return (
       <div
@@ -234,8 +259,8 @@ async function BookingFormIsland(): Promise<React.ReactElement> {
       {sameDayClosed && (
         <div className="rounded-lg border border-moonstone-500/40 bg-moonstone-600/10 p-4 text-rich-black">
           <p className="text-base">
-            Same-day bookings are closed for today (2 hours notice required, 6pm cut-off). The
-            earliest available time is tomorrow.
+            Same-day bookings are closed for today{sameDayDetail}. The earliest available time is
+            tomorrow.
           </p>
         </div>
       )}

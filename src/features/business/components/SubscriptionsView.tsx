@@ -55,12 +55,21 @@ function emptyForm(): FormState {
 }
 
 /**
+ * Today's date as a YYYY-MM-DD string in NZ time. Overdue/due-today are calendar
+ * comparisons for a NZ operator, so UTC would lag by up to 13 hours.
+ * @returns NZ-local ISO date string.
+ */
+function nzTodayISO(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Pacific/Auckland" }).format(new Date());
+}
+
+/**
  * Returns true if the subscription's next due date is in the past.
  * @param nextDue - ISO date string of next due date.
  * @returns Whether the subscription is overdue.
  */
 function isOverdue(nextDue: string): boolean {
-  return new Date(nextDue) < new Date(new Date().toISOString().split("T")[0]);
+  return new Date(nextDue) < new Date(nzTodayISO());
 }
 
 /**
@@ -69,7 +78,7 @@ function isOverdue(nextDue: string): boolean {
  * @returns Whether the subscription is due today.
  */
 function isDueToday(nextDue: string): boolean {
-  return nextDue.startsWith(new Date().toISOString().split("T")[0]);
+  return nextDue.startsWith(nzTodayISO());
 }
 
 /**

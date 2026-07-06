@@ -271,7 +271,7 @@ function ContactCard({
             ) : isConfirmingSync ? (
               <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs">
                 <p className="font-medium text-slate-600">Sync to Google?</p>
-                <div className="space-y-0.5 text-slate-500">
+                <div className="space-y-0.5 break-all text-slate-500">
                   <p>{c.name}</p>
                   {c.email && <p>{c.email}</p>}
                   {c.phone && <p>{formatNZPhone(c.phone)}</p>}

@@ -115,9 +115,20 @@ export async function uploadInvoicePdf(
       await ensureAnyoneWithLinkReader(res.data.id!);
       return { fileId: res.data.id!, webUrl: res.data.webViewLink! };
     } catch (err) {
-      // File may have been deleted from Drive - fall through to create a fresh one.
+      // Only fall through to a fresh create when the target is genuinely gone
+      // (404/410). A transient 5xx/429/timeout may have applied (or would
+      // succeed on retry), so rethrow it rather than orphaning the existing PDF
+      // behind a duplicate that the emailed link no longer points at.
+      const e = err as { code?: unknown; response?: { status?: unknown } };
+      const status =
+        typeof e.response?.status === "number"
+          ? e.response.status
+          : typeof e.code === "number"
+            ? e.code
+            : null;
+      if (status !== 404 && status !== 410) throw err;
       console.warn(
-        `[drive] Update failed for ${existingFileId} (${invoiceNumber}); creating new file:`,
+        `[drive] File ${existingFileId} (${invoiceNumber}) is gone (${status}); creating new file:`,
         err,
       );
     }

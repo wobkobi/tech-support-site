@@ -21,13 +21,21 @@ export async function loadPlacesLibrary(apiKey: string): Promise<void> {
   const existing = document.querySelector<HTMLScriptElement>(SCRIPT_MARKER);
   if (existing) {
     if (existing.dataset.loaded === "true") return;
-    await new Promise<void>((resolve, reject) => {
-      existing.addEventListener("load", () => resolve(), { once: true });
-      existing.addEventListener("error", () => reject(new Error("Maps script failed to load")), {
-        once: true,
+    // A tag left over from a previous failed load has already fired its error
+    // event, so fresh listeners would never settle - remove it and fall through
+    // to recreate the script. An in-flight tag (neither loaded nor failed) is
+    // still waited on so concurrent callers share the one load.
+    if (existing.dataset.failed === "true") {
+      existing.remove();
+    } else {
+      await new Promise<void>((resolve, reject) => {
+        existing.addEventListener("load", () => resolve(), { once: true });
+        existing.addEventListener("error", () => reject(new Error("Maps script failed to load")), {
+          once: true,
+        });
       });
-    });
-    return;
+      return;
+    }
   }
 
   await new Promise<void>((resolve, reject) => {
@@ -40,7 +48,12 @@ export async function loadPlacesLibrary(apiKey: string): Promise<void> {
       script.dataset.loaded = "true";
       resolve();
     });
-    script.addEventListener("error", () => reject(new Error("Maps script failed to load")));
+    script.addEventListener("error", () => {
+      // Mark the tag so the next call recreates it instead of waiting on a
+      // dead script whose error event has already fired.
+      script.dataset.failed = "true";
+      reject(new Error("Maps script failed to load"));
+    });
     document.head.appendChild(script);
   });
 }

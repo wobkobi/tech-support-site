@@ -86,22 +86,25 @@ export async function fetchQuickEstimate(input: QuickEstimateInput): Promise<Qui
         ? (travelRes.value.durationMins ?? 0)
         : 0;
 
+  // Resolve the live base + remote delta regardless of the AI duration call's
+  // outcome, so a failed/timed-out estimate still prices against the operator's
+  // current rate instead of the hardcoded $65 fallback.
+  const baseStandard =
+    rates.find((r) => r.ratePerHour !== null && r.isDefault)?.ratePerHour ??
+    rates.find((r) => r.ratePerHour !== null)?.ratePerHour ??
+    65;
+  const fullRate = baseStandard + remoteRateDelta(rates, meeting);
+
   let estimatedMins = 60;
   let confidence: EstimateConfidence = "medium";
   let explanation = "";
   let tasks: { label: string; mins: number }[] = [];
-  let fullRate = 65;
   if (estimateRes.status === "fulfilled" && estimateRes.value.ok && estimateRes.value.result) {
     const ai = estimateRes.value.result;
     estimatedMins = ai.estimatedMins;
     confidence = ai.confidence ?? "medium";
     explanation = ai.explanation;
     tasks = Array.isArray(ai.tasks) ? ai.tasks : [];
-    const baseStandard =
-      rates.find((r) => r.ratePerHour !== null && r.isDefault)?.ratePerHour ??
-      rates.find((r) => r.ratePerHour !== null)?.ratePerHour ??
-      65;
-    fullRate = baseStandard + remoteRateDelta(rates, meeting);
   }
 
   const travelRatePerHour =

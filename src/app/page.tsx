@@ -6,7 +6,7 @@
 import Reviews, { type ReviewItem } from "@/features/reviews/components/Reviews";
 import { formatReviewerName } from "@/features/reviews/lib/formatting";
 import { Button } from "@/shared/components/Button";
-import { FrostedSection, PageShell } from "@/shared/components/PageLayout";
+import { FrostedSection, PageShell, CARD as SHARED_CARD } from "@/shared/components/PageLayout";
 import { cn } from "@/shared/lib/cn";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
@@ -86,7 +86,9 @@ const supportItems: ReadonlyArray<SupportItem> = [
   { label: "Photo Storage", icon: FaImages },
 ];
 
-const CARD = "border-seasalt-400/60 bg-seasalt-800 rounded-xl border p-5 shadow-sm sm:p-6 md:p-7";
+// Home cards are the shared CARD with a touch more padding on md+. Deriving
+// from SHARED_CARD keeps the border/background in sync instead of drifting.
+const CARD = cn(SHARED_CARD, "md:p-7");
 
 /**
  * Home page component
@@ -147,9 +149,9 @@ export default async function Home(): Promise<React.ReactElement> {
                 <FaCalendarCheck className="h-5 w-5" aria-hidden />
                 Book appointment
               </Button>
-              <Button href="tel:+64212971237" variant="secondary" size="md">
+              <Button href={settings.identity.phoneTel} variant="secondary" size="md">
                 <FaPhone className="h-4 w-4" aria-hidden />
-                021 297 1237
+                {settings.identity.phone}
               </Button>
             </div>
 
@@ -341,21 +343,21 @@ export default async function Home(): Promise<React.ReactElement> {
       <footer className="mx-auto mb-6 w-fit max-w-[calc(100vw-2rem)] sm:mb-8">
         <div className="flex flex-col items-center gap-1 rounded-xl border border-seasalt-400/40 bg-seasalt-800/70 p-4 shadow-lg backdrop-blur-md sm:flex-row sm:gap-8 sm:px-6 sm:py-4">
           <a
-            href="tel:+64212971237"
+            href={settings.identity.phoneTel}
             className="flex items-center gap-3 rounded-md px-4 py-2 text-base font-bold text-russian-violet transition-colors hover:text-coquelicot-500 sm:text-lg"
           >
             <FaPhone className="h-4 w-4 shrink-0 sm:h-6 sm:w-6" aria-hidden />
-            <span>021 297 1237</span>
+            <span>{settings.identity.phone}</span>
           </a>
 
           <div className="hidden h-6 w-px bg-seasalt-400/50 sm:block" />
 
           <a
-            href="mailto:harrison@tothepoint.co.nz"
+            href={`mailto:${settings.identity.email}`}
             className="flex items-center gap-3 rounded-md px-4 py-2 text-base font-bold text-russian-violet transition-colors hover:text-coquelicot-500 sm:text-lg"
           >
             <FaEnvelope className="h-6 w-6 shrink-0 sm:h-7 sm:w-7" aria-hidden />
-            <span>harrison@tothepoint.co.nz</span>
+            <span>{settings.identity.email}</span>
           </a>
         </div>
       </footer>

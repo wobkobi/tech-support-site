@@ -196,7 +196,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     for (const [k, v] of Object.entries(answers)) {
       if (!ALLOWED_ANSWER_KEYS.has(k)) continue;
       if (typeof v !== "string") continue;
-      const clean = v.trim().slice(0, 200);
+      // Strip newlines and square brackets so an answer value cannot close the
+      // USER DATA sentinel and forge a trusted "[...]" annotation in the region
+      // the system prompt declares server-appended and trustworthy.
+      const clean = v
+        .trim()
+        .replace(/[\r\n[\]]/g, " ")
+        .slice(0, 200);
       if (clean) safeAnswers[k] = clean;
     }
   }

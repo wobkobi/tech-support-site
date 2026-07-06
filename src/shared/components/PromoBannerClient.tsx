@@ -123,7 +123,7 @@ export function PromoBannerClient({ promo }: Props): React.ReactElement {
 
         // Right padding leaves room for the absolute-positioned dismiss button.
         "px-4 py-2.5 pr-12 text-center text-base font-semibold sm:px-12 sm:text-lg",
-        "transition-transform duration-500 ease-out",
+        "transition-[translate] duration-500 ease-out",
         visible ? "translate-y-0" : "pointer-events-none -translate-y-full",
       )}
       role="status"
@@ -148,6 +148,9 @@ export function PromoBannerClient({ promo }: Props): React.ReactElement {
           // Pinned top-right so wrapping copy doesn't shove it mid-sentence on mobile.
           "group absolute top-1/2 right-2 -translate-y-1/2 sm:right-3",
           "inline-flex h-8 w-8 items-center justify-center rounded-full",
+          // Keep the 32px pill visual but extend the tap target to 44px (older
+          // audience, touch) via a transparent inset pseudo-element.
+          "before:absolute before:-inset-1.5 before:content-['']",
           "bg-russian-violet-500/10 text-russian-violet-500",
           "ring-1 ring-russian-violet-500/20",
           "hover:bg-russian-violet-500 hover:text-mustard-500 hover:ring-russian-violet-500",

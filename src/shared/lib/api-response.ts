@@ -1,8 +1,7 @@
 // src/shared/lib/api-response.ts
 /**
  * @description Shared JSON response helpers so every API route returns a
- * consistent discriminated shape. Errors are always `{ ok: false, error }` and
- * successes always carry `ok: true`, so clients branch on `ok` instead of
+ * consistent `{ ok, ... }` shape, letting clients branch on `ok` instead of
  * guessing between `{ error }` and `{ ok: false, error }`.
  */
 
@@ -21,15 +20,12 @@ export function errorResponse<T = never>(message: string, status = 400): NextRes
 }
 
 /**
- * Builds a successful JSON response. Any extra payload is spread alongside the
- * `ok: true` flag, e.g. `okResponse({ contacts })` > `{ ok: true, contacts }`.
- * @param data - Optional payload object merged into the response body.
+ * Builds a successful JSON response with a consistent `{ ok: true, ...data }`
+ * body, mirroring {@link errorResponse} so clients branch on `ok`.
+ * @param data - Payload object merged into the body alongside `ok: true`.
  * @param status - HTTP status code (defaults to 200).
- * @returns A {@link NextResponse} carrying `ok: true` plus any payload.
+ * @returns A {@link NextResponse} carrying the success body and status.
  */
-export function okResponse<T = never>(
-  data?: Record<string, unknown>,
-  status = 200,
-): NextResponse<T> {
-  return NextResponse.json({ ok: true, ...(data ?? {}) }, { status }) as NextResponse<T>;
+export function okResponse(data: Record<string, unknown> = {}, status = 200): NextResponse {
+  return NextResponse.json({ ok: true, ...data }, { status });
 }
