@@ -84,7 +84,7 @@
     "jsdom": "^29.1.1",
     "lint-staged": "^17.0.8",
     "pdf-lib": "^1.17.1",
-    "png-to-ico": "^3.0.1",
+    "png-to-ico": "^3.0.2",
     "postcss": "^8.5.16",
     "prettier": "^3.9.4",
     "prettier-plugin-organize-imports": "^4.3.0",
