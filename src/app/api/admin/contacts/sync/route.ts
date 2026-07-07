@@ -10,8 +10,10 @@ import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 
-// Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
-export const maxDuration = 60;
+// Full mode pushes EVERY email-bearing contact (sequential People API calls
+// at ~1s each), so the run scales with the contact count; give it the full
+// serverless ceiling.
+export const maxDuration = 300;
 
 /**
  * POST /api/admin/contacts/sync

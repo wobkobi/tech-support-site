@@ -40,9 +40,12 @@ export async function deleteContactFromGoogle(resourceName: string): Promise<voi
 
 /**
  * Imports all contacts from Google Contacts into the local database.
- * Paginates through all People API connections and upserts each contact by email.
- * Stores the Google resource name as `googleContactId`.
- * @returns The number of contacts imported/upserted.
+ * Paginates through all People API connections and upserts each contact by
+ * email. Rows whose stored `googleContactId` + `lastGoogleEtag` already match
+ * are skipped - the etag only changes when Google's copy changes, and the
+ * skip keeps `updatedAt` untouched so unchanged rows stay out of the push
+ * dirty set. Stores the Google resource name as `googleContactId`.
+ * @returns The number of contacts created or updated (skipped rows not counted).
  */
 export async function importFromGoogleContacts(): Promise<number> {
   try {
@@ -126,6 +129,8 @@ export async function importFromGoogleContacts(): Promise<number> {
         id: string;
         name: string;
         address: string | null;
+        googleContactId: string | null;
+        lastGoogleEtag: string | null;
       }
       const [emailMatches, phoneMatches] = await Promise.all([
         emailsToCheck.length > 0
@@ -134,7 +139,15 @@ export async function importFromGoogleContacts(): Promise<number> {
                 deletedAt: null,
                 OR: [{ email: { in: emailsToCheck } }, { altEmails: { hasSome: emailsToCheck } }],
               },
-              select: { id: true, email: true, altEmails: true, name: true, address: true },
+              select: {
+                id: true,
+                email: true,
+                altEmails: true,
+                name: true,
+                address: true,
+                googleContactId: true,
+                lastGoogleEtag: true,
+              },
             })
           : Promise.resolve([] as (MatchRow & { email: string | null; altEmails: string[] })[]),
         phonesToCheck.length > 0
@@ -143,7 +156,15 @@ export async function importFromGoogleContacts(): Promise<number> {
                 deletedAt: null,
                 OR: [{ phone: { in: phonesToCheck } }, { altPhones: { hasSome: phonesToCheck } }],
               },
-              select: { id: true, phone: true, altPhones: true, name: true, address: true },
+              select: {
+                id: true,
+                phone: true,
+                altPhones: true,
+                name: true,
+                address: true,
+                googleContactId: true,
+                lastGoogleEtag: true,
+              },
             })
           : Promise.resolve([] as (MatchRow & { phone: string | null; altPhones: string[] })[]),
       ]);
@@ -156,7 +177,13 @@ export async function importFromGoogleContacts(): Promise<number> {
       for (const c of emailMatches) {
         for (const e of [c.email, ...c.altEmails]) {
           if (e && emailSet.has(e) && !contactByEmail.has(e)) {
-            contactByEmail.set(e, { id: c.id, name: c.name, address: c.address });
+            contactByEmail.set(e, {
+              id: c.id,
+              name: c.name,
+              address: c.address,
+              googleContactId: c.googleContactId,
+              lastGoogleEtag: c.lastGoogleEtag,
+            });
           }
         }
       }
@@ -165,7 +192,13 @@ export async function importFromGoogleContacts(): Promise<number> {
       for (const c of phoneMatches) {
         for (const p of [c.phone, ...c.altPhones]) {
           if (p && phoneSet.has(p) && !contactByPhone.has(p)) {
-            contactByPhone.set(p, { id: c.id, name: c.name, address: c.address });
+            contactByPhone.set(p, {
+              id: c.id,
+              name: c.name,
+              address: c.address,
+              googleContactId: c.googleContactId,
+              lastGoogleEtag: c.lastGoogleEtag,
+            });
           }
         }
       }
@@ -178,15 +211,31 @@ export async function importFromGoogleContacts(): Promise<number> {
           try {
             const existing = contactByEmail.get(r.email);
             if (existing) {
+              // Nothing to pull when the stored link and etag both match -
+              // the etag only moves when Google's copy changes. Skipping the
+              // rewrite keeps updatedAt untouched so unchanged rows never
+              // enter the push dirty set.
+              if (
+                existing.googleContactId === r.resourceName &&
+                existing.lastGoogleEtag === r.etag
+              ) {
+                continue;
+              }
               // First-sync pull: on import, Google's values flow into the
               // site DB (Google wins for any field it has populated). The
               // blank-safety rule means empty Google values never overwrite
               // existing site data. Stamping lastSyncedAt + lastGoogleEtag
               // here is critical: without it the next syncContactToGoogle
               // would see the etag as "changed" and conflict every field.
+              // lastSyncedAt and updatedAt must be the SAME instant: left to
+              // auto-stamp, @updatedAt lands a few ms after this new Date(),
+              // so the strict updatedAt > lastSyncedAt dirty check would
+              // re-push the row every run and the cron never finishes.
+              const stampedAt = new Date();
               const updates: Record<string, unknown> = {
                 googleContactId: r.resourceName,
-                lastSyncedAt: new Date(),
+                lastSyncedAt: stampedAt,
+                updatedAt: stampedAt,
                 lastGoogleEtag: r.etag,
               };
               if (r.name && r.name !== existing.name) updates.name = r.name;
@@ -202,6 +251,8 @@ export async function importFromGoogleContacts(): Promise<number> {
                 data: updates,
               });
             } else {
+              // Same-instant stamp as the update branch above.
+              const stampedAt = new Date();
               const created = await prisma.contact.create({
                 data: {
                   name: r.name ?? r.email,
@@ -209,7 +260,8 @@ export async function importFromGoogleContacts(): Promise<number> {
                   phone: r.phone,
                   address: r.address ? ((await normaliseAddress(r.address)) ?? r.address) : null,
                   googleContactId: r.resourceName,
-                  lastSyncedAt: new Date(),
+                  lastSyncedAt: stampedAt,
+                  updatedAt: stampedAt,
                   lastGoogleEtag: r.etag,
                 },
                 select: { id: true, name: true, address: true },
@@ -218,6 +270,8 @@ export async function importFromGoogleContacts(): Promise<number> {
                 id: created.id,
                 name: created.name,
                 address: created.address,
+                googleContactId: r.resourceName,
+                lastGoogleEtag: r.etag,
               });
             }
             count++;
@@ -232,11 +286,20 @@ export async function importFromGoogleContacts(): Promise<number> {
           try {
             const existing = contactByPhone.get(r.phone);
             if (existing) {
-              // Same first-sync pull semantics as the email-matched branch.
+              // Same skip-unchanged and same-instant stamp semantics as the
+              // email-matched branch.
+              if (
+                existing.googleContactId === r.resourceName &&
+                existing.lastGoogleEtag === r.etag
+              ) {
+                continue;
+              }
               const namePlaceholder = existing.name === r.phone || existing.name === r.normPhone;
+              const stampedAt = new Date();
               const updates: Record<string, unknown> = {
                 googleContactId: r.resourceName,
-                lastSyncedAt: new Date(),
+                lastSyncedAt: stampedAt,
+                updatedAt: stampedAt,
                 lastGoogleEtag: r.etag,
               };
               // Fill a placeholder name freely, but only let a real Google name
@@ -258,6 +321,8 @@ export async function importFromGoogleContacts(): Promise<number> {
                 data: updates,
               });
             } else {
+              // Same-instant stamp as the update branch above.
+              const stampedAt = new Date();
               const created = await prisma.contact.create({
                 data: {
                   name: r.name ?? r.phone,
@@ -265,7 +330,8 @@ export async function importFromGoogleContacts(): Promise<number> {
                   phone: r.phone,
                   address: r.address ? ((await normaliseAddress(r.address)) ?? r.address) : null,
                   googleContactId: r.resourceName,
-                  lastSyncedAt: new Date(),
+                  lastSyncedAt: stampedAt,
+                  updatedAt: stampedAt,
                   lastGoogleEtag: r.etag,
                 },
                 select: { id: true, name: true, address: true },
@@ -274,6 +340,8 @@ export async function importFromGoogleContacts(): Promise<number> {
                 id: created.id,
                 name: created.name,
                 address: created.address,
+                googleContactId: r.resourceName,
+                lastGoogleEtag: r.etag,
               });
             }
             count++;
@@ -441,11 +509,14 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
           },
         });
         if (created.data.resourceName) {
+          // Same-instant stamp: see the pushOk stamp below for why.
+          const stampedAt = new Date();
           await prisma.contact.update({
             where: { id: contactId },
             data: {
               googleContactId: created.data.resourceName,
-              lastSyncedAt: new Date(),
+              lastSyncedAt: stampedAt,
+              updatedAt: stampedAt,
               lastGoogleEtag: created.data.etag ?? null,
             },
           });
@@ -532,7 +603,15 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
     };
     // Only mark the local edit as synced when the push actually succeeded;
     // otherwise leave lastSyncedAt so the dirty-set retries the push next run.
-    if (pushOk) siteUpdate.lastSyncedAt = new Date();
+    // lastSyncedAt and updatedAt must be the SAME instant: left to auto-stamp,
+    // @updatedAt lands a few ms after this new Date(), so the strict
+    // updatedAt > lastSyncedAt dirty check would mark the row dirty again and
+    // every run re-pushes the whole contact list until the cron times out.
+    if (pushOk) {
+      const stampedAt = new Date();
+      siteUpdate.lastSyncedAt = stampedAt;
+      siteUpdate.updatedAt = stampedAt;
+    }
     if (nameAction === "pull" && googleName) siteUpdate.name = googleName;
     if (emailAction === "pull" && googleEmail) siteUpdate.email = googleEmail;
     if (addressAction === "pull" && googleAddress) {
