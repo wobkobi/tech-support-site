@@ -11,8 +11,9 @@ import { errorResponse } from "@/shared/lib/api-response";
 import { isCronAuthorized } from "@/shared/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 
-// Raise the serverless ceiling so a slow upstream call (Google People API) cannot 504 on the default timeout.
-export const maxDuration = 60;
+// A catch-up sync that pushes many contacts (sequential People API calls at
+// ~1s each) can run well past 60s; give it the full serverless ceiling.
+export const maxDuration = 300;
 
 /**
  * GET /api/cron/sync-contacts
