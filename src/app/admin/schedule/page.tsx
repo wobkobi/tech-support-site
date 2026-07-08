@@ -10,7 +10,7 @@ import { DayAgendaView } from "@/features/admin/components/DayAgendaView";
 import { WeekView } from "@/features/admin/components/WeekView";
 import { mondayOf, type WeekEvent, type WeekViewKind } from "@/features/admin/lib/schedule-types";
 import { addDays, resolveWeekStart, toNZDateKey } from "@/features/admin/lib/week";
-import { lookupPublicHoliday } from "@/features/business/lib/pricing-policy.server";
+import { lookupPublicHolidaysForKeys } from "@/features/business/lib/pricing-policy.server";
 import { getCachedScheduleEvents } from "@/features/calendar/lib/google-calendar";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
@@ -194,21 +194,19 @@ export default async function AdminSchedulePage({
   }
 
   // Holiday lookups span the full buffered window so the agenda can show
-  // holiday badges across the prefetched range without another fetch. Run
-  // in parallel because each lookup hits the DB then falls back to the
-  // date-holidays package; serially this would add noticeable latency.
+  // holiday badges across the prefetched range without another fetch. One
+  // batched read covers the whole window (the per-day variant costs a DB
+  // round-trip per buffered day).
   const bufferedDayKeys: string[] = [];
-  const holidayPromises: Promise<{ name: string } | null>[] = [];
   for (let i = -BUFFER_DAYS_BEFORE; i < BUFFER_DAYS_AFTER; i++) {
-    const dayDate = addDays(weekStartDate, i);
-    bufferedDayKeys.push(toNZDateKey(dayDate));
-    holidayPromises.push(lookupPublicHoliday(dayDate).catch(() => null));
+    bufferedDayKeys.push(toNZDateKey(addDays(weekStartDate, i)));
   }
-  const holidayResults = await Promise.all(holidayPromises);
+  const holidaysByKey = await lookupPublicHolidaysForKeys(bufferedDayKeys).catch(
+    () => new Map<string, { name: string; region: string }>(),
+  );
   const holidaysByDateKey: Record<string, string> = {};
-  for (let i = 0; i < bufferedDayKeys.length; i++) {
-    const h = holidayResults[i];
-    if (h) holidaysByDateKey[bufferedDayKeys[i]] = h.name;
+  for (const [key, h] of holidaysByKey) {
+    holidaysByDateKey[key] = h.name;
   }
   // Current week's seven day keys - used to fall back to the week's first
   // day when the URL has no valid ?day=. The current week sits in the

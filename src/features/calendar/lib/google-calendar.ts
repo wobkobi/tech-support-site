@@ -219,89 +219,97 @@ export async function fetchAllCalendarEvents(
   const calendarIds = await fetchAccessibleCalendarIds();
   console.log(`[calendar] Checking ${calendarIds.length} calendars...`);
 
-  const allEvents: CalendarEvent[] = [];
-  let errorCount = 0;
-
   const personalCalendarId = process.env.PERSONAL_CALENDAR_ID ?? "";
 
-  // Fetch events from each calendar ID
-  for (const calendarId of calendarIds) {
-    try {
-      // Page through the calendar: events.list caps a page at 2500 (default 250)
-      // and returns nextPageToken when truncated. Without the loop a busy
-      // calendar (recurring series expanded by singleEvents over the booking
-      // horizon) would silently drop events past the first page, leaving those
-      // times treated as free.
-      const events: calendar_v3.Schema$Event[] = [];
-      let pageToken: string | undefined;
-      do {
-        const response = await calendar.events.list({
-          calendarId,
-          timeMin: startDate.toISOString(),
-          timeMax: endDate.toISOString(),
-          singleEvents: true,
-          orderBy: "startTime",
-          maxResults: 2500,
-          pageToken,
-        });
-        events.push(...(response.data.items ?? []));
-        pageToken = response.data.nextPageToken ?? undefined;
-      } while (pageToken);
-      const isPersonal = Boolean(personalCalendarId) && calendarId === personalCalendarId;
-      const processedEvents: CalendarEvent[] = [];
-
-      for (const event of events) {
-        // Skip cancelled events (organiser cancelled or event was deleted)
-        if (event.status === "cancelled") continue;
-
-        // Skip events the user has declined
-        const selfAttendee = event.attendees?.find((a) => a.self);
-        if (selfAttendee?.responseStatus === "declined") continue;
-
-        if (event.start?.dateTime && event.end?.dateTime) {
-          // Timed event - always block regardless of calendar
-          processedEvents.push({
-            id: event.id!,
-            start: event.start.dateTime,
-            end: event.end.dateTime,
-            summary: event.summary || undefined,
-            description: event.description || undefined,
-            location: event.location || undefined,
-            calendarEmail: calendarId,
-            recurringEventId: event.recurringEventId || undefined,
+  // Fetch every calendar concurrently - pagination within one calendar stays
+  // sequential (nextPageToken chains). Failures stay per-calendar (null) so
+  // one bad calendar cannot blank out the rest.
+  const perCalendarResults = await Promise.all(
+    calendarIds.map(async (calendarId): Promise<CalendarEvent[] | null> => {
+      try {
+        // Page through the calendar: events.list caps a page at 2500 (default 250)
+        // and returns nextPageToken when truncated. Without the loop a busy
+        // calendar (recurring series expanded by singleEvents over the booking
+        // horizon) would silently drop events past the first page, leaving those
+        // times treated as free.
+        const events: calendar_v3.Schema$Event[] = [];
+        let pageToken: string | undefined;
+        do {
+          const response = await calendar.events.list({
+            calendarId,
+            timeMin: startDate.toISOString(),
+            timeMax: endDate.toISOString(),
+            singleEvents: true,
+            orderBy: "startTime",
+            maxResults: 2500,
+            pageToken,
           });
-        } else if (event.start?.date && event.end?.date && !isPersonal) {
-          // All-day event from a non-personal calendar - block the full NZ day(s).
-          // All-day events use date strings ("YYYY-MM-DD"); end.date is exclusive.
-          // Convert NZ calendar midnight > UTC so slot checking works correctly.
-          const startDateStr = event.start.date;
-          const endDateStr = event.end.date;
-          const [sYear, sMonth, sDay] = startDateStr.split("-").map(Number);
-          const [eYear, eMonth, eDay] = endDateStr.split("-").map(Number);
-          const utcOffset = getPacificAucklandOffset(sYear, sMonth, sDay);
-          // NZ midnight = UTC hour 0 minus utcOffset (JS Date handles negative hour wrap)
-          const startAt = new Date(Date.UTC(sYear, sMonth - 1, sDay, -utcOffset, 0, 0));
-          const endAt = new Date(Date.UTC(eYear, eMonth - 1, eDay, -utcOffset, 0, 0));
-          processedEvents.push({
-            id: event.id!,
-            start: startAt.toISOString(),
-            end: endAt.toISOString(),
-            summary: event.summary || undefined,
-            description: event.description || undefined,
-            location: event.location || undefined,
-            calendarEmail: calendarId,
-            recurringEventId: event.recurringEventId || undefined,
-          });
+          events.push(...(response.data.items ?? []));
+          pageToken = response.data.nextPageToken ?? undefined;
+        } while (pageToken);
+        const isPersonal = Boolean(personalCalendarId) && calendarId === personalCalendarId;
+        const processedEvents: CalendarEvent[] = [];
+
+        for (const event of events) {
+          // Skip cancelled events (organiser cancelled or event was deleted)
+          if (event.status === "cancelled") continue;
+
+          // Skip events the user has declined
+          const selfAttendee = event.attendees?.find((a) => a.self);
+          if (selfAttendee?.responseStatus === "declined") continue;
+
+          if (event.start?.dateTime && event.end?.dateTime) {
+            // Timed event - always block regardless of calendar
+            processedEvents.push({
+              id: event.id!,
+              start: event.start.dateTime,
+              end: event.end.dateTime,
+              summary: event.summary || undefined,
+              description: event.description || undefined,
+              location: event.location || undefined,
+              calendarEmail: calendarId,
+              recurringEventId: event.recurringEventId || undefined,
+            });
+          } else if (event.start?.date && event.end?.date && !isPersonal) {
+            // All-day event from a non-personal calendar - block the full NZ day(s).
+            // All-day events use date strings ("YYYY-MM-DD"); end.date is exclusive.
+            // Convert NZ calendar midnight > UTC so slot checking works correctly.
+            const startDateStr = event.start.date;
+            const endDateStr = event.end.date;
+            const [sYear, sMonth, sDay] = startDateStr.split("-").map(Number);
+            const [eYear, eMonth, eDay] = endDateStr.split("-").map(Number);
+            const utcOffset = getPacificAucklandOffset(sYear, sMonth, sDay);
+            // NZ midnight = UTC hour 0 minus utcOffset (JS Date handles negative hour wrap)
+            const startAt = new Date(Date.UTC(sYear, sMonth - 1, sDay, -utcOffset, 0, 0));
+            const endAt = new Date(Date.UTC(eYear, eMonth - 1, eDay, -utcOffset, 0, 0));
+            processedEvents.push({
+              id: event.id!,
+              start: startAt.toISOString(),
+              end: endAt.toISOString(),
+              summary: event.summary || undefined,
+              description: event.description || undefined,
+              location: event.location || undefined,
+              calendarEmail: calendarId,
+              recurringEventId: event.recurringEventId || undefined,
+            });
+          }
+          // All-day events from the personal calendar are intentionally skipped
         }
-        // All-day events from the personal calendar are intentionally skipped
-      }
 
-      console.log(`[calendar] ${calendarId}: ${processedEvents.length} events`);
-      allEvents.push(...processedEvents);
-    } catch (error) {
-      console.error(`[calendar] Failed to fetch events from ${calendarId}:`, error);
-      errorCount++;
-    }
+        console.log(`[calendar] ${calendarId}: ${processedEvents.length} events`);
+        return processedEvents;
+      } catch (error) {
+        console.error(`[calendar] Failed to fetch events from ${calendarId}:`, error);
+        return null;
+      }
+    }),
+  );
+
+  const allEvents: CalendarEvent[] = [];
+  let errorCount = 0;
+  for (const result of perCalendarResults) {
+    if (result === null) errorCount++;
+    else allEvents.push(...result);
   }
 
   if (errorCount === calendarIds.length) {

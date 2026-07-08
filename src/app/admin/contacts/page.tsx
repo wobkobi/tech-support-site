@@ -1,12 +1,14 @@
 // src/app/admin/contacts/page.tsx
 /**
- * @description Admin contacts hub. Runs {@link autoMaintain} on load to surface
- * sync conflicts, counts pending conflicts, loads all contacts plus their
- * linked reviews, and renders the {@link ContactsAdminView} list.
+ * @description Admin contacts hub. Surfaces booking-sourced field conflicts
+ * via {@link enrichContactsFromBookings}, counts pending Google-sync
+ * conflicts, loads all contacts plus their linked reviews, and renders the
+ * {@link ContactsAdminView} list. The heavier dedup/merge/backfill passes run
+ * on the sync-contacts cron and the standalone admin routes, not per page load.
  */
 import { AdminPageLayout } from "@/features/admin/components/AdminPageLayout";
 import { ContactsAdminView } from "@/features/admin/components/ContactsAdminView";
-import { autoMaintain } from "@/features/admin/lib/auto-maintain";
+import { enrichContactsFromBookings } from "@/features/contacts/lib/maintenance";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import type { Metadata } from "next";
@@ -21,19 +23,21 @@ export const metadata: Metadata = {
 };
 
 /**
- * Admin contacts hub page. Runs autoMaintain on load then renders the contacts list.
+ * Admin contacts hub page. Enriches contacts from bookings (for the conflict
+ * banner) and loads the list in one parallel pass.
  * @returns Contacts hub page element.
  */
 export default async function AdminContactsPage(): Promise<React.ReactElement> {
   await requireAdminAuth();
 
-  const initialConflicts = await autoMaintain();
-
-  const pendingConflictsCount = await prisma.contactConflict.count({
-    where: { resolvedAt: null },
-  });
-
-  const [allContacts, reviews] = await Promise.all([
+  // Everything is independent, so run in one parallel pass. Fields enrich
+  // writes this pass show on the next load - acceptable lag for a rare write,
+  // and the returned conflict list itself is always current.
+  const [initialConflicts, pendingConflictsCount, allContacts, reviews] = await Promise.all([
+    enrichContactsFromBookings(),
+    prisma.contactConflict.count({
+      where: { resolvedAt: null },
+    }),
     prisma.contact.findMany({
       where: { deletedAt: null },
       orderBy: { createdAt: "desc" },

@@ -274,6 +274,12 @@ interface CalculatorViewProps {
   identity: IdentitySettings;
   /** Live pricing (GST, min travel, billing increment) for the job calculations. */
   pricing: JobPricing;
+  /** Rate configs resolved server-side so the calculator renders without a fetch waterfall. */
+  initialRates: RateConfig[];
+  /** Task templates resolved server-side, ordered by usage. */
+  initialTaskTemplates: TaskTemplate[];
+  /** Active promo resolved server-side; refined per job date by the job-context effect. */
+  initialPromo: ActivePromo | null;
 }
 
 /**
@@ -282,9 +288,18 @@ interface CalculatorViewProps {
  * @param props - Component props.
  * @param props.identity - Live business identity for the invoice preview.
  * @param props.pricing - Live pricing for the job calculations.
+ * @param props.initialRates - Server-resolved rate configs.
+ * @param props.initialTaskTemplates - Server-resolved task templates.
+ * @param props.initialPromo - Server-resolved active promo, or null.
  * @returns The rendered calculator view element.
  */
-export function CalculatorView({ identity, pricing }: CalculatorViewProps): React.ReactElement {
+export function CalculatorView({
+  identity,
+  pricing,
+  initialRates,
+  initialTaskTemplates,
+  initialPromo,
+}: CalculatorViewProps): React.ReactElement {
   const router = useRouter();
 
   // Lazy-read the saved draft once at mount. Non-meaningful drafts (just the
@@ -305,9 +320,9 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
     initialDraft?.savedAt ?? null,
   );
 
-  // Server-fetched reference data
-  const [rates, setRates] = useState<RateConfig[]>([]);
-  const [taskTemplates, setTaskTemplates] = useState<TaskTemplate[]>([]);
+  // Server-resolved reference data; setters keep the rate panel's refresh path working.
+  const [rates, setRates] = useState<RateConfig[]>(initialRates);
+  const [taskTemplates, setTaskTemplates] = useState<TaskTemplate[]>(initialTaskTemplates);
   // Multiple time slots all lump into one billable duration. AI parse populates
   // one slot per detected HH:MM-HH:MM segment; operators can add/remove rows
   // via the Time card. No labels, dates, or per-slot travel - it's all flat.
@@ -324,9 +339,12 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
   const [travelEntries, setTravelEntries] = useState<TravelEntry[]>(
     () => initialDraft?.travelEntries ?? [],
   );
-  const [hourlyRateId, setHourlyRateId] = useState<string | null>(
-    () => initialDraft?.hourlyRateId ?? null,
-  );
+  // Draft wins outright (even a null rate choice); otherwise seed the default
+  // rate from the server-provided rows.
+  const [hourlyRateId, setHourlyRateId] = useState<string | null>(() => {
+    if (initialDraft) return initialDraft.hourlyRateId ?? null;
+    return initialRates.find((r) => r.isDefault)?.id ?? null;
+  });
   // Tasks, parts, and notes
   const [tasks, setTasks] = useState<TaskLine[]>(() => initialDraft?.tasks ?? []);
   const [parts, setParts] = useState<PartLine[]>(() => initialDraft?.parts ?? []);
@@ -395,7 +413,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
 
   // Active promo + per-job skip flag (not persisted). activePromo holds the
   // promo for the selected job date (refined by the job-context effect below).
-  const [activePromo, setActivePromo] = useState<ActivePromo | null>(null);
+  const [activePromo, setActivePromo] = useState<ActivePromo | null>(initialPromo);
   const [skipPromo, setSkipPromo] = useState(false);
 
   // Job date drives the holiday + promo lookup so a past job is priced by what
@@ -484,47 +502,26 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
     };
   }, []);
 
-  // Initial data fetch
+  // Mount seeding + contacts fetch. Rates/templates/promo arrive as server
+  // props; the "now" times must still seed in an effect (nowTime() at render
+  // would mismatch between server render and hydration). Contacts stay a
+  // client fetch - the People API pages through every connection and is far
+  // too slow to block the server render on.
   useEffect(() => {
-    const now = nowTime();
-    Promise.all([
-      fetch("/api/business/rates")
-        .then((r) => r.json())
-        .catch(() => ({ ok: false, rates: [] })),
-      fetch("/api/business/task-templates")
-        .then((r) => r.json())
-        .catch(() => ({ ok: false, templates: [] })),
-      // Public; auto-applies any live promo to the Summary panel.
-      fetch("/api/promos/active")
-        .then((r) => r.json())
-        .catch(() => ({ ok: false, promo: null })),
-      fetch("/api/business/contacts")
-        .then((r) => r.json())
-        .catch(() => ({ ok: false, contacts: [] })),
-    ]).then(
-      ([ratesData, templatesData, promoData, contactsData]: [
-        { ok: boolean; rates: RateConfig[] },
-        { ok: boolean; templates: TaskTemplate[] },
-        { ok: boolean; promo: ActivePromo | null },
-        { ok: boolean; contacts: GoogleContact[] },
-      ]) => {
-        // Skip the "now" + default-rate seeding when a draft was restored on
-        // mount - the draft's values are the source of truth in that case.
-        if (!draftLoadedRef.current) {
-          setTimeRanges([{ startTime: now, endTime: addHour(now) }]);
-        }
-        if (ratesData.ok) {
-          setRates(ratesData.rates);
-          if (!draftLoadedRef.current) {
-            const def = ratesData.rates.find((r) => r.isDefault);
-            if (def) setHourlyRateId(def.id);
-          }
-        }
-        if (templatesData.ok) setTaskTemplates(templatesData.templates);
-        setActivePromo(promoData.promo ?? null);
-        if (contactsData.ok) setContacts(contactsData.contacts);
-      },
-    );
+    // Skip the "now" seeding when a draft was restored on mount - the draft's
+    // times are the source of truth in that case.
+    if (!draftLoadedRef.current) {
+      const now = nowTime();
+      setTimeRanges([{ startTime: now, endTime: addHour(now) }]);
+    }
+    fetch("/api/business/contacts")
+      .then((r) => r.json())
+      .then((d: { ok: boolean; contacts: GoogleContact[] }) => {
+        if (d.ok) setContacts(d.contacts);
+      })
+      .catch(() => {
+        /* picker stays empty; manual client entry still works */
+      });
   }, []);
 
   // Debounced draft writer. Any change to a persisted form field schedules a
