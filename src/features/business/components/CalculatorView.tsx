@@ -327,26 +327,17 @@ export function CalculatorView({
 }: CalculatorViewProps): React.ReactElement {
   const router = useRouter();
 
-  // Lazy-read the saved draft once at mount. Non-meaningful drafts (just the
-  // auto-seeded "now" times from a previous session, nothing the operator
-  // typed) are treated as "no draft" so a refresh after Clear gets
-  // fresh times instead of restoring stale timestamps.
-  const initialDraft = useMemo(() => {
-    // An event prefill is a deliberate fresh billing task - it outranks any
-    // saved draft, which would otherwise leak a previous job into this one.
-    if (eventPrefill) return null;
-    const d = loadDraft();
-    if (!d || !isMeaningfulDraft(d)) return null;
-    return d;
-  }, [eventPrefill]);
-  // True when a meaningful draft was loaded; readable inside async .then()
+  // The saved draft lives in localStorage (client-only), so reading it during
+  // render made the server HTML and the client hydration disagree whenever a
+  // draft existed (React hydration error on every calculator load). State
+  // initialises to server-consistent defaults; the mount effect below
+  // restores the draft after hydration.
+  // True when a meaningful draft was restored; readable inside async .then()
   // callbacks without being a React dependency.
-  const draftLoadedRef = useRef(initialDraft !== null);
+  const draftLoadedRef = useRef(false);
   // Captured once to keep timeAgo() pure for the toast label.
   const [mountedAt] = useState(() => Date.now());
-  const [draftRestoredAt, setDraftRestoredAt] = useState<number | null>(
-    initialDraft?.savedAt ?? null,
-  );
+  const [draftRestoredAt, setDraftRestoredAt] = useState<number | null>(null);
 
   // Server-resolved reference data; setters keep the rate panel's refresh path working.
   const [rates, setRates] = useState<RateConfig[]>(initialRates);
@@ -358,54 +349,37 @@ export function CalculatorView({
     if (eventPrefill) {
       return [{ startTime: eventPrefill.startTime, endTime: eventPrefill.endTime }];
     }
-    return initialDraft?.timeRanges ?? [{ startTime: "", endTime: "" }];
+    return [{ startTime: "", endTime: "" }];
   });
   // Operator override; null means "derive from sum of slots". Lets gaps inside
   // a single slot (lunch, etc.) be billed manually.
-  const [durationMinsOverride, setDurationMinsOverride] = useState<number | null>(
-    () => initialDraft?.durationMinsOverride ?? null,
-  );
+  const [durationMinsOverride, setDurationMinsOverride] = useState<number | null>(null);
   // Every travel charge (auto-lookup + any manual entries) lumped together.
   // jobToLineItems sums them into a single "Travel" invoice line.
-  const [travelEntries, setTravelEntries] = useState<TravelEntry[]>(
-    () => initialDraft?.travelEntries ?? [],
+  const [travelEntries, setTravelEntries] = useState<TravelEntry[]>([]);
+  // Default rate from the server-provided rows; a restored draft's choice
+  // (even null) overwrites this in the mount effect.
+  const [hourlyRateId, setHourlyRateId] = useState<string | null>(
+    () => initialRates.find((r) => r.isDefault)?.id ?? null,
   );
-  // Draft wins outright (even a null rate choice); otherwise seed the default
-  // rate from the server-provided rows.
-  const [hourlyRateId, setHourlyRateId] = useState<string | null>(() => {
-    if (initialDraft) return initialDraft.hourlyRateId ?? null;
-    return initialRates.find((r) => r.isDefault)?.id ?? null;
-  });
   // Tasks, parts, and notes
-  const [tasks, setTasks] = useState<TaskLine[]>(() => initialDraft?.tasks ?? []);
-  const [parts, setParts] = useState<PartLine[]>(() => initialDraft?.parts ?? []);
+  const [tasks, setTasks] = useState<TaskLine[]>([]);
+  const [parts, setParts] = useState<PartLine[]>([]);
   const [showParts, setShowParts] = useState(false);
   const [showTaxonomyModal, setShowTaxonomyModal] = useState(false);
-  const [notes, setNotes] = useState(() => initialDraft?.notes ?? "");
+  const [notes, setNotes] = useState("");
   // Half off labour when ticked (per pricing-policy.unsuccessfulWorkCopy).
-  const [unsuccessful, setUnsuccessful] = useState(() => initialDraft?.unsuccessful ?? false);
+  const [unsuccessful, setUnsuccessful] = useState(false);
   // Client details
-  const [clientName, setClientName] = useState(
-    () => eventPrefill?.clientName ?? initialDraft?.clientName ?? "",
-  );
-  const [clientEmail, setClientEmail] = useState(
-    () => eventPrefill?.clientEmail ?? initialDraft?.clientEmail ?? "",
-  );
+  const [clientName, setClientName] = useState(() => eventPrefill?.clientName ?? "");
+  const [clientEmail, setClientEmail] = useState(() => eventPrefill?.clientEmail ?? "");
   // Address-to state mirrors the InvoiceBuilder's segmented control so the
   // operator picks Name/Company/Custom once and the choice rides through to
   // the invoice without re-picking.
-  const [pickedContactName, setPickedContactName] = useState<string | null>(
-    () => initialDraft?.pickedContactName ?? null,
-  );
-  const [pickedContactCompany, setPickedContactCompany] = useState<string | null>(
-    () => initialDraft?.pickedContactCompany ?? null,
-  );
-  const [pickedContactGoogleId, setPickedContactGoogleId] = useState<string | null>(
-    () => initialDraft?.pickedContactGoogleId ?? null,
-  );
-  const [addressMode, setAddressModeState] = useState<"name" | "company" | "custom">(
-    () => initialDraft?.addressMode ?? "custom",
-  );
+  const [pickedContactName, setPickedContactName] = useState<string | null>(null);
+  const [pickedContactCompany, setPickedContactCompany] = useState<string | null>(null);
+  const [pickedContactGoogleId, setPickedContactGoogleId] = useState<string | null>(null);
+  const [addressMode, setAddressModeState] = useState<"name" | "company" | "custom">("custom");
   // Direct-save (Save invoice) state. pendingInvoiceId is set after a
   // successful POST so handleAddContactClose can PATCH `contactId` once the
   // modal returns the new Contact's id, then navigate to the detail page.
@@ -415,7 +389,7 @@ export function CalculatorView({
   const [sheetSyncToast, setSheetSyncToast] = useState<string | null>(null);
 
   // AI parse session
-  const [aiInput, setAiInput] = useState(() => initialDraft?.aiInput ?? "");
+  const [aiInput, setAiInput] = useState("");
   const [parsing, setParsing] = useState(false);
   const [parseResult, setParseResult] = useState<ParseJobResponse | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
@@ -424,9 +398,7 @@ export function CalculatorView({
   const [clarifyAnswers, setClarifyAnswers] = useState<Record<string, string>>({});
 
   // Travel lookup
-  const [jobAddress, setJobAddress] = useState(
-    () => eventPrefill?.jobAddress ?? initialDraft?.jobAddress ?? "",
-  );
+  const [jobAddress, setJobAddress] = useState(() => eventPrefill?.jobAddress ?? "");
   const [lookingUpTravel, setLookingUpTravel] = useState(false);
   const addressInputRef = useRef<HTMLInputElement>(null);
 
@@ -455,9 +427,7 @@ export function CalculatorView({
 
   // Job date drives the holiday + promo lookup so a past job is priced by what
   // applied THEN, not today. Persisted in the draft; defaults to today (NZ).
-  const [jobDate, setJobDate] = useState<string>(
-    () => eventPrefill?.jobDate ?? initialDraft?.jobDate ?? todayNZDate(),
-  );
+  const [jobDate, setJobDate] = useState<string>(() => eventPrefill?.jobDate ?? todayNZDate());
   // Holiday context for the selected date: name (for the UI) + the live labour
   // uplift fraction (0 when the date isn't a public holiday).
   const [holiday, setHoliday] = useState<{ name: string | null; uplift: number }>({
@@ -547,9 +517,38 @@ export function CalculatorView({
   // client fetch - the People API pages through every connection and is far
   // too slow to block the server render on.
   useEffect(() => {
-    // Skip the "now" seeding when a draft or event prefill supplied the times
-    // - those are the source of truth in that case.
-    if (!draftLoadedRef.current && !eventPrefill) {
+    // Restore the saved draft after mount (localStorage is client-only; see
+    // the note above the state block). An event prefill is a deliberate
+    // fresh billing task and outranks any draft; non-meaningful drafts (just
+    // auto-seeded times from a previous session) seed fresh "now" times
+    // instead of restoring stale timestamps.
+    const draft = eventPrefill ? null : loadDraft();
+    if (draft && isMeaningfulDraft(draft)) {
+      draftLoadedRef.current = true;
+      /* eslint-disable react-hooks/set-state-in-effect -- one-shot restore from
+         localStorage (an external store); doing this during render caused the
+         hydration mismatch this effect replaces */
+      setDraftRestoredAt(draft.savedAt ?? null);
+      setAiInput(draft.aiInput ?? "");
+      setJobDate(draft.jobDate ?? todayNZDate());
+      setTimeRanges(draft.timeRanges ?? [{ startTime: "", endTime: "" }]);
+      setDurationMinsOverride(draft.durationMinsOverride ?? null);
+      // Draft wins outright, even a null rate choice.
+      setHourlyRateId(draft.hourlyRateId ?? null);
+      setTravelEntries(draft.travelEntries ?? []);
+      setJobAddress(draft.jobAddress ?? "");
+      setTasks(draft.tasks ?? []);
+      setParts(draft.parts ?? []);
+      setNotes(draft.notes ?? "");
+      setClientName(draft.clientName ?? "");
+      setClientEmail(draft.clientEmail ?? "");
+      setPickedContactName(draft.pickedContactName ?? null);
+      setPickedContactCompany(draft.pickedContactCompany ?? null);
+      setPickedContactGoogleId(draft.pickedContactGoogleId ?? null);
+      setAddressModeState(draft.addressMode ?? "custom");
+      setUnsuccessful(draft.unsuccessful ?? false);
+      /* eslint-enable react-hooks/set-state-in-effect */
+    } else if (!eventPrefill) {
       const now = nowTime();
       setTimeRanges([{ startTime: now, endTime: addHour(now) }]);
     }
@@ -562,7 +561,7 @@ export function CalculatorView({
         /* picker stays empty; manual client entry still works */
       });
     // Run once on mount - eventPrefill is fixed per page load, and re-running
-    // would clobber edited times and refetch contacts.
+    // would clobber edited state and refetch contacts.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
