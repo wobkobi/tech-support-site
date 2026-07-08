@@ -159,8 +159,10 @@ export interface TravelEntry {
   isAuto?: boolean;
   /** Destination text shown in the operator-side breakdown (auto entries only). */
   destination?: string;
-  /** One-way drive time in minutes from the address lookup (auto entries only). */
+  /** Outbound drive time in minutes from the address lookup (auto entries only). */
   durationMinsOneWay?: number;
+  /** Return-leg drive time in minutes; readers fall back to durationMinsOneWay on legacy drafts. */
+  durationMinsBack?: number;
   /** One-way drive distance in km from the address lookup (auto entries only). */
   distanceKmOneWay?: number;
 }
@@ -288,9 +290,11 @@ export interface SheetCounterResponse {
 }
 
 export interface TravelInfo {
-  /** One-way drive distance in km from the address lookup. */
+  /** One-way drive distance in km from the address lookup (outbound leg). */
   distanceKmOneWay: number;
-  /** One-way drive time in minutes; calcTravelCharge doubles internally to produce the round-trip charge. */
+  /** Outbound drive time in minutes; summed with durationMinsBack by calcTravelCharge. */
   durationMins: number;
+  /** Return-leg drive time in minutes; mirrors durationMins when the back-leg lookup degrades. */
+  durationMinsBack: number;
   destination?: string;
 }

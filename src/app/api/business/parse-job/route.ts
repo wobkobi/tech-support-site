@@ -14,7 +14,7 @@ import {
   buildParseJobContext,
   buildParseJobPrompt,
 } from "@/features/business/lib/prompts/parse-job";
-import { lookupDriveDistance } from "@/features/business/lib/travel-distance";
+import { lookupDriveRoundTrip } from "@/features/business/lib/travel-distance";
 import type {
   ParseJobQuestion,
   ParseJobResponse,
@@ -283,24 +283,26 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     if (!parsed.noTravelCharge && parsed.statedDistanceKm && parsed.statedDistanceKm > 0) {
       // Operator stated round-trip km but no time. Halve back to a one-way
-      // figure so downstream consumers (calcTravelCharge) get the contract
-      // they expect; durationMins stays 0 here because there is no time signal.
+      // figure so downstream consumers get the contract they expect; both
+      // leg durations stay 0 here because there is no time signal.
       parsed.travel = {
         distanceKmOneWay: Math.round((parsed.statedDistanceKm / 2) * 10) / 10,
         durationMins: 0,
+        durationMinsBack: 0,
         destination: parsed.destination ?? undefined,
       };
     } else if (!parsed.noTravelCharge && parsed.destination) {
-      // Look up one-way distance via Google Distance Matrix and pass through
-      // unchanged - calcTravelCharge doubles internally for the round-trip
-      // charge. Direct call into the helper instead of a self-fetch so this
-      // works without NEXT_PUBLIC_BASE_URL set and doesn't burn the public
-      // route's rate-limit budget.
-      const lookup = await lookupDriveDistance(parsed.destination);
-      if (lookup.status === "ok" && lookup.data.distanceKm > 0) {
+      // Look up both drive legs via Google Distance Matrix (no times parsed,
+      // so both quote at "now"); calcTravelCharge sums the legs downstream.
+      // Direct call into the helper instead of a self-fetch so this works
+      // without NEXT_PUBLIC_BASE_URL set and doesn't burn the public route's
+      // rate-limit budget.
+      const lookup = await lookupDriveRoundTrip(parsed.destination);
+      if (lookup.status === "ok" && lookup.data.there.distanceKm > 0) {
         parsed.travel = {
-          distanceKmOneWay: lookup.data.distanceKm,
-          durationMins: lookup.data.durationMins,
+          distanceKmOneWay: lookup.data.there.distanceKm,
+          durationMins: lookup.data.there.durationMins,
+          durationMinsBack: lookup.data.back.durationMins,
           destination: parsed.destination,
         };
       }

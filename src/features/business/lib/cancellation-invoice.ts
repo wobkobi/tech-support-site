@@ -15,7 +15,7 @@ import {
 import { extractYearCode, generateInvoicePdf } from "@/features/business/lib/invoice-pdf";
 import { calcTravelCharge, FALLBACK_TRAVEL_RATE } from "@/features/business/lib/pricing-policy";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
-import { lookupDriveDistance } from "@/features/business/lib/travel-distance";
+import { lookupDriveRoundTrip } from "@/features/business/lib/travel-distance";
 import type { LineItem } from "@/features/business/types/business";
 import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-create";
 import { sendInvoiceEmail } from "@/features/reviews/lib/email";
@@ -63,14 +63,21 @@ export async function createDraftCancellationInvoice(
 
   if (options.includeTravel) {
     let travelMins = booking.travelMinsAtBooking ?? 0;
+    // Legacy rows missing the back-leg snapshot fall back to the outbound figure.
+    let travelMinsBack = booking.travelMinsBackAtBooking ?? 0;
     if (!travelMins) {
       // Legacy fallback for pre-snapshot rows: notes-parse + live lookup.
+      // No times passed - the drive "would have been" about now, matching
+      // the cancellation moment.
       const addressMatch = booking.notes?.match(/Address:\s*(.+)/i);
       const address = addressMatch?.[1]?.trim();
       if (address) {
         try {
-          const result = await lookupDriveDistance(address);
-          if (result.status === "ok") travelMins = result.data.durationMins;
+          const result = await lookupDriveRoundTrip(address);
+          if (result.status === "ok") {
+            travelMins = result.data.there.durationMins;
+            travelMinsBack = result.data.back.durationMins;
+          }
         } catch (err) {
           console.warn("[cancellation-invoice] travel lookup failed:", err);
         }
@@ -85,7 +92,12 @@ export async function createDraftCancellationInvoice(
         });
         travelRatePerHour = travelRow?.ratePerHour ?? FALLBACK_TRAVEL_RATE;
       }
-      const travelCost = calcTravelCharge(travelMins, travelRatePerHour, MIN_TRAVEL_CHARGE);
+      const travelCost = calcTravelCharge(
+        travelMins,
+        travelMinsBack || travelMins,
+        travelRatePerHour,
+        MIN_TRAVEL_CHARGE,
+      );
       if (travelCost > 0) {
         lineItems.push({
           description: "Cancellation travel (round-trip)",

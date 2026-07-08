@@ -86,7 +86,7 @@ export const CANCELLATION: CancellationPolicy = {
 };
 
 export interface TravelChargeBreakdown {
-  /** Raw round-trip cost before any rounding or floor: (oneWayMins/60) * 2 * ratePerHour. */
+  /** Raw round-trip cost before any rounding or floor: ((thereMins + backMins)/60) * ratePerHour. */
   rawCost: number;
   /** rawCost snapped to the nearest $5. */
   roundedCost: number;
@@ -101,22 +101,26 @@ export interface TravelChargeBreakdown {
  * {@link calcTravelCharge} and the operator-side breakdown display, so the
  * displayed math always matches what's billed.
  *
- * Pass ONE-WAY travelMins; this doubles internally to produce the round-trip
- * charge. Returns zeros for no travel (remote, or geocoded to origin).
- * @param travelMins - One-way drive time in minutes (from `lookupDriveDistance`).
+ * Each leg is quoted at its own departure time (out at job start, back at job
+ * end); callers with only one figure pass it for both legs, which reproduces
+ * the old symmetric doubling. Returns zeros for no travel (remote, or
+ * geocoded to origin).
+ * @param thereMins - Outbound drive time in minutes.
+ * @param backMins - Return drive time in minutes; pass thereMins again when no separate figure exists.
  * @param travelRatePerHour - Travel hourly rate, sourced from the `Travel` RateConfig.
  * @param minTravelCharge - Travel floor (live pricing setting); defaults to the code const.
  * @returns Per-step breakdown of the round-trip charge.
  */
 export function breakdownTravelCharge(
-  travelMins: number,
+  thereMins: number,
+  backMins: number,
   travelRatePerHour: number,
   minTravelCharge: number = MIN_TRAVEL_CHARGE,
 ): TravelChargeBreakdown {
-  if (travelMins <= 0 || travelRatePerHour <= 0) {
+  if (thereMins + backMins <= 0 || travelRatePerHour <= 0) {
     return { rawCost: 0, roundedCost: 0, finalCost: 0, minimumApplied: false };
   }
-  const rawCost = Math.round((travelMins / 60) * 2 * travelRatePerHour * 100) / 100;
+  const rawCost = Math.round(((thereMins + backMins) / 60) * travelRatePerHour * 100) / 100;
   const roundedCost = Math.round(rawCost / 5) * 5;
   const finalCost = Math.max(minTravelCharge, roundedCost);
   return {
@@ -128,23 +132,22 @@ export function breakdownTravelCharge(
 }
 
 /**
- * Round-trip travel charge. Doubles one-way drive time, snaps to $5, and
- * floors at {@link MIN_TRAVEL_CHARGE}. Returns 0 for no travel (remote, or geocoded
+ * Round-trip travel charge: sums both legs, snaps to $5, and floors at
+ * {@link MIN_TRAVEL_CHARGE}. Returns 0 for no travel (remote, or geocoded
  * to origin) so the floor doesn't invent a charge.
- *
- * Pass ONE-WAY travelMins; this doubles internally. Passing round-trip
- * minutes would 4x the bill.
- * @param travelMins - One-way drive time in minutes (from `lookupDriveDistance`).
+ * @param thereMins - Outbound drive time in minutes.
+ * @param backMins - Return drive time in minutes; pass thereMins again when no separate figure exists.
  * @param travelRatePerHour - Travel hourly rate, sourced from the `Travel` RateConfig.
  * @param minTravelCharge - Travel floor (live pricing setting); defaults to the code const.
  * @returns Charge in NZD (whole dollars after $5 rounding), or 0 when no travel.
  */
 export function calcTravelCharge(
-  travelMins: number,
+  thereMins: number,
+  backMins: number,
   travelRatePerHour: number,
   minTravelCharge: number = MIN_TRAVEL_CHARGE,
 ): number {
-  return breakdownTravelCharge(travelMins, travelRatePerHour, minTravelCharge).finalCost;
+  return breakdownTravelCharge(thereMins, backMins, travelRatePerHour, minTravelCharge).finalCost;
 }
 
 /**

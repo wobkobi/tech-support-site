@@ -119,9 +119,11 @@ export function TravelSection({
               entry.durationMinsOneWay !== undefined &&
               entry.durationMinsOneWay > 0;
             const oneWayMin = entry.durationMinsOneWay ?? 0;
-            const roundTripMin = oneWayMin * 2;
+            // Legacy drafts predate the return-leg lookup; mirror the outbound figure.
+            const backMin = entry.durationMinsBack ?? oneWayMin;
+            const roundTripMin = oneWayMin + backMin;
             const breakdown = showBreakdown
-              ? breakdownTravelCharge(oneWayMin, travelRatePerHour, minTravelCharge)
+              ? breakdownTravelCharge(oneWayMin, backMin, travelRatePerHour, minTravelCharge)
               : null;
             return (
               <div key={index} className="space-y-1">
@@ -186,8 +188,9 @@ export function TravelSection({
                       {entry.distanceKmOneWay !== undefined && ` (${entry.distanceKmOneWay} km)`}
                     </li>
                     <li>
-                      <span className="text-slate-400">Back:</span> {oneWayMin} min
-                      {entry.distanceKmOneWay !== undefined && ` (${entry.distanceKmOneWay} km)`}
+                      {/* Return leg quoted at its own departure time; km shown only on
+                          There - the back-leg distance is not returned by the lookup. */}
+                      <span className="text-slate-400">Back:</span> {backMin} min
                     </li>
                     <li>
                       <span className="text-slate-400">Raw:</span> {roundTripMin} min round trip @{" "}
