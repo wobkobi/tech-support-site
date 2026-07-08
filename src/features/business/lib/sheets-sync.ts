@@ -86,6 +86,10 @@ export async function resolveSheetIdForDate(date: Date): Promise<string | null> 
 
 /**
  * Looks up the numeric sheet ID (gid) of a tab by name; needed for batchUpdate.
+ * Matching is trimmed and case-insensitive to mirror how the values API
+ * resolves range names - the workbooks title their tabs "CASHBOOK"/"EXPENSES"
+ * while the code addresses them as "Cashbook"/"Expenses", so an exact match
+ * reads rows fine but broke every metadata lookup (Sync-ID backfill).
  * @param spreadsheetId - The spreadsheet file ID.
  * @param tabName - Human-readable tab name (e.g. "Cashbook").
  * @returns The numeric sheetId, or null if the tab is missing.
@@ -100,8 +104,19 @@ async function getTabSheetId(spreadsheetId: string, tabName: string): Promise<nu
       }),
     { label: "sheets-sync" },
   );
-  const tab = meta.data.sheets?.find((s) => s.properties?.title === tabName);
-  return tab?.properties?.sheetId ?? null;
+  const wanted = tabName.trim().toLowerCase();
+  const tab = meta.data.sheets?.find((s) => s.properties?.title?.trim().toLowerCase() === wanted);
+  if (tab?.properties?.sheetId == null) {
+    console.warn(
+      `[sheets-sync] Tab "${tabName}" not found in ${spreadsheetId}; tabs: ${(
+        meta.data.sheets ?? []
+      )
+        .map((s) => JSON.stringify(s.properties?.title ?? ""))
+        .join(", ")}`,
+    );
+    return null;
+  }
+  return tab.properties.sheetId;
 }
 
 /**
