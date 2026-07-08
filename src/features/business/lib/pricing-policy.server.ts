@@ -17,15 +17,61 @@ import {
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import Holidays from "date-holidays";
+import { unstable_cache } from "next/cache";
+import { cache } from "react";
 import "server-only";
+
+/** Cache tag busted by every RateConfig write so rate edits go live immediately. */
+export const RATE_CONFIG_TAG = "rate-config";
+
+/**
+ * RateConfig snapshot as stored in the data cache. `unstable_cache` JSON
+ * round-trips its value, so `updatedAt` is normalised to an ISO string up
+ * front - the shape is then identical on cache hit and miss.
+ */
+export interface CachedRateRow {
+  label: string;
+  ratePerHour: number | null;
+  flatRate: number | null;
+  hourlyDelta: number | null;
+  percentDelta: number | null;
+  unit: string;
+  isDefault: boolean;
+  updatedAt: string | null;
+}
+
+/**
+ * Cached RateConfig rows for the public pages and the public rates API.
+ * Tagged with {@link RATE_CONFIG_TAG}; the admin rate routes bust the tag on
+ * every write, so the 5-minute revalidate only matters as a safety net.
+ * @returns Rate rows ordered by label, Dates flattened to ISO strings.
+ */
+export const getRateRows = unstable_cache(
+  async (): Promise<CachedRateRow[]> => {
+    const rows = await prisma.rateConfig.findMany({ orderBy: { label: "asc" } });
+    return rows.map((r) => ({
+      label: r.label,
+      ratePerHour: r.ratePerHour,
+      flatRate: r.flatRate,
+      hourlyDelta: r.hourlyDelta,
+      percentDelta: r.percentDelta,
+      unit: r.unit,
+      isDefault: r.isDefault,
+      updatedAt: r.updatedAt ? r.updatedAt.toISOString() : null,
+    }));
+  },
+  ["rate-config"],
+  { tags: [RATE_CONFIG_TAG], revalidate: 300 },
+);
 
 /**
  * Live policy bundle, resolved from the settings panel (defaults + DB override).
  * Server-only because it reads the settings store; client code receives the
  * resolved values as props. {@link GST_RATE} stays a legislated constant.
+ * Wrapped in React `cache` so repeat calls within one request dedupe.
  * @returns The current policy values the operator has configured.
  */
-export async function getPolicy(): Promise<Policy> {
+export const getPolicy = cache(async (): Promise<Policy> => {
   const { pricing } = await getSettings();
   return {
     GST_REGISTERED: pricing.gstRegistered,
@@ -36,7 +82,7 @@ export async function getPolicy(): Promise<Policy> {
     PUBLIC_HOLIDAY_UPLIFT: pricing.publicHolidayUplift,
     CANCELLATION: pricing.cancellation,
   };
-}
+});
 
 /** One labour modifier as rendered on the pricing page accordion. */
 export interface PublicModifier {
@@ -69,14 +115,15 @@ const MODIFIER_DESCRIPTIONS: Record<string, string> = {
 };
 
 /**
- * Public pricing snapshot for the pricing + FAQ pages. Reads RateConfig
- * directly so the render takes one Prisma round-trip. Falls back to
+ * Public pricing snapshot for the pricing + FAQ pages and the layout JSON-LD.
+ * Reads the tag-cached rate rows ({@link getRateRows}) alongside the cached
+ * settings, and dedupes repeat calls within one request via React `cache`
+ * (layout + generateMetadata + page body all call it). Falls back to
  * hardcoded $65 / $40 defaults when a row is missing.
  * @returns Live pricing snapshot.
  */
-export async function getPublicPricing(): Promise<PublicPricing> {
-  const rows = await prisma.rateConfig.findMany({ orderBy: { label: "asc" } });
-  const { pricing } = await getSettings();
+export const getPublicPricing = cache(async (): Promise<PublicPricing> => {
+  const [rows, { pricing }] = await Promise.all([getRateRows(), getSettings()]);
 
   const baseRate =
     rows.find((r) => r.ratePerHour !== null && r.isDefault)?.ratePerHour ??
@@ -115,20 +162,21 @@ export async function getPublicPricing(): Promise<PublicPricing> {
   }
 
   // Latest mtime across rows; powers the "Rates last updated on {date}" footer.
-  const ratesUpdatedAt = rows.reduce<Date | null>((max, r) => {
-    const t = r.updatedAt;
-    if (!t) return max;
-    if (!max) return t;
-    return t > max ? t : max;
+  // Rows carry ISO strings (cache serialisation), which compare correctly
+  // lexicographically; rebuild the Date at the end so PublicPricing keeps its shape.
+  const isoMax = rows.reduce<string | null>((max, r) => {
+    if (!r.updatedAt) return max;
+    if (!max) return r.updatedAt;
+    return r.updatedAt > max ? r.updatedAt : max;
   }, null);
 
   return {
     baseRate,
     travelRatePerHour,
     modifiers,
-    ratesUpdatedAt,
+    ratesUpdatedAt: isoMax ? new Date(isoMax) : null,
   };
-}
+});
 
 // Cached Holidays instances. The nationwide instance covers all public
 // holidays; the Auckland instance is queried separately for the regional
@@ -197,4 +245,37 @@ export async function lookupPublicHoliday(
     console.warn("[pricing-policy] PublicHoliday lookup failed; using fallback:", err);
   }
   return holidayFromPackage(key);
+}
+
+/**
+ * Batch variant of {@link lookupPublicHoliday}: one `PublicHoliday` read
+ * covers every date key, with the algorithmic `date-holidays` fallback
+ * filling any key the table doesn't cover. Used by the admin schedule, which
+ * spans a multi-week window and would otherwise pay one DB round-trip per day.
+ * @param keys - NZ-local YYYY-MM-DD date strings.
+ * @returns Map from date key to `{ name, region }`; non-holiday keys are absent.
+ */
+export async function lookupPublicHolidaysForKeys(
+  keys: string[],
+): Promise<Map<string, { name: string; region: string }>> {
+  const result = new Map<string, { name: string; region: string }>();
+  if (keys.length === 0) return result;
+  try {
+    // region asc + first-row-wins per key replicates the per-key findFirst.
+    const rows = await prisma.publicHoliday.findMany({
+      where: { date: { in: keys }, region: { in: [NZ_REGION, HOME_REGION] } },
+      orderBy: { region: "asc" },
+    });
+    for (const row of rows) {
+      if (!result.has(row.date)) result.set(row.date, { name: row.name, region: row.region });
+    }
+  } catch (err) {
+    console.warn("[pricing-policy] PublicHoliday range lookup failed; using fallback:", err);
+  }
+  for (const key of keys) {
+    if (result.has(key)) continue;
+    const fallback = holidayFromPackage(key);
+    if (fallback) result.set(key, fallback);
+  }
+  return result;
 }

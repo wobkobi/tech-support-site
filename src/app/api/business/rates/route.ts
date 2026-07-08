@@ -7,9 +7,11 @@
  * wipes all rows and reseeds the DEFAULTS.
  */
 
+import { RATE_CONFIG_TAG } from "@/features/business/lib/pricing-policy.server";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
+import { revalidateTag } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 
 // Seed shape: one base hourly rate (Standard), modifier rates that shift the
@@ -77,36 +79,53 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return errorResponse("Unauthorized", 401);
   }
 
-  const existing = await prisma.rateConfig.findMany({ select: { label: true } });
-  const existingLabels = new Set(existing.map((r) => r.label));
+  // Read once and decide in memory which passive migrations still apply, so
+  // the steady state (nothing to migrate) stays a single read - the admin
+  // calculator hits this endpoint on every mount.
+  let rates = await prisma.rateConfig.findMany({ orderBy: { label: "asc" } });
+
+  const existingLabels = new Set(rates.map((r) => r.label));
   const missing = DEFAULTS.filter((d) => !existingLabels.has(d.label));
   if (missing.length > 0) {
     await prisma.rateConfig.createMany({ data: missing });
   }
+
   // Passive cleanup: Student and Complex are no longer part of DEFAULTS.
-  // Delete any leftover rows on every seed call so production matches the
-  // DEFAULTS shape without needing a manual migration.
-  await prisma.rateConfig.deleteMany({ where: { label: { in: ["Student", "Complex"] } } });
+  const hasRetiredLabels = rates.some((r) => r.label === "Student" || r.label === "Complex");
+  if (hasRetiredLabels) {
+    await prisma.rateConfig.deleteMany({ where: { label: { in: ["Student", "Complex"] } } });
+  }
 
   // Travel rate migration: legacy rows still carry { flatRate: 1.2, unit: "km" }
   // from the per-km model. Switch to { ratePerHour: 40, unit: "travel-hour" }
   // so time-based travel math (calcTravelCharge) reads the correct rate.
-  // Idempotent - only fires on rows that haven't already been converted.
-  await prisma.rateConfig.updateMany({
-    where: { label: "Travel", unit: "km" },
-    data: { ratePerHour: 40, flatRate: null, unit: "travel-hour" },
-  });
+  const hasLegacyTravel = rates.some((r) => r.label === "Travel" && r.unit === "km");
+  if (hasLegacyTravel) {
+    await prisma.rateConfig.updateMany({
+      where: { label: "Travel", unit: "km" },
+      data: { ratePerHour: 40, flatRate: null, unit: "travel-hour" },
+    });
+  }
 
-  // updatedAt backfill: rows created before the field existed have no value
-  // in Mongo and Prisma cannot coerce that to a non-null DateTime at read.
-  // Stamp them once with "now" so the pricing-page footer has something to
-  // show; future edits stamp via @updatedAt automatically. Idempotent.
-  await prisma.rateConfig.updateMany({
-    where: { updatedAt: { isSet: false } },
-    data: { updatedAt: new Date() },
-  });
+  // updatedAt backfill: rows created before the field existed have no value in
+  // Mongo; an unset nullable field reads back as null, so the null check covers
+  // both unset and explicit-null rows. Stamp them once with "now" so the
+  // pricing-page footer has something to show; future edits stamp via @updatedAt.
+  const needsUpdatedAtBackfill = rates.some((r) => r.updatedAt === null);
+  if (needsUpdatedAtBackfill) {
+    await prisma.rateConfig.updateMany({
+      where: { OR: [{ updatedAt: { isSet: false } }, { updatedAt: null }] },
+      data: { updatedAt: new Date() },
+    });
+  }
 
-  const rates = await prisma.rateConfig.findMany({ orderBy: { label: "asc" } });
+  // Re-read and bust the public pricing cache only when a migration wrote.
+  if (missing.length > 0 || hasRetiredLabels || hasLegacyTravel || needsUpdatedAtBackfill) {
+    rates = await prisma.rateConfig.findMany({ orderBy: { label: "asc" } });
+    // Next 16's revalidateTag requires a second CacheLifeConfig arg.
+    revalidateTag(RATE_CONFIG_TAG, {});
+  }
+
   return NextResponse.json({ ok: true, rates });
 }
 
@@ -157,6 +176,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     });
   }
 
+  // Next 16's revalidateTag requires a second CacheLifeConfig arg.
+  revalidateTag(RATE_CONFIG_TAG, {});
   return NextResponse.json({ ok: true, rate }, { status: 201 });
 }
 
@@ -173,5 +194,7 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
   await prisma.rateConfig.deleteMany({});
   await prisma.rateConfig.createMany({ data: DEFAULTS });
   const rates = await prisma.rateConfig.findMany({ orderBy: { label: "asc" } });
+  // Next 16's revalidateTag requires a second CacheLifeConfig arg.
+  revalidateTag(RATE_CONFIG_TAG, {});
   return NextResponse.json({ ok: true, rates });
 }

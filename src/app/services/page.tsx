@@ -27,6 +27,10 @@ import {
   FaWifi,
 } from "react-icons/fa6";
 
+// ISR so rate edits propagate via the rate-config tag purge instead of
+// requiring a redeploy (the page was previously baked at build time).
+export const revalidate = 3600;
+
 export const metadata: Metadata = {
   title: "Tech Support Services - Computers, Wi-Fi, Phones & More",
   description:

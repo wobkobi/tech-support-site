@@ -50,28 +50,90 @@ interface CalendarFetchResult {
   degraded: boolean;
 }
 
+// How far past its TTL a cached event stays servable. Two hours covers many
+// missed cron runs while keeping a hard bound on how stale the availability
+// picture can get; the submit-time conflict check still guards double-booking.
+const STALE_SERVE_WINDOW_MS = 2 * 60 * 60 * 1000;
+
 /**
- * Get calendar events, preferring cache, falling back to live API.
+ * Fetches live calendar events and repopulates the cache in the background.
+ * Shared by the blocking cold-cache path and the stale-serve background refresh.
+ * @param now - Current date
+ * @param maxDate - Maximum booking date
+ * @returns Live events from the Google Calendar API.
+ */
+async function fetchLiveAndCache(
+  now: Date,
+  maxDate: Date,
+): Promise<Array<{ id: string; start: string; end: string }>> {
+  const liveEvents = await fetchAllCalendarEvents(now, maxDate);
+  console.log(`[booking/page] Fetched ${liveEvents.length} live calendar events`);
+
+  // Populate cache in background so the next request is fast.
+  // Matches the cron writer's 30-min TTL (cron runs every 15 min).
+  const cacheExpiry = new Date(now.getTime() + 30 * 60 * 1000);
+  void Promise.all(
+    liveEvents.map((e) =>
+      prisma.calendarEventCache.upsert({
+        where: { eventId_calendarEmail: { eventId: e.id, calendarEmail: e.calendarEmail } },
+        create: {
+          eventId: e.id,
+          calendarEmail: e.calendarEmail,
+          startAt: new Date(e.start),
+          endAt: new Date(e.end),
+          fetchedAt: now,
+          expiresAt: cacheExpiry,
+        },
+        update: {
+          startAt: new Date(e.start),
+          endAt: new Date(e.end),
+          fetchedAt: now,
+          expiresAt: cacheExpiry,
+        },
+      }),
+    ),
+  ).catch((err) => console.error("[booking/page] Failed to populate calendar cache:", err));
+
+  return liveEvents.map((e) => ({ id: e.id, start: e.start, end: e.end }));
+}
+
+/**
+ * Get calendar events: fresh cache first, then stale-while-revalidate (serve
+ * expired-but-recent rows and refresh in the background), and only block on
+ * the live API when the cache holds nothing usable.
  * @param now - Current date
  * @param maxDate - Maximum booking date
  * @returns Events plus a `degraded` flag for the no-data state.
  */
 async function getCalendarEvents(now: Date, maxDate: Date): Promise<CalendarFetchResult> {
-  // Try the cache first
+  // One read covers fresh and stale rows; expiresAt decides which path below.
   const cachedEvents = await prisma.calendarEventCache.findMany({
     where: {
-      expiresAt: { gt: now },
+      fetchedAt: { gt: new Date(now.getTime() - STALE_SERVE_WINDOW_MS) },
       endAt: { gte: now },
     },
     select: {
       eventId: true,
       startAt: true,
       endAt: true,
+      expiresAt: true,
     },
   });
 
   if (cachedEvents.length > 0) {
-    console.log(`[booking/page] Using ${cachedEvents.length} cached calendar events`);
+    const hasExpired = cachedEvents.some((e) => e.expiresAt <= now);
+    if (hasExpired) {
+      // Stale-while-revalidate: render from the recent-but-expired rows now,
+      // bring the cache current in the background (missed-cron case).
+      console.log(
+        `[booking/page] Serving ${cachedEvents.length} stale cached calendar events; refreshing in background`,
+      );
+      void fetchLiveAndCache(now, maxDate).catch((err) =>
+        console.error("[booking/page] Background calendar refresh failed:", err),
+      );
+    } else {
+      console.log(`[booking/page] Using ${cachedEvents.length} cached calendar events`);
+    }
     return {
       events: cachedEvents.map((e) => ({
         id: e.eventId,
@@ -82,42 +144,9 @@ async function getCalendarEvents(now: Date, maxDate: Date): Promise<CalendarFetc
     };
   }
 
-  // Fall back to the live API
+  // Nothing usable cached - block on the live API.
   try {
-    const liveEvents = await fetchAllCalendarEvents(now, maxDate);
-    console.log(
-      `[booking/page] Fetched ${liveEvents.length} live calendar events (cache was empty)`,
-    );
-
-    // Populate cache in background so the next request is fast.
-    // Matches the cron writer's 30-min TTL (cron runs every 15 min).
-    const cacheExpiry = new Date(now.getTime() + 30 * 60 * 1000);
-    void Promise.all(
-      liveEvents.map((e) =>
-        prisma.calendarEventCache.upsert({
-          where: { eventId_calendarEmail: { eventId: e.id, calendarEmail: e.calendarEmail } },
-          create: {
-            eventId: e.id,
-            calendarEmail: e.calendarEmail,
-            startAt: new Date(e.start),
-            endAt: new Date(e.end),
-            fetchedAt: now,
-            expiresAt: cacheExpiry,
-          },
-          update: {
-            startAt: new Date(e.start),
-            endAt: new Date(e.end),
-            fetchedAt: now,
-            expiresAt: cacheExpiry,
-          },
-        }),
-      ),
-    ).catch((err) => console.error("[booking/page] Failed to populate calendar cache:", err));
-
-    return {
-      events: liveEvents.map((e) => ({ id: e.id, start: e.start, end: e.end })),
-      degraded: false,
-    };
+    return { events: await fetchLiveAndCache(now, maxDate), degraded: false };
   } catch (error) {
     console.error("[booking/page] Failed to fetch live calendar events:", error);
     return { events: [], degraded: true };

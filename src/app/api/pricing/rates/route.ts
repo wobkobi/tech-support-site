@@ -5,15 +5,16 @@
  * hourlyDelta, unit, isDefault), ordered by label.
  */
 
-import { prisma } from "@/shared/lib/prisma";
+import { getRateRows } from "@/features/business/lib/pricing-policy.server";
 import { NextResponse } from "next/server";
 
 /**
  * GET /api/pricing/rates - Public endpoint returning rate labels and amounts (no auth required).
+ * Served from the tag-cached rate rows, so it skips Mongo on warm requests.
  * @returns JSON with public rates array stripped of internal fields
  */
 export async function GET(): Promise<NextResponse> {
-  const rates = await prisma.rateConfig.findMany({ orderBy: { label: "asc" } });
+  const rates = await getRateRows();
 
   const publicRates = rates.map(
     ({ label, ratePerHour, flatRate, hourlyDelta, unit, isDefault }) => ({
