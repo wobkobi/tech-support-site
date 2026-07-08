@@ -47,6 +47,18 @@ const DEFAULTS = [
     isDefault: false,
   },
   {
+    // Phone-delivered work: no screen share, no travel - cheaper again than
+    // Remote. Quick calls are often not charged at all (operator's call);
+    // this rate covers the ones long enough to bill.
+    label: "Phone",
+    ratePerHour: null,
+    flatRate: null,
+    hourlyDelta: -25,
+    percentDelta: null,
+    unit: "modifier",
+    isDefault: false,
+  },
+  {
     label: "Public Holiday",
     ratePerHour: null,
     flatRate: null,

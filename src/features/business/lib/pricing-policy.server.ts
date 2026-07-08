@@ -111,6 +111,7 @@ export interface PublicPricing {
 const MODIFIER_DESCRIPTIONS: Record<string, string> = {
   Remote: "Screen-share session - I log in instead of visiting.",
   "At home": "Bench repair at my place - I take the device home to fix it instead of visiting.",
+  Phone: "Help over the phone - quick calls are often free; longer fixes bill at this rate.",
   "Public Holiday": "Applied automatically on NZ public holidays.",
 };
 
@@ -138,7 +139,10 @@ export const getPublicPricing = cache(async (): Promise<PublicPricing> => {
   const modifiers: PublicModifier[] = [];
   for (const row of rows) {
     if (row.unit !== "modifier") continue;
-    if ((row.label === "Remote" || row.label === "At home") && row.hourlyDelta !== null) {
+    if (
+      (row.label === "Remote" || row.label === "At home" || row.label === "Phone") &&
+      row.hourlyDelta !== null
+    ) {
       modifiers.push({
         label: row.label,
         effectiveRate: Math.round((baseRate + row.hourlyDelta) * 100) / 100,

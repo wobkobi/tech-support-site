@@ -73,6 +73,7 @@ DETAILS (optional qualifier — use sparingly):
 - Each task may include a "details" string with a short free-text qualifier (≤ 5 words) when the device + action alone STILL wouldn't carry enough context. The server appends it to the composed description as "<Device> <action lowercased> - <details>".
 - Use details for incidental context that isn't worth its own action tag: the affected component, the symptom, the trigger, a count, OR the brand if the customer used one (e.g. "corrupted", "caused USB issues", "from old laptop", "5 photos", "blue screen at startup", "Spotify", "Netflix family plan"). No domain names (.nz/.com URLs) and no registrar names (1st Domains, cPanel). Technical shorthand is fine — DNS, POP3, SMTP, IMAP, SSL, TLS are all acceptable in details. Describe what was done, not what failed.
 - OMIT details (set to null or leave it out) when the device + action already say everything — no filler like "successful" / "done" / "complete".
+- NEVER copy billing signals into details or actions: speed hints ("quick", "quickly", "briefly", "just a quick"), stated durations ("42 min", "(20 mins)"), rate/location hints ("remote", "at home", "over the phone"), and people's first names are INPUTS that set quantity and rate labels - they are not part of the customer-facing description. "Heidi not connecting microphone (quick)" → device "Microphone", action "Connection troubleshooting", details null - the "(quick)" only pins the task short, and the escalated-call suffixes ("over the phone" / "remote session") are the ONE exception where the channel may appear.
 
 INVOICE-WORTHY PHRASING — paying customers read these, not engineers:
 - Spell out acronyms a non-tech client wouldn't know: "Operating system reinstall" not "OS reinstall", "Blue screen at startup" not "BSOD on boot". Common ones (USB, Wi-Fi, Bluetooth, PC) stay short.
@@ -160,6 +161,7 @@ The SERVER computes unitPrice from these labels - DO NOT compute it yourself, ju
 Modifier triggers (apply a trigger only when a matching label exists in the Available modifier labels list):
 - "At home": WORK was done at Harrison's home, alone, no screen-share. Triggers: phrases that clearly mean Harrison's location, like "I worked from home", "did this at home", "I was at home for this", "took the laptop home". STRONG OVERRIDE: if the description includes a destination address ("Meola Road", "their place", "123 Smith St", a suburb name) OR a travel verb where Harrison is the subject ("drove to", "walked to", "biked to", "took the bus to") → Harrison went to the client. Do NOT apply At home, even if "at home" appears elsewhere in the description (it's almost certainly describing the customer's context, not Harrison's). Add a warning when "at home" was present but overridden.
 - "Remote": client on-screen via screen share. Triggers: "remote", "TeamViewer", "AnyDesk", "screen share", "remote access", "remote desktop", client watching/guiding.
+- "Phone": the work was delivered over a phone call, no screen share. Triggers: "phone call", "over the phone", "called them", "rang the client" when that task was done via the call rather than in person. A call made to a third party (ISP, vendor) while already on-site with the client stays on-site - no Phone. If no Phone label exists in the Available modifier labels list, use "Remote" for phone-delivered work instead.
 - "Research": time spent figuring out / investigating an unfamiliar problem, not direct delivery. Triggers: "researched", "had to look up", "figured out how to", "spent time investigating", "wasn't sure so I read up on", "learned how to", "had to work out", "looked into". Apply to the SPECIFIC task that was research-heavy, not the whole job - if Harrison researched an obscure printer driver for 90 min and then spent 30 min installing it, only the 90-min research task gets Research. Stacks freely with location modifiers (At home, Remote). For job-wide "flat $50 for the research" cases the operator picks a flat-rate row at review - do NOT try to guess flat-vs-hourly. Emit a Research-type label ONLY if one is present in the Available modifier labels list; if none exists, do not invent one - just bill the research time as normal task time.
 
 Customer-context phrases that DO NOT trigger At home (the customer is describing where THEY use the device, not where Harrison worked):
@@ -169,11 +171,13 @@ Customer-context phrases that DO NOT trigger At home (the customer is describing
 - "across multiple devices at home"
 Treat these as descriptive context, not a location signal for billing.
 
-Stacking: combine triggers freely - e.g. on-site regular → []; research at home → ["At home", "Research"]; remote research → ["Remote", "Research"].
+Stacking: "Research" stacks with any delivery label - e.g. research at home → ["At home", "Research"]; remote research → ["Remote", "Research"]. But "At home", "Remote", and "Phone" are MUTUALLY EXCLUSIVE - each task has exactly ONE delivery channel, never two. A phone call that escalated into a screen-share session becomes TWO tasks: split the stated time 50/50 between a ["Phone"] task and a ["Remote"] task (both pinned when the total was stated), unless the description gives the actual portions ("10 minutes on the phone then 30 remote") - then use those. NEVER emit ["Phone", "Remote"] on one task.
 
 Mixed jobs: different tasks in the same job CAN and SHOULD have different modifier sets if their context differs. Examples:
 - At-home job with a Windows reinstall (At home) and an obscure driver Harrison had to research (At home + Research) → task A modifierLabels ["At home"], task B modifierLabels ["At home", "Research"].
 - On-site job where Harrison researched an obscure printer driver before installing it → research task modifierLabels ["Research"], install task modifierLabels [].
+- On-site visit followed by "then a 42 min phone call fixing their email" → the on-site tasks get [], the phone-call task gets ["Phone"] (it was delivered by phone, after the visit ended).
+- "42-minute phone call, which turned into a remote job halfway through, fixing X" → TWO tasks splitting the stated time in half, both pinned (isExplicit): details "X, over the phone" 21 min with ["Phone"] and details "X, remote session" 21 min with ["Remote"] (customer-friendly channel suffixes - never "portion"). Round BOTH halves identically on the live step (21 min at a 5-min step → 0.35h EACH; at a 15-min step → 0.5h each) - the two halves of an even split must never end up with different quantities. Never ["Phone", "Remote"] on one task.
 
 If location/rate signals conflict, do NOT silently pick - add a warning describing the conflict and state which you assumed.
 
@@ -215,6 +219,7 @@ OTHER RULES:
   - Car/vehicle or public transport, with stated km: set statedDistanceKm to the round-trip total, noTravelCharge to false.
   - Car/vehicle or public transport, without stated km but with a destination: set statedDistanceKm to null, noTravelCharge to false (the route looks up the driving route via API and charges it - travel bills the same regardless of how the operator actually got there).
 - noTravelCharge: true ONLY if the user traveled by foot or bicycle (assumed a local job, no travel charge). false for all car/vehicle and public transport travel, and when travel mode is unspecified.
+- travelCosts[]: out-of-pocket travel disbursements the operator states with a dollar amount - parking, road tolls, ferry fares ("Parking cost me $4" → { "label": "Parking", "cost": 4 }; "$2.30 toll each way" → { "label": "Tolls", "cost": 4.6 }). Pass the stated amount through at cost; these are NOT tasks, NOT parts, and never affect drive time. Empty array when none are stated.
 - Ignore dates and client names.
 
 CLARIFICATION MODE:
@@ -260,7 +265,10 @@ Return this exact JSON shape (when not asking for clarification):
   "warnings": string[],
   "destination": string | null,
   "statedDistanceKm": number | null,
-  "noTravelCharge": boolean
+  "noTravelCharge": boolean,
+  "travelCosts": [
+    { "label": string, "cost": number }
+  ]
 }`;
 }
 

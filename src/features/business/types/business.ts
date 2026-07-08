@@ -157,6 +157,8 @@ export interface TravelEntry {
   cost: number;
   /** True when this entry was created by the address lookup; lets re-lookup replace it. */
   isAuto?: boolean;
+  /** True when this entry came from the AI parse's travelCosts (parking, tolls); a reparse replaces it, a manual address re-lookup leaves it alone. */
+  isParsedCost?: boolean;
   /** Destination text shown in the operator-side breakdown (auto entries only). */
   destination?: string;
   /** Outbound drive time in minutes from the address lookup (auto entries only). */
@@ -209,6 +211,8 @@ export interface ParseJobResponse {
   startTime: string | null;
   endTime: string | null;
   hourlyRateId: string | null;
+  /** Out-of-pocket travel disbursements stated with a dollar amount (parking, tolls, ferry) - passed through at cost. */
+  travelCosts?: { label: string; cost: number }[];
   tasks: ParsedTaskLine[];
   parts: ParsedPartLine[];
   notes: string;

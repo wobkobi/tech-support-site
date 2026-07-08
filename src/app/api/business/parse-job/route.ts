@@ -25,6 +25,7 @@ import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
+import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 
@@ -34,6 +35,30 @@ export const maxDuration = 60;
 /** Internal extension that carries the per-range duration (used by the pre-compute hint). */
 interface RangeWithDuration extends ParsedRange {
   durationMins: number;
+}
+
+/**
+ * Converts an operator-stated HH:MM (NZ wall clock, today) to a Date for the
+ * traffic-aware travel lookup. Times already past today roll to tomorrow so
+ * the quote stays inside Google's traffic-prediction horizon - mirrors the
+ * calculator's client-side jobStartIsoFromTime.
+ * @param hhmm - HH:MM (24h) NZ wall-clock string, or null.
+ * @returns Date, or undefined when the input isn't a valid HH:MM.
+ */
+function nzTimeToDate(hhmm: string | null | undefined): Date | undefined {
+  if (!hhmm || !/^\d{1,2}:\d{2}$/.test(hhmm)) return undefined;
+  const [h, m] = hhmm.split(":").map(Number);
+  if (h > 23 || m > 59) return undefined;
+  const nzDateStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Pacific/Auckland" }).format(
+    new Date(),
+  );
+  const [y, mo, d] = nzDateStr.split("-").map(Number);
+  const offset = getPacificAucklandOffset(y, mo, d);
+  let utc = new Date(Date.UTC(y, mo - 1, d, h - offset, m, 0));
+  if (utc.getTime() < Date.now()) {
+    utc = new Date(utc.getTime() + 24 * 60 * 60 * 1000);
+  }
+  return utc;
 }
 
 // Two times on one line, captured as start/end. The separator is forgiving so
@@ -292,12 +317,25 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         destination: parsed.destination ?? undefined,
       };
     } else if (!parsed.noTravelCharge && parsed.destination) {
-      // Look up both drive legs via Google Distance Matrix (no times parsed,
-      // so both quote at "now"); calcTravelCharge sums the legs downstream.
-      // Direct call into the helper instead of a self-fetch so this works
-      // without NEXT_PUBLIC_BASE_URL set and doesn't burn the public route's
-      // rate-limit budget.
-      const lookup = await lookupDriveRoundTrip(parsed.destination);
+      // Look up both drive legs via Google Distance Matrix, each at its own
+      // departure: outbound at the parsed job start, return at the parsed end
+      // (or start + duration). Missing/invalid times fall back to the
+      // lookup's defaults (now / +60 min). Direct call into the helper
+      // instead of a self-fetch so this works without NEXT_PUBLIC_BASE_URL
+      // set and doesn't burn the public route's rate-limit budget.
+      const parsedRanges = parsed.ranges ?? [];
+      const departAt = nzTimeToDate(parsed.startTime ?? parsedRanges[0]?.startTime);
+      let returnAt = nzTimeToDate(parsed.endTime ?? parsedRanges[parsedRanges.length - 1]?.endTime);
+      if (departAt && returnAt && returnAt <= departAt) {
+        // Independent roll-forward can invert the pair (start already past
+        // rolls to tomorrow while a future end stays today) - keep the
+        // return after the outbound leg.
+        returnAt = new Date(returnAt.getTime() + 24 * 60 * 60 * 1000);
+      }
+      if (departAt && !returnAt && parsed.durationMins && parsed.durationMins > 0) {
+        returnAt = new Date(departAt.getTime() + parsed.durationMins * 60_000);
+      }
+      const lookup = await lookupDriveRoundTrip(parsed.destination, departAt, returnAt);
       if (lookup.status === "ok" && lookup.data.there.distanceKm > 0) {
         parsed.travel = {
           distanceKmOneWay: lookup.data.there.distanceKm,
@@ -337,21 +375,59 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         const snap = findTemplateByTags(t.device, t.action, templates);
         const device = snap?.device ?? t.device ?? null;
         const action = snap?.action ?? t.action ?? null;
-        const details = t.details?.trim() ? t.details.trim() : null;
+        // Billing signals must not print on the invoice line. The prompt
+        // forbids them in details, but the model still echoes speed hints
+        // ("quick") from inputs like "(quick)" - strip them deterministically
+        // and tidy the leftover separators; an emptied details drops to null.
+        const rawDetails = t.details?.trim() ? t.details.trim() : null;
+        const details = rawDetails
+          ? rawDetails
+              .replace(/\b(?:quick(?:ly)?|briefly)\b/gi, "")
+              .replace(/\s{2,}/g, " ")
+              .replace(/\s*,\s*,+/g, ",")
+              .replace(/^[\s,;-]+|[\s,;-]+$/g, "")
+              .trim() || null
+          : null;
 
         const baseRate =
           findRateByLabel(t.baseRateLabel) ??
           ratesForLookup.find((r) => r.ratePerHour !== null && r.isDefault) ??
           ratesForLookup.find((r) => r.ratePerHour !== null) ??
           null;
-        const modifierIds = (t.modifierLabels ?? [])
+        const modifierRates = (t.modifierLabels ?? [])
           .map((label) => {
             const rate = findRateByLabel(label);
             if (!rate) unresolvedModifierLabels.add(label);
             return rate;
           })
-          .filter((r): r is RateConfig => r !== null && r.hourlyDelta !== null)
-          .map((r) => r.id);
+          .filter((r): r is RateConfig => r !== null && r.hourlyDelta !== null);
+        // Delivery channels (At home / Remote / Phone) are mutually exclusive -
+        // the prompt says so, but enforce it here so a model that stacks them
+        // anyway (e.g. a call that escalated to screen share emitting both
+        // Phone and Remote) cannot compound the discounts. Keep the channel
+        // with the highest effective rate; ties keep the first emitted.
+        // Matches the DEFAULT label names - renamed channels bypass this guard.
+        const CHANNEL_LABELS = new Set(["at home", "remote", "phone"]);
+        const channels = modifierRates.filter((r) => CHANNEL_LABELS.has(r.label.toLowerCase()));
+        const keptChannel = channels.reduce<RateConfig | null>(
+          (best, r) => (best === null || (r.hourlyDelta ?? 0) > (best.hourlyDelta ?? 0) ? r : best),
+          null,
+        );
+        const modifierIds = [
+          ...new Set(
+            modifierRates
+              .filter((r) => !CHANNEL_LABELS.has(r.label.toLowerCase()) || r.id === keptChannel?.id)
+              .map((r) => r.id),
+          ),
+        ];
+        if (channels.length > 1) {
+          parsed.warnings = [
+            ...(parsed.warnings ?? []),
+            `Task "${t.details ?? t.action ?? "?"}" had multiple delivery modifiers (${channels
+              .map((r) => r.label)
+              .join(" + ")}); kept ${keptChannel?.label}.`,
+          ];
+        }
 
         const computed = effectiveHourlyRate(ratesForLookup, baseRate?.id ?? null, modifierIds);
         const unitPrice = computed > 0 ? computed : (snap?.defaultPrice ?? task.unitPrice ?? 0);
@@ -380,6 +456,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         ];
       }
     }
+
+    // Out-of-pocket travel disbursements (parking, tolls, ferry) pass through
+    // at the stated cost. Sanitise the untrusted model output: finite positive
+    // amounts only, short labels, capped count.
+    parsed.travelCosts = Array.isArray(parsed.travelCosts)
+      ? parsed.travelCosts
+          .slice(0, 5)
+          .map((c) => ({
+            label: typeof c?.label === "string" ? c.label.trim().slice(0, 40) : "",
+            cost: Number(c?.cost),
+          }))
+          .filter(
+            (c) => c.label.length > 0 && Number.isFinite(c.cost) && c.cost > 0 && c.cost <= 500,
+          )
+      : [];
 
     // Attach the operator-stated ranges so the calculator can render one row
     // per detected segment. Strip the internal durationMins - the calc derives
