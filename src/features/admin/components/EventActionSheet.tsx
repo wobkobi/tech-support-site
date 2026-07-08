@@ -3,8 +3,8 @@
 /**
  * @description Bottom-sheet of quick mutations for a booking event, opened by
  * a long-press on a booking card in DayAgendaView: complete, cancel
- * (operator/on-behalf), no-show, reschedule, resend review email, delete
- * (test bookings only).
+ * (operator/on-behalf), no-show, reschedule, bill in calculator, resend
+ * review email, delete (test bookings only).
  */
 
 import type {
@@ -307,14 +307,24 @@ export function EventActionSheet({
           )}
 
           {(isConfirmed || isCompleted) && (
-            <button
-              type="button"
-              onClick={() => void handleResendReview()}
-              disabled={busy}
-              className="inline-flex h-11 items-center justify-center rounded-lg bg-moonstone-600/15 px-4 text-sm font-semibold text-moonstone-700 hover:bg-moonstone-600/25 disabled:opacity-50"
-            >
-              Send review email
-            </button>
+            <>
+              {/* Deep-link into the calculator with the event's (operator-corrected)
+                  times, client, and address pre-filled - see calculator/page.tsx. */}
+              <a
+                href={`/admin/business/calculator?eventId=${encodeURIComponent(event.id)}`}
+                className="inline-flex h-11 items-center justify-center rounded-lg bg-russian-violet/10 px-4 text-sm font-semibold text-russian-violet hover:bg-russian-violet/20"
+              >
+                Bill in calculator
+              </a>
+              <button
+                type="button"
+                onClick={() => void handleResendReview()}
+                disabled={busy}
+                className="inline-flex h-11 items-center justify-center rounded-lg bg-moonstone-600/15 px-4 text-sm font-semibold text-moonstone-700 hover:bg-moonstone-600/25 disabled:opacity-50"
+              >
+                Send review email
+              </button>
+            </>
           )}
 
           {isTestBooking && (

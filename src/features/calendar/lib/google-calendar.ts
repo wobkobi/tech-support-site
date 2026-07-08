@@ -166,6 +166,46 @@ export async function deleteBookingEvent(params: { eventId: string }): Promise<v
   });
 }
 
+/** Timed booking-calendar event as returned by {@link fetchBookingEvent}. */
+export interface BookingEventDetails {
+  /** ISO start of the event (the operator corrects these to actual on-site time). */
+  start: string;
+  /** ISO end of the event. */
+  end: string;
+  summary: string | null;
+  location: string | null;
+}
+
+/**
+ * Fetches one timed event from the booking calendar by id - live, not via the
+ * schedule cache, so just-made time corrections are certain to be current.
+ * Used by the calculator's "Bill in calculator" prefill.
+ * @param eventId - Google Calendar event id (as stored on Booking.calendarEventId).
+ * @returns Event details, or null when missing, cancelled, all-day, or on any API failure.
+ */
+export async function fetchBookingEvent(eventId: string): Promise<BookingEventDetails | null> {
+  try {
+    const calendar = getCalendarClient();
+    const res = await calendar.events.get({
+      calendarId: getBookingCalendarId(),
+      eventId,
+    });
+    const event = res.data;
+    if (!event || event.status === "cancelled") return null;
+    // All-day events carry date (not dateTime) and have no billable time window.
+    if (!event.start?.dateTime || !event.end?.dateTime) return null;
+    return {
+      start: event.start.dateTime,
+      end: event.end.dateTime,
+      summary: event.summary ?? null,
+      location: event.location ?? null,
+    };
+  } catch (err) {
+    console.warn("[calendar] fetchBookingEvent failed:", err);
+    return null;
+  }
+}
+
 /**
  * Creates an all-day "Busy" event on the booking calendar to block out the day
  * for new bookings. The existing {@link fetchAllCalendarEvents} path treats non-personal

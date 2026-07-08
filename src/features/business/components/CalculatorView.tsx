@@ -280,6 +280,29 @@ interface CalculatorViewProps {
   initialTaskTemplates: TaskTemplate[];
   /** Active promo resolved server-side; refined per job date by the job-context effect. */
   initialPromo: ActivePromo | null;
+  /** Job prefill from a schedule event ("Bill in calculator"); null on a normal load. */
+  eventPrefill: EventPrefill | null;
+}
+
+/**
+ * Job prefill built server-side from a booking-calendar event (whose times
+ * the operator corrects to actual on-site time) plus its Booking row. Wins
+ * over any saved draft - billing a specific event is a fresh task.
+ */
+export interface EventPrefill {
+  /** Google Calendar event id; stored on the saved invoice. */
+  calendarEventId: string;
+  /** Matching Booking row id, or null for manual calendar events. */
+  bookingId: string | null;
+  /** NZ-local YYYY-MM-DD of the event start. */
+  jobDate: string;
+  /** NZ-local HH:MM event start (actual on-site start). */
+  startTime: string;
+  /** NZ-local HH:MM event end (actual on-site end). */
+  endTime: string;
+  clientName: string;
+  clientEmail: string;
+  jobAddress: string;
 }
 
 /**
@@ -291,6 +314,7 @@ interface CalculatorViewProps {
  * @param props.initialRates - Server-resolved rate configs.
  * @param props.initialTaskTemplates - Server-resolved task templates.
  * @param props.initialPromo - Server-resolved active promo, or null.
+ * @param props.eventPrefill - Schedule-event job prefill, or null on a normal load.
  * @returns The rendered calculator view element.
  */
 export function CalculatorView({
@@ -299,6 +323,7 @@ export function CalculatorView({
   initialRates,
   initialTaskTemplates,
   initialPromo,
+  eventPrefill,
 }: CalculatorViewProps): React.ReactElement {
   const router = useRouter();
 
@@ -307,10 +332,13 @@ export function CalculatorView({
   // typed) are treated as "no draft" so a refresh after Clear gets
   // fresh times instead of restoring stale timestamps.
   const initialDraft = useMemo(() => {
+    // An event prefill is a deliberate fresh billing task - it outranks any
+    // saved draft, which would otherwise leak a previous job into this one.
+    if (eventPrefill) return null;
     const d = loadDraft();
     if (!d || !isMeaningfulDraft(d)) return null;
     return d;
-  }, []);
+  }, [eventPrefill]);
   // True when a meaningful draft was loaded; readable inside async .then()
   // callbacks without being a React dependency.
   const draftLoadedRef = useRef(initialDraft !== null);
@@ -326,9 +354,12 @@ export function CalculatorView({
   // Multiple time slots all lump into one billable duration. AI parse populates
   // one slot per detected HH:MM-HH:MM segment; operators can add/remove rows
   // via the Time card. No labels, dates, or per-slot travel - it's all flat.
-  const [timeRanges, setTimeRanges] = useState<ParsedRange[]>(
-    () => initialDraft?.timeRanges ?? [{ startTime: "", endTime: "" }],
-  );
+  const [timeRanges, setTimeRanges] = useState<ParsedRange[]>(() => {
+    if (eventPrefill) {
+      return [{ startTime: eventPrefill.startTime, endTime: eventPrefill.endTime }];
+    }
+    return initialDraft?.timeRanges ?? [{ startTime: "", endTime: "" }];
+  });
   // Operator override; null means "derive from sum of slots". Lets gaps inside
   // a single slot (lunch, etc.) be billed manually.
   const [durationMinsOverride, setDurationMinsOverride] = useState<number | null>(
@@ -354,8 +385,12 @@ export function CalculatorView({
   // Half off labour when ticked (per pricing-policy.unsuccessfulWorkCopy).
   const [unsuccessful, setUnsuccessful] = useState(() => initialDraft?.unsuccessful ?? false);
   // Client details
-  const [clientName, setClientName] = useState(() => initialDraft?.clientName ?? "");
-  const [clientEmail, setClientEmail] = useState(() => initialDraft?.clientEmail ?? "");
+  const [clientName, setClientName] = useState(
+    () => eventPrefill?.clientName ?? initialDraft?.clientName ?? "",
+  );
+  const [clientEmail, setClientEmail] = useState(
+    () => eventPrefill?.clientEmail ?? initialDraft?.clientEmail ?? "",
+  );
   // Address-to state mirrors the InvoiceBuilder's segmented control so the
   // operator picks Name/Company/Custom once and the choice rides through to
   // the invoice without re-picking.
@@ -389,7 +424,9 @@ export function CalculatorView({
   const [clarifyAnswers, setClarifyAnswers] = useState<Record<string, string>>({});
 
   // Travel lookup
-  const [jobAddress, setJobAddress] = useState(() => initialDraft?.jobAddress ?? "");
+  const [jobAddress, setJobAddress] = useState(
+    () => eventPrefill?.jobAddress ?? initialDraft?.jobAddress ?? "",
+  );
   const [lookingUpTravel, setLookingUpTravel] = useState(false);
   const addressInputRef = useRef<HTMLInputElement>(null);
 
@@ -418,7 +455,9 @@ export function CalculatorView({
 
   // Job date drives the holiday + promo lookup so a past job is priced by what
   // applied THEN, not today. Persisted in the draft; defaults to today (NZ).
-  const [jobDate, setJobDate] = useState<string>(() => initialDraft?.jobDate ?? todayNZDate());
+  const [jobDate, setJobDate] = useState<string>(
+    () => eventPrefill?.jobDate ?? initialDraft?.jobDate ?? todayNZDate(),
+  );
   // Holiday context for the selected date: name (for the UI) + the live labour
   // uplift fraction (0 when the date isn't a public holiday).
   const [holiday, setHoliday] = useState<{ name: string | null; uplift: number }>({
@@ -508,9 +547,9 @@ export function CalculatorView({
   // client fetch - the People API pages through every connection and is far
   // too slow to block the server render on.
   useEffect(() => {
-    // Skip the "now" seeding when a draft was restored on mount - the draft's
-    // times are the source of truth in that case.
-    if (!draftLoadedRef.current) {
+    // Skip the "now" seeding when a draft or event prefill supplied the times
+    // - those are the source of truth in that case.
+    if (!draftLoadedRef.current && !eventPrefill) {
       const now = nowTime();
       setTimeRanges([{ startTime: now, endTime: addHour(now) }]);
     }
@@ -522,6 +561,9 @@ export function CalculatorView({
       .catch(() => {
         /* picker stays empty; manual client entry still works */
       });
+    // Run once on mount - eventPrefill is fixed per page load, and re-running
+    // would clobber edited times and refetch contacts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Debounced draft writer. Any change to a persisted form field schedules a
@@ -748,6 +790,7 @@ export function CalculatorView({
           FALLBACK_TRAVEL_RATE;
         const cost = calcTravelCharge(
           result.travel.durationMins,
+          result.travel.durationMinsBack,
           travelRatePerHour,
           pricing.minTravelCharge,
         );
@@ -759,6 +802,7 @@ export function CalculatorView({
             isAuto: true,
             destination: result.destination ?? label,
             durationMinsOneWay: result.travel?.durationMins,
+            durationMinsBack: result.travel?.durationMinsBack,
             distanceKmOneWay: result.travel?.distanceKmOneWay,
           },
           ...prev.filter((e) => !e.isAuto),
@@ -1024,6 +1068,10 @@ export function CalculatorView({
           unsuccessful,
           unsuccessfulDiscount:
             totals.unsuccessfulDiscount > 0 ? totals.unsuccessfulDiscount : null,
+          // Match back to the billed job when this session came from the
+          // schedule's "Bill in calculator" action.
+          bookingId: eventPrefill?.bookingId ?? null,
+          calendarEventId: eventPrefill?.calendarEventId ?? null,
           // issueDate, dueDate, number all defaulted server-side.
         }),
       });
@@ -1108,6 +1156,8 @@ export function CalculatorView({
   /**
    * Calls the travel-time API with the current job address and replaces the
    * single auto travel entry. Manual entries (parking, etc.) are preserved.
+   * Each leg is quoted at its own departure: outbound at the job start,
+   * return at the job end (or start + duration when no end time is set).
    * Drive time of 0 (geocoded to origin or no match) leaves no auto entry;
    * any non-zero drive time bills the $10 minimum via {@link calcTravelCharge}.
    */
@@ -1119,30 +1169,61 @@ export function CalculatorView({
     setTravelEntries((prev) => prev.filter((e) => !e.isAuto));
     try {
       const departureTimeIso = jobStartIsoFromTime(aggregateStart);
+      // Return departure: the job's end time, guarded against
+      // jobStartIsoFromTime's independent roll-forward (a past start rolls to
+      // tomorrow while a future end stays today, inverting the pair); falls
+      // back to departure + estimated duration, else the server's default.
+      let returnDepartureTimeIso = jobStartIsoFromTime(aggregateEnd);
+      if (
+        departureTimeIso &&
+        returnDepartureTimeIso &&
+        returnDepartureTimeIso <= departureTimeIso
+      ) {
+        returnDepartureTimeIso = new Date(
+          new Date(returnDepartureTimeIso).getTime() + 24 * 60 * 60 * 1000,
+        ).toISOString();
+      }
+      if (departureTimeIso && !returnDepartureTimeIso && durationMins > 0) {
+        returnDepartureTimeIso = new Date(
+          new Date(departureTimeIso).getTime() + durationMins * 60_000,
+        ).toISOString();
+      }
       const res = await fetch("/api/pricing/travel-time", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           destination: jobAddress,
           ...(departureTimeIso ? { departureTimeIso } : {}),
+          ...(returnDepartureTimeIso ? { returnDepartureTimeIso } : {}),
         }),
       });
-      const d = (await res.json()) as { distanceKm?: number; durationMins?: number };
-      if (d.durationMins && d.durationMins > 0) {
+      const d = (await res.json()) as {
+        distanceKm?: number;
+        durationMinsThere?: number;
+        durationMinsBack?: number;
+      };
+      if (d.durationMinsThere && d.durationMinsThere > 0) {
         const travelRatePerHour =
           rates.find((r) => r.unit === "travel-hour" && r.ratePerHour !== null)?.ratePerHour ??
           FALLBACK_TRAVEL_RATE;
-        // calcTravelCharge doubles to round-trip internally and floors at
-        // MIN_TRAVEL_CHARGE, so a 1-min drive still bills the $10 minimum.
-        const cost = calcTravelCharge(d.durationMins, travelRatePerHour, pricing.minTravelCharge);
-        const label = jobAddress.trim() || `${d.durationMins} min drive`;
+        const backMins = d.durationMinsBack || d.durationMinsThere;
+        // calcTravelCharge sums the legs and floors at MIN_TRAVEL_CHARGE, so
+        // a 1-min drive still bills the $10 minimum.
+        const cost = calcTravelCharge(
+          d.durationMinsThere,
+          backMins,
+          travelRatePerHour,
+          pricing.minTravelCharge,
+        );
+        const label = jobAddress.trim() || `${d.durationMinsThere} min drive`;
         setTravelEntries((prev) => [
           {
             label,
             cost,
             isAuto: true,
             destination: jobAddress.trim() || label,
-            durationMinsOneWay: d.durationMins,
+            durationMinsOneWay: d.durationMinsThere,
+            durationMinsBack: backMins,
             distanceKmOneWay: d.distanceKm,
           },
           ...prev.filter((e) => !e.isAuto),

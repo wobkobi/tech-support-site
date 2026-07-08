@@ -65,6 +65,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // the admin dashboard can count how often the half-price clause fires.
     unsuccessful,
     unsuccessfulDiscount,
+    // Optional match back to the billed job (calculator event-prefill flow).
+    bookingId,
+    calendarEventId,
   } = body as {
     clientName?: string;
     clientEmail?: string;
@@ -77,6 +80,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     promoDiscount?: number | null;
     unsuccessful?: boolean;
     unsuccessfulDiscount?: number | null;
+    bookingId?: string | null;
+    calendarEventId?: string | null;
   };
 
   if (!clientName || !clientEmail || !Array.isArray(lineItems)) {
@@ -146,6 +151,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       unsuccessfulDiscount: unsuccessfulDiscountValue > 0 ? unsuccessfulDiscountValue : null,
       notes: notes ?? null,
       contactId: contactId ?? null,
+      // ObjectId shape enforced here (Prisma throws on malformed ids at read
+      // time otherwise); calendarEventId is a free-form Google id.
+      bookingId: bookingId && /^[a-f0-9]{24}$/i.test(bookingId) ? bookingId : null,
+      calendarEventId:
+        typeof calendarEventId === "string" && calendarEventId ? calendarEventId : null,
     },
   });
 
