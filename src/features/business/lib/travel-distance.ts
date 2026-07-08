@@ -78,11 +78,17 @@ export async function lookupDriveDistance(
   url.searchParams.set("key", apiKey);
   url.searchParams.set("units", "metric");
 
-  // Distance Matrix only accepts departure_time in the future (or "now"). If
-  // the caller asked for a past time, drop it and let Google use real-time.
-  if (departureTime && departureTime.getTime() > Date.now()) {
-    url.searchParams.set("departure_time", Math.floor(departureTime.getTime() / 1000).toString());
-    url.searchParams.set("traffic_model", "best_guess");
+  // Distance Matrix only accepts departure_time in the future. A past time
+  // clamps to just-ahead-of-now so the quote stays traffic-aware - dropping
+  // the param entirely would silently degrade to free-flow times, since
+  // Google only returns duration_in_traffic when departure_time is set.
+  // Pessimistic model: quotes lean toward the bad-day end of Google's range,
+  // because under-quoted travel is billed at the quote and eaten by the
+  // operator (travel bills one round trip per booking, never a return visit).
+  if (departureTime) {
+    const clamped = Math.max(departureTime.getTime(), Date.now() + 60_000);
+    url.searchParams.set("departure_time", Math.floor(clamped / 1000).toString());
+    url.searchParams.set("traffic_model", "pessimistic");
   }
 
   try {

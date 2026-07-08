@@ -48,7 +48,9 @@ function toReliableDeparture(departureTime: Date, now: Date): Date {
 export type TransportMode = "transit" | "driving" | "walking" | "bicycling";
 
 /**
- * Travel time between two addresses, in minutes (ceiling).
+ * Travel time between two addresses, in minutes (ceiling). Driving lookups
+ * with a future departure time use Google's traffic prediction
+ * (duration_in_traffic) rather than the free-flow duration.
  * Transit lookups beyond {@link SCHEDULE_HORIZON_DAYS} snap to the nearest
  * same-day-of-week within range so schedule data is available.
  * @param origin - Starting address or coordinates.
@@ -88,6 +90,11 @@ export async function calculateTravelMinutes(
   const timeParam =
     options?.useArrivalTime && mode === "transit" ? "arrival_time" : "departure_time";
   url.searchParams.set(timeParam, Math.floor(effectiveDeparture.getTime() / 1000).toString());
+  // Pessimistic traffic for driving so travel blocks reserve enough calendar
+  // time on a bad run; traffic_model is only valid for driving lookups.
+  if (mode === "driving" && timeParam === "departure_time") {
+    url.searchParams.set("traffic_model", "pessimistic");
+  }
   url.searchParams.set("key", apiKey);
 
   try {
@@ -104,6 +111,9 @@ export async function calculateTravelMinutes(
         elements: Array<{
           status: string;
           duration: { value: number }; // seconds
+          // Present for driving lookups with a future departure_time -
+          // Google's traffic prediction for that time.
+          duration_in_traffic?: { value: number };
         }>;
       }>;
     };
@@ -119,7 +129,11 @@ export async function calculateTravelMinutes(
       return null;
     }
 
-    return Math.ceil(element.duration.value / 60);
+    // Prefer the traffic-aware prediction when Google returned one (driving
+    // with departure_time); free-flow duration is the fallback. The settings
+    // travel-round buffer still pads on top for overrun.
+    const seconds = element.duration_in_traffic?.value ?? element.duration.value;
+    return Math.ceil(seconds / 60);
   } catch (error) {
     console.error("[travel-time] Failed to calculate travel time:", error);
     return null;
