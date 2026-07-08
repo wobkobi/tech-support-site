@@ -48,11 +48,12 @@ export type DriveDistanceResult =
 /**
  * Looks up driving distance + duration from HOME_ADDRESS to the given
  * destination. Appends ", New Zealand" to the destination string so the
- * Distance Matrix API resolves NZ addresses reliably. When `departureTime`
- * is supplied, asks Google for traffic-aware duration at that time and
- * prefers `duration_in_traffic` over the free-flow `duration`.
+ * Distance Matrix API resolves NZ addresses reliably. Always traffic-aware:
+ * quotes Google's pessimistic prediction for `departureTime`, defaulting to
+ * "leaving about now" when no (or a past) time is supplied, and prefers
+ * `duration_in_traffic` over the free-flow `duration`.
  * @param destination - Free-text destination address (1-100 chars).
- * @param departureTime - Optional intended departure time for traffic-aware lookup.
+ * @param departureTime - Intended departure time; omitted or past means now.
  * @returns Discriminated result so callers can tell misconfig (operator
  *   error, should surface) from a legitimate no-match (charge $0 travel).
  */
@@ -78,18 +79,16 @@ export async function lookupDriveDistance(
   url.searchParams.set("key", apiKey);
   url.searchParams.set("units", "metric");
 
-  // Distance Matrix only accepts departure_time in the future. A past time
-  // clamps to just-ahead-of-now so the quote stays traffic-aware - dropping
-  // the param entirely would silently degrade to free-flow times, since
-  // Google only returns duration_in_traffic when departure_time is set.
+  // Every quote is traffic-aware: no departure time (or a past one) means
+  // "leaving about now". Distance Matrix only accepts a future departure_time,
+  // and without one Google omits duration_in_traffic entirely - the quote
+  // would silently degrade to free-flow times.
   // Pessimistic model: quotes lean toward the bad-day end of Google's range,
   // because under-quoted travel is billed at the quote and eaten by the
   // operator (travel bills one round trip per booking, never a return visit).
-  if (departureTime) {
-    const clamped = Math.max(departureTime.getTime(), Date.now() + 60_000);
-    url.searchParams.set("departure_time", Math.floor(clamped / 1000).toString());
-    url.searchParams.set("traffic_model", "pessimistic");
-  }
+  const departMs = Math.max(departureTime?.getTime() ?? 0, Date.now() + 60_000);
+  url.searchParams.set("departure_time", Math.floor(departMs / 1000).toString());
+  url.searchParams.set("traffic_model", "pessimistic");
 
   try {
     const res = await fetch(url.toString());
