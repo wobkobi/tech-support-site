@@ -208,6 +208,8 @@ export interface ParseJobQuestion {
 
 export interface ParseJobResponse {
   durationMins: number | null;
+  /** Minutes of explicitly-stated work done OUTSIDE the stated session ranges (e.g. a call after the visit); included in durationMins and exempt from the wall-clock cap. */
+  outOfSessionMins?: number;
   startTime: string | null;
   endTime: string | null;
   hourlyRateId: string | null;

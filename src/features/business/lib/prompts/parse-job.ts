@@ -107,7 +107,7 @@ EXAMPLES — multi-task splitting + specific actions + details:
 
 BILLING — single source of truth for time distribution. Run the algorithm step by step.
 Let step = the billing increment from the BILLING context line expressed in hours (5 min > step = 0.0833h; 10 min > 0.1667h; 15 min > 0.25h), and minBill = the minimum billable time from that line. EVERY task qty must be a whole multiple of step. Some examples below show 0.25h figures because they are worked at a 15-min step for legibility - NEVER hardcode 0.25h; always read step from the context and round on it.
-1. Determine durationMins (from pre-computed annotation if present, otherwise from the description).
+1. Determine durationMins (from pre-computed annotation if present, otherwise from the description). The stated ranges are the WHOLE billable envelope - every task, including ones narrated with "then" (a call at the end of the visit), fits inside it. Work genuinely outside the session is billed by stating it as its own time range line, which the pre-compute already sums.
 2. Convert durationMins to billable minutes using the BILLING line in the context message: round to the NEAREST step, then take the larger of that and minBill; divide by 60 for totalHours. Distribute totalHours across the tasks on that same step grid.
    Examples at the default 5-min step, 15-min minimum (substitute the LIVE step): 23 min → 0.42h. 107 min → 1.75h. 110 min → 1.83h. 8 min → 0.25h (below the minimum).
 3. Identify how many distinct tasks there are (N).
@@ -177,7 +177,7 @@ Mixed jobs: different tasks in the same job CAN and SHOULD have different modifi
 - At-home job with a Windows reinstall (At home) and an obscure driver Harrison had to research (At home + Research) → task A modifierLabels ["At home"], task B modifierLabels ["At home", "Research"].
 - On-site job where Harrison researched an obscure printer driver before installing it → research task modifierLabels ["Research"], install task modifierLabels [].
 - On-site visit followed by "then a 42 min phone call fixing their email" → the on-site tasks get [], the phone-call task gets ["Phone"] (it was delivered by phone, after the visit ended).
-- "42-minute phone call, which turned into a remote job halfway through, fixing X" → TWO tasks splitting the stated time in half, both pinned (isExplicit): details "X, over the phone" 21 min with ["Phone"] and details "X, remote session" 21 min with ["Remote"] (customer-friendly channel suffixes - never "portion"). Round BOTH halves identically on the live step (21 min at a 5-min step → 0.35h EACH; at a 15-min step → 0.5h each) - the two halves of an even split must never end up with different quantities. Never ["Phone", "Remote"] on one task.
+- "42-minute phone call, which turned into a remote job halfway through, fixing X" → TWO tasks splitting the stated time in half, both pinned (isExplicit): details "X, over the phone" 21 min with ["Phone"] and details "X, remote session" 21 min with ["Remote"] (customer-friendly channel suffixes - never "portion"). Round BOTH halves identically on the live step (21 min at a 5-min step → 0.35h EACH; at a 15-min step → 0.5h each) - the two halves of an even split must never end up with different quantities. Never ["Phone", "Remote"] on one task. When the call happened after the stated session ("Then a 42-minute call..."), its 42 minutes ADD to durationMins and outOfSessionMins per BILLING rule 1 - the on-site tasks keep the full window.
 
 If location/rate signals conflict, do NOT silently pick - add a warning describing the conflict and state which you assumed.
 
@@ -241,6 +241,7 @@ Clarify response shape (use instead of the normal shape when blocked):
 Return this exact JSON shape (when not asking for clarification):
 {
   "durationMins": number | null,
+  "outOfSessionMins": number,
   "startTime": string | null,
   "endTime": string | null,
   "hourlyRateId": null,

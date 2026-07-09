@@ -276,7 +276,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // annotations so the model knows where operator-controlled text ends.
     let userContent = `${context}${input.trim()}\n--- END USER DATA ---`;
     if (precomputed !== null) {
-      userContent += `\n\n[Pre-computed session total: ${precomputed} min — use this as durationMins without recalculating]`;
+      userContent += `\n\n[Pre-computed on-site session total from the stated ranges: ${precomputed} min — use this as the base for durationMins; ADD explicitly-stated durations for work done outside these ranges per BILLING rule 1]`;
     }
     if (Object.keys(safeAnswers).length > 0) {
       const clarifications = Object.entries(safeAnswers)
@@ -484,19 +484,38 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       parsed.ranges = [];
     }
 
+    // Sanitise the model's out-of-session minutes (work explicitly stated to
+    // have happened outside the session ranges, e.g. a call after the visit).
+    const outOfSessionMins =
+      typeof parsed.outOfSessionMins === "number" &&
+      Number.isFinite(parsed.outOfSessionMins) &&
+      parsed.outOfSessionMins > 0
+        ? Math.min(Math.round(parsed.outOfSessionMins), 8 * 60)
+        : 0;
+    parsed.outOfSessionMins = outOfSessionMins;
+
     // Wall-clock ceiling: AI sometimes inflates durationMins from its own task
     // estimates ("9-9:30" but emits 50 min). Cap durationMins to the stated
-    // span - gaps only reduce billable time, never increase it.
+    // span plus any out-of-session minutes - gaps only reduce billable time,
+    // never increase it, but work after the session adds on top.
     if (parsed.startTime && parsed.endTime && typeof parsed.durationMins === "number") {
       const [sh, sm] = parsed.startTime.split(":").map(Number);
       const [eh, em] = parsed.endTime.split(":").map(Number);
       const wallMin = eh * 60 + em - (sh * 60 + sm);
-      if (wallMin > 0 && parsed.durationMins > wallMin) {
+      const ceiling = wallMin + outOfSessionMins;
+      if (wallMin > 0 && parsed.durationMins > ceiling) {
         parsed.warnings = [
           ...(parsed.warnings ?? []),
-          `AI emitted durationMins ${parsed.durationMins} > ${wallMin}-min wall-clock span. Capped to ${wallMin}.`,
+          `AI emitted durationMins ${parsed.durationMins} > ${ceiling}-min ceiling (${wallMin}-min span + ${outOfSessionMins} out-of-session). Capped to ${ceiling}.`,
         ];
-        parsed.durationMins = wallMin;
+        parsed.durationMins = ceiling;
+      }
+      // Floor: a model that reports outOfSessionMins but forgets to add it to
+      // durationMins would carve the extra work out of the on-site window
+      // (under-billing the session tasks). Enforce the sum deterministically.
+      const floor = wallMin + outOfSessionMins;
+      if (wallMin > 0 && outOfSessionMins > 0 && parsed.durationMins < floor) {
+        parsed.durationMins = floor;
       }
     }
 
