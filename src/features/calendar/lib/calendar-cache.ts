@@ -768,6 +768,14 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
     const key = `${block.sourceEventId}|${block.calendarEmail}`;
     if (currentEventKeys.has(key)) continue;
 
+    // Freeze finished events' blocks: the fetch window starts at `now`, so a
+    // naturally-finished event vanishes from currentEventKeys the moment it
+    // ends. Its block is the historical record of the reserved travel - the
+    // schedule's past days still render it, and the operator's end-of-event
+    // time corrections must not churn it. Only blocks whose event vanished
+    // while still upcoming (cancelled or deleted) are cleaned up.
+    if (block.eventEndAt < now) continue;
+
     const staleIds = [block.beforeEventId, block.afterEventId].filter(
       (id): id is string => id !== null,
     );

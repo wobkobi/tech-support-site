@@ -43,6 +43,17 @@ export default async function InvoiceViewPage({
 
   const identity = await getIdentity();
 
+  // Job match from the calculator's event-prefill flow: surface which booking
+  // this invoice bills so the schedule > invoice trail is visible after the fact.
+  const matchedBooking = invoice.bookingId
+    ? await prisma.booking
+        .findUnique({
+          where: { id: invoice.bookingId },
+          select: { id: true, name: true, startAt: true },
+        })
+        .catch(() => null)
+    : null;
+
   return (
     <AdminPageLayout current="business-invoices" contentClassName="mx-auto max-w-3xl px-6 py-8">
       {/* Actions bar */}
@@ -55,6 +66,14 @@ export default async function InvoiceViewPage({
         clientEmail={invoice.clientEmail}
         status={invoice.status}
       />
+
+      {matchedBooking && (
+        <p className="mb-3 text-xs text-slate-500">
+          Booked job: <span className="font-semibold text-slate-700">{matchedBooking.name}</span> on{" "}
+          {formatDateShort(matchedBooking.startAt)}{" "}
+          <span className="text-slate-400">#{matchedBooking.id.slice(-6)}</span>
+        </p>
+      )}
 
       {/* Invoice preview - mirrors the trimmed PDF layout. */}
       <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8 print:border-0 print:shadow-none">

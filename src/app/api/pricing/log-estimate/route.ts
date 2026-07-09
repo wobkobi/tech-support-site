@@ -21,6 +21,7 @@ interface LogBody {
   aiTasks?: unknown;
   address?: unknown;
   travelMins?: unknown;
+  travelMinsBack?: unknown;
   hourlyRate?: unknown;
   priceLow?: unknown;
   priceHigh?: unknown;
@@ -85,6 +86,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       : null;
   const travelMins =
     body.travelMins == null ? null : Math.max(0, Math.round(Number(body.travelMins) || 0));
+  const travelMinsBack =
+    body.travelMinsBack == null ? null : Math.max(0, Math.round(Number(body.travelMinsBack) || 0));
 
   const hourlyRate = Math.max(0, Number(body.hourlyRate) || 0);
   const priceLow = Math.max(0, Math.round(Number(body.priceLow) || 0));
@@ -115,6 +118,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         aiTasks,
         address,
         travelMins,
+        travelMinsBack,
         hourlyRate,
         priceLow,
         priceHigh,

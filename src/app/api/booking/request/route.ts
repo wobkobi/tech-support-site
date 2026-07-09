@@ -16,7 +16,7 @@ import {
 } from "@/features/booking/lib/booking";
 import { lookupPublicHoliday } from "@/features/business/lib/pricing-policy.server";
 import { getActivePromo } from "@/features/business/lib/promos";
-import { lookupDriveDistance } from "@/features/business/lib/travel-distance";
+import { lookupDriveRoundTrip } from "@/features/business/lib/travel-distance";
 import {
   createBookingEvent,
   deleteBookingEvent,
@@ -277,14 +277,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const baseRateAtBooking = baseRow?.ratePerHour ?? null;
     const travelRatePerHourAtBooking = travelRow?.ratePerHour ?? null;
 
-    // One-way drive time for in-person bookings; lets the late-cancel
-    // handler bill travel without a re-lookup. Non-blocking on failure.
+    // Drive-time snapshot for in-person bookings: outbound quoted at the
+    // booking's start, return at its end - genuine traffic predictions for
+    // the actual drives. Lets the late-cancel handler bill travel without a
+    // re-lookup. Non-blocking on failure.
     let travelMinsAtBooking: number | null = null;
+    let travelMinsBackAtBooking: number | null = null;
     if (meetingType === "in-person" && address && address.trim()) {
       try {
-        const drive = await lookupDriveDistance(address.trim());
+        const drive = await lookupDriveRoundTrip(address.trim(), startAt, endAt);
         if (drive.status === "ok") {
-          travelMinsAtBooking = drive.data.durationMins;
+          travelMinsAtBooking = drive.data.there.durationMins;
+          travelMinsBackAtBooking = drive.data.back.durationMins;
         }
       } catch (err) {
         console.warn("[booking/request] travel-time snapshot failed:", err);
@@ -341,6 +345,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           meetingType: meetingType === "in-person" ? "in_person" : "remote",
           duration,
           travelMinsAtBooking,
+          travelMinsBackAtBooking,
           // Rate snapshot locks in the quoted price against later admin edits.
           // complexRateAtBooking is no longer written (the Complex tier was
           // removed); the column stays for historical bookings.

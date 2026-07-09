@@ -1,6 +1,6 @@
 {
   "name": "tech-support-site",
-  "version": "3.131.3",
+  "version": "3.134.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,8 +9,6 @@
     "build:all": "npm run build:icons && npm run build",
     "build:icons": "tsx scripts/build-icons/index.ts",
     "build:poster": "npx tsx scripts/export-poster-screenshot.ts",
-    "db:drop-review-request": "dotenv -e .env.local -- tsx scripts/drop-review-request.ts",
-    "db:normalise-addresses": "dotenv -e .env.local -- tsx scripts/normalise-contact-addresses.ts",
     "db:push": "prisma db push",
     "dev": "next dev --turbopack",
     "format": "prettier --write \"**/*.{js,ts,jsx,tsx,mjs,css,html,md,json,yml,yaml}\"",

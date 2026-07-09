@@ -73,7 +73,7 @@ export default async function AdminPage(): Promise<React.ReactElement> {
     recentContacts,
     pastConfirmedBookings,
     contactsWithReviewSent,
-    allContacts,
+    unsentContacts,
     bookingsWithReviewSent,
     todaysBookings,
     monthIncome,
@@ -130,8 +130,15 @@ export default async function AdminPage(): Promise<React.ReactElement> {
       where: { reviewLinkSentAt: { not: null }, deletedAt: null },
       select: { email: true, phone: true },
     }),
+    // Suggestion candidates: only contacts never stamped as sent. Contacts
+    // with reviewLinkSentAt set were always filtered out below, so excluding
+    // them DB-side keeps the scan proportional to actual candidates instead
+    // of the whole table. isSet covers pre-field rows (MongoDB gotcha).
     prisma.contact.findMany({
-      where: { deletedAt: null },
+      where: {
+        deletedAt: null,
+        OR: [{ reviewLinkSentAt: null }, { reviewLinkSentAt: { isSet: false } }],
+      },
       orderBy: { name: "asc" },
       select: { id: true, name: true, email: true, phone: true, address: true },
     }),
@@ -192,7 +199,9 @@ export default async function AdminPage(): Promise<React.ReactElement> {
     ...contactsWithReviewSent.flatMap((c) => (c.phone ? [toE164NZ(c.phone)] : [])),
     ...bookingsWithReviewSent.flatMap((b) => (b.phone ? [toE164NZ(b.phone)] : [])),
   ]);
-  const contactsWithoutReviewLinks = allContacts.filter((c) => {
+  // The set diff still matters for cross-record coverage: an unsent contact
+  // sharing an email/phone with a sent contact or booking is already covered.
+  const contactsWithoutReviewLinks = unsentContacts.filter((c) => {
     if (c.email && sentEmails.has(c.email.toLowerCase())) return false;
     if (c.phone && sentPhones.has(toE164NZ(c.phone))) return false;
     return true;

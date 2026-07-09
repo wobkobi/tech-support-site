@@ -135,8 +135,10 @@ export function PricingWizard({
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ destination: dest }),
-          }).then((r) => r.json() as Promise<{ durationMins?: number }>)
-        : Promise.resolve({ durationMins: 0 }),
+          }).then(
+            (r) => r.json() as Promise<{ durationMinsThere?: number; durationMinsBack?: number }>,
+          )
+        : Promise.resolve({ durationMinsThere: 0, durationMinsBack: 0 }),
       fetch("/api/pricing/estimate-duration", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -155,13 +157,21 @@ export function PricingWizard({
       ),
     ]);
 
-    // travelMins is one-way; calcTravelCharge doubles internally for round-trip.
-    // Force 0 for remote even if an address was typed before backing up.
+    // Both legs quoted at "now"-ish traffic (no job time exists at this
+    // point; the server defaults the return to +60 min, matching the
+    // fallback duration below). Force 0 for remote even if an address was
+    // typed before backing up.
     const travelMins =
       meeting === "remote"
         ? 0
         : travelRes.status === "fulfilled"
-          ? (travelRes.value.durationMins ?? 0)
+          ? (travelRes.value.durationMinsThere ?? 0)
+          : 0;
+    const travelMinsBack =
+      meeting === "remote"
+        ? 0
+        : travelRes.status === "fulfilled"
+          ? (travelRes.value.durationMinsBack ?? travelMins)
           : 0;
 
     // Disclaim when an address was typed but geocoding returned durationMins: 0.
@@ -220,9 +230,9 @@ export function PricingWizard({
       priceRangeFor(mins, rate, confidence, estimatorRange);
 
     // Travel uses the dedicated Travel rate (never promo-discounted, never
-    // labour-rate). Routes through calcTravelCharge so the floor + round-trip
-    // doubling match the calculator and invoice exactly.
-    const travel = calcTravelCharge(travelMins, travelRatePerHour, minTravelCharge);
+    // labour-rate). Routes through calcTravelCharge so the floor + leg
+    // summing match the calculator and invoice exactly.
+    const travel = calcTravelCharge(travelMins, travelMinsBack, travelRatePerHour, minTravelCharge);
 
     /**
      * Visit total (floor applied) plus flat travel surcharge.
@@ -319,6 +329,7 @@ export function PricingWizard({
         aiTasks: tasks,
         address: dest || null,
         travelMins,
+        travelMinsBack,
         meetingType: meeting === "on-site" ? "in_person" : "remote",
         hourlyRate: promoRate,
         priceLow: promoRange.low,

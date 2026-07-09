@@ -150,11 +150,14 @@ model Booking {
   unit                String?
   meetingType         MeetingType?
   duration            JobDuration?
-  // One-way drive time from HOME_ADDRESS captured at booking creation via
-  // lookupDriveDistance. Required by the late-cancel auto-invoice travel
-  // line so cancelling within the travel window can be billed without a
-  // re-lookup. Null on legacy rows and on remote bookings.
-  travelMinsAtBooking Int?
+  // Drive times from the base address captured at booking creation via
+  // lookupDriveRoundTrip - outbound quoted at startAt, return at endAt, both
+  // traffic-aware. Required by the late-cancel auto-invoice travel line so
+  // cancelling within the travel window can be billed without a re-lookup.
+  // Null on legacy rows and on remote bookings; legacy rows missing the back
+  // leg fall back to the outbound figure.
+  travelMinsAtBooking     Int?
+  travelMinsBackAtBooking Int?
 
   // Rate / promo snapshot at booking creation. Honoured at invoice time
   // (and rendered into the confirmation email) so a customer who booked
@@ -436,6 +439,11 @@ model Invoice {
   status           InvoiceStatus @default(DRAFT)
   notes            String?
   contactId        String?       @db.ObjectId
+  // Optional match back to the job this invoice bills: the Booking row and
+  // the Google Calendar event (whose times the operator corrects to actual
+  // on-site time after each job). Set by the calculator's event prefill flow.
+  bookingId        String?       @db.ObjectId
+  calendarEventId  String?
   driveFileId      String?
   driveWebUrl      String?
   // Stamped when status transitions to VOIDED. Audit trail + powers "Voided
@@ -603,8 +611,11 @@ model PriceEstimateLog {
   aiTasks         EstimateTask[]
 
   // Address + drive time (step 2 is optional - skipped values stay null).
-  address    String?
-  travelMins Int?
+  // travelMins is the outbound leg (semantic continuity with legacy rows);
+  // travelMinsBack is the return leg, null on rows logged before two-leg quoting.
+  address        String?
+  travelMins     Int?
+  travelMinsBack Int?
 
   // Meeting modality picked in the wizard. Lets disputes confirm whether
   // the customer was quoted an on-site rate (with travel) or remote.

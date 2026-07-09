@@ -1,10 +1,10 @@
 // src/features/contacts/lib/maintenance.ts
 // Single source of truth for contact maintenance: backfilling contacts from
 // bookings, merging phone-only duplicates, linking reviews to contacts, and
-// surfacing field conflicts for the admin to resolve. Both the admin page load
-// (auto-maintain) and the standalone admin routes call these - keeping the logic
-// here is what stops the two paths from drifting apart. Every reader excludes
-// soft-deleted contacts (deletedAt != null).
+// surfacing field conflicts for the admin to resolve. The sync-contacts cron,
+// the standalone admin routes, and the contacts admin page (enrich only) call
+// these - keeping the logic here is what stops the paths from drifting apart.
+// Every reader excludes soft-deleted contacts (deletedAt != null).
 
 import { isNZMobileKey, normaliseContactPhone } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";

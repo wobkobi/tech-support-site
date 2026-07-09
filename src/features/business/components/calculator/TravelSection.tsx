@@ -119,9 +119,11 @@ export function TravelSection({
               entry.durationMinsOneWay !== undefined &&
               entry.durationMinsOneWay > 0;
             const oneWayMin = entry.durationMinsOneWay ?? 0;
-            const roundTripMin = oneWayMin * 2;
+            // Legacy drafts predate the return-leg lookup; mirror the outbound figure.
+            const backMin = entry.durationMinsBack ?? oneWayMin;
+            const roundTripMin = oneWayMin + backMin;
             const breakdown = showBreakdown
-              ? breakdownTravelCharge(oneWayMin, travelRatePerHour, minTravelCharge)
+              ? breakdownTravelCharge(oneWayMin, backMin, travelRatePerHour, minTravelCharge)
               : null;
             return (
               <div key={index} className="space-y-1">
@@ -130,7 +132,13 @@ export function TravelSection({
                     type="text"
                     value={entry.label}
                     placeholder={entry.isAuto ? "Lookup" : "e.g. Parking"}
-                    onChange={(e) => patchEntry(index, { label: e.target.value, isAuto: false })}
+                    onChange={(e) =>
+                      patchEntry(index, {
+                        label: e.target.value,
+                        isAuto: false,
+                        isParsedCost: false,
+                      })
+                    }
                     className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
                   />
                   <div className="flex items-center">
@@ -155,12 +163,14 @@ export function TravelSection({
                         patchEntry(index, {
                           cost: Math.round(value * 100) / 100,
                           isAuto: false,
+                          isParsedCost: false,
                         });
                       }}
                       onChange={(e) =>
                         patchEntry(index, {
                           cost: Math.round((parseFloat(e.target.value) || 0) * 100) / 100,
                           isAuto: false,
+                          isParsedCost: false,
                         })
                       }
                       className="w-24 rounded-r-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
@@ -186,8 +196,9 @@ export function TravelSection({
                       {entry.distanceKmOneWay !== undefined && ` (${entry.distanceKmOneWay} km)`}
                     </li>
                     <li>
-                      <span className="text-slate-400">Back:</span> {oneWayMin} min
-                      {entry.distanceKmOneWay !== undefined && ` (${entry.distanceKmOneWay} km)`}
+                      {/* Return leg quoted at its own departure time; km shown only on
+                          There - the back-leg distance is not returned by the lookup. */}
+                      <span className="text-slate-400">Back:</span> {backMin} min
                     </li>
                     <li>
                       <span className="text-slate-400">Raw:</span> {roundTripMin} min round trip @{" "}

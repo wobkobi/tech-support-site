@@ -20,7 +20,7 @@ interface ContactsAdminViewProps {
 /**
  * Client wrapper for the contacts page handling conflict resolution and Google sync state.
  * @param props - Component props.
- * @param props.initialConflicts - Conflicts pre-computed by autoMaintain on page load.
+ * @param props.initialConflicts - Conflicts pre-computed by enrichContactsFromBookings on page load.
  * @param props.contacts - All contact rows to display.
  * @returns Contacts admin view element.
  */

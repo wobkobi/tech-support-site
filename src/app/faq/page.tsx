@@ -32,8 +32,9 @@ export const metadata: Metadata = {
   },
 };
 
-// Live rates and copy are dynamic per request; ISR would serve stale prices.
-export const dynamic = "force-dynamic";
+// ISR with tag-based purge: rate and settings edits bust their cache tags,
+// which invalidates this page immediately - no per-request render needed.
+export const revalidate = 300;
 
 interface FaqItem {
   question: string;

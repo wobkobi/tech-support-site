@@ -134,8 +134,10 @@ export default async function RootLayout({
 }>): Promise<React.ReactElement> {
   // Live identity + weekly hours + rates so the JSON-LD never drifts from the
   // settings or the rate config.
-  const { availability, identity } = await getSettings();
-  const pricing = await getPublicPricing();
+  const [{ availability, identity }, pricing] = await Promise.all([
+    getSettings(),
+    getPublicPricing(),
+  ]);
   // schema.org telephone, derived from the editable tel: link (strip the scheme).
   const telephone = identity.phoneTel.replace(/^tel:/, "");
   const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];

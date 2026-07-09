@@ -2,7 +2,7 @@
 /**
  * @description Admin trigger to link reviews to contacts by email, phone, or token.
  * Delegates to the shared contacts maintenance module so this route and the
- * admin-page auto-maintain use identical matching (including the ambiguous-phone
+ * sync-contacts cron use identical matching (including the ambiguous-phone
  * guard that skips numbers shared by more than one contact).
  */
 

@@ -621,7 +621,13 @@ export async function runSheetsImport(dryRun: boolean): Promise<ImportResult> {
     let allSheetsClean = true;
 
     if (folderId) {
-      const sheetsToImport = await listSpreadsheetsInFolder(folderId);
+      // Retired workbooks prefixed "old" stay in the folder for reference but
+      // must not sync - they duplicate the replacement workbook's transactions,
+      // so importing both double-counts the ledger.
+      const sheetsToImport = (await listSpreadsheetsInFolder(folderId)).filter((s) => {
+        const fileName = s.name.split(" / ").pop() ?? s.name;
+        return !fileName.toLowerCase().startsWith("old");
+      });
       const aggregate = { ...zero, errors: [] as string[] };
       const perSheet: PerSheetCounts[] = [];
 

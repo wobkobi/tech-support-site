@@ -14,7 +14,7 @@ import {
   buildParseJobContext,
   buildParseJobPrompt,
 } from "@/features/business/lib/prompts/parse-job";
-import { lookupDriveDistance } from "@/features/business/lib/travel-distance";
+import { lookupDriveRoundTrip } from "@/features/business/lib/travel-distance";
 import type {
   ParseJobQuestion,
   ParseJobResponse,
@@ -25,6 +25,7 @@ import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
+import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 
@@ -34,6 +35,30 @@ export const maxDuration = 60;
 /** Internal extension that carries the per-range duration (used by the pre-compute hint). */
 interface RangeWithDuration extends ParsedRange {
   durationMins: number;
+}
+
+/**
+ * Converts an operator-stated HH:MM (NZ wall clock, today) to a Date for the
+ * traffic-aware travel lookup. Times already past today roll to tomorrow so
+ * the quote stays inside Google's traffic-prediction horizon - mirrors the
+ * calculator's client-side jobStartIsoFromTime.
+ * @param hhmm - HH:MM (24h) NZ wall-clock string, or null.
+ * @returns Date, or undefined when the input isn't a valid HH:MM.
+ */
+function nzTimeToDate(hhmm: string | null | undefined): Date | undefined {
+  if (!hhmm || !/^\d{1,2}:\d{2}$/.test(hhmm)) return undefined;
+  const [h, m] = hhmm.split(":").map(Number);
+  if (h > 23 || m > 59) return undefined;
+  const nzDateStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Pacific/Auckland" }).format(
+    new Date(),
+  );
+  const [y, mo, d] = nzDateStr.split("-").map(Number);
+  const offset = getPacificAucklandOffset(y, mo, d);
+  let utc = new Date(Date.UTC(y, mo - 1, d, h - offset, m, 0));
+  if (utc.getTime() < Date.now()) {
+    utc = new Date(utc.getTime() + 24 * 60 * 60 * 1000);
+  }
+  return utc;
 }
 
 // Two times on one line, captured as start/end. The separator is forgiving so
@@ -140,6 +165,42 @@ function calcSessionMins(input: string): number | null {
   const ranges = extractRanges(input);
   if (ranges.length === 0) return null;
   return ranges.reduce((s, x) => s + x.durationMins, 0);
+}
+
+/**
+ * Retired tag spellings the model can still emit (from older prompt wording or
+ * its own paraphrasing), mapped to their canonical replacement in the template
+ * taxonomy. Matched case-insensitively.
+ */
+const TAG_ALIASES: Record<string, string> = {
+  transfer: "Data Transfer",
+  security: "Privacy & Security",
+  "privacy configuration": "Privacy & Security",
+  "cloud storage": "Cloud Service",
+  "bios update": "Firmware Update",
+  "bluetooth & radio setup": "Setup",
+  tv: "TV",
+  "desktop / pc": "Desktop / PC",
+};
+
+/**
+ * Canonicalises one AI-emitted tag: retired spellings map through
+ * {@link TAG_ALIASES}, then any case-variant of a tag already in the template
+ * taxonomy snaps to the stored casing so near-duplicates ("Virus removal" vs
+ * "Virus Removal") can't split the taxonomy or the price memory. Unknown tags
+ * pass through trimmed - the vocabulary stays open.
+ * @param tag - Device or action tag from the AI.
+ * @param known - Lowercased tag > stored casing, built from the templates.
+ * @returns Canonical tag, or null when the input was empty.
+ */
+function canonicaliseTag(
+  tag: string | null | undefined,
+  known: Map<string, string>,
+): string | null {
+  const trimmed = tag?.trim();
+  if (!trimmed) return null;
+  const aliased = TAG_ALIASES[trimmed.toLowerCase()] ?? trimmed;
+  return known.get(aliased.toLowerCase()) ?? aliased;
 }
 
 /**
@@ -251,7 +312,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // annotations so the model knows where operator-controlled text ends.
     let userContent = `${context}${input.trim()}\n--- END USER DATA ---`;
     if (precomputed !== null) {
-      userContent += `\n\n[Pre-computed session total: ${precomputed} min — use this as durationMins without recalculating]`;
+      userContent += `\n\n[Pre-computed on-site session total from the stated ranges: ${precomputed} min — use this as the base for durationMins; ADD explicitly-stated durations for work done outside these ranges per BILLING rule 1]`;
     }
     if (Object.keys(safeAnswers).length > 0) {
       const clarifications = Object.entries(safeAnswers)
@@ -283,24 +344,39 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     if (!parsed.noTravelCharge && parsed.statedDistanceKm && parsed.statedDistanceKm > 0) {
       // Operator stated round-trip km but no time. Halve back to a one-way
-      // figure so downstream consumers (calcTravelCharge) get the contract
-      // they expect; durationMins stays 0 here because there is no time signal.
+      // figure so downstream consumers get the contract they expect; both
+      // leg durations stay 0 here because there is no time signal.
       parsed.travel = {
         distanceKmOneWay: Math.round((parsed.statedDistanceKm / 2) * 10) / 10,
         durationMins: 0,
+        durationMinsBack: 0,
         destination: parsed.destination ?? undefined,
       };
     } else if (!parsed.noTravelCharge && parsed.destination) {
-      // Look up one-way distance via Google Distance Matrix and pass through
-      // unchanged - calcTravelCharge doubles internally for the round-trip
-      // charge. Direct call into the helper instead of a self-fetch so this
-      // works without NEXT_PUBLIC_BASE_URL set and doesn't burn the public
-      // route's rate-limit budget.
-      const lookup = await lookupDriveDistance(parsed.destination);
-      if (lookup.status === "ok" && lookup.data.distanceKm > 0) {
+      // Look up both drive legs via Google Distance Matrix, each at its own
+      // departure: outbound at the parsed job start, return at the parsed end
+      // (or start + duration). Missing/invalid times fall back to the
+      // lookup's defaults (now / +60 min). Direct call into the helper
+      // instead of a self-fetch so this works without NEXT_PUBLIC_BASE_URL
+      // set and doesn't burn the public route's rate-limit budget.
+      const parsedRanges = parsed.ranges ?? [];
+      const departAt = nzTimeToDate(parsed.startTime ?? parsedRanges[0]?.startTime);
+      let returnAt = nzTimeToDate(parsed.endTime ?? parsedRanges[parsedRanges.length - 1]?.endTime);
+      if (departAt && returnAt && returnAt <= departAt) {
+        // Independent roll-forward can invert the pair (start already past
+        // rolls to tomorrow while a future end stays today) - keep the
+        // return after the outbound leg.
+        returnAt = new Date(returnAt.getTime() + 24 * 60 * 60 * 1000);
+      }
+      if (departAt && !returnAt && parsed.durationMins && parsed.durationMins > 0) {
+        returnAt = new Date(departAt.getTime() + parsed.durationMins * 60_000);
+      }
+      const lookup = await lookupDriveRoundTrip(parsed.destination, departAt, returnAt);
+      if (lookup.status === "ok" && lookup.data.there.distanceKm > 0) {
         parsed.travel = {
-          distanceKmOneWay: lookup.data.distanceKm,
-          durationMins: lookup.data.durationMins,
+          distanceKmOneWay: lookup.data.there.distanceKm,
+          durationMins: lookup.data.there.durationMins,
+          durationMinsBack: lookup.data.back.durationMins,
           destination: parsed.destination,
         };
       }
@@ -323,6 +399,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       // since-renamed modifier, or a hallucinated label). Collected so the
       // operator gets a warning instead of the modifier silently vanishing.
       const unresolvedModifierLabels = new Set<string>();
+      // Known-tag maps (lowercased > stored casing) for canonicaliseTag, so
+      // emitted case-variants land on the taxonomy's existing spelling.
+      const knownDevices = new Map(
+        templates.flatMap((t): [string, string][] =>
+          t.device ? [[t.device.toLowerCase(), t.device]] : [],
+        ),
+      );
+      const knownActions = new Map(
+        templates.flatMap((t): [string, string][] =>
+          t.action ? [[t.action.toLowerCase(), t.action]] : [],
+        ),
+      );
       parsed.tasks = parsed.tasks.map((task) => {
         const t = task as typeof task & {
           action?: string | null;
@@ -332,24 +420,65 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           modifierLabels?: string[];
           isShort?: boolean;
         };
-        const snap = findTemplateByTags(t.device, t.action, templates);
-        const device = snap?.device ?? t.device ?? null;
-        const action = snap?.action ?? t.action ?? null;
-        const details = t.details?.trim() ? t.details.trim() : null;
+        // Canonicalise BEFORE the template snap so a retired spelling
+        // ("Transfer") still finds its template ("Data Transfer") and its
+        // remembered price.
+        const device = canonicaliseTag(t.device, knownDevices);
+        const action = canonicaliseTag(t.action, knownActions);
+        const snap = findTemplateByTags(device, action, templates);
+        // Billing signals must not print on the invoice line. The prompt
+        // forbids them in details, but the model still echoes speed hints
+        // ("quick") from inputs like "(quick)" - strip them deterministically
+        // and tidy the leftover separators; an emptied details drops to null.
+        const rawDetails = t.details?.trim() ? t.details.trim() : null;
+        const details = rawDetails
+          ? rawDetails
+              .replace(/\b(?:quick(?:ly)?|briefly)\b/gi, "")
+              .replace(/\s{2,}/g, " ")
+              .replace(/\s*,\s*,+/g, ",")
+              .replace(/^[\s,;-]+|[\s,;-]+$/g, "")
+              .trim() || null
+          : null;
 
         const baseRate =
           findRateByLabel(t.baseRateLabel) ??
           ratesForLookup.find((r) => r.ratePerHour !== null && r.isDefault) ??
           ratesForLookup.find((r) => r.ratePerHour !== null) ??
           null;
-        const modifierIds = (t.modifierLabels ?? [])
+        const modifierRates = (t.modifierLabels ?? [])
           .map((label) => {
             const rate = findRateByLabel(label);
             if (!rate) unresolvedModifierLabels.add(label);
             return rate;
           })
-          .filter((r): r is RateConfig => r !== null && r.hourlyDelta !== null)
-          .map((r) => r.id);
+          .filter((r): r is RateConfig => r !== null && r.hourlyDelta !== null);
+        // Delivery channels (At home / Remote / Phone) are mutually exclusive -
+        // the prompt says so, but enforce it here so a model that stacks them
+        // anyway (e.g. a call that escalated to screen share emitting both
+        // Phone and Remote) cannot compound the discounts. Keep the channel
+        // with the highest effective rate; ties keep the first emitted.
+        // Matches the DEFAULT label names - renamed channels bypass this guard.
+        const CHANNEL_LABELS = new Set(["at home", "remote", "phone"]);
+        const channels = modifierRates.filter((r) => CHANNEL_LABELS.has(r.label.toLowerCase()));
+        const keptChannel = channels.reduce<RateConfig | null>(
+          (best, r) => (best === null || (r.hourlyDelta ?? 0) > (best.hourlyDelta ?? 0) ? r : best),
+          null,
+        );
+        const modifierIds = [
+          ...new Set(
+            modifierRates
+              .filter((r) => !CHANNEL_LABELS.has(r.label.toLowerCase()) || r.id === keptChannel?.id)
+              .map((r) => r.id),
+          ),
+        ];
+        if (channels.length > 1) {
+          parsed.warnings = [
+            ...(parsed.warnings ?? []),
+            `Task "${t.details ?? t.action ?? "?"}" had multiple delivery modifiers (${channels
+              .map((r) => r.label)
+              .join(" + ")}); kept ${keptChannel?.label}.`,
+          ];
+        }
 
         const computed = effectiveHourlyRate(ratesForLookup, baseRate?.id ?? null, modifierIds);
         const unitPrice = computed > 0 ? computed : (snap?.defaultPrice ?? task.unitPrice ?? 0);
@@ -379,6 +508,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     }
 
+    // Out-of-pocket travel disbursements (parking, tolls, ferry) pass through
+    // at the stated cost. Sanitise the untrusted model output: finite positive
+    // amounts only, short labels, capped count.
+    parsed.travelCosts = Array.isArray(parsed.travelCosts)
+      ? parsed.travelCosts
+          .slice(0, 5)
+          .map((c) => ({
+            label: typeof c?.label === "string" ? c.label.trim().slice(0, 40) : "",
+            cost: Number(c?.cost),
+          }))
+          .filter(
+            (c) => c.label.length > 0 && Number.isFinite(c.cost) && c.cost > 0 && c.cost <= 500,
+          )
+      : [];
+
     // Attach the operator-stated ranges so the calculator can render one row
     // per detected segment. Strip the internal durationMins - the calc derives
     // it from start/end on its own.
@@ -391,19 +535,38 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       parsed.ranges = [];
     }
 
+    // Sanitise the model's out-of-session minutes (work explicitly stated to
+    // have happened outside the session ranges, e.g. a call after the visit).
+    const outOfSessionMins =
+      typeof parsed.outOfSessionMins === "number" &&
+      Number.isFinite(parsed.outOfSessionMins) &&
+      parsed.outOfSessionMins > 0
+        ? Math.min(Math.round(parsed.outOfSessionMins), 8 * 60)
+        : 0;
+    parsed.outOfSessionMins = outOfSessionMins;
+
     // Wall-clock ceiling: AI sometimes inflates durationMins from its own task
     // estimates ("9-9:30" but emits 50 min). Cap durationMins to the stated
-    // span - gaps only reduce billable time, never increase it.
+    // span plus any out-of-session minutes - gaps only reduce billable time,
+    // never increase it, but work after the session adds on top.
     if (parsed.startTime && parsed.endTime && typeof parsed.durationMins === "number") {
       const [sh, sm] = parsed.startTime.split(":").map(Number);
       const [eh, em] = parsed.endTime.split(":").map(Number);
       const wallMin = eh * 60 + em - (sh * 60 + sm);
-      if (wallMin > 0 && parsed.durationMins > wallMin) {
+      const ceiling = wallMin + outOfSessionMins;
+      if (wallMin > 0 && parsed.durationMins > ceiling) {
         parsed.warnings = [
           ...(parsed.warnings ?? []),
-          `AI emitted durationMins ${parsed.durationMins} > ${wallMin}-min wall-clock span. Capped to ${wallMin}.`,
+          `AI emitted durationMins ${parsed.durationMins} > ${ceiling}-min ceiling (${wallMin}-min span + ${outOfSessionMins} out-of-session). Capped to ${ceiling}.`,
         ];
-        parsed.durationMins = wallMin;
+        parsed.durationMins = ceiling;
+      }
+      // Floor: a model that reports outOfSessionMins but forgets to add it to
+      // durationMins would carve the extra work out of the on-site window
+      // (under-billing the session tasks). Enforce the sum deterministically.
+      const floor = wallMin + outOfSessionMins;
+      if (wallMin > 0 && outOfSessionMins > 0 && parsed.durationMins < floor) {
+        parsed.durationMins = floor;
       }
     }
 

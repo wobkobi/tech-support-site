@@ -103,6 +103,17 @@ const TTFB_FAIL_MS = 10_000;
  */
 const IGNORE_404_URLS = ["/_vercel/insights/", "/_vercel/speed-insights/"];
 
+/**
+ * Console-error substrings ignored on EVERY page - third-party noise that can
+ * fire on any route, unlike the per-page ignoreErrors overrides.
+ * The Meta pixel detects Puppeteer as bot traffic and tries to beacon its own
+ * error log to connect.facebook.net, which the site's CSP correctly blocks;
+ * the browser then logs an informational CSP-violation message. That is the
+ * CSP working, not a page defect - it flaked two pushes on different pages
+ * before being ignored here.
+ */
+const IGNORE_CONSOLE_GLOBAL = ["connect.facebook.net"];
+
 /* ---------------------------------------------------------------- helpers */
 
 /**
@@ -345,6 +356,7 @@ async function checkPage(browser: Browser, baseUrl: string, spec: PageSpec): Pro
       const text = msg.text();
       const locUrl = msg.location().url ?? "";
       if (IGNORE_404_URLS.some((s) => text.includes(s) || locUrl.includes(s))) return;
+      if (IGNORE_CONSOLE_GLOBAL.some((s) => text.includes(s) || locUrl.includes(s))) return;
       if (spec.ignoreErrors?.some((s) => text.includes(s) || locUrl.includes(s)) ?? false) return;
       errors.push(`[console] ${text}`);
     });

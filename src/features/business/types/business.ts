@@ -157,10 +157,14 @@ export interface TravelEntry {
   cost: number;
   /** True when this entry was created by the address lookup; lets re-lookup replace it. */
   isAuto?: boolean;
+  /** True when this entry came from the AI parse's travelCosts (parking, tolls); a reparse replaces it, a manual address re-lookup leaves it alone. */
+  isParsedCost?: boolean;
   /** Destination text shown in the operator-side breakdown (auto entries only). */
   destination?: string;
-  /** One-way drive time in minutes from the address lookup (auto entries only). */
+  /** Outbound drive time in minutes from the address lookup (auto entries only). */
   durationMinsOneWay?: number;
+  /** Return-leg drive time in minutes; readers fall back to durationMinsOneWay on legacy drafts. */
+  durationMinsBack?: number;
   /** One-way drive distance in km from the address lookup (auto entries only). */
   distanceKmOneWay?: number;
 }
@@ -170,8 +174,9 @@ export interface JobCalculation {
   startTime: string;
   /** HH:MM end time of the job. */
   endTime: string;
-  /** Total billable minutes (operator override OR derived from start/end). */
+  /** Total billable minutes (time-slot sum + out-of-session follow-up). */
   durationMins: number;
+  /** Legacy top-level time-charge rate. The calculator always passes null - labour bills through the hourly task lines instead. */
   hourlyRate: RateConfig | null;
   tasks: TaskLine[];
   parts: PartLine[];
@@ -204,9 +209,13 @@ export interface ParseJobQuestion {
 
 export interface ParseJobResponse {
   durationMins: number | null;
+  /** Minutes of explicitly-stated work done OUTSIDE the stated session ranges (e.g. a call after the visit); included in durationMins and exempt from the wall-clock cap. */
+  outOfSessionMins?: number;
   startTime: string | null;
   endTime: string | null;
   hourlyRateId: string | null;
+  /** Out-of-pocket travel disbursements stated with a dollar amount (parking, tolls, ferry) - passed through at cost. */
+  travelCosts?: { label: string; cost: number }[];
   tasks: ParsedTaskLine[];
   parts: ParsedPartLine[];
   notes: string;
@@ -288,9 +297,11 @@ export interface SheetCounterResponse {
 }
 
 export interface TravelInfo {
-  /** One-way drive distance in km from the address lookup. */
+  /** One-way drive distance in km from the address lookup (outbound leg). */
   distanceKmOneWay: number;
-  /** One-way drive time in minutes; calcTravelCharge doubles internally to produce the round-trip charge. */
+  /** Outbound drive time in minutes; summed with durationMinsBack by calcTravelCharge. */
   durationMins: number;
+  /** Return-leg drive time in minutes; mirrors durationMins when the back-leg lookup degrades. */
+  durationMinsBack: number;
   destination?: string;
 }

@@ -14,7 +14,7 @@ import {
   type StartMinute,
   type TimeOfDay,
 } from "@/features/booking/lib/booking";
-import { lookupDriveDistance } from "@/features/business/lib/travel-distance";
+import { lookupDriveRoundTrip } from "@/features/business/lib/travel-distance";
 import {
   createBookingEvent,
   deleteBookingEvent,
@@ -256,15 +256,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // email notifications can show "was: <old time>".
     const previousStartAt = booking.startAt;
 
-    // Re-snapshot one-way drive time for the (possibly new) address so a late
-    // cancel bills the correct travel. Remote leaves it null so switching
+    // Re-snapshot both drive legs for the (possibly new) address and times -
+    // outbound at the new start, return at the new end - so a late cancel
+    // bills the correct travel. Remote leaves both null so switching
     // in-person > remote drops the old round-trip charge. Non-blocking on error.
     let travelMinsAtBooking: number | null = null;
+    let travelMinsBackAtBooking: number | null = null;
     if (meetingType === "in-person" && address && address.trim()) {
       try {
-        const drive = await lookupDriveDistance(address.trim());
+        const drive = await lookupDriveRoundTrip(address.trim(), startAt, endAt);
         if (drive.status === "ok") {
-          travelMinsAtBooking = drive.data.durationMins;
+          travelMinsAtBooking = drive.data.there.durationMins;
+          travelMinsBackAtBooking = drive.data.back.durationMins;
         }
       } catch (err) {
         console.warn("[booking/edit] travel-time snapshot failed:", err);
@@ -293,6 +296,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           meetingType: meetingType === "in-person" ? "in_person" : "remote",
           duration,
           travelMinsAtBooking,
+          travelMinsBackAtBooking,
         },
       });
       console.log(`[booking/edit] Updated booking: ${booking.id}`);

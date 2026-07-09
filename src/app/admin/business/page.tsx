@@ -169,11 +169,11 @@ export default async function BusinessPage({
   const monthStart = nzMidnightUtc(nzYear, nzMonth, 1);
   const monthEnd = nzMidnightUtc(nzYear, nzMonth + 1, 1);
 
-  // Business start date (from identity settings) drives the FY list + "(partial)" label.
-  const startDate = new Date((await getIdentity()).startDateIso);
-  const scope = resolveScope(fyParam, now, startDate);
-
-  const [incomeEntries, expenseEntries, invoices] = await Promise.all([
+  // One parallel pass over the independent reads: identity (FY list +
+  // "(partial)" label), the three ledgers, and the settings bundle used by the
+  // tax planner further down.
+  const [identity, incomeEntries, expenseEntries, invoices, settings] = await Promise.all([
+    getIdentity(),
     prisma.incomeEntry.findMany({
       orderBy: { date: "desc" },
       select: { id: true, date: true, customer: true, description: true, amount: true },
@@ -200,7 +200,12 @@ export default async function BusinessPage({
         status: true,
       },
     }),
+    getSettings(),
   ]);
+
+  // Business start date (from identity settings) drives the FY list + "(partial)" label.
+  const startDate = new Date(identity.startDateIso);
+  const scope = resolveScope(fyParam, now, startDate);
 
   // Plain-data shapes for the client component (avoids passing Date objects across the boundary).
   const incomeAll: IncomeRow[] = incomeEntries.map((e) => ({
@@ -244,7 +249,6 @@ export default async function BusinessPage({
   // authoritative; the live tax settings are the fallback for any cell it
   // doesn't fill (and the source when there's no workbook at all). Cached per
   // scope since the Drive/Sheets reads cost 3-5s on a miss.
-  const settings = await getSettings();
   const taxSettings = settings.tax;
   const gstRegistered = settings.pricing.gstRegistered;
   let rates: TaxRates = {

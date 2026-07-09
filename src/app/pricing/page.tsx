@@ -32,8 +32,10 @@ import Link from "next/link";
 import type React from "react";
 import { FaCaretDown, FaCheck } from "react-icons/fa6";
 
-// Admin rate / promo edits must show on next visit.
-export const dynamic = "force-dynamic";
+// ISR with tag-based purge: admin rate / promo edits bust the rate-config /
+// active-promo tags, which invalidates this page immediately; the 5-minute
+// window only limits how long a purely time-expired promo can linger.
+export const revalidate = 300;
 
 /**
  * Builds page metadata; reflects the active promo and live base/complex rates.

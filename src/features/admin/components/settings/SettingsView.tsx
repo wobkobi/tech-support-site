@@ -6,16 +6,7 @@
  * built show a placeholder noting they're still managed in code.
  */
 
-import { AvailabilityTab } from "@/features/admin/components/settings/AvailabilityTab";
-import { CommsTab } from "@/features/admin/components/settings/CommsTab";
-import { EstimatorTab } from "@/features/admin/components/settings/EstimatorTab";
-import { HoldsTab } from "@/features/admin/components/settings/HoldsTab";
-import { IdentityTab } from "@/features/admin/components/settings/IdentityTab";
-import { PricingTab } from "@/features/admin/components/settings/PricingTab";
-import { ReviewsTab } from "@/features/admin/components/settings/ReviewsTab";
-import { SchedulingTab } from "@/features/admin/components/settings/SchedulingTab";
 import { SettingsSearch } from "@/features/admin/components/settings/SettingsSearch";
-import { TaxTab } from "@/features/admin/components/settings/TaxTab";
 import { SettingsAllContext } from "@/features/admin/components/settings/useSettingsForm";
 import { cn } from "@/shared/lib/cn";
 import { GROUP_META } from "@/shared/lib/settings/field-meta";
@@ -32,8 +23,57 @@ import type {
   SettingsGroup,
   TaxSettings,
 } from "@/shared/lib/settings/types";
+import dynamic from "next/dynamic";
 import type React from "react";
 import { useEffect, useState } from "react";
+
+/**
+ * Placeholder shown while a tab editor chunk loads.
+ * @returns Loading placeholder element.
+ */
+function TabLoading(): React.ReactElement {
+  return <p className="py-8 text-center text-sm text-slate-400">Loading…</p>;
+}
+
+// Tab editors load on demand: only the active tab's chunk ships, instead of
+// bundling all nine editors into the settings page's first load.
+const AvailabilityTab = dynamic(
+  () =>
+    import("@/features/admin/components/settings/AvailabilityTab").then((m) => m.AvailabilityTab),
+  { loading: TabLoading },
+);
+const CommsTab = dynamic(
+  () => import("@/features/admin/components/settings/CommsTab").then((m) => m.CommsTab),
+  { loading: TabLoading },
+);
+const EstimatorTab = dynamic(
+  () => import("@/features/admin/components/settings/EstimatorTab").then((m) => m.EstimatorTab),
+  { loading: TabLoading },
+);
+const HoldsTab = dynamic(
+  () => import("@/features/admin/components/settings/HoldsTab").then((m) => m.HoldsTab),
+  { loading: TabLoading },
+);
+const IdentityTab = dynamic(
+  () => import("@/features/admin/components/settings/IdentityTab").then((m) => m.IdentityTab),
+  { loading: TabLoading },
+);
+const PricingTab = dynamic(
+  () => import("@/features/admin/components/settings/PricingTab").then((m) => m.PricingTab),
+  { loading: TabLoading },
+);
+const ReviewsTab = dynamic(
+  () => import("@/features/admin/components/settings/ReviewsTab").then((m) => m.ReviewsTab),
+  { loading: TabLoading },
+);
+const SchedulingTab = dynamic(
+  () => import("@/features/admin/components/settings/SchedulingTab").then((m) => m.SchedulingTab),
+  { loading: TabLoading },
+);
+const TaxTab = dynamic(
+  () => import("@/features/admin/components/settings/TaxTab").then((m) => m.TaxTab),
+  { loading: TabLoading },
+);
 
 /** Tab order shown in the settings bar. */
 const TAB_ORDER: SettingsGroup[] = [

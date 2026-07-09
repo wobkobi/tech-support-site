@@ -25,7 +25,6 @@ import {
   effectiveHourlyRate,
   hourlyTaskMinutes,
   jobToLineItems,
-  matchRateById,
   timeDiffMins,
   todayISO,
   type JobPricing,
@@ -112,7 +111,7 @@ function jobStartIsoFromTime(hhmm: string): string | null {
  * localStorage key for the calculator draft. Bump the version suffix when
  * CalculatorDraft fields change so stale shapes can't crash the form.
  */
-const DRAFT_KEY = "calculator-draft-v1";
+const DRAFT_KEY = "calculator-draft-v2";
 
 /**
  * Subset of CalculatorView state worth persisting across refreshes. Excludes
@@ -121,18 +120,15 @@ const DRAFT_KEY = "calculator-draft-v1";
  * session. The "Describe the job" input text itself IS persisted (`aiInput`).
  */
 interface CalculatorDraft {
-  v: 1;
+  v: 2;
   savedAt: number;
-  /**
-   * The "Describe the job" textarea text. Additive field: older v1 drafts saved
-   * before this existed simply lack it and default to "" on load (safe, no bump).
-   */
+  /** The "Describe the job" textarea text. */
   aiInput: string;
-  /** Date the job was done (YYYY-MM-DD); drives the holiday + promo lookup. Additive - older drafts default to today. */
+  /** Date the job was done (YYYY-MM-DD); drives the holiday + promo lookup. */
   jobDate: string;
   timeRanges: ParsedRange[];
-  durationMinsOverride: number | null;
-  hourlyRateId: string | null;
+  /** Out-of-session minutes added to the slot sum (0 = none). */
+  followUpMins: number;
   travelEntries: TravelEntry[];
   jobAddress: string;
   tasks: TaskLine[];
@@ -168,7 +164,7 @@ function isMeaningfulDraft(d: CalculatorDraft): boolean {
     d.pickedContactName !== null ||
     d.pickedContactCompany !== null ||
     d.unsuccessful ||
-    d.durationMinsOverride !== null
+    d.followUpMins > 0
   );
 }
 
@@ -184,7 +180,7 @@ function loadDraft(): CalculatorDraft | null {
     const raw = window.localStorage.getItem(DRAFT_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as CalculatorDraft;
-    if (parsed?.v !== 1) return null;
+    if (parsed?.v !== 2) return null;
     return parsed;
   } catch {
     return null;
@@ -199,7 +195,7 @@ function loadDraft(): CalculatorDraft | null {
 function saveDraft(draft: Omit<CalculatorDraft, "v" | "savedAt">): void {
   if (typeof window === "undefined") return;
   try {
-    const payload: CalculatorDraft = { v: 1, savedAt: Date.now(), ...draft };
+    const payload: CalculatorDraft = { v: 2, savedAt: Date.now(), ...draft };
     window.localStorage.setItem(DRAFT_KEY, JSON.stringify(payload));
   } catch {
     /* QuotaExceeded or private mode - silently degrade */
@@ -274,6 +270,42 @@ interface CalculatorViewProps {
   identity: IdentitySettings;
   /** Live pricing (GST, min travel, billing increment) for the job calculations. */
   pricing: JobPricing;
+  /** Rate configs resolved server-side so the calculator renders without a fetch waterfall. */
+  initialRates: RateConfig[];
+  /** Task templates resolved server-side, ordered by usage. */
+  initialTaskTemplates: TaskTemplate[];
+  /** Active promo resolved server-side; refined per job date by the job-context effect. */
+  initialPromo: ActivePromo | null;
+  /** Job prefill from a schedule event ("Bill in calculator"); null on a normal load. */
+  eventPrefill: EventPrefill | null;
+}
+
+/**
+ * Job prefill built server-side from a booking-calendar event (whose times
+ * the operator corrects to actual on-site time) plus its Booking row. Wins
+ * over any saved draft - billing a specific event is a fresh task.
+ */
+export interface EventPrefill {
+  /** Google Calendar event id; stored on the saved invoice. */
+  calendarEventId: string;
+  /** Matching Booking row id, or null for manual calendar events. */
+  bookingId: string | null;
+  /** NZ-local YYYY-MM-DD of the event start. */
+  jobDate: string;
+  /** NZ-local HH:MM event start (actual on-site start). */
+  startTime: string;
+  /** NZ-local HH:MM event end (actual on-site end). */
+  endTime: string;
+  clientName: string;
+  clientEmail: string;
+  jobAddress: string;
+  /**
+   * Drive prediction made for the event's actual window, from the frozen
+   * TravelBlock (raw minutes, no scheduling buffer) or the booking snapshot.
+   * Null when neither exists - the operator looks up manually.
+   */
+  travelMinsThere: number | null;
+  travelMinsBack: number | null;
 }
 
 /**
@@ -282,77 +314,90 @@ interface CalculatorViewProps {
  * @param props - Component props.
  * @param props.identity - Live business identity for the invoice preview.
  * @param props.pricing - Live pricing for the job calculations.
+ * @param props.initialRates - Server-resolved rate configs.
+ * @param props.initialTaskTemplates - Server-resolved task templates.
+ * @param props.initialPromo - Server-resolved active promo, or null.
+ * @param props.eventPrefill - Schedule-event job prefill, or null on a normal load.
  * @returns The rendered calculator view element.
  */
-export function CalculatorView({ identity, pricing }: CalculatorViewProps): React.ReactElement {
+export function CalculatorView({
+  identity,
+  pricing,
+  initialRates,
+  initialTaskTemplates,
+  initialPromo,
+  eventPrefill,
+}: CalculatorViewProps): React.ReactElement {
   const router = useRouter();
 
-  // Lazy-read the saved draft once at mount. Non-meaningful drafts (just the
-  // auto-seeded "now" times from a previous session, nothing the operator
-  // typed) are treated as "no draft" so a refresh after Clear gets
-  // fresh times instead of restoring stale timestamps.
-  const initialDraft = useMemo(() => {
-    const d = loadDraft();
-    if (!d || !isMeaningfulDraft(d)) return null;
-    return d;
-  }, []);
-  // True when a meaningful draft was loaded; readable inside async .then()
+  // The saved draft lives in localStorage (client-only), so reading it during
+  // render made the server HTML and the client hydration disagree whenever a
+  // draft existed (React hydration error on every calculator load). State
+  // initialises to server-consistent defaults; the mount effect below
+  // restores the draft after hydration.
+  // True when a meaningful draft was restored; readable inside async .then()
   // callbacks without being a React dependency.
-  const draftLoadedRef = useRef(initialDraft !== null);
+  const draftLoadedRef = useRef(false);
   // Captured once to keep timeAgo() pure for the toast label.
   const [mountedAt] = useState(() => Date.now());
-  const [draftRestoredAt, setDraftRestoredAt] = useState<number | null>(
-    initialDraft?.savedAt ?? null,
-  );
+  const [draftRestoredAt, setDraftRestoredAt] = useState<number | null>(null);
 
-  // Server-fetched reference data
-  const [rates, setRates] = useState<RateConfig[]>([]);
-  const [taskTemplates, setTaskTemplates] = useState<TaskTemplate[]>([]);
+  // Server-resolved reference data; setters keep the rate panel's refresh path working.
+  const [rates, setRates] = useState<RateConfig[]>(initialRates);
+  const [taskTemplates, setTaskTemplates] = useState<TaskTemplate[]>(initialTaskTemplates);
   // Multiple time slots all lump into one billable duration. AI parse populates
   // one slot per detected HH:MM-HH:MM segment; operators can add/remove rows
   // via the Time card. No labels, dates, or per-slot travel - it's all flat.
-  const [timeRanges, setTimeRanges] = useState<ParsedRange[]>(
-    () => initialDraft?.timeRanges ?? [{ startTime: "", endTime: "" }],
-  );
-  // Operator override; null means "derive from sum of slots". Lets gaps inside
-  // a single slot (lunch, etc.) be billed manually.
-  const [durationMinsOverride, setDurationMinsOverride] = useState<number | null>(
-    () => initialDraft?.durationMinsOverride ?? null,
-  );
+  const [timeRanges, setTimeRanges] = useState<ParsedRange[]>(() => {
+    if (eventPrefill) {
+      return [{ startTime: eventPrefill.startTime, endTime: eventPrefill.endTime }];
+    }
+    return [{ startTime: "", endTime: "" }];
+  });
+  // Out-of-session work (a call after the visit, a remote fix later) billed on
+  // top of the slot sum. The AI parse seeds it from outOfSessionMins.
+  const [followUpMins, setFollowUpMins] = useState(0);
   // Every travel charge (auto-lookup + any manual entries) lumped together.
-  // jobToLineItems sums them into a single "Travel" invoice line.
-  const [travelEntries, setTravelEntries] = useState<TravelEntry[]>(
-    () => initialDraft?.travelEntries ?? [],
-  );
-  const [hourlyRateId, setHourlyRateId] = useState<string | null>(
-    () => initialDraft?.hourlyRateId ?? null,
-  );
+  // jobToLineItems sums them into a single "Travel" invoice line. An event
+  // prefill seeds the entry from the drive prediction made for the event's
+  // ACTUAL window (frozen TravelBlock / booking snapshot) - a fresh lookup on
+  // a past job could only quote tomorrow's traffic, not that day's.
+  const [travelEntries, setTravelEntries] = useState<TravelEntry[]>(() => {
+    if (!eventPrefill?.travelMinsThere || eventPrefill.travelMinsThere <= 0) return [];
+    const there = eventPrefill.travelMinsThere;
+    const back = eventPrefill.travelMinsBack ?? there;
+    const travelRatePerHour =
+      initialRates.find((r) => r.unit === "travel-hour" && r.ratePerHour !== null)?.ratePerHour ??
+      FALLBACK_TRAVEL_RATE;
+    return [
+      {
+        label: eventPrefill.jobAddress || `${there} min drive`,
+        cost: calcTravelCharge(there, back, travelRatePerHour, pricing.minTravelCharge),
+        isAuto: true,
+        destination: eventPrefill.jobAddress || `${there} min drive`,
+        durationMinsOneWay: there,
+        durationMinsBack: back,
+      },
+    ];
+  });
   // Tasks, parts, and notes
-  const [tasks, setTasks] = useState<TaskLine[]>(() => initialDraft?.tasks ?? []);
-  const [parts, setParts] = useState<PartLine[]>(() => initialDraft?.parts ?? []);
+  const [tasks, setTasks] = useState<TaskLine[]>([]);
+  const [parts, setParts] = useState<PartLine[]>([]);
   const [showParts, setShowParts] = useState(false);
   const [showTaxonomyModal, setShowTaxonomyModal] = useState(false);
-  const [notes, setNotes] = useState(() => initialDraft?.notes ?? "");
+  const [notes, setNotes] = useState("");
   // Half off labour when ticked (per pricing-policy.unsuccessfulWorkCopy).
-  const [unsuccessful, setUnsuccessful] = useState(() => initialDraft?.unsuccessful ?? false);
+  const [unsuccessful, setUnsuccessful] = useState(false);
   // Client details
-  const [clientName, setClientName] = useState(() => initialDraft?.clientName ?? "");
-  const [clientEmail, setClientEmail] = useState(() => initialDraft?.clientEmail ?? "");
+  const [clientName, setClientName] = useState(() => eventPrefill?.clientName ?? "");
+  const [clientEmail, setClientEmail] = useState(() => eventPrefill?.clientEmail ?? "");
   // Address-to state mirrors the InvoiceBuilder's segmented control so the
   // operator picks Name/Company/Custom once and the choice rides through to
   // the invoice without re-picking.
-  const [pickedContactName, setPickedContactName] = useState<string | null>(
-    () => initialDraft?.pickedContactName ?? null,
-  );
-  const [pickedContactCompany, setPickedContactCompany] = useState<string | null>(
-    () => initialDraft?.pickedContactCompany ?? null,
-  );
-  const [pickedContactGoogleId, setPickedContactGoogleId] = useState<string | null>(
-    () => initialDraft?.pickedContactGoogleId ?? null,
-  );
-  const [addressMode, setAddressModeState] = useState<"name" | "company" | "custom">(
-    () => initialDraft?.addressMode ?? "custom",
-  );
+  const [pickedContactName, setPickedContactName] = useState<string | null>(null);
+  const [pickedContactCompany, setPickedContactCompany] = useState<string | null>(null);
+  const [pickedContactGoogleId, setPickedContactGoogleId] = useState<string | null>(null);
+  const [addressMode, setAddressModeState] = useState<"name" | "company" | "custom">("custom");
   // Direct-save (Save invoice) state. pendingInvoiceId is set after a
   // successful POST so handleAddContactClose can PATCH `contactId` once the
   // modal returns the new Contact's id, then navigate to the detail page.
@@ -361,8 +406,35 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
   const [pendingInvoiceId, setPendingInvoiceId] = useState<string | null>(null);
   const [sheetSyncToast, setSheetSyncToast] = useState<string | null>(null);
 
+  // "Bill a calendar event" picker: lazily fetched on first open so a normal
+  // calculator load costs nothing; choosing an event reloads the page with
+  // ?eventId= and the server prefills times, client, address, and travel.
+  const [eventPickerOpen, setEventPickerOpen] = useState(false);
+  const [recentEvents, setRecentEvents] = useState<
+    { id: string; summary: string; start: string; end: string }[] | null
+  >(null);
+  const [loadingEvents, setLoadingEvents] = useState(false);
+
+  /** Opens the event picker, fetching the recent-events list on first open. */
+  async function handleOpenEventPicker(): Promise<void> {
+    setEventPickerOpen((open) => !open);
+    if (recentEvents !== null || loadingEvents) return;
+    setLoadingEvents(true);
+    try {
+      const res = await fetch("/api/admin/schedule/recent-events");
+      const d = (await res.json()) as {
+        ok?: boolean;
+        events?: { id: string; summary: string; start: string; end: string }[];
+      };
+      setRecentEvents(d.ok && d.events ? d.events : []);
+    } catch {
+      setRecentEvents([]);
+    }
+    setLoadingEvents(false);
+  }
+
   // AI parse session
-  const [aiInput, setAiInput] = useState(() => initialDraft?.aiInput ?? "");
+  const [aiInput, setAiInput] = useState("");
   const [parsing, setParsing] = useState(false);
   const [parseResult, setParseResult] = useState<ParseJobResponse | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
@@ -371,7 +443,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
   const [clarifyAnswers, setClarifyAnswers] = useState<Record<string, string>>({});
 
   // Travel lookup
-  const [jobAddress, setJobAddress] = useState(() => initialDraft?.jobAddress ?? "");
+  const [jobAddress, setJobAddress] = useState(() => eventPrefill?.jobAddress ?? "");
   const [lookingUpTravel, setLookingUpTravel] = useState(false);
   const addressInputRef = useRef<HTMLInputElement>(null);
 
@@ -395,12 +467,12 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
 
   // Active promo + per-job skip flag (not persisted). activePromo holds the
   // promo for the selected job date (refined by the job-context effect below).
-  const [activePromo, setActivePromo] = useState<ActivePromo | null>(null);
+  const [activePromo, setActivePromo] = useState<ActivePromo | null>(initialPromo);
   const [skipPromo, setSkipPromo] = useState(false);
 
   // Job date drives the holiday + promo lookup so a past job is priced by what
   // applied THEN, not today. Persisted in the draft; defaults to today (NZ).
-  const [jobDate, setJobDate] = useState<string>(() => initialDraft?.jobDate ?? todayNZDate());
+  const [jobDate, setJobDate] = useState<string>(() => eventPrefill?.jobDate ?? todayNZDate());
   // Holiday context for the selected date: name (for the UI) + the live labour
   // uplift fraction (0 when the date isn't a public holiday).
   const [holiday, setHoliday] = useState<{ name: string | null; uplift: number }>({
@@ -484,47 +556,56 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
     };
   }, []);
 
-  // Initial data fetch
+  // Mount seeding + contacts fetch. Rates/templates/promo arrive as server
+  // props; the "now" times must still seed in an effect (nowTime() at render
+  // would mismatch between server render and hydration). Contacts stay a
+  // client fetch - the People API pages through every connection and is far
+  // too slow to block the server render on.
   useEffect(() => {
-    const now = nowTime();
-    Promise.all([
-      fetch("/api/business/rates")
-        .then((r) => r.json())
-        .catch(() => ({ ok: false, rates: [] })),
-      fetch("/api/business/task-templates")
-        .then((r) => r.json())
-        .catch(() => ({ ok: false, templates: [] })),
-      // Public; auto-applies any live promo to the Summary panel.
-      fetch("/api/promos/active")
-        .then((r) => r.json())
-        .catch(() => ({ ok: false, promo: null })),
-      fetch("/api/business/contacts")
-        .then((r) => r.json())
-        .catch(() => ({ ok: false, contacts: [] })),
-    ]).then(
-      ([ratesData, templatesData, promoData, contactsData]: [
-        { ok: boolean; rates: RateConfig[] },
-        { ok: boolean; templates: TaskTemplate[] },
-        { ok: boolean; promo: ActivePromo | null },
-        { ok: boolean; contacts: GoogleContact[] },
-      ]) => {
-        // Skip the "now" + default-rate seeding when a draft was restored on
-        // mount - the draft's values are the source of truth in that case.
-        if (!draftLoadedRef.current) {
-          setTimeRanges([{ startTime: now, endTime: addHour(now) }]);
-        }
-        if (ratesData.ok) {
-          setRates(ratesData.rates);
-          if (!draftLoadedRef.current) {
-            const def = ratesData.rates.find((r) => r.isDefault);
-            if (def) setHourlyRateId(def.id);
-          }
-        }
-        if (templatesData.ok) setTaskTemplates(templatesData.templates);
-        setActivePromo(promoData.promo ?? null);
-        if (contactsData.ok) setContacts(contactsData.contacts);
-      },
-    );
+    // Restore the saved draft after mount (localStorage is client-only; see
+    // the note above the state block). An event prefill is a deliberate
+    // fresh billing task and outranks any draft; non-meaningful drafts (just
+    // auto-seeded times from a previous session) seed fresh "now" times
+    // instead of restoring stale timestamps.
+    const draft = eventPrefill ? null : loadDraft();
+    if (draft && isMeaningfulDraft(draft)) {
+      draftLoadedRef.current = true;
+      /* eslint-disable react-hooks/set-state-in-effect -- one-shot restore from
+         localStorage (an external store); doing this during render caused the
+         hydration mismatch this effect replaces */
+      setDraftRestoredAt(draft.savedAt ?? null);
+      setAiInput(draft.aiInput ?? "");
+      setJobDate(draft.jobDate ?? todayNZDate());
+      setTimeRanges(draft.timeRanges ?? [{ startTime: "", endTime: "" }]);
+      setFollowUpMins(draft.followUpMins ?? 0);
+      setTravelEntries(draft.travelEntries ?? []);
+      setJobAddress(draft.jobAddress ?? "");
+      setTasks(draft.tasks ?? []);
+      setParts(draft.parts ?? []);
+      setNotes(draft.notes ?? "");
+      setClientName(draft.clientName ?? "");
+      setClientEmail(draft.clientEmail ?? "");
+      setPickedContactName(draft.pickedContactName ?? null);
+      setPickedContactCompany(draft.pickedContactCompany ?? null);
+      setPickedContactGoogleId(draft.pickedContactGoogleId ?? null);
+      setAddressModeState(draft.addressMode ?? "custom");
+      setUnsuccessful(draft.unsuccessful ?? false);
+      /* eslint-enable react-hooks/set-state-in-effect */
+    } else if (!eventPrefill) {
+      const now = nowTime();
+      setTimeRanges([{ startTime: now, endTime: addHour(now) }]);
+    }
+    fetch("/api/business/contacts")
+      .then((r) => r.json())
+      .then((d: { ok: boolean; contacts: GoogleContact[] }) => {
+        if (d.ok) setContacts(d.contacts);
+      })
+      .catch(() => {
+        /* picker stays empty; manual client entry still works */
+      });
+    // Run once on mount - eventPrefill is fixed per page load, and re-running
+    // would clobber edited state and refetch contacts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Debounced draft writer. Any change to a persisted form field schedules a
@@ -535,8 +616,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
         aiInput,
         jobDate,
         timeRanges,
-        durationMinsOverride,
-        hourlyRateId,
+        followUpMins,
         travelEntries,
         jobAddress,
         tasks,
@@ -556,8 +636,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
     aiInput,
     jobDate,
     timeRanges,
-    durationMinsOverride,
-    hourlyRateId,
+    followUpMins,
     travelEntries,
     jobAddress,
     tasks,
@@ -579,9 +658,10 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
     return () => clearTimeout(t);
   }, [draftRestoredAt]);
 
-  // Derived durations and rate groupings
+  // Derived durations and rate groupings. Billable window = slot sum plus any
+  // out-of-session follow-up minutes.
   const sumRangesMin = timeRanges.reduce((s, r) => s + timeDiffMins(r.startTime, r.endTime), 0);
-  const durationMins = durationMinsOverride != null ? durationMinsOverride : sumRangesMin;
+  const durationMins = sumRangesMin + followUpMins;
   // Aggregate first start / last end - used for the travel departure ISO and
   // the persisted JobCalculation. Sorted by startTime so out-of-order operator
   // entries still produce sensible bounds.
@@ -590,9 +670,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
     .sort((a, b) => a.startTime.localeCompare(b.startTime));
   const aggregateStart = sortedRanges[0]?.startTime ?? "";
   const aggregateEnd = sortedRanges[sortedRanges.length - 1]?.endTime ?? "";
-  const hourlyRate = matchRateById(rates, hourlyRateId);
-  // Base hourly rates (e.g. Standard $65/hr) used for the top-level Time
-  // selector and as the per-task base rate.
+  // Base hourly rates (e.g. Standard $65/hr) used as the per-task base rate.
   const baseRates = rates.filter((r) => r.ratePerHour !== null);
   // Modifier rates: either signed $/hr deltas (At home -$10, Remote -$10)
   // or percent uplifts (Public Holiday +25%). Toggled per task to shift the
@@ -602,12 +680,13 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
     .sort((a, b) => a.label.localeCompare(b.label));
   const flatRates = rates.filter((r) => r.flatRate !== null);
 
-  // Assemble the job and totals
+  // Assemble the job and totals. Labour bills entirely through the per-task
+  // base + modifier rates, so the legacy top-level time charge stays null.
   const job: JobCalculation = {
     startTime: aggregateStart,
     endTime: aggregateEnd,
     durationMins,
-    hourlyRate,
+    hourlyRate: null,
     tasks,
     parts,
     travelEntries,
@@ -638,7 +717,6 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
       parts,
       timeRanges,
       durationMins,
-      hourlyRate,
       holiday.uplift,
       travelEntries,
       clientName,
@@ -660,43 +738,35 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
     (result: ParseJobResponse, rateList: RateConfig[]) => {
       const includeTravelDefault = (result.travel?.durationMins ?? 0) > 0;
 
+      // Out-of-session work (a call after the visit) goes into the follow-up
+      // field; the parser includes it inside durationMins, so in-session slot
+      // time is durationMins minus this.
+      const outMins = Math.max(0, Math.round(result.outOfSessionMins ?? 0));
+      setFollowUpMins(outMins);
+
       // Hydrate the time slots. Prefer the per-range list when the parser found
       // segments; otherwise synthesise one slot from startTime/endTime, or as a
-      // last resort anchor the duration to "now".
-      let parsedWindowMin = 0;
+      // last resort anchor the in-session duration to "now". The billable
+      // window is always slot time + follow-up.
+      let parsedWindowMin = outMins;
       if (result.ranges && result.ranges.length > 0) {
         setTimeRanges(result.ranges.map((r) => ({ startTime: r.startTime, endTime: r.endTime })));
-        const sum = result.ranges.reduce((s, r) => s + timeDiffMins(r.startTime, r.endTime), 0);
-        const aiMin = result.durationMins ?? null;
-        // When the AI-emitted duration differs from the sum (e.g. the operator
-        // typed an explicit total), surface it via the override field.
-        if (aiMin != null && aiMin !== sum) {
-          setDurationMinsOverride(aiMin);
-          parsedWindowMin = aiMin;
-        } else {
-          setDurationMinsOverride(null);
-          parsedWindowMin = sum;
-        }
+        parsedWindowMin += result.ranges.reduce(
+          (s, r) => s + timeDiffMins(r.startTime, r.endTime),
+          0,
+        );
       } else if (result.startTime && result.endTime) {
         setTimeRanges([{ startTime: result.startTime, endTime: result.endTime }]);
-        const wallClockMin = timeDiffMins(result.startTime, result.endTime);
-        const aiMin = result.durationMins ?? null;
-        if (aiMin != null && aiMin !== wallClockMin) {
-          setDurationMinsOverride(aiMin);
-          parsedWindowMin = aiMin;
-        } else {
-          setDurationMinsOverride(null);
-          parsedWindowMin = wallClockMin;
-        }
+        parsedWindowMin += timeDiffMins(result.startTime, result.endTime);
       } else if (result.startTime) {
         const end = nowTime();
         setTimeRanges([{ startTime: result.startTime, endTime: end }]);
-        setDurationMinsOverride(null);
-        parsedWindowMin = timeDiffMins(result.startTime, end);
+        parsedWindowMin += timeDiffMins(result.startTime, end);
       } else if (result.durationMins !== null) {
+        const inSessionMins = Math.max(0, result.durationMins - outMins);
         const now = new Date();
         const endTotalMins = now.getHours() * 60 + now.getMinutes();
-        const startTotalMins = Math.max(0, endTotalMins - result.durationMins);
+        const startTotalMins = Math.max(0, endTotalMins - inSessionMins);
         const sh = Math.floor(startTotalMins / 60);
         const sm = startTotalMins % 60;
         setTimeRanges([
@@ -705,12 +775,10 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
             endTime: nowTime(),
           },
         ]);
-        setDurationMinsOverride(null);
-        parsedWindowMin = result.durationMins;
+        parsedWindowMin = outMins + inSessionMins;
       }
 
-      // Hydrate rate, task, and part lines
-      setHourlyRateId(result.hourlyRateId);
+      // Hydrate task and part lines
       const parsedTasks: TaskLine[] = result.tasks.map((t) => {
         const device = t.device ?? null;
         const action = t.action ?? null;
@@ -723,14 +791,17 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
         // rateConfigId to null so the promo math classifies it correctly even
         // if the AI emitted a stray ID.
         const isHourly = t.baseRateId != null;
+        // Round AI-emitted quantities to 2 dp so a fractional-hour estimate
+        // can't put a long float on the line.
+        const qty = Math.round(t.qty * 100) / 100;
         return {
           rateConfigId: isHourly ? null : (t.rateConfigId ?? null),
           baseRateId: t.baseRateId ?? null,
           modifierIds: t.modifierIds ?? [],
           description,
-          qty: t.qty,
+          qty,
           unitPrice: t.unitPrice,
-          lineTotal: Math.round(t.qty * t.unitPrice * 100) / 100,
+          lineTotal: Math.round(qty * t.unitPrice * 100) / 100,
           device,
           action,
           details,
@@ -741,9 +812,19 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
       const parsedParts = result.parts.map((p) => ({ description: p.description, cost: p.cost }));
 
       // Reparse semantics: the new parse result is the new truth for the auto
-      // travel entry. Manual entries (parking, ferry, etc.) survive a reparse
-      // so the operator doesn't have to re-type them after every AI tweak.
+      // travel entry AND the parsed out-of-pocket costs (parking, tolls).
+      // Operator-typed manual entries survive a reparse so they don't have to
+      // be re-typed after every AI tweak.
       setJobAddress(result.destination ?? "");
+
+      // Parsed disbursements pass through at the stated cost; isParsedCost
+      // lets a reparse replace them while a manual address re-lookup (which
+      // only replaces the isAuto drive entry) leaves them alone.
+      const parsedCostEntries: TravelEntry[] = (result.travelCosts ?? []).map((c) => ({
+        label: c.label,
+        cost: Math.round(c.cost * 100) / 100,
+        isParsedCost: true,
+      }));
 
       if (result.travel && includeTravelDefault) {
         const travelRatePerHour =
@@ -751,6 +832,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
           FALLBACK_TRAVEL_RATE;
         const cost = calcTravelCharge(
           result.travel.durationMins,
+          result.travel.durationMinsBack,
           travelRatePerHour,
           pricing.minTravelCharge,
         );
@@ -762,14 +844,21 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
             isAuto: true,
             destination: result.destination ?? label,
             durationMinsOneWay: result.travel?.durationMins,
+            durationMinsBack: result.travel?.durationMinsBack,
             distanceKmOneWay: result.travel?.distanceKmOneWay,
           },
-          ...prev.filter((e) => !e.isAuto),
+          ...parsedCostEntries,
+          ...prev.filter((e) => !e.isAuto && !e.isParsedCost),
         ]);
       } else {
         // No drive time from the parse (remote work or geocode-to-origin): drop
-        // any stale auto entry, leave manual entries alone.
-        setTravelEntries((prev) => prev.filter((e) => !e.isAuto));
+        // any stale auto entry, keep operator-typed manual entries, and still
+        // carry any parsed disbursements (a remote job has no parking, but a
+        // walking-distance one can).
+        setTravelEntries((prev) => [
+          ...parsedCostEntries,
+          ...prev.filter((e) => !e.isAuto && !e.isParsedCost),
+        ]);
       }
       // Rebalance parsed tasks to fit the listed window so an AI over-estimating
       // a single step doesn't silently over-bill. Tasks scale proportionally so
@@ -840,6 +929,9 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
     setTasks((prev) => {
       const t = [...prev];
       const item = { ...t[idx], [field]: val };
+      // Quantities round to 2 dp so hand-typed hour fractions (1.333333...)
+      // can't leave long floats on the line or the invoice.
+      if (field === "qty") item.qty = Math.round(Number(val) * 100) / 100;
       if (field === "rateConfigId") {
         const rate = rates.find((r) => r.id === val);
         if (rate) {
@@ -946,8 +1038,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
   function resetFormState(): void {
     const now = nowTime();
     setTimeRanges([{ startTime: now, endTime: addHour(now) }]);
-    setDurationMinsOverride(null);
-    setHourlyRateId(rates.find((r) => r.isDefault)?.id ?? null);
+    setFollowUpMins(0);
     setTravelEntries([]);
     setJobAddress("");
     setTasks([]);
@@ -1027,6 +1118,10 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
           unsuccessful,
           unsuccessfulDiscount:
             totals.unsuccessfulDiscount > 0 ? totals.unsuccessfulDiscount : null,
+          // Match back to the billed job when this session came from the
+          // schedule's "Bill in calculator" action.
+          bookingId: eventPrefill?.bookingId ?? null,
+          calendarEventId: eventPrefill?.calendarEventId ?? null,
           // issueDate, dueDate, number all defaulted server-side.
         }),
       });
@@ -1111,6 +1206,8 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
   /**
    * Calls the travel-time API with the current job address and replaces the
    * single auto travel entry. Manual entries (parking, etc.) are preserved.
+   * Each leg is quoted at its own departure: outbound at the job start,
+   * return at the job end (or start + duration when no end time is set).
    * Drive time of 0 (geocoded to origin or no match) leaves no auto entry;
    * any non-zero drive time bills the $10 minimum via {@link calcTravelCharge}.
    */
@@ -1122,30 +1219,61 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
     setTravelEntries((prev) => prev.filter((e) => !e.isAuto));
     try {
       const departureTimeIso = jobStartIsoFromTime(aggregateStart);
+      // Return departure: the job's end time, guarded against
+      // jobStartIsoFromTime's independent roll-forward (a past start rolls to
+      // tomorrow while a future end stays today, inverting the pair); falls
+      // back to departure + estimated duration, else the server's default.
+      let returnDepartureTimeIso = jobStartIsoFromTime(aggregateEnd);
+      if (
+        departureTimeIso &&
+        returnDepartureTimeIso &&
+        returnDepartureTimeIso <= departureTimeIso
+      ) {
+        returnDepartureTimeIso = new Date(
+          new Date(returnDepartureTimeIso).getTime() + 24 * 60 * 60 * 1000,
+        ).toISOString();
+      }
+      if (departureTimeIso && !returnDepartureTimeIso && durationMins > 0) {
+        returnDepartureTimeIso = new Date(
+          new Date(departureTimeIso).getTime() + durationMins * 60_000,
+        ).toISOString();
+      }
       const res = await fetch("/api/pricing/travel-time", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           destination: jobAddress,
           ...(departureTimeIso ? { departureTimeIso } : {}),
+          ...(returnDepartureTimeIso ? { returnDepartureTimeIso } : {}),
         }),
       });
-      const d = (await res.json()) as { distanceKm?: number; durationMins?: number };
-      if (d.durationMins && d.durationMins > 0) {
+      const d = (await res.json()) as {
+        distanceKm?: number;
+        durationMinsThere?: number;
+        durationMinsBack?: number;
+      };
+      if (d.durationMinsThere && d.durationMinsThere > 0) {
         const travelRatePerHour =
           rates.find((r) => r.unit === "travel-hour" && r.ratePerHour !== null)?.ratePerHour ??
           FALLBACK_TRAVEL_RATE;
-        // calcTravelCharge doubles to round-trip internally and floors at
-        // MIN_TRAVEL_CHARGE, so a 1-min drive still bills the $10 minimum.
-        const cost = calcTravelCharge(d.durationMins, travelRatePerHour, pricing.minTravelCharge);
-        const label = jobAddress.trim() || `${d.durationMins} min drive`;
+        const backMins = d.durationMinsBack || d.durationMinsThere;
+        // calcTravelCharge sums the legs and floors at MIN_TRAVEL_CHARGE, so
+        // a 1-min drive still bills the $10 minimum.
+        const cost = calcTravelCharge(
+          d.durationMinsThere,
+          backMins,
+          travelRatePerHour,
+          pricing.minTravelCharge,
+        );
+        const label = jobAddress.trim() || `${d.durationMinsThere} min drive`;
         setTravelEntries((prev) => [
           {
             label,
             cost,
             isAuto: true,
             destination: jobAddress.trim() || label,
-            durationMinsOneWay: d.durationMins,
+            durationMinsOneWay: d.durationMinsThere,
+            durationMinsBack: backMins,
             distanceKmOneWay: d.distanceKm,
           },
           ...prev.filter((e) => !e.isAuto),
@@ -1227,11 +1355,7 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
         return;
       }
       const d = await res.json();
-      if (d.ok && Array.isArray(d.rates)) {
-        setRates(d.rates);
-        const def = d.rates.find((r: RateConfig) => r.isDefault);
-        if (def) setHourlyRateId(def.id);
-      }
+      if (d.ok && Array.isArray(d.rates)) setRates(d.rates);
     } finally {
       setResettingRates(false);
     }
@@ -1477,6 +1601,67 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
             travel breakdown) from blowing the grid track past the viewport;
             mirrors the guard on the right column. */}
         <div className="min-w-0 space-y-5">
+          {/* Bill a calendar event: jump straight to a job's corrected times,
+              client, address, and frozen travel prediction. */}
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            {eventPrefill ? (
+              <p className="text-sm text-slate-600">
+                <span className="font-semibold text-russian-violet">Billing booked job:</span>{" "}
+                {eventPrefill.clientName || "(no name)"} - {eventPrefill.jobDate},{" "}
+                {eventPrefill.startTime}-{eventPrefill.endTime}
+              </p>
+            ) : (
+              <>
+                <div className="flex items-center justify-between gap-2">
+                  <h2 className="text-sm font-semibold text-russian-violet">
+                    Bill a calendar event
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => void handleOpenEventPicker()}
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                  >
+                    {eventPickerOpen ? "Hide" : "Pick a recent event"}
+                  </button>
+                </div>
+                {eventPickerOpen && (
+                  <div className="mt-3 max-h-64 space-y-1 overflow-y-auto">
+                    {loadingEvents && <p className="text-xs text-slate-400">Loading events…</p>}
+                    {!loadingEvents && recentEvents !== null && recentEvents.length === 0 && (
+                      <p className="text-xs text-slate-400">
+                        No booking-calendar events in the last two weeks.
+                      </p>
+                    )}
+                    {(recentEvents ?? []).map((ev) => (
+                      <button
+                        key={ev.id}
+                        type="button"
+                        onClick={() =>
+                          router.push(
+                            `/admin/business/calculator?eventId=${encodeURIComponent(ev.id)}`,
+                          )
+                        }
+                        className="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-100 px-3 py-2 text-left text-sm hover:border-russian-violet/30 hover:bg-russian-violet/5"
+                      >
+                        <span className="truncate font-medium text-slate-700">{ev.summary}</span>
+                        <span className="shrink-0 text-xs text-slate-500">
+                          {new Intl.DateTimeFormat("en-NZ", {
+                            timeZone: "Pacific/Auckland",
+                            weekday: "short",
+                            day: "numeric",
+                            month: "short",
+                            hour: "numeric",
+                            minute: "2-digit",
+                          }).format(new Date(ev.start))}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
           {/* AI input */}
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <h2 className="mb-3 text-sm font-semibold text-russian-violet">Describe the job</h2>
@@ -1583,13 +1768,9 @@ export function CalculatorView({ identity, pricing }: CalculatorViewProps): Reac
           <JobDetailsSection
             timeRanges={timeRanges}
             onTimeRangesChange={setTimeRanges}
-            durationMinsOverride={durationMinsOverride}
-            onDurationOverrideChange={setDurationMinsOverride}
+            followUpMins={followUpMins}
+            onFollowUpMinsChange={setFollowUpMins}
             durationMins={durationMins}
-            hourlyRateId={hourlyRateId}
-            onHourlyRateIdChange={setHourlyRateId}
-            baseRates={baseRates}
-            billingIncrementMins={pricing.billingIncrementMins}
           />
 
           {/* Travel */}

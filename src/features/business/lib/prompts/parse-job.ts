@@ -39,9 +39,9 @@ STRUCTURE — every task object represents ONE device + ONE action (+ optional d
 - EXCEPTION — causally-linked work is ONE task. When the description uses "because of" / "due to" / "caused by" / "from" (as cause) / "the root cause was" to link a fix to its underlying cause, treat the FIX as the task and put the cause in details. Diagnosing the cause is PART of fixing it, not a separate billable action. Example: "fixed account sign-in into Windows and Edge not syncing because of a Microsoft 365 business account config issue" → ONE task {device: "Laptop", action: "Account sign-in repair", details: "Windows, Edge, sync issue caused by M365 business config"}. The M365 config is NOT a separate "Configuration" task — it's the diagnosed cause. If the user also stated a duration like "took 10 mins", that duration belongs to the whole causally-linked task. SCOPE LIMIT: this exception covers ONE specific fix + ONE root cause. A multi-step job with distinct services (diagnosis, network setup, account configuration, security fix) must stay as separate tasks even if they all relate to a single theme like "email not working" — do NOT collapse the whole job into one task.
 - EXCEPTION — general app tuition across several programs is ONE task. When the session is teaching/explaining how to use multiple apps or programs (not fixing a physical device), emit ONE task {device: "Software", action: "Training", details: "<app list>"} rather than splitting per app or using "Other". The apps stay in details even if one (e.g. iCloud) would map to its own device when it were the actual subject of the work.
 - ONE device per task. If the same action applies to two devices, that's two tasks (e.g. "set up new phone and laptop" → task A device "Phone" action "Setup", task B device "Laptop" action "Setup").
-- Use generic device names — never brand names; the specific product the customer used goes in details, not the device tag. Match each product to the closest device in the vocabulary below (e.g. "iPhone" → "Phone", "Dropbox" → "Cloud storage").
+- Use generic device names — never brand names; the specific product the customer used goes in details, not the device tag. Match each product to the closest device in the vocabulary below (e.g. "iPhone" → "Phone", "Dropbox" → "Cloud service").
 - Use SPECIFIC action names when context calls for it — single concept per action, but encode meaningful detail in the verb-phrase rather than defaulting to a bare generic. Prefer "Corruption repair", "Windows repair", "Battery replacement", "Account recovery", "Password reset" over plain "Repair" / "Recovery" when the job description tells you what was actually fixed/recovered. Stay short (1-3 words) and never use "and".
-- PRESERVE compound qualifiers from the source ("Bluetooth/radio", "Wi-Fi + ethernet", "front + rear cam"). Either keep them in the action ("Bluetooth & radio setup") or push them into details ("Bluetooth & radio"). NEVER silently drop one half because it's shorter.
+- PRESERVE compound qualifiers from the source ("Bluetooth/radio", "Wi-Fi + ethernet", "front + rear cam") by pushing them into details ("Bluetooth & radio") under the generic action ("Setup"). Do NOT bake them into the action tag - compound actions splinter the taxonomy. NEVER silently drop one half because it's shorter.
 
 DEVICE vocabulary (suggested, but extensible — invent a similarly short generic noun if none match):
 - "Phone" = mobile / smartphone (iPhone, Android, Samsung).
@@ -58,26 +58,28 @@ DEVICE vocabulary (suggested, but extensible — invent a similarly short generi
 - "Email account" = email service (Gmail, Outlook, iCloud Mail).
 - "Social media account" = social profile (Facebook, Instagram, WhatsApp).
 - "Streaming account" = streaming / music service (Netflix, Spotify, Disney+).
-- "Cloud storage" = cloud file storage / backup (iCloud Drive, Dropbox, OneDrive, Google Drive) - use ONLY when the work is about files, backup, sync, or storage space. The Apple ID / Google account ITSELF (the login governing App Store / Play Store sign-in, purchases, or device activation) is NOT cloud storage even though the same login also unlocks iCloud/Drive - tag account-level work "Software" and put the account brand in details ("Apple ID, App Store"). Only tag "Cloud storage" when the customer's actual files or backup are the subject.
+- "Cloud service" = cloud file storage / backup (iCloud Drive, Dropbox, OneDrive, Google Drive) - use ONLY when the work is about files, backup, sync, or storage space. The Apple ID / Google account ITSELF (the login governing App Store / Play Store sign-in, purchases, or device activation) is NOT a cloud service even though the same login also unlocks iCloud/Drive - tag account-level work "Software" and put the account brand in details ("Apple ID, App Store"). Only tag "Cloud service" when the customer's actual files or backup are the subject.
 - "Software" = an app or program not tied to one physical device (ChatGPT, Excel, Word, Finder, web browser).
 - "Banking" = online banking / payments (internet banking, bank login).
 - "Other" = genuine catch-all when nothing above fits; use sparingly.
 
 ACTION vocabulary (starting points — extend as needed):
-- Bare verbs: "Setup", "Configuration", "Repair", "Troubleshooting", "Cleanup", "Recovery", "Transfer", "Migration", "Security", "Training", "Maintenance", "Diagnosis".
-- Specific verb-phrases: "Corruption repair", "Windows repair", "Operating system reinstall", "Battery replacement", "Screen replacement", "Password reset", "Account recovery", "Data transfer", "Photo transfer", "Driver update", "Virus removal".
-- SPECIFICITY GATE for transfers/migrations: only narrow to a payload-specific variant ("Photo transfer", "Data transfer", "Single file transfer") when the source NAMES what moved (photos, files, contacts, a count). For a bare unqualified "transfer" with no stated payload, use the generic action "Transfer", or "Migration" when it reads as moving a whole device's content to a new one (e.g. "new phone setup and transfer"). NEVER assume "photos" just because the device is a phone.
+- Bare verbs: "Setup", "Configuration", "Repair", "Troubleshooting", "Cleanup", "Recovery", "Migration", "Training", "Maintenance", "Diagnosis".
+- Specific verb-phrases: "Corruption repair", "Windows repair", "Operating system reinstall", "Battery replacement", "Screen replacement", "Password reset", "Account recovery", "Data transfer", "Photo transfer", "Firmware update", "Driver update", "Virus removal", "Privacy & security".
+- NEVER emit these retired action names: "Transfer" (use "Data transfer"), "Security" or "Privacy configuration" (use "Privacy & security"), "BIOS update" (use "Firmware update").
+- SPECIFICITY GATE for transfers/migrations: only narrow to a payload-specific variant ("Photo transfer", "Single file transfer") when the source NAMES what moved (photos, files, contacts, a count). For a bare unqualified "transfer" with no stated payload, use "Data transfer", or "Migration" when it reads as moving a whole device's content to a new one (e.g. "new phone setup and transfer"). NEVER assume "photos" just because the device is a phone.
 - Phrasing → action: "explained" / "guided" / "showed how to use" / "walkthrough" / "went through" → "Training" (don't invent "Explanation" / "Tuition" variants).
 
 DETAILS (optional qualifier — use sparingly):
 - Each task may include a "details" string with a short free-text qualifier (≤ 5 words) when the device + action alone STILL wouldn't carry enough context. The server appends it to the composed description as "<Device> <action lowercased> - <details>".
 - Use details for incidental context that isn't worth its own action tag: the affected component, the symptom, the trigger, a count, OR the brand if the customer used one (e.g. "corrupted", "caused USB issues", "from old laptop", "5 photos", "blue screen at startup", "Spotify", "Netflix family plan"). No domain names (.nz/.com URLs) and no registrar names (1st Domains, cPanel). Technical shorthand is fine — DNS, POP3, SMTP, IMAP, SSL, TLS are all acceptable in details. Describe what was done, not what failed.
 - OMIT details (set to null or leave it out) when the device + action already say everything — no filler like "successful" / "done" / "complete".
+- NEVER copy billing signals into details or actions: speed hints ("quick", "quickly", "briefly", "just a quick"), stated durations ("42 min", "(20 mins)"), rate/location hints ("remote", "at home", "over the phone"), and people's first names are INPUTS that set quantity and rate labels - they are not part of the customer-facing description. "Heidi not connecting microphone (quick)" → device "Microphone", action "Connection troubleshooting", details null - the "(quick)" only pins the task short, and the escalated-call suffixes ("over the phone" / "remote session") are the ONE exception where the channel may appear.
 
 INVOICE-WORTHY PHRASING — paying customers read these, not engineers:
 - Spell out acronyms a non-tech client wouldn't know: "Operating system reinstall" not "OS reinstall", "Blue screen at startup" not "BSOD on boot". Common ones (USB, Wi-Fi, Bluetooth, PC) stay short.
-- Brand names go in DETAILS, never in the device tag. Pair generic device ("Streaming account", "Phone", "Cloud storage") with the brand in details ("Spotify", "iPhone 15", "iCloud") so the taxonomy stays clean and the line is still recognisable.
-- Joining symbols: use "&" or "/" inside an action ("Bluetooth & radio setup"), commas inside details ("Spotify, family plan"). Avoid "+" — it reads as math, not English.
+- Brand names go in DETAILS, never in the device tag. Pair generic device ("Streaming account", "Phone", "Cloud service") with the brand in details ("Spotify", "iPhone 15", "iCloud") so the taxonomy stays clean and the line is still recognisable.
+- Joining symbols: use "&" or "/" inside details ("Bluetooth & radio"), commas to list items ("Spotify, family plan"). Avoid "+" — it reads as math, not English.
 - JARGON BAN — NEVER put any of the following in descriptions or details: email authentication record names (SPF, DKIM, DMARC), DNS record types (MX, A record, CNAME, PTR), domain names or URLs (anything ending .nz/.com/.org or containing www), provider or registrar names (1st Domains, Crazy Domains, cPanel, and similar), or IT-failure phrases (DNS split, delivery failures, authentication failure, misconfiguration, rejected by server). Acceptable shorthand: DNS, POP3, SMTP, IMAP, SSL, TLS. Describe outcomes positively — say what was configured, not what failed: "Outlook, POP3/SMTP" not "Outlook misconfigured"; "Gmail, outbound mail" not "Gmail rejection".
 
 REUSE — if a previously-used template in the user-message templates list has the exact (device, action) combination, copy those tag values verbatim. Don't switch "Phone" → "Smartphone" or "Setup" → "Configuration" mid-stream. Details are NOT templated — choose them per-job.
@@ -86,27 +88,27 @@ EXAMPLES — multi-task splitting + specific actions + details:
 - Input: "set up new phone and transfer photos to laptop, also reset the email password"
   Tasks: [{device: "Phone", action: "Setup"}, {device: "Phone", action: "Photo transfer", details: "to laptop"}, {device: "Email account", action: "Password reset"}]
 - Input: "iPhone setup and iCloud configuration, then laptop config for that"  (brand in details for both)
-  Tasks: [{device: "Phone", action: "Setup", details: "iPhone"}, {device: "Cloud storage", action: "Configuration", details: "iCloud"}, {device: "Laptop", action: "Configuration", details: "iCloud sync"}]
+  Tasks: [{device: "Phone", action: "Setup", details: "iPhone"}, {device: "Cloud service", action: "Configuration", details: "iCloud"}, {device: "Laptop", action: "Configuration", details: "iCloud sync"}]
 - Input: "fixed and repaired corrupted USB drives and fixed Windows since it was causing it"
   Tasks: [{device: "External storage", action: "Corruption repair", details: "USB"}, {device: "Desktop / PC", action: "Windows repair", details: "caused USB issues"}]
 - Input: "fixed virus on laptop"
   Tasks: [{device: "Laptop", action: "Virus removal"}]
 - Input: "shared plan, account setup, and explanation of how to use Spotify properly"  (same-device session; brand in details)
   Tasks: [{device: "Streaming account", action: "Setup", details: "Spotify, shared plan & training"}]
-- Input: "Bluetooth/radio setup for 2 cars"  (preserve both qualifiers)
-  Tasks: [{device: "Car", action: "Bluetooth & radio setup", details: "2 cars"}]
+- Input: "Bluetooth/radio setup for 2 cars"  (qualifiers preserved in details, generic action)
+  Tasks: [{device: "Car", action: "Setup", details: "Bluetooth & radio, 2 cars"}]
 - Input: "fixed BSOD on customer's Dell laptop, drivers were corrupted"  (spell out BSOD; brand in details)
   Tasks: [{device: "Laptop", action: "Driver repair", details: "Dell, blue screen"}]
 - Input: "explained and guided how to use ChatGPT, Excel, iCloud, Finder and more"  (general app tuition → one Software task, NOT "Other")
   Tasks: [{device: "Software", action: "Training", details: "ChatGPT, Excel, iCloud, Finder"}]
-- Input: "Apple App Store iCloud account fix"  (the Apple account/login itself - App Store sign-in + iCloud login - NOT file storage; do NOT tag Cloud storage)
+- Input: "Apple App Store iCloud account fix"  (the Apple account/login itself - App Store sign-in + iCloud login - NOT file storage; do NOT tag Cloud service)
   Tasks: [{device: "Software", action: "Account recovery", details: "iCloud, App Store"}]
 - Input: "email not working - diagnosed delivery issues, fixed DNS/routing records across multiple providers, reconfigured Outlook POP3/SMTP for multiple accounts, fixed Gmail rejecting outbound mail due to missing SPF/DKIM"  (4 distinct services - do NOT collapse; Network for DNS work; DNS/POP3/SMTP are fine in output details; SPF/DKIM/MX appear in the input but stay out of output details per JARGON BAN; domain names and registrar names are forbidden; use positive outcome language not failure phrases)
-  Tasks: [{device: "Email account", action: "Diagnosis", details: "not sending, not receiving"}, {device: "Network", action: "Configuration", details: "DNS, multiple providers"}, {device: "Email account", action: "Configuration", details: "Outlook, POP3/SMTP, multiple accounts"}, {device: "Email account", action: "Security", details: "Gmail, outbound mail"}]
+  Tasks: [{device: "Email account", action: "Diagnosis", details: "not sending, not receiving"}, {device: "Network", action: "Configuration", details: "DNS, multiple providers"}, {device: "Email account", action: "Configuration", details: "Outlook, POP3/SMTP, multiple accounts"}, {device: "Email account", action: "Privacy & security", details: "Gmail, outbound mail"}]
 
 BILLING — single source of truth for time distribution. Run the algorithm step by step.
 Let step = the billing increment from the BILLING context line expressed in hours (5 min > step = 0.0833h; 10 min > 0.1667h; 15 min > 0.25h), and minBill = the minimum billable time from that line. EVERY task qty must be a whole multiple of step. Some examples below show 0.25h figures because they are worked at a 15-min step for legibility - NEVER hardcode 0.25h; always read step from the context and round on it.
-1. Determine durationMins (from pre-computed annotation if present, otherwise from the description).
+1. Determine durationMins (from pre-computed annotation if present, otherwise from the description). The stated ranges are the WHOLE billable envelope - every task, including ones narrated with "then" (a call at the end of the visit), fits inside it. Work genuinely outside the session is billed by stating it as its own time range line, which the pre-compute already sums.
 2. Convert durationMins to billable minutes using the BILLING line in the context message: round to the NEAREST step, then take the larger of that and minBill; divide by 60 for totalHours. Distribute totalHours across the tasks on that same step grid.
    Examples at the default 5-min step, 15-min minimum (substitute the LIVE step): 23 min → 0.42h. 107 min → 1.75h. 110 min → 1.83h. 8 min → 0.25h (below the minimum).
 3. Identify how many distinct tasks there are (N).
@@ -140,7 +142,7 @@ Worked examples (worked at a 15-min step = 0.25h for legibility - they teach the
 - 1.75h across 4 tasks, no shorts and no explicit durations → P = {}, F = 4. subBase = 0.25, subLeftover = 0.75 → 3 most significant each get +0.25 → 0.5 / 0.5 / 0.5 / 0.25. All isExplicit: false.
 - 2.0h across 5 tasks: security "took most of the time", cleanup "quickly", virus removal "took 25 mins". P = {virus (0.5h, isExplicit, NOT short)}, S = {cleanup} (speed hint, no explicit duration → still goes through F with isShort but no isExplicit), F = {security, cleanup, plus 2 others}. floatingHours = 1.5. cleanup pinned at 0.25h via short rule. remaining = 1.25 across 3 floating non-short. subBase = 0.25, subLeftover = 0.5 → security gets +0.5 → 0.75. Final: virus 0.5 (isExplicit) / cleanup 0.25 (isShort) / security 0.75 / others 0.25 / 0.25.
 - 1.75h across 2 tasks ("Set up new laptop with OneDrive + M365 apps" + "Fixed account sign-in for Windows/Edge/M365 business"): no explicit durations. P = {}, F = 2. subBase = 0.75, subLeftover = 0.25. Rung 2 fires on the "Set up new laptop" task so it gets +0.25. Final: 1.0 / 0.75 (NOT 0.75 / 1.0).
-- 0.5h across 2 tasks ("Removed scareware with Malwarebytes" + "BIOS update quickly"): "quickly" puts BIOS in SHORT via the speed-hint rule, scareware in F. BIOS = 0.25 (isShort), remaining = 0.25, scareware = 0.25. Final: 0.25 / 0.25 with isShort false / true. isExplicit: false / false.
+- 0.5h across 2 tasks ("Removed scareware with Malwarebytes" + "BIOS update quickly", emitted as action "Firmware update"): "quickly" puts the firmware update in SHORT via the speed-hint rule, scareware in F. Firmware update = 0.25 (isShort), remaining = 0.25, scareware = 0.25. Final: 0.25 / 0.25 with isShort false / true. isExplicit: false / false.
 - SLACK example: 1h job, 3 tasks: "factory reset (10 mins)", "training", "transferred files (20 mins)". P = {factory reset (0.25h, isExplicit + isShort), file transfer (0.5h since ceil(20/15)*15 = 30, isExplicit)}. F = {training}. floatingHours = 1.0 - 0.25 - 0.5 = 0.25. Training = 0.25. Final: 0.25 / 0.25 / 0.5. Sum check OK. If totalHours had been 0.75h instead, floatingHours = 0 with training still in F — apply SLACK: shave 5 min off file transfer (0.5 → 0.42, then re-ceil to 0.5 since the +/-5 min cannot cross the 0.25h step) ... in practice this means accepting one of: drop the floating training task (it had no time), or push file transfer down to 0.25h if the stated 20 mins was loose. Use judgement; emit a warning when you used SLACK.
 
 qty is ALWAYS decimal hours. qty=1 means exactly 1 hour, never "1 occurrence".
@@ -160,6 +162,7 @@ The SERVER computes unitPrice from these labels - DO NOT compute it yourself, ju
 Modifier triggers (apply a trigger only when a matching label exists in the Available modifier labels list):
 - "At home": WORK was done at Harrison's home, alone, no screen-share. Triggers: phrases that clearly mean Harrison's location, like "I worked from home", "did this at home", "I was at home for this", "took the laptop home". STRONG OVERRIDE: if the description includes a destination address ("Meola Road", "their place", "123 Smith St", a suburb name) OR a travel verb where Harrison is the subject ("drove to", "walked to", "biked to", "took the bus to") → Harrison went to the client. Do NOT apply At home, even if "at home" appears elsewhere in the description (it's almost certainly describing the customer's context, not Harrison's). Add a warning when "at home" was present but overridden.
 - "Remote": client on-screen via screen share. Triggers: "remote", "TeamViewer", "AnyDesk", "screen share", "remote access", "remote desktop", client watching/guiding.
+- "Phone": the work was delivered over a phone call, no screen share. Triggers: "phone call", "over the phone", "called them", "rang the client" when that task was done via the call rather than in person. A call made to a third party (ISP, vendor) while already on-site with the client stays on-site - no Phone. If no Phone label exists in the Available modifier labels list, use "Remote" for phone-delivered work instead.
 - "Research": time spent figuring out / investigating an unfamiliar problem, not direct delivery. Triggers: "researched", "had to look up", "figured out how to", "spent time investigating", "wasn't sure so I read up on", "learned how to", "had to work out", "looked into". Apply to the SPECIFIC task that was research-heavy, not the whole job - if Harrison researched an obscure printer driver for 90 min and then spent 30 min installing it, only the 90-min research task gets Research. Stacks freely with location modifiers (At home, Remote). For job-wide "flat $50 for the research" cases the operator picks a flat-rate row at review - do NOT try to guess flat-vs-hourly. Emit a Research-type label ONLY if one is present in the Available modifier labels list; if none exists, do not invent one - just bill the research time as normal task time.
 
 Customer-context phrases that DO NOT trigger At home (the customer is describing where THEY use the device, not where Harrison worked):
@@ -169,11 +172,13 @@ Customer-context phrases that DO NOT trigger At home (the customer is describing
 - "across multiple devices at home"
 Treat these as descriptive context, not a location signal for billing.
 
-Stacking: combine triggers freely - e.g. on-site regular → []; research at home → ["At home", "Research"]; remote research → ["Remote", "Research"].
+Stacking: "Research" stacks with any delivery label - e.g. research at home → ["At home", "Research"]; remote research → ["Remote", "Research"]. But "At home", "Remote", and "Phone" are MUTUALLY EXCLUSIVE - each task has exactly ONE delivery channel, never two. A phone call that escalated into a screen-share session becomes TWO tasks: split the stated time 50/50 between a ["Phone"] task and a ["Remote"] task (both pinned when the total was stated), unless the description gives the actual portions ("10 minutes on the phone then 30 remote") - then use those. NEVER emit ["Phone", "Remote"] on one task.
 
 Mixed jobs: different tasks in the same job CAN and SHOULD have different modifier sets if their context differs. Examples:
 - At-home job with a Windows reinstall (At home) and an obscure driver Harrison had to research (At home + Research) → task A modifierLabels ["At home"], task B modifierLabels ["At home", "Research"].
 - On-site job where Harrison researched an obscure printer driver before installing it → research task modifierLabels ["Research"], install task modifierLabels [].
+- On-site visit followed by "then a 42 min phone call fixing their email" → the on-site tasks get [], the phone-call task gets ["Phone"] (it was delivered by phone, after the visit ended).
+- "42-minute phone call, which turned into a remote job halfway through, fixing X" → TWO tasks splitting the stated time in half, both pinned (isExplicit): details "X, over the phone" 21 min with ["Phone"] and details "X, remote session" 21 min with ["Remote"] (customer-friendly channel suffixes - never "portion"). Round BOTH halves identically on the live step (21 min at a 5-min step → 0.35h EACH; at a 15-min step → 0.5h each) - the two halves of an even split must never end up with different quantities. Never ["Phone", "Remote"] on one task. When the call happened after the stated session ("Then a 42-minute call..."), its 42 minutes ADD to durationMins and outOfSessionMins per BILLING rule 1 - the on-site tasks keep the full window.
 
 If location/rate signals conflict, do NOT silently pick - add a warning describing the conflict and state which you assumed.
 
@@ -215,6 +220,7 @@ OTHER RULES:
   - Car/vehicle or public transport, with stated km: set statedDistanceKm to the round-trip total, noTravelCharge to false.
   - Car/vehicle or public transport, without stated km but with a destination: set statedDistanceKm to null, noTravelCharge to false (the route looks up the driving route via API and charges it - travel bills the same regardless of how the operator actually got there).
 - noTravelCharge: true ONLY if the user traveled by foot or bicycle (assumed a local job, no travel charge). false for all car/vehicle and public transport travel, and when travel mode is unspecified.
+- travelCosts[]: out-of-pocket travel disbursements the operator states with a dollar amount - parking, road tolls, ferry fares ("Parking cost me $4" → { "label": "Parking", "cost": 4 }; "$2.30 toll each way" → { "label": "Tolls", "cost": 4.6 }). Pass the stated amount through at cost; these are NOT tasks, NOT parts, and never affect drive time. Empty array when none are stated.
 - Ignore dates and client names.
 
 CLARIFICATION MODE:
@@ -236,6 +242,7 @@ Clarify response shape (use instead of the normal shape when blocked):
 Return this exact JSON shape (when not asking for clarification):
 {
   "durationMins": number | null,
+  "outOfSessionMins": number,
   "startTime": string | null,
   "endTime": string | null,
   "hourlyRateId": null,
@@ -260,7 +267,10 @@ Return this exact JSON shape (when not asking for clarification):
   "warnings": string[],
   "destination": string | null,
   "statedDistanceKm": number | null,
-  "noTravelCharge": boolean
+  "noTravelCharge": boolean,
+  "travelCosts": [
+    { "label": string, "cost": number }
+  ]
 }`;
 }
 

@@ -6,9 +6,11 @@
  * the rate does not exist.
  */
 
+import { RATE_CONFIG_TAG } from "@/features/business/lib/pricing-policy.server";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
+import { revalidateTag } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
@@ -61,6 +63,8 @@ export async function PATCH(
         data: { isDefault: false },
       });
     }
+    // Next 16's revalidateTag requires a second CacheLifeConfig arg.
+    revalidateTag(RATE_CONFIG_TAG, {});
     return NextResponse.json({ ok: true, rate });
   } catch {
     return errorResponse("Rate not found", 404);
@@ -90,6 +94,8 @@ export async function DELETE(
 
   try {
     await prisma.rateConfig.delete({ where: { id } });
+    // Next 16's revalidateTag requires a second CacheLifeConfig arg.
+    revalidateTag(RATE_CONFIG_TAG, {});
     return NextResponse.json({ ok: true });
   } catch {
     return errorResponse("Rate not found", 404);

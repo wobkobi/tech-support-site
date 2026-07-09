@@ -56,8 +56,10 @@ export async function fetchQuickEstimate(input: QuickEstimateInput): Promise<Qui
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ destination: dest }),
-        }).then((r) => r.json() as Promise<{ durationMins?: number }>)
-      : Promise.resolve({ durationMins: 0 }),
+        }).then(
+          (r) => r.json() as Promise<{ durationMinsThere?: number; durationMinsBack?: number }>,
+        )
+      : Promise.resolve({ durationMinsThere: 0, durationMinsBack: 0 }),
     fetch("/api/pricing/estimate-duration", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -79,11 +81,19 @@ export async function fetchQuickEstimate(input: QuickEstimateInput): Promise<Qui
   const rates: PublicRate[] = ratesRes.status === "fulfilled" ? (ratesRes.value.rates ?? []) : [];
   const promo: ActivePromo | null =
     promoRes.status === "fulfilled" ? (promoRes.value.promo ?? null) : null;
+  // Both legs quoted at "now"-ish traffic (no job time exists here; the
+  // server defaults the return to +60 min, matching the fallback duration).
   const travelMins =
     meeting === "remote"
       ? 0
       : travelRes.status === "fulfilled"
-        ? (travelRes.value.durationMins ?? 0)
+        ? (travelRes.value.durationMinsThere ?? 0)
+        : 0;
+  const travelMinsBack =
+    meeting === "remote"
+      ? 0
+      : travelRes.status === "fulfilled"
+        ? (travelRes.value.durationMinsBack ?? travelMins)
         : 0;
 
   // Resolve the live base + remote delta regardless of the AI duration call's
@@ -112,7 +122,7 @@ export async function fetchQuickEstimate(input: QuickEstimateInput): Promise<Qui
   const promoRate = applyPromoToHourlyRate(fullRate, promo);
   const effectiveMins = Math.max(minBillableMins, estimatedMins);
   const band = priceRangeFor(effectiveMins, promoRate, confidence, estimatorRange);
-  const travel = calcTravelCharge(travelMins, travelRatePerHour, minTravelCharge);
+  const travel = calcTravelCharge(travelMins, travelMinsBack, travelRatePerHour, minTravelCharge);
   const low = band.low + travel;
   const high = band.high + travel;
 
@@ -129,6 +139,7 @@ export async function fetchQuickEstimate(input: QuickEstimateInput): Promise<Qui
         aiTasks: tasks,
         address: dest || null,
         travelMins,
+        travelMinsBack,
         meetingType: meeting === "in-person" ? "in_person" : "remote",
         hourlyRate: promoRate,
         priceLow: low,
