@@ -78,6 +78,17 @@ function getResend(): Resend {
 }
 
 /**
+ * Names the given email env vars that are unset or blank, so a "not configured"
+ * skip log says exactly which var to fix. The email layer deliberately skips
+ * (never throws) when unconfigured; this only makes the cause visible.
+ * @param names - Env var names the calling send path needs.
+ * @returns Comma-joined list of the blank vars.
+ */
+function missingEmailEnv(...names: string[]): string {
+  return names.filter((n) => !process.env[n]?.trim()).join(", ");
+}
+
+/**
  * Review data used for owner notification emails.
  */
 export interface ReviewNotificationData {
@@ -107,7 +118,9 @@ export async function sendOwnerReviewNotification(review: ReviewNotificationData
   const siteUrl = getSiteUrl();
 
   if (!adminEmail || !from || !process.env.RESEND_API_KEY) {
-    console.warn("[email] Resend not configured - skipping owner notification.");
+    console.warn(
+      `[email] Not configured (${missingEmailEnv("ADMIN_EMAIL", "EMAIL_FROM", "RESEND_API_KEY")}) - skipping owner notification.`,
+    );
     return;
   }
 
@@ -195,7 +208,9 @@ export async function sendOwnerBookingNotification(
   const from = process.env.EMAIL_FROM;
 
   if (!adminEmail || !from || !process.env.RESEND_API_KEY) {
-    console.warn("[email] Resend not configured - skipping owner booking notification.");
+    console.warn(
+      `[email] Not configured (${missingEmailEnv("ADMIN_EMAIL", "EMAIL_FROM", "RESEND_API_KEY")}) - skipping owner booking notification.`,
+    );
     return;
   }
 
@@ -269,7 +284,9 @@ export async function sendCustomerBookingConfirmation(
   const siteUrl = getSiteUrl();
 
   if (!from || !process.env.RESEND_API_KEY) {
-    console.warn("[email] Resend not configured - skipping customer booking confirmation.");
+    console.warn(
+      `[email] Not configured (${missingEmailEnv("EMAIL_FROM", "RESEND_API_KEY")}) - skipping customer booking confirmation.`,
+    );
     return;
   }
 
@@ -360,7 +377,9 @@ export async function sendBookingReminderEmail(booking: BookingNotificationData)
   const siteUrl = getSiteUrl();
 
   if (!from || !process.env.RESEND_API_KEY) {
-    console.warn("[email] Resend not configured - skipping booking reminder email.");
+    console.warn(
+      `[email] Not configured (${missingEmailEnv("EMAIL_FROM", "RESEND_API_KEY")}) - skipping booking reminder email.`,
+    );
     return false;
   }
 
@@ -450,7 +469,9 @@ export async function sendCustomerReviewRequest(booking: ReviewRequestData): Pro
   const siteUrl = getSiteUrl();
 
   if (!from || !process.env.RESEND_API_KEY) {
-    console.warn("[email] Resend not configured - skipping customer review request.");
+    console.warn(
+      `[email] Not configured (${missingEmailEnv("EMAIL_FROM", "RESEND_API_KEY")}) - skipping customer review request.`,
+    );
     return true;
   }
 
@@ -537,7 +558,9 @@ export async function sendPastClientReviewRequest(booking: ReviewRequestData): P
   const siteUrl = getSiteUrl();
 
   if (!from || !process.env.RESEND_API_KEY) {
-    console.warn("[email] Resend not configured - skipping past client review request.");
+    console.warn(
+      `[email] Not configured (${missingEmailEnv("EMAIL_FROM", "RESEND_API_KEY")}) - skipping past client review request.`,
+    );
     return true;
   }
 
@@ -690,7 +713,9 @@ export async function sendInvoiceEmail({
 }: SendInvoiceEmailArgs): Promise<boolean> {
   const from = process.env.EMAIL_FROM;
   if (!from || !process.env.RESEND_API_KEY) {
-    console.warn("[email] Resend not configured - skipping invoice email.");
+    console.warn(
+      `[email] Not configured (${missingEmailEnv("EMAIL_FROM", "RESEND_API_KEY")}) - skipping invoice email.`,
+    );
     return false;
   }
   if (!invoice.clientEmail) {
@@ -812,7 +837,9 @@ export async function sendVoidNotification({
 }: SendVoidNotificationArgs): Promise<boolean> {
   const from = process.env.EMAIL_FROM;
   if (!from || !process.env.RESEND_API_KEY) {
-    console.warn("[email] Resend not configured - skipping void notification.");
+    console.warn(
+      `[email] Not configured (${missingEmailEnv("EMAIL_FROM", "RESEND_API_KEY")}) - skipping void notification.`,
+    );
     return false;
   }
   if (!invoice.clientEmail) {

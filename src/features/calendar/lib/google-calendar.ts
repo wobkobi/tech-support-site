@@ -6,6 +6,7 @@
 import { google, type calendar_v3 } from "googleapis";
 import { unstable_cache } from "next/cache";
 
+import { requireEnv } from "@/shared/lib/env";
 import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 
 /**
@@ -48,14 +49,13 @@ function fetchAccessibleCalendarIds(): string[] {
  * @returns Authenticated OAuth2 client
  */
 export function getOAuth2Client(): InstanceType<typeof google.auth.OAuth2> {
-  const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
-  const redirectUri = process.env.GOOGLE_OAUTH_REDIRECT_URI;
-  const refreshToken = process.env.GOOGLE_OAUTH_REFRESH_TOKEN;
-
-  if (!clientId || !clientSecret || !redirectUri || !refreshToken) {
-    throw new Error("Missing Google OAuth credentials in environment variables");
-  }
+  // Per-var named asserts (non-empty) so a blanked credential - e.g. an
+  // unescaped $ swallowed by dotenv-expand - fails with the offending var name
+  // instead of a generic "missing credentials". Matches the env-layer convention.
+  const clientId = requireEnv("GOOGLE_OAUTH_CLIENT_ID");
+  const clientSecret = requireEnv("GOOGLE_OAUTH_CLIENT_SECRET");
+  const redirectUri = requireEnv("GOOGLE_OAUTH_REDIRECT_URI");
+  const refreshToken = requireEnv("GOOGLE_OAUTH_REFRESH_TOKEN");
 
   const oauth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
   oauth2Client.setCredentials({ refresh_token: refreshToken });

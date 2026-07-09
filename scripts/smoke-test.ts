@@ -7,6 +7,13 @@
  *   npx tsx scripts/smoke-test.ts              # build > start > test
  *   npx tsx scripts/smoke-test.ts --skip-build # start > test (reuse existing .next)
  *   npx tsx scripts/smoke-test.ts --port=3001
+ *   npx tsx scripts/smoke-test.ts --url=https://deploy.example.com  # test a deployed
+ *                                              # URL (no local build/server)
+ *
+ * Remote (--url) auth: reads ADMIN_SECRET (must match the DEPLOYED environment's
+ * value) for admin pages and VERCEL_AUTOMATION_BYPASS_SECRET for the Deployment
+ * Protection wall. Both are sent ONLY to the deployment origin via request
+ * interception, never to third-party hosts (maps, fonts, the Meta pixel).
  *
  * Exit codes:
  *   0  all pages loaded without errors
@@ -40,6 +47,22 @@ interface PageSpec {
   isAdmin?: boolean;
 }
 
+/**
+ * Auth context when testing a deployed URL (`--url`). Headers here are attached
+ * ONLY to requests whose origin matches {@link RemoteAuth.origin}, via request
+ * interception, so the admin secret never leaks to third-party hosts.
+ */
+interface RemoteAuth {
+  /** Deployment base URL (trailing slash stripped). */
+  baseUrl: string;
+  /** Deployment origin (scheme + host) that auth headers are scoped to. */
+  origin: string;
+  /** Admin secret matching the deployed environment; attached to admin specs only. */
+  adminSecret: string | null;
+  /** Vercel "Protection Bypass for Automation" secret; attached to every origin request. */
+  bypassSecret: string | null;
+}
+
 /* --------------------------------------------------------------- constants */
 
 /**
@@ -58,11 +81,6 @@ const PAGE_OVERRIDES: Record<string, { name?: string; ignoreErrors?: string[] }>
   "/poster": { name: "Poster (marketing print)" },
   "/admin": { name: "Admin Dashboard" },
   "/admin/business": { name: "Admin Business Overview" },
-  "/admin/business/invoices/new": {
-    name: "Admin New Invoice",
-    // Client immediately fetches invoice counter; sheet API may 4xx locally.
-    ignoreErrors: ["invoice-counter"],
-  },
   "/admin/business/calculator": {
     name: "Admin Calculator",
     // Maps API key restrictions can 4xx locally; legacy widget also logs a
@@ -212,19 +230,25 @@ function getFreePort(): Promise<number> {
 /**
  * Parses `--flag` and `--flag=value` CLI arguments.
  * @returns Parsed flags. `port` is `null` when not specified - caller should
- *   call {@link getFreePort} to pick an available port automatically.
+ *   call {@link getFreePort} to pick an available port automatically. `url` is
+ *   the deployed target for remote mode (accepts `--url=X` or `--url X`), or
+ *   `null` for the local build+server run.
  */
-function parseArgs(): { skipBuild: boolean; port: number | null } {
+function parseArgs(): { skipBuild: boolean; port: number | null; url: string | null } {
   const args = process.argv.slice(2);
   let skipBuild = false;
   let port: number | null = null;
+  let url: string | null = null;
 
-  for (const arg of args) {
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
     if (arg === "--skip-build") skipBuild = true;
     else if (arg.startsWith("--port=")) port = parseInt(arg.slice(7), 10);
+    else if (arg.startsWith("--url=")) url = arg.slice(6);
+    else if (arg === "--url") url = args[++i] ?? null;
   }
 
-  return { skipBuild, port };
+  return { skipBuild, port, url };
 }
 
 /**
@@ -309,23 +333,66 @@ async function waitForServer(port: number, timeoutMs = 30_000): Promise<void> {
 }
 
 /**
+ * Whether a request URL shares an origin (scheme + host + port) with the given
+ * deployment origin. Used to scope auth headers so they never ride along on
+ * cross-origin requests (maps, fonts, the Meta pixel).
+ * @param requestUrl - The outgoing request URL.
+ * @param origin - The deployment origin to match against.
+ * @returns True when the origins match.
+ */
+function isSameOrigin(requestUrl: string, origin: string): boolean {
+  try {
+    return new URL(requestUrl).origin === origin;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Visits a page with Puppeteer, collecting timing metrics and console errors.
  * @param browser - Puppeteer browser instance.
  * @param baseUrl - Server base URL.
  * @param spec - Page specification.
+ * @param remote - Remote-deployment auth context, or null for the local server.
  * @returns Result for the page.
  */
-async function checkPage(browser: Browser, baseUrl: string, spec: PageSpec): Promise<PageResult> {
+async function checkPage(
+  browser: Browser,
+  baseUrl: string,
+  spec: PageSpec,
+  remote: RemoteAuth | null,
+): Promise<PageResult> {
   const url = `${baseUrl}${spec.path}`;
   const errors: string[] = [];
 
   const page = await browser.newPage();
 
   try {
-    // Admin pages: the proxy redirects unauthenticated /admin/* to /admin/login,
-    // so attach the X-Admin-Secret header (still accepted by isAdminRequest
-    // alongside the cookie path) before navigation.
-    if (spec.isAdmin) {
+    if (remote) {
+      // Remote deployment: scope auth + Vercel protection-bypass headers to the
+      // deployment origin via request interception, so the admin secret is
+      // never sent to third-party hosts (maps, fonts, the Meta pixel). The
+      // bypass header rides EVERY origin request (public pages sit behind the
+      // SSO wall too); the admin secret only rides admin specs.
+      await page.setRequestInterception(true);
+      page.on("request", (req) => {
+        const headers = { ...req.headers() };
+        if (isSameOrigin(req.url(), remote.origin)) {
+          if (remote.bypassSecret) {
+            headers["x-vercel-protection-bypass"] = remote.bypassSecret;
+            headers["x-vercel-set-bypass-cookie"] = "true";
+          }
+          if (spec.isAdmin && remote.adminSecret) {
+            headers["x-admin-secret"] = remote.adminSecret;
+          }
+        }
+        // Request already handled/aborted (redirects can race) - ignore.
+        void req.continue({ headers }).catch(() => undefined);
+      });
+    } else if (spec.isAdmin) {
+      // Local server (single origin): the proxy redirects unauthenticated
+      // /admin/* to /admin/login, so attach the X-Admin-Secret header (accepted
+      // by isAdminRequest alongside the cookie path) before navigation.
       const secret = process.env.ADMIN_SECRET;
       if (secret) await page.setExtraHTTPHeaders({ "x-admin-secret": secret });
     }
@@ -459,27 +526,44 @@ function printTable(results: PageResult[]): void {
 /* ------------------------------------------------------------------ main */
 
 (async () => {
-  const { skipBuild, port: rawPort } = parseArgs();
-  const port = rawPort ?? (await getFreePort());
-  const baseUrl = `http://localhost:${port}`;
+  const { skipBuild, port: rawPort, url } = parseArgs();
+
+  // Remote mode: test a deployed URL, skipping the local build + server. Auth
+  // and protection-bypass secrets come from the environment and are scoped to
+  // the deployment origin inside checkPage.
+  const remote: RemoteAuth | null = url
+    ? {
+        baseUrl: url.replace(/\/$/, ""),
+        origin: new URL(url).origin,
+        adminSecret: process.env.ADMIN_SECRET ?? null,
+        bypassSecret: process.env.VERCEL_AUTOMATION_BYPASS_SECRET ?? null,
+      }
+    : null;
+
+  const port = remote ? 0 : (rawPort ?? (await getFreePort()));
+  const baseUrl = remote ? remote.baseUrl : `http://localhost:${port}`;
   let server: ChildProcess | null = null;
   let browser: Browser | null = null;
   let exitCode = 0;
 
   try {
-    // Build and prepare the standalone output
-    if (!skipBuild) runBuild();
-    copyStandaloneAssets();
+    if (remote) {
+      console.log(`▶ Remote target: ${baseUrl}\n`);
+    } else {
+      // Build and prepare the standalone output
+      if (!skipBuild) runBuild();
+      copyStandaloneAssets();
 
-    // Start the server and wait for readiness
-    server = startServer(port);
+      // Start the server and wait for readiness
+      server = startServer(port);
 
-    server.stderr?.on("data", (chunk: Buffer) => {
-      const line = chunk.toString().trim();
-      if (line) process.stderr.write(`  [server] ${line}\n`);
-    });
+      server.stderr?.on("data", (chunk: Buffer) => {
+        const line = chunk.toString().trim();
+        if (line) process.stderr.write(`  [server] ${line}\n`);
+      });
 
-    await waitForServer(port);
+      await waitForServer(port);
+    }
 
     // Launch the browser
     browser = await puppeteer.launch({
@@ -512,7 +596,7 @@ function printTable(results: PageResult[]): void {
 
     for (const spec of allPages) {
       process.stdout.write(`  Loading ${spec.path}…`);
-      const result = await checkPage(browser, baseUrl, spec);
+      const result = await checkPage(browser, baseUrl, spec, remote);
       results.push(result);
       const icon = result.status === "pass" ? "✓" : "✗";
       // \x1b[2K clears the entire line so the new (shorter) line doesn't leave
