@@ -1,21 +1,15 @@
 "use client";
 // src/features/business/components/calculator/JobDetailsSection.tsx
 /**
- * @description Time + hourly-rate card. Multiple Start/End slots sum into one
- * Labour line, with {@link slotIssue} flagging zero-length or cross-midnight
- * slots. A manual duration override wins over the slot sum, and a billed-
- * rounding hint shows only when a charging rate is selected.
+ * @description Time card. Multiple Start/End slots sum into the billable
+ * window, with {@link slotIssue} flagging zero-length or cross-midnight slots.
+ * A follow-up minutes field adds work done outside the slots (a call after the
+ * visit, a remote fix later) on top of the slot sum.
  */
-import {
-  billableMins,
-  formatNZD,
-  minsToHoursLabel,
-  timeDiffMins,
-} from "@/features/business/lib/business";
-import type { ParsedRange, RateConfig } from "@/features/business/types/business";
+import { minsToHoursLabel, timeDiffMins } from "@/features/business/lib/business";
+import type { ParsedRange } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
-import { FaCaretRight } from "react-icons/fa6";
 
 /** Inline warning shown under a slot whose Start/End look off. */
 interface SlotIssue {
@@ -51,68 +45,46 @@ function slotIssue(range: ParsedRange): SlotIssue | null {
 interface Props {
   timeRanges: ParsedRange[];
   onTimeRangesChange: (next: ParsedRange[]) => void;
-  /** Operator-entered override; null means "sum of timeRanges". */
-  durationMinsOverride: number | null;
-  onDurationOverrideChange: (next: number | null) => void;
-  /** Live billable minutes (override OR sum of slots). */
+  /** Minutes of billable work done outside the slots; added to the slot sum. */
+  followUpMins: number;
+  onFollowUpMinsChange: (next: number) => void;
+  /** Live billable minutes (slot sum + follow-up). */
   durationMins: number;
-  hourlyRateId: string | null;
-  onHourlyRateIdChange: (id: string | null) => void;
-  baseRates: RateConfig[];
-  /** Billing increment (live pricing setting) used for the "billed" rounding hint. */
-  billingIncrementMins: number;
 }
 
 /**
- * Time + hourly-rate card. Multiple Start/End slots sum into a single Labour
- * line; a manual duration override wins over the slot sum when set.
+ * Time card. Multiple Start/End slots sum into the billable window; the
+ * follow-up field adds out-of-session minutes (a call after the visit) on top.
  * @param props - Component props.
  * @param props.timeRanges - Time slots (always at least one).
  * @param props.onTimeRangesChange - Replaces the slots array.
- * @param props.durationMinsOverride - Manual override; null means "use slot sum".
- * @param props.onDurationOverrideChange - Sets or clears the override.
- * @param props.durationMins - Live billable minutes (override or slot sum).
- * @param props.hourlyRateId - Selected base hourly rate id.
- * @param props.onHourlyRateIdChange - Picks a different base hourly rate.
- * @param props.baseRates - Available base hourly rates.
- * @param props.billingIncrementMins - Billing increment (live pricing setting).
- * @returns Time/rate card element.
+ * @param props.followUpMins - Out-of-session minutes added to the slot sum.
+ * @param props.onFollowUpMinsChange - Sets the follow-up minutes.
+ * @param props.durationMins - Live billable minutes (slot sum + follow-up).
+ * @returns Time card element.
  */
 export function JobDetailsSection({
   timeRanges,
   onTimeRangesChange,
-  durationMinsOverride,
-  onDurationOverrideChange,
+  followUpMins,
+  onFollowUpMinsChange,
   durationMins,
-  hourlyRateId,
-  onHourlyRateIdChange,
-  baseRates,
-  billingIncrementMins,
 }: Props): React.ReactElement {
   const sumRangesMin = timeRanges.reduce((s, r) => s + timeDiffMins(r.startTime, r.endTime), 0);
-  // Mirror TotalsPanel's "Time" row visibility - only flag the rounded "billed"
-  // figure when the duration is actually being charged. With no rate selected
-  // (or a zero rate) durationMins is just bookkeeping, so the hint is noise.
-  const selectedRate = baseRates.find((r) => r.id === hourlyRateId);
-  const chargingDuration = selectedRate?.ratePerHour != null && selectedRate.ratePerHour > 0;
 
   /**
-   * Updates one slot's start or end time. Clears any duration override so the
-   * Duration field reflects the new sum until the operator explicitly types
-   * one in.
+   * Updates one slot's start or end time.
    * @param index - Slot index.
    * @param patch - Partial slot fields to merge.
    */
   function patchRange(index: number, patch: Partial<ParsedRange>): void {
     onTimeRangesChange(timeRanges.map((r, i) => (i === index ? { ...r, ...patch } : r)));
-    onDurationOverrideChange(null);
   }
 
   /** Appends a slot; rolling entry seeds its start from the previous slot's end. */
   function addRange(): void {
     const prevEnd = timeRanges[timeRanges.length - 1]?.endTime ?? "";
     onTimeRangesChange([...timeRanges, { startTime: prevEnd, endTime: "" }]);
-    onDurationOverrideChange(null);
   }
 
   /**
@@ -123,7 +95,6 @@ export function JobDetailsSection({
   function removeRange(index: number): void {
     if (timeRanges.length <= 1) return;
     onTimeRangesChange(timeRanges.filter((_, i) => i !== index));
-    onDurationOverrideChange(null);
   }
 
   const multi = timeRanges.length > 1;
@@ -201,53 +172,35 @@ export function JobDetailsSection({
       </div>
 
       <div>
-        <label className="mb-1 block text-xs font-medium text-slate-500">Duration (override)</label>
+        <label htmlFor="follow-up-mins" className="mb-1 block text-xs font-medium text-slate-500">
+          Follow-up time (mins)
+        </label>
         <input
+          id="follow-up-mins"
           type="number"
           min="0"
           step="5"
-          value={durationMinsOverride ?? durationMins}
+          inputMode="numeric"
+          value={followUpMins === 0 ? "" : followUpMins}
           onChange={(e) => {
-            // Blank/NaN clears the override so the Duration reverts to the slot
-            // sum instead of collapsing to 0 (which would drop the Labour line).
+            // Blank/NaN clears back to 0 so the duration reverts to the slot sum.
             const v = parseInt(e.target.value, 10);
-            onDurationOverrideChange(Number.isNaN(v) ? null : v);
+            onFollowUpMinsChange(Number.isNaN(v) || v < 0 ? 0 : v);
           }}
+          placeholder="0"
           className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
         />
         <p className="mt-1 text-xs text-slate-400">
-          {minsToHoursLabel(durationMins)}
-          {chargingDuration &&
-            billableMins(durationMins, billingIncrementMins) !== durationMins && (
-              <span className="ml-1 inline-flex items-center gap-1 text-slate-300">
-                <FaCaretRight className="h-3 w-3" aria-hidden />
-                {minsToHoursLabel(billableMins(durationMins, billingIncrementMins))} billed
-              </span>
-            )}
-          {durationMinsOverride != null &&
-            durationMinsOverride !== sumRangesMin &&
-            sumRangesMin > 0 && (
-              <span className="ml-1 text-slate-300 italic">
-                (slots sum {minsToHoursLabel(sumRangesMin)})
-              </span>
-            )}
+          Work done outside the slots - a call after the visit, a remote fix later.
         </p>
-      </div>
-
-      <div>
-        <label className="mb-1 block text-xs font-medium text-slate-500">Hourly rate</label>
-        <select
-          value={hourlyRateId ?? ""}
-          onChange={(e) => onHourlyRateIdChange(e.target.value || null)}
-          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
-        >
-          <option value="">None</option>
-          {baseRates.map((r) => (
-            <option key={r.id} value={r.id}>
-              {r.label} ({formatNZD(r.ratePerHour ?? 0)}/hr)
-            </option>
-          ))}
-        </select>
+        <p className="mt-1 text-xs text-slate-400">
+          Total {minsToHoursLabel(durationMins)}
+          {followUpMins > 0 && sumRangesMin > 0 && (
+            <span className="ml-1 text-slate-300 italic">
+              (slots {minsToHoursLabel(sumRangesMin)} + follow-up {minsToHoursLabel(followUpMins)})
+            </span>
+          )}
+        </p>
       </div>
     </div>
   );

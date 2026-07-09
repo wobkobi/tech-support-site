@@ -168,6 +168,42 @@ function calcSessionMins(input: string): number | null {
 }
 
 /**
+ * Retired tag spellings the model can still emit (from older prompt wording or
+ * its own paraphrasing), mapped to their canonical replacement in the template
+ * taxonomy. Matched case-insensitively.
+ */
+const TAG_ALIASES: Record<string, string> = {
+  transfer: "Data Transfer",
+  security: "Privacy & Security",
+  "privacy configuration": "Privacy & Security",
+  "cloud storage": "Cloud Service",
+  "bios update": "Firmware Update",
+  "bluetooth & radio setup": "Setup",
+  tv: "TV",
+  "desktop / pc": "Desktop / PC",
+};
+
+/**
+ * Canonicalises one AI-emitted tag: retired spellings map through
+ * {@link TAG_ALIASES}, then any case-variant of a tag already in the template
+ * taxonomy snaps to the stored casing so near-duplicates ("Virus removal" vs
+ * "Virus Removal") can't split the taxonomy or the price memory. Unknown tags
+ * pass through trimmed - the vocabulary stays open.
+ * @param tag - Device or action tag from the AI.
+ * @param known - Lowercased tag > stored casing, built from the templates.
+ * @returns Canonical tag, or null when the input was empty.
+ */
+function canonicaliseTag(
+  tag: string | null | undefined,
+  known: Map<string, string>,
+): string | null {
+  const trimmed = tag?.trim();
+  if (!trimmed) return null;
+  const aliased = TAG_ALIASES[trimmed.toLowerCase()] ?? trimmed;
+  return known.get(aliased.toLowerCase()) ?? aliased;
+}
+
+/**
  * Snaps AI device/action tags to the canonical template by exact match.
  * @param device - Device tag from the AI.
  * @param action - Action tag from the AI.
@@ -363,6 +399,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       // since-renamed modifier, or a hallucinated label). Collected so the
       // operator gets a warning instead of the modifier silently vanishing.
       const unresolvedModifierLabels = new Set<string>();
+      // Known-tag maps (lowercased > stored casing) for canonicaliseTag, so
+      // emitted case-variants land on the taxonomy's existing spelling.
+      const knownDevices = new Map(
+        templates.flatMap((t): [string, string][] =>
+          t.device ? [[t.device.toLowerCase(), t.device]] : [],
+        ),
+      );
+      const knownActions = new Map(
+        templates.flatMap((t): [string, string][] =>
+          t.action ? [[t.action.toLowerCase(), t.action]] : [],
+        ),
+      );
       parsed.tasks = parsed.tasks.map((task) => {
         const t = task as typeof task & {
           action?: string | null;
@@ -372,9 +420,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           modifierLabels?: string[];
           isShort?: boolean;
         };
-        const snap = findTemplateByTags(t.device, t.action, templates);
-        const device = snap?.device ?? t.device ?? null;
-        const action = snap?.action ?? t.action ?? null;
+        // Canonicalise BEFORE the template snap so a retired spelling
+        // ("Transfer") still finds its template ("Data Transfer") and its
+        // remembered price.
+        const device = canonicaliseTag(t.device, knownDevices);
+        const action = canonicaliseTag(t.action, knownActions);
+        const snap = findTemplateByTags(device, action, templates);
         // Billing signals must not print on the invoice line. The prompt
         // forbids them in details, but the model still echoes speed hints
         // ("quick") from inputs like "(quick)" - strip them deterministically

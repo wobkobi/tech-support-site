@@ -25,7 +25,6 @@ import {
   effectiveHourlyRate,
   hourlyTaskMinutes,
   jobToLineItems,
-  matchRateById,
   timeDiffMins,
   todayISO,
   type JobPricing,
@@ -112,7 +111,7 @@ function jobStartIsoFromTime(hhmm: string): string | null {
  * localStorage key for the calculator draft. Bump the version suffix when
  * CalculatorDraft fields change so stale shapes can't crash the form.
  */
-const DRAFT_KEY = "calculator-draft-v1";
+const DRAFT_KEY = "calculator-draft-v2";
 
 /**
  * Subset of CalculatorView state worth persisting across refreshes. Excludes
@@ -121,18 +120,15 @@ const DRAFT_KEY = "calculator-draft-v1";
  * session. The "Describe the job" input text itself IS persisted (`aiInput`).
  */
 interface CalculatorDraft {
-  v: 1;
+  v: 2;
   savedAt: number;
-  /**
-   * The "Describe the job" textarea text. Additive field: older v1 drafts saved
-   * before this existed simply lack it and default to "" on load (safe, no bump).
-   */
+  /** The "Describe the job" textarea text. */
   aiInput: string;
-  /** Date the job was done (YYYY-MM-DD); drives the holiday + promo lookup. Additive - older drafts default to today. */
+  /** Date the job was done (YYYY-MM-DD); drives the holiday + promo lookup. */
   jobDate: string;
   timeRanges: ParsedRange[];
-  durationMinsOverride: number | null;
-  hourlyRateId: string | null;
+  /** Out-of-session minutes added to the slot sum (0 = none). */
+  followUpMins: number;
   travelEntries: TravelEntry[];
   jobAddress: string;
   tasks: TaskLine[];
@@ -168,7 +164,7 @@ function isMeaningfulDraft(d: CalculatorDraft): boolean {
     d.pickedContactName !== null ||
     d.pickedContactCompany !== null ||
     d.unsuccessful ||
-    d.durationMinsOverride !== null
+    d.followUpMins > 0
   );
 }
 
@@ -184,7 +180,7 @@ function loadDraft(): CalculatorDraft | null {
     const raw = window.localStorage.getItem(DRAFT_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as CalculatorDraft;
-    if (parsed?.v !== 1) return null;
+    if (parsed?.v !== 2) return null;
     return parsed;
   } catch {
     return null;
@@ -199,7 +195,7 @@ function loadDraft(): CalculatorDraft | null {
 function saveDraft(draft: Omit<CalculatorDraft, "v" | "savedAt">): void {
   if (typeof window === "undefined") return;
   try {
-    const payload: CalculatorDraft = { v: 1, savedAt: Date.now(), ...draft };
+    const payload: CalculatorDraft = { v: 2, savedAt: Date.now(), ...draft };
     window.localStorage.setItem(DRAFT_KEY, JSON.stringify(payload));
   } catch {
     /* QuotaExceeded or private mode - silently degrade */
@@ -358,9 +354,9 @@ export function CalculatorView({
     }
     return [{ startTime: "", endTime: "" }];
   });
-  // Operator override; null means "derive from sum of slots". Lets gaps inside
-  // a single slot (lunch, etc.) be billed manually.
-  const [durationMinsOverride, setDurationMinsOverride] = useState<number | null>(null);
+  // Out-of-session work (a call after the visit, a remote fix later) billed on
+  // top of the slot sum. The AI parse seeds it from outOfSessionMins.
+  const [followUpMins, setFollowUpMins] = useState(0);
   // Every travel charge (auto-lookup + any manual entries) lumped together.
   // jobToLineItems sums them into a single "Travel" invoice line. An event
   // prefill seeds the entry from the drive prediction made for the event's
@@ -384,11 +380,6 @@ export function CalculatorView({
       },
     ];
   });
-  // Default rate from the server-provided rows; a restored draft's choice
-  // (even null) overwrites this in the mount effect.
-  const [hourlyRateId, setHourlyRateId] = useState<string | null>(
-    () => initialRates.find((r) => r.isDefault)?.id ?? null,
-  );
   // Tasks, parts, and notes
   const [tasks, setTasks] = useState<TaskLine[]>([]);
   const [parts, setParts] = useState<PartLine[]>([]);
@@ -586,9 +577,7 @@ export function CalculatorView({
       setAiInput(draft.aiInput ?? "");
       setJobDate(draft.jobDate ?? todayNZDate());
       setTimeRanges(draft.timeRanges ?? [{ startTime: "", endTime: "" }]);
-      setDurationMinsOverride(draft.durationMinsOverride ?? null);
-      // Draft wins outright, even a null rate choice.
-      setHourlyRateId(draft.hourlyRateId ?? null);
+      setFollowUpMins(draft.followUpMins ?? 0);
       setTravelEntries(draft.travelEntries ?? []);
       setJobAddress(draft.jobAddress ?? "");
       setTasks(draft.tasks ?? []);
@@ -627,8 +616,7 @@ export function CalculatorView({
         aiInput,
         jobDate,
         timeRanges,
-        durationMinsOverride,
-        hourlyRateId,
+        followUpMins,
         travelEntries,
         jobAddress,
         tasks,
@@ -648,8 +636,7 @@ export function CalculatorView({
     aiInput,
     jobDate,
     timeRanges,
-    durationMinsOverride,
-    hourlyRateId,
+    followUpMins,
     travelEntries,
     jobAddress,
     tasks,
@@ -671,9 +658,10 @@ export function CalculatorView({
     return () => clearTimeout(t);
   }, [draftRestoredAt]);
 
-  // Derived durations and rate groupings
+  // Derived durations and rate groupings. Billable window = slot sum plus any
+  // out-of-session follow-up minutes.
   const sumRangesMin = timeRanges.reduce((s, r) => s + timeDiffMins(r.startTime, r.endTime), 0);
-  const durationMins = durationMinsOverride != null ? durationMinsOverride : sumRangesMin;
+  const durationMins = sumRangesMin + followUpMins;
   // Aggregate first start / last end - used for the travel departure ISO and
   // the persisted JobCalculation. Sorted by startTime so out-of-order operator
   // entries still produce sensible bounds.
@@ -682,9 +670,7 @@ export function CalculatorView({
     .sort((a, b) => a.startTime.localeCompare(b.startTime));
   const aggregateStart = sortedRanges[0]?.startTime ?? "";
   const aggregateEnd = sortedRanges[sortedRanges.length - 1]?.endTime ?? "";
-  const hourlyRate = matchRateById(rates, hourlyRateId);
-  // Base hourly rates (e.g. Standard $65/hr) used for the top-level Time
-  // selector and as the per-task base rate.
+  // Base hourly rates (e.g. Standard $65/hr) used as the per-task base rate.
   const baseRates = rates.filter((r) => r.ratePerHour !== null);
   // Modifier rates: either signed $/hr deltas (At home -$10, Remote -$10)
   // or percent uplifts (Public Holiday +25%). Toggled per task to shift the
@@ -694,12 +680,13 @@ export function CalculatorView({
     .sort((a, b) => a.label.localeCompare(b.label));
   const flatRates = rates.filter((r) => r.flatRate !== null);
 
-  // Assemble the job and totals
+  // Assemble the job and totals. Labour bills entirely through the per-task
+  // base + modifier rates, so the legacy top-level time charge stays null.
   const job: JobCalculation = {
     startTime: aggregateStart,
     endTime: aggregateEnd,
     durationMins,
-    hourlyRate,
+    hourlyRate: null,
     tasks,
     parts,
     travelEntries,
@@ -730,7 +717,6 @@ export function CalculatorView({
       parts,
       timeRanges,
       durationMins,
-      hourlyRate,
       holiday.uplift,
       travelEntries,
       clientName,
@@ -752,43 +738,35 @@ export function CalculatorView({
     (result: ParseJobResponse, rateList: RateConfig[]) => {
       const includeTravelDefault = (result.travel?.durationMins ?? 0) > 0;
 
+      // Out-of-session work (a call after the visit) goes into the follow-up
+      // field; the parser includes it inside durationMins, so in-session slot
+      // time is durationMins minus this.
+      const outMins = Math.max(0, Math.round(result.outOfSessionMins ?? 0));
+      setFollowUpMins(outMins);
+
       // Hydrate the time slots. Prefer the per-range list when the parser found
       // segments; otherwise synthesise one slot from startTime/endTime, or as a
-      // last resort anchor the duration to "now".
-      let parsedWindowMin = 0;
+      // last resort anchor the in-session duration to "now". The billable
+      // window is always slot time + follow-up.
+      let parsedWindowMin = outMins;
       if (result.ranges && result.ranges.length > 0) {
         setTimeRanges(result.ranges.map((r) => ({ startTime: r.startTime, endTime: r.endTime })));
-        const sum = result.ranges.reduce((s, r) => s + timeDiffMins(r.startTime, r.endTime), 0);
-        const aiMin = result.durationMins ?? null;
-        // When the AI-emitted duration differs from the sum (e.g. the operator
-        // typed an explicit total), surface it via the override field.
-        if (aiMin != null && aiMin !== sum) {
-          setDurationMinsOverride(aiMin);
-          parsedWindowMin = aiMin;
-        } else {
-          setDurationMinsOverride(null);
-          parsedWindowMin = sum;
-        }
+        parsedWindowMin += result.ranges.reduce(
+          (s, r) => s + timeDiffMins(r.startTime, r.endTime),
+          0,
+        );
       } else if (result.startTime && result.endTime) {
         setTimeRanges([{ startTime: result.startTime, endTime: result.endTime }]);
-        const wallClockMin = timeDiffMins(result.startTime, result.endTime);
-        const aiMin = result.durationMins ?? null;
-        if (aiMin != null && aiMin !== wallClockMin) {
-          setDurationMinsOverride(aiMin);
-          parsedWindowMin = aiMin;
-        } else {
-          setDurationMinsOverride(null);
-          parsedWindowMin = wallClockMin;
-        }
+        parsedWindowMin += timeDiffMins(result.startTime, result.endTime);
       } else if (result.startTime) {
         const end = nowTime();
         setTimeRanges([{ startTime: result.startTime, endTime: end }]);
-        setDurationMinsOverride(null);
-        parsedWindowMin = timeDiffMins(result.startTime, end);
+        parsedWindowMin += timeDiffMins(result.startTime, end);
       } else if (result.durationMins !== null) {
+        const inSessionMins = Math.max(0, result.durationMins - outMins);
         const now = new Date();
         const endTotalMins = now.getHours() * 60 + now.getMinutes();
-        const startTotalMins = Math.max(0, endTotalMins - result.durationMins);
+        const startTotalMins = Math.max(0, endTotalMins - inSessionMins);
         const sh = Math.floor(startTotalMins / 60);
         const sm = startTotalMins % 60;
         setTimeRanges([
@@ -797,12 +775,10 @@ export function CalculatorView({
             endTime: nowTime(),
           },
         ]);
-        setDurationMinsOverride(null);
-        parsedWindowMin = result.durationMins;
+        parsedWindowMin = outMins + inSessionMins;
       }
 
-      // Hydrate rate, task, and part lines
-      setHourlyRateId(result.hourlyRateId);
+      // Hydrate task and part lines
       const parsedTasks: TaskLine[] = result.tasks.map((t) => {
         const device = t.device ?? null;
         const action = t.action ?? null;
@@ -815,14 +791,17 @@ export function CalculatorView({
         // rateConfigId to null so the promo math classifies it correctly even
         // if the AI emitted a stray ID.
         const isHourly = t.baseRateId != null;
+        // Round AI-emitted quantities to 2 dp so a fractional-hour estimate
+        // can't put a long float on the line.
+        const qty = Math.round(t.qty * 100) / 100;
         return {
           rateConfigId: isHourly ? null : (t.rateConfigId ?? null),
           baseRateId: t.baseRateId ?? null,
           modifierIds: t.modifierIds ?? [],
           description,
-          qty: t.qty,
+          qty,
           unitPrice: t.unitPrice,
-          lineTotal: Math.round(t.qty * t.unitPrice * 100) / 100,
+          lineTotal: Math.round(qty * t.unitPrice * 100) / 100,
           device,
           action,
           details,
@@ -950,6 +929,9 @@ export function CalculatorView({
     setTasks((prev) => {
       const t = [...prev];
       const item = { ...t[idx], [field]: val };
+      // Quantities round to 2 dp so hand-typed hour fractions (1.333333...)
+      // can't leave long floats on the line or the invoice.
+      if (field === "qty") item.qty = Math.round(Number(val) * 100) / 100;
       if (field === "rateConfigId") {
         const rate = rates.find((r) => r.id === val);
         if (rate) {
@@ -1056,8 +1038,7 @@ export function CalculatorView({
   function resetFormState(): void {
     const now = nowTime();
     setTimeRanges([{ startTime: now, endTime: addHour(now) }]);
-    setDurationMinsOverride(null);
-    setHourlyRateId(rates.find((r) => r.isDefault)?.id ?? null);
+    setFollowUpMins(0);
     setTravelEntries([]);
     setJobAddress("");
     setTasks([]);
@@ -1374,11 +1355,7 @@ export function CalculatorView({
         return;
       }
       const d = await res.json();
-      if (d.ok && Array.isArray(d.rates)) {
-        setRates(d.rates);
-        const def = d.rates.find((r: RateConfig) => r.isDefault);
-        if (def) setHourlyRateId(def.id);
-      }
+      if (d.ok && Array.isArray(d.rates)) setRates(d.rates);
     } finally {
       setResettingRates(false);
     }
@@ -1791,13 +1768,9 @@ export function CalculatorView({
           <JobDetailsSection
             timeRanges={timeRanges}
             onTimeRangesChange={setTimeRanges}
-            durationMinsOverride={durationMinsOverride}
-            onDurationOverrideChange={setDurationMinsOverride}
+            followUpMins={followUpMins}
+            onFollowUpMinsChange={setFollowUpMins}
             durationMins={durationMins}
-            hourlyRateId={hourlyRateId}
-            onHourlyRateIdChange={setHourlyRateId}
-            baseRates={baseRates}
-            billingIncrementMins={pricing.billingIncrementMins}
           />
 
           {/* Travel */}

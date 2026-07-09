@@ -174,8 +174,9 @@ export interface JobCalculation {
   startTime: string;
   /** HH:MM end time of the job. */
   endTime: string;
-  /** Total billable minutes (operator override OR derived from start/end). */
+  /** Total billable minutes (time-slot sum + out-of-session follow-up). */
   durationMins: number;
+  /** Legacy top-level time-charge rate. The calculator always passes null - labour bills through the hourly task lines instead. */
   hourlyRate: RateConfig | null;
   tasks: TaskLine[];
   parts: PartLine[];
