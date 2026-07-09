@@ -1,6 +1,6 @@
 {
   "name": "tech-support-site",
-  "version": "3.134.2",
+  "version": "3.134.3",
   "private": true,
   "type": "module",
   "scripts": {
@@ -54,7 +54,7 @@
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-icons": "^5.7.0",
-    "resend": "^6.17.1",
+    "resend": "^6.17.2",
     "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {
