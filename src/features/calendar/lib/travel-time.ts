@@ -90,10 +90,12 @@ export async function calculateTravelMinutes(
   const timeParam =
     options?.useArrivalTime && mode === "transit" ? "arrival_time" : "departure_time";
   url.searchParams.set(timeParam, Math.floor(effectiveDeparture.getTime() / 1000).toString());
-  // Pessimistic traffic for driving so travel blocks reserve enough calendar
-  // time on a bad run; traffic_model is only valid for driving lookups.
+  // best_guess traffic for driving: Google's most-likely duration for the
+  // departure time. The settings travelRoundBufferMin already pads blocks for
+  // bad runs, so pessimistic on top double-counted the safety margin.
+  // traffic_model is only valid for driving lookups.
   if (mode === "driving" && timeParam === "departure_time") {
-    url.searchParams.set("traffic_model", "pessimistic");
+    url.searchParams.set("traffic_model", "best_guess");
   }
   url.searchParams.set("key", apiKey);
 

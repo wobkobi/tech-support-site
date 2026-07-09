@@ -62,9 +62,9 @@ const DEFAULT_JOB_DURATION_MS = 60 * 60 * 1000;
 
 /**
  * One Distance Matrix call for a single leg, traffic-aware.
- * Pessimistic model: quotes lean toward the bad-day end of Google's range,
- * because under-quoted travel is billed at the quote and eaten by the
- * operator (travel bills one round trip per booking, never a return visit).
+ * best_guess model: Google's most-likely duration for that departure time.
+ * (Pessimistic was trialled and over-quoted rush-hour legs by ~50%; free-flow
+ * with no departure_time under-quoted. best_guess tracked real trips closest.)
  * @param origin - Leg origin address.
  * @param destination - Leg destination address.
  * @param apiKey - Google Maps server key.
@@ -83,7 +83,7 @@ async function lookupLeg(
   url.searchParams.set("key", apiKey);
   url.searchParams.set("units", "metric");
   url.searchParams.set("departure_time", Math.floor(departMs / 1000).toString());
-  url.searchParams.set("traffic_model", "pessimistic");
+  url.searchParams.set("traffic_model", "best_guess");
 
   try {
     const res = await fetch(url.toString());
