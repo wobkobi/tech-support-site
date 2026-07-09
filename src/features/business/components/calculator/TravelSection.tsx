@@ -132,7 +132,13 @@ export function TravelSection({
                     type="text"
                     value={entry.label}
                     placeholder={entry.isAuto ? "Lookup" : "e.g. Parking"}
-                    onChange={(e) => patchEntry(index, { label: e.target.value, isAuto: false })}
+                    onChange={(e) =>
+                      patchEntry(index, {
+                        label: e.target.value,
+                        isAuto: false,
+                        isParsedCost: false,
+                      })
+                    }
                     className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
                   />
                   <div className="flex items-center">
@@ -157,12 +163,14 @@ export function TravelSection({
                         patchEntry(index, {
                           cost: Math.round(value * 100) / 100,
                           isAuto: false,
+                          isParsedCost: false,
                         });
                       }}
                       onChange={(e) =>
                         patchEntry(index, {
                           cost: Math.round((parseFloat(e.target.value) || 0) * 100) / 100,
                           isAuto: false,
+                          isParsedCost: false,
                         })
                       }
                       className="w-24 rounded-r-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"

@@ -53,12 +53,35 @@ async function buildEventPrefill(eventId: string): Promise<EventPrefill | null> 
   const event = await fetchBookingEvent(eventId);
   if (!event) return null;
 
-  const booking = await prisma.booking
-    .findFirst({
-      where: { calendarEventId: eventId },
-      select: { id: true, name: true, email: true, address: true, unit: true },
-    })
-    .catch(() => null);
+  const [booking, travelBlock] = await Promise.all([
+    prisma.booking
+      .findFirst({
+        where: { calendarEventId: eventId },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          address: true,
+          unit: true,
+          travelMinsAtBooking: true,
+          travelMinsBackAtBooking: true,
+        },
+      })
+      .catch(() => null),
+    // Frozen drive prediction for the event's actual window. Raw minutes, not
+    // rounded - the rounding carries the scheduling buffer, which pads the
+    // calendar but must not be billed.
+    prisma.travelBlock
+      .findFirst({
+        where: { sourceEventId: eventId },
+        select: { rawTravelMinutes: true, rawTravelBackMinutes: true },
+      })
+      .catch(() => null),
+  ]);
+
+  const travelMinsThere = travelBlock?.rawTravelMinutes ?? booking?.travelMinsAtBooking ?? null;
+  const travelMinsBack =
+    travelBlock?.rawTravelBackMinutes ?? booking?.travelMinsBackAtBooking ?? null;
 
   return {
     calendarEventId: eventId,
@@ -72,6 +95,8 @@ async function buildEventPrefill(eventId: string): Promise<EventPrefill | null> 
       (booking?.address
         ? [booking.unit, booking.address].filter(Boolean).join("/")
         : event.location) ?? "",
+    travelMinsThere,
+    travelMinsBack,
   };
 }
 

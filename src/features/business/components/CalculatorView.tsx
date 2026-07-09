@@ -303,6 +303,13 @@ export interface EventPrefill {
   clientName: string;
   clientEmail: string;
   jobAddress: string;
+  /**
+   * Drive prediction made for the event's actual window, from the frozen
+   * TravelBlock (raw minutes, no scheduling buffer) or the booking snapshot.
+   * Null when neither exists - the operator looks up manually.
+   */
+  travelMinsThere: number | null;
+  travelMinsBack: number | null;
 }
 
 /**
@@ -355,8 +362,28 @@ export function CalculatorView({
   // a single slot (lunch, etc.) be billed manually.
   const [durationMinsOverride, setDurationMinsOverride] = useState<number | null>(null);
   // Every travel charge (auto-lookup + any manual entries) lumped together.
-  // jobToLineItems sums them into a single "Travel" invoice line.
-  const [travelEntries, setTravelEntries] = useState<TravelEntry[]>([]);
+  // jobToLineItems sums them into a single "Travel" invoice line. An event
+  // prefill seeds the entry from the drive prediction made for the event's
+  // ACTUAL window (frozen TravelBlock / booking snapshot) - a fresh lookup on
+  // a past job could only quote tomorrow's traffic, not that day's.
+  const [travelEntries, setTravelEntries] = useState<TravelEntry[]>(() => {
+    if (!eventPrefill?.travelMinsThere || eventPrefill.travelMinsThere <= 0) return [];
+    const there = eventPrefill.travelMinsThere;
+    const back = eventPrefill.travelMinsBack ?? there;
+    const travelRatePerHour =
+      initialRates.find((r) => r.unit === "travel-hour" && r.ratePerHour !== null)?.ratePerHour ??
+      FALLBACK_TRAVEL_RATE;
+    return [
+      {
+        label: eventPrefill.jobAddress || `${there} min drive`,
+        cost: calcTravelCharge(there, back, travelRatePerHour, pricing.minTravelCharge),
+        isAuto: true,
+        destination: eventPrefill.jobAddress || `${there} min drive`,
+        durationMinsOneWay: there,
+        durationMinsBack: back,
+      },
+    ];
+  });
   // Default rate from the server-provided rows; a restored draft's choice
   // (even null) overwrites this in the mount effect.
   const [hourlyRateId, setHourlyRateId] = useState<string | null>(
@@ -387,6 +414,33 @@ export function CalculatorView({
   const [saveInvoiceError, setSaveInvoiceError] = useState<string | null>(null);
   const [pendingInvoiceId, setPendingInvoiceId] = useState<string | null>(null);
   const [sheetSyncToast, setSheetSyncToast] = useState<string | null>(null);
+
+  // "Bill a calendar event" picker: lazily fetched on first open so a normal
+  // calculator load costs nothing; choosing an event reloads the page with
+  // ?eventId= and the server prefills times, client, address, and travel.
+  const [eventPickerOpen, setEventPickerOpen] = useState(false);
+  const [recentEvents, setRecentEvents] = useState<
+    { id: string; summary: string; start: string; end: string }[] | null
+  >(null);
+  const [loadingEvents, setLoadingEvents] = useState(false);
+
+  /** Opens the event picker, fetching the recent-events list on first open. */
+  async function handleOpenEventPicker(): Promise<void> {
+    setEventPickerOpen((open) => !open);
+    if (recentEvents !== null || loadingEvents) return;
+    setLoadingEvents(true);
+    try {
+      const res = await fetch("/api/admin/schedule/recent-events");
+      const d = (await res.json()) as {
+        ok?: boolean;
+        events?: { id: string; summary: string; start: string; end: string }[];
+      };
+      setRecentEvents(d.ok && d.events ? d.events : []);
+    } catch {
+      setRecentEvents([]);
+    }
+    setLoadingEvents(false);
+  }
 
   // AI parse session
   const [aiInput, setAiInput] = useState("");
@@ -779,9 +833,19 @@ export function CalculatorView({
       const parsedParts = result.parts.map((p) => ({ description: p.description, cost: p.cost }));
 
       // Reparse semantics: the new parse result is the new truth for the auto
-      // travel entry. Manual entries (parking, ferry, etc.) survive a reparse
-      // so the operator doesn't have to re-type them after every AI tweak.
+      // travel entry AND the parsed out-of-pocket costs (parking, tolls).
+      // Operator-typed manual entries survive a reparse so they don't have to
+      // be re-typed after every AI tweak.
       setJobAddress(result.destination ?? "");
+
+      // Parsed disbursements pass through at the stated cost; isParsedCost
+      // lets a reparse replace them while a manual address re-lookup (which
+      // only replaces the isAuto drive entry) leaves them alone.
+      const parsedCostEntries: TravelEntry[] = (result.travelCosts ?? []).map((c) => ({
+        label: c.label,
+        cost: Math.round(c.cost * 100) / 100,
+        isParsedCost: true,
+      }));
 
       if (result.travel && includeTravelDefault) {
         const travelRatePerHour =
@@ -804,12 +868,18 @@ export function CalculatorView({
             durationMinsBack: result.travel?.durationMinsBack,
             distanceKmOneWay: result.travel?.distanceKmOneWay,
           },
-          ...prev.filter((e) => !e.isAuto),
+          ...parsedCostEntries,
+          ...prev.filter((e) => !e.isAuto && !e.isParsedCost),
         ]);
       } else {
         // No drive time from the parse (remote work or geocode-to-origin): drop
-        // any stale auto entry, leave manual entries alone.
-        setTravelEntries((prev) => prev.filter((e) => !e.isAuto));
+        // any stale auto entry, keep operator-typed manual entries, and still
+        // carry any parsed disbursements (a remote job has no parking, but a
+        // walking-distance one can).
+        setTravelEntries((prev) => [
+          ...parsedCostEntries,
+          ...prev.filter((e) => !e.isAuto && !e.isParsedCost),
+        ]);
       }
       // Rebalance parsed tasks to fit the listed window so an AI over-estimating
       // a single step doesn't silently over-bill. Tasks scale proportionally so
@@ -1554,6 +1624,67 @@ export function CalculatorView({
             travel breakdown) from blowing the grid track past the viewport;
             mirrors the guard on the right column. */}
         <div className="min-w-0 space-y-5">
+          {/* Bill a calendar event: jump straight to a job's corrected times,
+              client, address, and frozen travel prediction. */}
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            {eventPrefill ? (
+              <p className="text-sm text-slate-600">
+                <span className="font-semibold text-russian-violet">Billing booked job:</span>{" "}
+                {eventPrefill.clientName || "(no name)"} - {eventPrefill.jobDate},{" "}
+                {eventPrefill.startTime}-{eventPrefill.endTime}
+              </p>
+            ) : (
+              <>
+                <div className="flex items-center justify-between gap-2">
+                  <h2 className="text-sm font-semibold text-russian-violet">
+                    Bill a calendar event
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => void handleOpenEventPicker()}
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                  >
+                    {eventPickerOpen ? "Hide" : "Pick a recent event"}
+                  </button>
+                </div>
+                {eventPickerOpen && (
+                  <div className="mt-3 max-h-64 space-y-1 overflow-y-auto">
+                    {loadingEvents && <p className="text-xs text-slate-400">Loading events…</p>}
+                    {!loadingEvents && recentEvents !== null && recentEvents.length === 0 && (
+                      <p className="text-xs text-slate-400">
+                        No booking-calendar events in the last two weeks.
+                      </p>
+                    )}
+                    {(recentEvents ?? []).map((ev) => (
+                      <button
+                        key={ev.id}
+                        type="button"
+                        onClick={() =>
+                          router.push(
+                            `/admin/business/calculator?eventId=${encodeURIComponent(ev.id)}`,
+                          )
+                        }
+                        className="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-100 px-3 py-2 text-left text-sm hover:border-russian-violet/30 hover:bg-russian-violet/5"
+                      >
+                        <span className="truncate font-medium text-slate-700">{ev.summary}</span>
+                        <span className="shrink-0 text-xs text-slate-500">
+                          {new Intl.DateTimeFormat("en-NZ", {
+                            timeZone: "Pacific/Auckland",
+                            weekday: "short",
+                            day: "numeric",
+                            month: "short",
+                            hour: "numeric",
+                            minute: "2-digit",
+                          }).format(new Date(ev.start))}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
           {/* AI input */}
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <h2 className="mb-3 text-sm font-semibold text-russian-violet">Describe the job</h2>
