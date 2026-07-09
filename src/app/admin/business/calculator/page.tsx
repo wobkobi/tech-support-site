@@ -79,9 +79,18 @@ async function buildEventPrefill(eventId: string): Promise<EventPrefill | null> 
       .catch(() => null),
   ]);
 
-  const travelMinsThere = travelBlock?.rawTravelMinutes ?? booking?.travelMinsAtBooking ?? null;
+  // Booking snapshots are only trusted when they carry a back leg - that
+  // field exists only since the traffic-aware two-leg change, so one-way-only
+  // snapshots are free-flow-era quotes that would bill as if there were no
+  // traffic. Without a usable prediction the travel card starts empty and the
+  // operator's Look up quotes traffic at the job's wall-clock times.
+  const snapshotIsTrafficAware = booking?.travelMinsBackAtBooking != null;
+  const travelMinsThere =
+    travelBlock?.rawTravelMinutes ??
+    (snapshotIsTrafficAware ? (booking?.travelMinsAtBooking ?? null) : null);
   const travelMinsBack =
-    travelBlock?.rawTravelBackMinutes ?? booking?.travelMinsBackAtBooking ?? null;
+    travelBlock?.rawTravelBackMinutes ??
+    (snapshotIsTrafficAware ? (booking?.travelMinsBackAtBooking ?? null) : null);
 
   return {
     calendarEventId: eventId,

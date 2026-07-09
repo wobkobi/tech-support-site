@@ -64,6 +64,7 @@ DEVICE semantic guide (what each common tag means; the live list above is author
 - "Software" = an app or program not tied to one physical device (ChatGPT, Excel, Word, Finder, web browser).
 - "Banking" = online banking / payments (internet banking, bank login).
 - "Other" = genuine catch-all when nothing above fits; use sparingly.
+- Peripherals are NEVER device tags: a microphone, webcam, mouse, keyboard, speaker, or headset belongs to the machine it plugs into. Tag the HOST device and name the peripheral in details. When the host is named, use it. When it is NOT named, infer it from the rest of the job's context (a session full of Outlook/Ethernet work implies the client's computer - pick "Laptop" or "Desktop / PC" only when the description hints at which; a session about a phone implies "Phone"); with no usable context at all, fall back to "Other". NEVER present an inferred host as more specific than the evidence supports, and do not coin peripheral names as new device tags.
 
 ACTION semantic guide (typical shapes; the "Current action tags" list is authoritative when it has a fitting entry):
 - Bare verbs: "Setup", "Configuration", "Repair", "Troubleshooting", "Cleanup", "Recovery", "Migration", "Training", "Maintenance", "Diagnosis".
@@ -80,6 +81,7 @@ DETAILS (optional qualifier — use sparingly):
 INVOICE-WORTHY PHRASING — paying customers read these, not engineers:
 - Spell out acronyms a non-tech client wouldn't know: "Operating system reinstall" not "OS reinstall", "Blue screen at startup" not "BSOD on boot". Common ones (USB, Wi-Fi, Bluetooth, PC) stay short.
 - Brand names go in DETAILS, never in the device tag. Pair generic device ("Streaming account", "Phone", "Cloud service") with the brand in details ("Spotify", "iPhone 15", "iCloud") so the taxonomy stays clean and the line is still recognisable.
+- Preserve official brand capitalisation exactly in details: "iCloud", "iPhone", "iPad", "macOS", "OneDrive", "eBay", "PayPal" - never "ICloud"/"Icloud"/"Ebay", even at the start of the details string.
 - Joining symbols: use "&" or "/" inside details ("Bluetooth & radio"), commas to list items ("Spotify, family plan"). Avoid "+" — it reads as math, not English.
 - JARGON BAN — NEVER put any of the following in descriptions or details: email authentication record names (SPF, DKIM, DMARC), DNS record types (MX, A record, CNAME, PTR), domain names or URLs (anything ending .nz/.com/.org or containing www), provider or registrar names (1st Domains, Crazy Domains, cPanel, and similar), or IT-failure phrases (DNS split, delivery failures, authentication failure, misconfiguration, rejected by server). Acceptable shorthand: DNS, POP3, SMTP, IMAP, SSL, TLS. Describe outcomes positively — say what was configured, not what failed: "Outlook, POP3/SMTP" not "Outlook misconfigured"; "Gmail, outbound mail" not "Gmail rejection".
 
@@ -115,10 +117,10 @@ Let step = the billing increment from the BILLING context line expressed in hour
 3. Identify how many distinct tasks there are (N).
 4. Classify each task into one of three sets, then distribute totalHours across them.
 
-   a. PINNED set (P) — tasks with an operator-stated explicit duration of ANY length ("(30 mins)", "took half an hour", "about 45 min", "15 min job", "(20 mins)", "took 10 mins"). The duration must clearly attach to one specific task, not the whole session.
+   a. PINNED set (P) — tasks with an operator-stated explicit duration of ANY length ("(30 mins)", "took half an hour", "about 45 min", "15 min job", "(20 mins)", "took 10 mins"). The duration must clearly attach to one specific task, not the whole session - and ONLY to the line/sentence it appears in. A neighbouring task about the same app or device stays FLOATING: "Outlook task display / Outlook calendar, they disappeared (10 mins)" pins ONLY the calendar task at 10 min; the tasks-display line floats with the rest.
       - pinnedQty = stated duration in hours, rounded UP to the next step. At a 5-min step: "(10 mins)" → 0.17h, "(20 mins)" → 0.33h, "(30 mins)" → 0.5h, "(50 mins)" → 0.83h. At a 15-min step the same inputs give 0.25h / 0.5h / 0.5h / 1.0h. ALWAYS round on the live step, never a fixed 0.25h.
       - Subset SHORT (S) — a pinned task is ALSO short when its stated duration is ≤ minBill OR the action is inherently one-shot (Factory reset, Password reset, Account unlock, Driver update, Single file transfer, Settings tweak) OR a "quick"/"quickly"/"briefly"/"short"/"just a quick"/"fast" hint applies. Short pinned tasks get qty = one step and isShort: true. Non-short pinned tasks get their pinnedQty and isShort: false.
-      - SLACK: when the leftover for the floating set (below) ends up awkward (under one step, or unsplittable across the remaining floating tasks), you MAY shift up to one step onto OR off the most semantically appropriate pinned task to make the residual splittable. Stay within one step of the stated duration.
+      - Operator-stated durations are EXACT: emit pinnedQty precisely as stated (rounded UP to the step) and never shift time onto or off a pinned task to tidy the floating residual - the server's rebalance fits the floating set to the total on its own. An awkward residual is fine; a moved stated duration is not.
    b. FLOATING set (F) — every task NOT in P. floatingHours = totalHours - sum(pinnedQty across P).
       - If |F| == 0, the pinned tasks already account for everything. If sum(pinned) < totalHours, give the residual in step chunks to the most significant pinned task (rule (d) below).
       - subBase = floor((floatingHours / |F|) / step) * step. Assign subBase to each task in F.

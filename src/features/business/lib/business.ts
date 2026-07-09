@@ -333,8 +333,13 @@ function parkHourRemainder(tasks: TaskLine[], windowMin: number): TaskLine[] {
   const sumQty = Math.round(hourly.reduce((s, t) => s + t.qty, 0) * 100) / 100;
   const diff = Math.round((targetHours - sumQty) * 100) / 100;
   if (diff === 0) return tasks;
-  let biggest = hourly[0];
-  for (const t of hourly) if (t.qty > biggest.qty) biggest = t;
+  // Operator-stated durations are exact: park the drift on the largest
+  // FLOATING task only. When every hourly task is pinned, leave the
+  // cent-level drift in place rather than move a stated time.
+  const floating = hourly.filter((t) => !t.isExplicit);
+  if (floating.length === 0) return tasks;
+  let biggest = floating[0];
+  for (const t of floating) if (t.qty > biggest.qty) biggest = t;
   const adjustedQty = Math.max(MIN_TASK_MINUTES / 60, Math.round((biggest.qty + diff) * 100) / 100);
   return tasks.map((t) =>
     t === biggest

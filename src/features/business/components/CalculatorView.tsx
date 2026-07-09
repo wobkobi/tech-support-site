@@ -80,15 +80,18 @@ function addHour(t: string): string {
   return `${String((h + 1) % 24).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 /**
- * Builds a UTC ISO timestamp for an HH:MM start time interpreted as NZ wall-clock.
- * Defaults to today; if the resulting time has already passed today's wall clock,
- * rolls forward to tomorrow so quotes for "later today" don't accidentally fall
- * outside Google's traffic-prediction horizon. Returns null when the input isn't
- * a valid HH:MM string.
+ * Builds a UTC ISO timestamp for an HH:MM start time interpreted as NZ
+ * wall-clock on the next occurrence of the job date's WEEKDAY (today counts
+ * while the time is still ahead). Google only quotes traffic for future
+ * departures, so a past job is priced at the same weekday + time - the
+ * closest proxy for the traffic that day actually had (a Wednesday-afternoon
+ * job quoted on a Thursday must not get Thursday's pattern). Returns null
+ * when the input isn't a valid HH:MM string.
  * @param hhmm - Start time in HH:MM (24h) NZ wall-clock.
+ * @param anchorDate - NZ-local YYYY-MM-DD whose weekday to match (the job date); malformed values fall back to today.
  * @returns ISO 8601 UTC timestamp, or null.
  */
-function jobStartIsoFromTime(hhmm: string): string | null {
+function jobStartIsoFromTime(hhmm: string, anchorDate?: string): string | null {
   if (!/^\d{1,2}:\d{2}$/.test(hhmm)) return null;
   const [h, m] = hhmm.split(":").map(Number);
   if (h < 0 || h > 23 || m < 0 || m > 59) return null;
@@ -99,10 +102,20 @@ function jobStartIsoFromTime(hhmm: string): string | null {
     day: "2-digit",
   }).format(new Date());
   const [y, mo, d] = nzDateStr.split("-").map(Number);
+  // Weekday of a Y-M-D is timezone-independent when computed in UTC.
+  const todayDow = new Date(Date.UTC(y, mo - 1, d)).getUTCDay();
+  let daysAhead = 0;
+  if (anchorDate && /^\d{4}-\d{2}-\d{2}$/.test(anchorDate)) {
+    const [ay, am, ad] = anchorDate.split("-").map(Number);
+    const targetDow = new Date(Date.UTC(ay, am - 1, ad)).getUTCDay();
+    daysAhead = (targetDow - todayDow + 7) % 7;
+  }
   const offset = getPacificAucklandOffset(y, mo, d);
-  let utc = new Date(Date.UTC(y, mo - 1, d, h - offset, m, 0));
+  let utc = new Date(Date.UTC(y, mo - 1, d + daysAhead, h - offset, m, 0));
   if (utc.getTime() < Date.now()) {
-    utc = new Date(utc.getTime() + 24 * 60 * 60 * 1000);
+    // Same-day time already passed: next day without an anchor, next week
+    // with one (keeping the weekday).
+    utc = new Date(utc.getTime() + (daysAhead === 0 && !anchorDate ? 1 : 7) * 24 * 60 * 60 * 1000);
   }
   return utc.toISOString();
 }
@@ -826,19 +839,33 @@ export function CalculatorView({
           pricing.minTravelCharge,
         );
         const label = result.destination?.trim() || `${result.travel.durationMins} min drive`;
-        setTravelEntries((prev) => [
-          {
-            label,
-            cost,
-            isAuto: true,
-            destination: result.destination ?? label,
-            durationMinsOneWay: result.travel?.durationMins,
-            durationMinsBack: result.travel?.durationMinsBack,
-            distanceKmOneWay: result.travel?.distanceKmOneWay,
-          },
-          ...parsedCostEntries,
-          ...prev.filter((e) => !e.isAuto && !e.isParsedCost),
-        ]);
+        const destination = result.destination ?? label;
+        setTravelEntries((prev) => {
+          // Google's live predictions drift between calls (minutes and even
+          // the chosen route change), so a reparse of the same destination
+          // keeps the existing auto entry rather than silently moving the
+          // travel price. "Look up" is the deliberate refresh.
+          const existingAuto = prev.find((e) => e.isAuto);
+          const sameDestination =
+            existingAuto?.destination?.trim().toLowerCase() === destination.trim().toLowerCase();
+          const autoEntry =
+            existingAuto && sameDestination
+              ? existingAuto
+              : {
+                  label,
+                  cost,
+                  isAuto: true,
+                  destination,
+                  durationMinsOneWay: result.travel?.durationMins,
+                  durationMinsBack: result.travel?.durationMinsBack,
+                  distanceKmOneWay: result.travel?.distanceKmOneWay,
+                };
+          return [
+            autoEntry,
+            ...parsedCostEntries,
+            ...prev.filter((e) => !e.isAuto && !e.isParsedCost),
+          ];
+        });
       } else {
         // No drive time from the parse (remote work or geocode-to-origin): drop
         // any stale auto entry, keep operator-typed manual entries, and still
@@ -883,7 +910,9 @@ export function CalculatorView({
     setParseResult(null);
     setClarifyQuestions([]);
     try {
-      const body: Record<string, unknown> = { input: aiInput };
+      // jobDate lets the server quote travel at the job's weekday traffic
+      // pattern rather than today's.
+      const body: Record<string, unknown> = { input: aiInput, jobDate };
       if (answers && Object.keys(answers).length > 0) body.answers = answers;
       const res = await fetch("/api/business/parse-job", {
         method: "POST",
@@ -1201,12 +1230,13 @@ export function CalculatorView({
     // lookup is in flight; manual entries survive.
     setTravelEntries((prev) => prev.filter((e) => !e.isAuto));
     try {
-      const departureTimeIso = jobStartIsoFromTime(aggregateStart);
+      // Both legs anchor to the JOB DATE's weekday so a past job is quoted
+      // with the traffic pattern of the day it actually happened.
+      const departureTimeIso = jobStartIsoFromTime(aggregateStart, jobDate);
       // Return departure: the job's end time, guarded against
-      // jobStartIsoFromTime's independent roll-forward (a past start rolls to
-      // tomorrow while a future end stays today, inverting the pair); falls
-      // back to departure + estimated duration, else the server's default.
-      let returnDepartureTimeIso = jobStartIsoFromTime(aggregateEnd);
+      // jobStartIsoFromTime's independent roll-forward inverting the pair;
+      // falls back to departure + estimated duration, else the server's default.
+      let returnDepartureTimeIso = jobStartIsoFromTime(aggregateEnd, jobDate);
       if (
         departureTimeIso &&
         returnDepartureTimeIso &&

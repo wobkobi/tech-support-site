@@ -38,14 +38,17 @@ interface RangeWithDuration extends ParsedRange {
 }
 
 /**
- * Converts an operator-stated HH:MM (NZ wall clock, today) to a Date for the
- * traffic-aware travel lookup. Times already past today roll to tomorrow so
- * the quote stays inside Google's traffic-prediction horizon - mirrors the
- * calculator's client-side jobStartIsoFromTime.
+ * Converts an operator-stated HH:MM (NZ wall clock) to a Date for the
+ * traffic-aware travel lookup, anchored to the next occurrence of the job
+ * date's WEEKDAY (today counts while the time is still ahead). Google only
+ * quotes future departures, so a past job is priced at the same weekday +
+ * time - the closest proxy for the traffic that day actually had. Mirrors
+ * the calculator's client-side jobStartIsoFromTime.
  * @param hhmm - HH:MM (24h) NZ wall-clock string, or null.
+ * @param anchorDate - NZ-local YYYY-MM-DD whose weekday to match (the job date); malformed/missing falls back to today.
  * @returns Date, or undefined when the input isn't a valid HH:MM.
  */
-function nzTimeToDate(hhmm: string | null | undefined): Date | undefined {
+function nzTimeToDate(hhmm: string | null | undefined, anchorDate?: string): Date | undefined {
   if (!hhmm || !/^\d{1,2}:\d{2}$/.test(hhmm)) return undefined;
   const [h, m] = hhmm.split(":").map(Number);
   if (h > 23 || m > 59) return undefined;
@@ -53,10 +56,20 @@ function nzTimeToDate(hhmm: string | null | undefined): Date | undefined {
     new Date(),
   );
   const [y, mo, d] = nzDateStr.split("-").map(Number);
+  // Weekday of a Y-M-D is timezone-independent when computed in UTC.
+  const todayDow = new Date(Date.UTC(y, mo - 1, d)).getUTCDay();
+  let daysAhead = 0;
+  if (anchorDate && /^\d{4}-\d{2}-\d{2}$/.test(anchorDate)) {
+    const [ay, am, ad] = anchorDate.split("-").map(Number);
+    const targetDow = new Date(Date.UTC(ay, am - 1, ad)).getUTCDay();
+    daysAhead = (targetDow - todayDow + 7) % 7;
+  }
   const offset = getPacificAucklandOffset(y, mo, d);
-  let utc = new Date(Date.UTC(y, mo - 1, d, h - offset, m, 0));
+  let utc = new Date(Date.UTC(y, mo - 1, d + daysAhead, h - offset, m, 0));
   if (utc.getTime() < Date.now()) {
-    utc = new Date(utc.getTime() + 24 * 60 * 60 * 1000);
+    // Same-day time already passed: next day without an anchor, next week
+    // with one (keeping the weekday).
+    utc = new Date(utc.getTime() + (daysAhead === 0 && !anchorDate ? 1 : 7) * 24 * 60 * 60 * 1000);
   }
   return utc;
 }
@@ -222,7 +235,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   // Parse and validate body
   const body = await request.json();
-  const { input, answers } = body as { input: unknown; answers?: Record<string, unknown> };
+  const { input, answers, jobDate } = body as {
+    input: unknown;
+    answers?: Record<string, unknown>;
+    jobDate?: unknown;
+  };
+  // Job date (NZ-local YYYY-MM-DD) anchors travel quotes to the job's weekday.
+  const jobDateAnchor =
+    typeof jobDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(jobDate) ? jobDate : undefined;
 
   if (!input || typeof input !== "string" || input.trim().length === 0) {
     return errorResponse("input is required", 400);
@@ -344,8 +364,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       // instead of a self-fetch so this works without NEXT_PUBLIC_BASE_URL
       // set and doesn't burn the public route's rate-limit budget.
       const parsedRanges = parsed.ranges ?? [];
-      const departAt = nzTimeToDate(parsed.startTime ?? parsedRanges[0]?.startTime);
-      let returnAt = nzTimeToDate(parsed.endTime ?? parsedRanges[parsedRanges.length - 1]?.endTime);
+      const departAt = nzTimeToDate(parsed.startTime ?? parsedRanges[0]?.startTime, jobDateAnchor);
+      let returnAt = nzTimeToDate(
+        parsed.endTime ?? parsedRanges[parsedRanges.length - 1]?.endTime,
+        jobDateAnchor,
+      );
       if (departAt && returnAt && returnAt <= departAt) {
         // Independent roll-forward can invert the pair (start already past
         // rolls to tomorrow while a future end stays today) - keep the
@@ -599,41 +622,49 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           .reduce((s, t) => s + (t.qty || 0), 0);
         const floatingTargets = targetHours - pinnedSum;
         const floatingSum = sumQty - pinnedSum;
+        // Operator-stated durations are EXACT - pinned tasks are never scaled
+        // or drift-parked. When nothing is floating (every task pinned), the
+        // sum simply stands and the mismatch surfaces as a warning for the
+        // operator instead of silently moving stated times.
         const canScaleFloating = floatingSum > 0 && floatingTargets > 0;
-        const multiplier = canScaleFloating ? floatingTargets / floatingSum : targetHours / sumQty;
-        parsed.tasks = parsed.tasks.map((t) => {
-          if (canScaleFloating && t.isExplicit) return t;
-          return {
-            ...t,
-            qty: Math.max(incHours, Math.round(t.qty * multiplier * 100) / 100),
-          };
-        });
-        // Park any rounding remainder on the largest floating task (or the
-        // largest task overall when nothing is floating) so the sum lands
-        // exactly on targetHours.
-        const adjustedSum = parsed.tasks.reduce((s, t) => s + t.qty, 0);
-        const drift = Math.round((targetHours - adjustedSum) * 100) / 100;
-        if (drift !== 0) {
-          const driftable = canScaleFloating
-            ? parsed.tasks.map((t, i) => ({ t, i })).filter(({ t }) => !t.isExplicit)
-            : parsed.tasks.map((t, i) => ({ t, i }));
-          if (driftable.length > 0) {
-            const largest = driftable.reduce((max, cur) => (cur.t.qty > max.t.qty ? cur : max));
-            parsed.tasks[largest.i] = {
-              ...parsed.tasks[largest.i],
-              qty: Math.max(
-                incHours,
-                Math.round((parsed.tasks[largest.i].qty + drift) * 100) / 100,
-              ),
+        if (canScaleFloating) {
+          const multiplier = floatingTargets / floatingSum;
+          parsed.tasks = parsed.tasks.map((t) => {
+            if (t.isExplicit) return t;
+            return {
+              ...t,
+              qty: Math.max(incHours, Math.round(t.qty * multiplier * 100) / 100),
             };
+          });
+          // Park any rounding remainder on the largest floating task so the
+          // sum lands exactly on targetHours.
+          const adjustedSum = parsed.tasks.reduce((s, t) => s + t.qty, 0);
+          const drift = Math.round((targetHours - adjustedSum) * 100) / 100;
+          if (drift !== 0) {
+            const driftable = parsed.tasks
+              .map((t, i) => ({ t, i }))
+              .filter(({ t }) => !t.isExplicit);
+            if (driftable.length > 0) {
+              const largest = driftable.reduce((max, cur) => (cur.t.qty > max.t.qty ? cur : max));
+              parsed.tasks[largest.i] = {
+                ...parsed.tasks[largest.i],
+                qty: Math.max(
+                  incHours,
+                  Math.round((parsed.tasks[largest.i].qty + drift) * 100) / 100,
+                ),
+              };
+            }
           }
+          parsed.warnings = [
+            ...(parsed.warnings ?? []),
+            `Rebalanced floating task quantities to match the ${targetHours}h total (stated durations untouched).`,
+          ];
+        } else {
+          parsed.warnings = [
+            ...(parsed.warnings ?? []),
+            `Task hours sum to ${Math.round(sumQty * 100) / 100}h but the stated times total ${targetHours}h - stated durations were left untouched; adjust manually if needed.`,
+          ];
         }
-        parsed.warnings = [
-          ...(parsed.warnings ?? []),
-          canScaleFloating
-            ? `Rebalanced floating task quantities to match the ${targetHours}h total (pinned tasks preserved).`
-            : `Rebalanced every task proportionally to match the ${targetHours}h total.`,
-        ];
       }
     }
 
