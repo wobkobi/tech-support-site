@@ -268,7 +268,7 @@ function todayNZDate(): string {
 interface CalculatorViewProps {
   /** Live business identity, threaded into the invoice preview. */
   identity: IdentitySettings;
-  /** Live pricing (GST, min travel, billing increment) for the job calculations. */
+  /** Live pricing (GST, min travel) for the job calculations. */
   pricing: JobPricing;
   /** Rate configs resolved server-side so the calculator renders without a fetch waterfall. */
   initialRates: RateConfig[];
@@ -662,9 +662,9 @@ export function CalculatorView({
   // out-of-session follow-up minutes.
   const sumRangesMin = timeRanges.reduce((s, r) => s + timeDiffMins(r.startTime, r.endTime), 0);
   const durationMins = sumRangesMin + followUpMins;
-  // Aggregate first start / last end - used for the travel departure ISO and
-  // the persisted JobCalculation. Sorted by startTime so out-of-order operator
-  // entries still produce sensible bounds.
+  // Aggregate first start / last end - used for the travel departure ISOs.
+  // Sorted by startTime so out-of-order operator entries still produce
+  // sensible bounds.
   const sortedRanges = [...timeRanges]
     .filter((r) => r.startTime)
     .sort((a, b) => a.startTime.localeCompare(b.startTime));
@@ -681,17 +681,13 @@ export function CalculatorView({
   const flatRates = rates.filter((r) => r.flatRate !== null);
 
   // Assemble the job and totals. Labour bills entirely through the per-task
-  // base + modifier rates, so the legacy top-level time charge stays null.
+  // base + modifier rates; durationMins is the rebalance window, not a charge.
   const job: JobCalculation = {
-    startTime: aggregateStart,
-    endTime: aggregateEnd,
     durationMins,
-    hourlyRate: null,
     tasks,
     parts,
     travelEntries,
     notes,
-    gst: false,
     unsuccessful,
     clientName,
     clientEmail,
@@ -703,14 +699,7 @@ export function CalculatorView({
   // skip re-render when unrelated parent state changes (e.g. typing in the
   // AI input box). Recomputes when any meaningful input shifts.
   const previewLineItems = useMemo(
-    () =>
-      jobToLineItems(
-        job,
-        pricing.billingIncrementMins,
-        holiday.uplift,
-        pricing.minTravelCharge,
-        pricing.minBillableMins,
-      ),
+    () => jobToLineItems(job, holiday.uplift, pricing.minTravelCharge),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       tasks,
@@ -1097,13 +1086,7 @@ export function CalculatorView({
     try {
       // Build and POST the invoice
       await saveTaskTemplates(tasks);
-      const lineItems = jobToLineItems(
-        job,
-        pricing.billingIncrementMins,
-        holiday.uplift,
-        pricing.minTravelCharge,
-        pricing.minBillableMins,
-      );
+      const lineItems = jobToLineItems(job, holiday.uplift, pricing.minTravelCharge);
       const promoActive = activePromo && !skipPromo && totals.promoDiscount > 0;
       const res = await fetch("/api/business/invoices", {
         method: "POST",

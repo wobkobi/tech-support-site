@@ -168,27 +168,12 @@ function calcSessionMins(input: string): number | null {
 }
 
 /**
- * Retired tag spellings the model can still emit (from older prompt wording or
- * its own paraphrasing), mapped to their canonical replacement in the template
- * taxonomy. Matched case-insensitively.
- */
-const TAG_ALIASES: Record<string, string> = {
-  transfer: "Data Transfer",
-  security: "Privacy & Security",
-  "privacy configuration": "Privacy & Security",
-  "cloud storage": "Cloud Service",
-  "bios update": "Firmware Update",
-  "bluetooth & radio setup": "Setup",
-  tv: "TV",
-  "desktop / pc": "Desktop / PC",
-};
-
-/**
- * Canonicalises one AI-emitted tag: retired spellings map through
- * {@link TAG_ALIASES}, then any case-variant of a tag already in the template
- * taxonomy snaps to the stored casing so near-duplicates ("Virus removal" vs
- * "Virus Removal") can't split the taxonomy or the price memory. Unknown tags
- * pass through trimmed - the vocabulary stays open.
+ * Canonicalises one AI-emitted tag: any case-variant of a tag already in the
+ * template taxonomy snaps to the stored casing so near-duplicates ("Virus
+ * removal" vs "Virus Removal") can't split the taxonomy or the price memory.
+ * Unknown tags pass through trimmed - the vocabulary stays open, and the
+ * caller warns the operator so a genuinely new tag is a visible decision, not
+ * silent drift.
  * @param tag - Device or action tag from the AI.
  * @param known - Lowercased tag > stored casing, built from the templates.
  * @returns Canonical tag, or null when the input was empty.
@@ -199,8 +184,7 @@ function canonicaliseTag(
 ): string | null {
   const trimmed = tag?.trim();
   if (!trimmed) return null;
-  const aliased = TAG_ALIASES[trimmed.toLowerCase()] ?? trimmed;
-  return known.get(aliased.toLowerCase()) ?? aliased;
+  return known.get(trimmed.toLowerCase()) ?? trimmed;
 }
 
 /**
@@ -411,6 +395,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           t.action ? [[t.action.toLowerCase(), t.action]] : [],
         ),
       );
+      // Tags the model coined that aren't in the taxonomy. Surfaced as a
+      // warning so a genuinely new tag is a visible operator decision and a
+      // drifted synonym gets corrected before it splits the price history.
+      const newTags = new Set<string>();
       parsed.tasks = parsed.tasks.map((task) => {
         const t = task as typeof task & {
           action?: string | null;
@@ -420,11 +408,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           modifierLabels?: string[];
           isShort?: boolean;
         };
-        // Canonicalise BEFORE the template snap so a retired spelling
-        // ("Transfer") still finds its template ("Data Transfer") and its
-        // remembered price.
+        // Canonicalise BEFORE the template snap so a case-drifted tag still
+        // finds its template and its remembered price.
         const device = canonicaliseTag(t.device, knownDevices);
         const action = canonicaliseTag(t.action, knownActions);
+        if (device && !knownDevices.has(device.toLowerCase())) newTags.add(device);
+        if (action && !knownActions.has(action.toLowerCase())) newTags.add(action);
         const snap = findTemplateByTags(device, action, templates);
         // Billing signals must not print on the invoice line. The prompt
         // forbids them in details, but the model still echoes speed hints
@@ -504,6 +493,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           `Dropped unrecognised modifier label(s): ${[...unresolvedModifierLabels].join(
             ", ",
           )}. None match a current rate - check the modifier labels in Settings > Pricing.`,
+        ];
+      }
+      if (newTags.size > 0) {
+        parsed.warnings = [
+          ...(parsed.warnings ?? []),
+          `New tag(s) not in the current taxonomy: ${[...newTags].join(
+            ", ",
+          )}. Fine for genuinely new work - otherwise switch the task to the existing tag so the price history stays on one key.`,
         ];
       }
     }
