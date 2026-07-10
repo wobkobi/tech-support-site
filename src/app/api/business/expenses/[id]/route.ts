@@ -82,6 +82,7 @@ export async function PUT(
   // different FY workbook, append to the new sheet BEFORE deleting the old row
   // so a failure can't strand the entry off-sheet; otherwise update in place.
   let sheetRowKey = existing.sheetRowKey;
+  let sheetSyncWarning = false;
   try {
     const newSheetId = await resolveSheetIdForDate(updated.date);
     const oldSheetId = await resolveSheetIdForDate(existing.date);
@@ -117,9 +118,12 @@ export async function PUT(
   } catch (err) {
     console.error(`[expenses] Failed to update sheet row for entry ${id}:`, err);
     sheetRowKey = existing.sheetRowKey;
+    // The sheet still holds the old values; the sheet-wins cron would revert
+    // this edit at the next pass. Surface it so the caller can toast.
+    sheetSyncWarning = true;
   }
 
-  return NextResponse.json({ ok: true, entry: { ...updated, sheetRowKey } });
+  return NextResponse.json({ ok: true, entry: { ...updated, sheetRowKey }, sheetSyncWarning });
 }
 
 /**
@@ -145,7 +149,10 @@ export async function DELETE(
 
   await prisma.expenseEntry.delete({ where: { id } });
 
-  // Remove the matching sheet row so the import can't resurrect the entry.
+  // Remove the matching sheet row so the import can't resurrect the entry. A
+  // failed delete leaves the row behind (the cron would re-import it), so
+  // surface a warning the caller can toast.
+  let sheetSyncWarning = false;
   if (existing.sheetRowKey) {
     try {
       const spreadsheetId = await resolveSheetIdForDate(existing.date);
@@ -154,8 +161,9 @@ export async function DELETE(
       }
     } catch (err) {
       console.error(`[expenses] Failed to delete sheet row for entry ${id}:`, err);
+      sheetSyncWarning = true;
     }
   }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, sheetSyncWarning });
 }

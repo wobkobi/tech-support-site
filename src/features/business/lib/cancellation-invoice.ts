@@ -7,12 +7,12 @@
  */
 
 import { calcInvoiceTotals } from "@/features/business/lib/business";
-import { uploadInvoicePdf } from "@/features/business/lib/google-drive";
+import { syncInvoicePdfToDrive } from "@/features/business/lib/invoice-drive-sync";
 import {
   getNextInvoiceNumber,
   writeBackInvoiceCounter,
 } from "@/features/business/lib/invoice-numbering";
-import { extractYearCode, generateInvoicePdf } from "@/features/business/lib/invoice-pdf";
+import { generateInvoicePdf, serializeInvoice } from "@/features/business/lib/invoice-pdf";
 import { calcTravelCharge, FALLBACK_TRAVEL_RATE } from "@/features/business/lib/pricing-policy";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { lookupDriveRoundTrip } from "@/features/business/lib/travel-distance";
@@ -148,6 +148,9 @@ export async function createDraftCancellationInvoice(
       status: "DRAFT",
       notes: customerNotes,
       contactId,
+      // Link the auto-draft to the booking it bills so the booking detail page
+      // (Phase 9) can surface it. Legacy cancellation invoices stay unlinked.
+      bookingId: booking.id,
     },
   });
   console.log(
@@ -186,13 +189,7 @@ async function sendCancellationInvoice(
       : `This invoice covers the late-cancellation fee for the appointment you cancelled inside the notice window. Please see the attached PDF for the details.`;
 
   try {
-    const pdfBytes = await generateInvoicePdf({
-      ...invoice,
-      issueDate: invoice.issueDate.toISOString(),
-      dueDate: invoice.dueDate.toISOString(),
-      createdAt: invoice.createdAt.toISOString(),
-      updatedAt: invoice.updatedAt.toISOString(),
-    });
+    const pdfBytes = await generateInvoicePdf(serializeInvoice(invoice));
 
     const ok = await sendInvoiceEmail({
       invoice: {
@@ -219,24 +216,7 @@ async function sendCancellationInvoice(
     console.log(`[cancellation-invoice] Auto-sent ${invoice.number}.`);
 
     // Sync the sent PDF to Drive so the archive matches what the client got.
-    // Drive failure is non-fatal - the email already went out.
-    try {
-      const yearCode = extractYearCode(invoice.number);
-      const drive = await uploadInvoicePdf(
-        pdfBytes,
-        invoice.number,
-        yearCode,
-        invoice.driveFileId ?? undefined,
-      );
-      if (drive.fileId !== invoice.driveFileId || drive.webUrl !== invoice.driveWebUrl) {
-        await prisma.invoice.update({
-          where: { id: invoice.id },
-          data: { driveFileId: drive.fileId, driveWebUrl: drive.webUrl },
-        });
-      }
-    } catch (err) {
-      console.error(`[cancellation-invoice] Drive sync failed for ${invoice.number}:`, err);
-    }
+    await syncInvoicePdfToDrive(invoice, pdfBytes, "[cancellation-invoice]");
   } catch (err) {
     console.error(`[cancellation-invoice] Auto-send failed for ${invoice.number}:`, err);
   }

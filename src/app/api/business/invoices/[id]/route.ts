@@ -8,8 +8,7 @@
  */
 
 import { calcInvoiceTotals, isValidLineItem } from "@/features/business/lib/business";
-import { uploadInvoicePdf } from "@/features/business/lib/google-drive";
-import { extractYearCode, generateInvoicePdf } from "@/features/business/lib/invoice-pdf";
+import { syncInvoicePdfToDriveById } from "@/features/business/lib/invoice-drive-sync";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
@@ -20,17 +19,44 @@ import { NextRequest, NextResponse } from "next/server";
 // Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
 export const maxDuration = 60;
 
+/** The lifecycle-timestamp patch {@link statusDataFor} returns for a status change. */
+interface StatusPatch {
+  status: InvoiceStatus;
+  voidedAt: Date | null;
+  sentAt?: Date;
+  paidAt?: Date | null;
+  paymentMethod?: null;
+  paymentReference?: null;
+}
+
 /**
- * Builds the patch payload for a status change: stamps `voidedAt` when the
- * target is VOIDED (audit trail), clears it for any other status so an
- * un-voided invoice drops the stale "Voided" label. All status-flipping
- * paths funnel through here.
+ * Builds the patch payload for a status change: stamps/clears the lifecycle
+ * timestamps to match the target status. voidedAt stamps on entering VOIDED and
+ * clears otherwise (preserved exactly). sentAt stamps the first time the invoice
+ * reaches SENT. paidAt stamps the first time it reaches PAID; leaving PAID clears
+ * the whole payment record (paidAt + method + reference) so a re-opened invoice
+ * carries no stale payment. All status-flipping paths funnel through here.
  * @param next - Target InvoiceStatus.
+ * @param current - The invoice's current lifecycle timestamps.
+ * @param current.sentAt - Current sentAt (null until first SENT); keeps an existing stamp.
+ * @param current.paidAt - Current paidAt (null until first PAID); keeps an existing stamp.
  * @returns Partial update payload to splat into prisma.invoice.update data.
  */
-function statusDataFor(next: InvoiceStatus): { status: InvoiceStatus; voidedAt: Date | null } {
-  if (next === "VOIDED") return { status: next, voidedAt: new Date() };
-  return { status: next, voidedAt: null };
+function statusDataFor(
+  next: InvoiceStatus,
+  current: { sentAt: Date | null; paidAt: Date | null },
+): StatusPatch {
+  const now = new Date();
+  const data: StatusPatch = { status: next, voidedAt: next === "VOIDED" ? now : null };
+  if (next === "SENT" && current.sentAt === null) data.sentAt = now;
+  if (next === "PAID") {
+    if (current.paidAt === null) data.paidAt = now;
+  } else {
+    data.paidAt = null;
+    data.paymentMethod = null;
+    data.paymentReference = null;
+  }
+  return data;
 }
 
 /**
@@ -46,42 +72,6 @@ function validateTransition(current: InvoiceStatus, next: InvoiceStatus): string
     return "Voided invoices are terminal; issue a new invoice instead of re-opening this one.";
   }
   return null;
-}
-
-/**
- * Re-uploads the invoice's PDF to Drive (replacing the existing file in place when
- * `driveFileId` is set, otherwise creating a fresh one) and persists any new IDs
- * on the invoice record. Failures are logged but never thrown - Drive is a
- * non-critical archive sync.
- * @param invoiceId - Invoice DB id (used for the post-upload patch).
- */
-async function syncInvoicePdfToDrive(invoiceId: string): Promise<void> {
-  try {
-    const inv = await prisma.invoice.findUnique({ where: { id: invoiceId } });
-    if (!inv) return;
-    const pdfBytes = await generateInvoicePdf({
-      ...inv,
-      issueDate: inv.issueDate.toISOString(),
-      dueDate: inv.dueDate.toISOString(),
-      createdAt: inv.createdAt.toISOString(),
-      updatedAt: inv.updatedAt.toISOString(),
-    });
-    const yearCode = extractYearCode(inv.number);
-    const drive = await uploadInvoicePdf(
-      pdfBytes,
-      inv.number,
-      yearCode,
-      inv.driveFileId ?? undefined,
-    );
-    if (drive.fileId !== inv.driveFileId || drive.webUrl !== inv.driveWebUrl) {
-      await prisma.invoice.update({
-        where: { id: invoiceId },
-        data: { driveFileId: drive.fileId, driveWebUrl: drive.webUrl },
-      });
-    }
-  } catch (err) {
-    console.error(`[invoice-patch] Drive sync failed:`, err);
-  }
 }
 
 /**
@@ -129,17 +119,47 @@ export async function PATCH(
   // stronger audit guarantee.
   const current = await prisma.invoice.findUnique({
     where: { id },
-    select: { status: true, promoDiscount: true, unsuccessfulDiscount: true },
+    select: {
+      status: true,
+      promoDiscount: true,
+      unsuccessfulDiscount: true,
+      sentAt: true,
+      paidAt: true,
+    },
   });
   if (!current) {
     return errorResponse("Invoice not found", 404);
   }
 
-  // Full update: the body carries invoice fields, not just a status.
-  if (body.clientName !== undefined || body.lineItems !== undefined) {
+  // Full update: the body carries invoice fields, not just a status. Includes
+  // notes-only edits - clientEmail/issueDate/dueDate/notes previously fell
+  // through to the status branch and 400'd on the missing status.
+  if (
+    body.clientName !== undefined ||
+    body.clientEmail !== undefined ||
+    body.issueDate !== undefined ||
+    body.dueDate !== undefined ||
+    body.lineItems !== undefined ||
+    body.notes !== undefined
+  ) {
     if (current.status === "VOIDED") {
       return NextResponse.json(
         { error: "Voided invoices are immutable; issue a new invoice instead." },
+        { status: 409 },
+      );
+    }
+    // Only DRAFT invoices can have their content edited; SENT/PAID are audit-
+    // locked (void + reissue instead). Notes stay editable on any status for IRD
+    // audit annotations, so they are excluded from this guard.
+    const editsContent =
+      body.clientName !== undefined ||
+      body.clientEmail !== undefined ||
+      body.issueDate !== undefined ||
+      body.dueDate !== undefined ||
+      body.lineItems !== undefined;
+    if (current.status !== "DRAFT" && editsContent) {
+      return NextResponse.json(
+        { error: "Only draft invoices can be edited; void and reissue." },
         { status: 409 },
       );
     }
@@ -169,7 +189,7 @@ export async function PATCH(
       preservedDiscount,
       GST_REGISTERED,
     );
-    const statusPatch = status !== undefined ? statusDataFor(status as InvoiceStatus) : {};
+    const statusPatch = status !== undefined ? statusDataFor(status as InvoiceStatus, current) : {};
     const invoice = await prisma.invoice.update({
       where: { id },
       data: {
@@ -189,7 +209,7 @@ export async function PATCH(
       },
     });
     // Any field change should be reflected in the Drive archive copy.
-    await syncInvoicePdfToDrive(id);
+    await syncInvoicePdfToDriveById(id, "[invoice-patch]");
     return NextResponse.json({ ok: true, invoice });
   }
 
@@ -218,10 +238,10 @@ export async function PATCH(
   }
   const invoice = await prisma.invoice.update({
     where: { id },
-    data: statusDataFor(status as InvoiceStatus),
+    data: statusDataFor(status as InvoiceStatus, current),
   });
   // Status changes (Mark as paid, etc.) should be reflected in the Drive archive copy.
-  await syncInvoicePdfToDrive(id);
+  await syncInvoicePdfToDriveById(id, "[invoice-patch]");
   return NextResponse.json({ ok: true, invoice });
 }
 

@@ -452,6 +452,16 @@ model Invoice {
   voidedAt         DateTime?
   // Stamped when send-email included the review link; powers the 30-day cooldown.
   reviewLinkSentAt DateTime?
+  // Stamped when send-email promotes DRAFT>SENT - a real timestamp, unlike the
+  // updatedAt proxy the route returned before. Null on legacy SENT rows.
+  sentAt           DateTime?
+  // Payment record, stamped by POST /pay when the invoice becomes PAID.
+  // paymentMethod is an INCOME_METHODS value; paymentReference is an optional
+  // operator note. Null on legacy PAID rows (the timeline degrades gracefully;
+  // never approximated from updatedAt).
+  paidAt           DateTime?
+  paymentMethod    String?
+  paymentReference String?
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 

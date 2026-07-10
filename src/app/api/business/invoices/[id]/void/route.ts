@@ -8,8 +8,8 @@
  * best-effort; the status change is authoritative and never rolls back.
  */
 
-import { uploadInvoicePdf } from "@/features/business/lib/google-drive";
-import { extractYearCode, generateInvoicePdf } from "@/features/business/lib/invoice-pdf";
+import { syncInvoicePdfToDrive } from "@/features/business/lib/invoice-drive-sync";
+import { generateInvoicePdf, serializeInvoice } from "@/features/business/lib/invoice-pdf";
 import { sendVoidNotification } from "@/features/reviews/lib/email";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
@@ -78,13 +78,7 @@ export async function POST(
   // notified:false to the caller so the operator can be advised to email manually.
   let pdfBytes: Buffer | null = null;
   try {
-    pdfBytes = await generateInvoicePdf({
-      ...updated,
-      issueDate: updated.issueDate.toISOString(),
-      dueDate: updated.dueDate.toISOString(),
-      createdAt: updated.createdAt.toISOString(),
-      updatedAt: updated.updatedAt.toISOString(),
-    });
+    pdfBytes = await generateInvoicePdf(serializeInvoice(updated));
   } catch (err) {
     console.error(`[invoice-void] PDF generation failed for ${updated.number}:`, err);
   }
@@ -109,26 +103,7 @@ export async function POST(
   }
 
   // Sync the stamped PDF to Drive so the original Drive link now shows VOID.
-  // Best-effort - log on failure, don't fail the request.
-  if (pdfBytes) {
-    try {
-      const yearCode = extractYearCode(updated.number);
-      const drive = await uploadInvoicePdf(
-        pdfBytes,
-        updated.number,
-        yearCode,
-        updated.driveFileId ?? undefined,
-      );
-      if (drive.fileId !== updated.driveFileId || drive.webUrl !== updated.driveWebUrl) {
-        await prisma.invoice.update({
-          where: { id },
-          data: { driveFileId: drive.fileId, driveWebUrl: drive.webUrl },
-        });
-      }
-    } catch (err) {
-      console.error(`[invoice-void] Drive sync failed for ${updated.number}:`, err);
-    }
-  }
+  if (pdfBytes) await syncInvoicePdfToDrive(updated, pdfBytes, "[invoice-void]");
 
   return NextResponse.json({
     ok: true,

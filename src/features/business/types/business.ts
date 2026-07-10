@@ -54,6 +54,14 @@ export interface Invoice {
   status: InvoiceStatus;
   notes: string | null;
   contactId: string | null;
+  /** ISO timestamp when the invoice was first sent (DRAFT>SENT). Null on legacy rows. */
+  sentAt?: string | null;
+  /** ISO timestamp when payment was recorded (status>PAID). Null on legacy PAID rows. */
+  paidAt?: string | null;
+  /** Payment method recorded at pay time (an INCOME_METHODS value). */
+  paymentMethod?: string | null;
+  /** Optional operator reference/note recorded with the payment. */
+  paymentReference?: string | null;
   driveFileId: string | null;
   driveWebUrl: string | null;
   createdAt: string;

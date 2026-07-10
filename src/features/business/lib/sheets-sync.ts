@@ -204,22 +204,38 @@ export async function ensureSyncIdSetup(spreadsheetId: string, tabName: string):
 }
 
 /**
- * Appends a row with a fresh Sync ID at column Z; pads to 25 columns.
+ * Appends a row with a Sync ID at column Z; pads to 25 columns.
+ *
+ * When the caller supplies a deterministic Sync ID (an entry's Mongo id), the
+ * append is idempotent: if a row already carries that id (a retry after a
+ * succeeded-but-unacknowledged append, or a re-persist), the existing id is
+ * returned WITHOUT appending a duplicate. Legacy callers pass none and get a
+ * fresh random id. The read-then-append is not atomic - live routes don't hold
+ * the sync lock - so a concurrent duplicate is still possible; the import's
+ * content-gated dedup is the backstop for that.
  * @param spreadsheetId - Spreadsheet file ID.
  * @param tabName - Tab to append to (e.g. "Cashbook").
  * @param cells - Values for columns A..Y; right-padded with empty strings.
- * @returns The Sync ID written into column Z.
+ * @param syncId - Optional caller-supplied deterministic Sync ID; a fresh random one is minted when omitted.
+ * @returns The Sync ID written into (or already present in) column Z.
  */
 export async function appendRowWithSyncId(
   spreadsheetId: string,
   tabName: string,
   cells: (string | number | null)[],
+  syncId?: string,
 ): Promise<string> {
   await ensureSyncIdSetup(spreadsheetId, tabName);
-  const syncId = randomUUID();
+  const id = syncId ?? randomUUID();
+  // Append-if-absent for deterministic ids: reuse an existing row instead of
+  // doubling it. Random ids can't collide, so skip the extra read for them.
+  if (syncId) {
+    const existing = await readSyncIdColumn(spreadsheetId, tabName);
+    if (existing.has(syncId)) return syncId;
+  }
   const padded: (string | number | null)[] = cells.slice(0, SYNC_ID_COLUMN_INDEX);
   while (padded.length < SYNC_ID_COLUMN_INDEX) padded.push("");
-  padded.push(syncId);
+  padded.push(id);
 
   const sheets = getSheetsClient();
   await withRetry(
@@ -234,7 +250,7 @@ export async function appendRowWithSyncId(
     { label: "sheets-sync" },
   );
 
-  return syncId;
+  return id;
 }
 
 /**
@@ -383,7 +399,11 @@ export async function updateRowBySyncId(
 ): Promise<{ updated: boolean; syncId: string }> {
   const rowIndex = await findRowIndexBySyncId(spreadsheetId, tabName, syncId);
   if (rowIndex === null) {
-    const newSyncId = await appendRowWithSyncId(spreadsheetId, tabName, cells);
+    // Row vanished (sheet-side delete): re-append under the SAME Sync ID rather
+    // than minting a fresh random one, so the caller's persisted sheetRowKey
+    // stays valid and the import's id-fallback can re-link an orphan left by a
+    // failed re-persist.
+    const newSyncId = await appendRowWithSyncId(spreadsheetId, tabName, cells, syncId);
     return { updated: false, syncId: newSyncId };
   }
 

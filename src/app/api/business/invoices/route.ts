@@ -8,18 +8,19 @@
  */
 
 import { calcInvoiceTotals, isValidLineItem } from "@/features/business/lib/business";
-import { uploadInvoicePdf } from "@/features/business/lib/google-drive";
+import { syncInvoicePdfToDrive } from "@/features/business/lib/invoice-drive-sync";
 import {
   getNextInvoiceNumber,
   writeBackInvoiceCounter,
 } from "@/features/business/lib/invoice-numbering";
-import { extractYearCode, generateInvoicePdf } from "@/features/business/lib/invoice-pdf";
+import { generateInvoicePdf, serializeInvoice } from "@/features/business/lib/invoice-pdf";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { parseAmount } from "@/features/business/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { prisma } from "@/shared/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 
 // Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
@@ -118,13 +119,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     unsuccessfulDiscountValue = parsed;
   }
 
-  // Allocate the invoice number
-  const { number, sheetNextCount, sheetSyncWarning } = await getNextInvoiceNumber();
   // GST mode is driven by the live pricing settings (gstRegistered); the
   // request body does not carry gst. Promo + unsuccessful both reduce the
   // taxable amount before GST (per IRD treatment of price reductions); they
   // sum into one discount argument for calcInvoiceTotals but persist as
-  // separate audit fields.
+  // separate audit fields. Totals are independent of the invoice number.
   const { GST_REGISTERED } = await getPolicy();
   const { subtotal, gstAmount, total } = calcInvoiceTotals(
     lineItems,
@@ -132,57 +131,72 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     GST_REGISTERED,
   );
 
-  // Create the invoice
-  const invoice = await prisma.invoice.create({
-    data: {
-      number,
-      clientName,
-      clientEmail,
-      issueDate: issueDateValue,
-      dueDate: dueDateValue,
-      lineItems,
-      gst: gstAmount > 0,
-      subtotal,
-      gstAmount,
-      total,
-      promoTitle: discount > 0 && promoTitle ? promoTitle : null,
-      promoDiscount: discount > 0 ? discount : null,
-      unsuccessful: unsuccessful === true,
-      unsuccessfulDiscount: unsuccessfulDiscountValue > 0 ? unsuccessfulDiscountValue : null,
-      notes: notes ?? null,
-      contactId: contactId ?? null,
-      // ObjectId shape enforced here (Prisma throws on malformed ids at read
-      // time otherwise); calendarEventId is a free-form Google id.
-      bookingId: bookingId && /^[a-f0-9]{24}$/i.test(bookingId) ? bookingId : null,
-      calendarEventId:
-        typeof calendarEventId === "string" && calendarEventId ? calendarEventId : null,
-    },
-  });
+  // Allocate a number and create the invoice, retrying on a unique-number
+  // collision. Concurrent creates or a stale sheet counter can mint the same
+  // number; the unique index rejects the loser, and getNextInvoiceNumber
+  // re-allocates above the new DB max on the next pass rather than 500ing.
+  let invoice: Awaited<ReturnType<typeof prisma.invoice.create>> | null = null;
+  let sheetNextCount: number | null = null;
+  let sheetSyncWarning = false;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const alloc = await getNextInvoiceNumber();
+    sheetNextCount = alloc.sheetNextCount;
+    sheetSyncWarning = alloc.sheetSyncWarning;
+    try {
+      invoice = await prisma.invoice.create({
+        data: {
+          number: alloc.number,
+          clientName,
+          clientEmail,
+          issueDate: issueDateValue,
+          dueDate: dueDateValue,
+          lineItems,
+          gst: gstAmount > 0,
+          subtotal,
+          gstAmount,
+          total,
+          promoTitle: discount > 0 && promoTitle ? promoTitle : null,
+          promoDiscount: discount > 0 ? discount : null,
+          unsuccessful: unsuccessful === true,
+          unsuccessfulDiscount: unsuccessfulDiscountValue > 0 ? unsuccessfulDiscountValue : null,
+          notes: notes ?? null,
+          contactId: contactId ?? null,
+          // ObjectId shape enforced here (Prisma throws on malformed ids at read
+          // time otherwise); calendarEventId is a free-form Google id.
+          bookingId: bookingId && /^[a-f0-9]{24}$/i.test(bookingId) ? bookingId : null,
+          calendarEventId:
+            typeof calendarEventId === "string" && calendarEventId ? calendarEventId : null,
+        },
+      });
+      break;
+    } catch (err) {
+      // P2002 = unique constraint (the number index): re-allocate and retry.
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === "P2002" &&
+        attempt < 4
+      ) {
+        console.warn(`[invoices] Invoice number ${alloc.number} collided; re-allocating.`);
+        continue;
+      }
+      throw err;
+    }
+  }
+  if (!invoice) {
+    return errorResponse("Could not allocate a unique invoice number", 500);
+  }
 
-  // Keep the Sheets counter in sync; the helper swallows + logs failures
-  // so the just-saved invoice isn't compromised by a transient Sheets hiccup.
+  // Keep the Sheets counter in sync; the helper swallows + logs failures so the
+  // just-saved invoice isn't compromised by a transient Sheets hiccup.
   await writeBackInvoiceCounter(sheetNextCount);
 
-  // Generate the PDF and upload to Drive, then store the Drive URL. Awaited (not
-  // fire-and-forget) so it completes before the response: Vercel freezes the
-  // function instance once the response is sent, so a detached promise may never
-  // run, leaving driveFileId / driveWebUrl null. maxDuration is raised above so
-  // the extra Google round-trips can't 504. Failures are logged and swallowed so
-  // a Drive hiccup never blocks invoice creation - sync-drive backfills later.
+  // Generate the PDF and sync it to Drive. Awaited (not fire-and-forget) so it
+  // completes before the response - Vercel freezes the instance once the
+  // response is sent, so a detached promise may never run. Failures are
+  // swallowed so a Drive hiccup never blocks invoice creation.
   try {
-    const pdfBuffer = await generateInvoicePdf({
-      ...invoice,
-      issueDate: invoice.issueDate.toISOString(),
-      dueDate: invoice.dueDate.toISOString(),
-      createdAt: invoice.createdAt.toISOString(),
-      updatedAt: invoice.updatedAt.toISOString(),
-    });
-    const yearCode = extractYearCode(invoice.number);
-    const { fileId, webUrl } = await uploadInvoicePdf(pdfBuffer, invoice.number, yearCode);
-    await prisma.invoice.update({
-      where: { id: invoice.id },
-      data: { driveFileId: fileId, driveWebUrl: webUrl },
-    });
+    const pdfBuffer = await generateInvoicePdf(serializeInvoice(invoice));
+    await syncInvoicePdfToDrive(invoice, pdfBuffer, "[invoices]");
   } catch (err) {
     console.error("[invoices] Drive PDF upload failed:", err);
   }

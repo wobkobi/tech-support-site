@@ -21,17 +21,31 @@ export interface NextInvoiceNumber {
 }
 
 /**
- * Fetches the next invoice number, preferring Sheets and falling back to a
- * Prisma `findFirst(orderBy number desc)` + {@link nextInvoiceNumber} when Sheets
- * is unreachable. Callers should pass `sheetNextCount` to
- * {@link writeBackInvoiceCounter} after the invoice row is created so the
- * Sheets counter stays in sync.
+ * Fetches the next invoice number as `max(sheet counter, highest existing DB
+ * number)`, so a stale Sheets B19 or a row created since the last write-back
+ * can't hand out an already-used number - the caller's collision-retry loop
+ * then converges upward. Falls back to the DB max alone when Sheets is
+ * unreachable. Callers pass `sheetNextCount` to {@link writeBackInvoiceCounter}
+ * after the row is created so the Sheets counter stays in sync.
  * @returns Next number plus the write-back counter (or null on fallback).
  */
 export async function getNextInvoiceNumber(): Promise<NextInvoiceNumber> {
   try {
     const data = await getInvoiceCounter();
-    return { number: data.nextFormatted, sheetNextCount: data.nextNumber, sheetSyncWarning: false };
+    const last = await prisma.invoice.findFirst({
+      orderBy: { number: "desc" },
+      select: { number: true },
+    });
+    // Trailing "-NNNN" is the sequence; the year segment can't leak in (\d+
+    // stops at the hyphen). Missing/legacy > 0 so the sheet counter wins.
+    const dbMatch = last?.number.match(/-(\d+)$/);
+    const dbNext = (dbMatch ? parseInt(dbMatch[1], 10) : 0) + 1;
+    const nextNumber = Math.max(data.nextNumber, dbNext);
+    const number =
+      nextNumber === data.nextNumber
+        ? data.nextFormatted
+        : `${data.prefix}-${data.yearCode}-${String(nextNumber).padStart(4, "0")}`;
+    return { number, sheetNextCount: nextNumber, sheetSyncWarning: false };
   } catch {
     const last = await prisma.invoice.findFirst({ orderBy: { number: "desc" } });
     const now = new Date();

@@ -7,8 +7,8 @@
  */
 
 import { getInvoiceReviewEligibility } from "@/features/business/lib/contact-review-token";
-import { uploadInvoicePdf } from "@/features/business/lib/google-drive";
-import { extractYearCode, generateInvoicePdf } from "@/features/business/lib/invoice-pdf";
+import { syncInvoicePdfToDrive } from "@/features/business/lib/invoice-drive-sync";
+import { generateInvoicePdf, serializeInvoice } from "@/features/business/lib/invoice-pdf";
 import { sendInvoiceEmail } from "@/features/reviews/lib/email";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
@@ -82,13 +82,7 @@ export async function POST(
   // Generate the invoice PDF
   let pdfBytes: Buffer;
   try {
-    pdfBytes = await generateInvoicePdf({
-      ...invoice,
-      issueDate: invoice.issueDate.toISOString(),
-      dueDate: invoice.dueDate.toISOString(),
-      createdAt: invoice.createdAt.toISOString(),
-      updatedAt: invoice.updatedAt.toISOString(),
-    });
+    pdfBytes = await generateInvoicePdf(serializeInvoice(invoice));
   } catch (err) {
     console.error(`[invoice-email] PDF generation failed for ${invoice.number}:`, err);
     return errorResponse("PDF generation failed", 500);
@@ -124,31 +118,22 @@ export async function POST(
   const updated = await prisma.invoice.update({
     where: { id },
     data: {
-      ...(invoice.status === "DRAFT" ? { status: "SENT" } : {}),
+      // First send stamps a real sentAt (DRAFT>SENT); re-sends of SENT/PAID
+      // leave status + sentAt alone (a receipt copy must not regress).
+      ...(invoice.status === "DRAFT" ? { status: "SENT", sentAt: new Date() } : {}),
       ...(includeReview ? { reviewLinkSentAt: new Date() } : {}),
     },
-    select: { updatedAt: true },
+    select: { updatedAt: true, sentAt: true },
   });
 
-  // Sync the freshly-sent PDF to Drive so the archive matches what the client received.
-  // Failures are logged but don't fail the request - the email is the critical path.
-  try {
-    const yearCode = extractYearCode(invoice.number);
-    const drive = await uploadInvoicePdf(
-      pdfBytes,
-      invoice.number,
-      yearCode,
-      invoice.driveFileId ?? undefined,
-    );
-    if (drive.fileId !== invoice.driveFileId || drive.webUrl !== invoice.driveWebUrl) {
-      await prisma.invoice.update({
-        where: { id },
-        data: { driveFileId: drive.fileId, driveWebUrl: drive.webUrl },
-      });
-    }
-  } catch (err) {
-    console.error(`[invoice-email] Drive sync failed for ${invoice.number}:`, err);
-  }
+  // Sync the freshly-sent PDF to Drive so the archive matches what the client
+  // received. Best-effort - the email is the critical path.
+  await syncInvoicePdfToDrive(invoice, pdfBytes, "[invoice-email]");
 
-  return NextResponse.json({ ok: true, sentAt: updated.updatedAt.toISOString() });
+  // Return the real sentAt (falling back to updatedAt for legacy SENT rows that
+  // predate the sentAt column).
+  return NextResponse.json({
+    ok: true,
+    sentAt: (updated.sentAt ?? updated.updatedAt).toISOString(),
+  });
 }
