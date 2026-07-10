@@ -83,7 +83,7 @@
     "lint-staged": "^17.0.8",
     "png-to-ico": "^3.0.2",
     "postcss": "^8.5.16",
-    "prettier": "^3.9.4",
+    "prettier": "^3.9.5",
     "prettier-plugin-organize-imports": "^4.3.0",
     "prettier-plugin-packagejson": "^3.0.2",
     "prettier-plugin-tailwindcss": "^0.8.0",
