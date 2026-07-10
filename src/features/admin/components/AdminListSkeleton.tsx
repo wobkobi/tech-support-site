@@ -4,9 +4,10 @@
  * Income, Expenses, Invoices, Contacts, Travel, Promos, Price-estimates):
  * heading + filter chips + the card-on-mobile / table-on-desktop card list.
  * The data-table route loading.tsx files re-export this as their default.
+ * Renders content bones only - the (shell) layout supplies the sidebar +
+ * padding, so no skeleton frame is needed here.
  */
 
-import { AdminSkeletonShell } from "@/features/admin/components/AdminSkeletonShell";
 import { Bone } from "@/shared/components/Skeleton";
 import type React from "react";
 
@@ -16,7 +17,7 @@ import type React from "react";
  */
 export function AdminListSkeleton(): React.ReactElement {
   return (
-    <AdminSkeletonShell>
+    <div role="status" aria-live="polite" aria-label="Loading">
       {/* Page heading. */}
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -51,6 +52,7 @@ export function AdminListSkeleton(): React.ReactElement {
           </div>
         ))}
       </div>
-    </AdminSkeletonShell>
+      <span className="sr-only">Loading...</span>
+    </div>
   );
 }

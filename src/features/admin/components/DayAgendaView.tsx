@@ -454,8 +454,8 @@ export function DayAgendaView({
 
       {/* Sticky header band - mini week strip + day-picker bar pinned to the
           top of the viewport while the events list scrolls under them. The
-          band sits at `top-14` to clear the mobile hamburger button (AdminPageLayout
-          uses pt-16 / 64px), and `-mx-4` / `-mx-6` so the slate-50 background
+          band sits at `top-14` to clear the mobile hamburger button (the admin
+          shell layout uses pt-16 / 64px), and `-mx-4` / `-mx-6` so the slate-50 background
           covers the page edges as content scrolls behind. */}
       <div
         data-no-swipe
