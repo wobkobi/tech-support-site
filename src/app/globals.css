@@ -79,6 +79,18 @@
   --color-moonstone-700: #8dd7e1;
   --color-moonstone-800: #b3e4eb;
   --color-moonstone-900: #d9f2f5;
+
+  /* admin neutrals - Polaris-like back-office chrome. Maps the slate values
+     hardcoded across admin pages so upgraded surfaces read from tokens; the
+     public site keeps its own palette untouched. */
+  --color-admin-bg: #f8fafc;
+  --color-admin-surface: #ffffff;
+  --color-admin-border: #e2e8f0;
+  --color-admin-border-strong: #cbd5e1;
+  --color-admin-text: #1e293b;
+  --color-admin-text-secondary: #475569;
+  --color-admin-muted: #64748b;
+  --color-admin-faint: #94a3b8;
 }
 
 /* Fixed light theme base colours */
