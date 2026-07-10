@@ -22,10 +22,8 @@ export const metadata: Metadata = {
 export default async function InvoicesPage(): Promise<React.ReactElement> {
   await requireAdminAuth();
 
-  return (
-    <>
-      <h1 className="mb-6 text-2xl font-extrabold text-russian-violet">Invoices</h1>
-      <InvoicesListView />
-    </>
-  );
+  // InvoicesListView renders its own PageHeader (title + Import/Sync/New actions)
+  // - the Drive actions are client handlers coupled to the fetched list, so they
+  // live in the client view rather than a separate server-side header.
+  return <InvoicesListView />;
 }
