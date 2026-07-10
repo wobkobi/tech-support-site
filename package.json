@@ -49,7 +49,7 @@
     "date-holidays": "^3.32.0",
     "googleapis": "^173.0.0",
     "next": "^16.2.10",
-    "openai": "^6.45.0",
+    "openai": "^6.46.0",
     "pdf-lib": "^1.17.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
