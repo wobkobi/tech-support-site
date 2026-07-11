@@ -25,6 +25,7 @@ interface LogBody {
   hourlyRate?: unknown;
   priceLow?: unknown;
   priceHigh?: unknown;
+  travelCharge?: unknown;
   promoTitle?: unknown;
   promoLabel?: unknown;
 }
@@ -92,6 +93,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const hourlyRate = Math.max(0, Number(body.hourlyRate) || 0);
   const priceLow = Math.max(0, Math.round(Number(body.priceLow) || 0));
   const priceHigh = Math.max(0, Math.round(Number(body.priceHigh) || 0));
+  const travelCharge =
+    body.travelCharge == null ? null : Math.max(0, Math.round(Number(body.travelCharge) || 0));
 
   const promoTitle =
     typeof body.promoTitle === "string" && body.promoTitle.trim()
@@ -122,6 +125,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         hourlyRate,
         priceLow,
         priceHigh,
+        travelCharge,
         promoTitle,
         promoLabel,
         environment,

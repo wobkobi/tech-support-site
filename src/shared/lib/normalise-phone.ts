@@ -147,6 +147,11 @@ export function validatePhone(raw: string): { result: PhoneValidationResult; e16
   const trimmed = raw.trim();
   if (!trimmed) return { result: "empty", e164: "" };
   const e164 = toE164NZ(trimmed);
-  if (!isValidPhone(e164)) return { result: "invalid", e164: "" };
+  // Non-empty input that normalises to no usable digits (letters/symbols) is
+  // invalid - isValidPhone treats empty as acceptable for optional fields, so
+  // guard the zero-digit case here rather than loosening isValidPhone.
+  if (!e164.replace(/\D/g, "") || !isValidPhone(e164)) {
+    return { result: "invalid", e164: "" };
+  }
   return { result: "ok", e164 };
 }

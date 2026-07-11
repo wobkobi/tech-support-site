@@ -7,6 +7,7 @@
  */
 
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
+import { BOOKING_FIELD_LIMITS } from "@/features/booking/lib/booking";
 import { priceRangeFor, remoteRateDelta } from "@/features/business/lib/estimate-range";
 import {
   calcTravelCharge,
@@ -81,7 +82,9 @@ export function PricingWizard({
   const [loading, setLoading] = useState(true);
   const [step, setStep] = useState<Step>("issue");
   const [issueDescription, setIssueDescription] = useState("");
-  const [meeting, setMeeting] = useState<MeetingMode>("on-site");
+  // Null until the customer explicitly picks - no silent on-site default, so a
+  // remote customer can't skip past and get a travel-inclusive quote by accident.
+  const [meeting, setMeeting] = useState<MeetingMode | null>(null);
   const [address, setAddress] = useState("");
   const [addressNotFound, setAddressNotFound] = useState(false);
   const [aiExplanation, setAiExplanation] = useState("");
@@ -116,6 +119,9 @@ export function PricingWizard({
 
   /** Calls both APIs in parallel then computes a price range from the AI's time estimate. */
   async function getEstimate(): Promise<void> {
+    // Reachable only after the meeting step, which requires an explicit pick;
+    // guard anyway so `meeting` narrows to a concrete mode below.
+    if (!meeting) return;
     setIsCalculating(true);
     setAddressNotFound(false);
 
@@ -334,6 +340,7 @@ export function PricingWizard({
         hourlyRate: promoRate,
         priceLow: promoRange.low,
         priceHigh: promoRange.high,
+        travelCharge: promoRange.travel,
         promoTitle: activePromo?.title ?? null,
         promoLabel: activePromo ? summariseForBanner(activePromo) : null,
       }),
@@ -395,7 +402,8 @@ export function PricingWizard({
    * @returns True if the user can proceed
    */
   function canAdvance(): boolean {
-    if (step === "issue") return issueDescription.trim().length > 0;
+    if (step === "issue") return issueDescription.trim().length >= BOOKING_FIELD_LIMITS.notesMin;
+    if (step === "meeting") return meeting !== null;
     return true;
   }
 
@@ -441,6 +449,7 @@ export function PricingWizard({
             rows={4}
             value={issueDescription}
             onChange={(e) => setIssueDescription(e.target.value)}
+            maxLength={BOOKING_FIELD_LIMITS.notes}
             aria-label="Describe the issue or job you need help with"
             placeholder="e.g. My laptop is running really slow and I think it has a virus. Also want to set up my new phone."
             className={cn(
@@ -449,6 +458,12 @@ export function PricingWizard({
               "focus:border-coquelicot focus:ring-2 focus:ring-coquelicot/30",
             )}
           />
+          {issueDescription.trim().length > 0 &&
+            issueDescription.trim().length < BOOKING_FIELD_LIMITS.notesMin && (
+              <p className="mt-2 text-sm text-slate-500">
+                Add a bit more detail for a better estimate.
+              </p>
+            )}
         </div>
       )}
 

@@ -631,10 +631,14 @@ model PriceEstimateLog {
   // the customer was quoted an on-site rate (with travel) or remote.
   meetingType MeetingType?
 
-  // Final price range shown to the user, post-promo.
-  hourlyRate Float
-  priceLow   Int
-  priceHigh  Int
+  // Final price range shown to the user, post-promo. priceLow/priceHigh are the
+  // all-in total (labour + travel); travelCharge is the round-trip travel slice
+  // of that total (null on rows logged before travel was broken out, 0 for
+  // remote), letting the booking notes show the labour/travel split.
+  hourlyRate   Float
+  priceLow     Int
+  priceHigh    Int
+  travelCharge Int?
 
   // Promo snapshot so old quotes remain reconstructable after promos change.
   promoTitle String?

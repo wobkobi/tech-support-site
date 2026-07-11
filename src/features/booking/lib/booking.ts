@@ -36,6 +36,24 @@ export function combineUnitAndAddress(unit: string, rest: string): string {
   return u ? `${u}/${r}` : r;
 }
 
+/**
+ * True when the entered unit looks like it is actually the street number - the
+ * unit value equals the leading number of the street address (e.g. unit "500"
+ * against "500 Pt Chev Road"). Used to warn customers in standalone houses who
+ * put their street number in the Apt/Unit box. Case-insensitive on the optional
+ * letter suffix ("12A"). Same `1-4 digit + optional letter` shape as
+ * {@link splitUnitFromAddress}, so unit-number semantics stay consistent.
+ * @param unit - Apartment / unit number as typed.
+ * @param rest - Street address + suburb as typed.
+ * @returns Whether the unit duplicates the leading street number.
+ */
+export function unitMatchesStreetNumber(unit: string, rest: string): boolean {
+  const u = unit.trim();
+  if (!u) return false;
+  const m = rest.trim().match(/^(\d{1,4}[A-Za-z]?)\b/);
+  return !!m && m[1].toLowerCase() === u.toLowerCase();
+}
+
 export const BOOKING_CONFIG = {
   timeZone: "Pacific/Auckland",
   maxAdvanceDays: 14,

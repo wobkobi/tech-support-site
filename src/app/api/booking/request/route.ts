@@ -29,7 +29,9 @@ import {
   sendOwnerBookingNotification,
 } from "@/features/reviews/lib/email";
 import { errorResponse } from "@/shared/lib/api-response";
-import { isValidPhone, toE164NZ } from "@/shared/lib/normalise-phone";
+import { normaliseAddress } from "@/shared/lib/normalise-address";
+import { normaliseName } from "@/shared/lib/normalise-name";
+import { validatePhone } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 import { getSettings } from "@/shared/lib/settings/get-settings";
@@ -98,15 +100,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       console.log(`[booking/request] idempotencyKey=${idempotencyKey}`);
     }
 
-    // Normalise + validate phone up front so a malformed number is rejected
-    // before any of the calendar / DB work runs.
-    const phoneE164 = phone ? toE164NZ(phone) || null : null;
-    if (phone && (!phoneE164 || !isValidPhone(phoneE164))) {
+    // Normalise + validate phone up front so a malformed number (letters,
+    // wrong length) is rejected before any of the calendar / DB work runs.
+    const phoneValidation = validatePhone(phone ?? "");
+    if (phoneValidation.result === "invalid") {
       return NextResponse.json(
         { ok: false, error: "Please enter a valid phone number, or leave it blank." },
         { status: 400 },
       );
     }
+    const phoneE164 = phoneValidation.e164 || null;
 
     // Honeypot trip: silently report success without creating a booking so the
     // bot moves on. Real users never fill this field (it's visually hidden
@@ -125,6 +128,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (!payloadCheck.valid) {
       return errorResponse(payloadCheck.error, 400);
     }
+
+    // Tidy the name (casing/spacing) and Google-canonicalise a typed address.
+    // normaliseAddress only formats an UNAMBIGUOUS match (null on 0 or >1
+    // candidates), so we never guess between streets - any real ambiguity was
+    // resolved by the customer's pick on the client. Falls back to the typed
+    // value so a genuine new address still books.
+    const cleanName = normaliseName(name) || name.trim();
+    const canonicalAddress =
+      meetingType === "in-person" && address?.trim()
+        ? ((await normaliseAddress(address.trim())) ?? address.trim())
+        : (address?.trim() ?? null);
 
     const now = new Date();
     const { config, acceptingBookings } = await getAvailabilityConfig();
@@ -216,6 +230,27 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const cancelToken = randomUUID();
     const reviewToken = randomUUID();
 
+    // Snapshot the public quote the customer saw (carried from /pricing or the
+    // inline booking estimate). Fetched before the notes/calendar are built so
+    // the quoted range appears in both. Best effort; the id is validated loosely
+    // and the low/high are copied so they survive the estimate-log retention
+    // purge. The stored priceLow/priceHigh are the all-in total (labour + travel).
+    let priceEstimateIdAtBooking: string | null = null;
+    let quotedLowAtBooking: number | null = null;
+    let quotedHighAtBooking: number | null = null;
+    let quotedTravelAtBooking: number | null = null;
+    if (estimateId && /^[a-f0-9]{24}$/i.test(estimateId)) {
+      const est = await prisma.priceEstimateLog
+        .findUnique({ where: { id: estimateId } })
+        .catch(() => null);
+      if (est) {
+        priceEstimateIdAtBooking = est.id;
+        quotedLowAtBooking = est.priceLow;
+        quotedHighAtBooking = est.priceHigh;
+        quotedTravelAtBooking = est.travelCharge;
+      }
+    }
+
     // Build notes
     let bookingNotes = `${notes.trim()}\n\n`;
     const timeLabel =
@@ -225,15 +260,27 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const durationLabel = `${duration === "short" ? "Standard" : "Extended"} (${durationMinutes} min)`;
     bookingNotes += `[${timeLabel} - ${durationLabel}]\n`;
     bookingNotes += `Meeting type: ${meetingType === "in-person" ? "In-person" : "Remote"}\n`;
-    if (meetingType === "in-person" && address) {
-      bookingNotes += `Address: ${address.trim()}\n`;
+    if (meetingType === "in-person" && canonicalAddress) {
+      bookingNotes += `Address: ${canonicalAddress}\n`;
+    }
+    if (quotedLowAtBooking !== null && quotedHighAtBooking !== null) {
+      // priceLow/priceHigh are the all-in total; subtract the travel slice to
+      // show labour + travel separately (matching the estimate card). Older
+      // logs have no travelCharge - fall back to the combined range.
+      if (quotedTravelAtBooking && quotedTravelAtBooking > 0) {
+        const labourLow = quotedLowAtBooking - quotedTravelAtBooking;
+        const labourHigh = quotedHighAtBooking - quotedTravelAtBooking;
+        bookingNotes += `Quoted: $${labourLow} - $${labourHigh} + $${quotedTravelAtBooking} travel\n`;
+      } else {
+        bookingNotes += `Quoted: $${quotedLowAtBooking} - $${quotedHighAtBooking}\n`;
+      }
     }
 
     // Create calendar event
     let calendarEventId: string | null = null;
     try {
       const cleanDurationLabel = `${duration === "short" ? "Standard" : "Extended"} ${durationMinutes} min`;
-      const summary = `Tech Support: ${name.trim()} - ${cleanDurationLabel}`;
+      const summary = `Tech Support: ${cleanName} - ${cleanDurationLabel}`;
       const calendarResult = await createBookingEvent({
         summary,
         description: bookingNotes,
@@ -241,8 +288,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         endAt,
         timeZone: config.timeZone,
         attendeeEmail: email.trim().toLowerCase(),
-        attendeeName: name.trim(),
-        location: meetingType === "in-person" && address ? address.trim() : undefined,
+        attendeeName: cleanName,
+        location: meetingType === "in-person" && canonicalAddress ? canonicalAddress : undefined,
       });
 
       calendarEventId = calendarResult.eventId;
@@ -283,9 +330,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // re-lookup. Non-blocking on failure.
     let travelMinsAtBooking: number | null = null;
     let travelMinsBackAtBooking: number | null = null;
-    if (meetingType === "in-person" && address && address.trim()) {
+    if (meetingType === "in-person" && canonicalAddress) {
       try {
-        const drive = await lookupDriveRoundTrip(address.trim(), startAt, endAt);
+        const drive = await lookupDriveRoundTrip(canonicalAddress, startAt, endAt);
         if (drive.status === "ok") {
           travelMinsAtBooking = drive.data.there.durationMins;
           travelMinsBackAtBooking = drive.data.back.durationMins;
@@ -303,28 +350,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     });
     const publicHolidayName = holiday?.name ?? null;
 
-    // Snapshot the public quote the customer saw (carried from /pricing or the
-    // inline booking estimate). Best effort; the id is validated loosely and
-    // the low/high are copied so they survive the estimate-log retention purge.
-    let priceEstimateIdAtBooking: string | null = null;
-    let quotedLowAtBooking: number | null = null;
-    let quotedHighAtBooking: number | null = null;
-    if (estimateId && /^[a-f0-9]{24}$/i.test(estimateId)) {
-      const est = await prisma.priceEstimateLog
-        .findUnique({ where: { id: estimateId } })
-        .catch(() => null);
-      if (est) {
-        priceEstimateIdAtBooking = est.id;
-        quotedLowAtBooking = est.priceLow;
-        quotedHighAtBooking = est.priceHigh;
-      }
-    }
-
     // Create booking
     try {
       const booking = await prisma.booking.create({
         data: {
-          name: name.trim(),
+          name: cleanName,
           email: email.trim().toLowerCase(),
           phone: phoneE164,
           notes: bookingNotes,
@@ -340,8 +370,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           // Notes text above stays dual-written for regex-parsing admin code.
           // Split unit off the address so apartment numbers can be filtered
           // without re-parsing.
-          address: address?.trim() ? splitUnitFromAddress(address.trim()).rest : null,
-          unit: address?.trim() ? splitUnitFromAddress(address.trim()).unit || null : null,
+          address: canonicalAddress ? splitUnitFromAddress(canonicalAddress).rest : null,
+          unit: canonicalAddress ? splitUnitFromAddress(canonicalAddress).unit || null : null,
           meetingType: meetingType === "in-person" ? "in_person" : "remote",
           duration,
           travelMinsAtBooking,
@@ -369,9 +399,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       // Upsert contact record - best effort, never fail the booking on write error
       try {
         const { contact } = await findOrCreateContactByEmail(email.trim().toLowerCase(), {
-          name: name.trim(),
+          name: cleanName,
           phone: phoneE164,
-          address: address?.trim() || null,
+          address: canonicalAddress,
         });
         // Best-effort sync to Google Contacts - never fail the booking if it errors.
         await syncContactToGoogle(contact.id);
