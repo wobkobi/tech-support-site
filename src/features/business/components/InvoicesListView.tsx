@@ -59,6 +59,9 @@ const FILTER_OPTIONS: { value: FilterKey; label: string }[] = [
 const CONTROL_CLS =
   "h-9 rounded-lg border border-admin-border-strong bg-admin-surface px-3 text-sm text-admin-text focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-russian-violet";
 
+/** Rows shown per page before pagination kicks in. */
+const PAGE_SIZE = 25;
+
 /**
  * Whether a payment can be recorded from the list: DRAFT or SENT only (PAID is
  * already settled, VOIDED can't be paid).
@@ -86,6 +89,7 @@ export function InvoicesListView(): React.ReactElement {
   const [toDate, setToDate] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("issued");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [page, setPage] = useState(1);
   const [payTarget, setPayTarget] = useState<Invoice | null>(null);
 
   // One "now" per mount so the OVERDUE derivation stays stable across renders.
@@ -167,6 +171,7 @@ export function InvoicesListView(): React.ReactElement {
    * @param key - Column to sort by.
    */
   function toggleSort(key: SortKey): void {
+    setPage(1);
     if (sortKey === key) {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     } else {
@@ -180,6 +185,7 @@ export function InvoicesListView(): React.ReactElement {
    * @param key - Filter bucket the card represents.
    */
   function toggleFilter(key: FilterKey): void {
+    setPage(1);
     setStatusFilter((s) => (s === key ? "all" : key));
   }
 
@@ -260,6 +266,18 @@ export function InvoicesListView(): React.ReactElement {
   const anyFilterActive =
     search !== "" || statusFilter !== "all" || fromDate !== "" || toDate !== "";
 
+  // Pagination. currentPage clamps defensively so a filter change that shrinks
+  // the result set can never leave us slicing past the end (page state may lag
+  // one render behind the filter handlers that reset it).
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const paged = useMemo(
+    () => sorted.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [sorted, currentPage],
+  );
+  const rangeStart = sorted.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+  const rangeEnd = Math.min(currentPage * PAGE_SIZE, sorted.length);
+
   return (
     <div>
       <PageHeader
@@ -329,7 +347,10 @@ export function InvoicesListView(): React.ReactElement {
           <input
             type="search"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
             placeholder="Number or client name"
             className={CONTROL_CLS}
           />
@@ -338,7 +359,10 @@ export function InvoicesListView(): React.ReactElement {
           <span className="text-xs font-medium text-admin-muted">Status</span>
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as FilterKey)}
+            onChange={(e) => {
+              setStatusFilter(e.target.value as FilterKey);
+              setPage(1);
+            }}
             className={CONTROL_CLS}
           >
             {FILTER_OPTIONS.map((o) => (
@@ -353,7 +377,10 @@ export function InvoicesListView(): React.ReactElement {
           <input
             type="date"
             value={fromDate}
-            onChange={(e) => setFromDate(e.target.value)}
+            onChange={(e) => {
+              setFromDate(e.target.value);
+              setPage(1);
+            }}
             className={CONTROL_CLS}
           />
         </label>
@@ -362,7 +389,10 @@ export function InvoicesListView(): React.ReactElement {
           <input
             type="date"
             value={toDate}
-            onChange={(e) => setToDate(e.target.value)}
+            onChange={(e) => {
+              setToDate(e.target.value);
+              setPage(1);
+            }}
             className={CONTROL_CLS}
           />
         </label>
@@ -374,6 +404,7 @@ export function InvoicesListView(): React.ReactElement {
               setStatusFilter("all");
               setFromDate("");
               setToDate("");
+              setPage(1);
             }}
           >
             Clear
@@ -393,7 +424,7 @@ export function InvoicesListView(): React.ReactElement {
             {invoices.length === 0 ? "No invoices yet." : "No invoices match your filters."}
           </p>
         ) : (
-          sorted.map((inv) => (
+          paged.map((inv) => (
             <div
               key={inv.id}
               className={cn(
@@ -485,7 +516,7 @@ export function InvoicesListView(): React.ReactElement {
               </tr>
             </thead>
             <tbody className="divide-y divide-admin-border">
-              {sorted.map((inv) => (
+              {paged.map((inv) => (
                 <tr key={inv.id} className="hover:bg-admin-bg">
                   <td className="px-4 py-3 font-mono text-xs font-semibold text-admin-text">
                     {inv.number}
@@ -544,6 +575,36 @@ export function InvoicesListView(): React.ReactElement {
           </table>
         )}
       </div>
+
+      {/* Pagination - only when the filtered set spills past one page. */}
+      {!loading && sorted.length > PAGE_SIZE && (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-admin-muted">
+          <span>
+            Showing {rangeStart}-{rangeEnd} of {sorted.length}
+          </span>
+          <div className="flex items-center gap-2">
+            <AdminButton
+              variant="secondary"
+              size="xs"
+              onClick={() => setPage(currentPage - 1)}
+              disabled={currentPage <= 1}
+            >
+              Previous
+            </AdminButton>
+            <span className="px-1 font-medium text-admin-text">
+              Page {currentPage} of {totalPages}
+            </span>
+            <AdminButton
+              variant="secondary"
+              size="xs"
+              onClick={() => setPage(currentPage + 1)}
+              disabled={currentPage >= totalPages}
+            >
+              Next
+            </AdminButton>
+          </div>
+        </div>
+      )}
 
       {payTarget && (
         <PaymentDialog

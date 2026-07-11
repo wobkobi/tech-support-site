@@ -69,12 +69,18 @@ export async function POST(
   // can't double-count a ledger row that was entered by hand.
   const createIncome = typeof body.createIncome === "boolean" ? body.createIncome : !alreadyPaid;
 
-  // Atomic claim: stamp the payment only where paidAt is still null. Covers a
+  // Atomic claim: stamp the payment only where paidAt is still empty. Covers a
   // fresh payment (status flips to PAID) and a backfill onto a legacy PAID row
-  // (paidAt still null). A concurrent double-click or a re-pay finds paidAt
+  // (paidAt still empty). A concurrent double-click or a re-pay finds paidAt
   // already set > count 0 > returns current state without a second income row.
+  //
+  // "Empty" must match BOTH an explicit null AND a missing field: on the
+  // schemaless Mongo store, invoices created before paidAt existed (and any the
+  // driver never wrote a null for) simply have no paidAt key. Prisma compiles a
+  // bare `paidAt: null` to "exists AND is null" ($ne $$REMOVE), which silently
+  // skips those rows - so OR in an isSet:false arm to catch the absent-key case.
   const claim = await prisma.invoice.updateMany({
-    where: { id, paidAt: null },
+    where: { id, OR: [{ paidAt: null }, { paidAt: { isSet: false } }] },
     data: { status: "PAID", paidAt, paymentMethod: method, paymentReference: reference },
   });
   if (claim.count !== 1) {
