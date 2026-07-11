@@ -23,6 +23,7 @@ import {
   collapseToWindow,
   composeDescription,
   effectiveHourlyRate,
+  enforceMinBillable,
   hourlyTaskMinutes,
   jobToLineItems,
   timeDiffMins,
@@ -712,7 +713,7 @@ export function CalculatorView({
   // skip re-render when unrelated parent state changes (e.g. typing in the
   // AI input box). Recomputes when any meaningful input shifts.
   const previewLineItems = useMemo(
-    () => jobToLineItems(job, holiday.uplift, pricing.minTravelCharge),
+    () => jobToLineItems(job, holiday.uplift, pricing.minTravelCharge, pricing.minBillableMins),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       tasks,
@@ -880,8 +881,11 @@ export function CalculatorView({
       // a single step doesn't silently over-bill. Tasks scale proportionally so
       // the over-long ones absorb more of the correction; anything that scales
       // below the minimum is dropped and the rest rescale.
+      // Rebalance to the window, then floor the whole job to the minimum
+      // billable time so a sub-minimum job (e.g. a 15-min task under a 30-min
+      // minimum) bills - and displays - at the floor rather than the raw time.
       const collapsed = collapseToWindow(parsedTasks, parsedWindowMin);
-      setTasks(collapsed.tasks);
+      setTasks(enforceMinBillable(collapsed.tasks, pricing.minBillableMins));
       if (collapsed.rescaled || collapsed.dropped > 0) {
         const parts: string[] = ["Rebalanced tasks"];
         if (collapsed.dropped > 0) {
@@ -895,7 +899,7 @@ export function CalculatorView({
       setParts(parsedParts);
       if (result.notes) setNotes(result.notes);
     },
-    [pricing.minTravelCharge],
+    [pricing.minTravelCharge, pricing.minBillableMins],
   );
 
   /**
@@ -1115,7 +1119,12 @@ export function CalculatorView({
     try {
       // Build and POST the invoice
       await saveTaskTemplates(tasks);
-      const lineItems = jobToLineItems(job, holiday.uplift, pricing.minTravelCharge);
+      const lineItems = jobToLineItems(
+        job,
+        holiday.uplift,
+        pricing.minTravelCharge,
+        pricing.minBillableMins,
+      );
       const promoActive = activePromo && !skipPromo && totals.promoDiscount > 0;
       const res = await fetch("/api/business/invoices", {
         method: "POST",
@@ -1808,9 +1817,10 @@ export function CalculatorView({
           <TaskTimeWarning
             tasks={tasks}
             windowMin={durationMins}
+            minBillableMins={pricing.minBillableMins}
             onFix={() => {
               const collapsed = collapseToWindow(tasks, durationMins);
-              setTasks(collapsed.tasks);
+              setTasks(enforceMinBillable(collapsed.tasks, pricing.minBillableMins));
             }}
           />
           <TasksSection
@@ -1989,27 +1999,56 @@ export function CalculatorView({
 interface TaskTimeWarningProps {
   tasks: TaskLine[];
   windowMin: number;
+  minBillableMins: number;
   onFix: () => void;
 }
 
 /**
  * Inline banner shown above the tasks panel when hourly task minutes don't
- * match the listed job window. Stays hidden when the totals line up so the
- * panel doesn't have a permanent strip of UI in the steady state.
+ * match the listed job window, or when a short job sits below the minimum
+ * billable time. Stays hidden when everything lines up so the panel doesn't
+ * carry a permanent strip of UI in the steady state.
  * @param props - Component props.
  * @param props.tasks - Current task lines (hourly + flat).
  * @param props.windowMin - Job window in minutes (`durationMins`).
- * @param props.onFix - Handler that collapses hourly tasks to fit the window.
+ * @param props.minBillableMins - Minimum billable labour minutes; below this the floor banner shows.
+ * @param props.onFix - Handler that collapses tasks to the window and floors to the minimum.
  * @returns Warning element, or null when totals already match.
  */
 function TaskTimeWarning({
   tasks,
   windowMin,
+  minBillableMins,
   onFix,
 }: TaskTimeWarningProps): React.ReactElement | null {
-  if (windowMin <= 0) return null;
   const taskMin = hourlyTaskMinutes(tasks);
   if (taskMin === 0) return null;
+
+  // Sub-minimum job: the whole-job labour sits under the billable floor. Offer
+  // to bill it at the minimum (Fix floors the tasks). Checked before the window
+  // comparison because a short job usually has taskMin == windowMin, which the
+  // drift tolerance below would otherwise swallow.
+  if (taskMin < minBillableMins) {
+    return (
+      <div
+        role="status"
+        className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900"
+      >
+        <span>
+          Tasks total {Math.round(taskMin)} min - minimum charge is {minBillableMins} min.
+        </span>
+        <button
+          type="button"
+          onClick={onFix}
+          className="rounded-lg border border-sky-300 bg-white px-3 py-1.5 text-xs font-medium text-sky-900 hover:bg-sky-100"
+        >
+          Fix - bill the minimum
+        </button>
+      </div>
+    );
+  }
+
+  if (windowMin <= 0) return null;
   // Tolerance: qty rounds to 2 dp (= 0.6-min granularity), so a 3-task split
   // can drift up to ~1.5 min from windowMin while still being "correct" after
   // collapseToWindow has snapped each row to a 5-min boundary. Without this
@@ -2017,6 +2056,10 @@ function TaskTimeWarning({
   // the underlying float is 214.8 vs 215.
   if (Math.abs(taskMin - windowMin) < 2) return null;
   const over = taskMin > windowMin;
+  // Billing to the minimum floor legitimately exceeds a shorter worked window,
+  // so a floored job (taskMin at the minimum, window below it) isn't an
+  // over-estimate - only flag "over" when the tasks also clear the floor.
+  if (over && taskMin <= minBillableMins) return null;
   return (
     <div
       role="status"

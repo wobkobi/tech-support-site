@@ -8,6 +8,7 @@ import {
   BILLING_INCREMENT_MINS,
   GST_RATE,
   GST_REGISTERED,
+  MIN_BILLABLE_MINS,
 } from "@/features/business/lib/pricing-policy";
 import type {
   JobCalculation,
@@ -441,27 +442,60 @@ export function effectiveHourlyRate(
 }
 
 /**
+ * Enforces the whole-job minimum-billable floor. When the hourly task lines
+ * carry some time but sum below minBillableMins, grows the most significant
+ * line so the billed labour is at least the minimum - the largest floating
+ * (non operator-stated) task, or the largest hourly task when every line is
+ * pinned. A job with no hourly time stays at 0 so the floor never invents a
+ * charge on an empty or parts-only job. Applied by both {@link calcJobTotal}
+ * and {@link jobToLineItems} so the on-screen total and the issued invoice
+ * agree, mirroring the {@link MIN_TRAVEL_CHARGE} floor.
+ * @param tasks - Task lines (`qty` in decimal hours); flat-rate lines pass through untouched.
+ * @param minBillableMins - Minimum billable labour minutes (live pricing setting); defaults to the code const.
+ * @returns Task list with the floor applied, or the input unchanged when already at/above the minimum.
+ */
+export function enforceMinBillable(
+  tasks: TaskLine[],
+  minBillableMins: number = MIN_BILLABLE_MINS,
+): TaskLine[] {
+  if (minBillableMins <= 0) return tasks;
+  const hourly = tasks.filter(isHourlyTask);
+  const totalMin = sumTaskMinutes(hourly);
+  if (totalMin <= 0 || totalMin >= minBillableMins) return tasks;
+  // Land the deficit on the most significant line: the largest floating task,
+  // falling back to the largest hourly task when the operator pinned them all.
+  const floating = hourly.filter((t) => !t.isExplicit);
+  const pool = floating.length > 0 ? floating : hourly;
+  let biggest = pool[0];
+  for (const t of pool) if (t.qty > biggest.qty) biggest = t;
+  const bumped = withMinutes(biggest, biggest.qty * 60 + (minBillableMins - totalMin));
+  return tasks.map((t) => (t === biggest ? bumped : t));
+}
+
+/**
  * Converts a job calculation into a flat array of invoice line items.
  * Emits one row per task, one row per part, and a single Travel row summed
- * from `travelEntries`. Mirrors {@link calcJobTotal}'s
- * {@link MIN_TRAVEL_CHARGE} floor so the issued invoice matches the
+ * from `travelEntries`. Mirrors {@link calcJobTotal}'s {@link MIN_TRAVEL_CHARGE}
+ * and {@link enforceMinBillable} floors so the issued invoice matches the
  * operator's on-screen total.
  * @param job - Job calculation with tasks, parts, and travel.
  * @param holidayUplift - Public-holiday labour uplift fraction (0 = none); adds a surcharge line.
  * @param minTravelCharge - Minimum auto-travel charge (live pricing setting); defaults to the code const.
+ * @param minBillableMins - Minimum billable labour minutes (live pricing setting); defaults to the code const.
  * @returns Array of line items ready for an invoice.
  */
 export function jobToLineItems(
   job: JobCalculation,
   holidayUplift: number = 0,
   minTravelCharge: number = MIN_TRAVEL_CHARGE,
+  minBillableMins: number = MIN_BILLABLE_MINS,
 ): LineItem[] {
   const items: LineItem[] = [];
   // Running total of hourly-task labour so the public-holiday surcharge line
   // can uplift exactly that, never travel or parts.
   let labourTotal = 0;
 
-  for (const task of job.tasks) {
+  for (const task of enforceMinBillable(job.tasks, minBillableMins)) {
     const lineTotal = Math.round(task.qty * task.unitPrice * 100) / 100;
     items.push({
       description: task.description,
@@ -522,6 +556,8 @@ export interface JobPromo {
 export interface JobPricing {
   gstRegistered: boolean;
   minTravelCharge: number;
+  /** Minimum billable labour minutes; the whole-job floor applied by {@link enforceMinBillable}. */
+  minBillableMins: number;
   /** Public-holiday labour uplift as a fraction (e.g. 0.25); 0/undefined when the job date isn't a holiday. */
   holidayUplift?: number;
 }
@@ -573,20 +609,23 @@ function isHourlyTask(task: TaskLine): boolean {
  * halve just those lines. Both fold into the single `unsuccessfulDiscount`.
  * GST mode is driven by {@link GST_REGISTERED} (see {@link calcInvoiceTotals}).
  * Travel floor ({@link MIN_TRAVEL_CHARGE}) only applies when an auto entry
- * contributed - manual-only travel passes through unchanged.
- * @param job - Job calculation with tasks, parts, and travel.
+ * contributed - manual-only travel passes through unchanged. The whole-job
+ * minimum-billable floor ({@link enforceMinBillable}) is applied up front so
+ * short jobs bill at least the configured minimum.
+ * @param jobIn - Job calculation with tasks, parts, and travel.
  * @param promo - Optional active promo to apply.
- * @param pricing - Live pricing (GST, min travel, holiday uplift); defaults to the code consts.
+ * @param pricing - Live pricing (GST, min travel, min billable, holiday uplift); defaults to the code consts.
  * @returns Cost breakdown with promo + unsuccessful discounts split out.
  */
 export function calcJobTotal(
-  job: JobCalculation,
+  jobIn: JobCalculation,
   promo: JobPromo | null = null,
   // Default built lazily (call-time, not module-eval) so reading the consts
   // here can't trip the circular-import TDZ with the pricing-policy module.
   pricing: JobPricing = {
     gstRegistered: GST_REGISTERED,
     minTravelCharge: MIN_TRAVEL_CHARGE,
+    minBillableMins: MIN_BILLABLE_MINS,
   },
 ): {
   tasksTotal: number;
@@ -599,6 +638,10 @@ export function calcJobTotal(
   gstAmount: number;
   total: number;
 } {
+  // Apply the whole-job minimum-billable floor once, up front, so every
+  // labour-derived figure below (tasks total, holiday uplift, promo and
+  // unsuccessful discounts) agrees with the floored invoice lines.
+  const job = { ...jobIn, tasks: enforceMinBillable(jobIn.tasks, pricing.minBillableMins) };
   const tasksTotal = job.tasks.reduce((s, t) => s + t.qty * t.unitPrice, 0);
   const partsTotal = job.parts.reduce((s, p) => s + p.cost, 0);
   const rawTravelTotal = travelEntriesTotal(job.travelEntries);
