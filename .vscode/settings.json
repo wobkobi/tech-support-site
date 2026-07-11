@@ -23,5 +23,7 @@
   },
   // Optional: don't let ESLint act as a formatter
   "eslint.format.enable": false,
-  "js/ts.tsdk.path": "node_modules\\typescript\\lib"
+  "js/ts.tsdk.path": "node_modules\\typescript\\lib",
+  // Disable the Code Spell Checker extension for this workspace
+  "cSpell.enabled": false
 }
