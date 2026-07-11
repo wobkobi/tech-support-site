@@ -416,6 +416,9 @@ export function CalculatorView({
   // successful POST so handleAddContactClose can PATCH `contactId` once the
   // modal returns the new Contact's id, then navigate to the detail page.
   const [savingInvoice, setSavingInvoice] = useState(false);
+  // True while the in-flight save is a "Save & send" (routes to ?send=1 and
+  // skips the calculator's add-to-contacts gate); drives the two button labels.
+  const [saveSendMode, setSaveSendMode] = useState(false);
   const [saveInvoiceError, setSaveInvoiceError] = useState<string | null>(null);
   const [pendingInvoiceId, setPendingInvoiceId] = useState<string | null>(null);
   const [sheetSyncToast, setSheetSyncToast] = useState<string | null>(null);
@@ -1087,10 +1090,14 @@ export function CalculatorView({
    * Direct save: POSTs the calculator state straight to the invoices API and
    * navigates to the detail page. Backdating / custom invoice number / custom
    * due date is handled by editing a saved DRAFT after the fact.
+   * @param send - When true ("Save & send"), skip the add-to-contacts gate and
+   *   route to the detail page with `?send=1` so it auto-opens the send preview
+   *   (which has its own add-to-contacts hook-in + contactId backfill).
    */
-  async function handleSaveInvoice(): Promise<void> {
+  async function handleSaveInvoice(send = false): Promise<void> {
     // Validate required fields
     setSaveInvoiceError(null);
+    setSaveSendMode(send);
     if (!clientName.trim()) {
       setSaveInvoiceError("Client name is required.");
       return;
@@ -1160,8 +1167,9 @@ export function CalculatorView({
       }
       const invoiceId = d.invoice.id;
       // Add-to-contacts gate: defer nav until the modal closes so
-      // handleAddContactClose can backfill contactId via PATCH.
-      if (clientEmail.trim()) {
+      // handleAddContactClose can backfill contactId via PATCH. "Save & send"
+      // skips this - the detail send flow runs its own add-to-contacts hook-in.
+      if (!send && clientEmail.trim()) {
         try {
           const checkRes = await fetch(
             `/api/admin/contacts/check?email=${encodeURIComponent(clientEmail.trim())}`,
@@ -1180,7 +1188,7 @@ export function CalculatorView({
       // operator opens it (mirrors the AddToContactsModal-gated path: the
       // backfill handler in handleAddContactClose ALSO clears the draft).
       clearDraft();
-      router.push(`/admin/business/invoices/${invoiceId}`);
+      router.push(`/admin/business/invoices/${invoiceId}${send ? "?send=1" : ""}`);
     } catch (err) {
       setSaveInvoiceError(err instanceof Error ? err.message : "Could not save invoice");
       setSavingInvoice(false);
@@ -1946,12 +1954,21 @@ export function CalculatorView({
               </p>
             )}
             <button
-              onClick={() => void handleSaveInvoice()}
+              onClick={() => void handleSaveInvoice(false)}
               disabled={savingInvoice || parsing}
               suppressHydrationWarning
               className="w-full rounded-lg bg-russian-violet px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
             >
-              {savingInvoice ? "Saving..." : "Save invoice"}
+              {savingInvoice && !saveSendMode ? "Saving..." : "Save invoice"}
+            </button>
+            <button
+              onClick={() => void handleSaveInvoice(true)}
+              disabled={savingInvoice || parsing}
+              suppressHydrationWarning
+              title="Save the invoice and jump straight to the send-to-client step."
+              className="w-full rounded-lg border border-russian-violet px-4 py-2 text-sm font-semibold text-russian-violet hover:bg-russian-violet/5 disabled:opacity-50"
+            >
+              {savingInvoice && saveSendMode ? "Saving..." : "Save & send"}
             </button>
             <button
               onClick={handleSaveIncome}

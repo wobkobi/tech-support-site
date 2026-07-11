@@ -44,6 +44,8 @@ interface InvoiceActionsProps {
   status: string;
   /** Invoice total - passed to {@link PaymentDialog}. */
   total: number;
+  /** Current notes; edited in place via the "Edit notes" modal (SENT/PAID). */
+  notes: string | null;
   /** First-sent stamp; drives the "Re-send" label. */
   sentAt?: string | null;
   /** Payment stamp; passed to {@link PaymentDialog}. */
@@ -72,6 +74,7 @@ const headers = { "Content-Type": "application/json" };
  * @param props.clientEmail - Recipient; "Send" is disabled when empty.
  * @param props.status - Current invoice status (drives which actions show).
  * @param props.total - Invoice total, passed to the payment dialog.
+ * @param props.notes - Current notes, edited via the notes modal (SENT/PAID).
  * @param props.sentAt - First-sent stamp; drives the Send/Re-send label.
  * @param props.paidAt - Payment stamp, passed to the payment dialog.
  * @param props.linkedIncome - Linked income count + total for the void warning.
@@ -86,6 +89,7 @@ export function InvoiceActions({
   clientEmail,
   status,
   total,
+  notes,
   sentAt,
   paidAt,
   linkedIncome,
@@ -118,6 +122,11 @@ export function InvoiceActions({
   // Confirm dialog (replacing window.confirm) + record-payment dialog.
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
+
+  // Edit-notes modal (SENT/PAID quick edit; notes stay editable post-send).
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [notesDraft, setNotesDraft] = useState(notes ?? "");
+  const [notesSaving, setNotesSaving] = useState(false);
 
   // Void modal state.
   const [voidModalOpen, setVoidModalOpen] = useState(false);
@@ -399,6 +408,34 @@ export function InvoiceActions({
     setEligibility(null);
   }, [sending]);
 
+  /**
+   * Saves a notes-only edit (allowed on SENT/PAID, not VOIDED) via the sparse
+   * PATCH branch, then refreshes so the preview + rail reflect the new note.
+   */
+  async function saveNotes(): Promise<void> {
+    setNotesSaving(true);
+    try {
+      const res = await fetch(`/api/business/invoices/${invoiceId}`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ notes: notesDraft.trim() || null }),
+      });
+      const d = await res.json();
+      if (!res.ok || !d.ok) {
+        toast(d.error ?? "Couldn't save the note.", { tone: "error" });
+        setNotesSaving(false);
+        return;
+      }
+      setNotesOpen(false);
+      setNotesSaving(false);
+      toast("Note saved.", { tone: "success" });
+      router.refresh();
+    } catch {
+      toast("Couldn't save the note. Check your connection.", { tone: "error" });
+      setNotesSaving(false);
+    }
+  }
+
   // Calculator "Save & send": open the send preview once on mount.
   const didAutoOpen = useRef(false);
   useEffect(() => {
@@ -417,6 +454,22 @@ export function InvoiceActions({
         {driveWebUrl && (
           <AdminButton variant="secondary" href={driveWebUrl}>
             View PDF in Drive ↗
+          </AdminButton>
+        )}
+        {isDraft && (
+          <AdminButton variant="secondary" href={`/admin/business/invoices/${invoiceId}/edit`}>
+            Edit
+          </AdminButton>
+        )}
+        {!isDraft && !isVoided && (
+          <AdminButton
+            variant="secondary"
+            onClick={() => {
+              setNotesDraft(notes ?? "");
+              setNotesOpen(true);
+            }}
+          >
+            Edit notes
           </AdminButton>
         )}
         {isDraft && (
@@ -467,6 +520,39 @@ export function InvoiceActions({
         onConfirm={() => void deleteDraft()}
         onCancel={() => setConfirmDeleteOpen(false)}
       />
+
+      {/* Edit-notes modal (SENT/PAID - content is audit-locked but notes stay
+          editable for IRD annotations via the sparse PATCH). */}
+      <Modal
+        open={notesOpen}
+        onClose={() => !notesSaving && setNotesOpen(false)}
+        title="Edit notes"
+        description="Shown on the invoice; the Drive PDF re-syncs on save."
+        size="md"
+        footer={
+          <>
+            <AdminButton
+              variant="secondary"
+              onClick={() => setNotesOpen(false)}
+              disabled={notesSaving}
+            >
+              Cancel
+            </AdminButton>
+            <AdminButton onClick={() => void saveNotes()} busy={notesSaving}>
+              Save note
+            </AdminButton>
+          </>
+        }
+      >
+        <textarea
+          rows={5}
+          value={notesDraft}
+          onChange={(e) => setNotesDraft(e.target.value)}
+          disabled={notesSaving}
+          placeholder="Optional note shown on the invoice."
+          className={cn(INPUT_CLS, "resize-y")}
+        />
+      </Modal>
 
       {/* Record payment - the real /pay flow (stamps + income + PDF re-sync). */}
       {payOpen && (
@@ -753,8 +839,18 @@ export function InvoiceActions({
           email={clientEmail}
           onClose={(newContactId) => {
             setShowAddContact(false);
-            // When a contact was created, force a fresh eligibility adopt so the
-            // review-link checkbox re-enables and auto-ticks.
+            if (newContactId) {
+              // Backfill the invoice's contactId (parity with the calculator's
+              // save flow, so a "Save & send" invoice still links the contact).
+              // Best-effort - the send proceeds without the FK if this fails.
+              void fetch(`/api/business/invoices/${invoiceId}`, {
+                method: "PATCH",
+                headers,
+                body: JSON.stringify({ contactId: newContactId }),
+              }).catch(() => undefined);
+            }
+            // Force a fresh eligibility adopt so the review-link checkbox
+            // re-enables and auto-ticks.
             void openPreview(Boolean(newContactId));
           }}
         />

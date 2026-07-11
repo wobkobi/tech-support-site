@@ -239,14 +239,19 @@ async function InvoiceRail({
  * Detail page for a single saved invoice.
  * @param props - Page props.
  * @param props.params - Route params containing the invoice ID.
+ * @param props.searchParams - Query params; `send=1` auto-opens the send preview.
  * @returns Invoice detail page element.
  */
 export default async function InvoiceViewPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ send?: string }>;
 }): Promise<React.ReactElement> {
   const { id } = await params;
+  // `?send=1` (from the calculator's "Save & send") opens the send preview on mount.
+  const { send } = await searchParams;
   await requireAdminAuth();
   const timer = new ServerTimer();
 
@@ -294,9 +299,11 @@ export default async function InvoiceViewPage({
             clientEmail={invoice.clientEmail}
             status={invoice.status}
             total={invoice.total}
+            notes={invoice.notes}
             sentAt={invoice.sentAt?.toISOString() ?? null}
             paidAt={invoice.paidAt?.toISOString() ?? null}
             linkedIncome={linkedIncome}
+            autoOpenSend={send === "1"}
           />
         }
       />
