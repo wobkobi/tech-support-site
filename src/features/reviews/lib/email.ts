@@ -258,7 +258,8 @@ export async function sendOwnerBookingNotification(
   try {
     await getResend().emails.send({
       from,
-      replyTo: adminEmail,
+      // Reply goes to the customer who booked, not back to the owner inbox.
+      replyTo: booking.email,
       to: adminEmail,
       subject,
       html,
