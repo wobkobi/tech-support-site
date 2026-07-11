@@ -1,12 +1,23 @@
 "use client";
 // src/app/admin/(shell)/business/invoices/[id]/InvoiceActions.tsx
 /**
- * @description Action bar for the invoice detail page: back, print, open Drive
- * PDF, and send-to-client. The send flow opens a preview modal with an editable
- * email body and greeting, plus an optional review link based on eligibility.
+ * @description Action buttons + modals for the invoice detail page: save PDF,
+ * open Drive PDF, record payment (via {@link PaymentDialog}), send-to-client,
+ * void, and delete-draft. The send flow opens a preview modal with an editable
+ * email body/greeting plus an optional review link based on eligibility; the
+ * void flow previews the notification and warns when linked income entries would
+ * be left behind. Housed beside the page so it ships in the PageHeader actions
+ * slot. Built on the shared admin primitives (Modal / ConfirmDialog / AdminButton
+ * / Toast).
  */
 
+import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
+import { Modal } from "@/features/admin/components/ui/Modal";
+import { useToast } from "@/features/admin/components/ui/Toast";
 import { AddToContactsModal } from "@/features/business/components/AddToContactsModal";
+import { PaymentDialog } from "@/features/business/components/invoice/PaymentDialog";
+import { formatNZD } from "@/features/business/lib/business";
 import type { InvoiceReviewEligibility } from "@/features/business/lib/contact-review-token";
 import {
   DEFAULT_INVOICE_EMAIL_BODY,
@@ -14,44 +25,74 @@ import {
 } from "@/features/business/lib/invoice-email-defaults";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type React from "react";
-import { useCallback, useEffect, useState } from "react";
-import { FaCaretLeft } from "react-icons/fa6";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+/** Count + dollar total of income entries linked to this invoice. */
+interface LinkedIncome {
+  count: number;
+  total: number;
+}
 
 interface InvoiceActionsProps {
-  backHref: string;
   driveWebUrl: string | null;
   invoiceId: string;
   invoiceNumber: string;
   clientName: string;
   clientEmail: string;
   status: string;
+  /** Invoice total - passed to {@link PaymentDialog}. */
+  total: number;
+  /** First-sent stamp; drives the "Re-send" label. */
+  sentAt?: string | null;
+  /** Payment stamp; passed to {@link PaymentDialog}. */
+  paidAt?: string | null;
+  /** Linked income entries - shown as a pre-flight warning in the void modal. */
+  linkedIncome: LinkedIncome;
+  /** When true, open the send preview once on mount (calculator "Save & send"). */
+  autoOpenSend?: boolean;
 }
 
+const INPUT_CLS = cn(
+  "w-full rounded-lg border border-admin-border-strong px-3 py-2 text-sm text-admin-text",
+  "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-russian-violet",
+);
+const FIELD_LABEL_CLS = "mb-2 block text-xs font-semibold text-admin-muted uppercase";
+/** Static JSON request headers - module-scoped so it's a stable useCallback dep. */
+const headers = { "Content-Type": "application/json" };
+
 /**
- * Action bar for an invoice detail page: back, print, Drive PDF, send-to-client.
+ * Action buttons + modals for an invoice detail page.
  * @param props - Component props.
- * @param props.backHref - URL for the back button.
  * @param props.driveWebUrl - Optional Google Drive PDF URL.
- * @param props.invoiceId - Invoice id used by the preview/send routes.
- * @param props.invoiceNumber - Filename for the downloaded PDF.
- * @param props.clientName - Used in the "add to contacts" link in the send modal.
+ * @param props.invoiceId - Invoice id used by the preview/send/void/pay routes.
+ * @param props.invoiceNumber - Filename for the downloaded PDF + email subjects.
+ * @param props.clientName - Used in the greeting + "add to contacts" hook.
  * @param props.clientEmail - Recipient; "Send" is disabled when empty.
- * @param props.status - Drives the "Sent" indicator.
- * @returns Invoice actions element with modal.
+ * @param props.status - Current invoice status (drives which actions show).
+ * @param props.total - Invoice total, passed to the payment dialog.
+ * @param props.sentAt - First-sent stamp; drives the Send/Re-send label.
+ * @param props.paidAt - Payment stamp, passed to the payment dialog.
+ * @param props.linkedIncome - Linked income count + total for the void warning.
+ * @param props.autoOpenSend - Open the send preview on mount when true.
+ * @returns Invoice actions element with its modals.
  */
 export function InvoiceActions({
-  backHref,
   driveWebUrl,
   invoiceId,
   invoiceNumber,
   clientName,
   clientEmail,
   status,
+  total,
+  sentAt,
+  paidAt,
+  linkedIncome,
+  autoOpenSend = false,
 }: InvoiceActionsProps): React.ReactElement {
   const router = useRouter();
+  const { toast } = useToast();
   // Send-email preview state
   const [previewOpen, setPreviewOpen] = useState(false);
   const [preview, setPreview] = useState<{ subject: string; html: string; to: string } | null>(
@@ -60,113 +101,61 @@ export function InvoiceActions({
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [sentAt, setSentAt] = useState<string | null>(null);
+  const [sentLocal, setSentLocal] = useState<boolean>(sentAt != null);
   // Action busy flags
-  const [marking, setMarking] = useState(false);
   const [voiding, setVoiding] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [currentStatus, setCurrentStatus] = useState(status);
   // Operator-typed greeting override. Empty = use the first word of clientName.
-  // Useful when the invoice is for a company but the email goes to a specific
-  // person inside it.
   const [greetingName, setGreetingName] = useState("");
-  // Editable email body. Pre-populated with the default copy; operator can
-  // tweak before each send. White-space is preserved when rendered.
+  // Editable email body, pre-populated with the default copy.
   const [customBody, setCustomBody] = useState(DEFAULT_INVOICE_EMAIL_BODY);
-  // Review-link inclusion. Defaults to whatever eligibility says when the
-  // modal opens; operator can toggle if eligible.
+  // Review-link inclusion. Defaults to whatever eligibility says when the modal opens.
   const [includeReview, setIncludeReview] = useState(true);
   const [eligibility, setEligibility] = useState<InvoiceReviewEligibility | null>(null);
-  // Drives the inline "Add to contacts" popup spawned from the no-contact
-  // eligibility row inside the send-invoice modal.
   const [showAddContact, setShowAddContact] = useState(false);
 
-  // Void modal state. Opened for SENT/PAID voids so the operator can decide
-  // whether to notify the client and tweak the message. DRAFT voids skip the
-  // modal entirely (no client to notify).
+  // Confirm dialog (replacing window.confirm) + record-payment dialog.
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [payOpen, setPayOpen] = useState(false);
+
+  // Void modal state.
   const [voidModalOpen, setVoidModalOpen] = useState(false);
   const [voidGreetingName, setVoidGreetingName] = useState("");
   const [voidCustomBody, setVoidCustomBody] = useState(DEFAULT_VOID_EMAIL_BODY);
   const [voidSendNotification, setVoidSendNotification] = useState(true);
-  // Rendered preview of the void notification email. Re-fetched on greeting /
-  // body blur so the operator sees the exact subject + body the client will
-  // receive, mirroring the send-invoice preview UX.
   const [voidPreview, setVoidPreview] = useState<{
     subject: string;
     html: string;
     to: string;
   } | null>(null);
   const [voidPreviewLoading, setVoidPreviewLoading] = useState(false);
-  // Post-void toast: surfaces notification success/failure + the linked income
-  // entry warning when the voided invoice had been marked PAID.
-  const [voidToast, setVoidToast] = useState<string | null>(null);
 
-  const headers = { "Content-Type": "application/json" };
-  const alreadySent = currentStatus === "SENT" || sentAt !== null;
+  const alreadySent = currentStatus === "SENT" || sentLocal;
   const isPaid = currentStatus === "PAID";
   const isDraft = currentStatus === "DRAFT";
   const isVoided = currentStatus === "VOIDED";
 
   /**
-   * Flips the invoice status to PAID via PATCH; refreshes the page on success.
+   * Opens the SENT/PAID void modal, resetting the message to the default so a
+   * previous custom message doesn't leak across voids.
    */
-  async function markPaid(): Promise<void> {
-    if (!confirm("Mark this invoice as paid?")) return;
-    setError(null);
-    setMarking(true);
-    try {
-      const res = await fetch(`/api/business/invoices/${invoiceId}`, {
-        method: "PATCH",
-        headers,
-        body: JSON.stringify({ status: "PAID" }),
-      });
-      const d = (await res.json()) as { ok: true } | { error: string };
-      if ("error" in d) throw new Error(d.error);
-      setCurrentStatus("PAID");
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not mark as paid");
-    } finally {
-      setMarking(false);
-    }
-  }
-
-  /**
-   * Entry point for voiding an invoice. DRAFT voids run silently (no client to
-   * notify); SENT/PAID voids open a modal so the operator can decide whether
-   * to email the client and tweak the message. The actual server call lives
-   * in {@link submitVoid} below so both paths share the network code.
-   */
-  async function voidInvoice(): Promise<void> {
-    if (isDraft) {
-      if (
-        !confirm(
-          "Void this draft? It will be marked as cancelled. The client never received it so no notification will be sent.",
-        )
-      )
-        return;
-      await submitVoid({ sendNotification: false });
-      return;
-    }
-    // SENT or PAID: open the modal. Reset body to the default each time so a
-    // previous custom message doesn't leak across voids.
+  function openVoidModal(): void {
     setError(null);
     setVoidCustomBody(DEFAULT_VOID_EMAIL_BODY);
     setVoidGreetingName("");
-    // Default notification ON when the client has an email - the common case.
     setVoidSendNotification(Boolean(clientEmail));
     setVoidModalOpen(true);
-    // Pass the just-reset values explicitly: the state setters above have not
-    // applied yet, so loadVoidPreview reading component state would post the
-    // previous session's edited body/greeting.
+    // Pass the just-reset values explicitly: the setters above have not applied
+    // yet, so loadVoidPreview reading component state would post the previous
+    // session's edited body/greeting.
     void loadVoidPreview("", DEFAULT_VOID_EMAIL_BODY);
   }
 
   /**
-   * Reopens the void modal on an already-VOIDED invoice so the operator can
-   * (re)send the notification email - useful when the first attempt was
-   * silent (dropdown void) or failed (Resend rejected). The void endpoint is
-   * idempotent on already-VOIDED rows: no status change, just (re)send.
+   * Reopens the void modal on an already-VOIDED invoice to (re)send the
+   * notification. The void endpoint is idempotent on VOIDED rows: no status
+   * change, just (re)send.
    */
   function resendVoidNotification(): void {
     if (!clientEmail) return;
@@ -175,20 +164,15 @@ export function InvoiceActions({
     setVoidGreetingName("");
     setVoidSendNotification(true);
     setVoidModalOpen(true);
-    // Pass the just-reset values explicitly (see voidInvoice): avoids posting
-    // the previous session's edited body/greeting from the stale closure.
     void loadVoidPreview("", DEFAULT_VOID_EMAIL_BODY);
   }
 
   /**
-   * Fetches the rendered void notification email and stores it in state so
-   * the modal can show an iframe preview. Only shows a spinner on the first
-   * load so subsequent re-fetches (after editing greeting/body) keep the
-   * existing preview visible.
-   * @param greetingOverride - Greeting to preview instead of reading component
-   * state; pass the just-set value when calling right after a setState so the
-   * fetch doesn't use the stale closure. Omit on blur re-fetches.
-   * @param bodyOverride - Body to preview instead of reading component state.
+   * Fetches the rendered void notification email into state for the iframe
+   * preview. Only spins on the first load so edit re-fetches keep the preview.
+   * @param greetingOverride - Greeting to preview instead of component state
+   * (pass the just-set value right after a setState to dodge the stale closure).
+   * @param bodyOverride - Body to preview instead of component state.
    */
   async function loadVoidPreview(greetingOverride?: string, bodyOverride?: string): Promise<void> {
     if (!clientEmail) return;
@@ -215,9 +199,9 @@ export function InvoiceActions({
   }
 
   /**
-   * Posts the void to the dedicated /void endpoint and updates local state.
-   * Shared by the DRAFT silent path and the modal Confirm action.
-   * @param opts - Whether to send the notification email and any operator overrides.
+   * Posts the void to the /void endpoint and updates local state. Shared by the
+   * DRAFT silent path (via ConfirmDialog) and the modal Confirm action.
+   * @param opts - Whether to notify + any operator overrides.
    * @param opts.sendNotification - True to email the client; false to void silently.
    * @param opts.greetingName - Optional override for the email greeting.
    * @param opts.customBody - Optional override for the email body.
@@ -247,12 +231,10 @@ export function InvoiceActions({
       if ("error" in d) throw new Error(d.error);
       setCurrentStatus("VOIDED");
       setVoidModalOpen(false);
-      // Compose a toast that surfaces both the notification outcome and the
-      // linked-income-entry warning when present. Cleared after 6s.
+      // Compose a message surfacing the notification outcome + linked-income
+      // warning. A remaining ledger entry or a failed email downgrades to warning.
       const parts: string[] = [];
       if (d.alreadyVoided) {
-        // Resend path: the invoice was already voided, so the only outcome that
-        // varies is whether the notification actually went out.
         parts.push(
           d.notified ? "Notification re-sent." : "Notification re-send failed - check server logs.",
         );
@@ -266,14 +248,15 @@ export function InvoiceActions({
       }
       if (d.incomeEntryCount > 0) {
         parts.push(
-          `${d.incomeEntryCount} linked income entr${d.incomeEntryCount === 1 ? "y" : "ies"} remain - reverse manually in /admin/business.`,
+          `${d.incomeEntryCount} linked income entr${d.incomeEntryCount === 1 ? "y" : "ies"} remain - reverse manually in the ledger.`,
         );
       }
-      setVoidToast(parts.join(" "));
-      setTimeout(() => setVoidToast(null), 6000);
+      const failed = (opts.sendNotification && !d.notified) || d.incomeEntryCount > 0;
+      toast(parts.join(" "), { tone: failed ? "warning" : "success" });
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not void invoice");
+      toast(err instanceof Error ? err.message : "Could not void invoice", { tone: "error" });
     } finally {
       setVoiding(false);
     }
@@ -288,12 +271,10 @@ export function InvoiceActions({
   }, [voiding]);
 
   /**
-   * Downloads the actual customer-facing PDF (same renderer as Drive + email
-   * attachment) for the saved invoice. Bypasses window.print() so the file
-   * is the real branded PDF, not a browser screenshot of the HTML preview.
+   * Downloads the real customer-facing PDF (same renderer as Drive + email
+   * attachment), bypassing window.print() so the file is the branded PDF.
    */
   async function downloadPdf(): Promise<void> {
-    setError(null);
     try {
       const res = await fetch(`/api/business/invoices/${invoiceId}/pdf`, { headers });
       if (!res.ok) {
@@ -310,94 +291,81 @@ export function InvoiceActions({
       a.remove();
       URL.revokeObjectURL(url);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not download PDF");
+      toast(err instanceof Error ? err.message : "Could not download PDF", { tone: "error" });
     }
   }
 
-  /**
-   * DRAFT-only delete: confirms, DELETEs the invoice, redirects to the list.
-   */
+  /** DRAFT-only delete: DELETEs the invoice, redirects to the list. */
   async function deleteDraft(): Promise<void> {
-    if (!confirm(`Delete invoice ${invoiceNumber}? This cannot be undone.`)) return;
-    setError(null);
     setDeleting(true);
     try {
-      const res = await fetch(`/api/business/invoices/${invoiceId}`, {
-        method: "DELETE",
-        headers,
-      });
+      const res = await fetch(`/api/business/invoices/${invoiceId}`, { method: "DELETE", headers });
       if (!res.ok) {
         const d = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(d.error ?? "Delete failed");
       }
-      router.push(backHref);
+      router.push("/admin/business/invoices");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not delete");
+      toast(err instanceof Error ? err.message : "Could not delete", { tone: "error" });
       setDeleting(false);
+      setConfirmDeleteOpen(false);
     }
   }
 
   /**
-   * Opens the modal and fetches the rendered email preview from the API.
-   * Uses the current `greetingName` and `customBody` state so the previewed
-   * email exactly matches what'll be sent. Only shows the spinner on the
-   * FIRST load - subsequent re-fetches (after editing greeting or body) keep
-   * the existing preview visible so the modal doesn't flash/shrink.
-   * @param forceAdopt - Re-adopt the server's fresh eligibility verdict (and
-   * sync the review-link checkbox to it) instead of keeping the operator's
-   * current toggle; used after "add to contacts" so the checkbox unlocks.
-   * @param includeReviewOverride - Review-link value to preview instead of
-   * reading component state; pass the just-toggled checkbox value so the
-   * re-fetch doesn't use the stale pre-toggle value from the closure.
+   * Opens the send modal and fetches the rendered email preview. Only spins on
+   * the FIRST load so edit re-fetches keep the preview visible.
+   * @param forceAdopt - Re-adopt the server's fresh eligibility verdict (and sync
+   * the review checkbox) instead of keeping the operator's toggle; used after
+   * "add to contacts" so the checkbox unlocks.
+   * @param includeReviewOverride - Review value to preview instead of component
+   * state; pass the just-toggled value so the re-fetch isn't stale.
    */
-  async function openPreview(forceAdopt = false, includeReviewOverride?: boolean): Promise<void> {
-    setError(null);
-    if (!preview) setLoading(true);
-    setPreviewOpen(true);
-    try {
-      // First open (or forceAdopt, e.g. just after adding the contact): send no
-      // includeReview override so the server defaults to whatever eligibility
-      // says, and that fresh result is adopted into local state - re-enabling and
-      // auto-ticking the review-link checkbox. On ordinary re-fetches (after
-      // edits) pass the current toggle so the preview matches the operator's choice.
-      const sendIncludeReview = !forceAdopt && eligibility !== null;
-      const effectiveIncludeReview = includeReviewOverride ?? includeReview;
-      const res = await fetch(`/api/business/invoices/${invoiceId}/preview-email`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          greetingName,
-          customBody,
-          ...(sendIncludeReview ? { includeReview: effectiveIncludeReview } : {}),
-        }),
-      });
-      const d = (await res.json()) as
-        | {
-            ok: true;
-            subject: string;
-            html: string;
-            to: string;
-            eligibility: InvoiceReviewEligibility;
-          }
-        | { error: string };
-      if ("error" in d) throw new Error(d.error);
-      setPreview({ subject: d.subject, html: d.html, to: d.to });
-      // On the first open, sync the toggle to eligibility. Subsequent
-      // re-fetches keep the operator's choice (sendIncludeReview === true).
-      if (!sendIncludeReview) {
-        setIncludeReview(d.eligibility.canSend);
+  const openPreview = useCallback(
+    async function openPreviewImpl(
+      forceAdopt = false,
+      includeReviewOverride?: boolean,
+    ): Promise<void> {
+      setError(null);
+      if (!preview) setLoading(true);
+      setPreviewOpen(true);
+      try {
+        const sendIncludeReview = !forceAdopt && eligibility !== null;
+        const effectiveIncludeReview = includeReviewOverride ?? includeReview;
+        const res = await fetch(`/api/business/invoices/${invoiceId}/preview-email`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            greetingName,
+            customBody,
+            ...(sendIncludeReview ? { includeReview: effectiveIncludeReview } : {}),
+          }),
+        });
+        const d = (await res.json()) as
+          | {
+              ok: true;
+              subject: string;
+              html: string;
+              to: string;
+              eligibility: InvoiceReviewEligibility;
+            }
+          | { error: string };
+        if ("error" in d) throw new Error(d.error);
+        setPreview({ subject: d.subject, html: d.html, to: d.to });
+        if (!sendIncludeReview) setIncludeReview(d.eligibility.canSend);
+        setEligibility(d.eligibility);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Could not load preview");
+      } finally {
+        setLoading(false);
       }
-      setEligibility(d.eligibility);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load preview");
-    } finally {
-      setLoading(false);
-    }
-  }
+    },
+    // eligibility/includeReview/greetingName/customBody/preview are read fresh
+    // each call so the preview matches the operator's current edits.
+    [invoiceId, eligibility, includeReview, greetingName, customBody, preview],
+  );
 
-  /**
-   * Confirms the send action: POSTs to send-email, refreshes the page on success.
-   */
+  /** Confirms the send action: POSTs to send-email, refreshes on success. */
   async function confirmSend(): Promise<void> {
     setError(null);
     setSending(true);
@@ -409,9 +377,10 @@ export function InvoiceActions({
       });
       const d = (await res.json()) as { ok: true; sentAt: string } | { error: string };
       if ("error" in d) throw new Error(d.error);
-      setSentAt(d.sentAt);
+      setSentLocal(true);
       setPreviewOpen(false);
       setPreview(null);
+      toast(`Invoice ${invoiceNumber} sent to ${clientName || "client"}.`, { tone: "success" });
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not send email");
@@ -420,473 +389,363 @@ export function InvoiceActions({
     }
   }
 
-  /**
-   * Closes the preview modal without sending.
-   */
+  /** Closes the send preview modal without sending. */
   const closePreview = useCallback((): void => {
     if (sending) return;
     setPreviewOpen(false);
     setPreview(null);
     setError(null);
-    // Drop eligibility so the next open re-fetches it and re-syncs the toggle
-    // (state may have changed since this modal was last opened).
+    // Drop eligibility so the next open re-fetches it and re-syncs the toggle.
     setEligibility(null);
   }, [sending]);
 
-  // Close whichever modal is open on Escape, matching AddToContactsModal. The
-  // close helpers no-op while a send/void is in-flight, so an accidental Escape
-  // mid-request is ignored.
+  // Calculator "Save & send": open the send preview once on mount.
+  const didAutoOpen = useRef(false);
   useEffect(() => {
-    if (!previewOpen && !voidModalOpen) return;
-    /**
-     * Closes the open modal on Escape.
-     * @param e - Keyboard event.
-     */
-    function handleKey(e: KeyboardEvent): void {
-      if (e.key !== "Escape") return;
-      if (previewOpen) closePreview();
-      else if (voidModalOpen) closeVoidModal();
+    if (autoOpenSend && clientEmail && !didAutoOpen.current) {
+      didAutoOpen.current = true;
+      void openPreview();
     }
-    document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
-  }, [previewOpen, voidModalOpen, closePreview, closeVoidModal]);
+  }, [autoOpenSend, clientEmail, openPreview]);
 
   return (
     <>
-      <div className="mb-6 flex flex-wrap gap-3 print:hidden">
-        <Link
-          href={backHref}
-          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-        >
-          <FaCaretLeft className="h-4 w-4" aria-hidden />
-          Back
-        </Link>
-        <button
-          onClick={() => void downloadPdf()}
-          className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-        >
+      <div className="flex flex-wrap items-center gap-2 print:hidden">
+        <AdminButton variant="secondary" onClick={() => void downloadPdf()}>
           Save PDF
-        </button>
+        </AdminButton>
         {driveWebUrl && (
-          <a
-            href={driveWebUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
+          <AdminButton variant="secondary" href={driveWebUrl}>
             View PDF in Drive ↗
-          </a>
+          </AdminButton>
         )}
         {isDraft && (
-          <button
-            type="button"
-            onClick={() => void deleteDraft()}
-            disabled={deleting}
-            className="rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
-          >
-            {deleting ? "Deleting..." : "Delete draft"}
-          </button>
+          <AdminButton variant="danger" onClick={() => setConfirmDeleteOpen(true)} busy={deleting}>
+            Delete draft
+          </AdminButton>
         )}
         {!isDraft && !isPaid && !isVoided && (
-          <button
-            type="button"
-            onClick={() => void voidInvoice()}
-            disabled={voiding}
-            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-          >
-            {voiding ? "Voiding..." : "Void invoice"}
-          </button>
+          <AdminButton variant="secondary" onClick={openVoidModal} busy={voiding}>
+            Void invoice
+          </AdminButton>
         )}
         {isVoided && clientEmail && (
-          <button
-            type="button"
-            onClick={resendVoidNotification}
-            disabled={voiding}
-            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-[#5a2a82] hover:bg-slate-50 disabled:opacity-50"
-          >
-            {voiding ? "Sending..." : "Resend void notification"}
-          </button>
+          <AdminButton variant="secondary" onClick={resendVoidNotification} busy={voiding}>
+            Resend void notification
+          </AdminButton>
         )}
-        <div className="ml-auto flex flex-wrap gap-3">
-          {!isPaid && !isVoided && (
-            <button
-              type="button"
-              onClick={() => void markPaid()}
-              disabled={marking}
-              className="rounded-lg border border-green-200 bg-white px-4 py-2 text-sm font-medium text-green-700 hover:bg-green-50 disabled:opacity-50"
-            >
-              {marking ? "Saving..." : "Mark as paid"}
-            </button>
-          )}
-          {!isVoided && (
-            <button
-              type="button"
-              onClick={() => void openPreview()}
-              disabled={!clientEmail}
-              title={!clientEmail ? "Add a client email to enable sending" : undefined}
-              className={cn(
-                "rounded-lg px-4 py-2 text-sm font-semibold text-white transition-colors",
-                "bg-russian-violet hover:opacity-90",
-                !clientEmail && "cursor-not-allowed opacity-40 hover:opacity-40",
-              )}
-            >
-              {alreadySent ? "Re-send to client" : "Send to client"}
-            </button>
-          )}
-        </div>
+        {!isPaid && !isVoided && (
+          <AdminButton variant="secondary" onClick={() => setPayOpen(true)}>
+            Mark as paid
+          </AdminButton>
+        )}
+        {isPaid && !paidAt && (
+          // Legacy PAID row with no recorded date/method - let the operator backfill.
+          <AdminButton variant="secondary" onClick={() => setPayOpen(true)}>
+            Record payment details
+          </AdminButton>
+        )}
+        {!isVoided && (
+          <AdminButton
+            onClick={() => void openPreview()}
+            disabled={!clientEmail}
+            aria-label={!clientEmail ? "Add a client email to enable sending" : undefined}
+          >
+            {alreadySent ? "Re-send to client" : "Send to client"}
+          </AdminButton>
+        )}
       </div>
 
-      {error && !previewOpen && !voidModalOpen && (
-        <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 print:hidden">
-          {error}
-        </p>
+      {/* Delete-draft confirm. */}
+      <ConfirmDialog
+        open={confirmDeleteOpen}
+        title={`Delete invoice ${invoiceNumber}?`}
+        body="This cannot be undone."
+        confirmLabel="Delete"
+        tone="danger"
+        busy={deleting}
+        onConfirm={() => void deleteDraft()}
+        onCancel={() => setConfirmDeleteOpen(false)}
+      />
+
+      {/* Record payment - the real /pay flow (stamps + income + PDF re-sync). */}
+      {payOpen && (
+        <PaymentDialog
+          open
+          invoice={{
+            id: invoiceId,
+            number: invoiceNumber,
+            total,
+            clientName,
+            status: currentStatus,
+            paidAt,
+          }}
+          hasLinkedIncome={linkedIncome.count > 0}
+          onClose={(recorded) => {
+            setPayOpen(false);
+            if (recorded) {
+              setCurrentStatus("PAID");
+              router.refresh();
+            }
+          }}
+        />
       )}
 
-      {voidToast && (
-        <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 print:hidden">
-          {voidToast}
-        </p>
-      )}
-
-      {previewOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 print:hidden"
-          onClick={closePreview}
-          role="dialog"
-          aria-modal="true"
-        >
-          <div
-            className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl bg-white shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-4">
-              <div className="min-w-0">
-                <h2 className="text-lg font-bold text-russian-violet">Send invoice</h2>
-                <p className="mt-1 text-sm text-slate-600">
-                  To: <span className="font-medium">{preview?.to ?? clientEmail}</span>
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={closePreview}
-                aria-label="Close"
-                className="text-slate-400 hover:text-slate-700"
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto">
-              {loading && (
-                <p className="p-6 text-center text-sm text-slate-500">Loading preview...</p>
-              )}
-              {error && !loading && (
-                <p className="m-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                  {error}
-                </p>
-              )}
-              {preview && !loading && (
-                <div className="p-6">
-                  <label
-                    htmlFor="greeting-name"
-                    className="mb-2 block text-xs font-semibold text-slate-400 uppercase"
-                  >
-                    Greeting (the person you're emailing)
-                  </label>
-                  <input
-                    id="greeting-name"
-                    type="text"
-                    value={greetingName}
-                    onChange={(e) => setGreetingName(e.target.value)}
-                    onBlur={() => void openPreview()}
-                    placeholder="John (leave blank to use the first word of clientName)"
-                    disabled={sending}
-                    className={cn(
-                      "mb-4 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm",
-                      "ring-russian-violet/20 focus:border-russian-violet focus:ring-1 focus:outline-none",
-                    )}
-                  />
-                  <label
-                    htmlFor="custom-body"
-                    className="mb-2 block text-xs font-semibold text-slate-400 uppercase"
-                  >
-                    Message
-                  </label>
-                  <textarea
-                    id="custom-body"
-                    rows={4}
-                    value={customBody}
-                    onChange={(e) => setCustomBody(e.target.value)}
-                    onBlur={() => void openPreview()}
-                    disabled={sending}
-                    className={cn(
-                      "mb-4 w-full resize-y rounded-lg border border-slate-200 px-3 py-2 text-sm",
-                      "ring-russian-violet/20 focus:border-russian-violet focus:ring-1 focus:outline-none",
-                    )}
-                  />
-                  {eligibility && (
-                    <div className="mb-4">
-                      <label
-                        className={cn(
-                          "flex items-start gap-2 text-sm",
-                          !eligibility.canSend && "cursor-not-allowed",
-                        )}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={includeReview && eligibility.canSend}
-                          disabled={!eligibility.canSend || sending}
-                          onChange={(e) => {
-                            setIncludeReview(e.target.checked);
-                            void openPreview(false, e.target.checked);
-                          }}
-                          className="mt-0.5 h-4 w-4 rounded border-slate-300 text-russian-violet focus:ring-russian-violet/30"
-                        />
-                        <span className={cn(!eligibility.canSend && "text-slate-400")}>
-                          Include review link in this email
-                          {eligibility.canSend === false && (
-                            <span className="ml-1 text-xs italic">
-                              {eligibility.reason === "already-reviewed" &&
-                                "(this customer has already left a review)"}
-                              {eligibility.reason === "sent-recently" &&
-                                ` (review request sent ${formatDateShort(eligibility.lastSentAt)} - can re-send from ${formatDateShort(eligibility.nextAllowedAt)})`}
-                              {eligibility.reason === "no-contact" && (
-                                <>
-                                  (no contact record -{" "}
-                                  <button
-                                    type="button"
-                                    onClick={() => setShowAddContact(true)}
-                                    className="font-semibold text-russian-violet underline hover:opacity-80"
-                                  >
-                                    add {clientName?.trim().split(" ")[0] || "them"} to contacts
-                                  </button>
-                                  )
-                                </>
-                              )}
-                            </span>
-                          )}
-                        </span>
-                      </label>
-                    </div>
+      {/* Send invoice preview modal. */}
+      <Modal
+        open={previewOpen}
+        onClose={closePreview}
+        title="Send invoice"
+        description={
+          <>
+            To: <span className="font-medium">{preview?.to ?? clientEmail}</span>
+          </>
+        }
+        size="lg"
+        footer={
+          <>
+            <AdminButton variant="secondary" onClick={closePreview} disabled={sending}>
+              Cancel
+            </AdminButton>
+            <AdminButton
+              onClick={() => void confirmSend()}
+              busy={sending}
+              disabled={loading || !!error || !preview}
+            >
+              Send email
+            </AdminButton>
+          </>
+        }
+      >
+        {loading && <p className="py-6 text-center text-sm text-admin-muted">Loading preview...</p>}
+        {error && !loading && (
+          <p className="rounded-lg border border-coquelicot-800 bg-coquelicot-900 px-4 py-3 text-sm text-coquelicot-200">
+            {error}
+          </p>
+        )}
+        {preview && !loading && (
+          <div>
+            <label htmlFor="greeting-name" className={FIELD_LABEL_CLS}>
+              Greeting (the person you&apos;re emailing)
+            </label>
+            <input
+              id="greeting-name"
+              type="text"
+              value={greetingName}
+              onChange={(e) => setGreetingName(e.target.value)}
+              onBlur={() => void openPreview()}
+              placeholder="John (leave blank to use the first word of the client name)"
+              disabled={sending}
+              className={cn(INPUT_CLS, "mb-4")}
+            />
+            <label htmlFor="custom-body" className={FIELD_LABEL_CLS}>
+              Message
+            </label>
+            <textarea
+              id="custom-body"
+              rows={4}
+              value={customBody}
+              onChange={(e) => setCustomBody(e.target.value)}
+              onBlur={() => void openPreview()}
+              disabled={sending}
+              className={cn(INPUT_CLS, "mb-4 resize-y")}
+            />
+            {eligibility && (
+              <div className="mb-4">
+                <label
+                  className={cn(
+                    "flex items-start gap-2 text-sm",
+                    !eligibility.canSend && "cursor-not-allowed",
                   )}
-                  <p className="mb-2 text-xs font-semibold text-slate-400 uppercase">Subject</p>
-                  <p className="mb-4 text-sm font-medium text-slate-800">{preview.subject}</p>
-                  <p className="mb-2 text-xs font-semibold text-slate-400 uppercase">Body</p>
-                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-sm text-slate-800">
+                >
+                  <input
+                    type="checkbox"
+                    checked={includeReview && eligibility.canSend}
+                    disabled={!eligibility.canSend || sending}
+                    onChange={(e) => {
+                      setIncludeReview(e.target.checked);
+                      void openPreview(false, e.target.checked);
+                    }}
+                    className="mt-0.5"
+                  />
+                  <span className={cn(!eligibility.canSend && "text-admin-faint")}>
+                    Include review link in this email
+                    {eligibility.canSend === false && (
+                      <span className="ml-1 text-xs italic">
+                        {eligibility.reason === "already-reviewed" &&
+                          "(this customer has already left a review)"}
+                        {eligibility.reason === "sent-recently" &&
+                          ` (review request sent ${formatDateShort(eligibility.lastSentAt)} - can re-send from ${formatDateShort(eligibility.nextAllowedAt)})`}
+                        {eligibility.reason === "no-contact" && (
+                          <>
+                            (no contact record -{" "}
+                            <button
+                              type="button"
+                              onClick={() => setShowAddContact(true)}
+                              className="font-semibold text-russian-violet underline hover:opacity-80"
+                            >
+                              add {clientName?.trim().split(" ")[0] || "them"} to contacts
+                            </button>
+                            )
+                          </>
+                        )}
+                      </span>
+                    )}
+                  </span>
+                </label>
+              </div>
+            )}
+            <p className={FIELD_LABEL_CLS}>Subject</p>
+            <p className="mb-4 text-sm font-medium text-admin-text">{preview.subject}</p>
+            <p className={FIELD_LABEL_CLS}>Body</p>
+            <div className="rounded-lg border border-admin-border bg-admin-bg p-2">
+              <iframe
+                title="Invoice email preview"
+                srcDoc={preview.html}
+                sandbox="allow-same-origin"
+                className="h-105 w-full rounded bg-white"
+              />
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Void invoice / resend-notification modal. */}
+      <Modal
+        open={voidModalOpen}
+        onClose={closeVoidModal}
+        title={isVoided ? "Resend void notification" : "Void invoice"}
+        description={
+          clientEmail ? (
+            isVoided ? (
+              <>
+                Re-send the void notification to <span className="font-medium">{clientEmail}</span>.
+                The invoice stays voided either way.
+              </>
+            ) : (
+              <>
+                This invoice was sent to <span className="font-medium">{clientEmail}</span>. Notify
+                them so they don&apos;t pay the original.
+              </>
+            )
+          ) : (
+            "No client email on file - voiding silently."
+          )
+        }
+        size="lg"
+        footer={
+          <>
+            <AdminButton variant="secondary" onClick={closeVoidModal} disabled={voiding}>
+              Cancel
+            </AdminButton>
+            <AdminButton
+              variant={isVoided ? "primary" : "danger"}
+              busy={voiding}
+              onClick={() =>
+                void submitVoid({
+                  sendNotification: Boolean(clientEmail) && voidSendNotification,
+                  greetingName: voidGreetingName || undefined,
+                  customBody: voidCustomBody,
+                })
+              }
+            >
+              {isVoided
+                ? "Send notification"
+                : clientEmail && voidSendNotification
+                  ? "Void & notify"
+                  : "Void invoice"}
+            </AdminButton>
+          </>
+        }
+      >
+        {error && (
+          <p className="mb-4 rounded-lg border border-coquelicot-800 bg-coquelicot-900 px-4 py-3 text-sm text-coquelicot-200">
+            {error}
+          </p>
+        )}
+
+        {/* Pre-flight: voiding does not reverse a recorded payment's ledger row. */}
+        {linkedIncome.count > 0 && (
+          <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            This invoice has {linkedIncome.count} linked income entr
+            {linkedIncome.count === 1 ? "y" : "ies"} totalling {formatNZD(linkedIncome.total)}.
+            Voiding won&apos;t reverse {linkedIncome.count === 1 ? "it" : "them"} - reverse manually
+            in the ledger.
+          </p>
+        )}
+
+        {clientEmail ? (
+          <>
+            <label className="mb-3 flex items-start gap-2 text-sm text-admin-text">
+              <input
+                type="checkbox"
+                checked={voidSendNotification}
+                onChange={(e) => setVoidSendNotification(e.target.checked)}
+                disabled={voiding}
+                className="mt-0.5"
+              />
+              <span>
+                Send notification email to <strong>{clientEmail}</strong>
+              </span>
+            </label>
+
+            {voidSendNotification && (
+              <>
+                <label htmlFor="void-greeting-name" className={FIELD_LABEL_CLS}>
+                  Greeting (the person you&apos;re emailing)
+                </label>
+                <input
+                  id="void-greeting-name"
+                  type="text"
+                  value={voidGreetingName}
+                  onChange={(e) => setVoidGreetingName(e.target.value)}
+                  onBlur={() => void loadVoidPreview()}
+                  placeholder={`${clientName?.trim().split(" ")[0] || "First name"} (leave blank to use the first word of the client name)`}
+                  disabled={voiding}
+                  className={cn(INPUT_CLS, "mb-4")}
+                />
+                <label htmlFor="void-custom-body" className={FIELD_LABEL_CLS}>
+                  Message
+                </label>
+                <textarea
+                  id="void-custom-body"
+                  rows={5}
+                  value={voidCustomBody}
+                  onChange={(e) => setVoidCustomBody(e.target.value)}
+                  onBlur={() => void loadVoidPreview()}
+                  disabled={voiding}
+                  className={cn(INPUT_CLS, "mb-4 resize-y")}
+                />
+                <p className={FIELD_LABEL_CLS}>Subject</p>
+                <p className="mb-4 text-sm font-medium text-admin-text">
+                  {voidPreview?.subject ?? `Invoice ${invoiceNumber} - voided`}
+                </p>
+                <p className={FIELD_LABEL_CLS}>Body</p>
+                <div className="rounded-lg border border-admin-border bg-admin-bg p-2">
+                  {voidPreviewLoading && !voidPreview ? (
+                    <p className="p-6 text-center text-sm text-admin-muted">Loading preview...</p>
+                  ) : voidPreview ? (
                     <iframe
-                      title="Invoice email preview"
-                      srcDoc={preview.html}
+                      title="Void notification email preview"
+                      srcDoc={voidPreview.html}
                       sandbox="allow-same-origin"
                       className="h-105 w-full rounded bg-white"
                     />
-                  </div>
+                  ) : null}
                 </div>
-              )}
-            </div>
-
-            <div className="flex flex-wrap justify-end gap-3 border-t border-slate-200 px-6 py-4">
-              <button
-                type="button"
-                onClick={closePreview}
-                disabled={sending}
-                className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => void confirmSend()}
-                disabled={sending || loading || !!error || !preview}
-                className={cn(
-                  "rounded-lg px-4 py-2 text-sm font-semibold text-white",
-                  "bg-russian-violet hover:opacity-90 disabled:opacity-50",
-                )}
-              >
-                {sending ? "Sending..." : "Send email"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {voidModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 print:hidden"
-          onClick={closeVoidModal}
-          role="dialog"
-          aria-modal="true"
-        >
-          <div
-            className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl bg-white shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-4">
-              <div className="min-w-0">
-                <h2 className="text-lg font-bold text-russian-violet">
-                  {isVoided ? "Resend void notification" : "Void invoice"}
-                </h2>
-                <p className="mt-1 text-sm text-slate-600">
-                  {clientEmail ? (
-                    isVoided ? (
-                      <>
-                        Re-send the void notification to{" "}
-                        <span className="font-medium">{clientEmail}</span>. The invoice stays voided
-                        either way.
-                      </>
-                    ) : (
-                      <>
-                        This invoice was sent to <span className="font-medium">{clientEmail}</span>.
-                        Notify them so they don't pay the original.
-                      </>
-                    )
-                  ) : (
-                    "No client email on file - voiding silently."
-                  )}
+                <p className="mt-3 text-xs text-admin-muted italic">
+                  The VOIDED-stamped PDF will be attached automatically.
                 </p>
-              </div>
-              <button
-                type="button"
-                onClick={closeVoidModal}
-                aria-label="Close"
-                className="text-slate-400 hover:text-slate-700"
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-6">
-              {error && (
-                <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                  {error}
-                </p>
-              )}
-
-              {clientEmail && (
-                <>
-                  <label className="mb-3 flex items-start gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={voidSendNotification}
-                      onChange={(e) => setVoidSendNotification(e.target.checked)}
-                      disabled={voiding}
-                      className="mt-0.5 h-4 w-4 rounded border-slate-300 text-russian-violet focus:ring-russian-violet/30"
-                    />
-                    <span>
-                      Send notification email to <strong>{clientEmail}</strong>
-                    </span>
-                  </label>
-
-                  {voidSendNotification && (
-                    <>
-                      <label
-                        htmlFor="void-greeting-name"
-                        className="mb-2 block text-xs font-semibold text-slate-400 uppercase"
-                      >
-                        Greeting (the person you're emailing)
-                      </label>
-                      <input
-                        id="void-greeting-name"
-                        type="text"
-                        value={voidGreetingName}
-                        onChange={(e) => setVoidGreetingName(e.target.value)}
-                        onBlur={() => void loadVoidPreview()}
-                        placeholder={`${clientName?.trim().split(" ")[0] || "First name"} (leave blank to use the first word of clientName)`}
-                        disabled={voiding}
-                        className={cn(
-                          "mb-4 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm",
-                          "ring-russian-violet/20 focus:border-russian-violet focus:ring-1 focus:outline-none",
-                        )}
-                      />
-                      <label
-                        htmlFor="void-custom-body"
-                        className="mb-2 block text-xs font-semibold text-slate-400 uppercase"
-                      >
-                        Message
-                      </label>
-                      <textarea
-                        id="void-custom-body"
-                        rows={5}
-                        value={voidCustomBody}
-                        onChange={(e) => setVoidCustomBody(e.target.value)}
-                        onBlur={() => void loadVoidPreview()}
-                        disabled={voiding}
-                        className={cn(
-                          "mb-4 w-full resize-y rounded-lg border border-slate-200 px-3 py-2 text-sm",
-                          "ring-russian-violet/20 focus:border-russian-violet focus:ring-1 focus:outline-none",
-                        )}
-                      />
-                      <p className="mb-2 text-xs font-semibold text-slate-400 uppercase">Subject</p>
-                      <p className="mb-4 text-sm font-medium text-slate-800">
-                        {voidPreview?.subject ?? `Invoice ${invoiceNumber} - voided`}
-                      </p>
-                      <p className="mb-2 text-xs font-semibold text-slate-400 uppercase">Body</p>
-                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-sm text-slate-800">
-                        {voidPreviewLoading && !voidPreview ? (
-                          <p className="p-6 text-center text-sm text-slate-500">
-                            Loading preview...
-                          </p>
-                        ) : voidPreview ? (
-                          <iframe
-                            title="Void notification email preview"
-                            srcDoc={voidPreview.html}
-                            sandbox="allow-same-origin"
-                            className="h-105 w-full rounded bg-white"
-                          />
-                        ) : null}
-                      </div>
-                      <p className="mt-3 text-xs text-slate-500 italic">
-                        The VOIDED-stamped PDF will be attached automatically.
-                      </p>
-                    </>
-                  )}
-                </>
-              )}
-              {!clientEmail && (
-                <p className="text-sm text-slate-600">
-                  No notification will be sent. The invoice will be marked VOIDED and the Drive PDF
-                  will get a diagonal VOID stamp.
-                </p>
-              )}
-            </div>
-
-            <div className="flex flex-wrap justify-end gap-3 border-t border-slate-200 px-6 py-4">
-              <button
-                type="button"
-                onClick={closeVoidModal}
-                disabled={voiding}
-                className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  void submitVoid({
-                    sendNotification: Boolean(clientEmail) && voidSendNotification,
-                    greetingName: voidGreetingName || undefined,
-                    customBody: voidCustomBody,
-                  })
-                }
-                disabled={voiding}
-                className={cn(
-                  "rounded-lg px-4 py-2 text-sm font-semibold text-white",
-                  "bg-russian-violet hover:opacity-90 disabled:opacity-50",
-                )}
-              >
-                {voiding
-                  ? isVoided
-                    ? "Sending..."
-                    : "Voiding..."
-                  : isVoided
-                    ? "Send notification"
-                    : clientEmail && voidSendNotification
-                      ? "Void & notify"
-                      : "Void invoice"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+              </>
+            )}
+          </>
+        ) : (
+          <p className="text-sm text-admin-text-secondary">
+            No notification will be sent. The invoice will be marked VOIDED and the Drive PDF will
+            get a diagonal VOID stamp.
+          </p>
+        )}
+      </Modal>
 
       {showAddContact && (
         <AddToContactsModal
@@ -894,9 +753,8 @@ export function InvoiceActions({
           email={clientEmail}
           onClose={(newContactId) => {
             setShowAddContact(false);
-            // When a contact was actually created, force a fresh eligibility
-            // adopt so the review-link checkbox re-enables and auto-ticks; on a
-            // plain dismiss (null) a normal re-fetch is enough.
+            // When a contact was created, force a fresh eligibility adopt so the
+            // review-link checkbox re-enables and auto-ticks.
             void openPreview(Boolean(newContactId));
           }}
         />
