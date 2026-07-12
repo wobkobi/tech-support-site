@@ -70,23 +70,39 @@ function runSelfTest(): number {
  * Parses `--flag=value` / `--flag` CLI arguments.
  * @returns Parsed flags with defaults applied.
  */
-function parseArgs(): { selfTest: boolean; url: string; runs: number } {
+function parseArgs(): { selfTest: boolean; url: string; runs: number; probe: boolean } {
   const args = process.argv.slice(2);
   let selfTest = false;
   let url = "http://localhost:3000";
   let runs = 2;
+  let probe = false;
   for (const arg of args) {
     if (arg === "--self-test") selfTest = true;
     else if (arg.startsWith("--url=")) url = arg.slice(6);
     else if (arg.startsWith("--runs=")) runs = Math.max(1, parseInt(arg.slice(7), 10) || 1);
+    else if (arg === "--probe") probe = true;
   }
-  return { selfTest, url, runs };
+  return { selfTest, url, runs, probe };
 }
 
 (async () => {
   const { selfTest } = parseArgs();
   if (selfTest) {
     process.exit(runSelfTest());
+  }
+  const adminSecret = process.env.ADMIN_SECRET;
+  if (!adminSecret) {
+    console.error("ADMIN_SECRET not set in .env.local - required for the harness.");
+    process.exit(1);
+  }
+  const { probe, url } = parseArgs();
+  if (probe) {
+    const { callEstimate, callParseJob } = await import("./client");
+    const est = await callEstimate(url, adminSecret, "Set up a new printer");
+    console.log("estimate:", est.estimatedMins, "min,", est.tasks.length, "task(s)");
+    const job = await callParseJob(url, adminSecret, "Set up a new laptop, 9-11am");
+    console.log("parse:", job.durationMins, "min,", job.tasks?.length ?? 0, "task(s)");
+    process.exit(0);
   }
   console.log("Full run not implemented yet.");
   process.exit(0);
