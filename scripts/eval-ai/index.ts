@@ -1,16 +1,14 @@
 // scripts/eval-ai/index.ts
-/**
- * @description On-demand eval harness for the two AI routes. Black-box tests
- * estimate-duration and parse-job against a running dev server. Run with
- * `npm run eval:ai` (needs `npm run dev` in another terminal). `--self-test`
- * runs the network-free pure-logic checks only.
- *
- * Usage:
- *   npm run eval:ai -- --self-test        # pure checks, no server, no API calls
- *   npm run eval:ai                       # full run against http://localhost:3000
- *   npm run eval:ai -- --url=http://localhost:3001
- *   npm run eval:ai -- --runs=3           # repeat each case 3x for reproducibility
- */
+// On-demand eval harness for the two AI routes. Black-box tests estimate-duration
+// and parse-job against a running dev server. Run with `npm run eval:ai` (needs
+// `npm run dev` in another terminal). `--self-test` runs the network-free
+// pure-logic checks only.
+//
+// Usage:
+//   npm run eval:ai -- --self-test        # pure checks, no server, no API calls
+//   npm run eval:ai                       # full run against http://localhost:3000
+//   npm run eval:ai -- --url=http://localhost:3001
+//   npm run eval:ai -- --runs=3           # repeat each case 3x for reproducibility
 
 import {
   estimateTolerance,

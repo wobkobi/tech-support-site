@@ -1,10 +1,8 @@
 // scripts/eval-ai/assert.ts
-/**
- * @description Pure, network-free expectation maths and tolerance helpers for
- * the eval harness. Mirrors the server-side clamps in
- * src/app/api/pricing/estimate-duration/route.ts so expected values stay in
- * lockstep with what the route actually enforces.
- */
+// Pure, network-free expectation maths and tolerance helpers for the eval
+// harness. Mirrors the server-side clamps in
+// src/app/api/pricing/estimate-duration/route.ts so expected values stay in
+// lockstep with what the route actually enforces.
 
 /** Grouping for a reported check. */
 export type CheckFamily = "context" | "reproducibility" | "drift";
