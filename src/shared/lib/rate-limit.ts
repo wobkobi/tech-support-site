@@ -71,6 +71,25 @@ export function getClientIp(request: NextRequest): string {
 }
 
 /**
+ * Dev-only escape hatch: outside production, a request presenting the admin
+ * secret skips rate limiting so the eval harness can batch the public route.
+ * Cannot be true in production - the environment check gates it.
+ * @param nodeEnv - `process.env.NODE_ENV`.
+ * @param headerSecret - The request's `x-admin-secret` header value (or null).
+ * @param adminSecret - `process.env.ADMIN_SECRET` (or undefined when unset).
+ * @returns True only when non-production and the secrets match.
+ */
+export function isRateLimitBypassed(
+  nodeEnv: string | undefined,
+  headerSecret: string | null,
+  adminSecret: string | undefined,
+): boolean {
+  if (nodeEnv === "production") return false;
+  if (!adminSecret) return false;
+  return headerSecret === adminSecret;
+}
+
+/**
  * Convenience wrapper that runs {@link rateLimit} and, when blocked, returns a
  * 429 response carrying a `Retry-After` header. Returns null when the request
  * should proceed.
@@ -86,6 +105,18 @@ export function rateLimitOrReject(
   limit: number,
   windowMs: number,
 ): NextResponse | null {
+  // Non-prod eval harness batches the public route; let it skip the limit when
+  // it presents the admin secret. Never fires in production.
+  if (
+    isRateLimitBypassed(
+      process.env.NODE_ENV,
+      request.headers.get("x-admin-secret"),
+      process.env.ADMIN_SECRET,
+    )
+  ) {
+    return null;
+  }
+
   const ip = getClientIp(request);
   const { allowed, retryAfterMs } = rateLimit(`${scope}:${ip}`, limit, windowMs);
   if (allowed) return null;
