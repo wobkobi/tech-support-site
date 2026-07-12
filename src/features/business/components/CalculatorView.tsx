@@ -1688,6 +1688,17 @@ export function CalculatorView({
                       <span className="font-semibold text-russian-violet">Billing booked job:</span>{" "}
                       {eventPrefill.clientName || "(no name)"} - {jobDate}, {slotStart || "--:--"}-
                       {slotEnd || "--:--"}
+                      {eventPrefill.bookingId && (
+                        <>
+                          {" · "}
+                          <a
+                            href={`/admin/bookings/${eventPrefill.bookingId}`}
+                            className="font-medium text-russian-violet underline hover:opacity-80"
+                          >
+                            View booking ↗
+                          </a>
+                        </>
+                      )}
                     </p>
                     {drifted && (
                       <div className="flex flex-wrap items-center gap-2">

@@ -1,15 +1,17 @@
 // src/app/admin/(shell)/bookings/page.tsx
 /**
  * @description Admin bookings list. Loads the most recent 1000 bookings (soft
- * cap to avoid unbounded scans), maps them to {@link AdminBookingRow}s, derives
- * per-status counts, and renders the filterable {@link BookingAdminList}.
+ * cap to avoid unbounded scans), maps them to {@link AdminBookingRow}s, and
+ * renders the filterable {@link BookingAdminList} (which owns the summary
+ * StatCards, search, date-range filter, and sort). The select is kept to just
+ * the columns the list shows; the detail page loads the full booking row itself.
  */
+import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import {
   BookingAdminList,
   type AdminBookingRow,
 } from "@/features/booking/components/admin/BookingAdminList";
 import { requireAdminAuth } from "@/shared/lib/auth";
-import { cn } from "@/shared/lib/cn";
 import { prisma } from "@/shared/lib/prisma";
 import type { Metadata } from "next";
 import type React from "react";
@@ -22,7 +24,7 @@ export const metadata: Metadata = {
 };
 
 /**
- * Admin bookings page listing all bookings with status filters.
+ * Admin bookings page listing all bookings with StatCards, filters, and sort.
  * @returns Bookings page element.
  */
 export default async function AdminBookingsPage(): Promise<React.ReactElement> {
@@ -38,13 +40,14 @@ export default async function AdminBookingsPage(): Promise<React.ReactElement> {
       name: true,
       email: true,
       phone: true,
-      notes: true,
       startAt: true,
       endAt: true,
       createdAt: true,
       status: true,
       cancelToken: true,
       reviewSentAt: true,
+      cancelledAt: true,
+      noShow: true,
       quotedLowAtBooking: true,
       quotedHighAtBooking: true,
     },
@@ -55,53 +58,21 @@ export default async function AdminBookingsPage(): Promise<React.ReactElement> {
     name: b.name,
     email: b.email,
     phone: b.phone ?? null,
-    notes: b.notes ?? null,
     startAt: b.startAt.toISOString(),
     endAt: b.endAt.toISOString(),
     createdAt: b.createdAt.toISOString(),
     status: b.status as AdminBookingRow["status"],
     cancelToken: b.cancelToken,
     reviewSentAt: b.reviewSentAt?.toISOString() ?? null,
+    cancelledAt: b.cancelledAt?.toISOString() ?? null,
+    noShow: b.noShow,
     quotedLow: b.quotedLowAtBooking ?? null,
     quotedHigh: b.quotedHighAtBooking ?? null,
   }));
 
-  const confirmedCount = allBookings.filter((b) => b.status === "confirmed").length;
-  const heldCount = allBookings.filter((b) => b.status === "held").length;
-  const completedCount = allBookings.filter((b) => b.status === "completed").length;
-  const cancelledCount = allBookings.filter((b) => b.status === "cancelled").length;
-
-  const statusStats = [
-    {
-      label: "Confirmed",
-      value: confirmedCount,
-      className: "bg-moonstone-600/15 text-moonstone-600",
-    },
-    {
-      label: "Held",
-      value: heldCount,
-      className: heldCount > 0 ? "bg-yellow-100 text-yellow-700" : "bg-slate-100 text-slate-500",
-    },
-    { label: "Completed", value: completedCount, className: "bg-green-100 text-green-700" },
-    { label: "Cancelled", value: cancelledCount, className: "bg-slate-100 text-slate-500" },
-  ];
-
   return (
     <>
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-2xl font-extrabold text-russian-violet">Bookings</h1>
-        <div className="flex flex-wrap gap-2">
-          {statusStats.map((s) => (
-            <span
-              key={s.label}
-              className={cn("rounded-full px-3 py-1 text-xs font-semibold", s.className)}
-            >
-              {s.value} {s.label}
-            </span>
-          ))}
-        </div>
-      </div>
-
+      <PageHeader title="Bookings" description="Search, filter, and manage customer bookings." />
       <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <BookingAdminList bookings={bookingRows} />
       </div>

@@ -2,9 +2,11 @@
 // src/features/admin/components/EventActionSheet.tsx
 /**
  * @description Bottom-sheet of quick mutations for a booking event, opened by
- * a long-press on a booking card in DayAgendaView: complete, cancel
- * (operator/on-behalf), no-show, reschedule, bill in calculator, resend
- * review email, delete (test bookings only).
+ * a long-press on a booking card in DayAgendaView: view details, complete,
+ * cancel (operator/on-behalf), no-show, reschedule, bill in calculator, resend
+ * review email, delete (test bookings only). Mutations route through the shared
+ * {@link useBookingActions} hook so the schedule view and the bookings list stay
+ * behaviourally identical, with toasts surfaced by the global admin toaster.
  */
 
 import type {
@@ -12,7 +14,7 @@ import type {
   WeekEvent,
   WeekEventBooking,
 } from "@/features/admin/lib/schedule-types";
-import { cn } from "@/shared/lib/cn";
+import { useBookingActions } from "@/features/booking/hooks/use-booking-actions";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 
@@ -28,12 +30,10 @@ interface EventActionSheetProps {
   onClose: () => void;
 }
 
-type ToastState = { msg: string; kind: "ok" | "warn" } | null;
-
 /**
- * Renders the action sheet + handles its API calls. Reuses the same
- * endpoints as BookingAdminList so the schedule view and the bookings list
- * stay behaviourally identical.
+ * Renders the action sheet + handles its API calls. Reuses {@link useBookingActions}
+ * (the same wrappers the bookings list and detail page use) so the schedule view
+ * and the bookings list stay behaviourally identical.
  * @param props - Component props.
  * @param props.event - Event with attached booking data.
  * @param props.onChanged - Parent callback after a successful mutation.
@@ -45,8 +45,8 @@ export function EventActionSheet({
   onChanged,
   onClose,
 }: EventActionSheetProps): React.ReactElement {
+  const actions = useBookingActions();
   const [busy, setBusy] = useState(false);
-  const [toast, setToast] = useState<ToastState>(null);
   // Stable "now" so the past/future booking checks don't get flagged for
   // calling an impure function during render.
   const [renderedAt] = useState(() => Date.now());
@@ -85,51 +85,23 @@ export function EventActionSheet({
   const isTestBooking = booking.name.toLowerCase().includes("test");
 
   /**
-   * Surfaces a toast for 4s, then clears it.
-   * @param msg - Toast message.
-   * @param kind - Toast kind for colour.
+   * Runs a mutation, then closes + refreshes on success. Toasts (including
+   * errors) come from {@link useBookingActions}.
+   * @param run - The action wrapper to invoke.
    */
-  function showToast(msg: string, kind: "ok" | "warn" = "ok"): void {
-    setToast({ msg, kind });
-    setTimeout(() => setToast(null), 4000);
-  }
-
-  /**
-   * Generic PATCH wrapper around /api/admin/bookings/[id]. Returns true on
-   * success so callers can decide whether to close + refresh.
-   * @param body - PATCH body.
-   * @returns Whether the request succeeded.
-   */
-  async function patch(body: Record<string, unknown>): Promise<boolean> {
+  async function act(run: () => Promise<{ ok: boolean }>): Promise<void> {
     setBusy(true);
-    try {
-      const res = await fetch(`/api/admin/bookings/${booking.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
-        showToast(data.error ?? "Action failed.", "warn");
-        return false;
-      }
-      return true;
-    } catch (err) {
-      console.error("[EventActionSheet] PATCH failed", err);
-      showToast("Network error - try again.", "warn");
-      return false;
-    } finally {
-      setBusy(false);
+    const result = await run();
+    setBusy(false);
+    if (result.ok) {
+      onChanged();
+      onClose();
     }
   }
 
   /** Marks the booking as completed and triggers the review email. */
-  async function handleComplete(): Promise<void> {
-    const ok = await patch({ status: "completed" });
-    if (ok) {
-      onChanged();
-      onClose();
-    }
+  function handleComplete(): void {
+    void act(() => actions.completeBooking(booking.id));
   }
 
   /**
@@ -137,79 +109,35 @@ export function EventActionSheet({
    * cancellation-fee rules (same wording as BookingAdminList for parity).
    * @param mode - Cancellation policy mode.
    */
-  async function handleCancel(mode: "operator" | "on-behalf"): Promise<void> {
+  function handleCancel(mode: "operator" | "on-behalf"): void {
     const confirmMsg =
       mode === "operator"
         ? "Cancel this booking on my end? No fee will be charged to the customer."
         : "Cancel for the customer? The standard cancellation fee rules will apply (callout + travel inside the fee windows).";
     if (!window.confirm(confirmMsg)) return;
-    const ok = await patch({ status: "cancelled", cancelMode: mode });
-    if (ok) {
-      onChanged();
-      onClose();
-    }
+    void act(() => actions.cancelBooking(booking.id, mode));
   }
 
   /** Flags the booking as a no-show; drafts the late-cancellation invoice. */
-  async function handleNoShow(): Promise<void> {
+  function handleNoShow(): void {
     if (
       !window.confirm(
         "Mark as no-show? A draft invoice will be created for the call-out fee plus round-trip travel.",
       )
     )
       return;
-    const ok = await patch({ markNoShow: true });
-    if (ok) {
-      onChanged();
-      onClose();
-    }
+    void act(() => actions.markNoShow(booking.id));
   }
 
   /** Re-sends (or first-sends) the review email. */
-  async function handleResendReview(): Promise<void> {
-    setBusy(true);
-    try {
-      const res = await fetch(`/api/admin/bookings/${booking.id}/resend-review`, {
-        method: "POST",
-        headers: {},
-      });
-      if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
-        showToast(data.error ?? "Failed to send.", "warn");
-        return;
-      }
-      onChanged();
-      onClose();
-    } catch (err) {
-      console.error("[EventActionSheet] resend-review failed", err);
-      showToast("Network error - try again.", "warn");
-    } finally {
-      setBusy(false);
-    }
+  function handleResendReview(): void {
+    void act(() => actions.resendReview(booking.id));
   }
 
   /** Permanently deletes the booking (test bookings only). */
-  async function handleDelete(): Promise<void> {
+  function handleDelete(): void {
     if (!window.confirm("Permanently delete this test booking? This cannot be undone.")) return;
-    setBusy(true);
-    try {
-      const res = await fetch(`/api/admin/bookings/${booking.id}`, {
-        method: "DELETE",
-        headers: {},
-      });
-      if (!res.ok) {
-        const data = (await res.json().catch(() => ({}))) as { error?: string };
-        showToast(data.error ?? "Delete failed.", "warn");
-        return;
-      }
-      onChanged();
-      onClose();
-    } catch (err) {
-      console.error("[EventActionSheet] DELETE failed", err);
-      showToast("Network error - try again.", "warn");
-    } finally {
-      setBusy(false);
-    }
+    void act(() => actions.deleteBooking(booking.id));
   }
 
   return (
@@ -239,24 +167,18 @@ export function EventActionSheet({
           </button>
         </div>
 
-        {toast && (
-          <p
-            className={cn(
-              "mb-3 rounded-md border px-3 py-2 text-xs font-medium",
-              toast.kind === "ok"
-                ? "border-green-200 bg-green-50 text-green-800"
-                : "border-amber-200 bg-amber-50 text-amber-800",
-            )}
-          >
-            {toast.msg}
-          </p>
-        )}
-
         <div className="flex flex-col gap-2">
+          <a
+            href={`/admin/bookings/${booking.id}`}
+            className="inline-flex h-11 items-center justify-center rounded-lg bg-russian-violet/10 px-4 text-sm font-semibold text-russian-violet hover:bg-russian-violet/20"
+          >
+            View details
+          </a>
+
           {isConfirmed && (
             <button
               type="button"
-              onClick={() => void handleComplete()}
+              onClick={handleComplete}
               disabled={busy}
               className="inline-flex h-11 items-center justify-center rounded-lg bg-green-500/20 px-4 text-sm font-semibold text-green-700 hover:bg-green-500/30 disabled:opacity-50"
             >
@@ -267,7 +189,7 @@ export function EventActionSheet({
           {isConfirmed && isPast && (
             <button
               type="button"
-              onClick={() => void handleNoShow()}
+              onClick={handleNoShow}
               disabled={busy}
               className="inline-flex h-11 items-center justify-center rounded-lg bg-amber-500/20 px-4 text-sm font-semibold text-amber-700 hover:bg-amber-500/30 disabled:opacity-50"
             >
@@ -279,7 +201,7 @@ export function EventActionSheet({
             <>
               <button
                 type="button"
-                onClick={() => void handleCancel("operator")}
+                onClick={() => handleCancel("operator")}
                 disabled={busy}
                 className="inline-flex h-11 items-center justify-center rounded-lg bg-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-300 disabled:opacity-50"
               >
@@ -287,7 +209,7 @@ export function EventActionSheet({
               </button>
               <button
                 type="button"
-                onClick={() => void handleCancel("on-behalf")}
+                onClick={() => handleCancel("on-behalf")}
                 disabled={busy}
                 className="inline-flex h-11 items-center justify-center rounded-lg bg-red-500/20 px-4 text-sm font-semibold text-red-600 hover:bg-red-500/30 disabled:opacity-50"
               >
@@ -318,7 +240,7 @@ export function EventActionSheet({
               </a>
               <button
                 type="button"
-                onClick={() => void handleResendReview()}
+                onClick={handleResendReview}
                 disabled={busy}
                 className="inline-flex h-11 items-center justify-center rounded-lg bg-moonstone-600/15 px-4 text-sm font-semibold text-moonstone-700 hover:bg-moonstone-600/25 disabled:opacity-50"
               >
@@ -330,7 +252,7 @@ export function EventActionSheet({
           {isTestBooking && (
             <button
               type="button"
-              onClick={() => void handleDelete()}
+              onClick={handleDelete}
               disabled={busy}
               className="inline-flex h-11 items-center justify-center rounded-lg bg-red-500/20 px-4 text-sm font-semibold text-red-600 hover:bg-red-500/30 disabled:opacity-50"
             >
