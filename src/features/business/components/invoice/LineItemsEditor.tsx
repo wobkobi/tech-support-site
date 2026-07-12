@@ -10,6 +10,7 @@
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { formatNZD } from "@/features/business/lib/business";
 import type { LineItem } from "@/features/business/types/business";
+import { cn } from "@/shared/lib/cn";
 import type React from "react";
 import { FaXmark } from "react-icons/fa6";
 
@@ -102,7 +103,7 @@ export function LineItemsEditor({
             onChange={(e) => updateRow(idx, { description: e.target.value })}
             placeholder="Description"
             disabled={disabled}
-            className={`col-span-2 sm:col-span-1 ${INPUT_CLS}`}
+            className={cn("col-span-2 sm:col-span-1", INPUT_CLS)}
             aria-label={`Line ${idx + 1} description`}
           />
           <input
@@ -112,7 +113,7 @@ export function LineItemsEditor({
             value={item.qty}
             onChange={(e) => updateRow(idx, { qty: parseNum(e.target.value) })}
             disabled={disabled}
-            className={`text-right ${INPUT_CLS}`}
+            className={cn("text-right", INPUT_CLS)}
             aria-label={`Line ${idx + 1} quantity`}
           />
           <input
@@ -122,7 +123,7 @@ export function LineItemsEditor({
             value={item.unitPrice}
             onChange={(e) => updateRow(idx, { unitPrice: parseNum(e.target.value) })}
             disabled={disabled}
-            className={`text-right ${INPUT_CLS}`}
+            className={cn("text-right", INPUT_CLS)}
             aria-label={`Line ${idx + 1} unit price`}
           />
           <span className="px-1 text-right text-sm font-semibold whitespace-nowrap text-admin-text">

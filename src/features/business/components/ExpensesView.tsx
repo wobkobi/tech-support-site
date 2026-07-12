@@ -88,7 +88,9 @@ export function ExpensesView({ onMigrated }: ExpensesViewProps): React.ReactElem
     category: "Other",
     amountIncl: "",
     gstRate: "0.15",
-    method: PAYMENT_METHODS[0],
+    // Cast to string so the field stays widenable; the const-array element is a
+    // literal type, which would otherwise pin `method` and reject edits.
+    method: PAYMENT_METHODS[0] as string,
     receipt: false,
     notes: "",
   };

@@ -4,7 +4,7 @@
  * @description Admin promo CRUD - form-on-top + table-below + overlap warning.
  */
 
-import type { PromoRow } from "@/app/admin/promos/page";
+import type { PromoRow } from "@/app/admin/(shell)/promos/page";
 import { formatNZD } from "@/features/business/lib/business";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";

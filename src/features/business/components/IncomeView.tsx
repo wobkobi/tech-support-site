@@ -45,7 +45,9 @@ export function IncomeView(): React.ReactElement {
     customer: "",
     description: "",
     amount: "",
-    method: INCOME_METHODS[0],
+    // Cast to string so the field stays widenable; the const-array element is a
+    // literal type, which would otherwise pin `method` and reject edits.
+    method: INCOME_METHODS[0] as string,
     notes: "",
   };
   const [form, setForm] = useState(emptyForm);

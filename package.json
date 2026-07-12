@@ -1,6 +1,6 @@
 {
   "name": "tech-support-site",
-  "version": "3.143.0",
+  "version": "3.143.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -18,10 +18,11 @@
     "prepare": "simple-git-hooks",
     "settings:seed": "dotenv -e .env.local -- tsx scripts/seed-settings.ts",
     "smoke": "dotenv -e .env.local -- tsx scripts/smoke-test.ts",
-    "start": "next start"
+    "start": "next start",
+    "typecheck": "tsc --noEmit"
   },
   "simple-git-hooks": {
-    "pre-commit": "npm install --package-lock-only && git add package-lock.json && npx lint-staged",
+    "pre-commit": "npm install --package-lock-only && git add package-lock.json && npx lint-staged && npm run typecheck",
     "pre-push": "npm run lint && npm run build && npm run smoke -- --skip-build"
   },
   "lint-staged": {
