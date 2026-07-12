@@ -1,11 +1,11 @@
 // src/app/admin/(shell)/business/expenses/page.tsx
 /**
- * @description Admin expenses page. Renders {@link ExpensesView} for recording
- * and viewing expense entries, with {@link SubscriptionsView} below for
- * recurring subscription costs.
+ * @description Admin expenses page. Renders {@link ExpensesPageView}, which pairs
+ * the expenses ledger with the subscriptions list below and refreshes the latter
+ * when an expense is migrated into a subscription.
  */
-import { ExpensesView } from "@/features/business/components/ExpensesView";
-import { SubscriptionsView } from "@/features/business/components/SubscriptionsView";
+import { PageHeader } from "@/features/admin/components/ui/PageHeader";
+import { ExpensesPageView } from "@/features/business/components/ExpensesPageView";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import type { Metadata } from "next";
 import type React from "react";
@@ -26,11 +26,11 @@ export default async function ExpensesPage(): Promise<React.ReactElement> {
 
   return (
     <>
-      <h1 className="mb-6 text-2xl font-extrabold text-russian-violet">Expenses</h1>
-      <ExpensesView />
-      <div className="mt-10">
-        <SubscriptionsView />
-      </div>
+      <PageHeader
+        title="Expenses"
+        description="Record expenses and recurring subscriptions; migrate a repeat cost into a subscription."
+      />
+      <ExpensesPageView />
     </>
   );
 }

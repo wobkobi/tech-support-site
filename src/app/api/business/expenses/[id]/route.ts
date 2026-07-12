@@ -21,6 +21,9 @@ import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
+// Raise the serverless ceiling so a slow Sheets round-trip cannot 504 on the default timeout.
+export const maxDuration = 60;
+
 /**
  * PUT /api/business/expenses/[id] - Updates an expense entry and its sheet row,
  * recomputing GST and the excl-GST amount server-side.

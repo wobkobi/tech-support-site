@@ -27,6 +27,10 @@ export const EXPENSE_CATEGORIES = [
   "Office supplies",
   "Insurance",
   "Accounting",
+  // Subscriptions post here when a recurring subscription is recorded (its
+  // category flows straight to the Expenses sheet), so it must be a valid
+  // category + a Data-Validation option in the Expenses category column.
+  "Subscriptions",
   "Other",
 ] as const;
 

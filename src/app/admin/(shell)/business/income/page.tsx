@@ -3,6 +3,7 @@
  * @description Admin income page. Renders {@link IncomeView} for recording and
  * viewing income entries.
  */
+import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { IncomeView } from "@/features/business/components/IncomeView";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import type { Metadata } from "next";
@@ -24,7 +25,10 @@ export default async function IncomePage(): Promise<React.ReactElement> {
 
   return (
     <>
-      <h1 className="mb-6 text-2xl font-extrabold text-russian-violet">Income</h1>
+      <PageHeader
+        title="Income"
+        description="Record income entries; each syncs to the Cashbook sheet. Invoice payments appear here automatically."
+      />
       <IncomeView />
     </>
   );

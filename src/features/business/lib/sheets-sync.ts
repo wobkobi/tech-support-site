@@ -348,10 +348,13 @@ export function buildCashbookCells(e: CashbookRowInput): (string | number | null
 /**
  * Builds the Expenses cells A..K for an expense entry. The GST rate (column H)
  * is derived from the stored GST split and written as a percent string (e.g.
- * "15%") to match what the importer's parser reads; I/J carry the derived GST
- * amount and excl-GST amount (informational - the importer recomputes them).
+ * "15%") to match what the importer's parser reads. Columns I (GST amount) and
+ * J (excl-GST amount) are sheet-managed formulas: null means "skip", so the
+ * app never overwrites the sheet's own formulas there (which broke the sheet
+ * when hard values landed on top of them). The importer recomputes I/J on read
+ * anyway, so the DB round-trip is unaffected. Mirrors {@link buildCashbookCells}.
  * @param e - Expense entry fields.
- * @returns Cell values for columns A..K.
+ * @returns Cell values for columns A..K (I/J null so the sheet formulas stand).
  */
 export function buildExpenseCells(e: ExpenseRowInput): (string | number | null)[] {
   const gstPct = e.amountExcl > 0 ? Math.round((e.gstAmount / e.amountExcl) * 100) : 0;
@@ -364,8 +367,8 @@ export function buildExpenseCells(e: ExpenseRowInput): (string | number | null)[
     e.receipt ? "Yes" : "No",
     e.amountIncl,
     `${gstPct}%`,
-    e.gstAmount,
-    e.amountExcl,
+    null,
+    null,
     e.notes ?? "",
   ];
 }
