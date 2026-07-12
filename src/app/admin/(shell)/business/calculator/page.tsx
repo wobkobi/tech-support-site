@@ -9,6 +9,7 @@
  * times plus its booking's client details, and links the saved invoice back
  * to both.
  */
+import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { CalculatorView, type EventPrefill } from "@/features/business/components/CalculatorView";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { getActivePromo } from "@/features/business/lib/promos";
@@ -95,8 +96,8 @@ async function buildEventPrefill(eventId: string): Promise<EventPrefill | null> 
     calendarEventId: eventId,
     bookingId: booking?.id ?? null,
     jobDate: formatNz(event.start, { year: "numeric", month: "2-digit", day: "2-digit" }),
-    startTime: formatNz(event.start, { hour: "2-digit", minute: "2-digit", hour12: false }),
-    endTime: formatNz(event.end, { hour: "2-digit", minute: "2-digit", hour12: false }),
+    startTime: formatNz(event.start, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" }),
+    endTime: formatNz(event.end, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" }),
     clientName: booking?.name ?? event.summary ?? "",
     clientEmail: booking?.email ?? "",
     jobAddress:
@@ -164,7 +165,10 @@ export default async function CalculatorPage({
 
   return (
     <>
-      <h1 className="mb-6 text-2xl font-extrabold text-russian-violet">Job calculator</h1>
+      <PageHeader
+        title="Job calculator"
+        description="Parse a job with AI or build it by hand, then save it as an invoice or income."
+      />
       <Suspense>
         <CalculatorView
           identity={identity}

@@ -6,6 +6,8 @@
  * a plain-English job description, and renders a live invoice preview.
  */
 
+import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
+import { useToast } from "@/features/admin/components/ui/Toast";
 import { validateEmail } from "@/features/booking/lib/booking";
 import { AddToContactsModal } from "@/features/business/components/AddToContactsModal";
 import { InvoicePreviewPanel } from "@/features/business/components/InvoicePreviewPanel";
@@ -79,6 +81,18 @@ function nowTime(): string {
 function addHour(t: string): string {
   const [h, m] = t.split(":").map(Number);
   return `${String((h + 1) % 24).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+/**
+ * Adds minutes to a time string, clamped within the same day (00:00-23:59).
+ * @param t - A time string in HH:MM format.
+ * @param mins - Minutes to add (may be negative).
+ * @returns The shifted time string in HH:MM format.
+ */
+function addMinsToTime(t: string, mins: number): string {
+  const [h, m] = t.split(":").map(Number);
+  const total = Math.max(0, Math.min(24 * 60 - 1, h * 60 + m + Math.round(mins)));
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
 }
 /**
  * Builds a UTC ISO timestamp for an HH:MM start time interpreted as NZ
@@ -421,7 +435,10 @@ export function CalculatorView({
   const [saveSendMode, setSaveSendMode] = useState(false);
   const [saveInvoiceError, setSaveInvoiceError] = useState<string | null>(null);
   const [pendingInvoiceId, setPendingInvoiceId] = useState<string | null>(null);
-  const [sheetSyncToast, setSheetSyncToast] = useState<string | null>(null);
+  const { toast } = useToast();
+  // Rate confirm dialogs (replacing window.confirm on reset / delete-rate).
+  const [confirmResetOpen, setConfirmResetOpen] = useState(false);
+  const [confirmDeleteRateId, setConfirmDeleteRateId] = useState<string | null>(null);
 
   // "Bill a calendar event" picker: lazily fetched on first open so a normal
   // calculator load costs nothing; choosing an event reloads the page with
@@ -467,7 +484,6 @@ export function CalculatorView({
   // Contacts and income save
   const [contacts, setContacts] = useState<GoogleContact[]>([]);
   const [savingIncome, setSavingIncome] = useState(false);
-  const [incomeToast, setIncomeToast] = useState<string | null>(null);
   const [incomeError, setIncomeError] = useState<string | null>(null);
 
   // Rate management
@@ -765,22 +781,26 @@ export function CalculatorView({
         setTimeRanges([{ startTime: result.startTime, endTime: result.endTime }]);
         parsedWindowMin += timeDiffMins(result.startTime, result.endTime);
       } else if (result.startTime) {
-        const end = nowTime();
+        // Start stated but no end: close the slot at the event's end when billing
+        // a booked job, else at "now". Anchoring to now would end a past job at
+        // today's wall clock instead of inside its actual window.
+        const end = eventPrefill ? eventPrefill.endTime : nowTime();
         setTimeRanges([{ startTime: result.startTime, endTime: end }]);
         parsedWindowMin += timeDiffMins(result.startTime, end);
       } else if (result.durationMins !== null) {
+        // Duration only ("was there about 2 hours"): anchor the slot to the
+        // event's start when billing a booked job, else to now-minus-duration.
         const inSessionMins = Math.max(0, result.durationMins - outMins);
-        const now = new Date();
-        const endTotalMins = now.getHours() * 60 + now.getMinutes();
-        const startTotalMins = Math.max(0, endTotalMins - inSessionMins);
-        const sh = Math.floor(startTotalMins / 60);
-        const sm = startTotalMins % 60;
-        setTimeRanges([
-          {
-            startTime: `${String(sh).padStart(2, "0")}:${String(sm).padStart(2, "0")}`,
-            endTime: nowTime(),
-          },
-        ]);
+        let startTime: string;
+        let endTime: string;
+        if (eventPrefill) {
+          startTime = eventPrefill.startTime;
+          endTime = addMinsToTime(eventPrefill.startTime, inSessionMins);
+        } else {
+          endTime = nowTime();
+          startTime = addMinsToTime(endTime, -inSessionMins);
+        }
+        setTimeRanges([{ startTime, endTime }]);
         parsedWindowMin = outMins + inSessionMins;
       }
 
@@ -896,13 +916,12 @@ export function CalculatorView({
             `(dropped ${collapsed.dropped} tiny task${collapsed.dropped === 1 ? "" : "s"})`,
           );
         }
-        setIncomeToast(`${parts.join(" ")} to fit the ${parsedWindowMin}-min window.`);
-        setTimeout(() => setIncomeToast(null), 4000);
+        toast(`${parts.join(" ")} to fit the ${parsedWindowMin}-min window.`, { tone: "info" });
       }
       setParts(parsedParts);
       if (result.notes) setNotes(result.notes);
     },
-    [pricing.minTravelCharge, pricing.minBillableMins],
+    [pricing.minTravelCharge, pricing.minBillableMins, eventPrefill, toast],
   );
 
   /**
@@ -1162,8 +1181,9 @@ export function CalculatorView({
         | { error: string };
       if ("error" in d) throw new Error(d.error);
       if (d.sheetSyncWarning) {
-        setSheetSyncToast("Invoice saved - sheet counter sync failed. Update SETTINGS!B17.");
-        setTimeout(() => setSheetSyncToast(null), 6000);
+        toast("Invoice saved - sheet counter sync failed. Update SETTINGS!B17.", {
+          tone: "warning",
+        });
       }
       const invoiceId = d.invoice.id;
       // Add-to-contacts gate: defer nav until the modal closes so
@@ -1219,8 +1239,7 @@ export function CalculatorView({
       });
       const d = await res.json();
       if (d.ok) {
-        setIncomeToast("Income entry saved.");
-        setTimeout(() => setIncomeToast(null), 3000);
+        toast("Income entry saved.", { tone: "success" });
         resetFormState();
       } else {
         setIncomeError(d.error || "Could not save income entry.");
@@ -1369,13 +1388,6 @@ export function CalculatorView({
    * cancels any in-progress edit so the form doesn't hold a stale ID.
    */
   async function handleResetRates(): Promise<void> {
-    if (
-      !confirm(
-        "Wipe all rates and reseed the defaults (Standard, At home, Remote, Public Holiday, Travel)? Any custom rates you've added will be deleted.",
-      )
-    ) {
-      return;
-    }
     handleCancelEdit();
     setResettingRates(true);
     try {
@@ -1504,7 +1516,6 @@ export function CalculatorView({
    * @param id - The ID of the rate configuration to delete.
    */
   async function handleDeleteRate(id: string): Promise<void> {
-    if (!confirm("Delete this rate?")) return;
     const res = await fetch(`/api/business/rates/${id}`, { method: "DELETE" });
     if (!res.ok) {
       // 404 = already deleted server-side. Refresh so the row disappears
@@ -1541,6 +1552,32 @@ export function CalculatorView({
           }}
         />
       )}
+
+      <ConfirmDialog
+        open={confirmResetOpen}
+        title="Reset all rates?"
+        body="This wipes every rate and reseeds the defaults (Standard, At home, Remote, Public Holiday, Travel). Any custom rates you've added will be deleted."
+        confirmLabel="Reset rates"
+        tone="danger"
+        onConfirm={() => {
+          setConfirmResetOpen(false);
+          void handleResetRates();
+        }}
+        onCancel={() => setConfirmResetOpen(false)}
+      />
+
+      <ConfirmDialog
+        open={confirmDeleteRateId !== null}
+        title="Delete this rate?"
+        confirmLabel="Delete"
+        tone="danger"
+        onConfirm={() => {
+          const id = confirmDeleteRateId;
+          setConfirmDeleteRateId(null);
+          if (id) void handleDeleteRate(id);
+        }}
+        onCancel={() => setConfirmDeleteRateId(null)}
+      />
 
       {/* Job date - drives the public-holiday + promo lookup for this job. */}
       <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
@@ -1605,8 +1642,8 @@ export function CalculatorView({
           onSubmit={handleSubmitRate}
           onStartEdit={handleStartEdit}
           onCancelEdit={handleCancelEdit}
-          onDeleteRate={handleDeleteRate}
-          onResetRates={() => void handleResetRates()}
+          onDeleteRate={(id) => setConfirmDeleteRateId(id)}
+          onResetRates={() => setConfirmResetOpen(true)}
         />
       )}
 
@@ -1635,11 +1672,49 @@ export function CalculatorView({
               client, address, and frozen travel prediction. */}
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             {eventPrefill ? (
-              <p className="text-sm text-slate-600">
-                <span className="font-semibold text-russian-violet">Billing booked job:</span>{" "}
-                {eventPrefill.clientName || "(no name)"} - {eventPrefill.jobDate},{" "}
-                {eventPrefill.startTime}-{eventPrefill.endTime}
-              </p>
+              (() => {
+                // Live banner: reflect the CURRENT job date + slot (which the
+                // operator may have edited below), and flag when they drift from
+                // the event's original window so a stray edit is obvious.
+                const slotStart = timeRanges[0]?.startTime ?? "";
+                const slotEnd = timeRanges[timeRanges.length - 1]?.endTime ?? "";
+                const drifted =
+                  jobDate !== eventPrefill.jobDate ||
+                  slotStart !== eventPrefill.startTime ||
+                  slotEnd !== eventPrefill.endTime;
+                return (
+                  <div className="space-y-2 text-sm">
+                    <p className="text-slate-600">
+                      <span className="font-semibold text-russian-violet">Billing booked job:</span>{" "}
+                      {eventPrefill.clientName || "(no name)"} - {jobDate}, {slotStart || "--:--"}-
+                      {slotEnd || "--:--"}
+                    </p>
+                    {drifted && (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs text-amber-700">
+                          Differs from the event window ({eventPrefill.jobDate},{" "}
+                          {eventPrefill.startTime}-{eventPrefill.endTime}).
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setJobDate(eventPrefill.jobDate);
+                            setTimeRanges([
+                              {
+                                startTime: eventPrefill.startTime,
+                                endTime: eventPrefill.endTime,
+                              },
+                            ]);
+                          }}
+                          className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-russian-violet hover:bg-slate-50"
+                        >
+                          Reset to event times
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()
             ) : (
               <>
                 <div className="flex items-center justify-between gap-2">
@@ -1933,19 +2008,9 @@ export function CalculatorView({
 
           {/* Actions */}
           <div className="space-y-2">
-            {incomeToast && (
-              <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-700">
-                {incomeToast}
-              </div>
-            )}
             {incomeError && (
               <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
                 {incomeError}
-              </div>
-            )}
-            {sheetSyncToast && (
-              <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
-                {sheetSyncToast}
               </div>
             )}
             {saveInvoiceError && (
