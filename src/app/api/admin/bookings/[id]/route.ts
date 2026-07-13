@@ -13,6 +13,7 @@ import { deleteBookingEvent, SCHEDULE_CALENDAR_TAG } from "@/features/calendar/l
 import { sendCustomerReviewRequest } from "@/features/reviews/lib/email";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
+import { isPastEditWindow, MAX_PAST_EDIT_HOURS } from "@/shared/lib/edit-window";
 import { toE164NZ } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
 import { revalidateTag } from "next/cache";
@@ -64,6 +65,17 @@ export async function PATCH(
   const booking = await prisma.booking.findUnique({ where: { id } });
   if (!booking) {
     return errorResponse("Booking not found.", 404);
+  }
+
+  // Lock past events: refuse state changes (complete / cancel / no-show) on a
+  // booking that ended more than 18h ago. Metadata-only edits (name/email/phone/
+  // notes/address corrections) are still allowed.
+  const isStateChange = body.status !== undefined || body.markNoShow === true;
+  if (isStateChange && isPastEditWindow(booking.endAt.getTime(), Date.now())) {
+    return errorResponse(
+      `Can't change a booking more than ${MAX_PAST_EDIT_HOURS}h after it ended.`,
+      409,
+    );
   }
 
   // Sparse update: only fields present in the body get written.

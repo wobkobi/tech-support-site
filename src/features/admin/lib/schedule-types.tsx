@@ -42,6 +42,29 @@ export interface WeekEvent {
   booking?: WeekEventBooking;
 }
 
+/** Id prefix for a placeholder block shown while an optimistic block syncs. */
+export const OPTIMISTIC_BUSY_PREFIX = "optimistic-busy-";
+
+/**
+ * Placeholder all-day "Busy" event for a day the operator just blocked, shown
+ * instantly before the real Google Calendar event exists. Its id carries
+ * {@link OPTIMISTIC_BUSY_PREFIX} so real-event lookups (e.g. the block button's
+ * unblock target) can exclude it.
+ * @param dayKey - NZ YYYY-MM-DD for the blocked day.
+ * @returns A synthetic all-day booking-kind event covering that day.
+ */
+export function optimisticBusyEvent(dayKey: string): WeekEvent {
+  return {
+    id: `${OPTIMISTIC_BUSY_PREFIX}${dayKey}`,
+    kind: "booking",
+    title: "Busy",
+    startAt: `${dayKey}T00:00:00.000Z`,
+    endAt: `${dayKey}T23:59:59.999Z`,
+    location: null,
+    isAllDay: true,
+  };
+}
+
 /**
  * Returns the YYYY-MM-DD key for the Monday of the NZ week containing the
  * given NZ date key. Pure UTC date-part math so DST + offset edges can't

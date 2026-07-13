@@ -12,16 +12,19 @@ import {
   KIND_STYLES,
   LegendDot,
   NZ_TZ,
+  OPTIMISTIC_BUSY_PREFIX,
   formatHour,
   formatTimeRange,
+  optimisticBusyEvent,
   type WeekEvent,
   type WeekViewKind,
 } from "@/features/admin/lib/schedule-types";
 import { cn } from "@/shared/lib/cn";
+import { isPastEditWindow, nzDayEndMs } from "@/shared/lib/edit-window";
 import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 import { useRouter } from "next/navigation";
 import type React from "react";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { FaCalendarDay, FaChevronLeft, FaChevronRight } from "react-icons/fa6";
 
 export type { WeekEvent, WeekViewKind };
@@ -60,12 +63,85 @@ export function WeekView({
   const router = useRouter();
   const [weekStartIso, setWeekStartIso] = useState(initialWeekStartIso);
   const [modalStartAt, setModalStartAt] = useState<string | null>(null);
-  const [busyAction, setBusyAction] = useState<string | null>(null);
+  // Days with a block/unblock request in flight - a Set so several can run at
+  // once (each button disables only its own day, not the whole week).
+  const [pendingDays, setPendingDays] = useState<Set<string>>(() => new Set());
+
+  /**
+   * Adds/removes a day from the in-flight set as its request starts/finishes.
+   * @param dayKey - The day whose request changed state.
+   * @param pending - True when starting, false when finished.
+   */
+  function setPending(dayKey: string, pending: boolean): void {
+    setPendingDays((prev) => {
+      const next = new Set(prev);
+      if (pending) next.add(dayKey);
+      else next.delete(dayKey);
+      return next;
+    });
+  }
+
+  // Optimistic block/unblock overrides per day (dateKey > blocked?). Applied the
+  // moment the operator clicks so the header button + spanning bars match the
+  // action instantly - the booking calendar is eventually consistent (Google lags
+  // a write and the 30s cache can serve a stale read), so a plain refetch lags.
+  // Applied when bucketing all-day events; a failed request reverts it.
+  const [optimisticBlock, setOptimisticBlock] = useState<Map<string, boolean>>(() => new Map());
+
+  /**
+   * Records the optimistic busy state for a just-clicked day so the UI flips
+   * before the server round-trip; the refetch reconciles (or the button reverts).
+   * @param dayKey - The toggled day (NZ YYYY-MM-DD).
+   * @param blocked - The new state (true = now blocked, false = now free).
+   */
+  function applyOptimisticBlock(dayKey: string, blocked: boolean): void {
+    setOptimisticBlock((prev) => new Map(prev).set(dayKey, blocked));
+  }
+
+  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /**
+   * Coalesces schedule refetches into ONE after rapid changes settle. Blocking
+   * several days fires one refresh, not one per click: each block busts the 30s
+   * cache, so N immediate refreshes would each re-hit Google and back the server
+   * up (locking out further clicks). The optimistic UI covers the 1.2s interim.
+   */
+  function debouncedRefresh(): void {
+    if (refreshTimer.current) clearTimeout(refreshTimer.current);
+    refreshTimer.current = setTimeout(() => router.refresh(), 1200);
+  }
+
+  // Reconcile optimistic overrides against fresh server data. An override only
+  // needs to bridge click > next refresh; once refreshed server events arrive,
+  // trust them and drop overrides for days no longer in flight (a lost/merged
+  // block then falls back to its real state instead of sticking). Track pending
+  // in a ref (updated in its own effect, not during render) so reconciliation
+  // fires on server data only, not when a request settles.
+  const pendingRef = useRef(pendingDays);
+  useEffect(() => {
+    pendingRef.current = pendingDays;
+  }, [pendingDays]);
+  useEffect(() => {
+    setOptimisticBlock((prev) => {
+      if (prev.size === 0) return prev;
+      let changed = false;
+      const next = new Map(prev);
+      for (const day of prev.keys()) {
+        if (!pendingRef.current.has(day)) {
+          next.delete(day);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [events]);
   // useTransition keeps the current grid visible while the server rebuilds
   // the buffer around a week that falls outside the current 21-day window.
   const [isPending, startTransition] = useTransition();
 
   const todayNzKey = useMemo(() => formatNzDateKey(new Date()), []);
+  // Stable "now" for the past-event lock (hides block buttons on old days).
+  const [renderedAt] = useState(() => Date.now());
 
   // Prev/Next/Today Monday keys derived from current state for the nav
   // chevrons and the "Today" button.
@@ -140,7 +216,10 @@ export function WeekView({
         const startKey = formatNzDateKey(new Date(ev.startAt));
         const endKey = formatNzDateKey(new Date(ev.endAt));
         for (const day of arr) {
-          if (day.key >= startKey && day.key < endKey) day.allDayEvents.push(ev);
+          if (day.key < startKey || day.key >= endKey) continue;
+          // Drop a Busy block from a day the operator just unblocked (optimistic).
+          if (ev.kind === "booking" && optimisticBlock.get(day.key) === false) continue;
+          day.allDayEvents.push(ev);
         }
       } else {
         const key = formatNzDateKey(new Date(ev.startAt));
@@ -148,8 +227,18 @@ export function WeekView({
         if (bucket) bucket.timedEvents.push(ev);
       }
     }
+    // Inject a placeholder Busy for days just blocked optimistically that don't
+    // yet have a real event, so the header button + a spanning bar show instantly.
+    for (const day of arr) {
+      if (
+        optimisticBlock.get(day.key) === true &&
+        !day.allDayEvents.some((e) => e.kind === "booking")
+      ) {
+        day.allDayEvents.push(optimisticBusyEvent(day.key));
+      }
+    }
     return arr;
-  }, [weekStartIso, events]);
+  }, [weekStartIso, events, optimisticBlock]);
 
   const hours = useMemo(
     () => Array.from({ length: DAY_HOURS + 1 }, (_, i) => DAY_START_HOUR + i),
@@ -161,19 +250,83 @@ export function WeekView({
   // Column numbering: 1 = time gutter, 2..8 = days, so day index i sits at
   // grid column i + 2.
   const allDayBars = useMemo(() => {
-    const seen = new Map<string, { event: WeekEvent; firstIdx: number; lastIdx: number }>();
+    interface RawBar {
+      key: string;
+      title: string;
+      kind: WeekViewKind;
+      startCol: number;
+      endCol: number;
+    }
+    const raw: RawBar[] = [];
+
+    // Blocks (booking-kind all-day, incl. optimistic placeholders): merge ANY
+    // contiguous run of blocked days into ONE "Busy" span, regardless of how many
+    // underlying events cover it. This keeps the bar visually stable while the
+    // server reconciles rapid blocks into a merged event - no appearing /
+    // disappearing / re-merging flicker as the calendar catches up.
+    const blocked = days.map((d) => d.allDayEvents.some((e) => e.kind === "booking"));
+    for (let i = 0; i < days.length;) {
+      if (!blocked[i]) {
+        i++;
+        continue;
+      }
+      let j = i;
+      while (j + 1 < days.length && blocked[j + 1]) j++;
+      raw.push({
+        key: `busy-${days[i].key}`,
+        title: "Busy",
+        kind: "booking",
+        startCol: i + 2,
+        endCol: j + 3,
+      });
+      i = j + 1;
+    }
+
+    // Other all-day events (e.g. car): one bar per event's contiguous run.
+    const idxByEvent = new Map<string, { event: WeekEvent; indices: number[] }>();
     for (let i = 0; i < days.length; i++) {
       for (const ev of days[i].allDayEvents) {
-        const existing = seen.get(ev.id);
-        if (existing) existing.lastIdx = i;
-        else seen.set(ev.id, { event: ev, firstIdx: i, lastIdx: i });
+        if (ev.kind === "booking") continue;
+        const entry = idxByEvent.get(ev.id);
+        if (entry) entry.indices.push(i);
+        else idxByEvent.set(ev.id, { event: ev, indices: [i] });
       }
     }
-    return Array.from(seen.values()).map((b) => ({
-      event: b.event,
-      startCol: b.firstIdx + 2,
-      endCol: b.lastIdx + 3,
-    }));
+    for (const { event, indices } of idxByEvent.values()) {
+      let runStart = indices[0];
+      let prev = indices[0];
+      /** Pushes the current contiguous run [runStart..prev] as one bar. */
+      const flush = (): void => {
+        raw.push({
+          key: `${event.id}-${runStart}`,
+          title: event.title,
+          kind: event.kind,
+          startCol: runStart + 2,
+          endCol: prev + 3,
+        });
+      };
+      for (let k = 1; k < indices.length; k++) {
+        if (indices[k] === prev + 1) {
+          prev = indices[k];
+        } else {
+          flush();
+          runStart = indices[k];
+          prev = indices[k];
+        }
+      }
+      flush();
+    }
+
+    // Pack bars onto rows: a bar reuses the first lane whose last bar ends before
+    // it starts, so non-overlapping bars share ONE row instead of staggering.
+    raw.sort((a, b) => a.startCol - b.startCol);
+    const laneEnds: number[] = [];
+    return raw.map((bar) => {
+      let lane = laneEnds.findIndex((end) => bar.startCol >= end);
+      if (lane === -1) lane = laneEnds.length;
+      laneEnds[lane] = bar.endCol;
+      return { ...bar, lane };
+    });
   }, [days]);
 
   /**
@@ -248,20 +401,27 @@ export function WeekView({
               <div className="border-r border-slate-200" />
               {days.map((day) => {
                 const isToday = day.key === todayNzKey;
-                const busyEvent = day.allDayEvents.find((e) => e.kind === "booking");
+                // Real block (for the unblock id) excludes the optimistic placeholder;
+                // `blocked` reflects the effective state so the button flips instantly.
+                const realBusy = day.allDayEvents.find(
+                  (e) => e.kind === "booking" && !e.id.startsWith(OPTIMISTIC_BUSY_PREFIX),
+                );
+                const anyBusy = day.allDayEvents.some((e) => e.kind === "booking");
                 const hasBookings = day.timedEvents.some((e) => e.kind === "booking");
                 const holidayName = holidaysByDateKey[day.key];
                 return (
                   <div
                     key={day.key}
                     className={cn(
-                      "border-r border-slate-200 px-2 py-3 text-center last:border-r-0",
+                      "relative border-r border-slate-200 px-2 pt-4 pb-3 text-center last:border-r-0",
                       isToday && "bg-russian-violet/5",
                     )}
                   >
+                    {/* Overlaid (no layout space) so a holiday never pushes the date
+                        down - every day/week keeps the same header height. */}
                     {holidayName && (
                       <div
-                        className="mb-1 truncate text-[10px] font-semibold tracking-wide text-amber-700 uppercase"
+                        className="absolute inset-x-0 top-0.5 truncate px-1 text-[9px] leading-none font-semibold tracking-wide text-amber-700 uppercase"
                         title={holidayName}
                       >
                         {holidayName}
@@ -281,11 +441,14 @@ export function WeekView({
                       </div>
                       <BlockDayButton
                         dateKey={day.key}
-                        busyEventId={busyEvent?.id ?? null}
+                        busyEventId={realBusy?.id ?? null}
+                        blocked={anyBusy}
                         hasBookings={hasBookings}
-                        busyAction={busyAction}
-                        onPending={setBusyAction}
-                        onChanged={() => router.refresh()}
+                        locked={isPastEditWindow(nzDayEndMs(day.key), renderedAt)}
+                        pending={pendingDays.has(day.key)}
+                        onPending={setPending}
+                        onChanged={debouncedRefresh}
+                        onOptimisticChange={applyOptimisticBlock}
                       />
                     </div>
                   </div>
@@ -296,19 +459,22 @@ export function WeekView({
             {/* All-day events bar - merges consecutive days into one continuous
               span so multi-day Busy blocks read as a single bar. */}
             {allDayBars.length > 0 && (
-              <div className="border-b border-slate-200 px-0 py-1">
+              <div className="grid grid-cols-[64px_repeat(7,1fr)] gap-y-0.5 border-b border-slate-200 px-0 py-1">
                 {allDayBars.map((bar) => (
-                  <div key={bar.event.id} className="grid grid-cols-[64px_repeat(7,1fr)] py-0.5">
-                    <div
-                      className={cn(
-                        "mx-1 truncate rounded border px-2 py-0.5 text-center text-[11px] font-semibold",
-                        KIND_STYLES[bar.event.kind],
-                      )}
-                      style={{ gridColumnStart: bar.startCol, gridColumnEnd: bar.endCol }}
-                      title={bar.event.title}
-                    >
-                      {bar.event.title}
-                    </div>
+                  <div
+                    key={bar.key}
+                    className={cn(
+                      "mx-1 truncate rounded border px-2 py-0.5 text-center text-[11px] font-semibold",
+                      KIND_STYLES[bar.kind],
+                    )}
+                    style={{
+                      gridColumnStart: bar.startCol,
+                      gridColumnEnd: bar.endCol,
+                      gridRowStart: bar.lane + 1,
+                    }}
+                    title={bar.title}
+                  >
+                    {bar.title}
                   </div>
                 ))}
               </div>

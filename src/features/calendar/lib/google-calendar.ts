@@ -220,28 +220,137 @@ export async function createBlockedDayEvent(params: {
   dateKey: string;
   summary?: string;
 }): Promise<{ eventId: string }> {
-  const calendar = getCalendarClient();
-
-  // All-day events use YYYY-MM-DD strings and an exclusive end date.
+  // All-day events use YYYY-MM-DD strings and an exclusive end date (next day).
   const [y, m, d] = params.dateKey.split("-").map(Number);
-  const next = new Date(Date.UTC(y, m - 1, d + 1, 12, 0, 0));
-  const endDateKey = next.toISOString().slice(0, 10);
+  const endDateKey = new Date(Date.UTC(y, m - 1, d + 1, 12, 0, 0)).toISOString().slice(0, 10);
+  return insertBlockedDayRange({
+    startDateKey: params.dateKey,
+    endDateKey,
+    summary: params.summary,
+  });
+}
 
+/** All-day blocked-day span; both YYYY-MM-DD, `endDateKey` exclusive. */
+export interface BlockedDayRange {
+  /** First blocked day (inclusive). */
+  startDateKey: string;
+  /** Day after the last blocked day (exclusive), matching Google's all-day end. */
+  endDateKey: string;
+  /** Event title, preserved when a split copies the block. */
+  summary: string | null;
+}
+
+/**
+ * Reads an all-day "Busy" block's date span. Returns null when the event is
+ * missing, cancelled, or not an all-day event (a timed event has no `start.date`),
+ * so callers can fall back to a whole-event delete.
+ * @param eventId - Google Calendar event id.
+ * @returns The block's date span, or null.
+ */
+export async function getBlockedDayRange(eventId: string): Promise<BlockedDayRange | null> {
+  try {
+    const calendar = getCalendarClient();
+    const res = await calendar.events.get({ calendarId: getBookingCalendarId(), eventId });
+    const event = res.data;
+    if (!event || event.status === "cancelled") return null;
+    // All-day events carry start.date / end.date (exclusive), not dateTime.
+    if (!event.start?.date || !event.end?.date) return null;
+    return {
+      startDateKey: event.start.date,
+      endDateKey: event.end.date,
+      summary: event.summary ?? null,
+    };
+  } catch (err) {
+    console.warn("[calendar] getBlockedDayRange failed:", err);
+    return null;
+  }
+}
+
+/**
+ * Repoints an existing all-day event to a new [start, end) span (end exclusive).
+ * Used to trim/shorten a block when a day is unblocked off its edge, or to keep
+ * the before-portion when a middle day is unblocked.
+ * @param params - Patch parameters.
+ * @param params.eventId - Google Calendar event id.
+ * @param params.startDateKey - New inclusive start (YYYY-MM-DD).
+ * @param params.endDateKey - New exclusive end (YYYY-MM-DD).
+ * @returns Promise that resolves when patched.
+ */
+export async function patchBlockedDayRange(params: {
+  eventId: string;
+  startDateKey: string;
+  endDateKey: string;
+}): Promise<void> {
+  const calendar = getCalendarClient();
+  await calendar.events.patch({
+    calendarId: getBookingCalendarId(),
+    eventId: params.eventId,
+    requestBody: {
+      start: { date: params.startDateKey },
+      end: { date: params.endDateKey },
+    },
+  });
+}
+
+/**
+ * Inserts an all-day "Busy" block spanning [startDateKey, endDateKey) (end
+ * exclusive). Backs {@link createBlockedDayEvent} and the after-portion of a
+ * middle-day unblock split.
+ * @param params - Insert parameters.
+ * @param params.startDateKey - Inclusive start (YYYY-MM-DD).
+ * @param params.endDateKey - Exclusive end (YYYY-MM-DD).
+ * @param params.summary - Event title (defaults to "Busy").
+ * @returns Created event id.
+ */
+export async function insertBlockedDayRange(params: {
+  startDateKey: string;
+  endDateKey: string;
+  summary?: string | null;
+}): Promise<{ eventId: string }> {
+  const calendar = getCalendarClient();
   const response = await calendar.events.insert({
     calendarId: getBookingCalendarId(),
     requestBody: {
       summary: params.summary ?? "Busy",
-      start: { date: params.dateKey },
-      end: { date: endDateKey },
+      start: { date: params.startDateKey },
+      end: { date: params.endDateKey },
       transparency: "opaque",
     },
   });
-
   if (!response.data.id) {
     throw new Error("Failed to create blocked-day event - no event ID returned");
   }
-
   return { eventId: response.data.id };
+}
+
+/**
+ * Lists all-day events on the booking calendar overlapping [fromDateKey,
+ * toDateKey). Used to find blocks adjacent to a newly blocked day so contiguous
+ * blocks can be merged into one span. Timed events are excluded.
+ * @param fromDateKey - Window start (inclusive, YYYY-MM-DD).
+ * @param toDateKey - Window end (exclusive, YYYY-MM-DD).
+ * @returns All-day blocks in the window with their date spans (end exclusive).
+ */
+export async function listBlockedDayRanges(
+  fromDateKey: string,
+  toDateKey: string,
+): Promise<Array<BlockedDayRange & { eventId: string }>> {
+  const calendar = getCalendarClient();
+  const res = await calendar.events.list({
+    calendarId: getBookingCalendarId(),
+    timeMin: `${fromDateKey}T00:00:00Z`,
+    timeMax: `${toDateKey}T00:00:00Z`,
+    singleEvents: true,
+    maxResults: 50,
+  });
+  return (res.data.items ?? [])
+    .filter((e) => e.status !== "cancelled" && e.start?.date && e.end?.date && e.id)
+    .map((e) => ({
+      eventId: e.id!,
+      startDateKey: e.start!.date!,
+      endDateKey: e.end!.date!,
+      summary: e.summary ?? null,
+    }));
 }
 
 /**
@@ -366,9 +475,11 @@ export async function fetchAllCalendarEvents(
 
 /**
  * Cached wrapper around {@link fetchAllCalendarEvents} for the admin schedule page.
- * 60-second TTL with revalidation on booking/blocked-day mutations via
- * {@link SCHEDULE_CALENDAR_TAG}. Takes ISO strings (not Date objects) so the cache
- * key is deterministically serialisable.
+ * 30-second TTL with revalidation on booking/blocked-day mutations via
+ * {@link SCHEDULE_CALENDAR_TAG}. Paired with the schedule's client-side auto-poll
+ * (the ScheduleAutoRefresh component) so externally-made calendar changes surface
+ * within ~30s; the operator's own edits still bust the cache immediately. Takes
+ * ISO strings (not Date objects) so the cache key is deterministically serialisable.
  * @param startIso - ISO 8601 start of range.
  * @param endIso - ISO 8601 end of range.
  * @returns Cached array of calendar events.
@@ -378,5 +489,5 @@ export const getCachedScheduleEvents = unstable_cache(
     return fetchAllCalendarEvents(new Date(startIso), new Date(endIso));
   },
   ["schedule-calendar-events"],
-  { tags: [SCHEDULE_CALENDAR_TAG], revalidate: 60 },
+  { tags: [SCHEDULE_CALENDAR_TAG], revalidate: 30 },
 );
