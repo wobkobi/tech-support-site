@@ -37,6 +37,8 @@ interface ContactSuggestion {
 interface ManualBookingModalProps {
   startAtIso: string;
   onClose: () => void;
+  /** Prefill the duration toggle (defaults to 60min). Set by the find-times tool. */
+  initialDurationMinutes?: 60 | 120;
 }
 
 /**
@@ -44,11 +46,13 @@ interface ManualBookingModalProps {
  * @param props - Component props.
  * @param props.startAtIso - Prefilled start time (ISO 8601) derived from the clicked slot.
  * @param props.onClose - Called when the modal should close (cancel or success).
+ * @param props.initialDurationMinutes - Prefilled job length (defaults to 60min).
  * @returns Modal element.
  */
 export function ManualBookingModal({
   startAtIso,
   onClose,
+  initialDurationMinutes = 60,
 }: ManualBookingModalProps): React.ReactElement {
   const router = useRouter();
   const nameRef = useRef<HTMLInputElement>(null);
@@ -63,7 +67,7 @@ export function ManualBookingModal({
   const [unit, setUnit] = useState("");
   const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
-  const [durationMinutes, setDurationMinutes] = useState<60 | 120>(60);
+  const [durationMinutes, setDurationMinutes] = useState<60 | 120>(initialDurationMinutes);
   const [sendConfirmation, setSendConfirmation] = useState(true);
   const [startAtLocal, setStartAtLocal] = useState(() => toLocalInputValue(startAtIso));
   const [submitting, setSubmitting] = useState(false);
