@@ -143,6 +143,17 @@ export function WeekView({
   // Stable "now" for the past-event lock (hides block buttons on old days).
   const [renderedAt] = useState(() => Date.now());
 
+  // Live "now" for the current-time line - ticks each minute so the marker
+  // creeps down today's column. Separate from renderedAt (which stays stable so
+  // the block buttons don't flicker as the clock advances).
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+  const nowKey = formatNzDateKey(new Date(nowMs));
+  const nowOffsetMin = minuteOfDay(new Date(nowMs).toISOString());
+
   // Prev/Next/Today Monday keys derived from current state for the nav
   // chevrons and the "Today" button.
   const { prevWeekKey, nextWeekKey, todayWeekKey } = useMemo(() => {
@@ -503,7 +514,17 @@ export function WeekView({
 
               {/* Day columns */}
               {days.map((day) => (
-                <DayColumn key={day.key} day={day} onClick={(e) => handleColumnClick(e, day.key)} />
+                <DayColumn
+                  key={day.key}
+                  day={day}
+                  onClick={(e) => handleColumnClick(e, day.key)}
+                  onOpenBooking={(id) => router.push(`/admin/bookings/${id}`)}
+                  nowLineTop={
+                    day.key === nowKey && nowOffsetMin >= 0 && nowOffsetMin <= DAY_HOURS * 60
+                      ? nowOffsetMin * PX_PER_MINUTE
+                      : null
+                  }
+                />
               ))}
             </div>
 
@@ -513,7 +534,9 @@ export function WeekView({
               <LegendDot kind="car" label="No car (Car cal)" />
               <LegendDot kind="personal" label="Personal" />
               <LegendDot kind="travel" label="Travel" />
-              <span className="ml-auto text-slate-400">Click an empty slot to add a booking</span>
+              <span className="ml-auto text-slate-400">
+                Click an empty slot to add · click a booking to edit
+              </span>
             </div>
           </div>
         </div>
@@ -533,17 +556,29 @@ export function WeekView({
 interface DayColumnProps {
   day: { key: string; timedEvents: WeekEvent[] };
   onClick: (event: React.MouseEvent<HTMLDivElement>) => void;
+  onOpenBooking: (bookingId: string) => void;
+  /** Pixel offset of the current-time line, or null when today isn't this column. */
+  nowLineTop: number | null;
 }
 
 /**
  * Renders a single day column with its events overlaid as absolute-positioned
- * blocks. Clicking the column background opens the booking modal.
+ * blocks. Clicking the column background opens the booking modal; clicking a
+ * booking card opens that booking's detail page for editing. Today's column
+ * also draws a live current-time line.
  * @param props - Component props.
  * @param props.day - Day bucket with the day key and its events.
  * @param props.onClick - Click handler forwarded from the parent week view.
+ * @param props.onOpenBooking - Opens a booking's detail page by id (on click).
+ * @param props.nowLineTop - Current-time line offset in px, or null if not today.
  * @returns Day column element.
  */
-function DayColumn({ day, onClick }: DayColumnProps): React.ReactElement {
+function DayColumn({
+  day,
+  onClick,
+  onOpenBooking,
+  nowLineTop,
+}: DayColumnProps): React.ReactElement {
   return (
     <div
       role="button"
@@ -569,16 +604,31 @@ function DayColumn({ day, onClick }: DayColumnProps): React.ReactElement {
         const durationMin =
           (new Date(ev.endAt).getTime() - new Date(ev.startAt).getTime()) / 60_000;
         const height = Math.max(18, durationMin * PX_PER_MINUTE);
+        // Bookings open on click for editing. Single click: a card has no other
+        // action, and double-click silently fails if the two clicks drift a pixel.
+        // With a DB row > in-app detail page; a booking added straight into Google
+        // Calendar (no row) > open there. stopPropagation always runs so a card
+        // click never falls through to the add-booking modal; car/personal/travel
+        // have no link and just swallow the click.
+        const bookingId = ev.kind === "booking" ? ev.booking?.id : undefined;
+        const calendarLink =
+          ev.kind === "booking" && !bookingId ? (ev.htmlLink ?? undefined) : undefined;
+        const canOpen = Boolean(bookingId || calendarLink);
         return (
           <div
             key={ev.id}
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (bookingId) onOpenBooking(bookingId);
+              else if (calendarLink) window.open(calendarLink, "_blank", "noopener,noreferrer");
+            }}
             className={cn(
-              "absolute right-1 left-1 overflow-hidden rounded-md border px-1.5 py-1 text-[11px] leading-tight shadow-sm",
+              "absolute right-1 left-1 overflow-hidden rounded-md border px-1.5 py-1 text-[11px] leading-tight shadow-sm select-none",
               KIND_STYLES[ev.kind],
+              canOpen && "cursor-pointer",
             )}
             style={{ top: `${top}px`, height: `${height}px` }}
-            title={`${ev.title}${ev.location ? `\n${ev.location}` : ""}`}
+            title={`${ev.title}${ev.location ? `\n${ev.location}` : ""}${bookingId ? "\nClick to open" : calendarLink ? "\nClick to open in Google Calendar" : ""}`}
           >
             <div className="truncate font-semibold">{ev.title}</div>
             {height > 32 && (
@@ -588,6 +638,17 @@ function DayColumn({ day, onClick }: DayColumnProps): React.ReactElement {
           </div>
         );
       })}
+
+      {/* Live current-time line: only today's column passes a non-null offset. */}
+      {nowLineTop != null && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 z-20 border-t-2 border-red-500"
+          style={{ top: `${nowLineTop}px` }}
+        >
+          <span className="absolute -top-1.25 left-0 h-2.5 w-2.5 rounded-full bg-red-500" />
+        </div>
+      )}
     </div>
   );
 }

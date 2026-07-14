@@ -80,6 +80,8 @@ export interface CalendarEvent {
   description?: string;
   location?: string;
   calendarEmail: string; // Which calendar this event is from
+  /** Google Calendar "open in Calendar" URL, when the API returns one. */
+  htmlLink?: string;
   // Parent series ID when this event is a recurring instance (from Google Calendar
   // singleEvents expansion). Stable across all occurrences of the same series.
   recurringEventId?: string;
@@ -417,6 +419,7 @@ export async function fetchAllCalendarEvents(
               description: event.description || undefined,
               location: event.location || undefined,
               calendarEmail: calendarId,
+              htmlLink: event.htmlLink || undefined,
               recurringEventId: event.recurringEventId || undefined,
             });
           } else if (event.start?.date && event.end?.date && !isPersonal) {
@@ -439,6 +442,7 @@ export async function fetchAllCalendarEvents(
               description: event.description || undefined,
               location: event.location || undefined,
               calendarEmail: calendarId,
+              htmlLink: event.htmlLink || undefined,
               recurringEventId: event.recurringEventId || undefined,
             });
           }

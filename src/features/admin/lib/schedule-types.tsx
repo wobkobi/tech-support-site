@@ -37,6 +37,13 @@ export interface WeekEvent {
   startAt: string;
   endAt: string;
   location: string | null;
+  /**
+   * Google Calendar "open in Calendar" URL, set only for booking-calendar events
+   * so a booking added straight into Google Calendar (no in-app record) can still
+   * be opened there on click. Null for car/personal (not openable); bookings that
+   * have a DB row open their in-app detail page instead.
+   */
+  htmlLink?: string | null;
   isAllDay: boolean;
   /** Populated for `kind === "booking"` events. Optional otherwise. */
   booking?: WeekEventBooking;

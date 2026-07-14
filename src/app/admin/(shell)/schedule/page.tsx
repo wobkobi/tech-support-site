@@ -148,6 +148,10 @@ export default async function AdminSchedulePage({
       startAt: e.start,
       endAt: e.end,
       location: e.location ?? null,
+      // Booking-calendar events open on click: those with a DB row go to the in-app
+      // detail page (via `booking` below); those without one (added straight into
+      // Google Calendar) fall back to this link. Car/personal get none - not openable.
+      htmlLink: kind === "booking" ? (e.htmlLink ?? null) : null,
       // fetchAllCalendarEvents converts all-day Google events to 24h timed events
       // spanning NZ midnight > midnight; treat anything >= 23h as a banner item.
       isAllDay: durationMs >= 23 * 60 * 60 * 1000,

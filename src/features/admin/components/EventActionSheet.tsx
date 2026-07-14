@@ -15,6 +15,7 @@ import type {
   WeekEventBooking,
 } from "@/features/admin/lib/schedule-types";
 import { useBookingActions } from "@/features/booking/hooks/use-booking-actions";
+import { isPastEditWindow, MAX_PAST_EDIT_HOURS } from "@/shared/lib/edit-window";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 
@@ -83,6 +84,11 @@ export function EventActionSheet({
   const isCompleted = status === "completed";
   const isConfirmed = status === "confirmed";
   const isTestBooking = booking.name.toLowerCase().includes("test");
+  // State changes (complete / cancel / no-show) lock 18h after the booking ends,
+  // mirroring the server guard - disable them here so the operator sees it up
+  // front instead of firing a request that bounces back as a rejection toast.
+  // Billing, review resend, reschedule (future-only), and delete stay available.
+  const isEditLocked = isPastEditWindow(new Date(event.endAt).getTime(), renderedAt);
 
   /**
    * Runs a mutation, then closes + refreshes on success. Toasts (including
@@ -175,11 +181,17 @@ export function EventActionSheet({
             View details
           </a>
 
+          {isEditLocked && !isCancelled && (
+            <p className="px-1 text-center text-xs text-slate-400">
+              Status changes lock {MAX_PAST_EDIT_HOURS}h after a booking ends.
+            </p>
+          )}
+
           {isConfirmed && (
             <button
               type="button"
               onClick={handleComplete}
-              disabled={busy}
+              disabled={busy || isEditLocked}
               className="inline-flex h-11 items-center justify-center rounded-lg bg-green-500/20 px-4 text-sm font-semibold text-green-700 hover:bg-green-500/30 disabled:opacity-50"
             >
               Mark completed
@@ -190,7 +202,7 @@ export function EventActionSheet({
             <button
               type="button"
               onClick={handleNoShow}
-              disabled={busy}
+              disabled={busy || isEditLocked}
               className="inline-flex h-11 items-center justify-center rounded-lg bg-amber-500/20 px-4 text-sm font-semibold text-amber-700 hover:bg-amber-500/30 disabled:opacity-50"
             >
               Mark no-show
@@ -202,7 +214,7 @@ export function EventActionSheet({
               <button
                 type="button"
                 onClick={() => handleCancel("operator")}
-                disabled={busy}
+                disabled={busy || isEditLocked}
                 className="inline-flex h-11 items-center justify-center rounded-lg bg-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-300 disabled:opacity-50"
               >
                 Cancel - my call
@@ -210,7 +222,7 @@ export function EventActionSheet({
               <button
                 type="button"
                 onClick={() => handleCancel("on-behalf")}
-                disabled={busy}
+                disabled={busy || isEditLocked}
                 className="inline-flex h-11 items-center justify-center rounded-lg bg-red-500/20 px-4 text-sm font-semibold text-red-600 hover:bg-red-500/30 disabled:opacity-50"
               >
                 Cancel - for customer
