@@ -68,6 +68,12 @@ export function ManualBookingModal({
   const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
   const [durationMinutes, setDurationMinutes] = useState<60 | 120>(initialDurationMinutes);
+  // Auto-size from the job notes: an estimate over an hour bumps the duration to
+  // 2 hours, unless the operator has set it by hand.
+  const [durationManuallySet, setDurationManuallySet] = useState(false);
+  const [estimating, setEstimating] = useState(false);
+  const [estimateHint, setEstimateHint] = useState<string | null>(null);
+  const lastEstimatedNotes = useRef("");
   const [sendConfirmation, setSendConfirmation] = useState(true);
   const [startAtLocal, setStartAtLocal] = useState(() => toLocalInputValue(startAtIso));
   const [submitting, setSubmitting] = useState(false);
@@ -75,6 +81,39 @@ export function ManualBookingModal({
 
   const [contacts, setContacts] = useState<ContactSuggestion[]>([]);
   const [nameListOpen, setNameListOpen] = useState(false);
+
+  /**
+   * Estimates job duration from the notes via the pricing estimator and bumps the
+   * duration to 2 hours when it runs over an hour. Skips when the operator set the
+   * duration by hand, the notes are too short, or they're unchanged since the last
+   * estimate; a rate-limit or failure just leaves the current duration in place.
+   */
+  async function estimateFromNotes(): Promise<void> {
+    if (durationManuallySet) return;
+    const desc = notes.trim();
+    if (desc.length < 8 || desc === lastEstimatedNotes.current) return;
+    lastEstimatedNotes.current = desc;
+    setEstimating(true);
+    try {
+      const res = await fetch("/api/pricing/estimate-duration", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: desc }),
+      });
+      if (!res.ok) return; // rate-limited or failed: leave the duration untouched
+      const data = (await res.json()) as { result?: { estimatedMins?: number } };
+      const mins = data.result?.estimatedMins;
+      if (typeof mins !== "number" || durationManuallySet) return;
+      setDurationMinutes(mins > 60 ? 120 : 60);
+      setEstimateHint(
+        mins > 60 ? `Notes estimate ~${mins} min - set to 2 hours` : `Notes estimate ~${mins} min`,
+      );
+    } catch (err) {
+      console.error("[ManualBookingModal] duration estimate failed", err);
+    } finally {
+      setEstimating(false);
+    }
+  }
 
   useEffect(() => {
     nameRef.current?.focus();
@@ -214,12 +253,22 @@ export function ManualBookingModal({
               <select
                 id="mb-duration"
                 value={durationMinutes}
-                onChange={(e) => setDurationMinutes(Number(e.target.value) as 60 | 120)}
+                onChange={(e) => {
+                  setDurationMinutes(Number(e.target.value) as 60 | 120);
+                  setDurationManuallySet(true);
+                  setEstimateHint(null);
+                }}
                 className={textInputClasses}
               >
                 <option value={60}>1 hour</option>
                 <option value={120}>2 hours</option>
               </select>
+              {estimating && (
+                <p className="mt-1 text-xs text-slate-400">Estimating from notes...</p>
+              )}
+              {!estimating && estimateHint && (
+                <p className="mt-1 text-xs text-slate-500">{estimateHint}</p>
+              )}
             </Field>
           </div>
 
@@ -348,6 +397,7 @@ export function ManualBookingModal({
               id="mb-notes"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
+              onBlur={() => void estimateFromNotes()}
               rows={3}
               maxLength={2000}
               className={cn(textInputClasses, "resize-y")}

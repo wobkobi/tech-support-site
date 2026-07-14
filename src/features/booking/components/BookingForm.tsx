@@ -1590,6 +1590,21 @@ export default function BookingForm({
                 <p className="mt-2 text-sm text-rich-black/70">
                   A ballpark from your description - the final cost is confirmed before any work.
                 </p>
+                {duration === "short" && quote.minsHigh > 60 && (
+                  <div className="mt-3 flex flex-col gap-2 rounded-lg border border-amber-400/50 bg-amber-50 p-3 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-sm text-rich-black/80">
+                      This looks like it might take around 2 hours - you can book a 2-hour visit so
+                      we&apos;ve got the time set aside.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => handleDurationChange("long")}
+                      className="self-start rounded-md bg-russian-violet px-4 py-2 text-sm font-semibold text-white hover:bg-russian-violet/90 sm:shrink-0 sm:self-auto"
+                    >
+                      Book 2 hours
+                    </button>
+                  </div>
+                )}
               </div>
             )}
             {quoteError && <p className="text-sm text-coquelicot-600">{quoteError}</p>}
