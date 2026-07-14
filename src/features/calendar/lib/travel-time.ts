@@ -86,6 +86,11 @@ export async function calculateTravelMinutes(
 
   const mode: TransportMode = options?.mode ?? "driving";
   const wantArrival = options?.useArrivalTime === true;
+  // Google rejects a past time anchor. A retained past job (kept on the schedule for
+  // the record) is priced at a near-future proxy - drive time between fixed points
+  // barely changes - so its block still gets a sensible length.
+  const anchor =
+    departureTime.getTime() > Date.now() ? departureTime : new Date(Date.now() + 30 * 60_000);
 
   /**
    * One Distance Matrix lookup at a fixed anchor time. Prefers Google's
@@ -157,7 +162,7 @@ export async function calculateTravelMinutes(
   // Transit supports arrival_time directly; snap far-future departures onto a
   // date whose schedule data is published.
   if (mode === "transit") {
-    const effective = toReliableDeparture(departureTime, new Date());
+    const effective = toReliableDeparture(anchor, new Date());
     return query(wantArrival ? "arrival_time" : "departure_time", effective.getTime() / 1000);
   }
 
@@ -167,7 +172,7 @@ export async function calculateTravelMinutes(
   // when you'd actually set off. Clamp to just ahead of now - Distance Matrix
   // rejects a past departure_time (imminent jobs).
   if (mode === "driving" && wantArrival) {
-    const targetSec = departureTime.getTime() / 1000;
+    const targetSec = anchor.getTime() / 1000;
     const rough = await query("departure_time", targetSec);
     if (rough === null) return null;
     const departSec = Math.max(targetSec - rough * 60, Date.now() / 1000 + 60);
@@ -175,5 +180,5 @@ export async function calculateTravelMinutes(
   }
 
   // Driving depart-at, walking, cycling: a single lookup at the departure time.
-  return query("departure_time", departureTime.getTime() / 1000);
+  return query("departure_time", anchor.getTime() / 1000);
 }

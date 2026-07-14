@@ -129,6 +129,11 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
   const maxDate = new Date(
     now.getTime() + settings.availability.maxAdvanceDays * 24 * 60 * 60 * 1000,
   );
+  // Also process jobs finished within the last few days so their travel bars stay
+  // on the schedule for the record (they'd otherwise be cleaned once the job passed).
+  // Past legs are priced at a near-future proxy inside calculateTravelMinutes.
+  const TRAVEL_RETENTION_DAYS = 7;
+  const travelWindowStart = new Date(now.getTime() - TRAVEL_RETENTION_DAYS * 24 * 60 * 60 * 1000);
   const scheduling = settings.scheduling;
   /**
    * Rounds raw travel minutes using the live travel-round buffer.
@@ -141,7 +146,7 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
   // Fetch fresh calendar events
   let rawEvents: CalendarEvent[] = [];
   try {
-    rawEvents = await fetchAllCalendarEvents(now, maxDate);
+    rawEvents = await fetchAllCalendarEvents(travelWindowStart, maxDate);
     console.log(`[refreshCalendarCache] Fetched ${rawEvents.length} calendar events`);
   } catch (error) {
     console.error("[refreshCalendarCache] Failed to fetch calendar events:", error);
@@ -258,11 +263,13 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
     }
   }
 
-  // Eligible-for-TravelBlock: every future event from any calendar that has a
-  // resolvable destination. Falls back to event.summary when no dedicated
-  // location field is set (e.g. business name as the title).
+  // Eligible-for-TravelBlock: every event within the travel window (recent past +
+  // future) from any calendar that has a resolvable destination. Recent past jobs
+  // are kept so their travel bars stay for the record; their legs are priced at a
+  // proxy time. Falls back to event.summary when no dedicated location field is set
+  // (e.g. business name as the title).
   const eligibleEvents = rawEvents.filter(
-    (e) => (e.location ?? e.summary) && new Date(e.start) > now,
+    (e) => (e.location ?? e.summary) && new Date(e.start) > travelWindowStart,
   );
 
   if (isDev) {
