@@ -171,27 +171,39 @@ export default async function AdminSchedulePage({
     });
   }
 
+  // Anchor each travel leg to its event's CURRENT times (matched by sourceEventId),
+  // not the times cached on the block. The operator edits event ends to the actual
+  // finish, so a block can carry a stale end until the travel cron recomputes -
+  // anchoring live keeps the leg flush against the event instead of stranded inside
+  // another one (a travel bar must never land in the middle of an event). Blocks
+  // whose event is gone are dropped as orphans. Rounded minutes may lag by one cron
+  // cycle, so a leg's length can be slightly off until then, but its POSITION is right.
+  const rawEventById = new Map(rawEvents.map((e) => [e.id, e]));
+
   for (const b of travelBlocks) {
+    const srcEvent = rawEventById.get(b.sourceEventId);
+    if (!srcEvent) continue;
+    const evStartMs = new Date(srcEvent.start).getTime();
+    const evEndMs = new Date(srcEvent.end).getTime();
+
     if (b.beforeEventId && b.roundedMinutes != null) {
-      const start = new Date(b.eventStartAt.getTime() - b.roundedMinutes * 60_000);
       events.push({
         id: b.beforeEventId,
         kind: "travel",
         title: `→ ${b.summary ?? "Travel"}`,
-        startAt: start.toISOString(),
-        endAt: b.eventStartAt.toISOString(),
+        startAt: new Date(evStartMs - b.roundedMinutes * 60_000).toISOString(),
+        endAt: new Date(evStartMs).toISOString(),
         location: b.detectedOrigin ?? null,
         isAllDay: false,
       });
     }
     if (b.afterEventId && b.roundedBackMinutes != null && !b.travelBackSuppressed) {
-      const end = new Date(b.eventEndAt.getTime() + b.roundedBackMinutes * 60_000);
       events.push({
         id: b.afterEventId,
         kind: "travel",
         title: `← ${b.customTravelBackDestination ?? "home"}`,
-        startAt: b.eventEndAt.toISOString(),
-        endAt: end.toISOString(),
+        startAt: new Date(evEndMs).toISOString(),
+        endAt: new Date(evEndMs + b.roundedBackMinutes * 60_000).toISOString(),
         location: b.customTravelBackDestination ?? null,
         isAllDay: false,
       });
