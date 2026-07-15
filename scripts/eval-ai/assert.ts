@@ -70,8 +70,10 @@ export function spread(values: number[]): number {
 }
 
 /**
- * Sums stated HH:MM time ranges into minutes, rolling a non-positive span over
- * midnight. Mirrors the parse-job route's per-range duration for simple ranges.
+ * Sums stated HH:MM ranges for simple same-day positive spans (rolls a
+ * non-positive span over midnight). The route's extractRanges has extra
+ * am/pm heuristics (a +12h retry before the +24h rollover) that this does
+ * not replicate.
  * @param ranges - Stated start/end pairs (24h HH:MM).
  * @returns Total minutes across all ranges.
  */

@@ -22,17 +22,17 @@ export interface EstimateCase {
 export const PARSE_CASES: ParseCase[] = [
   {
     id: "parse-single-2h",
-    input: "Set up a new laptop and transfer files, 9-11am",
+    input: "9-11am\nSet up a new laptop and transfer files",
     statedRanges: [{ startTime: "09:00", endTime: "11:00" }],
   },
   {
     id: "parse-single-90m",
-    input: "Fix Wi-Fi and set up a printer, 1:00pm-2:30pm",
+    input: "1-2:30pm\nFix Wi-Fi and set up a printer",
     statedRanges: [{ startTime: "13:00", endTime: "14:30" }],
   },
   {
     id: "parse-two-ranges",
-    input: "Onsite 9-10am, then more work 2-3pm same day",
+    input: "9-10am onsite\n2-3pm more work same day",
     statedRanges: [
       { startTime: "09:00", endTime: "10:00" },
       { startTime: "14:00", endTime: "15:00" },
