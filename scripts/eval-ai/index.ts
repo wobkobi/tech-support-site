@@ -11,6 +11,7 @@
 //   npm run eval:ai -- --runs=3           # repeat each case 3x for reproducibility
 
 import {
+  type CheckResult,
   estimateTolerance,
   expectedEstimateMins,
   spread,
@@ -168,6 +169,105 @@ async function collectRaw(
   return { ctx, raw };
 }
 
+/**
+ * Turns raw runs into reported checks across the three families: context
+ * (hard, gates the exit code), reproducibility (soft, reported), and drift
+ * (info-only).
+ * @param ctx - Live context used to build expectations.
+ * @param raw - Collected raw runs.
+ * @returns Ordered check results.
+ */
+function evaluate(ctx: LiveContext, raw: RawRun[]): CheckResult[] {
+  const out: CheckResult[] = [];
+  const inc = ctx.incrementMins;
+
+  for (const r of raw) {
+    const first = r.durations[0];
+
+    // Family 1: single-task estimate must reflect the live benchmark.
+    if (r.kind === "estimate-single") {
+      const bench = ctx.benchmarks.find((b) => b.label === r.benchmarkLabel);
+      if (bench) {
+        const expected = expectedEstimateMins(bench.mins, ctx.minBillableMins, inc);
+        const tol = estimateTolerance(expected, inc);
+        const ok = withinTolerance(first, expected, tol);
+        out.push({
+          id: r.id,
+          family: "context",
+          label: `estimate "${r.benchmarkLabel}"`,
+          status: ok ? "pass" : "fail",
+          detail: `got ${first}, expected ${expected} +/-${tol}`,
+        });
+      }
+    }
+
+    // Family 3 report-only: multi-task estimate printed for eyeballing.
+    if (r.kind === "estimate-multi") {
+      out.push({
+        id: r.id,
+        family: "drift",
+        label: `multi-task estimate ${r.id}`,
+        status: "info",
+        detail: `estimatedMins=${first} (review vs your benchmarks)`,
+      });
+    }
+
+    // Family 1: parse-job must use the stated times exactly.
+    if (r.kind === "parse" && r.statedRanges) {
+      const expected = statedSessionMins(r.statedRanges);
+      const ok = first === expected;
+      out.push({
+        id: r.id,
+        family: "context",
+        label: `parse durationMins ${r.id}`,
+        status: ok ? "pass" : "fail",
+        detail: `got ${first}, expected exactly ${expected}`,
+      });
+    }
+
+    // Family 2: reproducibility across runs.
+    const sp = spread(r.durations);
+    const tol = r.kind === "parse" ? 0 : 2 * inc;
+    out.push({
+      id: r.id,
+      family: "reproducibility",
+      label: `reproducibility ${r.id}`,
+      status: sp <= tol ? "pass" : "fail",
+      detail: `spread ${sp} over [${r.durations.join(", ")}], tol ${tol}`,
+    });
+  }
+  return out;
+}
+
+/**
+ * Prints checks grouped by family with a pass/fail/skip/info icon.
+ * @param checks - Evaluated checks.
+ */
+function printReport(checks: CheckResult[]): void {
+  const families: CheckResult["family"][] = ["context", "reproducibility", "drift"];
+  const titles: Record<CheckResult["family"], string> = {
+    context: "1. Each model uses ALL context",
+    reproducibility: "2. Reproducibility",
+    drift: "3. Public estimate vs benchmarks (report-only; benchmark-vs-history is out of scope)",
+  };
+  for (const fam of families) {
+    const rows = checks.filter((c) => c.family === fam);
+    if (rows.length === 0) continue;
+    console.log(`\n${titles[fam]}`);
+    for (const c of rows) {
+      const icon =
+        c.status === "pass"
+          ? "\x1b[32m✓\x1b[0m"
+          : c.status === "fail"
+            ? "\x1b[31m✗\x1b[0m"
+            : c.status === "skip"
+              ? "\x1b[33m-\x1b[0m"
+              : "\x1b[36m•\x1b[0m";
+      console.log(`  ${icon} ${c.label} - ${c.detail}`);
+    }
+  }
+}
+
 (async () => {
   const { selfTest, probe, url, showContext, runs } = parseArgs();
   if (selfTest) {
@@ -196,15 +296,35 @@ async function collectRaw(
     for (const b of ctx.benchmarks) console.log(`  - ${b.label}: ${b.mins}m`);
     process.exit(0);
   }
+  const started = new Date().toISOString();
   const { ctx, raw } = await collectRaw(url, adminSecret, runs);
-  console.log(`Collected ${raw.length} cases x ${runs} run(s) = ${raw.length * runs} calls.`);
+  const checks = evaluate(ctx, raw);
+  printReport(checks);
+
+  const fs = await import("fs");
+  const path = await import("path");
+  const dir = path.join("docs", "eval-ai");
+  fs.mkdirSync(dir, { recursive: true });
+  const artifact = path.join(dir, `run-${started.replace(/[:.]/g, "-")}.json`);
+  fs.writeFileSync(artifact, JSON.stringify({ started, runs, checks, raw }, null, 2));
+
+  // Only the deterministic context asserts (stated-time exactness, min-billable
+  // floor, increment) gate the exit code. Reproducibility is a soft, reported
+  // signal - a hosted LLM is never bit-for-bit reproducible, so a run-to-run
+  // spread is surfaced as a warning, not a build failure.
+  const contextFailed = checks.filter((c) => c.status === "fail" && c.family === "context");
+  const reproFailed = checks.filter((c) => c.status === "fail" && c.family === "reproducibility");
+  const calls = raw.length * runs;
+  console.log(`\n${raw.length} cases, ${calls} paid calls. Artifact: ${artifact}`);
+  if (reproFailed.length > 0) {
+    console.log(
+      `\n\x1b[33m⚠ ${reproFailed.length} reproducibility warning(s) - same input varied across runs (model non-determinism, not a gate).\x1b[0m`,
+    );
+  }
   console.log(
-    JSON.stringify(
-      raw.map((r) => ({ id: r.id, durations: r.durations })),
-      null,
-      2,
-    ),
+    contextFailed.length === 0
+      ? `\n\x1b[32m✓ all hard (context) assertions passed\x1b[0m\n`
+      : `\n\x1b[31m✗ ${contextFailed.length} hard (context) assertion(s) failed\x1b[0m\n`,
   );
-  void ctx;
-  process.exit(0);
+  process.exit(contextFailed.length === 0 ? 0 : 1);
 })();
