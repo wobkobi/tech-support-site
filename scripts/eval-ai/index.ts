@@ -17,12 +17,23 @@ import {
   statedSessionMins,
   withinTolerance,
 } from "./assert";
+import type { LiveContext } from "./context";
 
 /** One assertion check with expected/actual values, hardcoded - no network. */
 interface SelfCase {
   name: string;
   got: number | boolean;
   want: number | boolean;
+}
+
+/** Raw results for one case across N runs. */
+interface RawRun {
+  id: string;
+  kind: "estimate-single" | "estimate-multi" | "parse";
+  benchmarkLabel?: string;
+  statedRanges?: { startTime: string; endTime: string }[];
+  durations: number[];
+  first: unknown;
 }
 
 /**
@@ -93,8 +104,72 @@ function parseArgs(): {
   return { selfTest, url, runs, probe, showContext };
 }
 
+/**
+ * Runs every case `runs` times and collects the numeric result each time
+ * (estimatedMins for estimate cases, durationMins for parse cases).
+ * @param url - Server base URL.
+ * @param adminSecret - Admin secret for both routes.
+ * @param runs - Repeat count per case (reproducibility).
+ * @returns Raw runs plus the live context used to build expectations.
+ */
+async function collectRaw(
+  url: string,
+  adminSecret: string,
+  runs: number,
+): Promise<{ ctx: LiveContext; raw: RawRun[] }> {
+  const { loadLiveContext } = await import("./context");
+  const { callEstimate, callParseJob } = await import("./client");
+  const { PARSE_CASES, MULTI_ESTIMATE_CASES } = await import("./cases");
+  const ctx = await loadLiveContext();
+  const raw: RawRun[] = [];
+
+  // Single-task estimate probes generated from live benchmarks.
+  for (const b of ctx.benchmarks) {
+    const durations: number[] = [];
+    let first: unknown = null;
+    for (let i = 0; i < runs; i++) {
+      const r = await callEstimate(url, adminSecret, `Just ${b.label.toLowerCase()}, nothing else`);
+      durations.push(r.estimatedMins);
+      if (i === 0) first = r;
+    }
+    raw.push({
+      id: `est-${b.label}`,
+      kind: "estimate-single",
+      benchmarkLabel: b.label,
+      durations,
+      first,
+    });
+  }
+
+  // Multi-task estimate cases (report-only drift).
+  for (const c of MULTI_ESTIMATE_CASES) {
+    const durations: number[] = [];
+    let first: unknown = null;
+    for (let i = 0; i < runs; i++) {
+      const r = await callEstimate(url, adminSecret, c.description);
+      durations.push(r.estimatedMins);
+      if (i === 0) first = r;
+    }
+    raw.push({ id: c.id, kind: "estimate-multi", durations, first });
+  }
+
+  // Parse cases (exact stated-time assertion).
+  for (const c of PARSE_CASES) {
+    const durations: number[] = [];
+    let first: unknown = null;
+    for (let i = 0; i < runs; i++) {
+      const r = await callParseJob(url, adminSecret, c.input);
+      durations.push(r.durationMins ?? -1);
+      if (i === 0) first = r;
+    }
+    raw.push({ id: c.id, kind: "parse", statedRanges: c.statedRanges, durations, first });
+  }
+
+  return { ctx, raw };
+}
+
 (async () => {
-  const { selfTest } = parseArgs();
+  const { selfTest, probe, url, showContext, runs } = parseArgs();
   if (selfTest) {
     process.exit(runSelfTest());
   }
@@ -103,7 +178,6 @@ function parseArgs(): {
     console.error("ADMIN_SECRET not set in .env.local - required for the harness.");
     process.exit(1);
   }
-  const { probe, url, showContext } = parseArgs();
   if (probe) {
     const { callEstimate, callParseJob } = await import("./client");
     const est = await callEstimate(url, adminSecret, "Set up a new printer");
@@ -122,6 +196,15 @@ function parseArgs(): {
     for (const b of ctx.benchmarks) console.log(`  - ${b.label}: ${b.mins}m`);
     process.exit(0);
   }
-  console.log("Full run not implemented yet.");
+  const { ctx, raw } = await collectRaw(url, adminSecret, runs);
+  console.log(`Collected ${raw.length} cases x ${runs} run(s) = ${raw.length * runs} calls.`);
+  console.log(
+    JSON.stringify(
+      raw.map((r) => ({ id: r.id, durations: r.durations })),
+      null,
+      2,
+    ),
+  );
+  void ctx;
   process.exit(0);
 })();
