@@ -61,7 +61,7 @@
     "@eslint/eslintrc": "^3.3.6",
     "@eslint/js": "^9.39.4",
     "@next/bundle-analyzer": "^16.2.10",
-    "@tailwindcss/postcss": "^4.3.2",
+    "@tailwindcss/postcss": "^4.3.3",
     "@types/google.maps": "^3.65.2",
     "@types/jsdom": "^28.0.3",
     "@types/node": "^26.1.1",
