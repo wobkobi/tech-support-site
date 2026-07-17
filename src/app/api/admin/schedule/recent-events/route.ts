@@ -2,8 +2,9 @@
 /**
  * @description Admin endpoint listing recent booking-calendar events for the
  * calculator's "Bill a calendar event" picker. GET returns the last two weeks
- * plus the next few days, newest first, so the operator can jump straight to
- * billing a just-finished job with its corrected times.
+ * up to now (future bookings are excluded - a job isn't billable until it has
+ * started), newest first, so the operator can jump straight to billing a
+ * just-finished job with its corrected times.
  */
 
 import {
@@ -19,7 +20,8 @@ export const maxDuration = 60;
 
 /**
  * GET /api/admin/schedule/recent-events - Booking-calendar events from the
- * last 14 days through the next 3, newest first, capped at 30.
+ * last 14 days up to now, newest first, capped at 30. Events that have not yet
+ * started are excluded - you bill a job after it happens, not before.
  * Day-rounded window boundaries keep the underlying schedule cache key stable
  * across requests, so repeat opens of the picker stay cache-warm.
  * @param request - Incoming Next.js request
@@ -31,14 +33,21 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   const day = 24 * 60 * 60 * 1000;
-  const from = new Date(Math.floor(Date.now() / day) * day - 14 * day);
-  const to = new Date(Math.floor(Date.now() / day) * day + 4 * day);
+  const now = Date.now();
+  const todayStart = Math.floor(now / day) * day;
+  const from = new Date(todayStart - 14 * day);
+  // Upper bound at the start of tomorrow keeps the cache key day-stable; the
+  // start-time filter below drops anything not yet started, so no future
+  // booking reaches the picker.
+  const to = new Date(todayStart + day);
 
   try {
     const bookingCalId = getBookingCalendarId();
     const all = await getCachedScheduleEvents(from.toISOString(), to.toISOString());
     const events = all
       .filter((e) => e.calendarEmail === bookingCalId)
+      // Only jobs that have already started - a future booking isn't billable yet.
+      .filter((e) => new Date(e.start).getTime() <= now)
       .sort((a, b) => b.start.localeCompare(a.start))
       .slice(0, 30)
       .map((e) => ({ id: e.id, summary: e.summary ?? "(no title)", start: e.start, end: e.end }));
