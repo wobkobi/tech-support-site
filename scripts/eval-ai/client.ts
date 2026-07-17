@@ -32,21 +32,58 @@ export interface ParseJobResult {
 }
 
 /**
- * POSTs JSON and throws on any non-ok response or `{ ok: false }` body.
+ * Maps an HTTP status from one of the AI routes to an actionable hint, so a
+ * failed run tells the operator what to check rather than dumping a raw status.
+ * @param status - HTTP status code the route responded with.
+ * @returns A one-line diagnostic hint.
+ */
+function statusHint(status: number): string {
+  switch (status) {
+    case 401:
+      return "Unauthorised - ADMIN_SECRET in .env.local does not match the ADMIN_SECRET on the running dev server.";
+    case 429:
+      return "Rate limited - the dev-only bypass is not active. The server must run in dev (NODE_ENV is not 'production') with the same ADMIN_SECRET the harness sends.";
+    case 422:
+      return "The route rejected the request (its own validation or parse error). Check the description / input.";
+    case 500:
+      return "The route threw a server error - check the dev server terminal for the real stack trace. Common causes: a missing or invalid OPENAI_API_KEY on the server, or an OpenAI API failure.";
+    default:
+      return "Unexpected response - check the dev server terminal for details.";
+  }
+}
+
+/**
+ * POSTs JSON and throws a diagnostic Error on a network failure, any non-ok
+ * response, or an `{ ok: false }` body. The thrown message names the route,
+ * the status, and a hint for what to check - it is meant to be printed to the
+ * operator verbatim, without a stack trace.
  * @param url - Absolute route URL.
  * @param body - JSON request body.
  * @param adminSecret - Value sent as the `x-admin-secret` header.
  * @returns Parsed JSON typed as T.
  */
 async function postJson<T>(url: string, body: unknown, adminSecret: string): Promise<T> {
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "content-type": "application/json", "x-admin-secret": adminSecret },
-    body: JSON.stringify(body),
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-admin-secret": adminSecret },
+      body: JSON.stringify(body),
+    });
+  } catch (cause) {
+    // fetch rejects only on a network-level failure (server down, bad host,
+    // socket reset) - turn that into a clear "is the server up?" message.
+    const reason = cause instanceof Error ? cause.message : String(cause);
+    throw new Error(
+      `Could not reach the dev server at ${url} (${reason}). Is \`npm run dev\` running and serving that URL? Pass --url=<addr> if it is on another port.`,
+    );
+  }
   const json = (await res.json().catch(() => null)) as { ok?: boolean } | null;
   if (!res.ok || json?.ok === false || json === null) {
-    throw new Error(`${url} -> HTTP ${res.status}: ${JSON.stringify(json)}`);
+    const bodyText = json === null ? "(no JSON body)" : JSON.stringify(json);
+    throw new Error(
+      `${url} returned HTTP ${res.status}. ${statusHint(res.status)}\n  Response body: ${bodyText}`,
+    );
   }
   return json as T;
 }

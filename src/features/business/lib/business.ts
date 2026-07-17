@@ -145,12 +145,13 @@ export function nextInvoiceNumber(
  * rounding so customers are never bumped a full slot for a single minute of
  * overage; the operator gives back as often as they collect.
  * @param mins - Actual duration in minutes
- * @param incrementMins - Billing increment (live pricing setting); defaults to the code const.
+ * @param incrementMins - Billing increment (live pricing setting); defaults to the code const, and a non-positive value falls back to it (guards a divide-by-zero).
  * @returns Billable duration rounded to the nearest billing increment
  */
 export function billableMins(mins: number, incrementMins: number = BILLING_INCREMENT_MINS): number {
+  const inc = incrementMins > 0 ? incrementMins : BILLING_INCREMENT_MINS;
   if (mins <= 0) return 0;
-  return Math.round(mins / incrementMins) * incrementMins;
+  return Math.round(mins / inc) * inc;
 }
 
 /**

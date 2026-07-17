@@ -1,11 +1,14 @@
 // scripts/eval-ai/assert.ts
 // Pure, network-free expectation maths and tolerance helpers for the eval
-// harness. Mirrors the server-side clamps in
-// src/app/api/pricing/estimate-duration/route.ts so expected values stay in
-// lockstep with what the route actually enforces.
+// harness. Expected values come from the SAME canonical billing clamp the
+// routes call (clampBillableMins), so the auditor tracks the routes without
+// mirroring their code. Independent correctness is anchored by the hardcoded
+// canonical constants in the self-test (see index.ts).
+
+import { clampBillableMins, MAX_JOB_MINS } from "@/features/business/lib/pricing-policy";
 
 /** Grouping for a reported check. */
-export type CheckFamily = "context" | "reproducibility" | "drift";
+export type CheckFamily = "context" | "reproducibility" | "drift" | "cross-route";
 
 /** One reported assertion outcome. */
 export interface CheckResult {
@@ -17,24 +20,22 @@ export interface CheckResult {
 }
 
 /**
- * Expected estimatedMins for a single benchmarked task: snap to the increment,
- * then clamp to [minBillableMins, ceilingMins]. Mirrors the estimate-duration
- * route's server-side clamp exactly.
+ * Expected estimatedMins for a single benchmarked task: the shared
+ * {@link clampBillableMins} applied to the benchmark, so the expectation uses
+ * the exact clamp the estimate-duration route now calls.
  * @param benchmarkMins - Standalone benchmark minutes for the task.
  * @param minBillableMins - Live minimum billable floor.
  * @param incrementMins - Live rounding increment.
- * @param ceilingMins - Hard ceiling (defaults to the route's 8h cap).
+ * @param ceilingMins - Hard ceiling (defaults to the shared 8h cap).
  * @returns Expected estimatedMins the route would return.
  */
 export function expectedEstimateMins(
   benchmarkMins: number,
   minBillableMins: number,
   incrementMins: number,
-  ceilingMins = 8 * 60,
+  ceilingMins = MAX_JOB_MINS,
 ): number {
-  const inc = incrementMins > 0 ? incrementMins : 5;
-  const snapped = Math.round(Math.max(0, benchmarkMins) / inc) * inc;
-  return Math.min(ceilingMins, Math.max(minBillableMins, snapped));
+  return clampBillableMins(benchmarkMins, minBillableMins, incrementMins, ceilingMins);
 }
 
 /**
@@ -67,22 +68,4 @@ export function withinTolerance(actual: number, expected: number, tol: number): 
 export function spread(values: number[]): number {
   if (values.length === 0) return 0;
   return Math.max(...values) - Math.min(...values);
-}
-
-/**
- * Sums stated HH:MM ranges for simple same-day positive spans (rolls a
- * non-positive span over midnight). The route's extractRanges has extra
- * am/pm heuristics (a +12h retry before the +24h rollover) that this does
- * not replicate.
- * @param ranges - Stated start/end pairs (24h HH:MM).
- * @returns Total minutes across all ranges.
- */
-export function statedSessionMins(ranges: { startTime: string; endTime: string }[]): number {
-  return ranges.reduce((sum, r) => {
-    const [sh, sm] = r.startTime.split(":").map(Number);
-    const [eh, em] = r.endTime.split(":").map(Number);
-    let dur = eh * 60 + em - (sh * 60 + sm);
-    if (dur <= 0) dur += 24 * 60;
-    return sum + dur;
-  }, 0);
 }

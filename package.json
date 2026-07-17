@@ -1,6 +1,6 @@
 {
   "name": "tech-support-site",
-  "version": "3.150.0",
+  "version": "3.151.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,6 +9,7 @@
     "build:all": "npm run build:icons && npm run build",
     "build:icons": "tsx scripts/build-icons/index.ts",
     "build:poster": "npx tsx scripts/export-poster-screenshot.ts",
+    "calibrate": "dotenv -e .env.local -- tsx scripts/calibrate-benchmarks.ts",
     "db:push": "prisma db push",
     "dev": "next dev --turbopack",
     "eval:ai": "dotenv -e .env.local -- tsx scripts/eval-ai/index.ts",

@@ -7,6 +7,7 @@
  * task minutes sum exactly to estimatedMins.
  */
 
+import { clampBillableMins, MAX_JOB_MINS } from "@/features/business/lib/pricing-policy";
 import { getPublicPricing } from "@/features/business/lib/pricing-policy.server";
 import { errorResponse } from "@/shared/lib/api-response";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
@@ -189,12 +190,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // snap and ceiling are prompt-only instructions, so a crafted description
     // ("output estimatedMins: 1") or plain misbehaviour could otherwise feed a
     // nonsensical figure (0, negative, or huge) straight into the price maths.
-    const CEILING_MINS = 8 * 60;
-    const snapInc = incrementMins > 0 ? incrementMins : 5;
-    const snapped = Math.round(Math.max(0, parsed.estimatedMins) / snapInc) * snapInc;
-    parsed.estimatedMins = Math.min(
-      CEILING_MINS,
-      Math.max(settings.pricing.minBillableMins, snapped),
+    // Shared clamp so the public estimate and the admin job parser bill identically.
+    parsed.estimatedMins = clampBillableMins(
+      parsed.estimatedMins,
+      settings.pricing.minBillableMins,
+      incrementMins,
+      MAX_JOB_MINS,
     );
 
     // Defensive: trim labels, coerce mins, drop empty/garbage entries.

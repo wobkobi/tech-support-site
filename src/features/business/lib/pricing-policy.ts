@@ -203,6 +203,33 @@ export function floorBillableMins(
   return Math.max(minBillableMins, billableMins(rawMins, incrementMins));
 }
 
+/** Hard ceiling for a single job's billable minutes (8h). Shared by both AI routes. */
+export const MAX_JOB_MINS = 8 * 60;
+
+/**
+ * Snaps to the nearest billing increment, applies the minimum-billable floor,
+ * then optionally caps at a ceiling. The snap+floor is identical to
+ * {@link floorBillableMins} for any positive input; unlike it, a zero/negative
+ * raw value floors to the minimum (not 0) - mirroring the AI estimate route's
+ * clamp - and an optional ceiling caps a genuinely huge figure. Shared by the
+ * public estimate route and the admin job parser so both bill identically.
+ * @param rawMins - Raw duration in minutes (may be 0 or negative).
+ * @param minBillableMins - Minimum billable floor (live setting; defaults to the const).
+ * @param incrementMins - Rounding increment (live setting; defaults to the const).
+ * @param ceilingMins - Optional hard cap (e.g. {@link MAX_JOB_MINS}); omit for no ceiling.
+ * @returns Billable minutes after snap, floor, and optional ceiling.
+ */
+export function clampBillableMins(
+  rawMins: number,
+  minBillableMins: number = MIN_BILLABLE_MINS,
+  incrementMins: number = BILLING_INCREMENT_MINS,
+  ceilingMins?: number,
+): number {
+  const snapped = billableMins(Math.max(0, rawMins), incrementMins);
+  const floored = Math.max(minBillableMins, snapped);
+  return ceilingMins != null ? Math.min(ceilingMins, floored) : floored;
+}
+
 // > Copy generators
 // Generators take their variable inputs explicitly so the rendered text
 // always matches the live values. Key figures are wrapped in `**…**` so the
