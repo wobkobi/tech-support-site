@@ -1,15 +1,19 @@
 "use client";
 // src/features/reviews/components/admin/ReviewLinkHistoryTable.tsx
 /**
- * @description Table of review link history with inline editing for ReviewRequest entries.
+ * @description Table of review link history with inline editing of a contact's
+ * email/phone, and revoke for links not yet used. Legacy entries (customerRef or
+ * reviewId only) are read-only.
  */
 
+import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
+import { StatusPill } from "@/features/admin/components/ui/StatusPill";
+import { useToast } from "@/features/admin/components/ui/Toast";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
 import { formatNZPhone, isValidPhone, toE164NZ } from "@/shared/lib/normalise-phone";
 import type React from "react";
 import { useState } from "react";
-import { FaCheck } from "react-icons/fa6";
 import { CopyLinkButton } from "./CopyLinkButton";
 
 /**
@@ -49,6 +53,7 @@ interface ReviewLinkHistoryTableProps {
 export function ReviewLinkHistoryTable({
   entries: initialEntries,
 }: ReviewLinkHistoryTableProps): React.ReactElement {
+  const { toast } = useToast();
   const [entries, setEntries] = useState(initialEntries);
   const [query, setQuery] = useState("");
   /**
@@ -61,10 +66,8 @@ export function ReviewLinkHistoryTable({
   const [editEmail, setEditEmail] = useState("");
   const [editPhoneInput, setEditPhoneInput] = useState("");
   const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
   const [confirmRevokeKey, setConfirmRevokeKey] = useState<string | null>(null);
   const [revoking, setRevoking] = useState(false);
-  const [revokeError, setRevokeError] = useState<string | null>(null);
 
   /**
    * Returns the edit key for a given entry.
@@ -88,13 +91,11 @@ export function ReviewLinkHistoryTable({
     setEditingKey(key);
     setEditEmail(entry.email ?? "");
     setEditPhoneInput(entry.phone ? formatNZPhone(entry.phone) : "");
-    setSaveError(null);
   }
 
   /** Cancels editing without saving. */
   function cancelEdit(): void {
     setEditingKey(null);
-    setSaveError(null);
   }
 
   /**
@@ -104,7 +105,6 @@ export function ReviewLinkHistoryTable({
   async function handleRevoke(entry: LinkHistoryEntry): Promise<void> {
     if (!entry.id) return;
     setRevoking(true);
-    setRevokeError(null);
     try {
       const res = await fetch(`/api/admin/contacts/${entry.id}/clear-review-link`, {
         method: "POST",
@@ -114,8 +114,9 @@ export function ReviewLinkHistoryTable({
       if (!res.ok) throw new Error(data.error ?? "Request failed");
       setEntries((prev) => prev.filter((e) => e.id !== entry.id));
       setConfirmRevokeKey(null);
+      toast("Review link revoked.", { tone: "success" });
     } catch (err) {
-      setRevokeError(err instanceof Error ? err.message : "Something went wrong.");
+      toast(err instanceof Error ? err.message : "Something went wrong.", { tone: "error" });
     } finally {
       setRevoking(false);
     }
@@ -128,7 +129,6 @@ export function ReviewLinkHistoryTable({
   async function handleSave(entry: LinkHistoryEntry): Promise<void> {
     if (!entry.id) return;
     setSaving(true);
-    setSaveError(null);
     try {
       // PATCH the Contact row - email/phone live there now that the
       // standalone ReviewRequest model has been retired. Legacy entries
@@ -156,8 +156,9 @@ export function ReviewLinkHistoryTable({
         ),
       );
       setEditingKey(null);
+      toast("Contact details updated.", { tone: "success" });
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "Something went wrong.");
+      toast(err instanceof Error ? err.message : "Something went wrong.", { tone: "error" });
     } finally {
       setSaving(false);
     }
@@ -294,7 +295,6 @@ export function ReviewLinkHistoryTable({
                               : "Invalid phone number"}
                           </p>
                         )}
-                        {saveError && <p className="text-xs text-coquelicot-400">{saveError}</p>}
                         <div className="flex gap-2">
                           <button
                             type="button"
@@ -320,47 +320,20 @@ export function ReviewLinkHistoryTable({
                 {!isEditing && (
                   <div className="mt-2 flex items-center gap-3 border-t border-slate-100 pt-2">
                     {entry.reviewed ? (
-                      <span className="inline-flex items-center gap-1 text-xs font-medium text-moonstone-600">
-                        Reviewed
-                        <FaCheck className="h-3 w-3" aria-hidden />
-                      </span>
+                      <StatusPill tone="success">Reviewed</StatusPill>
                     ) : (
-                      <span className="text-xs text-slate-400">Not reviewed</span>
+                      <StatusPill tone="neutral">Not reviewed</StatusPill>
                     )}
                     <CopyLinkButton url={entry.reviewUrl} />
-                    {entry.id &&
-                      !entry.reviewed &&
-                      (confirmRevokeKey === key ? (
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            disabled={revoking}
-                            onClick={() => handleRevoke(entry)}
-                            className="text-xs font-semibold text-coquelicot-500 transition-colors hover:text-coquelicot-600 disabled:opacity-50"
-                          >
-                            {revoking ? "Revoking…" : "Confirm revoke"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setConfirmRevokeKey(null);
-                              setRevokeError(null);
-                            }}
-                            className="text-xs text-slate-400 transition-colors hover:text-slate-600"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => setConfirmRevokeKey(key)}
-                          className="ml-auto text-xs text-slate-400 transition-colors hover:text-coquelicot-500"
-                        >
-                          Revoke
-                        </button>
-                      ))}
-                    {revokeError && <p className="text-xs text-coquelicot-400">{revokeError}</p>}
+                    {entry.id && !entry.reviewed && (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmRevokeKey(key)}
+                        className="ml-auto text-xs text-slate-400 transition-colors hover:text-coquelicot-500"
+                      >
+                        Revoke
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -368,6 +341,22 @@ export function ReviewLinkHistoryTable({
           })}
         </div>
       )}
+
+      {/* One dialog for the list rather than a confirm pair per row: the entry
+          is looked up from the pending key, so only one can be in flight. */}
+      <ConfirmDialog
+        open={confirmRevokeKey !== null}
+        title="Revoke this review link?"
+        body="The link stops working and the send is cleared from this history, so you can send them a fresh one."
+        confirmLabel="Revoke"
+        tone="danger"
+        busy={revoking}
+        onConfirm={() => {
+          const entry = entries.find((e) => entryKey(e) === confirmRevokeKey);
+          if (entry) void handleRevoke(entry);
+        }}
+        onCancel={() => setConfirmRevokeKey(null)}
+      />
     </div>
   );
 }

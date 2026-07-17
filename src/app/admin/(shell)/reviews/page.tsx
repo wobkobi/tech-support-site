@@ -116,17 +116,53 @@ export default async function AdminReviewsPage(): Promise<React.ReactElement> {
     reviewCount: reviewCountByContact.get(c.id) ?? 0,
   }));
 
-  const sentEmails = new Set<string>([
-    ...sentContacts.flatMap((c) => (c.email ? [c.email.toLowerCase()] : [])),
-    ...sentBookings.flatMap((b) => (b.email ? [b.email.toLowerCase()] : [])),
+  // setDate over Date.now() arithmetic: react-hooks/purity rejects Date.now() in
+  // render and does not except server components, which only render once per
+  // request anyway. setDate also rolls months correctly on its own.
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+  // Two reasons to keep someone out of the picker, with two different lifetimes.
+  // A review already left is permanent - there is nothing left to ask for. A
+  // recent send is just a nudge already made, so it lapses after the window and
+  // they become suggestable again rather than being hidden for good.
+  const reviewedEmails = new Set<string>([
+    ...sentContacts.flatMap((c) =>
+      c.reviewLinkSubmittedAt && c.email ? [c.email.toLowerCase()] : [],
+    ),
+    ...sentBookings.flatMap((b) => (b.reviewSubmittedAt && b.email ? [b.email.toLowerCase()] : [])),
   ]);
-  const sentPhones = new Set<string>(
-    sentContacts.flatMap((c) => (c.phone ? [toE164NZ(c.phone)] : [])),
+  const reviewedPhones = new Set<string>(
+    sentContacts.flatMap((c) => (c.reviewLinkSubmittedAt && c.phone ? [toE164NZ(c.phone)] : [])),
   );
+  const recentlySentEmails = new Set<string>([
+    ...sentContacts.flatMap((c) =>
+      c.reviewLinkSentAt && c.reviewLinkSentAt >= thirtyDaysAgo && c.email
+        ? [c.email.toLowerCase()]
+        : [],
+    ),
+    ...sentBookings.flatMap((b) =>
+      b.reviewSentAt && b.reviewSentAt >= thirtyDaysAgo && b.email ? [b.email.toLowerCase()] : [],
+    ),
+  ]);
+  const recentlySentPhones = new Set<string>(
+    sentContacts.flatMap((c) =>
+      c.reviewLinkSentAt && c.reviewLinkSentAt >= thirtyDaysAgo && c.phone
+        ? [toE164NZ(c.phone)]
+        : [],
+    ),
+  );
+
   const contactSuggestions = allContacts
     .filter((c) => {
-      if (c.email && sentEmails.has(c.email.toLowerCase())) return false;
-      if (c.phone && sentPhones.has(toE164NZ(c.phone))) return false;
+      // Already reviewed - by their own contact link, or matched on email/phone
+      // from a booking send.
+      if ((reviewCountByContact.get(c.id) ?? 0) > 0) return false;
+      if (c.email && reviewedEmails.has(c.email.toLowerCase())) return false;
+      if (c.phone && reviewedPhones.has(toE164NZ(c.phone))) return false;
+      // Asked inside the window - let it pass before asking again.
+      if (c.email && recentlySentEmails.has(c.email.toLowerCase())) return false;
+      if (c.phone && recentlySentPhones.has(toE164NZ(c.phone))) return false;
       return true;
     })
     .map((c) => ({ id: c.id, name: c.name, email: c.email, phone: c.phone, address: c.address }));
@@ -217,11 +253,6 @@ export default async function AdminReviewsPage(): Promise<React.ReactElement> {
   // Legacy rows are sends that predate send-tracking (reviewed by definition),
   // so counting them would report a conversion rate that flatters itself.
   const trackedSends = linkHistory.filter((e) => e.source !== "Legacy");
-  // setDate over Date.now() arithmetic: react-hooks/purity rejects Date.now()
-  // in render and does not except server components, which only render once per
-  // request anyway. setDate also rolls months correctly on its own.
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
   const sentLast30 = trackedSends.filter((e) => new Date(e.sentAt) >= thirtyDaysAgo);
   const reviewedLast30 = sentLast30.filter((e) => e.reviewed).length;
   const conversion =
