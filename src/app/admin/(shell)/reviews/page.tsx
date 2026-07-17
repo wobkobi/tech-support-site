@@ -2,9 +2,13 @@
 /**
  * @description Admin reviews page. Loads reviews plus booking and contact
  * review-link sends (soft-capped at 1000 each), joins them into a unified link
- * history, and renders the {@link ReviewApprovalList}, {@link SendReviewLinkForm},
- * and {@link ReviewLinkHistoryTable}.
+ * history, summarises the pipeline as StatCards, and renders the
+ * {@link ReviewApprovalList}, {@link SendReviewLinkForm}, and
+ * {@link ReviewLinkHistoryTable}.
  */
+import { Card } from "@/features/admin/components/ui/Card";
+import { PageHeader } from "@/features/admin/components/ui/PageHeader";
+import { StatCard } from "@/features/admin/components/ui/StatCard";
 import { ReviewApprovalList } from "@/features/reviews/components/admin/ReviewApprovalList";
 import { ReviewLinkHistoryTable } from "@/features/reviews/components/admin/ReviewLinkHistoryTable";
 import { SendReviewLinkForm } from "@/features/reviews/components/admin/SendReviewLinkForm";
@@ -207,43 +211,73 @@ export default async function AdminReviewsPage(): Promise<React.ReactElement> {
     }),
   ].sort((a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime());
 
+  // Summary stats. Computed over the same soft-capped sets loaded above, so at
+  // 1000+ reviews or sends these describe the most recent 1000 rather than all
+  // time - fine at current volume, and the caps move together if that changes.
+  // Legacy rows are sends that predate send-tracking (reviewed by definition),
+  // so counting them would report a conversion rate that flatters itself.
+  const trackedSends = linkHistory.filter((e) => e.source !== "Legacy");
+  // setDate over Date.now() arithmetic: react-hooks/purity rejects Date.now()
+  // in render and does not except server components, which only render once per
+  // request anyway. setDate also rolls months correctly on its own.
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const sentLast30 = trackedSends.filter((e) => new Date(e.sentAt) >= thirtyDaysAgo);
+  const reviewedLast30 = sentLast30.filter((e) => e.reviewed).length;
+  const conversion =
+    sentLast30.length > 0 ? Math.round((reviewedLast30 / sentLast30.length) * 100) : null;
+
   return (
     <>
-      <h1 className="mb-6 text-2xl font-extrabold text-russian-violet">
-        Reviews
-        {pending.length > 0 && (
-          <span className="ml-3 rounded-full bg-coquelicot-500/20 px-2.5 py-0.5 text-sm font-semibold text-coquelicot-400">
-            {pending.length} pending
-          </span>
-        )}
-        <span className="ml-3 text-lg font-semibold text-slate-400">
-          {approved.length} approved
-        </span>
-      </h1>
+      <PageHeader
+        title="Reviews"
+        description="Approve what goes public, and ask past clients for one."
+      />
+
+      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatCard
+          label="Pending"
+          value={pending.length}
+          sub={pending.length > 0 ? "waiting on you" : "all caught up"}
+          tone={pending.length > 0 ? "warning" : "default"}
+        />
+        <StatCard label="Approved" value={approved.length} sub="live on the site" tone="success" />
+        <StatCard label="Links sent" value={sentLast30.length} sub="last 30 days" />
+        <StatCard
+          label="Turned into reviews"
+          value={conversion === null ? "-" : `${conversion}%`}
+          sub={
+            conversion === null
+              ? "no sends in the last 30 days"
+              : `${reviewedLast30} of ${sentLast30.length} sent`
+          }
+          tone={conversion !== null && conversion >= 50 ? "success" : "default"}
+        />
+      </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="flex flex-col gap-6 lg:col-span-2">
-          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <Card>
             <ReviewApprovalList
               pending={pending}
               approved={approved}
               contacts={contacts}
               showSendForm={false}
             />
-          </div>
+          </Card>
         </div>
 
         <div className="flex flex-col gap-6">
-          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <Card>
             <h2 className="mb-4 text-sm font-semibold text-russian-violet">Send a review link</h2>
             <SendReviewLinkForm contactSuggestions={contactSuggestions} />
-          </div>
+          </Card>
 
           {linkHistory.length > 0 && (
-            <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+            <Card>
               <h2 className="mb-4 text-sm font-semibold text-russian-violet">Link history</h2>
               <ReviewLinkHistoryTable entries={linkHistory} />
-            </div>
+            </Card>
           )}
         </div>
       </div>
