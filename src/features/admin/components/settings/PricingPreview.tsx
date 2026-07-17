@@ -24,11 +24,15 @@ export function PricingPreview({ config }: Props): React.ReactElement {
   const { cancellation: c, reschedule: r } = config;
   const lines: string[] = [];
 
-  lines.push(`Cancellations more than ${c.freeNoticeHours}h before the appointment are free.`);
+  // In person and remote are priced separately, so the preview shows both -
+  // reading only one line would hide half the policy from the operator.
   lines.push(
     c.travelChargeHours > 0
-      ? `Within ${c.freeNoticeHours}h a $${c.callOutFee} call-out applies; within ${c.travelChargeHours}h, round-trip travel is added too.`
-      : `Within ${c.freeNoticeHours}h a $${c.callOutFee} call-out applies.`,
+      ? `In person: free more than ${c.freeNoticeHours}h out. Inside that, a $${c.callOutFee} fee. Within ${c.travelChargeHours}h, or a no-show, the full $${c.fullCallOutFee} call-out plus round-trip travel.`
+      : `In person: free more than ${c.freeNoticeHours}h out. Inside that, a $${c.callOutFee} fee.`,
+  );
+  lines.push(
+    `Remote: free more than ${c.remoteFreeNoticeHours}h out. Inside that, or a no-show, a $${c.remoteFee} fee - no travel.`,
   );
 
   lines.push(

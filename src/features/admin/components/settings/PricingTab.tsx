@@ -140,6 +140,44 @@ export function PricingTab({ initial, defaults }: Props): React.ReactElement {
             setDraft((p) => ({ ...p, cancellation: { ...p.cancellation, callOutFee: v ?? 0 } }))
           }
         />
+        <NumberField
+          id="fullCallOutFee"
+          meta={m["cancellation.fullCallOutFee"]}
+          value={draft.cancellation.fullCallOutFee}
+          min={0}
+          error={fieldErrors["cancellation.fullCallOutFee"]}
+          customised={draft.cancellation.fullCallOutFee !== defaults.cancellation.fullCallOutFee}
+          onChange={(v) =>
+            setDraft((p) => ({ ...p, cancellation: { ...p.cancellation, fullCallOutFee: v ?? 0 } }))
+          }
+        />
+        <NumberField
+          id="remoteFreeNoticeHours"
+          meta={m["cancellation.remoteFreeNoticeHours"]}
+          value={draft.cancellation.remoteFreeNoticeHours}
+          min={0}
+          error={fieldErrors["cancellation.remoteFreeNoticeHours"]}
+          customised={
+            draft.cancellation.remoteFreeNoticeHours !== defaults.cancellation.remoteFreeNoticeHours
+          }
+          onChange={(v) =>
+            setDraft((p) => ({
+              ...p,
+              cancellation: { ...p.cancellation, remoteFreeNoticeHours: v ?? 0 },
+            }))
+          }
+        />
+        <NumberField
+          id="remoteFee"
+          meta={m["cancellation.remoteFee"]}
+          value={draft.cancellation.remoteFee}
+          min={0}
+          error={fieldErrors["cancellation.remoteFee"]}
+          customised={draft.cancellation.remoteFee !== defaults.cancellation.remoteFee}
+          onChange={(v) =>
+            setDraft((p) => ({ ...p, cancellation: { ...p.cancellation, remoteFee: v ?? 0 } }))
+          }
+        />
         <ToggleField
           id="autoSendCancellationInvoice"
           meta={m["cancellation.autoSendCancellationInvoice"]}
@@ -162,7 +200,7 @@ export function PricingTab({ initial, defaults }: Props): React.ReactElement {
       </h3>
       <div className="divide-y divide-slate-100">
         <NumberField
-          id="rescheduleCutoff"
+          id="reschedule.cutoffHours"
           meta={m["reschedule.cutoffHours"]}
           value={draft.reschedule.cutoffHours}
           min={0}

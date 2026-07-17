@@ -347,19 +347,39 @@ export const PRICING_FIELD_META: Record<string, FieldMeta> = {
     off: "Set 0 for no floor - bill the exact travel time.",
   },
   "cancellation.freeNoticeHours": {
-    title: "Free-cancellation window",
-    description: "Cancellations made more than this many hours before the appointment are free.",
+    title: "Free-cancellation window (in-person)",
+    description:
+      "In-person cancellations made more than this many hours before the appointment are free. Remote sessions have their own, shorter window below.",
     unit: "hours",
   },
   "cancellation.travelChargeHours": {
-    title: "Travel-charge window",
+    title: "Full call-out window",
     description:
-      "Cancelling within this many hours also bills round-trip travel (you'd already be on the way).",
+      "Cancelling within this many hours bills the full call-out plus round-trip travel, instead of the flat cancellation fee (you'd already be on the way).",
     unit: "hours",
   },
   "cancellation.callOutFee": {
-    title: "Call-out fee",
-    description: "Flat fee charged when a cancellation lands inside the free-cancellation window.",
+    title: "Cancellation fee",
+    description:
+      "Flat fee charged when a cancellation lands inside the free-cancellation window but outside the full call-out window.",
+    unit: "$",
+  },
+  "cancellation.fullCallOutFee": {
+    title: "Full call-out fee",
+    description:
+      "Charged instead of the cancellation fee when they cancel inside the full call-out window, or don't show at all. Round-trip travel is added on top.",
+    unit: "$",
+  },
+  "cancellation.remoteFreeNoticeHours": {
+    title: "Remote free-cancellation window",
+    description:
+      "Remote sessions can be cancelled free up to this many hours before. Shorter than the in-person window because there's no drive to plan around.",
+    unit: "hours",
+  },
+  "cancellation.remoteFee": {
+    title: "Remote cancellation fee",
+    description:
+      "Flat fee for a remote session cancelled inside its window, or a remote no-show. No call-out tier and no travel - a remote cancel only costs you the slot.",
     unit: "$",
   },
   "cancellation.autoSendCancellationInvoice": {
