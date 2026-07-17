@@ -296,7 +296,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
       </h3>
       <div className="divide-y divide-slate-100">
         <NumberField
-          id="durationShort"
+          id="durations.short"
           meta={m["durations.short"]}
           value={draft.durations.short}
           min={5}
@@ -307,7 +307,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
           }
         />
         <NumberField
-          id="durationLong"
+          id="durations.long"
           meta={m["durations.long"]}
           value={draft.durations.long}
           min={5}

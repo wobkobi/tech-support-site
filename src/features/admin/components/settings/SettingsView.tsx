@@ -180,15 +180,20 @@ export function SettingsView({
   };
 
   // After a search jump, scroll the target field into view + focus it once the
-  // (possibly just-switched) tab has rendered. Field id === meta key for most
-  // fields; nested keys gracefully fall back to just the tab switch.
+  // (possibly just-switched) tab has rendered. Search indexes the meta key, but
+  // a tab renders a nested key's field under its last segment alone (the group
+  // prefix is implied by the tab it lives in), so "cancellation.callOutFee"
+  // has to also look for "callOutFee" or every nested field would only ever
+  // switch tabs without scrolling.
   useEffect(() => {
     if (!focusTarget) return;
     const t = setTimeout(() => {
-      const el = document.getElementById(focusTarget.id);
+      const short = focusTarget.id.split(".").pop() ?? focusTarget.id;
+      const el = document.getElementById(focusTarget.id) ?? document.getElementById(short) ?? null;
       if (el) {
-        el.scrollIntoView({ block: "center", behavior: "smooth" });
-        el.focus();
+        const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        el.scrollIntoView({ block: "center", behavior: prefersReduced ? "auto" : "smooth" });
+        el.focus({ preventScroll: true });
       }
     }, 60);
     return () => clearTimeout(t);
