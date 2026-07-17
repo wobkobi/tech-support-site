@@ -13,6 +13,7 @@
  */
 
 import { MIN_TRAVEL_CHARGE, billableMins } from "@/features/business/lib/business";
+import { formatDateShort } from "@/shared/lib/date-format";
 
 export { MIN_TRAVEL_CHARGE };
 
@@ -84,6 +85,35 @@ export const CANCELLATION: CancellationPolicy = {
   callOutFee: 30,
   autoSendCancellationInvoice: true,
 };
+
+/** Which cancellation fee is being billed. */
+export type CancellationReason = "late-cancellation" | "no-show";
+
+/**
+ * Invoice line wording for a cancellation fee. Shared by the automated
+ * booking-cancel draft and the calculator's cancel mode so the two cannot drift
+ * apart.
+ * @param reason - Which fee this is.
+ * @param date - The cancelled booking's original start.
+ * @returns Line description, e.g. "Late cancellation fee - 15 Jul 2026".
+ */
+export function cancellationFeeLabel(reason: CancellationReason, date: Date | string): string {
+  const when = formatDateShort(date);
+  return reason === "no-show" ? `No-show fee - ${when}` : `Late cancellation fee - ${when}`;
+}
+
+/**
+ * Customer-facing invoice note for a cancellation fee.
+ * @param reason - Which fee this is.
+ * @param date - The cancelled booking's original start.
+ * @returns Note text written onto the invoice.
+ */
+export function cancellationNotes(reason: CancellationReason, date: Date | string): string {
+  const when = formatDateShort(date);
+  return reason === "no-show"
+    ? `Charge for missing the appointment originally booked for ${when}.`
+    : `Late cancellation fee for the appointment originally booked for ${when}.`;
+}
 
 export interface TravelChargeBreakdown {
   /** Raw round-trip cost before any rounding or floor: ((thereMins + backMins)/60) * ratePerHour. */

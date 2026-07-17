@@ -13,14 +13,19 @@ import {
   writeBackInvoiceCounter,
 } from "@/features/business/lib/invoice-numbering";
 import { generateInvoicePdf, serializeInvoice } from "@/features/business/lib/invoice-pdf";
-import { calcTravelCharge, FALLBACK_TRAVEL_RATE } from "@/features/business/lib/pricing-policy";
+import {
+  calcTravelCharge,
+  cancellationFeeLabel,
+  cancellationNotes,
+  FALLBACK_TRAVEL_RATE,
+  type CancellationReason,
+} from "@/features/business/lib/pricing-policy";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { lookupDriveRoundTrip } from "@/features/business/lib/travel-distance";
 import type { LineItem } from "@/features/business/types/business";
 import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-create";
 import { sendInvoiceEmail } from "@/features/reviews/lib/email";
 import { getIdentity } from "@/shared/lib/business-identity.server";
-import { formatDateShort } from "@/shared/lib/date-format";
 import { prisma } from "@/shared/lib/prisma";
 import type { Booking, Invoice } from "@prisma/client";
 
@@ -28,7 +33,7 @@ export interface DraftCancellationInvoiceOptions {
   /** True when the cancel lands inside CANCELLATION.travelChargeHours and round-trip travel should be billed. */
   includeTravel: boolean;
   /** Hint shown in the auto-draft's customer-facing notes (e.g. "Late cancellation" / "No-show"). */
-  reason?: "late-cancellation" | "no-show";
+  reason?: CancellationReason;
   /** When true, email the invoice and flip it to SENT instead of leaving it DRAFT. Best-effort: a send failure leaves the draft intact. */
   autoSend?: boolean;
 }
@@ -47,10 +52,7 @@ export async function createDraftCancellationInvoice(
 ): Promise<void> {
   const reason = options.reason ?? "late-cancellation";
   const { CANCELLATION, GST_REGISTERED, MIN_TRAVEL_CHARGE } = await getPolicy();
-  const headline =
-    reason === "no-show"
-      ? `No-show fee - ${formatDateShort(booking.startAt)}`
-      : `Late cancellation fee - ${formatDateShort(booking.startAt)}`;
+  const headline = cancellationFeeLabel(reason, booking.startAt);
 
   const lineItems: LineItem[] = [
     {
@@ -126,10 +128,7 @@ export async function createDraftCancellationInvoice(
     console.warn("[cancellation-invoice] contact link failed:", err);
   }
 
-  const customerNotes =
-    reason === "no-show"
-      ? `Charge for missing the appointment originally booked for ${formatDateShort(booking.startAt)}.`
-      : `Late cancellation fee for the appointment originally booked for ${formatDateShort(booking.startAt)}.`;
+  const customerNotes = cancellationNotes(reason, booking.startAt);
 
   const invoice = await prisma.invoice.create({
     data: {
@@ -176,7 +175,7 @@ export async function createDraftCancellationInvoice(
  */
 async function sendCancellationInvoice(
   invoice: Invoice,
-  reason: "late-cancellation" | "no-show",
+  reason: CancellationReason,
 ): Promise<void> {
   if (!invoice.clientEmail) {
     console.warn(`[cancellation-invoice] No client email on ${invoice.number}; left as draft.`);
