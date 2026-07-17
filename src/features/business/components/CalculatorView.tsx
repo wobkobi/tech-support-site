@@ -938,7 +938,18 @@ export function CalculatorView({
     try {
       // jobDate lets the server quote travel at the job's weekday traffic
       // pattern rather than today's.
-      const body: Record<string, unknown> = { input: aiInput, jobDate };
+      // When billing a booked job, hand the AI the booking's actual window so it
+      // bills the real session length instead of assuming a minimum. The parser
+      // reads a digit-led "HH:MM-HH:MM" line as the session range; only prepend it
+      // when the description doesn't already state its own times, so an operator's
+      // typed times still win.
+      const eventWindow =
+        eventPrefill && eventPrefill.startTime && eventPrefill.endTime
+          ? `${eventPrefill.startTime}-${eventPrefill.endTime}`
+          : null;
+      const statesTime = /\d{1,2}:\d{2}|\d{1,2}\s?(?:am|pm)/i.test(aiInput);
+      const input = eventWindow && !statesTime ? `${eventWindow}\n${aiInput}` : aiInput;
+      const body: Record<string, unknown> = { input, jobDate };
       if (answers && Object.keys(answers).length > 0) body.answers = answers;
       const res = await fetch("/api/business/parse-job", {
         method: "POST",
