@@ -14,6 +14,7 @@ import {
 } from "@/features/business/lib/invoice-numbering";
 import { generateInvoicePdf, serializeInvoice } from "@/features/business/lib/invoice-pdf";
 import {
+  assessCancellation,
   calcTravelCharge,
   cancellationFeeLabel,
   cancellationNotes,
@@ -30,8 +31,11 @@ import { prisma } from "@/shared/lib/prisma";
 import type { Booking, Invoice } from "@prisma/client";
 
 export interface DraftCancellationInvoiceOptions {
-  /** True when the cancel lands inside CANCELLATION.travelChargeHours and round-trip travel should be billed. */
-  includeTravel: boolean;
+  /**
+   * When the client called it off. Defaults to the booking's stamped
+   * cancelledAt, then to now. The policy measures notice from this.
+   */
+  cancelledAt?: Date;
   /** Hint shown in the auto-draft's customer-facing notes (e.g. "Late cancellation" / "No-show"). */
   reason?: CancellationReason;
   /** When true, email the invoice and flip it to SENT instead of leaving it DRAFT. Best-effort: a send failure leaves the draft intact. */
@@ -52,18 +56,37 @@ export async function createDraftCancellationInvoice(
 ): Promise<void> {
   const reason = options.reason ?? "late-cancellation";
   const { CANCELLATION, GST_REGISTERED, MIN_TRAVEL_CHARGE } = await getPolicy();
-  const headline = cancellationFeeLabel(reason, booking.startAt);
+  // The policy reads the tier off the booking itself. In-person and remote are
+  // priced separately, so taking the tier from a caller flag would just be a
+  // chance for the two paths to drift.
+  const charge = assessCancellation(
+    booking.startAt,
+    options.cancelledAt ?? booking.cancelledAt ?? new Date(),
+    {
+      reason,
+      meetingType: booking.meetingType === "remote" ? "remote" : "in-person",
+      policy: CANCELLATION,
+    },
+  );
 
+  // Enough notice to be free. Callers gate on this too, but a draft for $0 is
+  // never right, so refuse it here rather than trust every caller.
+  if (charge.fee <= 0) {
+    console.log(`[cancellation-invoice] No fee applies for booking ${booking.id}; no draft.`);
+    return;
+  }
+
+  const headline = cancellationFeeLabel(reason, booking.startAt);
   const lineItems: LineItem[] = [
     {
       description: headline,
       qty: 1,
-      unitPrice: CANCELLATION.callOutFee,
-      lineTotal: CANCELLATION.callOutFee,
+      unitPrice: charge.fee,
+      lineTotal: charge.fee,
     },
   ];
 
-  if (options.includeTravel) {
+  if (charge.travelApplies) {
     let travelMins = booking.travelMinsAtBooking ?? 0;
     // Legacy rows missing the back-leg snapshot fall back to the outbound figure.
     let travelMinsBack = booking.travelMinsBackAtBooking ?? 0;

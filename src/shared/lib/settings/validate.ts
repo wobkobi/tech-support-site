@@ -141,6 +141,26 @@ function validatePricing(p: PricingSettings): FieldError[] {
     errors.push({ field: "cancellation.travelChargeHours", message: "Must be 0 or more hours." });
   if (!nonNeg(p.cancellation?.callOutFee))
     errors.push({ field: "cancellation.callOutFee", message: "Must be 0 or more dollars." });
+  if (!nonNeg(p.cancellation?.fullCallOutFee))
+    errors.push({ field: "cancellation.fullCallOutFee", message: "Must be 0 or more dollars." });
+  if (!nonNeg(p.cancellation?.remoteFreeNoticeHours))
+    errors.push({
+      field: "cancellation.remoteFreeNoticeHours",
+      message: "Must be 0 or more hours.",
+    });
+  if (!nonNeg(p.cancellation?.remoteFee))
+    errors.push({ field: "cancellation.remoteFee", message: "Must be 0 or more dollars." });
+  // The full call-out replaces the flat fee inside the travel window, so a
+  // smaller one would make cancelling later cheaper than cancelling earlier.
+  if (
+    nonNeg(p.cancellation?.callOutFee) &&
+    nonNeg(p.cancellation?.fullCallOutFee) &&
+    (p.cancellation?.fullCallOutFee ?? 0) < (p.cancellation?.callOutFee ?? 0)
+  )
+    errors.push({
+      field: "cancellation.fullCallOutFee",
+      message: "Must be at least the cancellation fee, or cancelling later would cost less.",
+    });
   if (typeof p.cancellation?.autoSendCancellationInvoice !== "boolean")
     errors.push({
       field: "cancellation.autoSendCancellationInvoice",

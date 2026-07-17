@@ -4,10 +4,7 @@
  */
 
 import { createDraftCancellationInvoice } from "@/features/business/lib/cancellation-invoice";
-import {
-  isWithinCancellationWindow,
-  isWithinTravelWindow,
-} from "@/features/business/lib/pricing-policy";
+import { assessCancellation } from "@/features/business/lib/pricing-policy";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { deleteBookingEvent, SCHEDULE_CALENDAR_TAG } from "@/features/calendar/lib/google-calendar";
 import { sendCustomerReviewRequest } from "@/features/reviews/lib/email";
@@ -109,12 +106,21 @@ export async function PATCH(
         console.error("[admin/bookings] Failed to delete calendar event:", err);
       }
     }
+    const noShowAt = new Date();
+    const { CANCELLATION: noShowPolicy } = await getPolicy();
+    // A no-show always charges - they never called. The policy still decides
+    // whether a drive is billed, since a remote no-show has none.
+    const noShowCharge = assessCancellation(booking.startAt, noShowAt, {
+      reason: "no-show",
+      meetingType: booking.meetingType === "remote" ? "remote" : "in-person",
+      policy: noShowPolicy,
+    });
     data.status = "cancelled";
     data.activeSlotKey = `released:${id}`;
-    data.cancelledAt = new Date();
+    data.cancelledAt = noShowAt;
     data.cancelledBy = "customer";
     data.lateCancellation = true;
-    data.travelChargeApplies = true;
+    data.travelChargeApplies = noShowCharge.travelApplies;
     data.noShow = true;
   } else if (body.status === "cancelled" && booking.status !== "cancelled") {
     if (booking.calendarEventId) {
@@ -132,12 +138,15 @@ export async function PATCH(
     // Operator cancels never charge; on-behalf follows customer fee rules.
     data.cancelledBy = onBehalf ? "customer" : "operator";
     const { CANCELLATION } = await getPolicy();
-    data.lateCancellation = onBehalf
-      ? isWithinCancellationWindow(booking.startAt, now, CANCELLATION.freeNoticeHours)
-      : false;
-    data.travelChargeApplies = onBehalf
-      ? isWithinTravelWindow(booking.startAt, now, CANCELLATION.travelChargeHours)
-      : false;
+    // In-person and remote have their own windows and fees, so the policy reads
+    // the booking rather than one set of windows being applied to both.
+    const charge = assessCancellation(booking.startAt, now, {
+      reason: "late-cancellation",
+      meetingType: booking.meetingType === "remote" ? "remote" : "in-person",
+      policy: CANCELLATION,
+    });
+    data.lateCancellation = onBehalf ? charge.fee > 0 : false;
+    data.travelChargeApplies = onBehalf ? charge.travelApplies : false;
   } else if (body.status === "completed") {
     data.status = "completed";
     data.activeSlotKey = `released:${id}`;
@@ -155,7 +164,6 @@ export async function PATCH(
     booking.status !== "cancelled"
   ) {
     void createDraftCancellationInvoice(updated, {
-      includeTravel: updated.travelChargeApplies,
       reason: updated.noShow ? "no-show" : "late-cancellation",
     }).catch((err) => console.error("[admin/bookings] Failed to draft cancellation invoice:", err));
   }

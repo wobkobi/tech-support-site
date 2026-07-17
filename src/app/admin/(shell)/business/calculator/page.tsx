@@ -63,6 +63,7 @@ async function buildEventPrefill(eventId: string): Promise<EventPrefill | null> 
           email: true,
           address: true,
           unit: true,
+          meetingType: true,
           travelMinsAtBooking: true,
           travelMinsBackAtBooking: true,
         },
@@ -104,6 +105,15 @@ async function buildEventPrefill(eventId: string): Promise<EventPrefill | null> 
       (booking?.address
         ? [booking.unit, booking.address].filter(Boolean).join("/")
         : event.location) ?? "",
+    // Cancel mode bills no round trip on a remote session. Map the Prisma enum
+    // to the hyphenated form the client side uses; null when no booking backs
+    // the event, and the calculator falls back to inferring from the address.
+    meetingType:
+      booking?.meetingType === "remote"
+        ? "remote"
+        : booking?.meetingType === "in_person"
+          ? "in-person"
+          : null,
     travelMinsThere,
     travelMinsBack,
   };
@@ -173,6 +183,7 @@ export default async function CalculatorPage({
         <CalculatorView
           identity={identity}
           pricing={pricing}
+          cancellation={policy.CANCELLATION}
           initialRates={initialRates}
           initialTaskTemplates={initialTaskTemplates}
           initialPromo={promo}

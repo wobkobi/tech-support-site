@@ -7,10 +7,7 @@
  */
 
 import { createDraftCancellationInvoice } from "@/features/business/lib/cancellation-invoice";
-import {
-  isWithinCancellationWindow,
-  isWithinTravelWindow,
-} from "@/features/business/lib/pricing-policy";
+import { assessCancellation } from "@/features/business/lib/pricing-policy";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { deleteBookingEvent } from "@/features/calendar/lib/google-calendar";
 import { errorResponse } from "@/shared/lib/api-response";
@@ -107,18 +104,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     // Server clock decides the fee flags so a skewed client can't move the boundary.
+    // In-person and remote have their own windows and fees, so the policy reads
+    // the booking rather than one set of windows being applied to both.
     const now = new Date();
     const { CANCELLATION } = await getPolicy();
-    const lateCancellation = isWithinCancellationWindow(
-      booking.startAt,
-      now,
-      CANCELLATION.freeNoticeHours,
-    );
-    const travelChargeApplies = isWithinTravelWindow(
-      booking.startAt,
-      now,
-      CANCELLATION.travelChargeHours,
-    );
+    const charge = assessCancellation(booking.startAt, now, {
+      reason: "late-cancellation",
+      meetingType: booking.meetingType === "remote" ? "remote" : "in-person",
+      policy: CANCELLATION,
+    });
+    const lateCancellation = charge.fee > 0;
+    const travelChargeApplies = charge.travelApplies;
 
     // Cancel the booking
     const updated = await prisma.booking.update({
@@ -136,7 +132,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Fire-and-forget so a draft (or send) failure never blocks the cancel response.
     if (lateCancellation) {
       void createDraftCancellationInvoice(updated, {
-        includeTravel: travelChargeApplies,
+        cancelledAt: now,
         reason: "late-cancellation",
         // Auto-send only on this customer self-cancel path; no-show / operator
         // cancels stay drafts for review (see admin/bookings/[id]/route.ts).

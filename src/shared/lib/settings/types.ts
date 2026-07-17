@@ -53,8 +53,14 @@ export interface CancellationSettings {
   freeNoticeHours: number;
   /** Inside this window a cancellation also bills round-trip travel. */
   travelChargeHours: number;
-  /** Flat call-out fee inside the free-notice window. */
+  /** Flat in-person cancellation fee inside the free-notice window but outside the travel window. */
   callOutFee: number;
+  /** Full call-out billed for an in-person cancel inside the travel window, or on a no-show. Replaces callOutFee rather than stacking, and travel is added on top. */
+  fullCallOutFee: number;
+  /** Remote cancellations more than this many hours out are free. Priced separately - a remote session costs the slot but no drive. */
+  remoteFreeNoticeHours: number;
+  /** Flat fee for a remote cancel inside its window, or a remote no-show. No call-out tier and no travel. */
+  remoteFee: number;
   /** When true, a customer self-cancel via the website auto-sends the fee invoice instead of leaving it as a draft. */
   autoSendCancellationInvoice: boolean;
 }

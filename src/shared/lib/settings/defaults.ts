@@ -55,8 +55,11 @@ export const DEFAULT_SETTINGS: Settings = {
     minTravelCharge: 10,
     cancellation: {
       freeNoticeHours: 12,
-      travelChargeHours: 2,
-      callOutFee: 30,
+      travelChargeHours: 1,
+      callOutFee: 35,
+      fullCallOutFee: 65,
+      remoteFreeNoticeHours: 4,
+      remoteFee: 25,
       autoSendCancellationInvoice: true,
     },
     reschedule: { cutoffHours: 0, maxReschedules: null },

@@ -13,6 +13,7 @@ import { AddToContactsModal } from "@/features/business/components/AddToContacts
 import { InvoicePreviewPanel } from "@/features/business/components/InvoicePreviewPanel";
 import { ParseConfidenceBanner } from "@/features/business/components/ParseConfidenceBanner";
 import { TaxonomyManageModal } from "@/features/business/components/TaxonomyManageModal";
+import { CancelFeeSection } from "@/features/business/components/calculator/CancelFeeSection";
 import { ClientPickerSection } from "@/features/business/components/calculator/ClientPickerSection";
 import { JobDetailsSection } from "@/features/business/components/calculator/JobDetailsSection";
 import { PartsSection } from "@/features/business/components/calculator/PartsSection";
@@ -32,7 +33,16 @@ import {
   todayISO,
   type JobPricing,
 } from "@/features/business/lib/business";
-import { calcTravelCharge, FALLBACK_TRAVEL_RATE } from "@/features/business/lib/pricing-policy";
+import {
+  assessCancellation,
+  calcTravelCharge,
+  cancellationFeeLabel,
+  cancellationNotes,
+  FALLBACK_TRAVEL_RATE,
+  type CancellationPolicy,
+  type CancellationReason,
+  type CancelMeetingType,
+} from "@/features/business/lib/pricing-policy";
 import { summariseForBanner, type ActivePromo } from "@/features/business/lib/promos";
 import type {
   GoogleContact,
@@ -298,6 +308,12 @@ interface CalculatorViewProps {
   identity: IdentitySettings;
   /** Live pricing (GST, min travel) for the job calculations. */
   pricing: JobPricing;
+  /**
+   * Live cancellation policy driving cancel mode: the notice windows decide
+   * whether a fee and the round trip apply, and callOutFee is the amount. Sits
+   * outside {@link JobPricing} because none of it is a calcJobTotal input.
+   */
+  cancellation: CancellationPolicy;
   /** Rate configs resolved server-side so the calculator renders without a fetch waterfall. */
   initialRates: RateConfig[];
   /** Task templates resolved server-side, ordered by usage. */
@@ -328,6 +344,12 @@ export interface EventPrefill {
   clientEmail: string;
   jobAddress: string;
   /**
+   * How the booking was to be met. Cancel mode bills no round trip on a remote
+   * session. Null when no Booking row backs the event, in which case the
+   * calculator infers it from whether there is an address or a drive.
+   */
+  meetingType: CancelMeetingType | null;
+  /**
    * Drive prediction made for the event's actual window, from the frozen
    * TravelBlock (raw minutes, no scheduling buffer) or the booking snapshot.
    * Null when neither exists - the operator looks up manually.
@@ -342,6 +364,7 @@ export interface EventPrefill {
  * @param props - Component props.
  * @param props.identity - Live business identity for the invoice preview.
  * @param props.pricing - Live pricing for the job calculations.
+ * @param props.cancellation - Live cancellation policy driving cancel mode.
  * @param props.initialRates - Server-resolved rate configs.
  * @param props.initialTaskTemplates - Server-resolved task templates.
  * @param props.initialPromo - Server-resolved active promo, or null.
@@ -351,6 +374,7 @@ export interface EventPrefill {
 export function CalculatorView({
   identity,
   pricing,
+  cancellation,
   initialRates,
   initialTaskTemplates,
   initialPromo,
@@ -416,6 +440,25 @@ export function CalculatorView({
   const [notes, setNotes] = useState("");
   // Half off labour when ticked (per pricing-policy.unsuccessfulWorkCopy).
   const [unsuccessful, setUnsuccessful] = useState(false);
+  // Cancel mode: a cancelled job has no work to bill, so the job-shaped sections
+  // are swapped for CancelFeeSection and the fee is written into tasks as one
+  // flat line. Client picker, travel, invoice preview, and save are reused as-is.
+  const [cancelMode, setCancelMode] = useState(false);
+  const [cancelReason, setCancelReason] = useState<CancellationReason>("late-cancellation");
+  const [includeCancelTravel, setIncludeCancelTravel] = useState(true);
+  // The booking's start and the moment the client called it off. The policy
+  // windows are measured between these two, so both are operator-entered rather
+  // than read off the clock - this is usually written up after the fact.
+  const [cancelBookingTime, setCancelBookingTime] = useState("09:00");
+  const [cancelledAtDate, setCancelledAtDate] = useState("");
+  const [cancelledAtTime, setCancelledAtTime] = useState("09:00");
+  // On site or remote. The fee covers the held slot either way, but only an
+  // in-person booking has a drive, so the travel window never applies remotely.
+  const [cancelMeetingType, setCancelMeetingType] = useState<CancelMeetingType>("in-person");
+  const cancelSectionRef = useRef<HTMLDivElement>(null);
+  // Travel entries parked while the policy says no round trip, so flipping the
+  // decision back restores the figure instead of forcing a fresh lookup.
+  const [stashedTravel, setStashedTravel] = useState<TravelEntry[]>([]);
   // Client details
   const [clientName, setClientName] = useState(() => eventPrefill?.clientName ?? "");
   const [clientEmail, setClientEmail] = useState(() => eventPrefill?.clientEmail ?? "");
@@ -725,6 +768,22 @@ export function CalculatorView({
     clientName,
     clientEmail,
   };
+  // Cancel-mode verdict for the form's explanation. Pure: new Date(string) is
+  // deterministic, unlike the argless new Date() / Date.now() the React Compiler
+  // purity rule rejects in render. The windows are measured from the booking's
+  // start back to the moment the client called it off.
+  const cancelBookingStart = new Date(`${jobDate}T${cancelBookingTime || "00:00"}`);
+  const cancelledAtStamp = new Date(`${cancelledAtDate || jobDate}T${cancelledAtTime || "00:00"}`);
+  const cancelNoticeHours =
+    (cancelBookingStart.getTime() - cancelledAtStamp.getTime()) / (60 * 60 * 1000);
+  // Same helper the charge itself goes through, so the explanation can never
+  // disagree with what lands on the invoice.
+  const cancelCharge = assessCancellation(cancelBookingStart, cancelledAtStamp, {
+    reason: cancelReason,
+    meetingType: cancelMeetingType,
+    policy: cancellation,
+  });
+
   // Apply the date's public-holiday uplift to labour (0 when not a holiday).
   const jobPricing = { ...pricing, holidayUplift: holiday.uplift };
   const totals = calcJobTotal(job, !skipPromo ? activePromo : null, jobPricing);
@@ -1113,7 +1172,202 @@ export function CalculatorView({
     setClarifyQuestions([]);
     setClarifyAnswers({});
     setDraftRestoredAt(null);
+    setCancelMode(false);
     clearDraft();
+  }
+
+  /**
+   * The cancellation fee as a single flat task. baseRateId stays null so the
+   * totals code treats it as flat (business.ts splits hourly from flat on
+   * `baseRateId != null`): it bills qty * unitPrice, contributes no labour
+   * minutes, and collapseToWindow early-returns for want of an hourly task. No
+   * RateConfig is needed - rateConfigId only links flat rate rows like Travel.
+   * @param reason - Which fee is being billed.
+   * @param date - The cancelled booking's date (YYYY-MM-DD).
+   * @param fee - Fee amount in NZD.
+   * @returns The single flat task representing the fee.
+   */
+  function buildCancelFeeTask(reason: CancellationReason, date: string, fee: number): TaskLine {
+    return {
+      rateConfigId: null,
+      baseRateId: null,
+      description: cancellationFeeLabel(reason, date),
+      qty: 1,
+      unitPrice: fee,
+      lineTotal: fee,
+    };
+  }
+
+  /**
+   * Bills the round trip or parks it. Parking stashes the entries rather than
+   * dropping them, so reversing the decision restores the figure instead of
+   * forcing a fresh address lookup.
+   * @param include - Whether to bill travel.
+   */
+  function applyCancelTravel(include: boolean): void {
+    setIncludeCancelTravel(include);
+    if (include) {
+      setTravelEntries((prev) => (prev.length === 0 ? stashedTravel : prev));
+    } else {
+      setTravelEntries((prev) => {
+        if (prev.length > 0) setStashedTravel(prev);
+        return [];
+      });
+    }
+  }
+
+  /**
+   * Applies the cancellation policy to the entered times and rewrites the fee
+   * line, the note, and the travel decision to match. Every cancel input funnels
+   * through here so the invoice always reflects the policy rather than whatever
+   * was last typed.
+   *
+   * Cancels made with more than freeNoticeHours' notice are free, so the fee
+   * drops to 0 rather than the form quietly billing for something the policy
+   * gives away. A no-show has no notice to measure - the client never called -
+   * so it always bills the fee. Travel only ever applies to an in-person
+   * booking: a remote session has no drive to bill however late it is dropped.
+   * @param next - The changed inputs; anything omitted keeps its current value.
+   * @param next.reason - Late cancellation or no-show.
+   * @param next.meetingType - On site or remote.
+   * @param next.bookingDate - The booking's date (YYYY-MM-DD).
+   * @param next.bookingTime - The booking's start time (HH:MM).
+   * @param next.cancelledDate - Date the client called it off (YYYY-MM-DD).
+   * @param next.cancelledTime - Time the client called it off (HH:MM).
+   */
+  function applyCancelPolicy(next: {
+    reason?: CancellationReason;
+    meetingType?: CancelMeetingType;
+    bookingDate?: string;
+    bookingTime?: string;
+    cancelledDate?: string;
+    cancelledTime?: string;
+  }): void {
+    const reason = next.reason ?? cancelReason;
+    const meetingType = next.meetingType ?? cancelMeetingType;
+    const bookingDate = next.bookingDate ?? jobDate;
+    const bookingTime = next.bookingTime ?? cancelBookingTime;
+    const offDate = (next.cancelledDate ?? cancelledAtDate) || bookingDate;
+    const offTime = next.cancelledTime ?? cancelledAtTime;
+
+    const charge = assessCancellation(
+      new Date(`${bookingDate}T${bookingTime}`),
+      new Date(`${offDate}T${offTime}`),
+      { reason, meetingType, policy: cancellation },
+    );
+
+    setTasks([buildCancelFeeTask(reason, bookingDate, charge.fee)]);
+    setNotes(cancellationNotes(reason, bookingDate));
+    applyCancelTravel(charge.travelApplies);
+  }
+
+  /**
+   * Enters cancel mode, replacing any job work with the policy's verdict. Tasks
+   * and parts are cleared because nothing was done on site. The booking's start
+   * seeds from the billed event, and the cancel moment starts alongside it so
+   * the worst case (no notice) shows until the real time is entered.
+   */
+  function enterCancelMode(): void {
+    const bookingTime = eventPrefill?.startTime ?? timeRanges[0]?.startTime ?? "09:00";
+    // Prefer the booking's own answer. Without one (an event created straight on
+    // the calendar), infer from whether there is anywhere to drive to.
+    const meetingType: CancelMeetingType =
+      eventPrefill?.meetingType ??
+      (jobAddress.trim() || travelEntries.length > 0 ? "in-person" : "remote");
+    setCancelMode(true);
+    setCancelReason("late-cancellation");
+    setCancelMeetingType(meetingType);
+    setCancelBookingTime(bookingTime);
+    setCancelledAtDate(jobDate);
+    setCancelledAtTime(bookingTime);
+    setParts([]);
+    setUnsuccessful(false);
+    applyCancelPolicy({
+      reason: "late-cancellation",
+      meetingType,
+      bookingTime,
+      cancelledDate: jobDate,
+      cancelledTime: bookingTime,
+    });
+  }
+
+  /**
+   * Leaves cancel mode and clears the fee line so a half-finished cancel cannot
+   * leak into a job invoice.
+   */
+  function exitCancelMode(): void {
+    setCancelMode(false);
+    setTasks([]);
+    setNotes("");
+  }
+
+  // The button that opens cancel mode sits at the bottom of the column while the
+  // form renders at the top, so without this you would click it and watch
+  // nothing happen. Runs after the form exists; exiting is left alone, since the
+  // button you came back to is already under the cursor.
+  useEffect(() => {
+    if (!cancelMode) return;
+    const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    cancelSectionRef.current?.scrollIntoView({
+      block: "start",
+      behavior: prefersReduced ? "auto" : "smooth",
+    });
+  }, [cancelMode]);
+
+  /**
+   * Switches the fee type and re-applies the policy.
+   * @param reason - The newly-picked fee type.
+   */
+  function handleCancelReasonChange(reason: CancellationReason): void {
+    setCancelReason(reason);
+    applyCancelPolicy({ reason });
+  }
+
+  /**
+   * Switches between an on-site and a remote booking and re-applies the policy.
+   * Flipping to remote parks the round trip; flipping back restores it when the
+   * timing still warrants one.
+   * @param meetingType - The newly-picked meeting type.
+   */
+  function handleCancelMeetingTypeChange(meetingType: CancelMeetingType): void {
+    setCancelMeetingType(meetingType);
+    applyCancelPolicy({ meetingType });
+  }
+
+  /**
+   * Corrects the booking's date and re-applies the policy.
+   * @param date - The new date (YYYY-MM-DD).
+   */
+  function handleCancelledDateChange(date: string): void {
+    setJobDate(date);
+    applyCancelPolicy({ bookingDate: date });
+  }
+
+  /**
+   * Corrects the booking's start time and re-applies the policy.
+   * @param time - The new start time (HH:MM).
+   */
+  function handleCancelBookingTimeChange(time: string): void {
+    setCancelBookingTime(time);
+    applyCancelPolicy({ bookingTime: time });
+  }
+
+  /**
+   * Corrects the date the client called it off and re-applies the policy.
+   * @param date - The new date (YYYY-MM-DD).
+   */
+  function handleCancelledAtDateChange(date: string): void {
+    setCancelledAtDate(date);
+    applyCancelPolicy({ cancelledDate: date });
+  }
+
+  /**
+   * Corrects the time the client called it off and re-applies the policy.
+   * @param time - The new time (HH:MM).
+   */
+  function handleCancelledAtTimeChange(time: string): void {
+    setCancelledAtTime(time);
+    applyCancelPolicy({ cancelledTime: time });
   }
 
   /**
@@ -1789,167 +2043,219 @@ export function CalculatorView({
             )}
           </div>
 
-          {/* AI input */}
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="mb-3 text-sm font-semibold text-russian-violet">Describe the job</h2>
-            <textarea
-              value={aiInput}
-              onChange={(e) => {
-                setAiInput(e.target.value);
-                if (clarifyQuestions.length > 0) {
-                  setClarifyQuestions([]);
-                  setClarifyAnswers({});
+          {/* Early cancel: bills the call-out fee instead of job work, so every
+              job-shaped section below is swapped out while it is on. The button
+              that gets you here lives at the bottom - it is a rare action and
+              should not compete with the normal job flow. */}
+          {cancelMode && (
+            <div ref={cancelSectionRef}>
+              <CancelFeeSection
+                reason={cancelReason}
+                onReasonChange={handleCancelReasonChange}
+                meetingType={cancelMeetingType}
+                onMeetingTypeChange={handleCancelMeetingTypeChange}
+                bookingDate={jobDate}
+                onBookingDateChange={handleCancelledDateChange}
+                bookingTime={cancelBookingTime}
+                onBookingTimeChange={handleCancelBookingTimeChange}
+                cancelledAtDate={cancelledAtDate}
+                onCancelledAtDateChange={handleCancelledAtDateChange}
+                cancelledAtTime={cancelledAtTime}
+                onCancelledAtTimeChange={handleCancelledAtTimeChange}
+                fee={cancelCharge.fee}
+                includeTravel={includeCancelTravel}
+                hasTravel={travelEntries.length > 0 || stashedTravel.length > 0}
+                noticeHours={cancelNoticeHours}
+                feeApplies={cancelCharge.fee > 0}
+                travelApplies={cancelCharge.travelApplies}
+                isFullCallOut={cancelCharge.isFullCallOut}
+                freeNoticeHours={
+                  cancelMeetingType === "remote"
+                    ? cancellation.remoteFreeNoticeHours
+                    : cancellation.freeNoticeHours
                 }
-              }}
-              rows={6}
-              placeholder="e.g. Was at Dave's for 2 hours, removed some malware, set up his new router, had to drive out to Papakura"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
-            />
-            {parseError && <p className="mt-1 text-xs text-red-600">{parseError}</p>}
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button
-                onClick={() => void handleParse()}
-                suppressHydrationWarning
-                disabled={parsing || !aiInput.trim()}
-                className="rounded-lg bg-russian-violet px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
-              >
-                {parsing ? "Parsing..." : hasParsed ? "Re-parse" : "Parse with AI"}
-              </button>
-              {/* Clear the cached description + parse session (the textarea is
-                  draft-persisted, so old text reappears on every visit).
-                  Parsed tasks/travel below stay - only the AI box resets. */}
-              {(aiInput.trim() !== "" || hasParsed || clarifyQuestions.length > 0) && (
-                <button
-                  onClick={() => {
-                    setAiInput("");
-                    setParseResult(null);
-                    setParseError(null);
-                    setHasParsed(false);
+                travelChargeHours={cancellation.travelChargeHours}
+                onExit={exitCancelMode}
+              />
+            </div>
+          )}
+
+          {/* AI input */}
+          {!cancelMode && (
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <h2 className="mb-3 text-sm font-semibold text-russian-violet">Describe the job</h2>
+              <textarea
+                value={aiInput}
+                onChange={(e) => {
+                  setAiInput(e.target.value);
+                  if (clarifyQuestions.length > 0) {
                     setClarifyQuestions([]);
                     setClarifyAnswers({});
-                  }}
-                  disabled={parsing}
-                  aria-label="Clear job description"
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                  }
+                }}
+                rows={6}
+                placeholder="e.g. Was at Dave's for 2 hours, removed some malware, set up his new router, had to drive out to Papakura"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+              />
+              {parseError && <p className="mt-1 text-xs text-red-600">{parseError}</p>}
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  onClick={() => void handleParse()}
+                  suppressHydrationWarning
+                  disabled={parsing || !aiInput.trim()}
+                  className="rounded-lg bg-russian-violet px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
                 >
-                  Clear
+                  {parsing ? "Parsing..." : hasParsed ? "Re-parse" : "Parse with AI"}
                 </button>
-              )}
-              <span className="self-center text-xs text-slate-400">or build manually below</span>
-            </div>
-            {parseResult && !parseError && (
-              <div className="mt-3">
-                <ParseConfidenceBanner
-                  confidence={parseResult.confidence}
-                  warnings={parseResult.warnings}
-                  onDismiss={() => setParseResult(null)}
-                />
-              </div>
-            )}
-            {clarifyQuestions.length > 0 && (
-              <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
-                <p className="mb-3 text-xs font-medium text-amber-800">
-                  A few quick questions to fill in the gaps:
-                </p>
-                <div className="space-y-3">
-                  {clarifyQuestions.map((q) => (
-                    <div key={q.id}>
-                      <label className="mb-1 block text-xs font-medium text-slate-700">
-                        {q.question}
-                      </label>
-                      <input
-                        type="text"
-                        placeholder={q.hint}
-                        value={clarifyAnswers[q.id] ?? ""}
-                        onChange={(e) =>
-                          setClarifyAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))
-                        }
-                        className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
-                      />
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-3 flex gap-2">
-                  <button
-                    onClick={() => void handleParse(clarifyAnswers)}
-                    disabled={parsing}
-                    className="rounded-lg bg-russian-violet px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
-                  >
-                    {parsing ? "Parsing..." : "Submit answers"}
-                  </button>
+                {/* Clear the cached description + parse session (the textarea is
+                  draft-persisted, so old text reappears on every visit).
+                  Parsed tasks/travel below stay - only the AI box resets. */}
+                {(aiInput.trim() !== "" || hasParsed || clarifyQuestions.length > 0) && (
                   <button
                     onClick={() => {
+                      setAiInput("");
+                      setParseResult(null);
+                      setParseError(null);
+                      setHasParsed(false);
                       setClarifyQuestions([]);
                       setClarifyAnswers({});
                     }}
-                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                    disabled={parsing}
+                    aria-label="Clear job description"
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
                   >
-                    Skip
+                    Clear
                   </button>
-                </div>
+                )}
+                <span className="self-center text-xs text-slate-400">or build manually below</span>
               </div>
-            )}
-          </div>
+              {parseResult && !parseError && (
+                <div className="mt-3">
+                  <ParseConfidenceBanner
+                    confidence={parseResult.confidence}
+                    warnings={parseResult.warnings}
+                    onDismiss={() => setParseResult(null)}
+                  />
+                </div>
+              )}
+              {clarifyQuestions.length > 0 && (
+                <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
+                  <p className="mb-3 text-xs font-medium text-amber-800">
+                    A few quick questions to fill in the gaps:
+                  </p>
+                  <div className="space-y-3">
+                    {clarifyQuestions.map((q) => (
+                      <div key={q.id}>
+                        <label className="mb-1 block text-xs font-medium text-slate-700">
+                          {q.question}
+                        </label>
+                        <input
+                          type="text"
+                          placeholder={q.hint}
+                          value={clarifyAnswers[q.id] ?? ""}
+                          onChange={(e) =>
+                            setClarifyAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))
+                          }
+                          className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      onClick={() => void handleParse(clarifyAnswers)}
+                      disabled={parsing}
+                      className="rounded-lg bg-russian-violet px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
+                    >
+                      {parsing ? "Parsing..." : "Submit answers"}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setClarifyQuestions([]);
+                        setClarifyAnswers({});
+                      }}
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                    >
+                      Skip
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Time */}
-          <JobDetailsSection
-            timeRanges={timeRanges}
-            onTimeRangesChange={setTimeRanges}
-            followUpMins={followUpMins}
-            onFollowUpMinsChange={setFollowUpMins}
-            durationMins={durationMins}
-          />
+          {!cancelMode && (
+            <JobDetailsSection
+              timeRanges={timeRanges}
+              onTimeRangesChange={setTimeRanges}
+              followUpMins={followUpMins}
+              onFollowUpMinsChange={setFollowUpMins}
+              durationMins={durationMins}
+            />
+          )}
 
-          {/* Travel */}
-          <TravelSection
-            addressInputRef={addressInputRef}
-            jobAddress={jobAddress}
-            onJobAddressChange={setJobAddress}
-            travelEntries={travelEntries}
-            onTravelEntriesChange={setTravelEntries}
-            lookingUpTravel={lookingUpTravel}
-            onLookup={() => void handleTravelLookup()}
-            travelRatePerHour={
-              rates.find((r) => r.unit === "travel-hour" && r.ratePerHour !== null)?.ratePerHour ??
-              FALLBACK_TRAVEL_RATE
-            }
-            minTravelCharge={pricing.minTravelCharge}
-          />
+          {/* Travel. Stays available in cancel mode while the round trip is
+              being billed, so the amount can still be looked up or corrected. */}
+          {(!cancelMode || includeCancelTravel) && (
+            <TravelSection
+              addressInputRef={addressInputRef}
+              jobAddress={jobAddress}
+              onJobAddressChange={setJobAddress}
+              travelEntries={travelEntries}
+              onTravelEntriesChange={setTravelEntries}
+              lookingUpTravel={lookingUpTravel}
+              onLookup={() => void handleTravelLookup()}
+              travelRatePerHour={
+                rates.find((r) => r.unit === "travel-hour" && r.ratePerHour !== null)
+                  ?.ratePerHour ?? FALLBACK_TRAVEL_RATE
+              }
+              minTravelCharge={pricing.minTravelCharge}
+            />
+          )}
 
           {/* Tasks - inline warning when hourly task minutes drift from the
               listed job window. AI parses auto-collapse in applyParseResult,
-              so this only fires on manual edits or window changes. */}
-          <TaskTimeWarning
-            tasks={tasks}
-            windowMin={durationMins}
-            minBillableMins={pricing.minBillableMins}
-            onFix={() => {
-              const collapsed = collapseToWindow(tasks, durationMins);
-              setTasks(enforceMinBillable(collapsed.tasks, pricing.minBillableMins));
-            }}
-          />
-          <TasksSection
-            tasks={tasks}
-            onTasksChange={setTasks}
-            onUpdateTask={updateTask}
-            onSetTaskBase={setTaskBase}
-            onToggleTaskModifier={toggleTaskModifier}
-            onAddTask={() => setTasks((p) => [...p, emptyTask(rates)])}
-            onManageTags={() => setShowTaxonomyModal(true)}
-            taskTemplates={taskTemplates}
-            baseRates={baseRates}
-            modifierRates={modifierRates}
-            flatRates={flatRates}
-            jobUnsuccessful={unsuccessful}
-          />
+              so this only fires on manual edits or window changes. Cancel mode
+              has no work lines, so the whole block goes. */}
+          {!cancelMode && (
+            <>
+              <TaskTimeWarning
+                tasks={tasks}
+                windowMin={durationMins}
+                minBillableMins={pricing.minBillableMins}
+                onFix={() => {
+                  const collapsed = collapseToWindow(tasks, durationMins);
+                  setTasks(enforceMinBillable(collapsed.tasks, pricing.minBillableMins));
+                }}
+              />
+              <TasksSection
+                tasks={tasks}
+                onTasksChange={setTasks}
+                onUpdateTask={updateTask}
+                onSetTaskBase={setTaskBase}
+                onToggleTaskModifier={toggleTaskModifier}
+                onAddTask={() => setTasks((p) => [...p, emptyTask(rates)])}
+                onManageTags={() => setShowTaxonomyModal(true)}
+                taskTemplates={taskTemplates}
+                baseRates={baseRates}
+                modifierRates={modifierRates}
+                flatRates={flatRates}
+                jobUnsuccessful={unsuccessful}
+              />
+            </>
+          )}
 
-          {/* Parts */}
-          <PartsSection
-            parts={parts}
-            onPartsChange={setParts}
-            show={showParts}
-            onToggle={() => setShowParts((p) => !p)}
-          />
+          {/* Parts. Nothing was fitted on a cancelled job, so it is hidden and
+              enterCancelMode clears whatever was there. */}
+          {!cancelMode && (
+            <PartsSection
+              parts={parts}
+              onPartsChange={setParts}
+              show={showParts}
+              onToggle={() => setShowParts((p) => !p)}
+            />
+          )}
 
           {/* Notes */}
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -1961,6 +2267,18 @@ export function CalculatorView({
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
             />
           </div>
+
+          {/* Early cancel entry. Parked at the bottom: billing a job that never
+              happened is the rare case, so it stays out of the normal flow. */}
+          {!cancelMode && (
+            <button
+              type="button"
+              onClick={enterCancelMode}
+              className="rounded-lg border border-coquelicot-500/40 px-3 py-1.5 text-sm font-semibold text-coquelicot-500 transition-colors hover:bg-coquelicot-500/10"
+            >
+              Make early cancel
+            </button>
+          )}
         </div>
 
         {/* RIGHT column - live invoice preview (replaces the legacy Summary

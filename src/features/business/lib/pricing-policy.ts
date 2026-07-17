@@ -68,26 +68,114 @@ export function nzDateKey(d: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+/**
+ * Cancellation rules. In-person and remote are priced separately: an on-site
+ * visit costs a slot plus a drive across Auckland, a remote session only costs
+ * the slot, so remote gets a shorter free window and a smaller flat fee with no
+ * call-out tier at all.
+ */
 export interface CancellationPolicy {
-  /** Cancellations made more than this many hours before the booking are free. */
+  /** In-person cancellations made more than this many hours before the booking are free. */
   freeNoticeHours: number;
-  /** Cancellations made within this many hours of the booking add the travel charge on top of the call-out fee (assumed-driving window). */
+  /** In-person cancellations made within this many hours of the booking bill fullCallOutFee plus round-trip travel (the assumed-driving window). */
   travelChargeHours: number;
-  /** Flat fee applied when a cancellation lands inside freeNoticeHours. */
+  /** Flat fee for an in-person cancellation inside freeNoticeHours but outside travelChargeHours. */
   callOutFee: number;
+  /** Full call-out billed for an in-person cancellation inside travelChargeHours, or on a no-show. Replaces callOutFee rather than stacking on it, and travel is added on top. */
+  fullCallOutFee: number;
+  /** Remote cancellations made more than this many hours before the booking are free. */
+  remoteFreeNoticeHours: number;
+  /** Flat fee for a remote cancellation inside remoteFreeNoticeHours, or a remote no-show. There is no drive, so no call-out tier and no travel. */
+  remoteFee: number;
   /** When true, a customer self-cancel via the website auto-sends the fee invoice instead of leaving it as a draft. */
   autoSendCancellationInvoice: boolean;
 }
 
 export const CANCELLATION: CancellationPolicy = {
   freeNoticeHours: 12,
-  travelChargeHours: 2,
-  callOutFee: 30,
+  travelChargeHours: 1,
+  callOutFee: 35,
+  fullCallOutFee: 65,
+  remoteFreeNoticeHours: 4,
+  remoteFee: 25,
   autoSendCancellationInvoice: true,
 };
 
 /** Which cancellation fee is being billed. */
 export type CancellationReason = "late-cancellation" | "no-show";
+
+/**
+ * Whether the cancelled booking was on site or remote. The fee is the same
+ * either way - it covers the held slot - but only an in-person booking has a
+ * drive to bill, so {@link CANCELLATION.travelChargeHours} never applies to a
+ * remote session.
+ */
+export type CancelMeetingType = "in-person" | "remote";
+
+/** What a cancellation actually bills, once the policy has been applied. */
+export interface CancellationCharge {
+  /** Fee in NZD; 0 when the cancel was made with enough notice to be free. */
+  fee: number;
+  /** True when the round trip is billed on top of the fee. */
+  travelApplies: boolean;
+  /** True when the cancel earned the full call-out rather than the flat late fee. */
+  isFullCallOut: boolean;
+}
+
+/**
+ * Applies the cancellation policy to one booking. Single source of truth for
+ * which tier a cancel lands in, shared by the customer/operator auto-draft and
+ * the calculator's cancel mode so they cannot drift apart.
+ *
+ * In person, three tiers: outside freeNoticeHours is free; inside it bills the
+ * flat callOutFee; inside travelChargeHours (or a no-show, where the client
+ * never called at all) bills the full call-out instead, plus the round trip.
+ *
+ * Remote is its own two-tier rule, not a discount on the in-person one: outside
+ * remoteFreeNoticeHours is free, inside it (or a no-show) bills the flat
+ * remoteFee. There is no drive, so no call-out tier and no travel however late
+ * it is dropped.
+ *
+ * A no-show never called, so there is no notice to measure - it always lands in
+ * the charged tier.
+ * @param bookingStart - When the booking was due to start.
+ * @param cancelledAt - When the client called it off; ignored for a no-show.
+ * @param options - Booking shape.
+ * @param options.reason - Late cancellation or no-show.
+ * @param options.meetingType - On site or remote.
+ * @param options.policy - Live policy (defaults to the module constant).
+ * @returns The fee, whether travel is added, and which tier applied.
+ */
+export function assessCancellation(
+  bookingStart: Date,
+  cancelledAt: Date,
+  options: {
+    reason: CancellationReason;
+    meetingType: CancelMeetingType;
+    policy?: CancellationPolicy;
+  },
+): CancellationCharge {
+  const p = options.policy ?? CANCELLATION;
+  const noShow = options.reason === "no-show";
+
+  if (options.meetingType === "remote") {
+    const charged =
+      noShow || isWithinCancellationWindow(bookingStart, cancelledAt, p.remoteFreeNoticeHours);
+    return { fee: charged ? p.remoteFee : 0, travelApplies: false, isFullCallOut: false };
+  }
+
+  const feeApplies =
+    noShow || isWithinCancellationWindow(bookingStart, cancelledAt, p.freeNoticeHours);
+  if (!feeApplies) return { fee: 0, travelApplies: false, isFullCallOut: false };
+
+  const isFullCallOut =
+    noShow || isWithinTravelWindow(bookingStart, cancelledAt, p.travelChargeHours);
+  return {
+    fee: isFullCallOut ? p.fullCallOutFee : p.callOutFee,
+    travelApplies: isFullCallOut,
+    isFullCallOut,
+  };
+}
 
 /**
  * Invoice line wording for a cancellation fee. Shared by the automated
@@ -267,16 +355,31 @@ export function clampBillableMins(
 // through as plain-text emphasis.
 
 /**
+ * Renders an hour count for customer-facing copy. The windows are settings, so
+ * a value of 1 is reachable and "1 hours" would read as a bug to a client.
+ * @param n - Number of hours.
+ * @returns e.g. "1 hour", "12 hours".
+ */
+function hours(n: number): string {
+  return `${n} hour${n === 1 ? "" : "s"}`;
+}
+
+/**
  * Cancellation policy text (pricing accordion + booking emails + cancel page).
  * @param p - Cancellation policy (defaults to the module constant).
  * @returns Multi-line copy describing the cancellation rules.
  */
 export function cancellationCopy(p: CancellationPolicy = CANCELLATION): string {
   return (
-    `**Free** if cancelled at least **${p.freeNoticeHours} hours** before your appointment. ` +
-    `Inside that window, a **$${p.callOutFee} call-out fee** applies. ` +
-    `If cancelled within **${p.travelChargeHours} hours** of the appointment ` +
-    `(when I would already be on the way), the fee also includes **round-trip travel**.`
+    `**In-person visits:** free if cancelled at least **${hours(p.freeNoticeHours)}** before your ` +
+    `appointment. Inside that window, a **$${p.callOutFee} cancellation fee** applies. If ` +
+    `cancelled within **${hours(p.travelChargeHours)}** of the appointment (when I would already ` +
+    `be on the way), or if nobody is there when I arrive, the full **$${p.fullCallOutFee} ` +
+    `call-out** applies plus **round-trip travel**.\n\n` +
+    `**Remote sessions:** free if cancelled at least **${hours(p.remoteFreeNoticeHours)}** before ` +
+    `your appointment. Inside that window, or if you are not there, a **$${p.remoteFee} fee** ` +
+    `applies.\n\n` +
+    `Please cancel using the link in your confirmation email, or by phone or text.`
   );
 }
 
