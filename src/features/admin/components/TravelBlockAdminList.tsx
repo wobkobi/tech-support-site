@@ -43,6 +43,17 @@ export interface TravelBlockRow {
 
 type TransportMode = "transit" | "driving" | "walking" | "bicycling";
 
+/** Minutes returned by the travel PATCH route after its immediate reprice. */
+interface TravelPatchResponse {
+  ok?: boolean;
+  travel?: {
+    rawTravelMinutes: number | null;
+    roundedMinutes: number | null;
+    rawTravelBackMinutes: number | null;
+    roundedBackMinutes: number | null;
+  } | null;
+}
+
 const MODES: { value: TransportMode; label: string; icon: string }[] = [
   { value: "transit", label: "Transit", icon: "🚌" },
   { value: "driving", label: "Driving", icon: "🚗" },
@@ -136,16 +147,19 @@ export function TravelBlockAdminList({
         setActionError("Couldn't update the transport mode - try again.");
         return;
       }
+      // The route reprices immediately and returns the fresh minutes; apply them
+      // so the card updates without a reload (null legs mean the API had none).
+      const t = ((await res.json()) as TravelPatchResponse).travel ?? null;
       setBlocks((prev) =>
         prev.map((b) =>
           b.id === id
             ? {
                 ...b,
                 transportMode: mode,
-                rawTravelMinutes: null,
-                roundedMinutes: null,
-                rawTravelBackMinutes: null,
-                roundedBackMinutes: null,
+                rawTravelMinutes: t?.rawTravelMinutes ?? null,
+                roundedMinutes: t?.roundedMinutes ?? null,
+                rawTravelBackMinutes: t?.rawTravelBackMinutes ?? null,
+                roundedBackMinutes: t?.roundedBackMinutes ?? null,
               }
             : b,
         ),
@@ -202,16 +216,18 @@ export function TravelBlockAdminList({
         setActionError("Couldn't save the origin - try again.");
         return;
       }
+      // Apply the freshly repriced minutes the route returns for the new origin.
+      const t = ((await res.json()) as TravelPatchResponse).travel ?? null;
       setBlocks((prev) =>
         prev.map((b) =>
           b.id === id
             ? {
                 ...b,
                 customOrigin,
-                rawTravelMinutes: null,
-                roundedMinutes: null,
-                rawTravelBackMinutes: null,
-                roundedBackMinutes: null,
+                rawTravelMinutes: t?.rawTravelMinutes ?? null,
+                roundedMinutes: t?.roundedMinutes ?? null,
+                rawTravelBackMinutes: t?.rawTravelBackMinutes ?? null,
+                roundedBackMinutes: t?.roundedBackMinutes ?? null,
               }
             : b,
         ),
@@ -248,6 +264,11 @@ export function TravelBlockAdminList({
           const isSaving = saving === b.id;
           const isEditingOrigin = editingOriginId === b.id;
           const effectiveOrigin = b.customOrigin ?? b.detectedOrigin ?? null;
+          // Past jobs have no live cache and the cron won't revisit them, so the
+          // cache-expiry and "recalculate" hints below are noise - hide them. A
+          // finished job is past by a wide margin, so this stays stable across
+          // SSR + hydration (unlike the sub-minute expiry text it gates).
+          const isPast = new Date(b.eventEndAt) < new Date();
 
           return (
             <div
@@ -320,7 +341,8 @@ export function TravelBlockAdminList({
                       </button>
                     ))}
                   </div>
-                  {(b.rawTravelMinutes === null || b.rawTravelBackMinutes === null) &&
+                  {!isPast &&
+                    (b.rawTravelMinutes === null || b.rawTravelBackMinutes === null) &&
                     b.transportMode !== null && (
                       <p className="mt-1 text-xs text-amber-500">
                         Mode changed - recalculate to update travel times
@@ -396,7 +418,8 @@ export function TravelBlockAdminList({
                       </button>
                     </div>
                   )}
-                  {(b.rawTravelMinutes === null || b.rawTravelBackMinutes === null) &&
+                  {!isPast &&
+                    (b.rawTravelMinutes === null || b.rawTravelBackMinutes === null) &&
                     b.customOrigin !== null && (
                       <p className="mt-1 text-xs text-amber-500">
                         Origin changed - recalculate to update travel times
@@ -413,17 +436,19 @@ export function TravelBlockAdminList({
                     <p className="text-sm text-slate-700">
                       {formatMinutes(b.rawTravelMinutes, b.roundedMinutes)}
                     </p>
-                    <p
-                      className={cn(
-                        "text-xs",
-                        !b.beforeExpiresAt || new Date(b.beforeExpiresAt) < new Date()
-                          ? "text-red-500"
-                          : "text-slate-400",
-                      )}
-                      suppressHydrationWarning
-                    >
-                      {formatExpiry(b.beforeExpiresAt)}
-                    </p>
+                    {!isPast && (
+                      <p
+                        className={cn(
+                          "text-xs",
+                          !b.beforeExpiresAt || new Date(b.beforeExpiresAt) < new Date()
+                            ? "text-red-500"
+                            : "text-slate-400",
+                        )}
+                        suppressHydrationWarning
+                      >
+                        {formatExpiry(b.beforeExpiresAt)}
+                      </p>
+                    )}
                   </div>
                   <div>
                     <p className="mb-0.5 text-xs font-medium tracking-wide text-slate-400 uppercase">
@@ -438,7 +463,7 @@ export function TravelBlockAdminList({
                       <p className="text-xs text-slate-400">
                         no return trip - suppressed by design
                       </p>
-                    ) : (
+                    ) : !isPast ? (
                       <p
                         className={cn(
                           "text-xs",
@@ -450,7 +475,7 @@ export function TravelBlockAdminList({
                       >
                         {formatExpiry(b.afterExpiresAt)}
                       </p>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               </div>

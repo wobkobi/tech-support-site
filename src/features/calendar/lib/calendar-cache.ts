@@ -35,6 +35,86 @@ function roundTravelMinutes(raw: number, bufferMin: number): number {
   return Math.ceil((raw + bufferMin) / TRAVEL_ROUND_INCREMENT_MIN) * TRAVEL_ROUND_INCREMENT_MIN;
 }
 
+/** Raw + rounded minutes for both legs, as written back onto a TravelBlock. */
+export interface RecomputedTravel {
+  rawTravelMinutes: number | null;
+  roundedMinutes: number | null;
+  rawTravelBackMinutes: number | null;
+  roundedBackMinutes: number | null;
+}
+
+/**
+ * Recomputes and persists one TravelBlock's travel-there / travel-back minutes
+ * immediately, pricing from the block's own stored origin, destination, and
+ * event window rather than the live calendar fetch.
+ *
+ * The 15-min refresh cron only maintains upcoming events - a finished job drops
+ * out of the fetch and its block freezes ({@link refreshCalendarCache} never
+ * revisits it). So changing a past job's mode or origin would clear its minutes
+ * with nothing to refill them. This fills them on the spot, for past and future
+ * jobs alike, by reusing the block's frozen endpoints. Chaining and travel-back
+ * suppression are deliberately not re-derived here - those are scheduling
+ * concerns the next cron re-evaluates for upcoming events; a finished job just
+ * needs its two legs priced for the record, and an already-suppressed back
+ * stays empty.
+ * @param blockId - TravelBlock id to recompute.
+ * @returns The recomputed raw/rounded minutes, or null when the block is gone.
+ */
+export async function recomputeTravelBlock(blockId: string): Promise<RecomputedTravel | null> {
+  const block = await prisma.travelBlock.findUnique({ where: { id: blockId } });
+  if (!block) return null;
+
+  const settings = await getSettings();
+  const homeAddress = settings.identity.baseAddress.line || process.env.HOME_ADDRESS || "";
+  const bufferMin = settings.scheduling.travelRoundBufferMin;
+
+  const origin = block.customOrigin ?? block.detectedOrigin ?? homeAddress;
+  const destination = block.destination;
+  const backDestination = block.customTravelBackDestination ?? homeAddress;
+  // Match the cron's read-time default (null mode > driving).
+  const mode = (block.transportMode ?? "driving") as TransportMode;
+
+  const empty: RecomputedTravel = {
+    rawTravelMinutes: null,
+    roundedMinutes: null,
+    rawTravelBackMinutes: null,
+    roundedBackMinutes: null,
+  };
+
+  // No endpoints to price against - store blanks rather than guess.
+  if (!origin || !destination) {
+    await prisma.travelBlock.update({ where: { id: blockId }, data: empty });
+    return empty;
+  }
+
+  // Booking events get a wind-down buffer before the return departure, matching
+  // how refreshCalendarCache times the travel-back leg.
+  const backBufferMin = settings.scheduling.travelBackDepartureBufferMin;
+  const isBookingEvent = block.calendarEmail === getBookingCalendarId();
+  const departureForBack = isBookingEvent
+    ? new Date(block.eventEndAt.getTime() + backBufferMin * 60_000)
+    : block.eventEndAt;
+
+  const [rawThere, rawBack] = await Promise.all([
+    calculateTravelMinutes(origin, destination, block.eventStartAt, {
+      useArrivalTime: true,
+      mode,
+    }),
+    block.travelBackSuppressed
+      ? Promise.resolve(null)
+      : calculateTravelMinutes(destination, backDestination, departureForBack, { mode }),
+  ]);
+
+  const data: RecomputedTravel = {
+    rawTravelMinutes: rawThere,
+    roundedMinutes: rawThere !== null ? roundTravelMinutes(rawThere, bufferMin) : null,
+    rawTravelBackMinutes: rawBack,
+    roundedBackMinutes: rawBack !== null ? roundTravelMinutes(rawBack, bufferMin) : null,
+  };
+  await prisma.travelBlock.update({ where: { id: blockId }, data });
+  return data;
+}
+
 /**
  * Finds the best origin address for the travel-to leg of a given event.
  * Looks for a preceding event that ends within the lookahead window of the
