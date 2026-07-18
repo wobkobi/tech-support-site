@@ -101,6 +101,19 @@ interface ContactEditField {
 }
 
 /**
+ * Classes for a filter chip button.
+ * @param active - Whether the chip is selected.
+ * @returns Class string.
+ */
+function chipClass(active: boolean): string {
+  return `rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+    active
+      ? "border-russian-violet bg-russian-violet text-white"
+      : "border-slate-200 bg-white text-slate-500 hover:bg-slate-100"
+  }`;
+}
+
+/**
  * Plain text input used by the Name field.
  * @param props - Field render props.
  * @param props.id - DOM id for label association.
@@ -474,6 +487,13 @@ export function ContactAdminList({
   const [expandedReviewsId, setExpandedReviewsId] = useState<string | null>(null);
   const [syncedOpen, setSyncedOpen] = useState(true);
   const [query, setQuery] = useState("");
+  // Filter chips, AND-combined with the search. Sync is tri-state (all/one/other)
+  // since a contact is exactly one of synced or not.
+  const [syncFilter, setSyncFilter] = useState<"all" | "synced" | "unsynced">("all");
+  const [reviewedOnly, setReviewedOnly] = useState(false);
+  const [noEmail, setNoEmail] = useState(false);
+  const [noPhone, setNoPhone] = useState(false);
+  const [sort, setSort] = useState<"name" | "newest" | "oldest">("name");
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   // Contact currently selected to merge away; while set, every other card offers
@@ -490,6 +510,19 @@ export function ContactAdminList({
    */
   function alphSort(a: ContactRow, b: ContactRow): number {
     return a.name.localeCompare(b.name, "en", { sensitivity: "base" });
+  }
+
+  /**
+   * Sorts contacts by the chosen order: name, or created date newest/oldest.
+   * @param a - First contact.
+   * @param b - Second contact.
+   * @returns Comparator result.
+   */
+  function bySort(a: ContactRow, b: ContactRow): number {
+    if (sort === "name") return alphSort(a, b);
+    const at = new Date(a.createdAt).getTime();
+    const bt = new Date(b.createdAt).getTime();
+    return sort === "newest" ? bt - at : at - bt;
   }
 
   /**
@@ -515,10 +548,20 @@ export function ContactAdminList({
       )
     : contacts;
 
-  const newContacts = visible.filter(isNew).sort(alphSort);
-  const rest = visible.filter((c) => !isNew(c));
-  const unsynced = rest.filter((c) => !c.googleContactId).sort(alphSort);
-  const synced = rest.filter((c) => !!c.googleContactId).sort(alphSort);
+  const anyFilter = syncFilter !== "all" || reviewedOnly || noEmail || noPhone;
+  const filtered = visible.filter((c) => {
+    if (syncFilter === "synced" && !c.googleContactId) return false;
+    if (syncFilter === "unsynced" && c.googleContactId) return false;
+    if (reviewedOnly && c.reviews.length === 0) return false;
+    if (noEmail && c.email) return false;
+    if (noPhone && c.phone) return false;
+    return true;
+  });
+
+  const newContacts = filtered.filter(isNew).sort(bySort);
+  const rest = filtered.filter((c) => !isNew(c));
+  const unsynced = rest.filter((c) => !c.googleContactId).sort(bySort);
+  const synced = rest.filter((c) => !!c.googleContactId).sort(bySort);
 
   /**
    * Opens the inline edit form for a contact row.
@@ -847,6 +890,61 @@ export function ContactAdminList({
         >
           Export CSV
         </button>
+      </div>
+
+      {/* Filter chips - narrow the list without leaving the page. */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => setSyncFilter((f) => (f === "synced" ? "all" : "synced"))}
+          className={chipClass(syncFilter === "synced")}
+        >
+          Synced
+        </button>
+        <button
+          type="button"
+          onClick={() => setSyncFilter((f) => (f === "unsynced" ? "all" : "unsynced"))}
+          className={chipClass(syncFilter === "unsynced")}
+        >
+          Unsynced
+        </button>
+        <button
+          type="button"
+          onClick={() => setReviewedOnly((v) => !v)}
+          className={chipClass(reviewedOnly)}
+        >
+          Has reviews
+        </button>
+        <button type="button" onClick={() => setNoEmail((v) => !v)} className={chipClass(noEmail)}>
+          No email
+        </button>
+        <button type="button" onClick={() => setNoPhone((v) => !v)} className={chipClass(noPhone)}>
+          No phone
+        </button>
+        {anyFilter && (
+          <button
+            type="button"
+            onClick={() => {
+              setSyncFilter("all");
+              setReviewedOnly(false);
+              setNoEmail(false);
+              setNoPhone(false);
+            }}
+            className="ml-1 text-xs font-medium text-slate-400 underline underline-offset-2 hover:text-slate-600"
+          >
+            Clear
+          </button>
+        )}
+        <select
+          aria-label="Sort contacts"
+          value={sort}
+          onChange={(e) => setSort(e.target.value as "name" | "newest" | "oldest")}
+          className="ml-auto rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs text-slate-600 focus:ring-1 focus:ring-russian-violet/30 focus:outline-none"
+        >
+          <option value="name">Name A-Z</option>
+          <option value="newest">Newest first</option>
+          <option value="oldest">Oldest first</option>
+        </select>
       </div>
 
       {/* New contacts - added in the last 7 days */}

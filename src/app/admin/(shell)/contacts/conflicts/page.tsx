@@ -9,6 +9,7 @@ import {
   ContactConflictsView,
   type ConflictRow,
 } from "@/features/admin/components/ContactConflictsView";
+import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import type { Metadata } from "next";
@@ -58,11 +59,11 @@ export default async function AdminContactConflictsPage(): Promise<React.ReactEl
 
   return (
     <>
-      <h1 className="mb-2 text-2xl font-extrabold text-russian-violet">Contact conflicts</h1>
-      <p className="mb-6 text-sm text-slate-500">
-        Fields where the site DB and Google Contacts both changed since the last sync. Pick which
-        value should win - the chosen value is written to both sides and the conflict is closed.
-      </p>
+      <PageHeader
+        breadcrumbs={[{ label: "Contacts", href: "/admin/contacts" }, { label: "Conflicts" }]}
+        title="Contact conflicts"
+        description="Fields where the site and Google Contacts both changed since the last sync. Pick which value wins - it's written to both sides and the conflict is closed."
+      />
       <ContactConflictsView initial={rows} />
     </>
   );
