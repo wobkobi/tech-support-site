@@ -14,6 +14,7 @@ import { EmailInput } from "@/shared/components/EmailInput";
 import { PhoneInput } from "@/shared/components/PhoneInput";
 import { formatDateShort } from "@/shared/lib/date-format";
 import { formatNZPhone, validatePhone } from "@/shared/lib/normalise-phone";
+import Link from "next/link";
 import type React from "react";
 import { useEffect, useState } from "react";
 
@@ -262,7 +263,12 @@ function ContactCard({
   return (
     <div className="flex flex-col gap-1 overflow-hidden rounded-xl border border-slate-200 bg-white p-4">
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
-        <span className="min-w-0 truncate font-semibold text-russian-violet">{c.name}</span>
+        <Link
+          href={`/admin/contacts/${c.id}`}
+          className="min-w-0 truncate font-semibold text-russian-violet hover:underline"
+        >
+          {c.name}
+        </Link>
         <div className="flex items-center gap-2">
           <span className="text-xs text-slate-400">{formatDateShort(c.createdAt)}</span>
           {!c.googleContactId &&
