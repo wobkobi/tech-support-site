@@ -6,6 +6,10 @@
  * pending reviews, recent contacts, outstanding invoices).
  */
 import { DashboardQuickActions } from "@/features/admin/components/DashboardQuickActions";
+import { Card } from "@/features/admin/components/ui/Card";
+import { PageHeader } from "@/features/admin/components/ui/PageHeader";
+import { StatCard } from "@/features/admin/components/ui/StatCard";
+import { StatusPill } from "@/features/admin/components/ui/StatusPill";
 import { formatNZD } from "@/features/business/lib/business";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { cn } from "@/shared/lib/cn";
@@ -24,6 +28,54 @@ export const metadata: Metadata = {
   title: "Admin",
   robots: { index: false, follow: false },
 };
+
+/**
+ * A titled list-panel card for the dashboard grid: header (title + optional
+ * count badge + optional "view all" link) over a list or an empty state.
+ * @param props - Panel props.
+ * @param props.title - Panel heading.
+ * @param props.badge - Optional node beside the title (e.g. a count pill).
+ * @param props.action - Optional right-aligned link.
+ * @param props.action.label - Link text.
+ * @param props.action.href - Link destination.
+ * @param props.empty - Text shown when there are no rows.
+ * @param props.children - The list element, or null to show the empty state.
+ * @returns Panel element.
+ */
+function Panel({
+  title,
+  badge,
+  action,
+  empty,
+  children,
+}: {
+  title: string;
+  badge?: React.ReactNode;
+  action?: { label: string; href: string };
+  empty: string;
+  children: React.ReactNode | null;
+}): React.ReactElement {
+  return (
+    <Card padding="none">
+      <div className="flex items-center justify-between gap-3 border-b border-admin-border px-5 py-4">
+        <h2 className="flex items-center gap-2 text-sm font-semibold text-admin-text">
+          {title}
+          {badge}
+        </h2>
+        {action && (
+          <Link
+            href={action.href}
+            className="inline-flex items-center gap-1 text-xs text-admin-faint hover:text-russian-violet"
+          >
+            {action.label}
+            <FaCaretRight className="h-3 w-3" aria-hidden />
+          </Link>
+        )}
+      </div>
+      {children ?? <p className="px-5 py-6 text-sm text-admin-faint">{empty}</p>}
+    </Card>
+  );
+}
 
 /**
  * NZ (Pacific/Auckland) midnight for a calendar date, returned as the equivalent
@@ -311,16 +363,16 @@ export default async function AdminPage(): Promise<React.ReactElement> {
 
   return (
     <>
-      <h1 className="mb-6 text-2xl font-extrabold text-russian-violet">Dashboard</h1>
+      <PageHeader title="Dashboard" />
 
       {/* Today's snapshot - pinned at the top so the morning glance is instant. */}
-      <div className="mb-6 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-russian-violet/20 bg-linear-to-r from-russian-violet/5 to-white px-5 py-4">
+      <div className="mb-6 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-russian-violet/20 bg-linear-to-r from-russian-violet/5 to-admin-surface px-5 py-4">
         <p className="text-sm font-semibold text-russian-violet">Today</p>
-        <p className="text-sm text-slate-700">
+        <p className="text-sm text-admin-text-secondary">
           <span className="font-bold text-russian-violet">{todaysBookings.length}</span> booking
           {todaysBookings.length === 1 ? "" : "s"}
         </p>
-        <p className="text-sm text-slate-700">
+        <p className="text-sm text-admin-text-secondary">
           <span
             className={cn(
               "font-bold",
@@ -332,13 +384,13 @@ export default async function AdminPage(): Promise<React.ReactElement> {
           review{pendingCount === 1 ? "" : "s"} to approve
         </p>
         {overdueInvoices.length > 0 && (
-          <p className="text-sm text-slate-700">
+          <p className="text-sm text-admin-text-secondary">
             <span className="font-bold text-coquelicot-400">{overdueInvoices.length}</span> overdue
             invoice{overdueInvoices.length === 1 ? "" : "s"}
           </p>
         )}
         {heldCount > 0 && (
-          <p className="text-sm text-slate-700">
+          <p className="text-sm text-admin-text-secondary">
             <span className="font-bold text-coquelicot-400">{heldCount}</span> held booking
             {heldCount === 1 ? "" : "s"} to action
           </p>
@@ -358,84 +410,57 @@ export default async function AdminPage(): Promise<React.ReactElement> {
 
       <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {stats.map((s) => (
-          <Link
+          <StatCard
             key={s.label}
+            label={s.label}
+            value={s.value}
+            sub={s.sub}
             href={s.href}
-            className="group rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm transition-shadow hover:shadow-md"
-          >
-            <p
-              className={cn(
-                "font-extrabold",
-                typeof s.value === "string" ? "text-xl" : "text-2xl",
-                s.urgent ? "text-coquelicot-400" : "text-russian-violet",
-              )}
-            >
-              {s.value}
-            </p>
-            <p className="mt-0.5 text-xs text-slate-500">{s.label}</p>
-            {s.sub && <p className="mt-0.5 text-[11px] text-slate-400">{s.sub}</p>}
-          </Link>
+            tone={s.urgent ? "critical" : "violet"}
+          />
         ))}
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Upcoming bookings */}
-        <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-            <h2 className="text-sm font-semibold text-slate-700">Upcoming bookings</h2>
-            <Link
-              href={`/admin/bookings`}
-              className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-russian-violet"
-            >
-              View all
-              <FaCaretRight className="h-3 w-3" aria-hidden />
-            </Link>
-          </div>
-          {upcomingBookings.length === 0 ? (
-            <p className="px-5 py-6 text-sm text-slate-400">No upcoming confirmed bookings.</p>
-          ) : (
-            <ul className="divide-y divide-slate-100">
+        <Panel
+          title="Upcoming bookings"
+          action={{ label: "View all", href: "/admin/bookings" }}
+          empty="No upcoming confirmed bookings."
+        >
+          {upcomingBookings.length === 0 ? null : (
+            <ul className="divide-y divide-admin-border">
               {upcomingBookings.map((b) => (
                 <li key={b.id} className="flex items-start justify-between gap-3 px-5 py-3">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-slate-700">{b.name}</p>
-                    <p className="truncate text-xs text-slate-400">
+                    <p className="truncate text-sm font-medium text-admin-text">{b.name}</p>
+                    <p className="truncate text-xs text-admin-faint">
                       {b.email}
                       {b.phone ? ` · ${b.phone}` : ""}
                     </p>
                   </div>
-                  <p className="shrink-0 text-right text-xs text-slate-500">
+                  <p className="shrink-0 text-right text-xs text-admin-muted">
                     {formatDateTimeShort(b.startAt.toISOString())}
                   </p>
                 </li>
               ))}
             </ul>
           )}
-        </div>
+        </Panel>
 
         {/* Pending reviews */}
-        <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-            <h2 className="text-sm font-semibold text-slate-700">
-              Pending reviews
-              {pendingReviews.length > 0 && (
-                <span className="ml-2 rounded-full bg-coquelicot-500/15 px-2 py-0.5 text-xs font-semibold text-coquelicot-400">
-                  {pendingCount}
-                </span>
-              )}
-            </h2>
-            <Link
-              href={`/admin/reviews`}
-              className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-russian-violet"
-            >
-              Review all
-              <FaCaretRight className="h-3 w-3" aria-hidden />
-            </Link>
-          </div>
-          {pendingReviews.length === 0 ? (
-            <p className="px-5 py-6 text-sm text-slate-400">No reviews pending approval.</p>
-          ) : (
-            <ul className="divide-y divide-slate-100">
+        <Panel
+          title="Pending reviews"
+          badge={
+            pendingReviews.length > 0 ? (
+              <StatusPill tone="critical">{pendingCount}</StatusPill>
+            ) : undefined
+          }
+          action={{ label: "Review all", href: "/admin/reviews" }}
+          empty="No reviews pending approval."
+        >
+          {pendingReviews.length === 0 ? null : (
+            <ul className="divide-y divide-admin-border">
               {pendingReviews.map((r) => {
                 const name = r.isAnonymous
                   ? "Anonymous"
@@ -443,28 +468,23 @@ export default async function AdminPage(): Promise<React.ReactElement> {
                 return (
                   <li key={r.id} className="px-5 py-3">
                     <div className="mb-1 flex items-center justify-between gap-3">
-                      <p className="text-xs font-medium text-slate-600">{name}</p>
-                      <p className="shrink-0 text-xs text-slate-400">
+                      <p className="text-xs font-medium text-admin-text-secondary">{name}</p>
+                      <p className="shrink-0 text-xs text-admin-faint">
                         {formatDateShort(r.createdAt.toISOString())}
                       </p>
                     </div>
-                    <p className="line-clamp-2 text-xs text-slate-500">{r.text}</p>
+                    <p className="line-clamp-2 text-xs text-admin-muted">{r.text}</p>
                   </li>
                 );
               })}
             </ul>
           )}
-        </div>
+        </Panel>
 
         {/* Recent activity - unified timeline of bookings, reviews, contacts, invoices. */}
-        <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-            <h2 className="text-sm font-semibold text-slate-700">Recent activity</h2>
-          </div>
-          {activity.length === 0 ? (
-            <p className="px-5 py-6 text-sm text-slate-400">No activity yet.</p>
-          ) : (
-            <ul className="divide-y divide-slate-100">
+        <Panel title="Recent activity" empty="No activity yet.">
+          {activity.length === 0 ? null : (
+            <ul className="divide-y divide-admin-border">
               {activity.map((e, i) => (
                 <li
                   key={`${e.kind}:${i}:${e.timestamp.getTime()}`}
@@ -475,7 +495,7 @@ export default async function AdminPage(): Promise<React.ReactElement> {
                       "mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold",
                       e.kind === "booking" && "bg-moonstone-600/15 text-moonstone-600",
                       e.kind === "review" && "bg-yellow-500/15 text-yellow-600",
-                      e.kind === "contact" && "bg-slate-200 text-slate-600",
+                      e.kind === "contact" && "bg-admin-border text-admin-muted",
                       e.kind === "invoice" && "bg-russian-violet/15 text-russian-violet",
                     )}
                     aria-hidden="true"
@@ -489,33 +509,27 @@ export default async function AdminPage(): Promise<React.ReactElement> {
                           : "I"}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-slate-700">{e.title}</p>
-                    <p className="truncate text-xs text-slate-400">{e.detail}</p>
+                    <p className="truncate text-sm font-medium text-admin-text">{e.title}</p>
+                    <p className="truncate text-xs text-admin-faint">{e.detail}</p>
                   </div>
-                  <p className="shrink-0 text-xs text-slate-400">
+                  <p className="shrink-0 text-xs text-admin-faint">
                     {formatDateShort(e.timestamp.toISOString())}
                   </p>
                 </li>
               ))}
             </ul>
           )}
-        </div>
+        </Panel>
 
         {/* System status - quick view of how fresh the various sync sources are. */}
-        <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-            <h2 className="text-sm font-semibold text-slate-700">System status</h2>
-            <Link
-              href={`/admin/settings`}
-              className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-russian-violet"
-            >
-              Settings
-              <FaCaretRight className="h-3 w-3" aria-hidden />
-            </Link>
-          </div>
-          <ul className="divide-y divide-slate-100 text-sm">
+        <Panel
+          title="System status"
+          action={{ label: "Settings", href: "/admin/settings" }}
+          empty=""
+        >
+          <ul className="divide-y divide-admin-border text-sm">
             <li className="flex items-center justify-between px-5 py-3">
-              <span className="text-slate-600">Calendar cache</span>
+              <span className="text-admin-text-secondary">Calendar cache</span>
               <span
                 className={cn(
                   "text-xs",
@@ -523,7 +537,7 @@ export default async function AdminPage(): Promise<React.ReactElement> {
                     ? "font-medium text-coquelicot-400"
                     : calendarLastRefreshMs > 30 * 60 * 1000
                       ? "text-yellow-600"
-                      : "text-slate-500",
+                      : "text-admin-muted",
                 )}
               >
                 {calendarLastRefreshMs === null
@@ -532,23 +546,26 @@ export default async function AdminPage(): Promise<React.ReactElement> {
               </span>
             </li>
             <li className="flex items-center justify-between px-5 py-3">
-              <span className="text-slate-600">Latest invoice</span>
-              <span className="text-xs text-slate-500">
+              <span className="text-admin-text-secondary">Latest invoice</span>
+              <span className="text-xs text-admin-muted">
                 {recentInvoices[0]
                   ? `${recentInvoices[0].number} (${formatDateShort(recentInvoices[0].createdAt.toISOString())})`
                   : "none yet"}
               </span>
             </li>
             <li className="flex items-center justify-between px-5 py-3">
-              <span className="text-slate-600">Unsynced contacts</span>
+              <span className="text-admin-text-secondary">Unsynced contacts</span>
               <span
-                className={cn("text-xs", unsyncedCount > 0 ? "text-yellow-600" : "text-slate-500")}
+                className={cn(
+                  "text-xs",
+                  unsyncedCount > 0 ? "text-yellow-600" : "text-admin-muted",
+                )}
               >
                 {unsyncedCount === 0 ? "all synced" : `${unsyncedCount} pending`}
               </span>
             </li>
           </ul>
-        </div>
+        </Panel>
       </div>
     </>
   );
