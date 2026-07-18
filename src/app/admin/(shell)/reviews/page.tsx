@@ -28,10 +28,17 @@ export const metadata: Metadata = {
 
 /**
  * Admin reviews page for approving/revoking reviews and sending review links.
+ * @param props - Page props.
+ * @param props.searchParams - Optional `contactId` to prefill the send form (from a contact's detail page).
  * @returns Reviews management page element.
  */
-export default async function AdminReviewsPage(): Promise<React.ReactElement> {
+export default async function AdminReviewsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ contactId?: string }>;
+}): Promise<React.ReactElement> {
   await requireAdminAuth();
+  const { contactId } = await searchParams;
 
   // Soft caps to prevent unbounded scans as data grows. The page joins these
   // sets to build a unified link history; if the most recent 1000 ever stops
@@ -258,6 +265,15 @@ export default async function AdminReviewsPage(): Promise<React.ReactElement> {
   const conversion =
     sentLast30.length > 0 ? Math.round((reviewedLast30 / sentLast30.length) * 100) : null;
 
+  // Arriving from a contact's "Send review link" - load that person to prefill
+  // the send form and open it. Soft-deleted or missing ids fall through to null.
+  const prefillContact = contactId
+    ? await prisma.contact.findFirst({
+        where: { id: contactId, deletedAt: null },
+        select: { name: true, email: true, phone: true },
+      })
+    : null;
+
   return (
     <>
       <PageHeader
@@ -301,7 +317,11 @@ export default async function AdminReviewsPage(): Promise<React.ReactElement> {
         <div className="flex flex-col gap-6">
           <Card>
             <h2 className="mb-4 text-sm font-semibold text-russian-violet">Send a review link</h2>
-            <SendReviewLinkForm contactSuggestions={contactSuggestions} />
+            <SendReviewLinkForm
+              contactSuggestions={contactSuggestions}
+              prefill={prefillContact ?? undefined}
+              defaultOpen={prefillContact !== null}
+            />
           </Card>
 
           {linkHistory.length > 0 && (

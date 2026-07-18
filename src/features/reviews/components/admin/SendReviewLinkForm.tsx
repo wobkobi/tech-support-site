@@ -39,6 +39,8 @@ interface SendReviewLinkFormProps {
   contactSuggestions?: ContactSuggestion[];
   /** Start the form expanded without needing to click the toggle */
   defaultOpen?: boolean;
+  /** Pre-fill the fields for one person, e.g. arriving from a contact's detail page. SMS mode is chosen when they have a phone but no email. */
+  prefill?: { name: string; email: string | null; phone: string | null };
 }
 
 /**
@@ -47,21 +49,26 @@ interface SendReviewLinkFormProps {
  * @param props - Component props.
  * @param props.contactSuggestions - Contacts worth asking (not already reviewed, not sent a link recently), shown in a pre-fill dropdown.
  * @param props.defaultOpen - Start the form expanded. Defaults to false.
+ * @param props.prefill - Pre-fill the fields for one person (name + email/phone).
  * @returns Send review link form element.
  */
 export function SendReviewLinkForm({
   contactSuggestions = [],
   defaultOpen = false,
+  prefill,
 }: SendReviewLinkFormProps): React.ReactElement {
   const { toast } = useToast();
   const [open, setOpen] = useState(defaultOpen);
-  const [mode, setMode] = useState<"email" | "sms">("email");
+  // Prefer email; fall back to SMS only when there's a phone but no email.
+  const [mode, setMode] = useState<"email" | "sms">(
+    prefill && !prefill.email && prefill.phone ? "sms" : "email",
+  );
   const [contactSearch, setContactSearch] = useState("");
   const [listOpen, setListOpen] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phoneInput, setPhoneInput] = useState("");
+  const [name, setName] = useState(prefill?.name ?? "");
+  const [email, setEmail] = useState(prefill?.email ?? "");
+  const [phoneInput, setPhoneInput] = useState(prefill?.phone ? formatNZPhone(prefill.phone) : "");
   const [loading, setLoading] = useState(false);
   const [smsText, setSmsText] = useState<string | null>(null);
   const [existingUrl, setExistingUrl] = useState<string | null>(null);

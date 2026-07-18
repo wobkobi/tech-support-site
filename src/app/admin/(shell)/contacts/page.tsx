@@ -7,6 +7,8 @@
  * on the sync-contacts cron and the standalone admin routes, not per page load.
  */
 import { ContactsAdminView } from "@/features/admin/components/ContactsAdminView";
+import { PageHeader } from "@/features/admin/components/ui/PageHeader";
+import { StatCard } from "@/features/admin/components/ui/StatCard";
 import { enrichContactsFromBookings } from "@/features/contacts/lib/maintenance";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
@@ -102,12 +104,36 @@ export default async function AdminContactsPage(): Promise<React.ReactElement> {
     reviews: reviewsByContactId.get(c.id) ?? [],
   }));
 
+  // Booking-field conflicts (amber panel) + Google-sync conflicts (top banner)
+  // are both "needs a decision", so the stat counts them together.
+  const unsynced = allContacts.filter((c) => !c.googleContactId).length;
+  const openConflicts = pendingConflictsCount + initialConflicts.length;
+  const reviewCovered = contactRows.filter((c) => c.reviews.length > 0).length;
+
   return (
     <>
-      <h1 className="mb-6 text-2xl font-extrabold text-russian-violet">
-        Contacts
-        <span className="ml-3 text-lg font-semibold text-slate-400">{allContacts.length}</span>
-      </h1>
+      <PageHeader
+        title="Contacts"
+        description="Everyone who has booked, been invoiced, or reviewed."
+      />
+
+      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatCard label="Contacts" value={allContacts.length} />
+        <StatCard
+          label="Not synced"
+          value={unsynced}
+          sub={unsynced > 0 ? "to Google" : "all synced"}
+          tone={unsynced > 0 ? "warning" : "default"}
+        />
+        <StatCard
+          label="Conflicts"
+          value={openConflicts}
+          sub={openConflicts > 0 ? "need review" : "none open"}
+          tone={openConflicts > 0 ? "critical" : "default"}
+        />
+        <StatCard label="Reviewed" value={reviewCovered} sub="left a review" tone="success" />
+      </div>
+
       {pendingConflictsCount > 0 && (
         <Link
           href={`/admin/contacts/conflicts`}

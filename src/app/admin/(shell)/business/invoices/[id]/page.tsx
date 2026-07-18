@@ -22,6 +22,7 @@ import { ServerTimer } from "@/shared/lib/server-timing";
 import type { Invoice as PrismaInvoice } from "@prisma/client";
 import type { Metadata } from "next";
 import Image from "next/image";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import type React from "react";
 import { Suspense } from "react";
@@ -202,12 +203,15 @@ async function InvoiceRail({
           </InfoRow>
           <InfoRow label="Contact">
             {contact ? (
-              <>
+              <Link
+                href={`/admin/contacts/${contact.id}`}
+                className="text-blue-500 hover:text-blue-700"
+              >
                 {contact.name}
                 <span className="block text-xs font-normal text-admin-muted">
                   {contact.email || contact.phone || "no details"}
                 </span>
-              </>
+              </Link>
             ) : (
               <span className="text-admin-faint">Not linked</span>
             )}

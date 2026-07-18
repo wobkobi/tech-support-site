@@ -262,7 +262,10 @@ export default async function BookingDetailPage({
             <dl className="space-y-2 text-sm">
               <InfoRow label="Contact">
                 {contact ? (
-                  <Link href="/admin/contacts" className="text-blue-500 hover:text-blue-700">
+                  <Link
+                    href={`/admin/contacts/${contact.id}`}
+                    className="text-blue-500 hover:text-blue-700"
+                  >
                     {contact.name}
                   </Link>
                 ) : (
