@@ -5,6 +5,10 @@
  * range shown to the user) with today/week/month counts. Dev/test rows are
  * hidden unless `?showDev=1` is set; entries are purged after 30 days.
  */
+import { Card } from "@/features/admin/components/ui/Card";
+import { PageHeader } from "@/features/admin/components/ui/PageHeader";
+import { StatCard } from "@/features/admin/components/ui/StatCard";
+import { StatusPill } from "@/features/admin/components/ui/StatusPill";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { cn } from "@/shared/lib/cn";
 import { formatDateTimeShort } from "@/shared/lib/date-format";
@@ -89,113 +93,103 @@ export default async function AdminPriceEstimatesPage({
 
   return (
     <>
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-extrabold text-russian-violet">Price estimates</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Read-only audit log of public pricing wizard submissions. Rows are deleted after 30
-            days.
-            {includeDev ? " Showing dev submissions too." : ""}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {stats.map((s) => (
-            <span
-              key={s.label}
-              className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700"
-            >
-              <span className="text-russian-violet">{s.value}</span> {s.label}
-            </span>
-          ))}
+      <PageHeader
+        title="Price estimates"
+        description={`Read-only audit log of public pricing wizard submissions. Rows are deleted after 30 days.${includeDev ? " Showing dev submissions too." : ""}`}
+        actions={
           <Link
             href={toggleHref}
             className={cn(
               "rounded-full border px-3 py-1 text-xs font-semibold transition-colors",
               includeDev
-                ? "border-coquelicot/40 bg-coquelicot/10 text-coquelicot-500 hover:bg-coquelicot/20"
-                : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
+                ? "border-coquelicot-500/40 bg-coquelicot-500/10 text-coquelicot-500 hover:bg-coquelicot-500/20"
+                : "border-admin-border bg-admin-surface text-admin-muted hover:bg-admin-bg",
             )}
           >
             {includeDev ? "Hide dev" : devCount > 0 ? `Show dev (${devCount})` : "Show dev"}
           </Link>
-        </div>
+        }
+      />
+
+      <div className="mb-6 grid grid-cols-3 gap-3">
+        {stats.map((s) => (
+          <StatCard key={s.label} label={s.label} value={s.value} />
+        ))}
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-        {logs.length === 0 ? (
-          <p className="py-8 text-center text-sm text-slate-400">No price estimates logged yet.</p>
-        ) : (
-          <ul className="divide-y divide-slate-100">
-            {logs.map((log) => (
-              <li key={log.id} className="py-4">
-                <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-                  <p className="flex items-center gap-2 text-xs text-slate-400">
-                    {formatDateTimeShort(log.createdAt.toISOString())}
-                    {log.environment !== "production" && (
-                      <span className="rounded-md border border-coquelicot/40 bg-coquelicot/10 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-coquelicot-500 uppercase">
-                        {log.environment}
+      <Card padding="none">
+        <div className="p-4 sm:p-6">
+          {logs.length === 0 ? (
+            <p className="py-8 text-center text-sm text-admin-faint">
+              No price estimates logged yet.
+            </p>
+          ) : (
+            <ul className="divide-y divide-admin-border">
+              {logs.map((log) => (
+                <li key={log.id} className="py-4">
+                  <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+                    <p className="flex items-center gap-2 text-xs text-admin-faint">
+                      {formatDateTimeShort(log.createdAt.toISOString())}
+                      {log.environment !== "production" && (
+                        <StatusPill tone="critical">{log.environment}</StatusPill>
+                      )}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      <StatusPill tone={log.aiCategory === "complex" ? "critical" : "info"}>
+                        {log.aiCategory}
+                      </StatusPill>
+                      <span className="text-admin-muted">
+                        {formatMins(log.aiEstimatedMins)} at ${log.hourlyRate.toFixed(0)}/hr
+                      </span>
+                      <span className="font-bold text-russian-violet">
+                        ${log.priceLow} - ${log.priceHigh}
+                      </span>
+                    </div>
+                  </div>
+
+                  <p className="mb-2 text-sm whitespace-pre-wrap text-admin-text">
+                    {log.description}
+                  </p>
+
+                  {log.aiExplanation && (
+                    <p className="mb-2 text-xs text-admin-muted italic">AI: {log.aiExplanation}</p>
+                  )}
+
+                  {log.aiTasks.length > 0 && (
+                    <div className="mb-2 flex flex-wrap gap-1.5">
+                      {log.aiTasks.map((task, i) => (
+                        <span
+                          key={`${log.id}-task-${i}`}
+                          className="rounded-md bg-admin-bg px-2 py-0.5 text-xs text-admin-muted"
+                        >
+                          {task.label}: {formatMins(task.mins)}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-admin-faint">
+                    {log.address && (
+                      <span>
+                        <span className="font-medium text-admin-muted">Address:</span> {log.address}
+                        {log.travelMins != null && log.travelMins > 0
+                          ? ` (${formatMins(log.travelMins)} drive)`
+                          : ""}
                       </span>
                     )}
-                  </p>
-                  <div className="flex flex-wrap items-center gap-2 text-xs">
-                    <span
-                      className={cn(
-                        "rounded-full px-2 py-0.5 font-semibold",
-                        log.aiCategory === "complex"
-                          ? "bg-coquelicot-500/15 text-coquelicot-400"
-                          : "bg-moonstone-600/15 text-moonstone-600",
-                      )}
-                    >
-                      {log.aiCategory}
-                    </span>
-                    <span className="text-slate-500">
-                      {formatMins(log.aiEstimatedMins)} at ${log.hourlyRate.toFixed(0)}/hr
-                    </span>
-                    <span className="font-bold text-russian-violet">
-                      ${log.priceLow} - ${log.priceHigh}
-                    </span>
-                  </div>
-                </div>
-
-                <p className="mb-2 text-sm whitespace-pre-wrap text-slate-700">{log.description}</p>
-
-                {log.aiExplanation && (
-                  <p className="mb-2 text-xs text-slate-500 italic">AI: {log.aiExplanation}</p>
-                )}
-
-                {log.aiTasks.length > 0 && (
-                  <div className="mb-2 flex flex-wrap gap-1.5">
-                    {log.aiTasks.map((task, i) => (
-                      <span
-                        key={`${log.id}-task-${i}`}
-                        className="rounded-md bg-slate-100 px-2 py-0.5 text-xs text-slate-600"
-                      >
-                        {task.label}: {formatMins(task.mins)}
+                    {log.promoLabel && (
+                      <span>
+                        <span className="font-medium text-admin-muted">Promo:</span>{" "}
+                        {log.promoLabel}
                       </span>
-                    ))}
+                    )}
                   </div>
-                )}
-
-                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400">
-                  {log.address && (
-                    <span>
-                      <span className="font-medium text-slate-500">Address:</span> {log.address}
-                      {log.travelMins != null && log.travelMins > 0
-                        ? ` (${formatMins(log.travelMins)} drive)`
-                        : ""}
-                    </span>
-                  )}
-                  {log.promoLabel && (
-                    <span>
-                      <span className="font-medium text-slate-500">Promo:</span> {log.promoLabel}
-                    </span>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </Card>
     </>
   );
 }
