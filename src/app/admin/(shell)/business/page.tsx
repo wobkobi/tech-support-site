@@ -5,6 +5,8 @@
  * income, expenses, and invoices into {@link BusinessDashboardCards}, and shows
  * the tax planner with a cached snapshot plus a Sheets import action.
  */
+import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import {
   BusinessDashboardCards,
   type ExpenseRow,
@@ -322,7 +324,7 @@ export default async function BusinessPage({
 
   return (
     <>
-      <h1 className="mb-6 text-2xl font-extrabold text-russian-violet">Business</h1>
+      <PageHeader title="Business" />
 
       {/* FY scope selector */}
       <div role="tablist" aria-label="Financial year scope" className="mb-6 flex flex-wrap gap-2">
@@ -338,7 +340,7 @@ export default async function BusinessPage({
                 "rounded-lg border px-3 py-1.5 text-sm font-semibold transition-colors",
                 active
                   ? "border-russian-violet bg-russian-violet text-white"
-                  : "border-slate-300 bg-white text-slate-600 hover:border-russian-violet/50 hover:text-russian-violet",
+                  : "border-admin-border bg-admin-surface text-admin-muted hover:border-russian-violet/50 hover:text-russian-violet",
               )}
             >
               {tab.label}
@@ -377,13 +379,9 @@ export default async function BusinessPage({
       {/* Action links - full-width stacked on mobile, side-by-side from sm+. */}
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
         {links.map((l) => (
-          <Link
-            key={l.label}
-            href={l.href}
-            className="rounded-lg bg-russian-violet px-4 py-2 text-center text-sm font-medium text-white transition-opacity hover:opacity-90 sm:w-auto sm:text-left"
-          >
+          <AdminButton key={l.label} href={l.href} variant="primary" className="w-full sm:w-auto">
             {l.label}
-          </Link>
+          </AdminButton>
         ))}
       </div>
 

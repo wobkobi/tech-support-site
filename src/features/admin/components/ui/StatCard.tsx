@@ -12,7 +12,7 @@ import Link from "next/link";
 import type React from "react";
 
 /** Accent tone for the stat value. */
-export type StatTone = "default" | "success" | "warning" | "critical" | "violet";
+export type StatTone = "default" | "success" | "warning" | "critical" | "violet" | "info";
 
 /**
  * Value-colour class for the given tone.
@@ -31,6 +31,8 @@ function valueToneClass(tone: StatTone): string {
       return "text-coquelicot-400";
     case "violet":
       return "text-russian-violet";
+    case "info":
+      return "text-moonstone-600";
   }
 }
 
