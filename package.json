@@ -1,6 +1,6 @@
 {
   "name": "tech-support-site",
-  "version": "3.158.1",
+  "version": "3.158.2",
   "private": true,
   "type": "module",
   "scripts": {
@@ -83,9 +83,9 @@
     "eslint-plugin-tailwind-canonical-classes": "^1.4.1",
     "globals": "^17.7.0",
     "jsdom": "^29.1.1",
-    "lint-staged": "^17.0.8",
+    "lint-staged": "^17.1.0",
     "png-to-ico": "^3.0.2",
-    "postcss": "^8.5.19",
+    "postcss": "^8.5.20",
     "prettier": "^3.9.5",
     "prettier-plugin-organize-imports": "^4.3.0",
     "prettier-plugin-packagejson": "^3.0.2",

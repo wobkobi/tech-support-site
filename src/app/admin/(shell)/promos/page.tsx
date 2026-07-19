@@ -4,6 +4,7 @@
  * {@link PromoRow}s for the server > client boundary, and renders
  * {@link PromosView} for inline CRUD of time-limited pricing offers.
  */
+import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { PromosView } from "@/features/business/components/PromosView";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
@@ -50,12 +51,10 @@ export default async function AdminPromosPage(): Promise<React.ReactElement> {
 
   return (
     <>
-      <h1 className="mb-6 text-2xl font-extrabold text-russian-violet">Promos</h1>
-      <p className="mb-6 text-sm text-slate-500">
-        Time-limited offers. Each active promo applies automatically to the public pricing wizard,
-        the admin calculator, and the site-wide banner. Only one promo is active at a time; if date
-        ranges overlap the most recently created one wins.
-      </p>
+      <PageHeader
+        title="Promos"
+        description="Time-limited offers. Each active promo applies automatically to the public pricing wizard, the admin calculator, and the site-wide banner. Only one is active at a time; if date ranges overlap, the most recently created wins."
+      />
       <PromosView initial={initial} />
     </>
   );
