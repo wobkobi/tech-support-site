@@ -9,10 +9,13 @@
 
 import { NumberField, ToggleField } from "@/features/admin/components/settings/SettingsFields";
 import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
+import { SettingsSaveBar } from "@/features/admin/components/settings/SettingsSaveBar";
 import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
+import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { COMMS_FIELD_META } from "@/shared/lib/settings/field-meta";
 import type { CommsSettings } from "@/shared/lib/settings/types";
 import type React from "react";
+import { useState } from "react";
 
 interface Props {
   initial: CommsSettings;
@@ -28,8 +31,9 @@ interface Props {
  */
 export function CommsTab({ initial, defaults }: Props): React.ReactElement {
   const form = useSettingsForm("comms", initial, defaults);
-  const { draft, setDraft, dirty, saving, fieldErrors, blocks, savedAt } = form;
+  const { draft, setDraft, baseline, dirty, saving, fieldErrors, blocks, savedAt } = form;
   const m = COMMS_FIELD_META;
+  const [confirmAllOff, setConfirmAllOff] = useState(false);
 
   /**
    * Merges a comms patch into the draft.
@@ -38,29 +42,44 @@ export function CommsTab({ initial, defaults }: Props): React.ReactElement {
    */
   const set = (patch: Partial<CommsSettings>): void => setDraft((p) => ({ ...p, ...patch }));
 
+  /**
+   * Applies an email-toggle change, then confirms if it has just turned the LAST
+   * remaining customer email off. The switch flips right away so the dialog
+   * reflects what was done; Cancel restores all three emails to their saved
+   * state (see the dialog's onCancel).
+   * @param patch - The single email-toggle change.
+   */
+  const setNotify = (patch: Partial<CommsSettings>): void => {
+    const next = { ...draft, ...patch };
+    set(patch);
+    if (!next.notifyConfirmation && !next.notifyReminder && !next.notifyReviewRequest) {
+      setConfirmAllOff(true);
+    }
+  };
+
   return (
     <div>
-      <div className="divide-y divide-slate-100">
+      <div className="divide-y divide-admin-border">
         <ToggleField
           id="notifyConfirmation"
           meta={m.notifyConfirmation}
           value={draft.notifyConfirmation}
           customised={draft.notifyConfirmation !== defaults.notifyConfirmation}
-          onChange={(v) => set({ notifyConfirmation: v })}
+          onChange={(v) => setNotify({ notifyConfirmation: v })}
         />
         <ToggleField
           id="notifyReminder"
           meta={m.notifyReminder}
           value={draft.notifyReminder}
           customised={draft.notifyReminder !== defaults.notifyReminder}
-          onChange={(v) => set({ notifyReminder: v })}
+          onChange={(v) => setNotify({ notifyReminder: v })}
         />
         <ToggleField
           id="notifyReviewRequest"
           meta={m.notifyReviewRequest}
           value={draft.notifyReviewRequest}
           customised={draft.notifyReviewRequest !== defaults.notifyReviewRequest}
-          onChange={(v) => set({ notifyReviewRequest: v })}
+          onChange={(v) => setNotify({ notifyReviewRequest: v })}
         />
         <NumberField
           id="reminderLeadHours"
@@ -103,40 +122,35 @@ export function CommsTab({ initial, defaults }: Props): React.ReactElement {
         </div>
       )}
 
-      {/* Save bar */}
-      <div className="mt-6 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => {
-            if (
-              !draft.notifyConfirmation &&
-              !draft.notifyReminder &&
-              !draft.notifyReviewRequest &&
-              !confirm(
-                "Turn off all customer emails? Customers won't get booking confirmations, reminders, or review requests.",
-              )
-            )
-              return;
-            void form.save();
-          }}
-          disabled={!dirty || saving}
-          className="rounded-lg bg-russian-violet px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
-        >
-          {saving ? "Saving..." : "Save changes"}
-        </button>
-        <button
-          type="button"
-          onClick={form.resetToDefault}
-          disabled={saving}
-          className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-        >
-          Reset to defaults
-        </button>
-        {dirty && !saving && <span className="text-sm text-slate-400">Unsaved changes</span>}
-        {!dirty && savedAt && <span className="text-sm font-medium text-emerald-600">Saved</span>}
-      </div>
+      <SettingsSaveBar
+        dirty={dirty}
+        saving={saving}
+        savedAt={savedAt}
+        onSave={() => void form.save()}
+        onReset={form.resetToDefault}
+      />
 
       <SettingsHistory group="comms" onRestore={(v: CommsSettings) => setDraft(v)} />
+
+      <ConfirmDialog
+        open={confirmAllOff}
+        title="Turn off all customer emails?"
+        body="Customers won't get booking confirmations, reminders, or review requests."
+        confirmLabel="Turn all off"
+        cancelLabel="Keep emails on"
+        tone="danger"
+        onConfirm={() => setConfirmAllOff(false)}
+        onCancel={() => {
+          // Restore all three email switches to their last-SAVED state (baseline,
+          // not the page-load value), so a mid-session save of one as off is kept.
+          setConfirmAllOff(false);
+          set({
+            notifyConfirmation: baseline.notifyConfirmation,
+            notifyReminder: baseline.notifyReminder,
+            notifyReviewRequest: baseline.notifyReviewRequest,
+          });
+        }}
+      />
     </div>
   );
 }

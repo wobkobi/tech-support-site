@@ -10,10 +10,13 @@
 import { PricingPreview } from "@/features/admin/components/settings/PricingPreview";
 import { NumberField, ToggleField } from "@/features/admin/components/settings/SettingsFields";
 import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
+import { SettingsSaveBar } from "@/features/admin/components/settings/SettingsSaveBar";
 import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
+import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { PRICING_FIELD_META } from "@/shared/lib/settings/field-meta";
 import type { PricingSettings } from "@/shared/lib/settings/types";
 import type React from "react";
+import { useState } from "react";
 
 interface Props {
   initial: PricingSettings;
@@ -29,8 +32,9 @@ interface Props {
  */
 export function PricingTab({ initial, defaults }: Props): React.ReactElement {
   const form = useSettingsForm("pricing", initial, defaults);
-  const { draft, setDraft, dirty, saving, fieldErrors, blocks, warns, savedAt } = form;
+  const { draft, setDraft, baseline, dirty, saving, fieldErrors, blocks, warns, savedAt } = form;
   const m = PRICING_FIELD_META;
+  const [confirmGst, setConfirmGst] = useState(false);
 
   /**
    * Updates a top-level pricing field.
@@ -39,20 +43,26 @@ export function PricingTab({ initial, defaults }: Props): React.ReactElement {
    */
   const setTop = (patch: Partial<PricingSettings>): void => setDraft((p) => ({ ...p, ...patch }));
 
+  /**
+   * Flips GST registration, then confirms if it has just been turned on (and
+   * wasn't on at load). The switch moves right away so the dialog reflects the
+   * change; Cancel restores it to its saved state.
+   * @param v - The attempted GST-registered value.
+   */
+  const setGst = (v: boolean): void => {
+    setTop({ gstRegistered: v });
+    if (v && !baseline.gstRegistered) setConfirmGst(true);
+  };
+
   return (
     <div>
-      <div className="divide-y divide-slate-100">
+      <div className="divide-y divide-admin-border">
         <ToggleField
           id="gstRegistered"
           meta={m.gstRegistered}
           value={draft.gstRegistered}
           customised={draft.gstRegistered !== defaults.gstRegistered}
-          onChange={(v) => {
-            // Turning GST on is high-impact (changes every invoice) - confirm first.
-            if (v && !window.confirm("Turn on GST registration? Invoices will start showing GST."))
-              return;
-            setTop({ gstRegistered: v });
-          }}
+          onChange={setGst}
         />
         <NumberField
           id="minBillableMins"
@@ -98,7 +108,7 @@ export function PricingTab({ initial, defaults }: Props): React.ReactElement {
       <h3 className="mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase">
         Cancellation
       </h3>
-      <div className="divide-y divide-slate-100">
+      <div className="divide-y divide-admin-border">
         <NumberField
           id="freeNoticeHours"
           meta={m["cancellation.freeNoticeHours"]}
@@ -198,7 +208,7 @@ export function PricingTab({ initial, defaults }: Props): React.ReactElement {
       <h3 className="mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase">
         Reschedule
       </h3>
-      <div className="divide-y divide-slate-100">
+      <div className="divide-y divide-admin-border">
         <NumberField
           id="reschedule.cutoffHours"
           meta={m["reschedule.cutoffHours"]}
@@ -258,39 +268,29 @@ export function PricingTab({ initial, defaults }: Props): React.ReactElement {
         </div>
       )}
 
-      {/* Save bar */}
-      <div className="mt-6 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => {
-            if (
-              draft.gstRegistered &&
-              !initial.gstRegistered &&
-              !confirm(
-                "Turn on GST registration? Invoices will then show a GST breakdown - set your GST number in Business identity first.",
-              )
-            )
-              return;
-            void form.save();
-          }}
-          disabled={!dirty || saving}
-          className="rounded-lg bg-russian-violet px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
-        >
-          {saving ? "Saving..." : "Save changes"}
-        </button>
-        <button
-          type="button"
-          onClick={form.resetToDefault}
-          disabled={saving}
-          className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-        >
-          Reset to defaults
-        </button>
-        {dirty && !saving && <span className="text-sm text-slate-400">Unsaved changes</span>}
-        {!dirty && savedAt && <span className="text-sm font-medium text-emerald-600">Saved</span>}
-      </div>
+      <SettingsSaveBar
+        dirty={dirty}
+        saving={saving}
+        savedAt={savedAt}
+        onSave={() => void form.save()}
+        onReset={form.resetToDefault}
+      />
 
       <SettingsHistory group="pricing" onRestore={(v: PricingSettings) => setDraft(v)} />
+
+      <ConfirmDialog
+        open={confirmGst}
+        title="Turn on GST registration?"
+        body="Invoices will then show a GST breakdown - set your GST number in Business identity first."
+        confirmLabel="Turn on GST"
+        cancelLabel="Leave GST off"
+        onConfirm={() => setConfirmGst(false)}
+        onCancel={() => {
+          // Cancel puts GST back to its last-saved state (baseline).
+          setConfirmGst(false);
+          setTop({ gstRegistered: baseline.gstRegistered });
+        }}
+      />
     </div>
   );
 }

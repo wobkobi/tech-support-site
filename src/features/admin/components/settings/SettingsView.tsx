@@ -32,7 +32,7 @@ import { useEffect, useState } from "react";
  * @returns Loading placeholder element.
  */
 function TabLoading(): React.ReactElement {
-  return <p className="py-8 text-center text-sm text-slate-400">Loading…</p>;
+  return <p className="py-8 text-center text-sm text-admin-faint">Loading…</p>;
 }
 
 // Tab editors load on demand: only the active tab's chunk ships, instead of
@@ -218,7 +218,7 @@ export function SettingsView({
         <SettingsSearch onJump={handleJump} />
 
         {/* Tab bar - horizontally scrollable on phones. */}
-        <div className="mb-6 flex gap-1 overflow-x-auto border-b border-slate-200">
+        <div className="mb-6 flex gap-1 overflow-x-auto border-b border-admin-border">
           {TAB_ORDER.map((group) => {
             const isActive = group === active;
             const ready = IMPLEMENTED.has(group);
@@ -231,8 +231,8 @@ export function SettingsView({
                   "border-b-2 px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors",
                   isActive
                     ? "border-russian-violet text-russian-violet"
-                    : "border-transparent text-slate-500 hover:text-slate-700",
-                  !ready && "text-slate-400 italic",
+                    : "border-transparent text-admin-muted hover:text-admin-text",
+                  !ready && "text-admin-faint italic",
                 )}
               >
                 {GROUP_META[group].title}
@@ -241,9 +241,9 @@ export function SettingsView({
           })}
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+        <div className="rounded-xl border border-admin-border bg-admin-surface p-5 shadow-sm sm:p-6">
           <h2 className="text-lg font-bold text-russian-violet">{meta.title}</h2>
-          <p className="mt-1 text-sm text-slate-500">{meta.blurb}</p>
+          <p className="mt-1 text-sm text-admin-muted">{meta.blurb}</p>
           <div className="mt-4">
             {active === "availability" ? (
               <AvailabilityTab initial={availability} defaults={availabilityDefaults} />
@@ -264,7 +264,7 @@ export function SettingsView({
             ) : active === "scheduling" ? (
               <SchedulingTab initial={scheduling} defaults={schedulingDefaults} />
             ) : (
-              <p className="py-8 text-center text-sm text-slate-400">
+              <p className="py-8 text-center text-sm text-admin-faint">
                 This section is still managed in code - its editor is coming in a later step.
               </p>
             )}

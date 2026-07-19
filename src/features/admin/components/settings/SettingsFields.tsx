@@ -54,10 +54,10 @@ export function FieldShell({
           )}
         </span>
       </label>
-      <p className="mt-0.5 text-sm text-slate-500">{meta.description}</p>
-      {meta.off && <p className="mt-0.5 text-xs text-slate-400 italic">{meta.off}</p>}
+      <p className="mt-0.5 text-sm text-admin-muted">{meta.description}</p>
+      {meta.off && <p className="mt-0.5 text-xs text-admin-faint italic">{meta.off}</p>}
       <div className="mt-2">{children}</div>
-      {error && <p className="mt-1 text-xs font-medium text-red-600">{error}</p>}
+      {error && <p className="mt-1 text-xs font-medium text-coquelicot-500">{error}</p>}
     </div>
   );
 }
@@ -125,10 +125,10 @@ export function NumberField({
           }}
           className={cn(
             "w-32 rounded-lg border px-3 py-2.5 text-base focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-            error ? "border-red-400" : "border-slate-300",
+            error ? "border-coquelicot-400" : "border-admin-border-strong",
           )}
         />
-        {meta.unit && <span className="text-sm text-slate-500">{meta.unit}</span>}
+        {meta.unit && <span className="text-sm text-admin-muted">{meta.unit}</span>}
       </div>
     </FieldShell>
   );
@@ -181,7 +181,7 @@ export function TextField({
   const [revealed, setRevealed] = useState(false);
   const inputClass = cn(
     "focus:ring-russian-violet/30 w-full rounded-lg border px-3 py-2.5 text-base focus:outline-none focus:ring-2",
-    error ? "border-red-400" : "border-slate-300",
+    error ? "border-coquelicot-400" : "border-admin-border-strong",
   );
   return (
     <FieldShell id={id} meta={meta} error={error} customised={customised}>
@@ -208,7 +208,7 @@ export function TextField({
             <button
               type="button"
               onClick={() => setRevealed((r) => !r)}
-              className="shrink-0 rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-600 hover:bg-slate-50"
+              className="shrink-0 rounded-lg border border-admin-border-strong px-3 py-2.5 text-sm text-admin-text-secondary hover:bg-admin-bg"
             >
               {revealed ? "Hide" : "Show"}
             </button>
@@ -254,17 +254,19 @@ export function ToggleField({
         onClick={() => onChange(!value)}
         className={cn(
           "relative inline-flex h-7 w-12 items-center rounded-full transition-colors",
-          value ? "bg-russian-violet" : "bg-slate-300",
+          value ? "bg-russian-violet" : "bg-admin-border-strong",
         )}
       >
         <span
           className={cn(
-            "inline-block h-5 w-5 rounded-full bg-white shadow transition-[translate]",
+            "inline-block h-5 w-5 rounded-full bg-admin-surface shadow transition-[translate]",
             value ? "translate-x-6" : "translate-x-1",
           )}
         />
       </button>
-      <span className="ml-3 align-middle text-sm text-slate-600">{value ? "On" : "Off"}</span>
+      <span className="ml-3 align-middle text-sm text-admin-text-secondary">
+        {value ? "On" : "Off"}
+      </span>
     </FieldShell>
   );
 }

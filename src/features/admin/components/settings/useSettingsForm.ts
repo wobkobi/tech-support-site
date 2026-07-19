@@ -22,6 +22,8 @@ export const SettingsAllContext = createContext<Settings | null>(null);
 export interface SettingsFormApi<G extends SettingsGroup> {
   draft: Settings[G];
   setDraft: React.Dispatch<React.SetStateAction<Settings[G]>>;
+  /** Last-saved value (advances on each successful save). The revert target. */
+  baseline: Settings[G];
   dirty: boolean;
   saving: boolean;
   /** Field path > message for inline errors. */
@@ -155,6 +157,7 @@ export function useSettingsForm<G extends SettingsGroup>(
   return {
     draft,
     setDraft,
+    baseline,
     dirty,
     saving,
     fieldErrors,
