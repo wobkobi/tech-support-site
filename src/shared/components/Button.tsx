@@ -25,6 +25,10 @@ interface ButtonAsLink {
    * Use for file downloads so the browser handles them directly without the router.
    */
   download?: string;
+  /** Link target, e.g. "_blank" for an external destination. Passthrough links only. */
+  target?: string;
+  /** Relationship hint; pair "noreferrer" with target="_blank". Passthrough links only. */
+  rel?: string;
   variant?: ButtonVariant;
   size?: ButtonSize;
   fullWidth?: boolean;
@@ -154,6 +158,8 @@ export function Button(props: ButtonProps): React.ReactElement {
       scroll,
       replace,
       download,
+      target,
+      rel,
       "aria-current": ariaCurrent,
       "aria-label": ariaLabel,
     } = props;
@@ -164,7 +170,16 @@ export function Button(props: ButtonProps): React.ReactElement {
       download !== undefined || (!href.startsWith("/") && !href.startsWith("#"));
     if (isPassthrough) {
       return (
-        <a href={href} download={download} className={baseClasses} aria-label={ariaLabel}>
+        <a
+          href={href}
+          download={download}
+          target={target}
+          // Always pair a new tab with noopener: without it the opened page can
+          // reach back through window.opener.
+          rel={rel ?? (target === "_blank" ? "noreferrer noopener" : undefined)}
+          className={baseClasses}
+          aria-label={ariaLabel}
+        >
           {children}
         </a>
       );

@@ -3,16 +3,27 @@
  * @description Booking request success page.
  */
 
+import { buildAppointmentDescription, parseBookingNotes } from "@/features/booking/lib/booking";
+import { googleCalendarUrl } from "@/features/booking/lib/ics";
 import { cancellationCopy } from "@/features/business/lib/pricing-policy";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { Button } from "@/shared/components/Button";
 import { CARD } from "@/shared/components/PageLayout";
+import { getIdentity } from "@/shared/lib/business-identity.server";
 import { cn } from "@/shared/lib/cn";
 import { formatDateTimeLong } from "@/shared/lib/date-format";
 import { prisma } from "@/shared/lib/prisma";
+import { getSiteUrl } from "@/shared/lib/site-url";
 import type { Metadata } from "next";
 import type React from "react";
-import { FaCircleCheck, FaHouse, FaPenToSquare, FaTag } from "react-icons/fa6";
+import {
+  FaCalendarPlus,
+  FaCircleCheck,
+  FaDownload,
+  FaHouse,
+  FaPenToSquare,
+  FaTag,
+} from "react-icons/fa6";
 import { BookingConversion } from "./BookingConversion";
 
 // Post-booking confirmation, only reachable after submitting the form: keep
@@ -104,6 +115,7 @@ export default async function BookingSuccessPage({
             address: true,
             unit: true,
             meetingType: true,
+            notes: true,
             status: true,
           },
         })
@@ -113,7 +125,33 @@ export default async function BookingSuccessPage({
   // Only restate an appointment that is still live - revisiting this URL after
   // cancelling must not present the old slot as if it were still booked.
   const appointment = booking && booking.status !== "cancelled" ? booking : null;
-  const { CANCELLATION } = await getPolicy();
+  const [{ CANCELLATION }, identity] = await Promise.all([getPolicy(), getIdentity()]);
+
+  // Add-to-calendar targets. Google Calendar already invites the customer's
+  // email address; these cover everyone whose calendar isn't that address.
+  const calendarLocation =
+    appointment && appointment.meetingType !== "remote"
+      ? [appointment.unit, appointment.address].filter(Boolean).join(", ")
+      : "";
+  const googleUrl =
+    appointment && cancelToken
+      ? googleCalendarUrl({
+          start: appointment.startAt,
+          end: appointment.endAt,
+          summary: `${identity.company} appointment`,
+          location: calendarLocation || undefined,
+          // Same blurb the .ics carries, so both calendar paths read alike.
+          description: buildAppointmentDescription({
+            company: identity.company,
+            phone: identity.phone,
+            email: identity.email,
+            isRemote: appointment.meetingType === "remote",
+            userNotes: parseBookingNotes(appointment.notes).userNotes,
+            manageUrl: `${getSiteUrl()}/booking/edit?token=${encodeURIComponent(cancelToken)}`,
+            cancelUrl: `${getSiteUrl()}/booking/cancel?token=${encodeURIComponent(cancelToken)}`,
+          }),
+        })
+      : null;
 
   return (
     <main id="main" className="relative min-h-dvh overflow-hidden">
@@ -202,6 +240,32 @@ export default async function BookingSuccessPage({
                     </DetailRow>
                   )}
                 </dl>
+
+                <div className="mt-4 flex flex-wrap gap-3 border-t border-seasalt-400/60 pt-4">
+                  {googleUrl && (
+                    <Button
+                      href={googleUrl}
+                      variant="secondary"
+                      size="sm"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <FaCalendarPlus className="h-4 w-4" aria-hidden />
+                      Add to Google Calendar
+                    </Button>
+                  )}
+                  {cancelToken && (
+                    <Button
+                      href={`/api/booking/ics?token=${encodeURIComponent(cancelToken)}`}
+                      download="appointment.ics"
+                      variant="ghost"
+                      size="sm"
+                    >
+                      <FaDownload className="h-4 w-4" aria-hidden />
+                      Download calendar file
+                    </Button>
+                  )}
+                </div>
               </section>
             )}
 

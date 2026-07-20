@@ -11,6 +11,7 @@ import {
   DURATION_OPTIONS,
   TIME_OF_DAY_OPTIONS,
   buildAvailableDays,
+  parseBookingNotes,
   type BookableDay,
   type ExistingBooking,
   type JobDuration,
@@ -59,39 +60,6 @@ function getNZHour(date: Date): number {
     hour12: false,
   }).formatToParts(date);
   return parseInt(parts.find((p) => p.type === "hour")?.value ?? "0");
-}
-
-/**
- * Parse the structured booking notes back into form fields.
- * Notes format: "{userNotes}\n\n[{timeLabel} - {durationLabel}]\nMeeting type: ...\n[Address: ...]\n[Phone: ...]"
- * @param raw - Raw notes string from DB.
- * @returns Parsed fields.
- */
-function parseBookingNotes(raw: string | null): {
-  userNotes: string;
-  meetingType: "in-person" | "remote" | "";
-  address: string;
-  phone: string;
-} {
-  if (!raw) return { userNotes: "", meetingType: "", address: "", phone: "" };
-
-  const metaSeparatorIdx = raw.indexOf("\n\n[");
-  const userNotes = metaSeparatorIdx >= 0 ? raw.slice(0, metaSeparatorIdx).trim() : raw.trim();
-  const meta = metaSeparatorIdx >= 0 ? raw.slice(metaSeparatorIdx) : "";
-
-  const meetingTypeLine = meta.match(/Meeting type:\s*(.+)/i)?.[1]?.trim() ?? "";
-  const meetingType: "in-person" | "remote" | "" = meetingTypeLine
-    .toLowerCase()
-    .includes("in-person")
-    ? "in-person"
-    : meetingTypeLine.toLowerCase().includes("remote")
-      ? "remote"
-      : "";
-
-  const address = meta.match(/Address:\s*(.+)/i)?.[1]?.trim() ?? "";
-  const phone = meta.match(/Phone:\s*(.+)/i)?.[1]?.trim() ?? "";
-
-  return { userNotes, meetingType, address, phone };
 }
 
 /**

@@ -7,6 +7,81 @@ import type { AvailabilitySettings } from "@/shared/lib/settings/types";
 import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 
 /**
+ * Parses the structured booking notes blob back into its parts.
+ * Format: `{userNotes}\n\n[{timeLabel} - {durationLabel}]\nMeeting type: ...\n[Address: ...]\n[Phone: ...]`
+ *
+ * The structured columns (`address`, `meetingType`) are the preferred source
+ * now; this stays because legacy rows only carry the values inside the notes
+ * text, and because `userNotes` - what the customer actually typed - has no
+ * column of its own.
+ * @param raw - Raw notes string from the DB.
+ * @returns The customer's own text plus the parsed metadata fields.
+ */
+export function parseBookingNotes(raw: string | null): {
+  userNotes: string;
+  meetingType: "in-person" | "remote" | "";
+  address: string;
+  phone: string;
+} {
+  if (!raw) return { userNotes: "", meetingType: "", address: "", phone: "" };
+
+  const metaSeparatorIdx = raw.indexOf("\n\n[");
+  const userNotes = metaSeparatorIdx >= 0 ? raw.slice(0, metaSeparatorIdx).trim() : raw.trim();
+  const meta = metaSeparatorIdx >= 0 ? raw.slice(metaSeparatorIdx) : "";
+
+  const meetingTypeLine = meta.match(/Meeting type:\s*(.+)/i)?.[1]?.trim() ?? "";
+  const meetingType: "in-person" | "remote" | "" = meetingTypeLine
+    .toLowerCase()
+    .includes("in-person")
+    ? "in-person"
+    : meetingTypeLine.toLowerCase().includes("remote")
+      ? "remote"
+      : "";
+
+  const address = meta.match(/Address:\s*(.+)/i)?.[1]?.trim() ?? "";
+  const phone = meta.match(/Phone:\s*(.+)/i)?.[1]?.trim() ?? "";
+
+  return { userNotes, meetingType, address, phone };
+}
+
+/**
+ * Builds the customer-facing blurb that goes in a calendar entry (both the
+ * `.ics` DESCRIPTION and the Google Calendar "details" field), so the two never
+ * drift apart. Deliberately omits the time and address - a calendar entry
+ * already shows those in its own fields.
+ * @param input - The pieces to assemble.
+ * @param input.company - Business name.
+ * @param input.phone - Contact phone.
+ * @param input.email - Contact email.
+ * @param input.isRemote - Whether the appointment is remote.
+ * @param input.userNotes - What the customer typed when booking.
+ * @param input.manageUrl - Absolute reschedule link.
+ * @param input.cancelUrl - Absolute cancel link.
+ * @returns Plain-text description with newline separators.
+ */
+export function buildAppointmentDescription(input: {
+  company: string;
+  phone: string;
+  email: string;
+  isRemote: boolean;
+  userNotes: string;
+  manageUrl: string;
+  cancelUrl: string;
+}): string {
+  const { company, phone, email, isRemote, userNotes, manageUrl, cancelUrl } = input;
+  return [
+    isRemote
+      ? `Remote session with ${company} - no visit required.`
+      : `${company} is coming to you.`,
+    userNotes ? `\nWhat you told us:\n${userNotes}` : "",
+    `\nNeed to change or cancel?\nReschedule: ${manageUrl}\nCancel: ${cancelUrl}`,
+    `\nQuestions? ${phone} or ${email}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+/**
  * Splits an NZ-style apartment-prefixed address ("12/160 Kepa Road Orakei")
  * into unit + street-and-rest. The unit prefix is 1-4 digits with an optional
  * letter suffix (e.g. "12", "12A") followed by "/". Returns unit="" otherwise.
