@@ -579,6 +579,81 @@ ${await buildEmailSignature(siteUrl)}
   }
 }
 
+/** One upcoming booking listed in the manage-links email. */
+export interface ManageLinksBooking {
+  /** Appointment start (UTC). */
+  startAt: Date;
+  /** Token behind the edit / cancel links. */
+  cancelToken: string;
+}
+
+/**
+ * Emails someone their own manage links after a find-my-booking lookup. Only
+ * ever sent to the address that owns the bookings, so it is safe for it to
+ * carry the tokens - that is the same thing the original confirmation did.
+ * @param to - Recipient address (the booking email).
+ * @param bookings - Their upcoming bookings, soonest first.
+ * @returns True if Resend accepted the message, false on misconfig / failure.
+ */
+export async function sendBookingManageLinksEmail(
+  to: string,
+  bookings: ManageLinksBooking[],
+): Promise<boolean> {
+  const from = process.env.EMAIL_FROM;
+  const siteUrl = getSiteUrl();
+
+  if (!from || !process.env.RESEND_API_KEY) {
+    console.warn(
+      `[email] Not configured (${missingEmailEnv("EMAIL_FROM", "RESEND_API_KEY")}) - skipping manage-links email.`,
+    );
+    return false;
+  }
+  if (bookings.length === 0) return false;
+
+  const rows = bookings
+    .map((b) => {
+      const editUrl = `${siteUrl}/booking/edit?token=${encodeURIComponent(b.cancelToken)}`;
+      const cancelUrl = `${siteUrl}/booking/cancel?token=${encodeURIComponent(b.cancelToken)}`;
+      return `
+    <div style="background:#f6f7f8;border-radius:8px;padding:16px;margin-bottom:16px">
+      <p style="margin:0 0 12px;font-size:16px;font-weight:600;color:#0c0a3e">${formatDateTimeLong(b.startAt)}</p>
+      <a href="${editUrl}" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-size:13px;font-weight:600;margin:0 8px 10px 0">✏️ Change appointment</a>
+      <a href="${cancelUrl}" style="display:inline-block;background:#e8e8e8;color:#333;text-decoration:none;padding:12px 20px;border-radius:8px;font-size:13px;font-weight:600;margin:0 0 10px">❌ Cancel appointment</a>
+    </div>`;
+    })
+    .join("");
+
+  const plural = bookings.length === 1 ? "appointment" : "appointments";
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="font-family:system-ui,sans-serif;background:#f6f7f8;margin:0;padding:24px">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
+    <h2 style="margin:0 0 12px;color:#0c0a3e;font-size:20px">Your upcoming ${plural}</h2>
+    <p style="margin:0 0 20px;color:#444;line-height:1.6">Here are the links to change or cancel. If you didn't ask for this email you can safely ignore it.</p>
+    ${rows}
+    <p style="margin:20px 0 0;color:#444;font-size:14px;line-height:1.6">Prefer to talk it through? Just reply to this email.</p>
+${await buildEmailSignature(siteUrl)}
+  </div>
+</body>
+</html>`;
+
+  try {
+    await getResend().emails.send({
+      from,
+      replyTo: process.env.ADMIN_EMAIL,
+      to,
+      subject: `Your upcoming ${plural}`,
+      html,
+    });
+    return true;
+  } catch (error) {
+    console.error("[email] Failed to send manage-links email:", error);
+    return false;
+  }
+}
+
 /**
  * Booking data used for customer review request emails.
  */
