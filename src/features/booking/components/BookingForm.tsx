@@ -798,9 +798,10 @@ export default function BookingForm({
         }
       }
 
-      // Redirect to the success page
+      // Redirect to the success page. Edit mode flags itself so the success
+      // page does not report the reschedule as a fresh lead conversion.
       if (isEditMode) {
-        router.push(`/booking/success?cancelToken=${encodeURIComponent(cancelToken!)}`);
+        router.push(`/booking/success?cancelToken=${encodeURIComponent(cancelToken!)}&edited=1`);
       } else {
         const successUrl = data.cancelToken
           ? `/booking/success?cancelToken=${encodeURIComponent(data.cancelToken)}`

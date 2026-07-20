@@ -104,6 +104,8 @@ export default async function BookingSuccessPage({
   const params = await searchParams;
   const tokenValue = params.cancelToken;
   const cancelToken = Array.isArray(tokenValue) ? tokenValue[0] : tokenValue;
+  // Edit-mode submits land here too; they must not count as new leads.
+  const edited = params.edited === "1";
 
   // Restate the appointment itself (the details card below) plus the
   // snapshotted promo title, so customers see the rate is locked even if the
@@ -161,7 +163,7 @@ export default async function BookingSuccessPage({
 
   return (
     <main id="main" className="relative min-h-dvh overflow-hidden">
-      <BookingConversion />
+      <BookingConversion bookingRef={cancelToken ?? null} edited={edited} />
       {/* Backdrop. Fixed, not absolute: an absolute layer stretches to the full
           page height, so once the content scrolls past one viewport the image
           gets scaled over that taller box instead of staying put. */}

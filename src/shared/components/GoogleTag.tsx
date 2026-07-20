@@ -1,9 +1,11 @@
 "use client";
 // src/shared/components/GoogleTag.tsx
 /**
- * @description Loads gtag.js for GA4 + Google Ads and reports tel: link taps.
+ * @description Loads gtag.js for GA4 + Google Ads and reports tel: and
+ * mailto: link taps.
  */
 
+import { usePathname } from "next/navigation";
 import Script from "next/script";
 import type React from "react";
 import { useEffect } from "react";
@@ -17,24 +19,36 @@ const CALL_LABEL = process.env.NEXT_PUBLIC_GOOGLE_ADS_CALL_LABEL;
 const loaderId = ADS_ID ?? GA4_ID;
 
 /**
- * Injects the Google tag and reports phone-link taps as conversions. Renders
+ * Injects the Google tag and reports phone-link taps as conversions and
+ * email-link taps as GA4 events. Renders
  * nothing when no measurement IDs are set, so the site runs untracked in dev
- * or before the Ads/GA4 IDs are configured.
- * @returns The gtag script tags, or null when unconfigured.
+ * or before the Ads/GA4 IDs are configured. Also renders nothing on /admin
+ * pages, so back-office browsing never pollutes GA4/Ads data.
+ * @returns The gtag script tags, or null when unconfigured or on admin pages.
  */
 export function GoogleTag(): React.ReactElement | null {
-  // One delegated listener covers every tel: link (raw anchors and the Button
-  // component alike), so individual links never need their own handler.
+  const pathname = usePathname();
+  // Admin pages are operator-only; keep them out of analytics entirely.
+  const isAdmin = pathname === "/admin" || pathname.startsWith("/admin/");
+
+  // One delegated listener covers every tel: and mailto: link (raw anchors and
+  // the Button component alike), so individual links never need their own
+  // handler. Mirrors MetaPixel's Contact tracking on the Google side.
   useEffect(() => {
-    if (!loaderId) return;
+    if (!loaderId || isAdmin) return;
     /**
-     * Reports a tel: link tap to GA4, and to Ads when a call label is set.
+     * Reports a tel: link tap to GA4 (and to Ads when a call label is set), and
+     * a mailto: link tap to GA4.
      * @param event - The bubbled document click.
      */
     const onClick = (event: MouseEvent): void => {
       const origin = event.target as HTMLElement | null;
-      const link = origin?.closest?.('a[href^="tel:"]');
-      if (!link || typeof window.gtag !== "function") return;
+      const link = origin?.closest?.('a[href^="tel:"], a[href^="mailto:"]');
+      if (!(link instanceof HTMLAnchorElement) || typeof window.gtag !== "function") return;
+      if (link.href.startsWith("mailto:")) {
+        window.gtag("event", "email_click");
+        return;
+      }
       window.gtag("event", "phone_call_click");
       if (ADS_ID && CALL_LABEL) {
         window.gtag("event", "conversion", { send_to: `${ADS_ID}/${CALL_LABEL}` });
@@ -42,9 +56,9 @@ export function GoogleTag(): React.ReactElement | null {
     };
     document.addEventListener("click", onClick);
     return () => document.removeEventListener("click", onClick);
-  }, []);
+  }, [isAdmin]);
 
-  if (!loaderId) return null;
+  if (!loaderId || isAdmin) return null;
 
   return (
     <>

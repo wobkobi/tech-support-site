@@ -19,11 +19,14 @@ const baseCode = `!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.
 /**
  * Injects the Meta Pixel base code and keeps PageView in sync with App Router
  * navigation. Renders nothing when NEXT_PUBLIC_META_PIXEL_ID is unset, so the
- * site runs untracked in dev or before the pixel is configured.
- * @returns The pixel script tags, or null when unconfigured.
+ * site runs untracked in dev or before the pixel is configured. Also renders
+ * nothing on /admin pages, so back-office browsing never reaches Meta.
+ * @returns The pixel script tags, or null when unconfigured or on admin pages.
  */
 export function MetaPixel(): React.ReactElement | null {
   const pathname = usePathname();
+  // Admin pages are operator-only; keep them out of analytics entirely.
+  const isAdmin = pathname === "/admin" || pathname.startsWith("/admin/");
   // The base snippet already fires PageView on first load; skip the initial
   // effect run so that view is not double-counted.
   const primed = useRef(false);
@@ -39,14 +42,14 @@ export function MetaPixel(): React.ReactElement | null {
       primed.current = true;
       return;
     }
-    if (!PIXEL_ID || typeof window.fbq !== "function") return;
+    if (!PIXEL_ID || isAdmin || typeof window.fbq !== "function") return;
     window.fbq("track", "PageView");
-  }, [pathname]);
+  }, [pathname, isAdmin]);
 
   // One delegated listener reports every phone (tel:) or email (mailto:) link
   // tap as a Contact event, mirroring how GoogleTag tracks phone clicks.
   useEffect(() => {
-    if (!PIXEL_ID) return;
+    if (!PIXEL_ID || isAdmin) return;
     /**
      * Reports a tel: or mailto: link tap to the Meta Pixel as a Contact event.
      * @param event - The bubbled document click.
@@ -59,9 +62,9 @@ export function MetaPixel(): React.ReactElement | null {
     };
     document.addEventListener("click", onClick);
     return () => document.removeEventListener("click", onClick);
-  }, []);
+  }, [isAdmin]);
 
-  if (!PIXEL_ID) return null;
+  if (!PIXEL_ID || isAdmin) return null;
 
   return (
     <>
