@@ -153,6 +153,23 @@ export const COMMS_FIELD_META: Record<string, FieldMeta> = {
     description: "Delete public price-estimate logs older than this many days.",
     unit: "days",
   },
+  invoiceRemindersEnabled: {
+    title: "Overdue invoice reminders",
+    description:
+      "Email a polite nudge (invoice attached) when a sent invoice goes past its due date. At most two reminders per invoice.",
+    off: "When off, overdue invoices are never chased automatically - the manual Send reminder button still works.",
+  },
+  invoiceReminderFirstDays: {
+    title: "First reminder",
+    description: "Days past the due date before the first nudge.",
+    unit: "days overdue",
+  },
+  invoiceReminderSecondDays: {
+    title: "Second reminder",
+    description:
+      "Days past the due date before the second nudge. That's the last one - nothing sends after it.",
+    unit: "days overdue",
+  },
 };
 
 /** Field metadata for the reviews group, keyed by field name. */

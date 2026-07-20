@@ -62,6 +62,10 @@ export interface Invoice {
   paymentMethod?: string | null;
   /** Optional operator reference/note recorded with the payment. */
   paymentReference?: string | null;
+  /** When the most recent overdue reminder was emailed; null = never. */
+  reminderLastSentAt?: string | null;
+  /** How many overdue reminders have gone out; null reads as 0 (Mongo backfill rule). */
+  reminderCount?: number | null;
   driveFileId: string | null;
   driveWebUrl: string | null;
   createdAt: string;

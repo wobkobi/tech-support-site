@@ -462,6 +462,12 @@ model Invoice {
   paidAt           DateTime?
   paymentMethod    String?
   paymentReference String?
+  // Overdue-reminder tracking, stamped only after Resend accepts the send.
+  // reminderCount is nullable (NOT @default) because Mongo db push does not
+  // backfill defaults and Prisma throws reading rows that lack a required
+  // field - readers treat null as 0.
+  reminderLastSentAt DateTime?
+  reminderCount      Int?
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 

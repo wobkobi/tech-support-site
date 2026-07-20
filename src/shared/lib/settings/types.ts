@@ -179,6 +179,12 @@ export interface CommsSettings {
   reviewEmailDelayMins: number;
   /** How long price-estimate logs are kept before auto-purge (days). */
   priceEstimateRetentionDays: number;
+  /** Master switch for the overdue-invoice reminder emails. */
+  invoiceRemindersEnabled: boolean;
+  /** Days past due before the first overdue nudge. */
+  invoiceReminderFirstDays: number;
+  /** Days past due before the second (and final) nudge. */
+  invoiceReminderSecondDays: number;
 }
 
 export interface HoldsSettings {

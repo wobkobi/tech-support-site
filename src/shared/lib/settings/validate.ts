@@ -259,6 +259,17 @@ function validateComms(c: CommsSettings): FieldError[] {
     errors.push({ field: "reviewEmailDelayMins", message: "Must be 0 or more minutes." });
   if (!inRange(c.priceEstimateRetentionDays, 1, 3650))
     errors.push({ field: "priceEstimateRetentionDays", message: "Must be 1-3650 days." });
+  if (typeof c.invoiceRemindersEnabled !== "boolean")
+    errors.push({ field: "invoiceRemindersEnabled", message: "Must be on or off." });
+  if (!inRange(c.invoiceReminderFirstDays, 1, 365))
+    errors.push({ field: "invoiceReminderFirstDays", message: "Must be 1-365 days." });
+  if (!inRange(c.invoiceReminderSecondDays, 1, 365))
+    errors.push({ field: "invoiceReminderSecondDays", message: "Must be 1-365 days." });
+  if (c.invoiceReminderSecondDays <= c.invoiceReminderFirstDays)
+    errors.push({
+      field: "invoiceReminderSecondDays",
+      message: "Second reminder must be later than the first.",
+    });
   return errors;
 }
 

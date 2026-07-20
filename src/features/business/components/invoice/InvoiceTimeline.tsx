@@ -33,6 +33,10 @@ interface InvoiceTimelineProps {
   paymentReference?: string | null;
   /** When the invoice was voided; null on legacy voided rows. */
   voidedAt?: Date | string | null;
+  /** When the most recent overdue reminder was emailed; null = never. */
+  reminderLastSentAt?: Date | string | null;
+  /** How many overdue reminders have gone out; null reads as 0. */
+  reminderCount?: number | null;
 }
 
 /** One rendered timeline step. */
@@ -74,6 +78,8 @@ function dotClass(tone: StepTone): string {
  * @param props.paymentMethod - Payment method (nullable).
  * @param props.paymentReference - Payment reference (nullable).
  * @param props.voidedAt - Void timestamp (nullable).
+ * @param props.reminderLastSentAt - Most recent overdue-reminder timestamp (nullable).
+ * @param props.reminderCount - Overdue reminders sent so far (null reads as 0).
  * @returns The timeline element.
  */
 export function InvoiceTimeline({
@@ -85,6 +91,8 @@ export function InvoiceTimeline({
   paymentMethod,
   paymentReference,
   voidedAt,
+  reminderLastSentAt,
+  reminderCount,
 }: InvoiceTimelineProps): React.ReactElement {
   const steps: Step[] = [{ label: "Created", date: createdAt, tone: "neutral" }];
 
@@ -95,6 +103,16 @@ export function InvoiceTimeline({
 
   if (reviewLinkSentAt) {
     steps.push({ label: "Review link sent", date: reviewLinkSentAt, tone: "violet" });
+  }
+
+  // Overdue chasing: one step summarising all reminders, dated by the latest.
+  if (reminderLastSentAt != null) {
+    const n = reminderCount ?? 1;
+    steps.push({
+      label: n > 1 ? `Reminder sent (x${n})` : "Reminder sent",
+      date: reminderLastSentAt,
+      tone: "critical",
+    });
   }
 
   if (status === "PAID" || paidAt != null) {

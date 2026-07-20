@@ -138,6 +138,8 @@ async function InvoiceRail({
           paymentMethod={invoice.paymentMethod}
           paymentReference={invoice.paymentReference}
           voidedAt={invoice.voidedAt}
+          reminderLastSentAt={invoice.reminderLastSentAt}
+          reminderCount={invoice.reminderCount}
         />
       </Card>
 
@@ -308,6 +310,8 @@ export default async function InvoiceViewPage({
             paidAt={invoice.paidAt?.toISOString() ?? null}
             linkedIncome={linkedIncome}
             autoOpenSend={send === "1"}
+            isOverdue={isInvoiceOverdue(invoice)}
+            reminderCount={invoice.reminderCount}
           />
         }
       />

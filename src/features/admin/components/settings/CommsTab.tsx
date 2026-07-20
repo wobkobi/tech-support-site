@@ -108,6 +108,31 @@ export function CommsTab({ initial, defaults }: Props): React.ReactElement {
           customised={draft.priceEstimateRetentionDays !== defaults.priceEstimateRetentionDays}
           onChange={(v) => set({ priceEstimateRetentionDays: v ?? 1 })}
         />
+        <ToggleField
+          id="invoiceRemindersEnabled"
+          meta={m.invoiceRemindersEnabled}
+          value={draft.invoiceRemindersEnabled}
+          customised={draft.invoiceRemindersEnabled !== defaults.invoiceRemindersEnabled}
+          onChange={(v) => set({ invoiceRemindersEnabled: v })}
+        />
+        <NumberField
+          id="invoiceReminderFirstDays"
+          meta={m.invoiceReminderFirstDays}
+          value={draft.invoiceReminderFirstDays}
+          min={1}
+          error={fieldErrors.invoiceReminderFirstDays}
+          customised={draft.invoiceReminderFirstDays !== defaults.invoiceReminderFirstDays}
+          onChange={(v) => set({ invoiceReminderFirstDays: v ?? 1 })}
+        />
+        <NumberField
+          id="invoiceReminderSecondDays"
+          meta={m.invoiceReminderSecondDays}
+          value={draft.invoiceReminderSecondDays}
+          min={1}
+          error={fieldErrors.invoiceReminderSecondDays}
+          customised={draft.invoiceReminderSecondDays !== defaults.invoiceReminderSecondDays}
+          onChange={(v) => set({ invoiceReminderSecondDays: v ?? 1 })}
+        />
       </div>
 
       {/* Guardrail blocks */}

@@ -54,6 +54,10 @@ interface InvoiceActionsProps {
   linkedIncome: LinkedIncome;
   /** When true, open the send preview once on mount (calculator "Save & send"). */
   autoOpenSend?: boolean;
+  /** True when the invoice is SENT and past due - gates the Send reminder action. */
+  isOverdue?: boolean;
+  /** Reminders already sent (null reads as 0); shown in the confirm copy. */
+  reminderCount?: number | null;
 }
 
 const INPUT_CLS = cn(
@@ -79,6 +83,8 @@ const headers = { "Content-Type": "application/json" };
  * @param props.paidAt - Payment stamp, passed to the payment dialog.
  * @param props.linkedIncome - Linked income count + total for the void warning.
  * @param props.autoOpenSend - Open the send preview on mount when true.
+ * @param props.isOverdue - Whether the invoice is SENT and past due.
+ * @param props.reminderCount - Reminders already sent (null reads as 0).
  * @returns Invoice actions element with its modals.
  */
 export function InvoiceActions({
@@ -94,6 +100,8 @@ export function InvoiceActions({
   paidAt,
   linkedIncome,
   autoOpenSend = false,
+  isOverdue = false,
+  reminderCount = null,
 }: InvoiceActionsProps): React.ReactElement {
   const router = useRouter();
   const { toast } = useToast();
@@ -122,6 +130,10 @@ export function InvoiceActions({
   // Confirm dialog (replacing window.confirm) + record-payment dialog.
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
+
+  // Overdue-reminder confirm + busy state.
+  const [confirmReminderOpen, setConfirmReminderOpen] = useState(false);
+  const [sendingReminder, setSendingReminder] = useState(false);
 
   // Edit-notes modal (SENT/PAID quick edit; notes stay editable post-send).
   const [notesOpen, setNotesOpen] = useState(false);
@@ -301,6 +313,33 @@ export function InvoiceActions({
       URL.revokeObjectURL(url);
     } catch (err) {
       toast(err instanceof Error ? err.message : "Could not download PDF", { tone: "error" });
+    }
+  }
+
+  /**
+   * Sends an overdue reminder (same variant + stamping as the cron) and
+   * refreshes so the timeline picks up the new stamp.
+   */
+  async function sendReminder(): Promise<void> {
+    setSendingReminder(true);
+    try {
+      const res = await fetch(`/api/business/invoices/${invoiceId}/send-reminder`, {
+        method: "POST",
+        headers,
+      });
+      const d = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        reminderNumber?: number;
+        error?: string;
+      };
+      if (!res.ok || !d.ok) throw new Error(d.error ?? "Reminder failed");
+      toast(`Reminder sent to ${clientName || "client"}.`, { tone: "success" });
+      router.refresh();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Could not send reminder", { tone: "error" });
+    } finally {
+      setSendingReminder(false);
+      setConfirmReminderOpen(false);
     }
   }
 
@@ -492,6 +531,15 @@ export function InvoiceActions({
             Mark as paid
           </AdminButton>
         )}
+        {isOverdue && !isPaid && !isVoided && clientEmail && (
+          <AdminButton
+            variant="secondary"
+            onClick={() => setConfirmReminderOpen(true)}
+            busy={sendingReminder}
+          >
+            Send reminder
+          </AdminButton>
+        )}
         {isPaid && !paidAt && (
           // Legacy PAID row with no recorded date/method - let the operator backfill.
           <AdminButton variant="secondary" onClick={() => setPayOpen(true)}>
@@ -519,6 +567,20 @@ export function InvoiceActions({
         busy={deleting}
         onConfirm={() => void deleteDraft()}
         onCancel={() => setConfirmDeleteOpen(false)}
+      />
+
+      <ConfirmDialog
+        open={confirmReminderOpen}
+        title="Send an overdue reminder?"
+        body={
+          (reminderCount ?? 0) > 0
+            ? `${clientName || "The client"} has already been reminded ${reminderCount === 1 ? "once" : `${reminderCount} times`}. This sends another polite nudge with the invoice attached.`
+            : `Emails ${clientName || "the client"} a polite nudge with the invoice attached.`
+        }
+        confirmLabel="Send reminder"
+        busy={sendingReminder}
+        onConfirm={() => void sendReminder()}
+        onCancel={() => setConfirmReminderOpen(false)}
       />
 
       {/* Edit-notes modal (SENT/PAID - content is audit-locked but notes stay

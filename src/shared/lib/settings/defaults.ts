@@ -136,6 +136,9 @@ export const DEFAULT_SETTINGS: Settings = {
     reminderLeadHours: 24,
     reviewEmailDelayMins: 30,
     priceEstimateRetentionDays: 30,
+    invoiceRemindersEnabled: true,
+    invoiceReminderFirstDays: 3,
+    invoiceReminderSecondDays: 10,
   },
 
   // Hold-expiry window (minutes) for "held" bookings, read by the release-holds

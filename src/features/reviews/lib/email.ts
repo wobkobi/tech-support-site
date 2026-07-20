@@ -961,6 +961,103 @@ export async function sendInvoiceEmail({
   }
 }
 
+interface SendInvoiceReminderEmailArgs {
+  invoice: InvoiceEmailData;
+  pdfBytes: Uint8Array;
+  /** 1 for the first nudge, 2 for the second-and-final. Sets the tone. */
+  reminderNumber: number;
+}
+
+/**
+ * Sends a polite overdue-invoice nudge with the PDF attached. Deliberately has
+ * none of the invoice email's review-link machinery - chasing money and asking
+ * for a review do not belong in the same message. Failures are caught and
+ * logged - never throws.
+ * @param args - Send inputs.
+ * @param args.invoice - Invoice row fields needed for the body.
+ * @param args.pdfBytes - Raw PDF bytes (OVERDUE watermark already applied by the caller's generate).
+ * @param args.reminderNumber - 1 or 2; the second says it's the last one.
+ * @returns True if Resend accepted the message, false on failure or misconfig.
+ */
+export async function sendInvoiceReminderEmail({
+  invoice,
+  pdfBytes,
+  reminderNumber,
+}: SendInvoiceReminderEmailArgs): Promise<boolean> {
+  const from = process.env.EMAIL_FROM;
+  if (!from || !process.env.RESEND_API_KEY) {
+    console.warn(
+      `[email] Not configured (${missingEmailEnv("EMAIL_FROM", "RESEND_API_KEY")}) - skipping invoice reminder.`,
+    );
+    return false;
+  }
+  if (!invoice.clientEmail) {
+    console.warn(`[email] Invoice ${invoice.number} has no clientEmail - skipping reminder.`);
+    return false;
+  }
+
+  const siteUrl = getSiteUrl();
+  const identity = await getIdentity();
+  const greeting = escapeHtml((invoice.clientName.split(" ")[0] || invoice.clientName).trim());
+  const safeNumber = escapeHtml(invoice.number);
+  const dueDate = escapeHtml(formatDateShort(invoice.dueDate));
+  const totalLabel = escapeHtml(formatNZD(invoice.total));
+  const closing =
+    reminderNumber >= 2
+      ? "This is the last automatic reminder I'll send. If something's holding payment up, just reply and we'll sort it out."
+      : "If you've already paid in the last day or two, please ignore this - bank transfers can cross over.";
+
+  const subject = `Friendly reminder - invoice ${invoice.number} (${totalLabel})`;
+  const html = `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8" /></head>
+<body style="margin:0;padding:24px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0c0a3e;background:#f6f7f8">
+  <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:12px;padding:24px">
+    <h1 style="margin:0 0 16px;font-size:20px;font-weight:700;color:#0c0a3e">Hi ${greeting},</h1>
+
+    <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#333">Just a friendly nudge - invoice ${safeNumber} was due on ${dueDate} and hasn't come through yet. A copy is attached.</p>
+
+    <div style="margin:0 0 16px;padding:12px 16px;background:#f3f4f6;border-radius:8px;font-size:14px;color:#333">
+      <p style="margin:0 0 4px"><strong>Invoice:</strong> ${safeNumber}</p>
+      <p style="margin:0 0 4px"><strong>Amount due:</strong> ${totalLabel}</p>
+      <p style="margin:0"><strong>Was due:</strong> ${dueDate}</p>
+    </div>
+
+    <p style="margin:0 0 8px;font-size:14px;color:#333"><strong>Bank transfer:</strong></p>
+    <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#333">
+      Payee: ${escapeHtml(identity.name)}<br />
+      Account: <strong>${escapeHtml(identity.bankAccount)}</strong><br />
+      Reference: <strong>${safeNumber}</strong>
+    </p>
+
+    <p style="margin:0;font-size:14px;color:#333">${closing}</p>
+
+    ${await buildEmailSignature(siteUrl)}
+  </div>
+</body>
+</html>`;
+
+  try {
+    await getResend().emails.send({
+      from,
+      replyTo: process.env.ADMIN_EMAIL,
+      to: invoice.clientEmail,
+      subject,
+      html,
+      attachments: [
+        {
+          filename: `Invoice ${invoice.number}.pdf`,
+          content: Buffer.from(pdfBytes),
+        },
+      ],
+    });
+    return true;
+  } catch (error) {
+    console.error(`[email] Failed to send reminder for invoice ${invoice.number}:`, error);
+    return false;
+  }
+}
+
 interface BuildVoidEmailArgs {
   invoice: InvoiceEmailData;
   greetingName?: string;
