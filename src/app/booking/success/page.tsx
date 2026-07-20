@@ -8,6 +8,7 @@ import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { Button } from "@/shared/components/Button";
 import { CARD } from "@/shared/components/PageLayout";
 import { cn } from "@/shared/lib/cn";
+import { formatDateTimeLong } from "@/shared/lib/date-format";
 import { prisma } from "@/shared/lib/prisma";
 import type { Metadata } from "next";
 import type React from "react";
@@ -36,6 +37,45 @@ function renderEmphasised(text: string): React.ReactNode[] {
 }
 
 /**
+ * Human-readable appointment length, derived from the booked window rather than
+ * the optional `duration` enum so legacy rows (which never set it) still read
+ * correctly.
+ * @param startAt - Appointment start.
+ * @param endAt - Appointment end.
+ * @returns Length such as "45 minutes", "1 hour", "1 hour 30 minutes".
+ */
+function formatLength(startAt: Date, endAt: Date): string {
+  const mins = Math.max(0, Math.round((endAt.getTime() - startAt.getTime()) / 60_000));
+  const hours = Math.floor(mins / 60);
+  const rest = mins % 60;
+  const hourPart = hours === 1 ? "1 hour" : hours > 1 ? `${hours} hours` : "";
+  const minPart = rest === 1 ? "1 minute" : rest > 1 ? `${rest} minutes` : "";
+  return [hourPart, minPart].filter(Boolean).join(" ") || "Less than a minute";
+}
+
+/**
+ * One label/value row in the appointment details card.
+ * @param props - Component props.
+ * @param props.label - Row label.
+ * @param props.children - Row value.
+ * @returns A details row.
+ */
+function DetailRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}): React.ReactElement {
+  return (
+    <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-3">
+      <dt className="shrink-0 font-semibold text-russian-violet sm:w-36">{label}</dt>
+      <dd className="text-rich-black/80">{children}</dd>
+    </div>
+  );
+}
+
+/**
  * Booking success page component.
  * @param props - Page props.
  * @param props.searchParams - URL search params.
@@ -50,24 +90,38 @@ export default async function BookingSuccessPage({
   const tokenValue = params.cancelToken;
   const cancelToken = Array.isArray(tokenValue) ? tokenValue[0] : tokenValue;
 
-  // Surface the snapshotted promo title so customers see the rate is locked
-  // even if the offer expires before service.
+  // Restate the appointment itself (the details card below) plus the
+  // snapshotted promo title, so customers see the rate is locked even if the
+  // offer expires before service. Degrades to the generic page without a token.
   const booking = cancelToken
     ? await prisma.booking
         .findFirst({
           where: { cancelToken },
-          select: { promoTitleAtBooking: true },
+          select: {
+            promoTitleAtBooking: true,
+            startAt: true,
+            endAt: true,
+            address: true,
+            unit: true,
+            meetingType: true,
+            status: true,
+          },
         })
         .catch(() => null)
     : null;
   const promoTitle = booking?.promoTitleAtBooking ?? null;
+  // Only restate an appointment that is still live - revisiting this URL after
+  // cancelling must not present the old slot as if it were still booked.
+  const appointment = booking && booking.status !== "cancelled" ? booking : null;
   const { CANCELLATION } = await getPolicy();
 
   return (
     <main id="main" className="relative min-h-dvh overflow-hidden">
       <BookingConversion />
-      {/* Backdrop */}
-      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+      {/* Backdrop. Fixed, not absolute: an absolute layer stretches to the full
+          page height, so once the content scrolls past one viewport the image
+          gets scaled over that taller box instead of staying put. */}
+      <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
         <picture>
           <source type="image/avif" srcSet="/source/backdrop-blur.avif" />
           <img
@@ -124,6 +178,32 @@ export default async function BookingSuccessPage({
                 )}
               </div>
             </section>
+
+            {appointment && (
+              <section className={cn(CARD)}>
+                <h2 className="mb-3 text-lg font-bold text-russian-violet sm:text-xl">
+                  Your appointment
+                </h2>
+                <dl className="space-y-2 text-base text-rich-black/80 sm:text-lg">
+                  <DetailRow label="When">{formatDateTimeLong(appointment.startAt)}</DetailRow>
+                  <DetailRow label="Length">
+                    {formatLength(appointment.startAt, appointment.endAt)}
+                  </DetailRow>
+                  {appointment.meetingType && (
+                    <DetailRow label="Type">
+                      {appointment.meetingType === "in_person" ? "In person" : "Remote (online)"}
+                    </DetailRow>
+                  )}
+                  {/* Remote jobs have no address; older rows may carry one without
+                      a meetingType, so show it whenever it exists and isn't remote. */}
+                  {appointment.address && appointment.meetingType !== "remote" && (
+                    <DetailRow label="Where">
+                      {[appointment.unit, appointment.address].filter(Boolean).join(", ")}
+                    </DetailRow>
+                  )}
+                </dl>
+              </section>
+            )}
 
             <section className={cn(CARD)}>
               <h2 className="mb-2 text-lg font-bold text-russian-violet sm:text-xl">
