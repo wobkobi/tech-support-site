@@ -227,7 +227,18 @@ function CancelContent(): React.ReactElement {
                     >
                       {submit.kind === "submitting" ? "Cancelling..." : "Confirm cancellation"}
                     </button>
-                    <Button href="/" variant="secondary" size="sm">
+                    {/* Moving the appointment is usually what someone actually
+                        wants when they land here - offer it before cancelling. */}
+                    {token && (
+                      <Button
+                        href={`/booking/edit?token=${encodeURIComponent(token)}`}
+                        variant="secondary"
+                        size="sm"
+                      >
+                        Reschedule instead
+                      </Button>
+                    )}
+                    <Button href="/" variant="ghost" size="sm">
                       Keep my booking
                     </Button>
                   </div>

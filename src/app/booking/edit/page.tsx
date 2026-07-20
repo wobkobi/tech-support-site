@@ -19,9 +19,12 @@ import {
   type TimeOfDay,
 } from "@/features/booking/lib/booking";
 import { fetchAllCalendarEvents } from "@/features/calendar/lib/google-calendar";
+import { Button } from "@/shared/components/Button";
 import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
+import { getIdentity } from "@/shared/lib/business-identity.server";
 import { cn } from "@/shared/lib/cn";
 import { prisma } from "@/shared/lib/prisma";
+import { getSettings } from "@/shared/lib/settings/get-settings";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type React from "react";
@@ -144,10 +147,26 @@ export default async function EditBookingPage({
       startAt: true,
       endAt: true,
       status: true,
+      rescheduleCount: true,
     },
   });
 
   if (!booking || booking.status === "cancelled") notFound();
+
+  // Mirror the POST route's reschedule gate (api/booking/edit/route.ts) so the
+  // customer learns they can't change this booking BEFORE filling the form in,
+  // instead of getting a rejection after submitting. 0 / null means "rule off".
+  const [{ pricing }, identity] = await Promise.all([getSettings(), getIdentity()]);
+  const { reschedule } = pricing;
+  const hoursUntilStart = (booking.startAt.getTime() - new Date().getTime()) / 3_600_000;
+  const cutoffBlocked = reschedule.cutoffHours > 0 && hoursUntilStart < reschedule.cutoffHours;
+  const limitBlocked =
+    reschedule.maxReschedules !== null && booking.rescheduleCount >= reschedule.maxReschedules;
+  const blocked = cutoffBlocked || limitBlocked;
+  const changesLeft =
+    reschedule.maxReschedules !== null
+      ? Math.max(0, reschedule.maxReschedules - booking.rescheduleCount)
+      : null;
 
   // Derive form values from stored booking
   const durationMinutes = (booking.endAt.getTime() - booking.startAt.getTime()) / 60000;
@@ -233,19 +252,70 @@ export default async function EditBookingPage({
               Edit booking
             </h1>
             <p className="text-sm text-rich-black sm:text-base">
-              Update your appointment details below. A new calendar invite will be sent when you
-              save.
+              {blocked
+                ? "This booking can no longer be changed online."
+                : "Update your appointment details below. A new calendar invite will be sent when you save."}
             </p>
           </section>
 
-          <section className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}>
-            <BookingForm
-              availableDays={availableDays}
-              durations={availabilityConfig.durations}
-              cancelToken={cancelToken}
-              initialValues={initialValues}
-            />
-          </section>
+          {blocked ? (
+            /* The server would reject a save anyway, so don't show a form that
+               can only fail - explain why and offer the paths that still work. */
+            <section className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}>
+              <h2 className="mb-2 text-lg font-bold text-russian-violet sm:text-xl">
+                {cutoffBlocked ? "Too close to your appointment" : "Change limit reached"}
+              </h2>
+              <p className="mb-4 text-base text-rich-black/80 sm:text-lg">
+                {cutoffBlocked
+                  ? `Bookings can't be changed within ${reschedule.cutoffHours} hours of the appointment.`
+                  : "This booking has already been changed the maximum number of times."}{" "}
+                Give me a call or text and I'll sort it out for you.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                {identity.phoneTel && (
+                  <Button href={`tel:${identity.phoneTel}`} variant="secondary" size="sm">
+                    Call {identity.phone}
+                  </Button>
+                )}
+                <Button
+                  href={`/booking/cancel?token=${encodeURIComponent(cancelToken)}`}
+                  variant="ghost"
+                  size="sm"
+                >
+                  Cancel instead
+                </Button>
+              </div>
+            </section>
+          ) : (
+            <section className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}>
+              {/* Only worth saying when a limit is actually configured. */}
+              {(changesLeft !== null || reschedule.cutoffHours > 0) && (
+                <p className="mb-4 rounded-lg border border-mustard-400 bg-mustard-900 px-4 py-3 text-sm text-rich-black/80 sm:text-base">
+                  {changesLeft !== null && (
+                    <>
+                      You can change this booking{" "}
+                      <strong>
+                        {changesLeft} more {changesLeft === 1 ? "time" : "times"}
+                      </strong>
+                      .{" "}
+                    </>
+                  )}
+                  {reschedule.cutoffHours > 0 && (
+                    <>
+                      Changes close <strong>{reschedule.cutoffHours} hours before</strong> your
+                      appointment.
+                    </>
+                  )}
+                </p>
+              )}
+              <BookingForm
+                availableDays={availableDays}
+                durations={availabilityConfig.durations}
+                cancelToken={cancelToken}
+                initialValues={initialValues}
+              />
+            </section>
+          )}
         </div>
       </FrostedSection>
     </PageShell>
