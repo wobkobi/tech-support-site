@@ -10,6 +10,9 @@ import Script from "next/script";
 import type React from "react";
 import { useEffect, useRef } from "react";
 
+// Scoped to the Production environment on Vercel, so preview and local builds
+// load no pixel. Test traffic must never reach Meta, where it would skew ad
+// delivery - do not add this to the Preview environment.
 const PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID;
 
 // The base snippet from Events Manager, with the pixel ID injected. fbevents.js

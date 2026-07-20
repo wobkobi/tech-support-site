@@ -7,6 +7,8 @@
 
 import { useEffect } from "react";
 
+// Scoped to the Production environment on Vercel, so preview deploys - which
+// run the booking flow against test data - report no conversions.
 const ADS_ID = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID;
 const BOOKING_LABEL = process.env.NEXT_PUBLIC_GOOGLE_ADS_BOOKING_LABEL;
 const PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID;

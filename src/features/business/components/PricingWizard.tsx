@@ -322,6 +322,13 @@ export function PricingWizard({
     setIsCalculating(false);
     setStep("results");
 
+    // Reaching a quote is the strongest intent signal short of booking: the
+    // customer has described a real problem and seen a price. Report it so the
+    // funnel shows where estimates stall instead of turning into bookings.
+    if (typeof window.gtag === "function") {
+      window.gtag("event", "price_estimate");
+    }
+
     // Audit log: fire-and-forget so failures don't break the UX. Captures
     // the raw text, AI interpretation, meeting mode the customer picked, and
     // the exact range shown so disputes can be reconstructed.

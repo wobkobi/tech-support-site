@@ -10,6 +10,9 @@ import Script from "next/script";
 import type React from "react";
 import { useEffect } from "react";
 
+// Scoped to the Production environment on Vercel: preview and local builds see
+// these undefined and load no tag, which keeps branch deploys out of the live
+// property. Adding them to Preview would silently start reporting test traffic.
 const GA4_ID = process.env.NEXT_PUBLIC_GA4_ID;
 const ADS_ID = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID;
 const CALL_LABEL = process.env.NEXT_PUBLIC_GOOGLE_ADS_CALL_LABEL;
@@ -20,16 +23,27 @@ const loaderId = ADS_ID ?? GA4_ID;
 
 /**
  * Injects the Google tag and reports phone-link taps as conversions and
- * email-link taps as GA4 events. Renders
- * nothing when no measurement IDs are set, so the site runs untracked in dev
- * or before the Ads/GA4 IDs are configured. Also renders nothing on /admin
- * pages, so back-office browsing never pollutes GA4/Ads data.
+ * email-link taps as GA4 events. Renders nothing when no measurement IDs are
+ * set, so the site runs untracked in dev, in preview deploys and before the
+ * Ads/GA4 IDs are configured. Also renders nothing on /admin pages, so
+ * back-office browsing never pollutes GA4/Ads data.
  * @returns The gtag script tags, or null when unconfigured or on admin pages.
  */
 export function GoogleTag(): React.ReactElement | null {
   const pathname = usePathname();
   // Admin pages are operator-only; keep them out of analytics entirely.
   const isAdmin = pathname === "/admin" || pathname.startsWith("/admin/");
+
+  // Unmounting this component does not unload gtag.js: once loaded on a public
+  // page it keeps running, and GA4 enhanced measurement reports a page_view on
+  // every browser history change - so a client-side navigation into /admin
+  // would still send the admin path (which carries invoice and contact IDs).
+  // The documented `ga-disable-<ID>` flag is checked per hit, so toggling it
+  // suppresses those hits even though the tag is already live.
+  useEffect(() => {
+    if (!GA4_ID) return;
+    (window as unknown as Record<string, boolean>)[`ga-disable-${GA4_ID}`] = isAdmin;
+  }, [isAdmin]);
 
   // One delegated listener covers every tel: and mailto: link (raw anchors and
   // the Button component alike), so individual links never need their own
