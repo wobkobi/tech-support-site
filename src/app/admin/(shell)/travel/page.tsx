@@ -10,6 +10,8 @@ import {
   TravelBlockAdminList,
   type TravelBlockRow,
 } from "@/features/admin/components/TravelBlockAdminList";
+import { Card } from "@/features/admin/components/ui/Card";
+import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import type { Metadata } from "next";
@@ -107,18 +109,15 @@ export default async function AdminTravelPage(): Promise<React.ReactElement> {
 
   return (
     <>
-      <h1 className="mb-6 text-2xl font-extrabold text-russian-violet">Travel blocks</h1>
+      <PageHeader
+        title="Travel blocks"
+        description="Travel time blocks computed for calendar events with a location. Refreshed every 15 minutes by the cron job."
+        actions={<RecalculateButton />}
+      />
 
-      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
-          <p className="text-sm text-slate-500">
-            Travel time blocks computed for calendar events with a location. Refreshed every 15
-            minutes by the cron job.
-          </p>
-          <RecalculateButton />
-        </div>
+      <Card>
         <TravelBlockAdminList blocks={travelBlockRows} calendarLabels={calendarLabels} />
-      </div>
+      </Card>
     </>
   );
 }
