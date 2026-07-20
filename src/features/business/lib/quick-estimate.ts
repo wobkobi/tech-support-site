@@ -21,6 +21,14 @@ export interface QuickEstimateInput {
   estimatorRange: EstimatorRange;
   minBillableMins: number;
   minTravelCharge: number;
+  /**
+   * When the customer has already picked a slot, the drive is quoted at that
+   * time so the estimate matches what the booking will snapshot. Omitted before
+   * a slot is chosen, in which case the route prices a representative weekday.
+   */
+  departureTimeIso?: string;
+  /** End of the visit; the return leg is quoted from here. */
+  returnDepartureTimeIso?: string;
 }
 
 /** Result of a one-shot estimate. `estimateId` is null when logging failed. */
@@ -63,7 +71,11 @@ export async function fetchQuickEstimate(input: QuickEstimateInput): Promise<Qui
       ? fetch("/api/pricing/travel-time", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ destination: dest }),
+          body: JSON.stringify({
+            destination: dest,
+            departureTimeIso: input.departureTimeIso,
+            returnDepartureTimeIso: input.returnDepartureTimeIso,
+          }),
         }).then(
           (r) => r.json() as Promise<{ durationMinsThere?: number; durationMinsBack?: number }>,
         )

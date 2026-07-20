@@ -265,7 +265,17 @@ export function PricingWizard({
     const taskLines = (() => {
       const visitJob = rangeFor(effectiveMins, promoRate);
       if (tasks.length <= 1) {
-        return [{ label: "Tech support", low: visitJob.low, high: visitJob.high, note: null }];
+        // Use the AI's own label ("Wi-Fi troubleshooting") rather than a generic
+        // one - the multi-task branch below already does. "Tech support" stays
+        // as the fallback for a parse that returned no tasks at all.
+        return [
+          {
+            label: tasks[0]?.label || "Tech support",
+            low: visitJob.low,
+            high: visitJob.high,
+            note: null,
+          },
+        ];
       }
       const totalTaskMins = tasks.reduce((s, t) => s + t.mins, 0) || 1;
       const lines = tasks.map((t) => ({
@@ -308,6 +318,7 @@ export function PricingWizard({
           : []),
       ],
       includesTravel: promoRange.travel > 0,
+      travelCharge: promoRange.travel,
       includesAfterHours: false,
       ...(original
         ? {
@@ -568,7 +579,12 @@ export function PricingWizard({
               {meeting === "remote"
                 ? "Remote session - no travel charge. "
                 : result.includesTravel
-                  ? `Includes round-trip drive time at the Travel rate, ${formatPriceRound(minTravelCharge)} minimum. `
+                  ? // Only mention the minimum when the minimum is what's being
+                    // charged - saying "$10 minimum" beside a $40 drive reads as
+                    // if the customer is being quoted the floor.
+                    (result.travelCharge ?? 0) <= minTravelCharge
+                    ? `Includes round-trip drive time at the Travel rate, ${formatPriceRound(minTravelCharge)} minimum. `
+                    : "Includes round-trip drive time at the Travel rate. "
                   : addressNotFound
                     ? "Address not found - actual travel will be confirmed before work begins. "
                     : ""}

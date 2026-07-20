@@ -54,12 +54,13 @@ STACKING rules — apply when the description has MORE THAN ONE distinct task:
 3. BACKGROUND tasks - data transfers, virus scans, OS/driver updates, backups, large downloads - contribute only ~15-25% of their standalone benchmark, because they run unattended while the operator works on the other tasks.
 4. Sum the stacked contributions to get estimatedMins. tasks[].mins must sum to estimatedMins.
 
-Worked example — "Fix Wi-Fi + set up new printer + transfer files from old laptop" (benchmarks Wi-Fi 45, printer 45, transfer 120):
-- Wi-Fi 45 (hands-on) -> 45 (primary)
-- Printer 45 (hands-on) -> 25 (additional hands-on, ~50%)
-- File transfer 120 (background copy) -> 20 (background, ~15-20%)
+Worked example — ILLUSTRATIVE ONLY. The figures below are made up to show the stacking arithmetic; always take the real standalone times from the benchmarks in the context message, never from this example.
+Say the benchmarks were Wi-Fi 50, printer 40, transfer 100:
+- Wi-Fi 50 (hands-on) -> 50 (primary)
+- Printer 40 (hands-on) -> 20 (additional hands-on, ~50%)
+- File transfer 100 (background copy) -> 20 (background, ~15-20%)
 - estimatedMins: 90
-- tasks: [{"label":"Wi-Fi troubleshooting","mins":45},{"label":"Printer setup","mins":25},{"label":"File transfer","mins":20}]
+- tasks: [{"label":"Wi-Fi troubleshooting","mins":50},{"label":"Printer setup","mins":20},{"label":"File transfer","mins":20}]
 
 Round each task's mins and estimatedMins to the nearest increment given in the context message. Never return estimatedMins below the minimum billable time given in the context. For a SINGLE task description, return exactly one entry in tasks whose mins equal estimatedMins.
 Return valid JSON only. No markdown, no text outside the JSON object.`;

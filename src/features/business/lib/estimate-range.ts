@@ -36,10 +36,23 @@ export function remoteRateDelta(rates: RemoteRateLike[], meeting: string): numbe
 }
 
 /**
+ * Hard floor on the low end, as a fraction of straight-time cost.
+ *
+ * This is a guard rail, not a tuning knob - the tunable part is the confidence
+ * band in Settings > estimator. A wide low-confidence band (lowFactor 0.55)
+ * multiplied by a short job produced quotes implying roughly half the hourly
+ * rate, which reads as a price the job can actually be done for. Whatever the
+ * band is tuned to, the advertised low stays within this fraction of what the
+ * time would really cost.
+ */
+export const LOW_END_FLOOR_FACTOR = 0.75;
+
+/**
  * Builds a whole-dollar low/high price band for one visit slice. The band
  * widens (and the low end drops faster than the high end rises) as confidence
- * falls; it rounds to the nearest $5 and is never narrower than the configured
- * minimum spread.
+ * falls; it rounds to the nearest $5, never falls below
+ * {@link LOW_END_FLOOR_FACTOR} of straight-time cost, and is never narrower
+ * than the configured minimum spread.
  * @param mins - Billable minutes for this slice (already floored).
  * @param rate - Effective $/hr for labour.
  * @param confidence - How confident the estimate is; selects the band width.
@@ -54,7 +67,13 @@ export function priceRangeFor(
 ): { low: number; high: number } {
   const band = range[confidence] ?? range.medium;
   const cost = (mins / 60) * rate;
-  const low = Math.floor((cost * band.lowFactor) / 5) * 5;
+  // The band's own low rounds DOWN to $5 (never overquote the cheap end). The
+  // floor rounds to the NEAREST $5 instead - rounding it down too would push
+  // the result back under the guarantee it exists to enforce, which on a short
+  // job is the difference between $30 and $25.
+  const bandLow = Math.floor((cost * band.lowFactor) / 5) * 5;
+  const flooredLow = Math.round((cost * LOW_END_FLOOR_FACTOR) / 5) * 5;
+  const low = Math.max(bandLow, flooredLow);
   const high = Math.max(Math.ceil((cost * band.highFactor) / 5) * 5, low + range.minSpread);
   return { low, high };
 }

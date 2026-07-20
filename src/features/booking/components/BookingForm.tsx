@@ -26,6 +26,7 @@ import { suggestEmailCorrection } from "@/shared/lib/email-typo-suggestion";
 import { isPlausibleName, normaliseName } from "@/shared/lib/normalise-name";
 import { validatePhone } from "@/shared/lib/normalise-phone";
 import type { EstimatorRange } from "@/shared/lib/settings/types";
+import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 import { useRouter, useSearchParams } from "next/navigation";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
@@ -235,6 +236,22 @@ export default function BookingForm({
   const [submitting, setSubmitting] = useState(false);
 
   /**
+   * The chosen slot's start as a real instant. The picker works in NZ-local
+   * parts (date key + hour + sub-slot minute), so the NZ offset for that
+   * calendar date is applied to get UTC - DST-correct, unlike using the
+   * browser's own timezone.
+   * @returns The slot start, or null when day or time isn't chosen yet.
+   */
+  function slotStartInstant(): Date | null {
+    if (!selectedDay || !selectedTime) return null;
+    const window = selectedDay.timeWindows.find((w) => w.value === selectedTime);
+    if (!window) return null;
+    const [y, m, d] = selectedDay.dateKey.split("-").map(Number);
+    const offset = getPacificAucklandOffset(y, m, d);
+    return new Date(Date.UTC(y, m - 1, d, window.startHour - offset, selectedMinute, 0, 0));
+  }
+
+  /**
    * Runs the inline rough estimate from the current description + meeting +
    * address, shows the range, and captures the logged estimate id so the
    * booking snapshots the quote the customer saw.
@@ -245,6 +262,14 @@ export default function BookingForm({
     setEstimating(true);
     setQuoteError(null);
     try {
+      // Quote the drive at the slot the customer actually picked, so the
+      // estimate lines up with what the booking snapshots at submit time. The
+      // submit payload sends raw date/time parts, so build the instant here.
+      const slotStart = selectedDay && selectedTime ? slotStartInstant() : null;
+      const slotEnd = slotStart
+        ? new Date(slotStart.getTime() + durations[duration] * 60_000)
+        : null;
+
       const res = await fetchQuickEstimate({
         description: notes.trim(),
         meeting: meetingType === "remote" ? "remote" : "in-person",
@@ -252,6 +277,8 @@ export default function BookingForm({
         estimatorRange,
         minBillableMins,
         minTravelCharge,
+        departureTimeIso: slotStart?.toISOString(),
+        returnDepartureTimeIso: slotEnd?.toISOString(),
       });
       setQuote({
         low: res.low,
@@ -1591,7 +1618,11 @@ export default function BookingForm({
                 <p className="mt-2 text-sm text-rich-black/70">
                   A ballpark from your description - the final cost is confirmed before any work.
                 </p>
-                {duration === "short" && quote.minsHigh > 60 && (
+                {/* Gate on the MIDDLE of the range, not its high end: a wide
+                    band like 25m-1h10m has a typical case well under an hour,
+                    and nudging those to a 2-hour visit fires on almost every
+                    estimate. Only suggest it when the likely time runs over. */}
+                {duration === "short" && (quote.minsLow + quote.minsHigh) / 2 > 60 && (
                   <div className="mt-3 flex flex-col gap-2 rounded-lg border border-amber-400/50 bg-amber-50 p-3 sm:flex-row sm:items-center sm:justify-between">
                     <p className="text-sm text-rich-black/80">
                       This looks like it might take around 2 hours - you can book a 2-hour visit so
