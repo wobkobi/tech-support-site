@@ -10,6 +10,7 @@
 
 import { NumberField, TextField } from "@/features/admin/components/settings/SettingsFields";
 import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
+import { SettingsSaveBar } from "@/features/admin/components/settings/SettingsSaveBar";
 import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
 import { IDENTITY_FIELD_META } from "@/shared/lib/settings/field-meta";
 import type { BaseAddress, IdentitySettings } from "@/shared/lib/settings/types";
@@ -64,7 +65,7 @@ export function IdentityTab({ initial, defaults }: Props): React.ReactElement {
   return (
     <div>
       <SectionHeading>Contact</SectionHeading>
-      <div className="divide-y divide-slate-100">
+      <div className="divide-y divide-admin-border">
         <TextField
           id="name"
           meta={m.name}
@@ -120,7 +121,7 @@ export function IdentityTab({ initial, defaults }: Props): React.ReactElement {
       </div>
 
       <SectionHeading>Base address (travel origin + map)</SectionHeading>
-      <div className="divide-y divide-slate-100">
+      <div className="divide-y divide-admin-border">
         <TextField
           id="addrLine"
           meta={m["baseAddress.line"]}
@@ -161,7 +162,7 @@ export function IdentityTab({ initial, defaults }: Props): React.ReactElement {
       </div>
 
       <SectionHeading>Invoicing</SectionHeading>
-      <div className="divide-y divide-slate-100">
+      <div className="divide-y divide-admin-border">
         <NumberField
           id="paymentTermsDays"
           meta={m.paymentTermsDays}
@@ -226,27 +227,13 @@ export function IdentityTab({ initial, defaults }: Props): React.ReactElement {
         </div>
       )}
 
-      {/* Save bar */}
-      <div className="mt-6 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => void form.save()}
-          disabled={!dirty || saving}
-          className="rounded-lg bg-russian-violet px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
-        >
-          {saving ? "Saving..." : "Save changes"}
-        </button>
-        <button
-          type="button"
-          onClick={form.resetToDefault}
-          disabled={saving}
-          className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-        >
-          Reset to defaults
-        </button>
-        {dirty && !saving && <span className="text-sm text-slate-400">Unsaved changes</span>}
-        {!dirty && savedAt && <span className="text-sm font-medium text-emerald-600">Saved</span>}
-      </div>
+      <SettingsSaveBar
+        dirty={dirty}
+        saving={saving}
+        savedAt={savedAt}
+        onSave={() => void form.save()}
+        onReset={form.resetToDefault}
+      />
 
       <SettingsHistory group="identity" onRestore={(v: IdentitySettings) => setDraft(v)} />
     </div>

@@ -66,11 +66,11 @@ export function PricingPreview({ config }: Props): React.ReactElement {
   );
 
   return (
-    <div className="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-4">
+    <div className="mt-6 rounded-lg border border-admin-border bg-admin-bg p-4">
       <h3 className="text-xs font-bold tracking-wide text-russian-violet uppercase">
         Live preview
       </h3>
-      <ul className="mt-2 space-y-1 text-sm text-slate-600">
+      <ul className="mt-2 space-y-1 text-sm text-admin-text-secondary">
         {lines.map((line) => (
           <li key={line}>{line}</li>
         ))}

@@ -59,7 +59,7 @@ export function AvailabilityPreview({ config }: Props): React.ReactElement {
   }, [config]);
 
   return (
-    <div className="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-4">
+    <div className="mt-6 rounded-lg border border-admin-border bg-admin-bg p-4">
       <h3 className="text-xs font-bold tracking-wide text-russian-violet uppercase">
         Live preview
       </h3>
@@ -77,22 +77,22 @@ export function AvailabilityPreview({ config }: Props): React.ReactElement {
           return (
             <div
               key={index}
-              className={cn("rounded-md p-2 text-center", open ? "bg-emerald-50" : "bg-slate-100")}
+              className={cn("rounded-md p-2 text-center", open ? "bg-emerald-50" : "bg-admin-bg")}
             >
-              <p className="text-xs font-semibold text-slate-700">{name}</p>
+              <p className="text-xs font-semibold text-admin-text">{name}</p>
               {open ? (
                 <>
                   <p className="text-[11px] text-emerald-700">
                     {fmtHour(d.open)}-{fmtHour(d.close)}
                   </p>
                   {d.break && (
-                    <p className="text-[11px] text-slate-400">
+                    <p className="text-[11px] text-admin-faint">
                       break {fmtHour(d.break.start)}-{fmtHour(d.break.end)}
                     </p>
                   )}
                 </>
               ) : (
-                <p className="text-[11px] text-slate-400">Closed</p>
+                <p className="text-[11px] text-admin-faint">Closed</p>
               )}
             </div>
           );
@@ -100,7 +100,7 @@ export function AvailabilityPreview({ config }: Props): React.ReactElement {
       </div>
 
       {config.acceptingBookings && (
-        <p className="mt-3 text-sm text-slate-600">
+        <p className="mt-3 text-sm text-admin-text-secondary">
           {nextBookable
             ? `Next bookable day: ${nextBookable}`
             : `No bookable days in the next ${config.maxAdvanceDays} days with these settings.`}

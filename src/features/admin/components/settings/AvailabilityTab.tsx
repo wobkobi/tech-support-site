@@ -15,6 +15,7 @@ import {
   ToggleField,
 } from "@/features/admin/components/settings/SettingsFields";
 import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
+import { SettingsSaveBar } from "@/features/admin/components/settings/SettingsSaveBar";
 import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
 import { hourLabel } from "@/features/booking/lib/booking";
 import { cn } from "@/shared/lib/cn";
@@ -74,7 +75,7 @@ function HourSelect({ value, onChange, from, to, close }: HourSelectProps): Reac
     <select
       value={value}
       onChange={(e) => onChange(Number(e.target.value))}
-      className="rounded-lg border border-slate-300 px-2 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+      className="rounded-lg border border-admin-border-strong px-2 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
     >
       {opts.map((h) => (
         <option key={h} value={h}>
@@ -120,7 +121,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
   return (
     <div>
       {/* Master switch + paused message */}
-      <div className="divide-y divide-slate-100">
+      <div className="divide-y divide-admin-border">
         <ToggleField
           id="acceptingBookings"
           meta={m.acceptingBookings}
@@ -138,7 +139,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
             value={draft.closedMessage}
             rows={2}
             onChange={(e) => setTop({ closedMessage: e.target.value })}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-base focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+            className="w-full rounded-lg border border-admin-border-strong px-3 py-2 text-base focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
           />
         </FieldShell>
       </div>
@@ -147,7 +148,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
       <h3 className="mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase">
         Weekly hours
       </h3>
-      <p className="mt-1 text-sm text-slate-500">
+      <p className="mt-1 text-sm text-admin-muted">
         Set the hours you take bookings each day. Turn a day off, or add a midday break that splits
         it into two windows.
       </p>
@@ -155,9 +156,9 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
         {DAY_ORDER.map(({ index, name }) => {
           const d = draft.schedule[index];
           return (
-            <div key={index} className="rounded-lg border border-slate-200 p-3">
+            <div key={index} className="rounded-lg border border-admin-border p-3">
               <div className="flex flex-wrap items-center gap-3">
-                <span className="w-24 text-sm font-semibold text-slate-700">{name}</span>
+                <span className="w-24 text-sm font-semibold text-admin-text">{name}</span>
                 <button
                   type="button"
                   role="switch"
@@ -165,18 +166,18 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
                   onClick={() => setDay(index, { enabled: !d.enabled })}
                   className={cn(
                     "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
-                    d.enabled ? "bg-russian-violet" : "bg-slate-300",
+                    d.enabled ? "bg-russian-violet" : "bg-admin-border-strong",
                   )}
                 >
                   <span
                     className={cn(
-                      "inline-block h-4 w-4 rounded-full bg-white shadow transition-[translate]",
+                      "inline-block h-4 w-4 rounded-full bg-admin-surface shadow transition-[translate]",
                       d.enabled ? "translate-x-6" : "translate-x-1",
                     )}
                   />
                 </button>
                 {d.enabled ? (
-                  <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+                  <div className="flex flex-wrap items-center gap-2 text-sm text-admin-text-secondary">
                     <HourSelect
                       value={d.open}
                       from={0}
@@ -227,7 +228,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
                     )}
                   </div>
                 ) : (
-                  <span className="text-sm text-slate-400 italic">Day off</span>
+                  <span className="text-sm text-admin-faint italic">Day off</span>
                 )}
               </div>
             </div>
@@ -239,7 +240,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
       <h3 className="mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase">
         Booking rules
       </h3>
-      <div className="divide-y divide-slate-100">
+      <div className="divide-y divide-admin-border">
         <NumberField
           id="maxAdvanceDays"
           meta={m.maxAdvanceDays}
@@ -294,7 +295,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
       <h3 className="mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase">
         Job lengths &amp; daily limits
       </h3>
-      <div className="divide-y divide-slate-100">
+      <div className="divide-y divide-admin-border">
         <NumberField
           id="durations.short"
           meta={m["durations.short"]}
@@ -371,27 +372,13 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
         </div>
       )}
 
-      {/* Save bar */}
-      <div className="mt-6 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => void form.save()}
-          disabled={!dirty || saving}
-          className="rounded-lg bg-russian-violet px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
-        >
-          {saving ? "Saving..." : "Save changes"}
-        </button>
-        <button
-          type="button"
-          onClick={form.resetToDefault}
-          disabled={saving}
-          className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-        >
-          Reset to defaults
-        </button>
-        {dirty && !saving && <span className="text-sm text-slate-400">Unsaved changes</span>}
-        {!dirty && savedAt && <span className="text-sm font-medium text-emerald-600">Saved</span>}
-      </div>
+      <SettingsSaveBar
+        dirty={dirty}
+        saving={saving}
+        savedAt={savedAt}
+        onSave={() => void form.save()}
+        onReset={form.resetToDefault}
+      />
 
       <SettingsHistory group="availability" onRestore={(v: AvailabilitySettings) => setDraft(v)} />
     </div>
