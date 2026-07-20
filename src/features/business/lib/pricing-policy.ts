@@ -367,20 +367,37 @@ function hours(n: number): string {
 /**
  * Cancellation policy text (pricing accordion + booking emails + cancel page).
  * @param p - Cancellation policy (defaults to the module constant).
+ * @param opts - Optional narrowing for a context that knows the meeting type.
+ * @param opts.only - Show just this tier; omit to show both (the general case).
  * @returns Multi-line copy describing the cancellation rules.
  */
-export function cancellationCopy(p: CancellationPolicy = CANCELLATION): string {
-  return (
+export function cancellationCopy(
+  p: CancellationPolicy = CANCELLATION,
+  opts?: { only?: "in_person" | "remote" },
+): string {
+  const inPerson =
     `**In-person visits:** free if cancelled at least **${hours(p.freeNoticeHours)}** before your ` +
     `appointment. Inside that window, a **$${p.callOutFee} cancellation fee** applies. If ` +
     `cancelled within **${hours(p.travelChargeHours)}** of the appointment (when I would already ` +
     `be on the way), or if nobody is there when I arrive, the full **$${p.fullCallOutFee} ` +
-    `call-out** applies plus **round-trip travel**.\n\n` +
+    `call-out** applies plus **round-trip travel**.`;
+  const remote =
     `**Remote sessions:** free if cancelled at least **${hours(p.remoteFreeNoticeHours)}** before ` +
     `your appointment. Inside that window, or if you are not there, a **$${p.remoteFee} fee** ` +
-    `applies.\n\n` +
-    `Please cancel using the link in your confirmation email, or by phone or text.`
-  );
+    `applies.`;
+  const closing = `Please cancel using the link in your confirmation email, or by phone or text.`;
+
+  // A booking already knows which kind it is, so a confirmation email can show
+  // just the tier that binds this customer. Pages that describe the policy in
+  // general (pricing, FAQ) pass nothing and get both.
+  const tiers =
+    opts?.only === "in_person"
+      ? [inPerson]
+      : opts?.only === "remote"
+        ? [remote]
+        : [inPerson, remote];
+
+  return [...tiers, closing].join("\n\n");
 }
 
 /**

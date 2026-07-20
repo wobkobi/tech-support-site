@@ -3,7 +3,11 @@
  * @description Booking request success page.
  */
 
-import { buildAppointmentDescription, parseBookingNotes } from "@/features/booking/lib/booking";
+import {
+  buildAppointmentDescription,
+  combineUnitAndAddress,
+  parseBookingNotes,
+} from "@/features/booking/lib/booking";
 import { googleCalendarUrl } from "@/features/booking/lib/ics";
 import { cancellationCopy } from "@/features/business/lib/pricing-policy";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
@@ -129,9 +133,11 @@ export default async function BookingSuccessPage({
 
   // Add-to-calendar targets. Google Calendar already invites the customer's
   // email address; these cover everyone whose calendar isn't that address.
+  // Rejoined in the stored NZ form ("12/160 Kepa Road"); a comma between unit
+  // and street reads as a different address to a map lookup.
   const calendarLocation =
     appointment && appointment.meetingType !== "remote"
-      ? [appointment.unit, appointment.address].filter(Boolean).join(", ")
+      ? combineUnitAndAddress(appointment.unit ?? "", appointment.address ?? "")
       : "";
   const googleUrl =
     appointment && cancelToken
@@ -236,7 +242,7 @@ export default async function BookingSuccessPage({
                       a meetingType, so show it whenever it exists and isn't remote. */}
                   {appointment.address && appointment.meetingType !== "remote" && (
                     <DetailRow label="Where">
-                      {[appointment.unit, appointment.address].filter(Boolean).join(", ")}
+                      {combineUnitAndAddress(appointment.unit ?? "", appointment.address ?? "")}
                     </DetailRow>
                   )}
                 </dl>

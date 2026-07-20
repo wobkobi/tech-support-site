@@ -8,6 +8,7 @@
 import {
   BOOKING_CONFIG,
   BOOKING_FIELD_LIMITS,
+  combineUnitAndAddress,
   validateEmail,
 } from "@/features/booking/lib/booking";
 import {
@@ -235,6 +236,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         endAt: booking.endAt,
         cancelToken: booking.cancelToken,
         promoTitleAtBooking: booking.promoTitleAtBooking,
+        address: combineUnitAndAddress(booking.unit ?? "", booking.address ?? ""),
+        meetingType: booking.meetingType,
+        rescheduleCount: booking.rescheduleCount,
       });
     }
 

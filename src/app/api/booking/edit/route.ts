@@ -370,6 +370,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           endAt,
           cancelToken: booking.cancelToken,
           promoTitleAtBooking: booking.promoTitleAtBooking,
+          address: canonicalAddress ?? "",
+          meetingType: meetingType === "in-person" ? "in_person" : "remote",
+          // The update above incremented it, so the stored count is one ahead
+          // of the value loaded into `booking` - use the incremented one or the
+          // calendar entry's SEQUENCE won't rise and clients ignore the update.
+          rescheduleCount: booking.rescheduleCount + 1,
         },
         { kind: "rescheduled", previousStartAt },
       ),
@@ -382,6 +388,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           startAt,
           endAt,
           cancelToken: booking.cancelToken,
+          address: canonicalAddress ?? "",
+          meetingType: meetingType === "in-person" ? "in_person" : "remote",
         },
         { kind: "rescheduled", previousStartAt },
       ),

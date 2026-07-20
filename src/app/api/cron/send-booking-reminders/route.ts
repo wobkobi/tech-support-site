@@ -9,6 +9,7 @@
  * fee in a reminder would read as a bait-and-switch.
  */
 
+import { combineUnitAndAddress } from "@/features/booking/lib/booking";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { sendBookingReminderEmail } from "@/features/reviews/lib/email";
 import { errorResponse } from "@/shared/lib/api-response";
@@ -61,6 +62,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         endAt: true,
         cancelToken: true,
         promoTitleAtBooking: true,
+        address: true,
+        unit: true,
+        meetingType: true,
+        rescheduleCount: true,
       },
     });
 
@@ -80,6 +85,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           endAt: b.endAt,
           cancelToken: b.cancelToken,
           promoTitleAtBooking: b.promoTitleAtBooking,
+          address: combineUnitAndAddress(b.unit ?? "", b.address ?? ""),
+          meetingType: b.meetingType,
+          rescheduleCount: b.rescheduleCount,
         });
         // Only stamp sent-at after Resend accepts the send. Stamping before
         // would silently drop the reminder forever on a transient hiccup,

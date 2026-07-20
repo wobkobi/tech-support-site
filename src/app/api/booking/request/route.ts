@@ -5,6 +5,7 @@
 
 import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
 import {
+  combineUnitAndAddress,
   parseHourLabel,
   splitUnitFromAddress,
   validateBookingPayloadFields,
@@ -423,6 +424,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           startAt: booking.startAt,
           endAt: booking.endAt,
           cancelToken: booking.cancelToken,
+          address: combineUnitAndAddress(booking.unit ?? "", booking.address ?? ""),
+          meetingType: booking.meetingType,
         }),
         ...(comms.notifyConfirmation
           ? [
@@ -435,6 +438,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
                 endAt: booking.endAt,
                 cancelToken: booking.cancelToken,
                 promoTitleAtBooking: booking.promoTitleAtBooking,
+                address: combineUnitAndAddress(booking.unit ?? "", booking.address ?? ""),
+                meetingType: booking.meetingType,
+                rescheduleCount: booking.rescheduleCount,
               }),
             ]
           : []),

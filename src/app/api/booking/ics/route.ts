@@ -6,7 +6,11 @@
  * cache, and must not leak booking data for a cancelled slot.
  */
 
-import { buildAppointmentDescription, parseBookingNotes } from "@/features/booking/lib/booking";
+import {
+  buildAppointmentDescription,
+  combineUnitAndAddress,
+  parseBookingNotes,
+} from "@/features/booking/lib/booking";
 import { buildIcs } from "@/features/booking/lib/ics";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { prisma } from "@/shared/lib/prisma";
@@ -49,7 +53,9 @@ export async function GET(request: NextRequest): Promise<Response> {
 
   const identity = await getIdentity();
   const site = getSiteUrl();
-  const where = [booking.unit, booking.address].filter(Boolean).join(", ");
+  // Rejoin in the stored NZ form ("12/160 Kepa Road"), not a comma join - a
+  // unit separated by a comma reads as a different address to a map lookup.
+  const where = combineUnitAndAddress(booking.unit ?? "", booking.address ?? "");
   const location = booking.meetingType === "remote" || !where ? undefined : where;
   const manageUrl = `${site}/booking/edit?token=${encodeURIComponent(token)}`;
 

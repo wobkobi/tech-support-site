@@ -3,12 +3,15 @@
  * @description Shared Resend utility for sending transactional emails.
  */
 
+import { buildAppointmentDescription, parseBookingNotes } from "@/features/booking/lib/booking";
+import { buildIcs } from "@/features/booking/lib/ics";
 import { formatNZD } from "@/features/business/lib/business";
 import {
   DEFAULT_INVOICE_EMAIL_BODY,
   DEFAULT_VOID_EMAIL_BODY,
 } from "@/features/business/lib/invoice-email-defaults";
 import { cancellationCopy } from "@/features/business/lib/pricing-policy";
+import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { formatDateShort, formatDateTimeLong } from "@/shared/lib/date-format";
 import { getSiteUrl } from "@/shared/lib/site-url";
@@ -189,6 +192,96 @@ export interface BookingNotificationData {
   cancelToken: string;
   /** Promo title snapshotted at booking time, or null when none was active. */
   promoTitleAtBooking?: string | null;
+  /**
+   * Appointment address, already combined with any unit. Drives the map link
+   * and the calendar attachment's LOCATION. Omit for remote jobs.
+   */
+  address?: string | null;
+  /**
+   * Whether this is an on-site or remote job. Nullable on older bookings, where
+   * the value only ever lived in the notes text - treated as "unknown" rather
+   * than assumed on-site, so a remote customer is never sent directions.
+   */
+  meetingType?: "in_person" | "remote" | null;
+  /** How many times the booking has moved; becomes the calendar SEQUENCE. */
+  rescheduleCount?: number;
+}
+
+/**
+ * Cancellation policy text for a booking email, read from the LIVE settings
+ * (not the hardcoded policy default) and narrowed to the tier that actually
+ * binds this customer. Emails quote fees the customer can be charged, so they
+ * must never drift from what the operator has configured.
+ * @param booking - The booking being emailed about.
+ * @returns Policy copy in the `**…**` emphasis convention.
+ */
+async function liveCancellationCopy(booking: BookingNotificationData): Promise<string> {
+  const { CANCELLATION: live } = await getPolicy();
+  // A null meetingType (older rows) can't be narrowed - show both tiers.
+  return cancellationCopy(live, booking.meetingType ? { only: booking.meetingType } : undefined);
+}
+
+/**
+ * On-site address for a booking, or "" when the job is remote or has none.
+ * @param booking - The booking being emailed about.
+ * @returns Trimmed address, or an empty string.
+ */
+function onSiteAddress(booking: BookingNotificationData): string {
+  const isRemote = booking.meetingType === "remote";
+  return !isRemote && booking.address ? booking.address.trim() : "";
+}
+
+/**
+ * "Open in Google Maps" line for the OWNER's emails. Deliberately not sent to
+ * the customer: the appointment address is almost always their own home, so
+ * directions to it are noise. The operator is the one who has to drive there.
+ * @param booking - The booking being emailed about.
+ * @returns HTML paragraph, or "" when there's nothing to map.
+ */
+function ownerMapHtml(booking: BookingNotificationData): string {
+  const address = onSiteAddress(booking);
+  if (!address) return "";
+  // Just the action - the notes block directly above already prints the full
+  // address, so repeating it here only makes the email longer.
+  return `<p style="margin:0 0 20px"><a href="https://www.google.com/maps/search/?api=1&amp;query=${encodeURIComponent(
+    address,
+  )}" style="color:#43bccd;font-size:14px;font-weight:600">📍 Get directions</a></p>`;
+}
+
+/**
+ * Builds the `.ics` attachment sent with the customer's booking emails.
+ * @param booking - The booking being emailed about.
+ * @returns A Resend attachment list holding one calendar file.
+ */
+async function bookingIcsAttachment(
+  booking: BookingNotificationData,
+): Promise<Array<{ filename: string; content: Buffer }>> {
+  const siteUrl = getSiteUrl();
+  const identity = await getIdentity();
+  const isRemote = booking.meetingType === "remote";
+  const address = onSiteAddress(booking);
+
+  const ics = buildIcs({
+    uid: `booking-${booking.id}@tothepointtech.co.nz`,
+    start: booking.startAt,
+    end: booking.endAt,
+    summary: `${identity.company} appointment`,
+    description: buildAppointmentDescription({
+      company: identity.company,
+      phone: identity.phone,
+      email: identity.email,
+      isRemote,
+      userNotes: parseBookingNotes(booking.notes).userNotes,
+      manageUrl: `${siteUrl}/booking/edit?token=${encodeURIComponent(booking.cancelToken)}`,
+      cancelUrl: `${siteUrl}/booking/cancel?token=${encodeURIComponent(booking.cancelToken)}`,
+    }),
+    location: address || undefined,
+    url: `${siteUrl}/booking/edit?token=${encodeURIComponent(booking.cancelToken)}`,
+    sequence: booking.rescheduleCount ?? 0,
+    organiserEmail: identity.email,
+  });
+
+  return [{ filename: "appointment.ics", content: Buffer.from(ics, "utf-8") }];
 }
 
 /**
@@ -250,6 +343,8 @@ export async function sendOwnerBookingNotification(
       <p style="margin:0 0 12px;font-size:14px;color:#444"><a href="mailto:${safeMailto}" style="color:#43bccd">${safeEmail}</a></p>
       <p style="margin:0;font-size:14px;color:#444;line-height:1.6">${notesHtml}</p>
     </div>
+
+    ${ownerMapHtml(booking)}
   </div>
 </body>
 </html>`;
@@ -299,7 +394,20 @@ export async function sendCustomerBookingConfirmation(
   const previous = options?.previousStartAt ? formatDateTimeLong(options.previousStartAt) : null;
   const cancelUrl = `${siteUrl}/booking/cancel?token=${encodeURIComponent(booking.cancelToken)}`;
   const editUrl = `${siteUrl}/booking/edit?token=${encodeURIComponent(booking.cancelToken)}`;
-  const notesHtml = escapeHtml(booking.notes).replace(/\n/g, "<br>");
+  // Only the customer's own words: the rest of the notes blob restates the time
+  // (already shown above) and the meeting type / address (now their own line).
+  const userNotesHtml = escapeHtml(parseBookingNotes(booking.notes).userNotes).replace(
+    /\n/g,
+    "<br>",
+  );
+  const onSite = onSiteAddress(booking);
+  const whereLine =
+    booking.meetingType === "remote"
+      ? `<p style="margin:0 0 20px;color:#444;font-size:14px">💻 Remote session - no visit needed.</p>`
+      : onSite
+        ? `<p style="margin:0 0 20px;color:#444;font-size:14px">📍 ${escapeHtml(onSite)}</p>`
+        : "";
+  const cancellationText = await liveCancellationCopy(booking);
 
   const heading =
     kind === "rescheduled"
@@ -315,6 +423,7 @@ export async function sendCustomerBookingConfirmation(
     kind === "rescheduled" && previous
       ? `<p style="margin:0 0 20px;color:#888;font-size:13px"><s>${escapeHtml(previous)}</s></p>`
       : "";
+  const attachments = await bookingIcsAttachment(booking);
   const promoLine = booking.promoTitleAtBooking
     ? `<div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;padding:12px 16px;margin-bottom:16px"><p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#0c0a3e">🏷 Rate locked in: ${escapeHtml(booking.promoTitleAtBooking)}</p><p style="margin:0;font-size:13px;color:#444;line-height:1.5">This rate applies to your appointment even if the offer ends before your visit.</p></div>`
     : "";
@@ -332,22 +441,28 @@ export async function sendCustomerBookingConfirmation(
     <p style="margin:0 0 8px;color:#888;font-size:13px;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Your appointment</p>
     <p style="margin:0 0 4px;font-size:16px;font-weight:600;color:#0c0a3e">${start}</p>
     ${previousLine}
+    ${whereLine}
 
     ${promoLine}
 
-    <div style="background:#f6f7f8;border-radius:8px;padding:16px;margin-bottom:24px">
-      <p style="margin:0;font-size:14px;color:#444;line-height:1.6">${notesHtml}</p>
-    </div>
+    ${
+      userNotesHtml
+        ? `<div style="background:#f6f7f8;border-radius:8px;padding:16px;margin-bottom:24px">
+      <p style="margin:0 0 4px;font-size:13px;color:#888">What you told me</p>
+      <p style="margin:0;font-size:14px;color:#444;line-height:1.6">${userNotesHtml}</p>
+    </div>`
+        : ""
+    }
 
     <p style="margin:0 0 20px;color:#444;font-size:14px;line-height:1.6">
-      If you need to change the time or any details, use the <strong>Change appointment</strong> button below. You can also <strong>propose a new time</strong> from the calendar invite, or just reply to this email and we'll sort something out.
+      Need to change anything? Use the buttons below, or just reply to this email.
     </p>
 
-    <a href="${editUrl}" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;margin-right:8px">✏️ Change appointment</a>
-    <a href="${cancelUrl}" style="display:inline-block;background:#e8e8e8;color:#333;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600">❌ Cancel appointment</a>
+    <a href="${editUrl}" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-size:13px;font-weight:600;margin:0 8px 10px 0">✏️ Change appointment</a>
+    <a href="${cancelUrl}" style="display:inline-block;background:#e8e8e8;color:#333;text-decoration:none;padding:12px 20px;border-radius:8px;font-size:13px;font-weight:600;margin:0 0 10px">❌ Cancel appointment</a>
 
     <p style="margin:28px 0 6px;color:#888;font-size:13px;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Cancellation policy</p>
-    <p style="margin:0;color:#444;font-size:13px;line-height:1.6">${renderEmphasisedHtml(cancellationCopy())}</p>
+    <p style="margin:0;color:#444;font-size:13px;line-height:1.6">${renderEmphasisedHtml(cancellationText)}</p>
 ${await buildEmailSignature(siteUrl)}
   </div>
 </body>
@@ -361,6 +476,7 @@ ${await buildEmailSignature(siteUrl)}
       to: booking.email,
       subject,
       html,
+      attachments,
     });
   } catch (error) {
     console.error(`[email] Failed to send booking confirmation for booking ${booking.id}:`, error);
@@ -390,10 +506,22 @@ export async function sendBookingReminderEmail(booking: BookingNotificationData)
   const start = formatDateTimeLong(booking.startAt);
   const cancelUrl = `${siteUrl}/booking/cancel?token=${encodeURIComponent(booking.cancelToken)}`;
   const editUrl = `${siteUrl}/booking/edit?token=${encodeURIComponent(booking.cancelToken)}`;
-  const notesHtml = escapeHtml(booking.notes).replace(/\n/g, "<br>");
+  const userNotesHtml = escapeHtml(parseBookingNotes(booking.notes).userNotes).replace(
+    /\n/g,
+    "<br>",
+  );
+  const onSite = onSiteAddress(booking);
+  const whereLine =
+    booking.meetingType === "remote"
+      ? `<p style="margin:0 0 20px;color:#444;font-size:14px">💻 Remote session - no visit needed.</p>`
+      : onSite
+        ? `<p style="margin:0 0 20px;color:#444;font-size:14px">📍 ${escapeHtml(onSite)}</p>`
+        : "";
+  const cancellationText = await liveCancellationCopy(booking);
   const promoLine = booking.promoTitleAtBooking
     ? `<div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;padding:12px 16px;margin-bottom:16px"><p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#0c0a3e">🏷 Rate locked in: ${escapeHtml(booking.promoTitleAtBooking)}</p><p style="margin:0;font-size:13px;color:#444;line-height:1.5">This rate applies to your appointment even if the offer ends before your visit.</p></div>`
     : "";
+  const attachments = await bookingIcsAttachment(booking);
 
   // Render the email body
   const html = `
@@ -406,23 +534,29 @@ export async function sendBookingReminderEmail(booking: BookingNotificationData)
     <p style="margin:0 0 20px;color:#444;line-height:1.6">Your appointment with To The Point Tech is coming up tomorrow.</p>
 
     <p style="margin:0 0 8px;color:#888;font-size:13px;text-transform:uppercase;letter-spacing:.05em;font-weight:600">When</p>
-    <p style="margin:0 0 20px;font-size:16px;font-weight:600;color:#0c0a3e">${start}</p>
+    <p style="margin:0 0 4px;font-size:16px;font-weight:600;color:#0c0a3e">${start}</p>
+    ${whereLine}
 
     ${promoLine}
 
-    <div style="background:#f6f7f8;border-radius:8px;padding:16px;margin-bottom:24px">
-      <p style="margin:0;font-size:14px;color:#444;line-height:1.6">${notesHtml}</p>
-    </div>
+    ${
+      userNotesHtml
+        ? `<div style="background:#f6f7f8;border-radius:8px;padding:16px;margin-bottom:24px">
+      <p style="margin:0 0 4px;font-size:13px;color:#888">What you told me</p>
+      <p style="margin:0;font-size:14px;color:#444;line-height:1.6">${userNotesHtml}</p>
+    </div>`
+        : ""
+    }
 
     <p style="margin:0 0 20px;color:#444;font-size:14px;line-height:1.6">
       Need to change anything? Use the buttons below, or just reply to this email.
     </p>
 
-    <a href="${editUrl}" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;margin-right:8px">✏️ Change appointment</a>
-    <a href="${cancelUrl}" style="display:inline-block;background:#e8e8e8;color:#333;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600">❌ Cancel appointment</a>
+    <a href="${editUrl}" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-size:13px;font-weight:600;margin:0 8px 10px 0">✏️ Change appointment</a>
+    <a href="${cancelUrl}" style="display:inline-block;background:#e8e8e8;color:#333;text-decoration:none;padding:12px 20px;border-radius:8px;font-size:13px;font-weight:600;margin:0 0 10px">❌ Cancel appointment</a>
 
     <p style="margin:28px 0 6px;color:#888;font-size:13px;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Cancellation policy</p>
-    <p style="margin:0;color:#444;font-size:13px;line-height:1.6">${renderEmphasisedHtml(cancellationCopy())}</p>
+    <p style="margin:0;color:#444;font-size:13px;line-height:1.6">${renderEmphasisedHtml(cancellationText)}</p>
 ${await buildEmailSignature(siteUrl)}
   </div>
 </body>
@@ -436,6 +570,7 @@ ${await buildEmailSignature(siteUrl)}
       to: booking.email,
       subject: `Reminder: appointment tomorrow - ${start}`,
       html,
+      attachments,
     });
     return true;
   } catch (error) {
