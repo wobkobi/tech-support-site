@@ -364,7 +364,7 @@ export function WeekView({
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-extrabold text-russian-violet">Schedule</h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-admin-muted">
             {days[0]?.subLabel} - {days[6]?.subLabel} (
             {days[0]?.date
               ? new Intl.DateTimeFormat("en-NZ", { timeZone: NZ_TZ, year: "numeric" }).format(
@@ -379,14 +379,14 @@ export function WeekView({
             type="button"
             onClick={() => goToWeek(prevWeekKey)}
             aria-label="Previous week"
-            className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 sm:h-9 sm:w-9"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-admin-border bg-admin-surface text-admin-text-secondary hover:bg-admin-bg sm:h-9 sm:w-9"
           >
             <FaChevronLeft />
           </button>
           <button
             type="button"
             onClick={() => goToWeek(todayWeekKey)}
-            className="inline-flex h-11 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 sm:h-9"
+            className="inline-flex h-11 items-center gap-2 rounded-md border border-admin-border bg-admin-surface px-3 text-sm font-medium text-admin-text hover:bg-admin-bg sm:h-9"
           >
             <FaCalendarDay />
             Today
@@ -395,7 +395,7 @@ export function WeekView({
             type="button"
             onClick={() => goToWeek(nextWeekKey)}
             aria-label="Next week"
-            className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 sm:h-9 sm:w-9"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-admin-border bg-admin-surface text-admin-text-secondary hover:bg-admin-bg sm:h-9 sm:w-9"
           >
             <FaChevronRight />
           </button>
@@ -405,11 +405,11 @@ export function WeekView({
       {/* relative wrapper carries the right-edge fade hint - the grid is wider
           than the admin content area until ~xl, so it scrolls horizontally. */}
       <div className="relative">
-        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="overflow-x-auto rounded-xl border border-admin-border bg-admin-surface shadow-sm">
           <div className="min-w-225">
             {/* Day headers */}
-            <div className="grid grid-cols-[64px_repeat(7,1fr)] border-b border-slate-200">
-              <div className="border-r border-slate-200" />
+            <div className="grid grid-cols-[64px_repeat(7,1fr)] border-b border-admin-border">
+              <div className="border-r border-admin-border" />
               {days.map((day) => {
                 const isToday = day.key === todayNzKey;
                 // Real block (for the unblock id) excludes the optimistic placeholder;
@@ -424,7 +424,7 @@ export function WeekView({
                   <div
                     key={day.key}
                     className={cn(
-                      "relative border-r border-slate-200 px-2 pt-4 pb-3 text-center last:border-r-0",
+                      "relative border-r border-admin-border px-2 pt-4 pb-3 text-center last:border-r-0",
                       isToday && "bg-russian-violet/5",
                     )}
                   >
@@ -438,14 +438,14 @@ export function WeekView({
                         {holidayName}
                       </div>
                     )}
-                    <div className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
+                    <div className="text-xs font-semibold tracking-wide text-admin-muted uppercase">
                       {day.label}
                     </div>
                     <div className="mt-0.5 flex items-center justify-center gap-1.5">
                       <div
                         className={cn(
                           "text-sm font-bold",
-                          isToday ? "text-russian-violet" : "text-slate-800",
+                          isToday ? "text-russian-violet" : "text-admin-text",
                         )}
                       >
                         {day.subLabel}
@@ -470,7 +470,7 @@ export function WeekView({
             {/* All-day events bar - merges consecutive days into one continuous
               span so multi-day Busy blocks read as a single bar. */}
             {allDayBars.length > 0 && (
-              <div className="grid grid-cols-[64px_repeat(7,1fr)] gap-y-0.5 border-b border-slate-200 px-0 py-1">
+              <div className="grid grid-cols-[64px_repeat(7,1fr)] gap-y-0.5 border-b border-admin-border px-0 py-1">
                 {allDayBars.map((bar) => (
                   <div
                     key={bar.key}
@@ -497,12 +497,12 @@ export function WeekView({
               style={{ height: `${DAY_HEIGHT_PX}px` }}
             >
               {/* Time gutter */}
-              <div className="relative border-r border-slate-200">
+              <div className="relative border-r border-admin-border">
                 {hours.map((h, i) => (
                   <div
                     key={h}
                     className={cn(
-                      "absolute right-1 text-[11px] font-medium text-slate-400",
+                      "absolute right-1 text-[11px] font-medium text-admin-faint",
                       i === 0 && "top-0",
                     )}
                     style={{ top: i === 0 ? 0 : `${i * 60 * PX_PER_MINUTE - 6}px` }}
@@ -529,12 +529,12 @@ export function WeekView({
             </div>
 
             {/* Legend */}
-            <div className="flex flex-wrap items-center gap-3 border-t border-slate-200 px-4 py-3 text-xs text-slate-500">
+            <div className="flex flex-wrap items-center gap-3 border-t border-admin-border px-4 py-3 text-xs text-admin-muted">
               <LegendDot kind="booking" label="Booking" />
               <LegendDot kind="car" label="No car (Car cal)" />
               <LegendDot kind="personal" label="Personal" />
               <LegendDot kind="travel" label="Travel" />
-              <span className="ml-auto text-slate-400">
+              <span className="ml-auto text-admin-faint">
                 Click an empty slot to add · click a booking to edit
               </span>
             </div>
@@ -585,7 +585,7 @@ function DayColumn({
       tabIndex={0}
       onClick={onClick}
       className={cn(
-        "relative border-r border-slate-200 last:border-r-0 hover:bg-slate-50/40",
+        "relative border-r border-admin-border last:border-r-0 hover:bg-admin-bg/40",
         "cursor-pointer focus:ring-2 focus:ring-russian-violet/30 focus:outline-none focus:ring-inset",
       )}
       style={{ height: `${DAY_HEIGHT_PX}px` }}
@@ -594,7 +594,7 @@ function DayColumn({
       {Array.from({ length: DAY_HOURS }).map((_, i) => (
         <div
           key={i}
-          className="pointer-events-none absolute right-0 left-0 border-t border-slate-100"
+          className="pointer-events-none absolute right-0 left-0 border-t border-admin-border"
           style={{ top: `${i * 60 * PX_PER_MINUTE}px` }}
         />
       ))}

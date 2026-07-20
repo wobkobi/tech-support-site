@@ -9,6 +9,7 @@ import { DayAgendaView } from "@/features/admin/components/DayAgendaView";
 import { ScheduleAutoRefresh } from "@/features/admin/components/ScheduleAutoRefresh";
 import { ScheduleFindTimes } from "@/features/admin/components/ScheduleFindTimes";
 import { WeekView } from "@/features/admin/components/WeekView";
+import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { mondayOf, type WeekEvent, type WeekViewKind } from "@/features/admin/lib/schedule-types";
 import { addDays, resolveWeekStart, toNZDateKey } from "@/features/admin/lib/week";
 import { lookupPublicHolidaysForKeys } from "@/features/business/lib/pricing-policy.server";
@@ -246,6 +247,7 @@ export default async function AdminSchedulePage({
     <>
       {/* Silent 30s poll so externally-made calendar changes surface on their own. */}
       <ScheduleAutoRefresh />
+      <PageHeader title="Schedule" />
       {/* Next-open-times bar - shared across the mobile agenda + desktop grid. */}
       <ScheduleFindTimes />
       <div className={"lg:hidden"}>

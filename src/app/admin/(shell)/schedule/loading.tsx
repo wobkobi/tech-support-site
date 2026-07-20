@@ -15,6 +15,9 @@ import type React from "react";
 export default function ScheduleLoading(): React.ReactElement {
   return (
     <div role="status" aria-live="polite" aria-label="Loading schedule">
+      {/* Page title. */}
+      <Bone className="mb-6 h-8 w-40 bg-slate-200" />
+
       {/* Toolbar: prev/next + current range. */}
       <div className="mb-4 flex items-center justify-between gap-3">
         <Bone className="h-9 w-40 bg-slate-200" />

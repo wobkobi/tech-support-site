@@ -9,6 +9,7 @@
  * behaviourally identical, with toasts surfaced by the global admin toaster.
  */
 
+import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import type {
   BookingStatus,
   WeekEvent,
@@ -18,6 +19,19 @@ import { useBookingActions } from "@/features/booking/hooks/use-booking-actions"
 import { isPastEditWindow, MAX_PAST_EDIT_HOURS } from "@/shared/lib/edit-window";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
+
+/** Which mutation a pending confirmation will run once accepted. */
+type PendingTarget =
+  { kind: "cancel"; mode: "operator" | "on-behalf" } | { kind: "no-show" } | { kind: "delete" };
+
+/** A mutation awaiting confirmation, with the dialog copy to show for it. */
+interface PendingAction {
+  title: string;
+  body: string;
+  confirmLabel: string;
+  tone: "default" | "danger";
+  target: PendingTarget;
+}
 
 interface EventActionSheetProps {
   /**
@@ -51,24 +65,31 @@ export function EventActionSheet({
   // Stable "now" so the past/future booking checks don't get flagged for
   // calling an impure function during render.
   const [renderedAt] = useState(() => Date.now());
+  const [pending, setPending] = useState<PendingAction | null>(null);
 
   // Keep the latest onClose without re-running the dialog effect (parent passes
   // a fresh closure each render). Updated in an effect so the ref is never
   // written during render.
   const onCloseRef = useRef(onClose);
+  // Mirrors `pending` so the Escape handler can defer to the confirm dialog
+  // without the effect depending on it.
+  const pendingRef = useRef<PendingAction | null>(pending);
   useEffect(() => {
     onCloseRef.current = onClose;
+    pendingRef.current = pending;
   });
 
   // Close on Escape and restore focus to the opener when the sheet unmounts.
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null;
     /**
-     * Closes the sheet when Escape is pressed.
+     * Closes the sheet when Escape is pressed. While a confirm dialog is open
+     * the key belongs to that dialog, so the sheet stays put.
      * @param e - Keydown event.
      */
     function onKey(e: KeyboardEvent): void {
-      if (e.key === "Escape") onCloseRef.current();
+      if (e.key !== "Escape" || pendingRef.current) return;
+      onCloseRef.current();
     }
     document.addEventListener("keydown", onKey);
     return () => {
@@ -116,23 +137,27 @@ export function EventActionSheet({
    * @param mode - Cancellation policy mode.
    */
   function handleCancel(mode: "operator" | "on-behalf"): void {
-    const confirmMsg =
-      mode === "operator"
-        ? "Cancel this booking on my end? No fee will be charged to the customer."
-        : "Cancel for the customer? The standard cancellation fee rules will apply (callout + travel inside the fee windows).";
-    if (!window.confirm(confirmMsg)) return;
-    void act(() => actions.cancelBooking(booking.id, mode));
+    setPending({
+      title: mode === "operator" ? "Cancel this booking?" : "Cancel for the customer?",
+      body:
+        mode === "operator"
+          ? "Cancelled on your end - no fee will be charged to the customer."
+          : "The standard cancellation fee rules will apply (call-out + travel inside the fee windows).",
+      confirmLabel: "Cancel booking",
+      tone: "danger",
+      target: { kind: "cancel", mode },
+    });
   }
 
   /** Flags the booking as a no-show; drafts the late-cancellation invoice. */
   function handleNoShow(): void {
-    if (
-      !window.confirm(
-        "Mark as no-show? A draft invoice will be created for the call-out fee plus round-trip travel.",
-      )
-    )
-      return;
-    void act(() => actions.markNoShow(booking.id));
+    setPending({
+      title: "Mark as no-show?",
+      body: "A draft invoice will be created for the call-out fee plus round-trip travel.",
+      confirmLabel: "Mark no-show",
+      tone: "danger",
+      target: { kind: "no-show" },
+    });
   }
 
   /** Re-sends (or first-sends) the review email. */
@@ -142,8 +167,13 @@ export function EventActionSheet({
 
   /** Permanently deletes the booking (test bookings only). */
   function handleDelete(): void {
-    if (!window.confirm("Permanently delete this test booking? This cannot be undone.")) return;
-    void act(() => actions.deleteBooking(booking.id));
+    setPending({
+      title: "Delete this test booking?",
+      body: "This permanently deletes the booking and cannot be undone.",
+      confirmLabel: "Delete booking",
+      tone: "danger",
+      target: { kind: "delete" },
+    });
   }
 
   return (
@@ -156,18 +186,18 @@ export function EventActionSheet({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-lg rounded-xl bg-white p-4 shadow-xl"
+        className="w-full max-w-lg rounded-xl bg-admin-surface p-4 shadow-xl"
       >
         <div className="mb-3 flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-slate-700">{booking.name}</p>
-            <p className="truncate text-xs text-slate-500">{event.title}</p>
+            <p className="truncate text-sm font-semibold text-admin-text">{booking.name}</p>
+            <p className="truncate text-xs text-admin-muted">{event.title}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-admin-faint hover:bg-admin-bg hover:text-admin-text"
           >
             ×
           </button>
@@ -182,7 +212,7 @@ export function EventActionSheet({
           </a>
 
           {isEditLocked && !isCancelled && (
-            <p className="px-1 text-center text-xs text-slate-400">
+            <p className="px-1 text-center text-xs text-admin-faint">
               Status changes lock {MAX_PAST_EDIT_HOURS}h after a booking ends.
             </p>
           )}
@@ -215,7 +245,7 @@ export function EventActionSheet({
                 type="button"
                 onClick={() => handleCancel("operator")}
                 disabled={busy || isEditLocked}
-                className="inline-flex h-11 items-center justify-center rounded-lg bg-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-300 disabled:opacity-50"
+                className="inline-flex h-11 items-center justify-center rounded-lg bg-admin-border px-4 text-sm font-semibold text-admin-text hover:bg-admin-border-strong disabled:opacity-50"
               >
                 Cancel - my call
               </button>
@@ -272,6 +302,28 @@ export function EventActionSheet({
             </button>
           )}
         </div>
+
+        {/* Sits inside the stop-propagation container so dialog clicks don't
+            bubble to the sheet backdrop and close it mid-confirm. */}
+        <ConfirmDialog
+          open={pending !== null}
+          title={pending?.title ?? ""}
+          body={pending?.body}
+          confirmLabel={pending?.confirmLabel}
+          tone={pending?.tone}
+          busy={busy}
+          onConfirm={() => {
+            const target = pending?.target;
+            setPending(null);
+            if (!target) return;
+            void act(() => {
+              if (target.kind === "cancel") return actions.cancelBooking(booking.id, target.mode);
+              if (target.kind === "no-show") return actions.markNoShow(booking.id);
+              return actions.deleteBooking(booking.id);
+            });
+          }}
+          onCancel={() => setPending(null)}
+        />
       </div>
     </div>
   );

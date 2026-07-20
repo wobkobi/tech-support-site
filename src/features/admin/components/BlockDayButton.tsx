@@ -162,7 +162,7 @@ export function BlockDayButton({
           "disabled:cursor-not-allowed disabled:opacity-50",
           isBlocked
             ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
-            : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
+            : "border-admin-border bg-admin-surface text-admin-text hover:bg-admin-bg",
         )}
       >
         {isBlocked ? <FaCircleCheck className="h-4 w-4" /> : <FaBan className="h-4 w-4" />}
@@ -179,8 +179,8 @@ export function BlockDayButton({
       aria-label={label}
       title={label}
       className={cn(
-        "inline-flex h-6 w-6 items-center justify-center rounded text-slate-400 transition-colors",
-        "hover:bg-slate-200 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-40",
+        "inline-flex h-6 w-6 items-center justify-center rounded text-admin-faint transition-colors",
+        "hover:bg-admin-border hover:text-admin-text disabled:cursor-not-allowed disabled:opacity-40",
         isBlocked && "text-red-500 hover:bg-red-100 hover:text-red-700",
       )}
     >
