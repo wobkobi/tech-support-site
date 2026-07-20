@@ -4,8 +4,7 @@
  */
 
 import { ReviewScrollHandler } from "@/features/reviews/components/ReviewScrollHandler";
-import { formatReviewerName } from "@/features/reviews/lib/formatting";
-import { splitReviewsIntoColumns } from "@/features/reviews/lib/gridColumns";
+import { ReviewsList, type PublicReview } from "@/features/reviews/components/ReviewsList";
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
 import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
 import { cn } from "@/shared/lib/cn";
@@ -46,19 +45,20 @@ export default async function ReviewsPage(): Promise<React.ReactElement> {
       firstName: true,
       lastName: true,
       isAnonymous: true,
+      verified: true,
+      createdAt: true,
     },
     where: { status: "approved" },
   });
 
-  const normalisedRows = rows.map((r) => ({
+  const normalisedRows: PublicReview[] = rows.map((r) => ({
     ...r,
     text: r.text.trim().replace(/\s+/g, " "),
     firstName: r.firstName?.trim() || null,
     lastName: r.lastName?.trim() || null,
+    // Dates can't cross the server > client boundary as Date objects.
+    createdAt: r.createdAt.toISOString(),
   }));
-
-  // Balance reviews into two columns so the masonry grid packs with no gaps.
-  const reviewColumns = splitReviewsIntoColumns(normalisedRows);
 
   return (
     <PageShell>
@@ -107,28 +107,7 @@ export default async function ReviewsPage(): Promise<React.ReactElement> {
               aria-label="Client reviews"
               className="animate-slide-up animate-fill-both animate-delay-100"
             >
-              {/* Two balanced masonry columns (see splitReviewsIntoColumns). On mobile both
-                  <ul>s collapse via display:contents into one flex column, where the CSS
-                  `order` (date index) restores a single newest-first list. */}
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-                {[reviewColumns.left, reviewColumns.right].map((column, columnIndex) => (
-                  <ul key={columnIndex} className="contents sm:flex sm:flex-1 sm:flex-col sm:gap-4">
-                    {column.map(({ review: r, order }) => (
-                      <li
-                        key={r.id}
-                        id={`review-${r.id}`}
-                        style={{ order }}
-                        className="flex flex-col rounded-lg border-2 border-seasalt-400/60 bg-seasalt-800/80 p-4 sm:p-5"
-                      >
-                        <p className="text-base text-rich-black sm:text-lg">{r.text}</p>
-                        <p className="pt-3 text-right text-base font-semibold text-russian-violet sm:text-lg">
-                          - {formatReviewerName(r)}
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
-                ))}
-              </div>
+              <ReviewsList reviews={normalisedRows} />
             </section>
           )}
 

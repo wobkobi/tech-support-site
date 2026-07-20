@@ -236,7 +236,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Notify the owner - fire-and-forget, never blocks the response
     void sendOwnerReviewNotification(review);
 
-    return NextResponse.json({ ok: true, id: review.id, verified }, { status: 201 });
+    // `status` goes back so the thank-you screen can say whether the review is
+    // already live or waiting on approval, instead of guessing.
+    return NextResponse.json({ ok: true, id: review.id, verified, status }, { status: 201 });
   } catch (error) {
     console.error("[reviews] POST error:", error);
     return errorResponse("Failed to submit review.", 500);

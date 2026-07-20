@@ -84,7 +84,10 @@ function ReviewCard({
         <p className="line-clamp-4">
           <ReviewText text={r.text} />
         </p>
-        <p className="pt-3 text-right text-sm font-semibold text-russian-violet sm:text-base">
+        {/* mt-auto pins the name to the bottom of the card. Without it the name
+            trails the text, so cards in a row (equal height, unequal text)
+            end up with their names at different heights. */}
+        <p className="mt-auto pt-3 text-right text-sm font-semibold text-russian-violet sm:text-base">
           - {r.name}
         </p>
       </Link>
