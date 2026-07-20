@@ -6,13 +6,14 @@
  * the clicked slot and POSTs to the admin booking-create endpoint.
  */
 
+import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { Modal } from "@/features/admin/components/ui/Modal";
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import {
   combineUnitAndAddress,
   splitUnitFromAddress,
   validateEmail,
 } from "@/features/booking/lib/booking";
-import { Button } from "@/shared/components/Button";
 import { EmailInput } from "@/shared/components/EmailInput";
 import { Field } from "@/shared/components/Field";
 import { PhoneInput } from "@/shared/components/PhoneInput";
@@ -22,7 +23,6 @@ import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 import { useRouter } from "next/navigation";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
-import { FaXmark } from "react-icons/fa6";
 
 const NZ_TZ = "Pacific/Auckland";
 
@@ -57,6 +57,8 @@ export function ManualBookingModal({
   const router = useRouter();
   const nameRef = useRef<HTMLInputElement>(null);
   const nameWrapRef = useRef<HTMLDivElement>(null);
+  // Lets the footer's Create button submit the form that lives in the modal body.
+  const formRef = useRef<HTMLFormElement>(null);
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -139,18 +141,6 @@ export function ManualBookingModal({
     void loadContacts();
   }, []);
 
-  useEffect(() => {
-    /**
-     * Closes the modal when Escape is pressed.
-     * @param e - Keyboard event captured at document level.
-     */
-    function onKey(e: KeyboardEvent): void {
-      if (e.key === "Escape") onClose();
-    }
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
   /**
    * Submits the manual booking. Validates locally then POSTs to the admin
    * create endpoint. On success refreshes the schedule page so the new booking
@@ -212,233 +202,214 @@ export function ManualBookingModal({
   }
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="manual-booking-title"
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center"
-      onClick={onClose}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white shadow-xl"
-      >
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-          <h2 id="manual-booking-title" className="text-lg font-bold text-russian-violet">
-            New booking
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="inline-flex h-8 w-8 items-center justify-center rounded text-slate-500 hover:bg-slate-100"
+    <Modal
+      open
+      onClose={onClose}
+      title="New booking"
+      size="md"
+      footer={
+        <>
+          <AdminButton variant="secondary" onClick={onClose} disabled={submitting}>
+            Cancel
+          </AdminButton>
+          {/* The footer sits outside the form, so submit through the form itself -
+              requestSubmit keeps the browser's required-field validation. */}
+          <AdminButton
+            variant="primary"
+            busy={submitting}
+            onClick={() => formRef.current?.requestSubmit()}
           >
-            <FaXmark />
-          </button>
+            Create booking
+          </AdminButton>
+        </>
+      }
+    >
+      <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field label="Start" htmlFor="mb-start" required>
+            <input
+              id="mb-start"
+              type="datetime-local"
+              value={startAtLocal}
+              onChange={(e) => setStartAtLocal(e.target.value)}
+              required
+              className={textInputClasses}
+            />
+          </Field>
+          <Field label="Duration" htmlFor="mb-duration">
+            <select
+              id="mb-duration"
+              value={durationMinutes}
+              onChange={(e) => {
+                setDurationMinutes(Number(e.target.value) as 60 | 120);
+                setDurationManuallySet(true);
+                setEstimateHint(null);
+              }}
+              className={textInputClasses}
+            >
+              <option value={60}>1 hour</option>
+              <option value={120}>2 hours</option>
+            </select>
+            {estimating && (
+              <p className="mt-1 text-xs text-admin-faint">Estimating from notes...</p>
+            )}
+            {!estimating && estimateHint && (
+              <p className="mt-1 text-xs text-admin-muted">{estimateHint}</p>
+            )}
+          </Field>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 px-5 py-5">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Field label="Start" htmlFor="mb-start" required>
-              <input
-                id="mb-start"
-                type="datetime-local"
-                value={startAtLocal}
-                onChange={(e) => setStartAtLocal(e.target.value)}
-                required
-                className={textInputClasses}
-              />
-            </Field>
-            <Field label="Duration" htmlFor="mb-duration">
-              <select
-                id="mb-duration"
-                value={durationMinutes}
-                onChange={(e) => {
-                  setDurationMinutes(Number(e.target.value) as 60 | 120);
-                  setDurationManuallySet(true);
-                  setEstimateHint(null);
-                }}
-                className={textInputClasses}
-              >
-                <option value={60}>1 hour</option>
-                <option value={120}>2 hours</option>
-              </select>
-              {estimating && (
-                <p className="mt-1 text-xs text-slate-400">Estimating from notes...</p>
-              )}
-              {!estimating && estimateHint && (
-                <p className="mt-1 text-xs text-slate-500">{estimateHint}</p>
-              )}
-            </Field>
-          </div>
-
-          <Field label="Customer name" htmlFor="mb-name" required>
-            <div
-              ref={nameWrapRef}
-              className="relative"
-              onBlur={(e) => {
-                if (!nameWrapRef.current?.contains(e.relatedTarget as Node)) {
-                  setNameListOpen(false);
-                }
+        <Field label="Customer name" htmlFor="mb-name" required>
+          <div
+            ref={nameWrapRef}
+            className="relative"
+            onBlur={(e) => {
+              if (!nameWrapRef.current?.contains(e.relatedTarget as Node)) {
+                setNameListOpen(false);
+              }
+            }}
+          >
+            <input
+              ref={nameRef}
+              id="mb-name"
+              type="text"
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                setNameListOpen(true);
               }}
-            >
-              <input
-                ref={nameRef}
-                id="mb-name"
-                type="text"
-                value={name}
-                onChange={(e) => {
-                  setName(e.target.value);
-                  setNameListOpen(true);
-                }}
-                onFocus={() => setNameListOpen(true)}
-                autoComplete="off"
-                required
-                maxLength={100}
-                className={textInputClasses}
-              />
-              {nameListOpen &&
-                contacts.length > 0 &&
-                (() => {
-                  const q = name.trim().toLowerCase();
-                  const matches = contacts.filter((c) => {
-                    if (!q) return true;
-                    return (
-                      c.name.toLowerCase().includes(q) ||
-                      c.email?.toLowerCase().includes(q) ||
-                      c.address?.toLowerCase().includes(q) ||
-                      c.phone?.includes(q)
-                    );
-                  });
-                  if (matches.length === 0) return null;
+              onFocus={() => setNameListOpen(true)}
+              autoComplete="off"
+              required
+              maxLength={100}
+              className={textInputClasses}
+            />
+            {nameListOpen &&
+              contacts.length > 0 &&
+              (() => {
+                const q = name.trim().toLowerCase();
+                const matches = contacts.filter((c) => {
+                  if (!q) return true;
                   return (
-                    <div className="absolute top-full right-0 left-0 z-20 mt-1 max-h-64 overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg">
-                      {matches.slice(0, 30).map((c) => (
-                        <button
-                          key={c.id}
-                          type="button"
-                          onMouseDown={(e) => e.preventDefault()}
-                          onClick={() => {
-                            setName(c.name);
-                            setEmail(c.email ?? "");
-                            setPhone(c.phone ? formatNZPhone(c.phone) : "");
-                            // Split the stored address back into unit + street so the
-                            // dedicated unit box stays populated on edit.
-                            {
-                              const split = splitUnitFromAddress(c.address ?? "");
-                              setUnit(split.unit);
-                              setAddress(split.rest);
-                            }
-                            setNameListOpen(false);
-                          }}
-                          className="flex w-full flex-col gap-0.5 px-3 py-2 text-left hover:bg-slate-50"
-                        >
-                          <span className="text-sm font-medium text-slate-800">{c.name}</span>
-                          {c.address && <span className="text-xs text-slate-500">{c.address}</span>}
-                          <span className="text-xs text-slate-400">
-                            {[c.email, c.phone ? formatNZPhone(c.phone) : null]
-                              .filter(Boolean)
-                              .join(" · ") || "No contact info"}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
+                    c.name.toLowerCase().includes(q) ||
+                    c.email?.toLowerCase().includes(q) ||
+                    c.address?.toLowerCase().includes(q) ||
+                    c.phone?.includes(q)
                   );
-                })()}
-            </div>
-          </Field>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Field label="Phone" htmlFor="mb-phone" optional>
-              <PhoneInput id="mb-phone" value={phone} onChange={setPhone} />
-            </Field>
-            <Field label="Email" htmlFor="mb-email" required>
-              <EmailInput
-                id="mb-email"
-                value={email}
-                onChange={setEmail}
-                required
-                maxLength={320}
-              />
-            </Field>
+                });
+                if (matches.length === 0) return null;
+                return (
+                  <div className="absolute top-full right-0 left-0 z-20 mt-1 max-h-64 overflow-y-auto rounded-md border border-admin-border bg-admin-surface shadow-lg">
+                    {matches.slice(0, 30).map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          setName(c.name);
+                          setEmail(c.email ?? "");
+                          setPhone(c.phone ? formatNZPhone(c.phone) : "");
+                          // Split the stored address back into unit + street so the
+                          // dedicated unit box stays populated on edit.
+                          {
+                            const split = splitUnitFromAddress(c.address ?? "");
+                            setUnit(split.unit);
+                            setAddress(split.rest);
+                          }
+                          setNameListOpen(false);
+                        }}
+                        className="flex w-full flex-col gap-0.5 px-3 py-2 text-left hover:bg-admin-bg"
+                      >
+                        <span className="text-sm font-medium text-admin-text">{c.name}</span>
+                        {c.address && <span className="text-xs text-admin-muted">{c.address}</span>}
+                        <span className="text-xs text-admin-faint">
+                          {[c.email, c.phone ? formatNZPhone(c.phone) : null]
+                            .filter(Boolean)
+                            .join(" · ") || "No contact info"}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                );
+              })()}
           </div>
+        </Field>
 
-          {/* Stack below sm: the unit input + address autocomplete can't both
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field label="Phone" htmlFor="mb-phone" optional>
+            <PhoneInput id="mb-phone" value={phone} onChange={setPhone} />
+          </Field>
+          <Field label="Email" htmlFor="mb-email" required>
+            <EmailInput id="mb-email" value={email} onChange={setEmail} required maxLength={320} />
+          </Field>
+        </div>
+
+        {/* Stack below sm: the unit input + address autocomplete can't both
               shrink to fit three tracks on a narrow phone, and this modal is
               fixed-position so the page-level overflow clip doesn't contain it. */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <Field label="Apt / Unit" htmlFor="mb-unit" optional>
-              <input
-                id="mb-unit"
-                type="text"
-                value={unit}
-                onChange={(e) => setUnit(e.target.value)}
-                autoComplete="off"
-                maxLength={20}
-                placeholder="12"
-                className={textInputClasses}
-              />
-            </Field>
-            <div className="sm:col-span-2">
-              <Field label="Address" htmlFor="mb-address" optional>
-                <AddressAutocomplete
-                  id="mb-address"
-                  value={address}
-                  onChange={setAddress}
-                  placeholder="Street address"
-                  maxLength={250}
-                />
-              </Field>
-            </div>
-          </div>
-
-          <Field label="Notes" htmlFor="mb-notes" optional>
-            <textarea
-              id="mb-notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              onBlur={() => void estimateFromNotes()}
-              rows={3}
-              maxLength={2000}
-              className={cn(textInputClasses, "resize-y")}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <Field label="Apt / Unit" htmlFor="mb-unit" optional>
+            <input
+              id="mb-unit"
+              type="text"
+              value={unit}
+              onChange={(e) => setUnit(e.target.value)}
+              autoComplete="off"
+              maxLength={20}
+              placeholder="12"
+              className={textInputClasses}
             />
           </Field>
-
-          <label className="flex items-center gap-2 text-sm text-slate-700">
-            <input
-              type="checkbox"
-              checked={sendConfirmation}
-              onChange={(e) => setSendConfirmation(e.target.checked)}
-              className="h-4 w-4 rounded border-slate-300"
-            />
-            Send confirmation email to customer
-          </label>
-
-          {error && (
-            <p
-              role="alert"
-              className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
-            >
-              {error}
-            </p>
-          )}
-
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={submitting}>
-              Cancel
-            </Button>
-            <Button type="submit" variant="secondary" size="sm" disabled={submitting}>
-              {submitting ? "Saving..." : "Create booking"}
-            </Button>
+          <div className="sm:col-span-2">
+            <Field label="Address" htmlFor="mb-address" optional>
+              <AddressAutocomplete
+                id="mb-address"
+                value={address}
+                onChange={setAddress}
+                placeholder="Street address"
+                maxLength={250}
+              />
+            </Field>
           </div>
-        </form>
-      </div>
-    </div>
+        </div>
+
+        <Field label="Notes" htmlFor="mb-notes" optional>
+          <textarea
+            id="mb-notes"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            onBlur={() => void estimateFromNotes()}
+            rows={3}
+            maxLength={2000}
+            className={cn(textInputClasses, "resize-y")}
+          />
+        </Field>
+
+        <label className="flex items-center gap-2 text-sm text-admin-text">
+          <input
+            type="checkbox"
+            checked={sendConfirmation}
+            onChange={(e) => setSendConfirmation(e.target.checked)}
+            className="h-4 w-4 rounded border-admin-border-strong"
+          />
+          Send confirmation email to customer
+        </label>
+
+        {error && (
+          <p
+            role="alert"
+            className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+          >
+            {error}
+          </p>
+        )}
+      </form>
+    </Modal>
   );
 }
 
 const textInputClasses = cn(
-  "w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800",
+  "w-full rounded-md border border-admin-border-strong bg-admin-surface px-3 py-2 text-sm text-admin-text",
   "focus:border-russian-violet focus:outline-none focus:ring-2 focus:ring-russian-violet/30",
 );
 

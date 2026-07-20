@@ -8,8 +8,10 @@
  * doesn't already exist in the DB.
  */
 
+import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { Modal } from "@/features/admin/components/ui/Modal";
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 /**
  * Props for AddToContactsModal.
@@ -53,18 +55,6 @@ export function AddToContactsModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    /**
-     * Closes the modal on Escape.
-     * @param e - Keyboard event.
-     */
-    function handleKey(e: KeyboardEvent): void {
-      if (e.key === "Escape") onClose(null);
-    }
-    document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
-  }, [onClose]);
-
   /**
    * Persists the contact then closes. Passes the new Contact's DB id back via
    * `onClose` so the caller can backfill an FK on a parent row (e.g. set
@@ -96,59 +86,32 @@ export function AddToContactsModal({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
-      onClick={() => onClose(null)}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Add to contacts"
-    >
-      <div
-        className="w-full max-w-md overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-          <h2 className="text-base font-semibold text-russian-violet">Add to contacts?</h2>
-          <button
-            type="button"
-            onClick={() => onClose(null)}
-            className="text-2xl leading-none text-slate-400 transition-colors hover:text-slate-700"
-            aria-label="Close"
-          >
-            ×
-          </button>
-        </div>
-
-        <div className="space-y-3 px-5 py-4 text-sm text-slate-700">
-          <p>
-            <span className="font-semibold">{name}</span>
-            {
-              " isn't in your contacts yet. Add them so you can send review links and pre-fill future invoices?"
-            }
-          </p>
-          <p className="text-xs text-slate-500">{email}</p>
-          {error && <p className="text-xs text-coquelicot-500">{error}</p>}
-        </div>
-
-        <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
-          <button
-            type="button"
-            onClick={() => onClose(null)}
-            disabled={saving}
-            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-          >
+    <Modal
+      open
+      onClose={() => onClose(null)}
+      title="Add to contacts?"
+      size="sm"
+      footer={
+        <>
+          <AdminButton variant="secondary" onClick={() => onClose(null)} disabled={saving}>
             Not now
-          </button>
-          <button
-            type="button"
-            onClick={() => void handleConfirm()}
-            disabled={saving}
-            className="rounded-lg bg-moonstone-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-moonstone-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {saving ? "Adding..." : "Yes, add"}
-          </button>
-        </div>
+          </AdminButton>
+          <AdminButton variant="primary" onClick={() => void handleConfirm()} busy={saving}>
+            Yes, add
+          </AdminButton>
+        </>
+      }
+    >
+      <div className="space-y-3 text-sm text-admin-text">
+        <p>
+          <span className="font-semibold">{name}</span>
+          {
+            " isn't in your contacts yet. Add them so you can send review links and pre-fill future invoices?"
+          }
+        </p>
+        <p className="text-xs text-admin-muted">{email}</p>
+        {error && <p className="text-xs text-coquelicot-500">{error}</p>}
       </div>
-    </div>
+    </Modal>
   );
 }

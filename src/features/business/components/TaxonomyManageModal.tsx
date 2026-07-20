@@ -13,6 +13,7 @@
  * not something the system can do.
  */
 
+import { Modal } from "@/features/admin/components/ui/Modal";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
 import { useEffect, useState } from "react";
@@ -119,19 +120,6 @@ export function TaxonomyManageModal({ onClose, onChanged }: Props): React.ReactE
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Close on Escape.
-  useEffect(() => {
-    /**
-     * Closes the modal when Escape is pressed.
-     * @param e - Keyboard event.
-     */
-    function onKey(e: KeyboardEvent): void {
-      if (e.key === "Escape") onClose();
-    }
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
   /**
    * Clears a tag from every task tagged with it. Caller must have confirmed
    * via the inline two-step (no window.confirm, Firefox suppresses it).
@@ -192,73 +180,52 @@ export function TaxonomyManageModal({ onClose, onChanged }: Props): React.ReactE
   }
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Manage task taxonomy"
-      onClick={onClose}
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-12 backdrop-blur-sm"
+    <Modal
+      open
+      onClose={onClose}
+      title="Manage tags"
+      size="lg"
+      description={
+        <>
+          <strong>Rename</strong> to fix a spelling - every task using the tag follows, and
+          duplicates merge. <strong>Clear</strong> only when that work is gone for good: it removes
+          the tag from the AI&apos;s vocabulary, so those tasks are not retagged later.
+        </>
+      }
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl"
-      >
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-          <div>
-            <h2 className="text-base font-bold text-russian-violet">Manage tags</h2>
-            <p className="mt-0.5 text-xs text-slate-500">
-              <strong>Rename</strong> to fix a spelling - every task using the tag follows, and
-              duplicates merge. <strong>Clear</strong> only when that work is gone for good: it
-              removes the tag from the AI&apos;s vocabulary, so those tasks are not retagged later.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="h-9 w-9 shrink-0 rounded-lg text-2xl leading-none text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-          >
-            ×
-          </button>
-        </div>
+      <div className="space-y-6">
+        {loading && <p className="text-sm text-admin-muted">Loading...</p>}
+        {error && <p className="rounded bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>}
 
-        <div className="max-h-[60vh] space-y-6 overflow-y-auto px-5 py-4">
-          {loading && <p className="text-sm text-slate-500">Loading...</p>}
-          {error && <p className="rounded bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>}
-
-          {!loading && (
-            <>
-              {(["devices", "actions"] as const).map((kind) => (
-                <TagSection
-                  key={kind}
-                  title={kind === "devices" ? "Devices" : "Actions"}
-                  tags={kind === "devices" ? devices : actions}
-                  kind={kind}
-                  busyKey={busy}
-                  pendingKey={pendingClear}
-                  renamingKey={renaming}
-                  renameValue={renameValue}
-                  onRenameValue={setRenameValue}
-                  onRequestRename={(name) => {
-                    setPendingClear(null);
-                    setRenaming(`${kind}:${name}`);
-                    setRenameValue(name);
-                  }}
-                  onSubmitRename={(name) => void renameTag(kind, name, renameValue)}
-                  onCancelRename={() => setRenaming(null)}
-                  onRequestClear={(name) => {
-                    setRenaming(null);
-                    setPendingClear(`${kind}:${name}`);
-                  }}
-                  onConfirmClear={(name) => void clearTag(kind, name)}
-                  onCancelClear={() => setPendingClear(null)}
-                />
-              ))}
-            </>
-          )}
-        </div>
+        {!loading &&
+          (["devices", "actions"] as const).map((kind) => (
+            <TagSection
+              key={kind}
+              title={kind === "devices" ? "Devices" : "Actions"}
+              tags={kind === "devices" ? devices : actions}
+              kind={kind}
+              busyKey={busy}
+              pendingKey={pendingClear}
+              renamingKey={renaming}
+              renameValue={renameValue}
+              onRenameValue={setRenameValue}
+              onRequestRename={(name) => {
+                setPendingClear(null);
+                setRenaming(`${kind}:${name}`);
+                setRenameValue(name);
+              }}
+              onSubmitRename={(name) => void renameTag(kind, name, renameValue)}
+              onCancelRename={() => setRenaming(null)}
+              onRequestClear={(name) => {
+                setRenaming(null);
+                setPendingClear(`${kind}:${name}`);
+              }}
+              onConfirmClear={(name) => void clearTag(kind, name)}
+              onCancelClear={() => setPendingClear(null)}
+            />
+          ))}
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -319,7 +286,7 @@ function TagSection({
         {title}
       </h3>
       {tags.length === 0 ? (
-        <p className="text-xs text-slate-400 italic">None yet.</p>
+        <p className="text-xs text-admin-faint italic">None yet.</p>
       ) : (
         <ul className="flex flex-col gap-1">
           {tags.map((tag) => {
@@ -335,8 +302,8 @@ function TagSection({
                   isPending
                     ? "border-red-300 bg-red-50"
                     : isRenaming
-                      ? "border-slate-400 bg-slate-50"
-                      : "border-slate-200",
+                      ? "border-admin-border-strong bg-admin-bg"
+                      : "border-admin-border",
                 )}
               >
                 {isRenaming ? (
@@ -350,7 +317,7 @@ function TagSection({
                         if (e.key === "Escape") onCancelRename();
                       }}
                       aria-label={`Rename ${tag}`}
-                      className="min-w-0 flex-1 rounded border border-slate-300 px-2 py-1 text-sm text-slate-700"
+                      className="min-w-0 flex-1 rounded border border-admin-border-strong px-2 py-1 text-sm text-admin-text"
                     />
                     <div className="flex shrink-0 items-center gap-2">
                       <button
@@ -364,7 +331,7 @@ function TagSection({
                       <button
                         type="button"
                         onClick={onCancelRename}
-                        className="rounded text-xs font-semibold text-slate-500 hover:text-slate-700"
+                        className="rounded text-xs font-semibold text-admin-muted hover:text-admin-text"
                       >
                         Cancel
                       </button>
@@ -372,7 +339,7 @@ function TagSection({
                   </>
                 ) : (
                   <>
-                    <span className="truncate text-sm text-slate-700">{tag}</span>
+                    <span className="truncate text-sm text-admin-text">{tag}</span>
                     {isPending ? (
                       <div className="flex shrink-0 items-center gap-2">
                         <span className="text-xs text-red-700">Clear for good?</span>
@@ -386,7 +353,7 @@ function TagSection({
                         <button
                           type="button"
                           onClick={onCancelClear}
-                          className="rounded text-xs font-semibold text-slate-500 hover:text-slate-700"
+                          className="rounded text-xs font-semibold text-admin-muted hover:text-admin-text"
                         >
                           Cancel
                         </button>
@@ -397,7 +364,7 @@ function TagSection({
                           type="button"
                           disabled={isBusy}
                           onClick={() => onRequestRename(tag)}
-                          className="rounded text-xs font-semibold text-slate-500 hover:text-russian-violet disabled:opacity-50"
+                          className="rounded text-xs font-semibold text-admin-muted hover:text-russian-violet disabled:opacity-50"
                         >
                           Rename
                         </button>
