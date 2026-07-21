@@ -199,14 +199,6 @@ export function IdentityTab({ initial, defaults }: Props): React.ReactElement {
           onChange={(v) => set({ bankAccount: v })}
         />
         <TextField
-          id="invoicePrefix"
-          meta={m.invoicePrefix}
-          value={draft.invoicePrefix}
-          error={fieldErrors.invoicePrefix}
-          customised={draft.invoicePrefix !== defaults.invoicePrefix}
-          onChange={(v) => set({ invoicePrefix: v })}
-        />
-        <TextField
           id="homeRegion"
           meta={m.homeRegion}
           value={draft.homeRegion}

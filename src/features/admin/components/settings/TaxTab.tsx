@@ -2,9 +2,9 @@
 // src/features/admin/components/settings/TaxTab.tsx
 /**
  * @description Editor for the tax-planner group: the income-tax / ACC /
- * KiwiSaver reserve rates (stored as fractions) and the weekly transfer
- * amounts. These feed the dashboard tax planner and the per-FY tax reserve;
- * a per-FY workbook rate, when present, still takes precedence over these.
+ * KiwiSaver reserve rates (stored as fractions). These feed the dashboard tax
+ * planner and the per-FY tax reserve; a per-FY workbook rate, when present,
+ * still takes precedence over these.
  */
 
 import { NumberField } from "@/features/admin/components/settings/SettingsFields";
@@ -75,24 +75,6 @@ export function TaxTab({ initial, defaults }: Props): React.ReactElement {
           error={fieldErrors.kiwiSaver}
           customised={draft.kiwiSaver !== defaults.kiwiSaver}
           onChange={(v) => set({ kiwiSaver: v ?? 0 })}
-        />
-        <NumberField
-          id="weeklyKiwiSaver"
-          meta={m.weeklyKiwiSaver}
-          value={draft.weeklyKiwiSaver}
-          min={0}
-          error={fieldErrors.weeklyKiwiSaver}
-          customised={draft.weeklyKiwiSaver !== defaults.weeklyKiwiSaver}
-          onChange={(v) => set({ weeklyKiwiSaver: v ?? 0 })}
-        />
-        <NumberField
-          id="weeklyTax"
-          meta={m.weeklyTax}
-          value={draft.weeklyTax}
-          min={0}
-          error={fieldErrors.weeklyTax}
-          customised={draft.weeklyTax !== defaults.weeklyTax}
-          onChange={(v) => set({ weeklyTax: v ?? 0 })}
         />
       </div>
 

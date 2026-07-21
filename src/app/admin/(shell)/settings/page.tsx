@@ -46,8 +46,6 @@ export default async function SettingsPage(): Promise<React.ReactElement> {
         commsDefaults={DEFAULT_SETTINGS.comms}
         reviews={settings.reviews}
         reviewsDefaults={DEFAULT_SETTINGS.reviews}
-        holds={settings.holds}
-        holdsDefaults={DEFAULT_SETTINGS.holds}
         identity={settings.identity}
         identityDefaults={DEFAULT_SETTINGS.identity}
         tax={settings.tax}

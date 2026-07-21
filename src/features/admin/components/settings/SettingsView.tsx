@@ -14,7 +14,6 @@ import type {
   AvailabilitySettings,
   CommsSettings,
   EstimatorSettings,
-  HoldsSettings,
   IdentitySettings,
   PricingSettings,
   ReviewsSettings,
@@ -50,10 +49,6 @@ const EstimatorTab = dynamic(
   () => import("@/features/admin/components/settings/EstimatorTab").then((m) => m.EstimatorTab),
   { loading: TabLoading },
 );
-const HoldsTab = dynamic(
-  () => import("@/features/admin/components/settings/HoldsTab").then((m) => m.HoldsTab),
-  { loading: TabLoading },
-);
 const IdentityTab = dynamic(
   () => import("@/features/admin/components/settings/IdentityTab").then((m) => m.IdentityTab),
   { loading: TabLoading },
@@ -83,7 +78,6 @@ const TAB_ORDER: SettingsGroup[] = [
   "identity",
   "tax",
   "comms",
-  "holds",
   "scheduling",
   "reviews",
 ];
@@ -97,7 +91,6 @@ const IMPLEMENTED: ReadonlySet<SettingsGroup> = new Set<SettingsGroup>([
   "tax",
   "comms",
   "reviews",
-  "holds",
   "scheduling",
 ]);
 
@@ -112,8 +105,6 @@ interface Props {
   commsDefaults: CommsSettings;
   reviews: ReviewsSettings;
   reviewsDefaults: ReviewsSettings;
-  holds: HoldsSettings;
-  holdsDefaults: HoldsSettings;
   identity: IdentitySettings;
   identityDefaults: IdentitySettings;
   tax: TaxSettings;
@@ -135,8 +126,6 @@ interface Props {
  * @param props.commsDefaults - Code default comms settings.
  * @param props.reviews - Resolved current reviews settings.
  * @param props.reviewsDefaults - Code default reviews settings.
- * @param props.holds - Resolved current holds settings.
- * @param props.holdsDefaults - Code default holds settings.
  * @param props.identity - Resolved current identity settings.
  * @param props.identityDefaults - Code default identity settings.
  * @param props.tax - Resolved current tax settings.
@@ -156,8 +145,6 @@ export function SettingsView({
   commsDefaults,
   reviews,
   reviewsDefaults,
-  holds,
-  holdsDefaults,
   identity,
   identityDefaults,
   tax,
@@ -206,7 +193,6 @@ export function SettingsView({
     estimator,
     comms,
     reviews,
-    holds,
     identity,
     tax,
     scheduling,
@@ -257,8 +243,6 @@ export function SettingsView({
               <CommsTab initial={comms} defaults={commsDefaults} />
             ) : active === "reviews" ? (
               <ReviewsTab initial={reviews} defaults={reviewsDefaults} />
-            ) : active === "holds" ? (
-              <HoldsTab initial={holds} defaults={holdsDefaults} />
             ) : active === "tax" ? (
               <TaxTab initial={tax} defaults={taxDefaults} />
             ) : active === "scheduling" ? (

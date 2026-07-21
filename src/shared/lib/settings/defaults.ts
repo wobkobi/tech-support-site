@@ -44,6 +44,17 @@ export const DEFAULT_SETTINGS: Settings = {
     durations: { short: 60, long: 120 },
     maxJobsPerDay: null,
     maxBillableHoursPerDay: null,
+    // Weekend lie-in: from Friday 18:00, Sat/Sun slots before noon are blocked.
+    morningGuards: [
+      {
+        enabled: true,
+        label: "Weekend mornings",
+        triggerDay: 5,
+        triggerHour: 18,
+        protectedDays: [6, 0],
+        earliestHour: 12,
+      },
+    ],
   },
 
   // Source: pricing-policy.ts + MIN_TRAVEL_CHARGE in business.ts.
@@ -53,6 +64,7 @@ export const DEFAULT_SETTINGS: Settings = {
     billingIncrementMins: 5,
     publicHolidayUplift: 0.25,
     minTravelCharge: 10,
+    unsuccessfulWorkFactor: 0.5,
     cancellation: {
       freeNoticeHours: 12,
       travelChargeHours: 1,
@@ -91,6 +103,10 @@ export const DEFAULT_SETTINGS: Settings = {
       low: { lowFactor: 0.55, highFactor: 1.6 },
       minSpread: 20,
     },
+    maxJobHours: 8,
+    stackHandsOnFactor: 0.5,
+    stackBackgroundFactor: 0.2,
+    lowEndFloorFactor: 0.75,
   },
 
   // Source: business-identity.ts + layout.tsx JSON-LD + HOME_ADDRESS env.
@@ -115,8 +131,8 @@ export const DEFAULT_SETTINGS: Settings = {
     startDateIso: "2025-10-01T00:00:00Z",
     gstNumber: process.env.NEXT_PUBLIC_BUSINESS_GST_NUMBER ?? "",
     bankAccount: process.env.NEXT_PUBLIC_BUSINESS_BANK_ACCOUNT ?? BANK_ACCOUNT_PLACEHOLDER,
-    invoicePrefix: "TTP",
     homeRegion: "Auckland",
+    serviceRadiusKm: 25,
   },
 
   // Source: DEFAULT_TAX_RATES in tax-planner.ts (sheet still overrides per-FY).
@@ -124,8 +140,6 @@ export const DEFAULT_SETTINGS: Settings = {
     incomeTax: 0.2,
     acc: 0.0146,
     kiwiSaver: 0.12,
-    weeklyKiwiSaver: 0,
-    weeklyTax: 0,
   },
 
   // Source: cron route literals + contact-review-token.ts.
@@ -139,20 +153,17 @@ export const DEFAULT_SETTINGS: Settings = {
     invoiceRemindersEnabled: true,
     invoiceReminderFirstDays: 3,
     invoiceReminderSecondDays: 10,
+    invoiceReminderMaxCount: 2,
   },
 
-  // Hold-expiry window (minutes) for "held" bookings, read by the release-holds
-  // cron. Currently inert - no route creates holds; bookings confirm directly.
-  holds: {
-    holdExpirationMinutes: 15,
-  },
-
-  // Source: calendar-cache.ts travel-block heuristics.
+  // Source: calendar-cache.ts travel-block heuristics + edit-window.ts + travel-time route.
   scheduling: {
     travelRoundBufferMin: 10,
     minHomeDwellMin: 60,
     travelBackDepartureBufferMin: 30,
     smartOriginLookaheadHours: 4,
+    pastEditLockHours: 18,
+    travelQuoteHour: 14,
   },
 
   // Source: page.tsx getApprovedReviews (take 20) + reviews POST + contact-review-token.ts.

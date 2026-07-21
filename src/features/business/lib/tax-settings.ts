@@ -1,15 +1,13 @@
 // src/features/business/lib/tax-settings.ts
 /**
  * @description Reads the planner configuration cells from a per-FY workbook's
- * SETTINGS tab. Some cells are at fixed positions (rates and weekly amounts);
- * the auto-transfer start date is found by scanning column A for its label so
- * the operator can drop it anywhere they like.
+ * SETTINGS tab. The rate cells are at fixed positions; the auto-transfer start
+ * date is found by scanning column A for its label so the operator can drop it
+ * anywhere they like.
  *
  *   B13 - Tax Reserve Rate (income tax %)
  *   B14 - ACC Rate
  *   B15 - KiwiSaver Rate
- *   B22 - Weekly KiwiSaver transfer ($)
- *   B23 - Weekly tax account transfer ($)
  *   B(?) - Auto-transfer start date (located by label match in column A)
  */
 
@@ -20,8 +18,6 @@ import type { TaxSettings } from "@/shared/lib/settings/types";
 /** Combined planner configuration for one workbook. */
 export interface PlannerConfig {
   rates: TaxRates;
-  weeklyKiwiSaver: number;
-  weeklyTax: number;
   /** ISO date the bank auto-transfers began firing, or null when not set. */
   transferStartDate: Date | null;
 }
@@ -76,7 +72,7 @@ function parseDateCell(raw: unknown): Date | null {
  * the sheet is unreadable so callers can fall back to defaults.
  *
  * Performs two batched reads:
- * 1. Fixed cells: B13-B15 (rates) and B22-B23 (weekly amounts)
+ * 1. Fixed cells: B13-B15 (rates)
  * 2. Whole `A:B` range to scan for the auto-transfer start date label
  *
  * The sheet stays authoritative for any cell it fills; `fallback` (the live tax
@@ -94,21 +90,18 @@ export async function readPlannerConfig(
   try {
     res = await sheets.spreadsheets.values.batchGet({
       spreadsheetId,
-      ranges: ["SETTINGS!B13:B15", "SETTINGS!B22:B23", "SETTINGS!A:B"],
+      ranges: ["SETTINGS!B13:B15", "SETTINGS!A:B"],
     });
   } catch {
     return null;
   }
 
   const ratesRange = res.data.valueRanges?.[0]?.values ?? [];
-  const weeklyRange = res.data.valueRanges?.[1]?.values ?? [];
-  const fullSheet = (res.data.valueRanges?.[2]?.values ?? []) as unknown[][];
+  const fullSheet = (res.data.valueRanges?.[1]?.values ?? []) as unknown[][];
 
   const incomeTax = num(ratesRange[0]?.[0]);
   const acc = num(ratesRange[1]?.[0]);
   const kiwiSaver = num(ratesRange[2]?.[0]);
-  const weeklyKiwiSaver = num(weeklyRange[0]?.[0]);
-  const weeklyTax = num(weeklyRange[1]?.[0]);
 
   /**
    * Treat raw rate cells > 1 as percentages (user might enter "20" instead of "0.2").
@@ -138,8 +131,6 @@ export async function readPlannerConfig(
       // GST output ratio is a legislated NZ constant, never operator-tunable.
       gstOutOfInclusive: DEFAULT_TAX_RATES.gstOutOfInclusive,
     },
-    weeklyKiwiSaver: weeklyKiwiSaver ?? fallback.weeklyKiwiSaver,
-    weeklyTax: weeklyTax ?? fallback.weeklyTax,
     transferStartDate,
   };
 }
