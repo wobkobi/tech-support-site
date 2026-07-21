@@ -313,17 +313,28 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
           customised={draft.minHoursNotice !== defaults.minHoursNotice}
           onChange={(v) => setTop({ minHoursNotice: v ?? 0 })}
         />
-        <NumberField
+        <FieldShell
           id="sameDayCutoffHour"
           meta={m.sameDayCutoffHour}
-          value={draft.sameDayCutoffHour}
-          nullable
-          min={0}
-          max={23}
           error={fieldErrors.sameDayCutoffHour}
           customised={draft.sameDayCutoffHour !== defaults.sameDayCutoffHour}
-          onChange={(v) => setTop({ sameDayCutoffHour: v })}
-        />
+        >
+          <select
+            id="sameDayCutoffHour"
+            value={draft.sameDayCutoffHour ?? ""}
+            onChange={(e) =>
+              setTop({ sameDayCutoffHour: e.target.value === "" ? null : Number(e.target.value) })
+            }
+            className="rounded-lg border border-admin-border-strong px-2 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+          >
+            <option value="">No cutoff</option>
+            {Array.from({ length: 24 }, (_, h) => (
+              <option key={h} value={h}>
+                {hourLabel(h)}
+              </option>
+            ))}
+          </select>
+        </FieldShell>
         <NumberField
           id="bufferMin"
           meta={m.bufferMin}

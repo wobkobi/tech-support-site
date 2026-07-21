@@ -42,7 +42,9 @@ export function SettingsSaveBar({
   onReset,
 }: SettingsSaveBarProps): React.ReactElement {
   return (
-    <div className="mt-6 flex items-center gap-3">
+    // Sticky + full-bleed within the card padding so the actions stay reachable
+    // on long tabs without scrolling to the very bottom.
+    <div className="sticky bottom-0 z-10 -mx-5 mt-6 flex items-center gap-3 border-t border-admin-border bg-admin-surface/95 px-5 py-3 backdrop-blur sm:-mx-6 sm:px-6">
       <AdminButton variant="primary" busy={saving} disabled={!dirty || saving} onClick={onSave}>
         Save changes
       </AdminButton>

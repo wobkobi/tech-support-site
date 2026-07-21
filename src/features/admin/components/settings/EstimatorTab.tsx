@@ -8,6 +8,7 @@
  */
 
 import { BenchmarkListField } from "@/features/admin/components/settings/BenchmarkListField";
+import { EstimatorPreview } from "@/features/admin/components/settings/EstimatorPreview";
 import { NumberField } from "@/features/admin/components/settings/SettingsFields";
 import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
 import { SettingsSaveBar } from "@/features/admin/components/settings/SettingsSaveBar";
@@ -189,6 +190,8 @@ export function EstimatorTab({ initial, defaults }: Props): React.ReactElement {
           />
         </div>
       </div>
+
+      <EstimatorPreview estimator={draft} />
 
       {/* Guardrail blocks - save was refused. */}
       {blocks.length > 0 && (

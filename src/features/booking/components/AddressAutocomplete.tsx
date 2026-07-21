@@ -34,6 +34,28 @@ const LOCATION_RESTRICTION = {
 export interface SelectedPlace {
   /** The full formatted address, as also pushed through `onChange`. */
   formattedAddress: string;
+  /** Latitude of the place - only present when `fetchDetails` is set. */
+  lat?: number;
+  /** Longitude of the place - only present when `fetchDetails` is set. */
+  lng?: number;
+  /** Suburb/locality - only present when `fetchDetails` is set. */
+  locality?: string;
+  /** Postcode - only present when `fetchDetails` is set. */
+  postcode?: string;
+}
+
+/**
+ * Reads one address component's long text by type from a new-Places components
+ * array. Returns undefined when absent.
+ * @param components - The place's addressComponents (or undefined).
+ * @param type - The component type to find (e.g. "locality").
+ * @returns The component's long text, or undefined.
+ */
+function pickComponent(
+  components: google.maps.places.AddressComponent[] | undefined,
+  type: string,
+): string | undefined {
+  return components?.find((c) => c.types.includes(type))?.longText ?? undefined;
 }
 
 /** One rendered suggestion row. */
@@ -88,6 +110,12 @@ export interface AddressAutocompleteProps {
   /** Fired when a suggestion is selected, with the normalised payload. */
   onPlaceSelected?: (place: SelectedPlace) => void;
   /**
+   * When true, also fetch the place's location + address components (lat/lng,
+   * locality, postcode) on selection. Off by default so the common booking
+   * lookup stays on the cheapest field set.
+   */
+  fetchDetails?: boolean;
+  /**
    * Fired when the Places API can't be used (missing key, script load failure,
    * or a failing suggestion fetch) so the parent can bypass any "must pick a
    * suggestion" gates. Fires once per outage - a recovery re-arms it.
@@ -121,6 +149,7 @@ export interface AddressAutocompleteProps {
  * @param props.value - Current address value.
  * @param props.onChange - Callback when address changes.
  * @param props.onPlaceSelected - Callback when a suggestion is selected.
+ * @param props.fetchDetails - Also emit lat/lng + locality/postcode on selection.
  * @param props.onFallbackMode - Fired once per outage when the Places API can't be used.
  * @param props.onRecovered - Fired when autocomplete comes back after a failure.
  * @param props.placeholder - Input placeholder text.
@@ -138,6 +167,7 @@ export default function AddressAutocomplete({
   value,
   onChange,
   onPlaceSelected,
+  fetchDetails = false,
   onFallbackMode,
   onRecovered,
   placeholder = "Start typing your address...",
@@ -345,12 +375,30 @@ export default function AddressAutocomplete({
     setActiveIndex(-1);
     setSuggestions([]);
     let formatted = item.prediction.text.toString();
+    let details: Omit<SelectedPlace, "formattedAddress"> = {};
     try {
       const place = item.prediction.toPlace();
       // The session token rides into this first fetchFields automatically,
-      // closing the session at session rates.
-      await place.fetchFields({ fields: ["formattedAddress"] });
+      // closing the session at session rates. Only pull the extra
+      // location/component fields when the caller opted in.
+      await place.fetchFields({
+        fields: fetchDetails
+          ? ["formattedAddress", "location", "addressComponents"]
+          : ["formattedAddress"],
+      });
       formatted = place.formattedAddress ?? formatted;
+      if (fetchDetails) {
+        const comps = place.addressComponents ?? undefined;
+        details = {
+          lat: place.location?.lat(),
+          lng: place.location?.lng(),
+          locality:
+            pickComponent(comps, "locality") ??
+            pickComponent(comps, "sublocality_level_1") ??
+            pickComponent(comps, "sublocality"),
+          postcode: pickComponent(comps, "postal_code"),
+        };
+      }
     } catch (err) {
       // Degrade to the prediction text - still a full usable address line.
       console.error("[AddressAutocomplete] fetchFields failed:", err);
@@ -358,7 +406,7 @@ export default function AddressAutocomplete({
     // Session concluded either way - next lookup starts a fresh token.
     tokenRef.current = null;
     onChange(formatted);
-    onPlaceSelected?.({ formattedAddress: formatted });
+    onPlaceSelected?.({ formattedAddress: formatted, ...details });
   }
 
   /**

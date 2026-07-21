@@ -16,6 +16,7 @@ import {
 import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
 import { SettingsSaveBar } from "@/features/admin/components/settings/SettingsSaveBar";
 import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
+import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import { IDENTITY_FIELD_META } from "@/shared/lib/settings/field-meta";
 import type { BaseAddress, IdentitySettings } from "@/shared/lib/settings/types";
 import type React from "react";
@@ -126,13 +127,30 @@ export function IdentityTab({ initial, defaults }: Props): React.ReactElement {
 
       <SectionHeading>Base address (travel origin + map)</SectionHeading>
       <div className="divide-y divide-admin-border">
-        <TextField
+        <FieldShell
           id="addrLine"
           meta={m["baseAddress.line"]}
-          value={draft.baseAddress.line}
           customised={draft.baseAddress.line !== defaults.baseAddress.line}
-          onChange={(v) => setAddr({ line: v })}
-        />
+        >
+          <AddressAutocomplete
+            id="addrLine"
+            value={draft.baseAddress.line}
+            fetchDetails
+            aria-label="Base address"
+            placeholder="Start typing the base address..."
+            inputClassName="w-full rounded-lg border border-admin-border-strong px-3 py-2.5 text-base focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+            onChange={(v) => setAddr({ line: v })}
+            onPlaceSelected={(p) =>
+              setAddr({
+                line: p.formattedAddress,
+                ...(p.locality ? { locality: p.locality } : {}),
+                ...(p.postcode ? { postcode: p.postcode } : {}),
+                ...(p.lat != null ? { lat: Math.round(p.lat * 1e6) / 1e6 } : {}),
+                ...(p.lng != null ? { lng: Math.round(p.lng * 1e6) / 1e6 } : {}),
+              })
+            }
+          />
+        </FieldShell>
         <TextField
           id="addrLocality"
           meta={m["baseAddress.locality"]}

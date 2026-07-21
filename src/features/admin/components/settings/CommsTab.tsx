@@ -58,7 +58,10 @@ export function CommsTab({ initial, defaults }: Props): React.ReactElement {
 
   return (
     <div>
-      <div className="divide-y divide-admin-border">
+      <h3 className="text-xs font-bold tracking-wide text-russian-violet uppercase">
+        Which emails send
+      </h3>
+      <div className="mt-2 divide-y divide-admin-border">
         <ToggleField
           id="notifyConfirmation"
           meta={m.notifyConfirmation}
@@ -80,6 +83,12 @@ export function CommsTab({ initial, defaults }: Props): React.ReactElement {
           customised={draft.notifyReviewRequest !== defaults.notifyReviewRequest}
           onChange={(v) => setNotify({ notifyReviewRequest: v })}
         />
+      </div>
+
+      <h3 className="mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase">
+        Timings
+      </h3>
+      <div className="mt-2 divide-y divide-admin-border">
         <NumberField
           id="reminderLeadHours"
           meta={m.reminderLeadHours}
@@ -108,6 +117,12 @@ export function CommsTab({ initial, defaults }: Props): React.ReactElement {
           customised={draft.priceEstimateRetentionDays !== defaults.priceEstimateRetentionDays}
           onChange={(v) => set({ priceEstimateRetentionDays: v ?? 1 })}
         />
+      </div>
+
+      <h3 className="mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase">
+        Overdue invoice reminders
+      </h3>
+      <div className="mt-2 divide-y divide-admin-border">
         <ToggleField
           id="invoiceRemindersEnabled"
           meta={m.invoiceRemindersEnabled}

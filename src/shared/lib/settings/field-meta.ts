@@ -82,9 +82,8 @@ export const AVAILABILITY_FIELD_META: Record<string, FieldMeta> = {
   },
   sameDayCutoffHour: {
     title: "Same-day cutoff",
-    description: "After this hour (24-hour clock) same-day booking closes for the rest of the day.",
-    unit: "hour 0-23",
-    off: "Leave blank for no same-day cutoff.",
+    description: "After this time, same-day booking closes for the rest of the day.",
+    off: "Choose 'No cutoff' to allow same-day booking all day.",
   },
   bufferMin: {
     title: "Calendar buffer",
@@ -220,7 +219,8 @@ export const IDENTITY_FIELD_META: Record<string, FieldMeta> = {
   },
   "baseAddress.line": {
     title: "Base address",
-    description: "Your home/base street address - the origin every travel charge is measured from.",
+    description:
+      "Your home/base address - the origin every travel charge is measured from. Pick a suggestion to auto-fill the suburb, postcode, and map coordinates below.",
   },
   "baseAddress.locality": {
     title: "Suburb / locality",
@@ -232,11 +232,11 @@ export const IDENTITY_FIELD_META: Record<string, FieldMeta> = {
   },
   "baseAddress.lat": {
     title: "Latitude",
-    description: "Map latitude for the business location (SEO).",
+    description: "Map latitude (SEO). Auto-fills when you pick an address; edit if needed.",
   },
   "baseAddress.lng": {
     title: "Longitude",
-    description: "Map longitude for the business location (SEO).",
+    description: "Map longitude (SEO). Auto-fills when you pick an address; edit if needed.",
   },
   paymentTermsDays: {
     title: "Payment terms",
