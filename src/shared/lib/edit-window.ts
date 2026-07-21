@@ -8,17 +8,22 @@
 
 import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 
-/** Hours after an event/day ends before it's locked from further edits. */
+/** Fallback hours after an event/day ends before it locks (live: scheduling.pastEditLockHours). */
 export const MAX_PAST_EDIT_HOURS = 18;
 
 /**
  * Whether an event that ended at `endMs` is now locked from editing.
  * @param endMs - The event/day end, epoch ms.
  * @param nowMs - Current time, epoch ms.
- * @returns True when it ended more than {@link MAX_PAST_EDIT_HOURS} ago.
+ * @param lockHours - Hours after the end before locking (defaults to the constant).
+ * @returns True when it ended more than `lockHours` ago.
  */
-export function isPastEditWindow(endMs: number, nowMs: number): boolean {
-  return nowMs - endMs > MAX_PAST_EDIT_HOURS * 60 * 60 * 1000;
+export function isPastEditWindow(
+  endMs: number,
+  nowMs: number,
+  lockHours: number = MAX_PAST_EDIT_HOURS,
+): boolean {
+  return nowMs - endMs > lockHours * 60 * 60 * 1000;
 }
 
 /**

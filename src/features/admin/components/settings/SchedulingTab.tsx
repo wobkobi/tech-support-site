@@ -95,6 +95,16 @@ export function SchedulingTab({ initial, defaults }: Props): React.ReactElement 
           customised={draft.travelQuoteHour !== defaults.travelQuoteHour}
           onChange={(v) => set({ travelQuoteHour: v ?? 0 })}
         />
+        <NumberField
+          id="pastEditLockHours"
+          meta={m.pastEditLockHours}
+          value={draft.pastEditLockHours}
+          min={0}
+          max={720}
+          error={fieldErrors.pastEditLockHours}
+          customised={draft.pastEditLockHours !== defaults.pastEditLockHours}
+          onChange={(v) => set({ pastEditLockHours: v ?? 0 })}
+        />
       </div>
 
       {/* Guardrail blocks */}

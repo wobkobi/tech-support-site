@@ -132,6 +132,16 @@ export function CommsTab({ initial, defaults }: Props): React.ReactElement {
           customised={draft.invoiceReminderSecondDays !== defaults.invoiceReminderSecondDays}
           onChange={(v) => set({ invoiceReminderSecondDays: v ?? 1 })}
         />
+        <NumberField
+          id="invoiceReminderMaxCount"
+          meta={m.invoiceReminderMaxCount}
+          value={draft.invoiceReminderMaxCount}
+          min={0}
+          max={10}
+          error={fieldErrors.invoiceReminderMaxCount}
+          customised={draft.invoiceReminderMaxCount !== defaults.invoiceReminderMaxCount}
+          onChange={(v) => set({ invoiceReminderMaxCount: v ?? 0 })}
+        />
       </div>
 
       {/* Guardrail blocks */}

@@ -14,6 +14,7 @@ import { cancellationCopy } from "@/features/business/lib/pricing-policy";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { formatDateShort, formatDateTimeLong } from "@/shared/lib/date-format";
+import { getSettings } from "@/shared/lib/settings/get-settings";
 import { getSiteUrl } from "@/shared/lib/site-url";
 import { Resend } from "resend";
 
@@ -992,12 +993,13 @@ export async function sendInvoiceReminderEmail({
 
   const siteUrl = getSiteUrl();
   const identity = await getIdentity();
+  const { comms } = await getSettings();
   const greeting = escapeHtml((invoice.clientName.split(" ")[0] || invoice.clientName).trim());
   const safeNumber = escapeHtml(invoice.number);
   const dueDate = escapeHtml(formatDateShort(invoice.dueDate));
   const totalLabel = escapeHtml(formatNZD(invoice.total));
   const closing =
-    reminderNumber >= 2
+    reminderNumber >= comms.invoiceReminderMaxCount
       ? "This is the last automatic reminder I'll send. If something's holding payment up, just reply and we'll sort it out."
       : "If you've already paid in the last day or two, please ignore this - bank transfers can cross over.";
 

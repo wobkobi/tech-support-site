@@ -14,8 +14,9 @@ import {
 } from "@/features/calendar/lib/google-calendar";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
-import { isPastEditWindow, MAX_PAST_EDIT_HOURS, nzDayEndMs } from "@/shared/lib/edit-window";
+import { isPastEditWindow, nzDayEndMs } from "@/shared/lib/edit-window";
 import { prisma } from "@/shared/lib/prisma";
+import { getSettings } from "@/shared/lib/settings/get-settings";
 import { addDaysToDateKey, getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 import { revalidateTag } from "next/cache";
 import { type NextRequest, NextResponse } from "next/server";
@@ -50,8 +51,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return errorResponse("Invalid date.", 400);
   }
 
-  if (isPastEditWindow(nzDayEndMs(dateKey), Date.now())) {
-    return errorResponse(`Can't block a day more than ${MAX_PAST_EDIT_HOURS}h in the past.`, 409);
+  const { scheduling } = await getSettings();
+  if (isPastEditWindow(nzDayEndMs(dateKey), Date.now(), scheduling.pastEditLockHours)) {
+    return errorResponse(
+      `Can't block a day more than ${scheduling.pastEditLockHours}h in the past.`,
+      409,
+    );
   }
 
   const [y, m, d] = dateKey.split("-").map(Number);

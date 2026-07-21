@@ -10,9 +10,10 @@ import { deleteBookingEvent, SCHEDULE_CALENDAR_TAG } from "@/features/calendar/l
 import { sendCustomerReviewRequest } from "@/features/reviews/lib/email";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
-import { isPastEditWindow, MAX_PAST_EDIT_HOURS } from "@/shared/lib/edit-window";
+import { isPastEditWindow } from "@/shared/lib/edit-window";
 import { toE164NZ } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
+import { getSettings } from "@/shared/lib/settings/get-settings";
 import { revalidateTag } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -65,12 +66,16 @@ export async function PATCH(
   }
 
   // Lock past events: refuse state changes (complete / cancel / no-show) on a
-  // booking that ended more than 18h ago. Metadata-only edits (name/email/phone/
-  // notes/address corrections) are still allowed.
+  // booking that ended more than the configured window ago. Metadata-only edits
+  // (name/email/phone/notes/address corrections) are still allowed.
   const isStateChange = body.status !== undefined || body.markNoShow === true;
-  if (isStateChange && isPastEditWindow(booking.endAt.getTime(), Date.now())) {
+  const { scheduling } = await getSettings();
+  if (
+    isStateChange &&
+    isPastEditWindow(booking.endAt.getTime(), Date.now(), scheduling.pastEditLockHours)
+  ) {
     return errorResponse(
-      `Can't change a booking more than ${MAX_PAST_EDIT_HOURS}h after it ended.`,
+      `Can't change a booking more than ${scheduling.pastEditLockHours}h after it ended.`,
       409,
     );
   }

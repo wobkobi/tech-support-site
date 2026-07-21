@@ -1,6 +1,6 @@
 // src/app/api/cron/send-invoice-reminders/route.ts
-// Daily cron chasing overdue SENT invoices: max two nudges per invoice at the
-// comms-settings offsets, idempotent via reminderCount. See docs/CRON.md.
+// Daily cron chasing overdue SENT invoices: up to the configured max nudges per
+// invoice at the comms-settings offsets, idempotent via reminderCount. See docs/CRON.md.
 
 import { sendOverdueReminder } from "@/features/business/lib/invoice-reminders";
 import { errorResponse } from "@/shared/lib/api-response";
@@ -43,8 +43,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     for (const inv of candidates) {
       const count = inv.reminderCount ?? 0;
-      // Max two reminders ever - after that it's the operator's problem.
-      if (count >= 2) {
+      // Stop once the configured max is reached - after that it's the operator's problem.
+      if (count >= comms.invoiceReminderMaxCount) {
         results.skipped++;
         continue;
       }

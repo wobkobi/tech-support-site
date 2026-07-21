@@ -16,8 +16,9 @@ import {
 } from "@/features/calendar/lib/google-calendar";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
-import { isPastEditWindow, MAX_PAST_EDIT_HOURS, nzDayEndMs } from "@/shared/lib/edit-window";
+import { isPastEditWindow, nzDayEndMs } from "@/shared/lib/edit-window";
 import { prisma } from "@/shared/lib/prisma";
+import { getSettings } from "@/shared/lib/settings/get-settings";
 import { addDaysToDateKey } from "@/shared/lib/timezone-utils";
 import { revalidateTag } from "next/cache";
 import { type NextRequest, NextResponse } from "next/server";
@@ -71,8 +72,15 @@ export async function DELETE(
   }
   const removedDay = request.nextUrl.searchParams.get("date");
 
-  if (removedDay && isPastEditWindow(nzDayEndMs(removedDay), Date.now())) {
-    return errorResponse(`Can't unblock a day more than ${MAX_PAST_EDIT_HOURS}h in the past.`, 409);
+  const { scheduling } = await getSettings();
+  if (
+    removedDay &&
+    isPastEditWindow(nzDayEndMs(removedDay), Date.now(), scheduling.pastEditLockHours)
+  ) {
+    return errorResponse(
+      `Can't unblock a day more than ${scheduling.pastEditLockHours}h in the past.`,
+      409,
+    );
   }
 
   // Refuse to touch a real booking's calendar event via the blocked-day route:
