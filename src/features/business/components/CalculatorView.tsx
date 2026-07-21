@@ -57,7 +57,6 @@ import type {
   TravelEntry,
 } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
-import { loadPlacesLibrary } from "@/shared/lib/google-maps-loader";
 import type { IdentitySettings } from "@/shared/lib/settings/types";
 import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 import { useRouter } from "next/navigation";
@@ -410,7 +409,7 @@ export function CalculatorView({
   // top of the slot sum. The AI parse seeds it from outOfSessionMins.
   const [followUpMins, setFollowUpMins] = useState(0);
   // Every travel charge (auto-lookup + any manual entries) lumped together.
-  // jobToLineItems sums them into a single "Travel" invoice line. An event
+  // jobToLineItems sums them into one "Round-trip travel" invoice line. An event
   // prefill seeds the entry from the drive prediction made for the event's
   // ACTUAL window (frozen TravelBlock / booking snapshot) - a fresh lookup on
   // a past job could only quote tomorrow's traffic, not that day's.
@@ -522,7 +521,6 @@ export function CalculatorView({
   // Travel lookup
   const [jobAddress, setJobAddress] = useState(() => eventPrefill?.jobAddress ?? "");
   const [lookingUpTravel, setLookingUpTravel] = useState(false);
-  const addressInputRef = useRef<HTMLInputElement>(null);
 
   // Contacts and income save
   const [contacts, setContacts] = useState<GoogleContact[]>([]);
@@ -587,50 +585,18 @@ export function CalculatorView({
     };
   }, [jobDate]);
 
-  // Google Maps address autocomplete
-  useEffect(() => {
-    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
-    if (!apiKey || !addressInputRef.current) return;
-
-    const inputEl = addressInputRef.current;
-    let cancelled = false;
-    let listener: google.maps.MapsEventListener | null = null;
-
-    loadPlacesLibrary(apiKey)
-      .then(() => {
-        if (cancelled || !inputEl) return;
-        const autocomplete = new google.maps.places.Autocomplete(inputEl, {
-          componentRestrictions: { country: "nz" },
-          fields: ["formatted_address", "address_components"],
-          types: ["geocode"],
-        });
-        listener = autocomplete.addListener("place_changed", () => {
-          const place = autocomplete.getPlace();
-          // Keep the full formatted address so it matches what the AI phraser
-          // receives; travel-time still resolves a suburb out of the full string.
-          const next =
-            place.formatted_address ??
-            place.address_components?.find(
-              (c) => c.types.includes("locality") || c.types.includes("sublocality_level_1"),
-            )?.long_name ??
-            "";
-          if (next) {
-            setJobAddress(next);
-            // Drop any stale auto entry so the operator runs a fresh lookup;
-            // manual entries (parking, etc.) survive.
-            setTravelEntries((prev) => prev.filter((e) => !e.isAuto));
-          }
-        });
-      })
-      .catch((err) => {
-        console.error("[calculator] Maps autocomplete failed to load:", err);
-      });
-
-    return () => {
-      cancelled = true;
-      if (listener) google.maps.event.removeListener(listener);
-    };
-  }, []);
+  /**
+   * A Places suggestion was picked in the travel section: keep the full
+   * formatted address (matches what the AI phraser receives; travel-time still
+   * resolves a suburb out of the full string) and drop any stale auto travel
+   * entry so the operator runs a fresh lookup. Manual entries (parking, etc.)
+   * survive.
+   * @param formattedAddress - The selected address.
+   */
+  function handleAddressSelected(formattedAddress: string): void {
+    setJobAddress(formattedAddress);
+    setTravelEntries((prev) => prev.filter((e) => !e.isAuto));
+  }
 
   // Mount seeding + contacts fetch. Rates/templates/promo arrive as server
   // props; the "now" times must still seed in an effect (nowTime() at render
@@ -2199,9 +2165,9 @@ export function CalculatorView({
               being billed, so the amount can still be looked up or corrected. */}
           {(!cancelMode || includeCancelTravel) && (
             <TravelSection
-              addressInputRef={addressInputRef}
               jobAddress={jobAddress}
               onJobAddressChange={setJobAddress}
+              onAddressSelected={handleAddressSelected}
               travelEntries={travelEntries}
               onTravelEntriesChange={setTravelEntries}
               lookingUpTravel={lookingUpTravel}

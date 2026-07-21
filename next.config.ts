@@ -11,7 +11,7 @@ const cspProd =
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
   "img-src 'self' data: blob: https://maps.googleapis.com https://maps.gstatic.com https://*.google.com https://*.gstatic.com https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://googleads.g.doubleclick.net https://www.facebook.com; " +
   "font-src 'self' data: https://fonts.gstatic.com; " +
-  "connect-src 'self' https://maps.googleapis.com https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://googleads.g.doubleclick.net https://connect.facebook.net https://www.facebook.com; " +
+  "connect-src 'self' https://maps.googleapis.com https://places.googleapis.com https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://googleads.g.doubleclick.net https://connect.facebook.net https://www.facebook.com; " +
   "worker-src 'self' blob:; " +
   "manifest-src 'self'; " +
   "object-src 'none'; " +
@@ -25,7 +25,7 @@ const cspDev =
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
   "img-src 'self' data: blob: https://tothepoint.co.nz https://www.tothepoint.co.nz https://maps.googleapis.com https://maps.gstatic.com https://*.google.com https://*.gstatic.com https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://googleads.g.doubleclick.net https://www.facebook.com; " +
   "font-src 'self' data: https://fonts.gstatic.com; " +
-  "connect-src 'self' ws: http://localhost:3000 http://127.0.0.1:3000 https://maps.googleapis.com https://va.vercel-scripts.com https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://googleads.g.doubleclick.net https://connect.facebook.net https://www.facebook.com; " +
+  "connect-src 'self' ws: http://localhost:3000 http://127.0.0.1:3000 https://maps.googleapis.com https://places.googleapis.com https://va.vercel-scripts.com https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://googleads.g.doubleclick.net https://connect.facebook.net https://www.facebook.com; " +
   "worker-src 'self' blob:; " +
   "object-src 'none'; " +
   "frame-ancestors 'none'; " +

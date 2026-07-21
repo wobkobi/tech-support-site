@@ -6,17 +6,18 @@
  * into a single "Travel" invoice line. Auto entries show a step-by-step
  * {@link breakdownTravelCharge} (there/back > raw > rounded > final).
  */
+import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import { formatNZD, travelEntriesTotal } from "@/features/business/lib/business";
 import { breakdownTravelCharge } from "@/features/business/lib/pricing-policy";
 import type { TravelEntry } from "@/features/business/types/business";
 import { parseMoney } from "@/shared/lib/parse-money";
 import type React from "react";
-import type { RefObject } from "react";
 
 interface Props {
-  addressInputRef: RefObject<HTMLInputElement | null>;
   jobAddress: string;
   onJobAddressChange: (value: string) => void;
+  /** Fired when a Places suggestion is picked (full formatted address). */
+  onAddressSelected: (formattedAddress: string) => void;
   travelEntries: TravelEntry[];
   onTravelEntriesChange: (entries: TravelEntry[]) => void;
   lookingUpTravel: boolean;
@@ -34,9 +35,9 @@ interface Props {
  * breakdown (destination > there/back > raw > rounded > final) so the operator
  * can see exactly how the figure was derived.
  * @param props - Component props.
- * @param props.addressInputRef - Ref the parent attaches Maps autocomplete to.
  * @param props.jobAddress - Current address text.
  * @param props.onJobAddressChange - Address change handler.
+ * @param props.onAddressSelected - Fired when a Places suggestion is picked.
  * @param props.travelEntries - All travel charges (auto + manual).
  * @param props.onTravelEntriesChange - Replaces the entries array.
  * @param props.lookingUpTravel - True while a lookup is in flight.
@@ -46,9 +47,9 @@ interface Props {
  * @returns Travel section element.
  */
 export function TravelSection({
-  addressInputRef,
   jobAddress,
   onJobAddressChange,
+  onAddressSelected,
   travelEntries,
   onTravelEntriesChange,
   lookingUpTravel,
@@ -84,21 +85,26 @@ export function TravelSection({
     <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
       <h2 className="text-sm font-semibold text-russian-violet">Travel</h2>
       <div className="flex gap-2">
-        <input
-          ref={addressInputRef}
-          type="text"
-          placeholder="Client address or suburb"
-          value={jobAddress}
-          autoComplete="off"
-          onChange={(e) => onJobAddressChange(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              onLookup();
-            }
-          }}
-          className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
-        />
+        <div className="flex-1">
+          <AddressAutocomplete
+            id="calculator-job-address"
+            value={jobAddress}
+            onChange={onJobAddressChange}
+            onPlaceSelected={(p) => onAddressSelected(p.formattedAddress)}
+            placeholder="Client address or suburb"
+            aria-label="Client address or suburb"
+            // Enter only reaches here when the suggestion dropdown is closed
+            // (the combobox consumes it while open), so a picked/typed address
+            // still triggers the lookup shortcut.
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                onLookup();
+              }
+            }}
+            inputClassName="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+          />
+        </div>
         <button
           type="button"
           onClick={onLookup}
