@@ -9,8 +9,8 @@ import { cn } from "@/shared/lib/cn";
 import Link from "next/link";
 import type React from "react";
 
-export type ButtonVariant = "primary" | "secondary" | "tertiary" | "ghost";
-export type ButtonSize = "sm" | "md" | "lg";
+type ButtonVariant = "primary" | "secondary" | "tertiary" | "ghost";
+type ButtonSize = "sm" | "md" | "lg";
 
 /**
  * Button props when rendering as a Next.js Link (href present).
@@ -91,7 +91,7 @@ function getVariantClasses(variant: ButtonVariant): string {
       return cn(
         "bg-transparent text-russian-violet",
         "border border-russian-violet/40",
-        "hover:bg-russian-violet/10 hover:border-russian-violet/70",
+        "hover:border-russian-violet/70 hover:bg-russian-violet/10",
         "transition-all",
       );
   }
@@ -144,8 +144,8 @@ export function Button(props: ButtonProps): React.ReactElement {
     // resolves bg/text/border conflicts in favour of the disabled look.
     disabled && [
       "cursor-not-allowed",
-      "bg-seasalt-400 text-rich-black/70 border-seasalt-400/50",
-      "hover:bg-seasalt-400 hover:text-rich-black/70 hover:border-seasalt-400/50",
+      "border-seasalt-400/50 bg-seasalt-400 text-rich-black/70",
+      "hover:border-seasalt-400/50 hover:bg-seasalt-400 hover:text-rich-black/70",
       "shadow-none hover:shadow-none",
     ],
     className,

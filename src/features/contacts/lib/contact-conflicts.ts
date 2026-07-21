@@ -7,14 +7,10 @@
  */
 
 import { prisma } from "@/shared/lib/prisma";
-import type { ConflictResolution, ContactField } from "@prisma/client";
+import type { ContactField } from "@prisma/client";
 
-// Re-export the Prisma enum types under the names the rest of the codebase
-// uses. The admin-driven resolution endpoint also accepts "auto" via the
-// ConflictResolution enum; that variant is stamped by clearContactConflict
-// rather than picked by a human, so the public TS type below excludes it.
+// Re-export the Prisma enum type under the name the rest of the codebase uses.
 export type { ContactField };
-export type AdminConflictResolution = Exclude<ConflictResolution, "auto">;
 
 /**
  * Records (or refreshes) a pending conflict for a contact's field. If an

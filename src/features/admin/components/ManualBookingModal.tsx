@@ -266,7 +266,7 @@ export function ManualBookingModal({
             ref={nameWrapRef}
             className="relative"
             onBlur={(e) => {
-              if (!nameWrapRef.current?.contains(e.relatedTarget as Node)) {
+              if (!nameWrapRef.current?.contains(e.relatedTarget)) {
                 setNameListOpen(false);
               }
             }}
@@ -412,7 +412,7 @@ export function ManualBookingModal({
 
 const textInputClasses = cn(
   "w-full rounded-md border border-admin-border-strong bg-admin-surface px-3 py-2 text-sm text-admin-text",
-  "focus:border-russian-violet focus:outline-none focus:ring-2 focus:ring-russian-violet/30",
+  "focus:border-russian-violet focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
 );
 
 /**

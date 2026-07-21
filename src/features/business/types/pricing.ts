@@ -15,14 +15,7 @@ export interface PublicRate {
   isDefault: boolean;
 }
 
-export interface SelectedService {
-  label: string;
-  type: "flat" | "hourly";
-  flatRate: number | null;
-  ratePerHour: number | null;
-}
-
-export interface BreakdownLine {
+interface BreakdownLine {
   label: string;
   low: number;
   high: number;

@@ -117,8 +117,8 @@ export default function Reviews({ items = [] }: ReviewsProps): React.ReactElemen
   if (!items.length) return null;
 
   const cardBase = cn(
-    "bg-seasalt-800/80 flex flex-col rounded-lg border-2",
-    "border-seasalt-400/60 hover:border-coquelicot-500/60 transition-colors",
+    "flex flex-col rounded-lg border-2 bg-seasalt-800/80",
+    "border-seasalt-400/60 transition-colors hover:border-coquelicot-500/60",
   );
 
   // Marquee when more than three reviews

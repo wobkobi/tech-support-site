@@ -5,7 +5,7 @@
 // overnight (+24h). Pure and dependency-free so the tsx eval harness can import it.
 
 /** am/pm marker, or null when a time fragment carries none. */
-export type Meridiem = "am" | "pm" | null;
+type Meridiem = "am" | "pm" | null;
 
 /** One parsed start/end range plus its resolved duration in minutes. */
 export interface ParsedTimeRange {
@@ -26,7 +26,7 @@ const TIME_RANGE_RE =
  * @param s - Time fragment like "7", "9pm", "10:30am".
  * @returns "am" / "pm" / null.
  */
-export function meridiemOf(s: string): Meridiem {
+function meridiemOf(s: string): Meridiem {
   const t = s.toLowerCase();
   if (/pm/.test(t)) return "pm";
   if (/am/.test(t)) return "am";
@@ -39,7 +39,7 @@ export function meridiemOf(s: string): Meridiem {
  * @param assume - Meridiem to apply when the string has none (e.g. trailing "pm" in "7-9pm").
  * @returns Minutes since midnight, or null if unparseable.
  */
-export function parseTimeMins(s: string, assume: Meridiem = null): number | null {
+function parseTimeMins(s: string, assume: Meridiem = null): number | null {
   const t = s.trim().toLowerCase();
   const meridiem: Meridiem = meridiemOf(t) ?? assume;
   const clean = t.replace(/[apm\s]/g, "");
@@ -58,7 +58,7 @@ export function parseTimeMins(s: string, assume: Meridiem = null): number | null
  * @param mins - Minutes since midnight (may exceed 1440 for cross-midnight ends).
  * @returns HH:MM string.
  */
-export function minsToHHMM(mins: number): string {
+function minsToHHMM(mins: number): string {
   const wrapped = ((mins % (24 * 60)) + 24 * 60) % (24 * 60);
   const h = Math.floor(wrapped / 60);
   const m = wrapped % 60;

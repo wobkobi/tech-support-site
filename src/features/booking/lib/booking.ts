@@ -184,9 +184,6 @@ export const TIME_OF_DAY_OPTIONS: ReadonlyArray<TimeOfDayOption> = [
 // operator's schedule, so the type is a plain string rather than a fixed enum.
 export type TimeOfDay = string;
 
-// Default 15-minute sub-slot offsets within each hour. The live offsets come
-// from the availability settings; this constant is the default + edit-page shape.
-export const SUB_SLOT_MINUTES = [0, 15, 30, 45] as const;
 export type StartMinute = number;
 
 /**
@@ -232,7 +229,7 @@ export function parseHourLabel(label: string): number | null {
  * @param longestDurationMins - Longest selectable job length, in minutes.
  * @returns Sorted list of start hours (empty when no job can fit).
  */
-export function startHoursForDay(
+function startHoursForDay(
   window: { open: number; close: number; break: { start: number; end: number } | null },
   longestDurationMins: number,
 ): number[] {
@@ -245,13 +242,13 @@ export function startHoursForDay(
   return hours;
 }
 
-export interface SubSlot {
+interface SubSlot {
   minute: StartMinute;
   availableShort: boolean;
   availableLong: boolean;
 }
 
-export interface TimeWindow {
+interface TimeWindow {
   value: TimeOfDay;
   label: string;
   startHour: number; // used for sub-slot label generation in the UI
@@ -287,12 +284,6 @@ export interface ExistingBooking {
   endAt: Date;
   bufferBeforeMin: number;
   bufferAfterMin: number;
-}
-
-export interface ExistingEvent {
-  id: string;
-  start: string;
-  end: string;
 }
 
 /**
@@ -353,7 +344,7 @@ function isSlotFree(
  * @param guards - The live morning-guard rules.
  * @returns True when an enabled guard blocks the slot.
  */
-export function isSlotMorningGuarded(
+function isSlotMorningGuarded(
   year: number,
   month: number,
   day: number,

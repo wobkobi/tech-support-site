@@ -159,7 +159,7 @@ export default async function ReviewPage({
                 <ReviewFormProtected
                   bookingId={sourceType === "booking" ? sourceId! : undefined}
                   contactId={sourceType === "contact" ? sourceId! : undefined}
-                  token={token!}
+                  token={token}
                   prefillName={prefillName!}
                   prefillEmail={prefillEmail ?? undefined}
                   prefillPhone={prefillPhone ?? undefined}

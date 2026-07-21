@@ -200,7 +200,7 @@ export function BookingAdminList({
         <div className="inline-flex flex-wrap rounded-lg border border-slate-200 bg-slate-100 p-0.5">
           {FILTERS.map((f) => {
             const label = f === "all" ? "All" : f.charAt(0).toUpperCase() + f.slice(1);
-            const count = f === "all" ? bookings.length : counts[f as keyof typeof counts];
+            const count = f === "all" ? bookings.length : counts[f];
             const isActive = filter === f;
             return (
               <button

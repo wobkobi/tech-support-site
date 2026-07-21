@@ -19,7 +19,7 @@ import { CopyLinkButton } from "./CopyLinkButton";
 /**
  * A single row in the review link history table.
  */
-export interface LinkHistoryEntry {
+interface LinkHistoryEntry {
   /** Contact id for manual sends; null for auto-sent booking entries and legacy entries. */
   id: string | null;
   /**

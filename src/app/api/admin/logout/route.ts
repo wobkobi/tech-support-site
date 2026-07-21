@@ -12,7 +12,7 @@ import { NextResponse } from "next/server";
  * Clears the admin session cookie and returns `{ ok: true }`.
  * @returns JSON response with the cookie clear instruction.
  */
-export async function POST(): Promise<NextResponse> {
+export function POST(): NextResponse {
   const res = NextResponse.json({ ok: true });
   res.cookies.set(ADMIN_SESSION_COOKIE, "", {
     httpOnly: true,

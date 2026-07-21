@@ -124,7 +124,7 @@ async function getTabSheetId(spreadsheetId: string, tabName: string): Promise<nu
  * @param spreadsheetId - The spreadsheet file ID.
  * @param tabName - Tab to prepare (e.g. "Cashbook" or "Expenses").
  */
-export async function ensureSyncIdSetup(spreadsheetId: string, tabName: string): Promise<void> {
+async function ensureSyncIdSetup(spreadsheetId: string, tabName: string): Promise<void> {
   const cached = setupCache.get(spreadsheetId);
   if (cached?.has(tabName)) return;
 
@@ -368,7 +368,7 @@ export function buildExpenseCells(e: ExpenseRowInput): (string | number | null)[
  * @param tabName - Tab to read (e.g. "Cashbook").
  * @returns Map of Sync ID to 1-based row number.
  */
-export async function readSyncIdColumn(
+async function readSyncIdColumn(
   spreadsheetId: string,
   tabName: string,
 ): Promise<Map<string, number>> {
@@ -399,7 +399,7 @@ export async function readSyncIdColumn(
  * @param syncId - Sync ID to locate.
  * @returns 1-based row number, or null when not present.
  */
-export async function findRowIndexBySyncId(
+async function findRowIndexBySyncId(
   spreadsheetId: string,
   tabName: string,
   syncId: string,

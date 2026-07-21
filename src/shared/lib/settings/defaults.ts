@@ -13,7 +13,7 @@
 import type { Settings, WeeklySchedule } from "@/shared/lib/settings/types";
 
 /** Bank-account placeholder shown when neither the DB nor the env var is set. */
-export const BANK_ACCOUNT_PLACEHOLDER = "[BANK ACCOUNT NOT SET - configure in admin settings]";
+const BANK_ACCOUNT_PLACEHOLDER = "[BANK ACCOUNT NOT SET - configure in admin settings]";
 
 /**
  * Builds the default weekly window: every day open 10:00-20:00, no break
@@ -29,7 +29,7 @@ function defaultSchedule(): WeeklySchedule {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  // Source: BOOKING_CONFIG + DURATION_OPTIONS + SUB_SLOT_MINUTES in booking.ts.
+  // Source: BOOKING_CONFIG + DURATION_OPTIONS in booking.ts.
   availability: {
     acceptingBookings: true,
     closedMessage:

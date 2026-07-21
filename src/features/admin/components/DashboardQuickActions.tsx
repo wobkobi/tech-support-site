@@ -18,7 +18,7 @@ import { FaCheck } from "react-icons/fa6";
 /**
  * A past confirmed booking that is ready to be completed.
  */
-export interface PastBookingRow {
+interface PastBookingRow {
   /** Booking database ID */
   id: string;
   /** Customer name */

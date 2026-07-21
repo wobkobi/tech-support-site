@@ -52,7 +52,7 @@ export interface InvoiceRow {
 }
 
 /** Selected scope - drives card titles and which optional cards render. */
-export interface DashboardScope {
+interface DashboardScope {
   label: string;
   isAllTime: boolean;
   isCurrentFy: boolean;

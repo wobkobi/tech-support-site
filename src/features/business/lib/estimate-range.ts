@@ -40,7 +40,7 @@ export function remoteRateDelta(rates: RemoteRateLike[], meeting: string): numbe
  * rail, not a tuning knob (the band in Settings stays tunable). Stops a wide
  * low-confidence band advertising roughly half the hourly rate.
  */
-export const LOW_END_FLOOR_FACTOR = 0.75;
+const LOW_END_FLOOR_FACTOR = 0.75;
 
 /**
  * Builds a whole-dollar low/high price band for one visit slice. The band

@@ -17,7 +17,7 @@ import type React from "react";
 import { useState } from "react";
 
 /** The minimal invoice shape the dialog needs. */
-export interface PaymentDialogInvoice {
+interface PaymentDialogInvoice {
   id: string;
   number: string;
   total: number;

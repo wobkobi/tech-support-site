@@ -15,7 +15,7 @@ import type React from "react";
 import { useEffect, useId, useRef } from "react";
 
 /** Dialog width. */
-export type ModalSize = "sm" | "md" | "lg";
+type ModalSize = "sm" | "md" | "lg";
 
 /** Props for {@link Modal}. */
 interface ModalProps {

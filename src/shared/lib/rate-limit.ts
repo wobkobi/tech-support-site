@@ -27,7 +27,7 @@ const MAX_BUCKETS = 10_000;
  * @param windowMs - Window length in milliseconds.
  * @returns Object with `allowed` and the `retryAfterMs` when blocked.
  */
-export function rateLimit(
+function rateLimit(
   key: string,
   limit: number,
   windowMs: number,
@@ -79,7 +79,7 @@ export function getClientIp(request: NextRequest): string {
  * @param adminSecret - `process.env.ADMIN_SECRET` (or undefined when unset).
  * @returns True only when non-production and the secrets match.
  */
-export function isRateLimitBypassed(
+function isRateLimitBypassed(
   nodeEnv: string | undefined,
   headerSecret: string | null,
   adminSecret: string | undefined,

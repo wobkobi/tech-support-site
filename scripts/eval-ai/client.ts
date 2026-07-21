@@ -12,7 +12,7 @@ export interface EstimateResult {
 }
 
 /** A single parse-job task (only the fields the harness inspects). */
-export interface ParseTask {
+interface ParseTask {
   qty?: number;
   modifierIds?: string[];
   baseRateId?: string | null;

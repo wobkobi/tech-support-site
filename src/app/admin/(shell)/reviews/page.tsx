@@ -229,8 +229,7 @@ export default async function AdminReviewsPage({
       phone: c.phone,
       sentAt: c.reviewLinkSentAt!.toISOString(),
       reviewed: !!c.reviewLinkSubmittedAt,
-      source: (c.reviewLinkSentMode === "sms" ? "Manual SMS" : "Manual email") as
-        "Auto" | "Manual email" | "Manual SMS" | "Legacy",
+      source: c.reviewLinkSentMode === "sms" ? ("Manual SMS" as const) : ("Manual email" as const),
       reviewUrl: c.reviewToken ? `${siteUrl}/review?token=${c.reviewToken}` : "",
     })),
     ...legacyReviews.map((r) => {

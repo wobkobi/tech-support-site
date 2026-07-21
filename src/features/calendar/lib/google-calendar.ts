@@ -367,7 +367,7 @@ export async function fetchAllCalendarEvents(
 ): Promise<CalendarEvent[]> {
   const calendar = getCalendarClient();
 
-  const calendarIds = await fetchAccessibleCalendarIds();
+  const calendarIds = fetchAccessibleCalendarIds();
   console.log(`[calendar] Checking ${calendarIds.length} calendars...`);
 
   const personalCalendarId = process.env.PERSONAL_CALENDAR_ID ?? "";

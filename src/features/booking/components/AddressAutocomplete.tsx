@@ -31,7 +31,7 @@ const LOCATION_RESTRICTION = {
 };
 
 /** Normalised selection payload handed to `onPlaceSelected`. */
-export interface SelectedPlace {
+interface SelectedPlace {
   /** The full formatted address, as also pushed through `onChange`. */
   formattedAddress: string;
   /** Latitude of the place - only present when `fetchDetails` is set. */

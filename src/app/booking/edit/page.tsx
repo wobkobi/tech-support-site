@@ -15,7 +15,6 @@ import {
   type BookableDay,
   type ExistingBooking,
   type JobDuration,
-  type StartMinute,
   type TimeOfDay,
 } from "@/features/booking/lib/booking";
 import { fetchAllCalendarEvents } from "@/features/calendar/lib/google-calendar";
@@ -175,9 +174,9 @@ export default async function EditBookingPage({
   const dateKey = getNZDateKey(booking.startAt);
   const nzHour = getNZHour(booking.startAt);
   const matchedSlot = TIME_OF_DAY_OPTIONS.find((t) => t.startHour === nzHour);
-  const timeOfDay: TimeOfDay = (matchedSlot?.value ?? "10am") as TimeOfDay;
+  const timeOfDay: TimeOfDay = matchedSlot?.value ?? "10am";
   // Minutes are timezone-independent - preserve the sub-slot offset
-  const startMinute = (booking.startAt.getUTCMinutes() as StartMinute) ?? 0;
+  const startMinute = booking.startAt.getUTCMinutes() ?? 0;
 
   const { userNotes, meetingType, address } = parseBookingNotes(booking.notes);
 
@@ -232,7 +231,7 @@ export default async function EditBookingPage({
             isSelected && m === startMinute && (durationOption?.durationMinutes ?? 60) >= 120,
         }));
         return {
-          value: t.value as TimeOfDay,
+          value: t.value,
           label: t.label,
           startHour: t.startHour,
           availableShort: isSelected,

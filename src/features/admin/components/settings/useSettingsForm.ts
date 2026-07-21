@@ -69,7 +69,7 @@ export function useSettingsForm<G extends SettingsGroup>(
   const all = useContext(SettingsAllContext);
   const live = useMemo(() => {
     if (!all) return { blocks: [] as string[], warns: [] as string[] };
-    const proposed = { ...all, [group]: draft } as Settings;
+    const proposed = { ...all, [group]: draft };
     const issues = checkGuardrails(proposed);
     return {
       blocks: issues.filter((i) => i.level === "block").map((i) => i.message),

@@ -14,9 +14,9 @@ import Link from "next/link";
 import type React from "react";
 
 /** Visual variant. */
-export type AdminButtonVariant = "primary" | "secondary" | "danger" | "ghost";
+type AdminButtonVariant = "primary" | "secondary" | "danger" | "ghost";
 /** Control height. */
-export type AdminButtonSize = "xs" | "sm";
+type AdminButtonSize = "xs" | "sm";
 
 /** Props shared by both the link and button forms. */
 interface AdminButtonCommon {

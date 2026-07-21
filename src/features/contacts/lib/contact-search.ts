@@ -16,7 +16,7 @@ import type { GoogleContact } from "@/features/business/types/business";
  * @param token - Lowercased search token.
  * @returns Numeric score (lower = better match) or Infinity.
  */
-export function scoreContactToken(c: GoogleContact, token: string): number {
+function scoreContactToken(c: GoogleContact, token: string): number {
   const fields: { value: string; weight: number }[] = [
     { value: c.name?.toLowerCase() ?? "", weight: 0 },
     { value: c.email?.toLowerCase() ?? "", weight: 100 },

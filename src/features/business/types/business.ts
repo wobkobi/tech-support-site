@@ -107,18 +107,6 @@ export interface ExpenseEntry {
   updatedAt?: string | null;
 }
 
-export interface BusinessSummary {
-  totalIncome: number;
-  totalExpensesExcl: number;
-  totalGstClaimable: number;
-  taxReserve: number;
-  profit: number;
-  currentMonthIncome: number;
-  currentMonthExpenses: number;
-  incomeCount: number;
-  expenseCount: number;
-}
-
 export interface GoogleContact {
   id: string;
   name: string;
@@ -200,11 +188,6 @@ export interface JobCalculation {
   clientEmail: string;
 }
 
-export interface ParseJobRequest {
-  input: string;
-  answers?: Record<string, string>;
-}
-
 export interface ParseJobQuestion {
   id: string;
   question: string;
@@ -238,7 +221,7 @@ export interface ParsedRange {
   endTime: string;
 }
 
-export interface ParsedTaskLine {
+interface ParsedTaskLine {
   rateConfigId: string | null;
   /** Resolved base rate ID (set by the server from baseRateLabel emitted by the AI). */
   baseRateId?: string | null;
@@ -259,7 +242,7 @@ export interface ParsedTaskLine {
   isExplicit?: boolean;
 }
 
-export interface ParsedPartLine {
+interface ParsedPartLine {
   description: string;
   cost: number;
 }
@@ -291,15 +274,7 @@ export interface Subscription {
   updatedAt: string;
 }
 
-export interface SheetCounterResponse {
-  lastNumber: number;
-  nextNumber: number;
-  yearCode: string;
-  nextFormatted: string;
-  prefix: string;
-}
-
-export interface TravelInfo {
+interface TravelInfo {
   /** One-way drive distance in km from the address lookup (outbound leg). */
   distanceKmOneWay: number;
   /** Outbound drive time in minutes; summed with durationMinsBack by calcTravelCharge. */

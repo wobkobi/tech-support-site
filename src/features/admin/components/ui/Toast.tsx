@@ -13,10 +13,10 @@ import type React from "react";
 import { createContext, useCallback, useContext, useRef, useState } from "react";
 
 /** Toast tone. */
-export type ToastTone = "info" | "success" | "warning" | "error";
+type ToastTone = "info" | "success" | "warning" | "error";
 
 /** Options accepted by {@link ToastApi.toast}. */
-export interface ToastOptions {
+interface ToastOptions {
   /** Visual tone (defaults to "info"). */
   tone?: ToastTone;
   /** Override the auto-dismiss delay, in milliseconds. */

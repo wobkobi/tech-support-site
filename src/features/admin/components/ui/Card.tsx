@@ -9,7 +9,7 @@ import { cn } from "@/shared/lib/cn";
 import type React from "react";
 
 /** Inner padding preset for a {@link Card}. */
-export type CardPadding = "none" | "sm" | "md";
+type CardPadding = "none" | "sm" | "md";
 
 /** Props for {@link Card}. */
 interface CardProps {

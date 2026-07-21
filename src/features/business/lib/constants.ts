@@ -13,8 +13,6 @@ export const VALID_FREQUENCIES = [
   "annually",
 ] as const;
 
-export type Frequency = (typeof VALID_FREQUENCIES)[number];
-
 // Order mirrors the Expenses sheet's category dropdown exactly so the app's
 // select and the sheet read the same list top to bottom.
 export const EXPENSE_CATEGORIES = [

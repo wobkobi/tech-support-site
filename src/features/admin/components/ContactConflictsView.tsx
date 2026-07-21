@@ -23,7 +23,9 @@ export interface ConflictRow {
   contactId: string;
   contactName: string;
   contactEmail: string | null;
-  field: "name" | "email" | "address" | string;
+  // Known fields plus an open set; `string & {}` keeps the literal hints
+  // without them collapsing into plain string.
+  field: "name" | "email" | "address" | (string & {});
   siteValue: string | null;
   googleValue: string | null;
   createdAt: string;

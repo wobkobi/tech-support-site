@@ -198,7 +198,7 @@ export function TextField({
 }: TextFieldProps): React.ReactElement {
   const [revealed, setRevealed] = useState(false);
   const inputClass = cn(
-    "focus:ring-russian-violet/30 w-full rounded-lg border px-3 py-2.5 text-base focus:outline-none focus:ring-2",
+    "w-full rounded-lg border px-3 py-2.5 text-base focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
     error ? "border-coquelicot-400" : "border-admin-border-strong",
   );
   return (

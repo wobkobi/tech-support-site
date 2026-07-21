@@ -15,8 +15,6 @@
 import { MIN_TRAVEL_CHARGE, billableMins } from "@/features/business/lib/business";
 import { formatDateShort } from "@/shared/lib/date-format";
 
-export { MIN_TRAVEL_CHARGE };
-
 /** GST is back-calculated from the inclusive total via calcGstFromInclusive when enabled. */
 export const GST_RATE = 0.15;
 
@@ -37,10 +35,10 @@ export const MIN_BILLABLE_MINS = 15;
 export const BILLING_INCREMENT_MINS = 5;
 
 /** Multiplier applied to labour on NZ public holidays. Travel and parts are not uplifted. */
-export const PUBLIC_HOLIDAY_UPLIFT = 0.25;
+const PUBLIC_HOLIDAY_UPLIFT = 0.25;
 
 /** Fallback fraction charged for an unsuccessful visit (0.5 = half price). */
-export const UNSUCCESSFUL_WORK_FACTOR = 0.5;
+const UNSUCCESSFUL_WORK_FACTOR = 0.5;
 
 /** Fallback Standard base rate ($/hr) when no default hourly RateConfig row exists; mirrors the seed default. */
 export const FALLBACK_BASE_RATE = 65;
@@ -295,32 +293,13 @@ export function isWithinTravelWindow(
   return msUntil < travelChargeHours * 60 * 60 * 1000;
 }
 
-/**
- * Rounds to the nearest billing increment then applies the minimum-billable
- * floor. 0 stays 0 (no work, no charge) so a placeholder job does not invent
- * time. Both bounds default to the code constants but accept the live pricing
- * settings so callers (calculator, job parser) stay consistent.
- * @param rawMins - Actual worked minutes.
- * @param minBillableMins - Minimum billable floor (live setting; defaults to the const).
- * @param incrementMins - Rounding increment (live setting; defaults to the const).
- * @returns Billable minutes after the floor.
- */
-export function floorBillableMins(
-  rawMins: number,
-  minBillableMins: number = MIN_BILLABLE_MINS,
-  incrementMins: number = BILLING_INCREMENT_MINS,
-): number {
-  if (rawMins <= 0) return 0;
-  return Math.max(minBillableMins, billableMins(rawMins, incrementMins));
-}
-
 /** Hard ceiling for a single job's billable minutes (8h). Shared by both AI routes. */
 export const MAX_JOB_MINS = 8 * 60;
 
 /**
  * Snaps to the nearest billing increment, applies the minimum-billable floor,
- * then optionally caps at a ceiling. Unlike {@link floorBillableMins}, a
- * zero/negative raw value floors to the minimum (not 0). Shared by the public
+ * then optionally caps at a ceiling. A zero/negative raw value floors to the
+ * minimum rather than staying at 0. Shared by the public
  * estimate route and the admin job parser so both bill identically.
  * @param rawMins - Raw duration in minutes (may be 0 or negative).
  * @param minBillableMins - Minimum billable floor (live setting; defaults to the const).

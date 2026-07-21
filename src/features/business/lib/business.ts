@@ -60,15 +60,6 @@ export function calcGstFromInclusive(amountIncl: number, gstRate: number): numbe
 }
 
 /**
- * UTC slash date "DD/MM/YYYY" - safe for server-side sheet writes.
- * @param date - Date to format.
- * @returns Formatted string.
- */
-export function formatUTCDDMMYYYY(date: Date): string {
-  return formatDateSlash(date, { utc: true });
-}
-
-/**
  * Invoice totals with an optional discount. GST mode is driven by
  * {@link GST_REGISTERED} in pricing-policy.ts. When false (today), gstAmount=0;
  * when true (future), gstAmount is back-calculated from the inclusive
@@ -578,7 +569,7 @@ export interface JobPricing {
  * @param promo - Active promo or null.
  * @returns Discount in dollars.
  */
-export function computeJobPromoDiscount(job: JobCalculation, promo: JobPromo | null): number {
+function computeJobPromoDiscount(job: JobCalculation, promo: JobPromo | null): number {
   if (!promo) return 0;
 
   // A task is hourly if either: it has a baseRateId set (new rate model),

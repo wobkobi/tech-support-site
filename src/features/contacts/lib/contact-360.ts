@@ -10,7 +10,7 @@ import { prisma } from "@/shared/lib/prisma";
 import type { Contact } from "@prisma/client";
 
 /** A booking that matched this contact by email or mobile. */
-export interface Contact360Booking {
+interface Contact360Booking {
   id: string;
   name: string;
   startAt: Date;
@@ -19,7 +19,7 @@ export interface Contact360Booking {
 }
 
 /** An invoice linked to this contact by contactId or client email. */
-export interface Contact360Invoice {
+interface Contact360Invoice {
   id: string;
   number: string;
   total: number;
@@ -28,7 +28,7 @@ export interface Contact360Invoice {
 }
 
 /** An income entry reached through one of the contact's invoices. */
-export interface Contact360Income {
+interface Contact360Income {
   id: string;
   amount: number;
   date: Date;
@@ -37,7 +37,7 @@ export interface Contact360Income {
 }
 
 /** A review linked to this contact by contactId. */
-export interface Contact360Review {
+interface Contact360Review {
   id: string;
   text: string;
   status: string;

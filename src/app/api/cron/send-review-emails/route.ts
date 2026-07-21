@@ -168,7 +168,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       } catch (error) {
         console.error(`[review-email] Failed for booking ${booking.id}:`, error);
         results.failed++;
-        results.errors.push(`Booking ${booking.id}: ${error}`);
+        results.errors.push(`Booking ${booking.id}: ${String(error)}`);
       }
     }
 

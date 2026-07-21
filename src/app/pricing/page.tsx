@@ -78,8 +78,8 @@ function renderEmphasised(text: string): React.ReactNode[] {
 const ACCORDION_DETAILS =
   "group rounded-xl border border-seasalt-400/60 bg-seasalt-900/40 p-0 open:bg-white open:shadow-sm";
 const ACCORDION_SUMMARY = cn(
-  "text-russian-violet flex cursor-pointer items-center justify-between gap-3 rounded-xl px-5 py-4 text-base font-semibold sm:text-lg",
-  "hover:bg-white/60 marker:hidden",
+  "flex cursor-pointer items-center justify-between gap-3 rounded-xl px-5 py-4 text-base font-semibold text-russian-violet sm:text-lg",
+  "marker:hidden hover:bg-white/60",
   "[&::-webkit-details-marker]:hidden",
 );
 const ACCORDION_BODY =

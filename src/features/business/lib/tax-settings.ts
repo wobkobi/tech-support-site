@@ -39,7 +39,8 @@ const START_DATE_LABELS = [
 function num(raw: unknown): number | null {
   if (raw === null || raw === undefined) return null;
   if (typeof raw === "number") return Number.isFinite(raw) ? raw : null;
-  const n = parseFloat(String(raw).replace(/[$,\s%]/g, ""));
+  if (typeof raw !== "string") return null;
+  const n = parseFloat(raw.replace(/[$,\s%]/g, ""));
   if (!Number.isFinite(n)) return null;
   return n;
 }
@@ -51,8 +52,7 @@ function num(raw: unknown): number | null {
  * @returns Parsed Date or null.
  */
 function parseDateCell(raw: unknown): Date | null {
-  if (raw === null || raw === undefined) return null;
-  const s = String(raw).trim();
+  const s = typeof raw === "string" ? raw.trim() : typeof raw === "number" ? String(raw) : "";
   if (!s) return null;
   const dmy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (dmy) {
@@ -113,9 +113,8 @@ export async function readPlannerConfig(
   // Locate the auto-transfer start date by scanning column A for any of the labels.
   let transferStartDate: Date | null = null;
   for (const row of fullSheet) {
-    const label = String(row?.[0] ?? "")
-      .trim()
-      .toLowerCase();
+    const cell = row?.[0];
+    const label = typeof cell === "string" ? cell.trim().toLowerCase() : "";
     if (!label) continue;
     if (START_DATE_LABELS.includes(label)) {
       transferStartDate = parseDateCell(row?.[1]);

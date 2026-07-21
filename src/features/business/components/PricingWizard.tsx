@@ -102,7 +102,7 @@ export function PricingWizard({
 
   useEffect(() => {
     // Rates + active promo in parallel; promo may be null.
-    Promise.all([
+    void Promise.all([
       fetch("/api/pricing/rates")
         .then((r) => r.json())
         .catch(() => ({ ok: false, rates: [] })),

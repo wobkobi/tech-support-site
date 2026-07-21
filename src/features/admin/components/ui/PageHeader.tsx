@@ -11,7 +11,7 @@ import Link from "next/link";
 import type React from "react";
 
 /** One breadcrumb: a label, optionally linked. */
-export interface Breadcrumb {
+interface Breadcrumb {
   /** Crumb label. */
   label: string;
   /** Destination; when omitted the crumb renders as plain text (current page). */

@@ -27,8 +27,6 @@ import type React from "react";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { FaCalendarDay, FaChevronLeft, FaChevronRight } from "react-icons/fa6";
 
-export type { WeekEvent, WeekViewKind };
-
 interface WeekViewProps {
   /** ISO of Monday-NZ-midnight for the initial week (state takes over after mount). */
   initialWeekStartIso: string;

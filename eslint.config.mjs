@@ -1,4 +1,5 @@
 // eslint.config.mjs
+import js from "@eslint/js";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 import prettier from "eslint-config-prettier/flat";
@@ -7,11 +8,50 @@ import prettierPlugin from "eslint-plugin-prettier/recommended";
 import tailwindCanonical from "eslint-plugin-tailwind-canonical-classes";
 import { defineConfig, globalIgnores } from "eslint/config";
 import globals from "globals";
+import tseslint from "typescript-eslint";
 
 export default defineConfig([
+  // Core ESLint recommended rules - the Next presets do not include these.
+  // Must come first: the eslint-recommended layer inside nextTs then switches
+  // off the core rules TypeScript itself already enforces (no-undef etc.).
+  js.configs.recommended,
+
   // Next.js core + Core Web Vitals + TS rules
   ...nextVitals,
   ...nextTs,
+
+  // Type-aware TS rules for app code. Scoped to src/ because scripts/ sits
+  // outside tsconfig's project graph, so it stays on the non-type-checked
+  // recommended set from nextTs.
+  ...tseslint.configs.recommendedTypeChecked.map((c) => ({
+    ...c,
+    files: ["src/**/*.{ts,tsx}"],
+  })),
+  {
+    files: ["src/**/*.{ts,tsx}"],
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: {
+      // The no-unsafe-* family fires ~250 times on any-typed values flowing out
+      // of external SDKs (googleapis, JSON parsing). Off until those boundaries
+      // get typed; the high-value async-correctness rules below stay on.
+      "@typescript-eslint/no-unsafe-assignment": "off",
+      "@typescript-eslint/no-unsafe-member-access": "off",
+      "@typescript-eslint/no-unsafe-argument": "off",
+      "@typescript-eslint/no-unsafe-return": "off",
+      "@typescript-eslint/no-unsafe-call": "off",
+      // Async handlers on JSX props (onClick={async ...}) are fine - React
+      // ignores the returned promise. Keep the non-attribute checks on.
+      "@typescript-eslint/no-misused-promises": [
+        "error",
+        { checksVoidReturn: { attributes: false } },
+      ],
+    },
+  },
 
   // JSDoc baseline (flat config variant, tuned for TS)
   jsdoc.configs["flat/recommended-typescript-error"],
@@ -30,6 +70,9 @@ export default defineConfig([
       jsdoc: { mode: "typescript" },
     },
     rules: {
+      // Core hygiene: require === except the idiomatic `!= null` check
+      eqeqeq: ["error", "smart"],
+
       // TS hygiene
       "@typescript-eslint/no-unused-vars": "error",
       "@typescript-eslint/consistent-type-definitions": "error",

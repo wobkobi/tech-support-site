@@ -13,7 +13,7 @@ import { FaCheck } from "react-icons/fa6";
 
 type RateType = "flat" | "hourly" | "modifier" | "percent";
 
-export interface RateFormState {
+interface RateFormState {
   label: string;
   type: RateType;
   amount: string;

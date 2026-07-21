@@ -518,7 +518,7 @@ export default function BookingForm({
       if (draft.dateKey && draft.timeOfDay && availableDays.length > 0) {
         const day = availableDays.find((d) => d.dateKey === draft.dateKey);
         const win = day?.timeWindows.find((w) => w.value === draft.timeOfDay);
-        const minute = (draft.startMinute ?? 0) as StartMinute;
+        const minute = draft.startMinute ?? 0;
         const sub = win?.subSlots.find((s) => s.minute === minute);
         const desiredDuration = draft.duration === "long" ? "long" : "short";
         const available = desiredDuration === "short" ? sub?.availableShort : sub?.availableLong;

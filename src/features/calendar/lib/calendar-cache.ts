@@ -8,7 +8,7 @@ import {
   getBookingCalendarId,
   type CalendarEvent,
 } from "@/features/calendar/lib/google-calendar";
-import { calculateTravelMinutes, type TransportMode } from "@/features/calendar/lib/travel-time";
+import { calculateTravelMinutes } from "@/features/calendar/lib/travel-time";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 
@@ -68,7 +68,7 @@ export async function recomputeTravelBlock(blockId: string): Promise<RecomputedT
   const destination = block.destination;
   const backDestination = block.customTravelBackDestination ?? homeAddress;
   // Match the cron's read-time default (null mode > driving).
-  const mode = (block.transportMode ?? "driving") as TransportMode;
+  const mode = block.transportMode ?? "driving";
 
   const empty: RecomputedTravel = {
     rawTravelMinutes: null,
@@ -122,7 +122,7 @@ export async function recomputeTravelBlock(blockId: string): Promise<RecomputedT
  * @param lookaheadHours - How far back to look for a preceding event (scheduling.smartOriginLookaheadHours).
  * @returns The best origin address to use.
  */
-export function findSmartOrigin(
+function findSmartOrigin(
   allEvents: CalendarEvent[],
   targetEvent: CalendarEvent,
   homeAddress: string,
@@ -159,7 +159,7 @@ export function findSmartOrigin(
  * @param excludeCalendarEmails - Calendars that must never be chained into.
  * @returns The candidate next event with its location and start, or null.
  */
-export function findNextChainedEvent(
+function findNextChainedEvent(
   allEvents: CalendarEvent[],
   currentEvent: CalendarEvent,
   effectiveDeparture: Date,
@@ -661,7 +661,7 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
       ? `${event.recurringEventId}|${event.calendarEmail}`
       : null;
     const seriesMode = seriesKey ? (seriesModeByKey.get(seriesKey) ?? null) : null;
-    const travelMode = (existing?.transportMode ?? seriesMode ?? "driving") as TransportMode;
+    const travelMode = existing?.transportMode ?? seriesMode ?? "driving";
 
     // Three Distance Matrix calls in parallel - the third (home>next) only
     // fires when a chaining candidate exists, and feeds the dwell calculation.

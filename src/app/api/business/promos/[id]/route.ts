@@ -63,7 +63,7 @@ export async function PATCH(
   if (hasFlat === hasPct) {
     return errorResponse("exactly one of flatHourlyRate or percentDiscount must be set", 400);
   }
-  if (hasPct && (percentDiscount! <= 0 || percentDiscount! >= 1)) {
+  if (hasPct && (percentDiscount <= 0 || percentDiscount >= 1)) {
     return errorResponse("percentDiscount must be between 0 and 1 (e.g. 0.20 for 20%)", 400);
   }
 

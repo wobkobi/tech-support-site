@@ -72,5 +72,5 @@ export async function loadPlacesLibrary(apiKey: string): Promise<google.maps.Pla
   if (typeof window.google?.maps?.importLibrary !== "function") {
     await bootstrap(apiKey);
   }
-  return (await google.maps.importLibrary("places")) as google.maps.PlacesLibrary;
+  return await google.maps.importLibrary("places");
 }

@@ -72,7 +72,7 @@ export interface AvailabilitySettings {
   morningGuards: MorningGuard[];
 }
 
-export interface CancellationSettings {
+interface CancellationSettings {
   /** Cancellations more than this many hours out are free. */
   freeNoticeHours: number;
   /** Inside this window a cancellation also bills round-trip travel. */
@@ -89,7 +89,7 @@ export interface CancellationSettings {
   autoSendCancellationInvoice: boolean;
 }
 
-export interface RescheduleSettings {
+interface RescheduleSettings {
   /** Can't reschedule within this many hours of the booking. 0 = no limit. */
   cutoffHours: number;
   /** Max times one booking can be rescheduled. null/0 = no limit. */
@@ -153,7 +153,7 @@ export interface Benchmark {
 export type EstimateConfidence = "high" | "medium" | "low";
 
 /** Low/high multipliers applied to the point estimate for one confidence level. */
-export interface EstimatorRangeBand {
+interface EstimatorRangeBand {
   /** Multiplier for the LOW end of the range (e.g. 0.85 = 85% of the point estimate). */
   lowFactor: number;
   /** Multiplier for the HIGH end of the range (e.g. 1.2 = 120%). */

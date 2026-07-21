@@ -61,7 +61,7 @@ export default async function AdminBookingsPage(): Promise<React.ReactElement> {
     startAt: b.startAt.toISOString(),
     endAt: b.endAt.toISOString(),
     createdAt: b.createdAt.toISOString(),
-    status: b.status as AdminBookingRow["status"],
+    status: b.status,
     cancelToken: b.cancelToken,
     reviewSentAt: b.reviewSentAt?.toISOString() ?? null,
     cancelledAt: b.cancelledAt?.toISOString() ?? null,

@@ -56,7 +56,7 @@ function yearCodeToFolderName(yearCode: string): string {
  * @param yearCode - Compact fiscal year code (e.g. "2627" for FY 2026-27).
  * @returns The Google Drive folder ID for the year subfolder.
  */
-export async function getOrCreateInvoiceFolder(yearCode: string): Promise<string> {
+async function getOrCreateInvoiceFolder(yearCode: string): Promise<string> {
   if (folderCache.has(yearCode)) return folderCache.get(yearCode)!;
   const invoicesId = await getOrCreateFolder("root", "Invoices");
   const yearId = await getOrCreateFolder(invoicesId, yearCodeToFolderName(yearCode));
@@ -149,28 +149,6 @@ export async function uploadInvoicePdf(
   });
   await ensureAnyoneWithLinkReader(res.data.id!);
   return { fileId: res.data.id!, webUrl: res.data.webViewLink! };
-}
-
-/**
- * Lists all invoice PDFs in the year folder.
- * @param yearCode - Fiscal year code of the folder to list.
- * @returns Array of file metadata objects.
- */
-export async function listInvoicePdfs(
-  yearCode: string,
-): Promise<{ name: string; fileId: string; webUrl: string }[]> {
-  const drive = getDriveClient();
-  const folderId = await getOrCreateInvoiceFolder(yearCode);
-  const res = await drive.files.list({
-    q: `'${folderId}' in parents and mimeType='application/pdf' and trashed=false`,
-    fields: "files(id,name,webViewLink)",
-    pageSize: 200,
-  });
-  return (res.data.files ?? []).map((f) => ({
-    name: f.name!,
-    fileId: f.id!,
-    webUrl: f.webViewLink!,
-  }));
 }
 
 /**

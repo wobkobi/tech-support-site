@@ -9,7 +9,7 @@
 import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 
 /** Fallback hours after an event/day ends before it locks (live: scheduling.pastEditLockHours). */
-export const MAX_PAST_EDIT_HOURS = 18;
+const MAX_PAST_EDIT_HOURS = 18;
 
 /**
  * Whether an event that ended at `endMs` is now locked from editing.

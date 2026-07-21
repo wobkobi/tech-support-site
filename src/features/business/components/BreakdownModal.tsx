@@ -28,7 +28,7 @@ export interface BreakdownRow {
 /**
  * One step in a breakdown that walks through a calculation rather than listing rows.
  */
-export interface BreakdownCalcStep {
+interface BreakdownCalcStep {
   label: string;
   value: string;
   /** Set true to render this step as a subtraction (e.g. "less expenses"). */

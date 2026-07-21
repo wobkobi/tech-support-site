@@ -61,7 +61,7 @@ export function BenchmarkListField({
    */
   const inputClass = (err?: string): string =>
     cn(
-      "focus:ring-russian-violet/30 rounded-lg border px-3 py-2.5 text-base focus:outline-none focus:ring-2",
+      "rounded-lg border px-3 py-2.5 text-base focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
       err ? "border-coquelicot-400" : "border-admin-border-strong",
     );
 

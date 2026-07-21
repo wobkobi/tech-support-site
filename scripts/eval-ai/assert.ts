@@ -8,7 +8,7 @@
 import { clampBillableMins, MAX_JOB_MINS } from "@/features/business/lib/pricing-policy";
 
 /** Grouping for a reported check. */
-export type CheckFamily = "context" | "reproducibility" | "drift" | "cross-route";
+type CheckFamily = "context" | "reproducibility" | "drift" | "cross-route";
 
 /** One reported assertion outcome. */
 export interface CheckResult {

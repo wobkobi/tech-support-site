@@ -367,6 +367,3 @@ export function ReviewApprovalList({
     </div>
   );
 }
-
-// Barrel exports for backward compatibility
-export type { ReviewRow } from "./review-types";

@@ -32,7 +32,7 @@ import {
   FaXmark,
 } from "react-icons/fa6";
 
-export type AdminPage =
+type AdminPage =
   | "dashboard"
   | "reviews"
   | "contacts"

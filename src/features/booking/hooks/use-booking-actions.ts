@@ -14,7 +14,7 @@ import { useToast } from "@/features/admin/components/ui/Toast";
 import { useCallback, useMemo } from "react";
 
 /** Outcome of a booking mutation. */
-export interface BookingActionResult {
+interface BookingActionResult {
   /** True when the request succeeded. */
   ok: boolean;
   /** Set by the complete path when the review-request email actually went out. */
@@ -24,7 +24,7 @@ export interface BookingActionResult {
 }
 
 /** Cancellation policy mode - operator (no fee) vs on-behalf (customer fee rules). */
-export type CancelMode = "operator" | "on-behalf";
+type CancelMode = "operator" | "on-behalf";
 
 /** The wrappers returned by {@link useBookingActions}. */
 export interface UseBookingActions {

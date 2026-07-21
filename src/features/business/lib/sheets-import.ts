@@ -77,7 +77,7 @@ function parseGstRate(raw: string): number {
   return isNaN(n) ? 0.15 : n > 1 ? n / 100 : n;
 }
 
-export interface PerSheetCounts {
+interface PerSheetCounts {
   /** Drive file ID of the spreadsheet that was imported. */
   fileId: string;
   /** Display name of the spreadsheet. */

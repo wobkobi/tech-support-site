@@ -241,7 +241,7 @@ export function SendReviewLinkForm({
               ref={pickerRef}
               className="relative flex flex-col gap-1"
               onBlur={(e) => {
-                if (!pickerRef.current?.contains(e.relatedTarget as Node)) setListOpen(false);
+                if (!pickerRef.current?.contains(e.relatedTarget)) setListOpen(false);
               }}
             >
               <label className="text-xs font-medium text-slate-500">Pick an existing contact</label>

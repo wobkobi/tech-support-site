@@ -42,7 +42,7 @@ const DEFAULT_INVALID = "Enter a valid phone number.";
 
 const DEFAULT_INPUT_CLASSES = cn(
   "w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800",
-  "focus:border-russian-violet focus:outline-none focus:ring-2 focus:ring-russian-violet/30",
+  "focus:border-russian-violet focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
 );
 
 /**

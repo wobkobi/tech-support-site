@@ -7,7 +7,7 @@ import type { TaxRates } from "@/features/business/lib/tax-planner";
 import { prisma } from "@/shared/lib/prisma";
 
 /** How long a cached snapshot is fresh (1h trades staleness for fewer API calls). */
-export const TAX_CACHE_TTL_MS = 60 * 60 * 1000;
+const TAX_CACHE_TTL_MS = 60 * 60 * 1000;
 
 /** Setting-table key prefix; one row per scope. */
 const KEY_PREFIX = "tax-cache:";
@@ -53,7 +53,7 @@ export async function writeCachedTaxSnapshot(
   const value = JSON.stringify({
     cachedAtISO: new Date().toISOString(),
     data,
-  } as SerialisedSnapshot);
+  });
   await prisma.setting.upsert({
     where: { key: KEY_PREFIX + scopeKey },
     update: { value },

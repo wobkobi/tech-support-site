@@ -105,7 +105,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         }
       } catch (error) {
         results.failed++;
-        results.errors.push(`email ${b.id}: ${error}`);
+        results.errors.push(`email ${b.id}: ${String(error)}`);
         console.error(`[cron/send-booking-reminders] email for ${b.id} failed:`, error);
       }
     }
