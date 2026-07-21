@@ -536,8 +536,17 @@ export function jobToLineItems(
       ? minTravelCharge
       : rawTravelTotal;
   if (travelTotal > 0) {
+    // Total drive minutes across auto entries (there + back; legacy drafts
+    // without a back leg fall back to the outbound figure) so the line reads
+    // "Round-trip travel (46 min drive)" instead of a bare "Travel" the
+    // customer can't relate to anything.
+    const driveMins = job.travelEntries.reduce((sum, e) => {
+      if (!e.isAuto || !e.durationMinsOneWay) return sum;
+      return sum + e.durationMinsOneWay + (e.durationMinsBack ?? e.durationMinsOneWay);
+    }, 0);
     items.push({
-      description: "Travel",
+      description:
+        driveMins > 0 ? `Round-trip travel (${driveMins} min drive)` : "Round-trip travel",
       qty: 1,
       unitPrice: travelTotal,
       lineTotal: travelTotal,
