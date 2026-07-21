@@ -199,8 +199,10 @@ export interface BookingNotificationData {
   address?: string | null;
   /**
    * Whether this is an on-site or remote job. Nullable on older bookings, where
-   * the value only ever lived in the notes text - treated as "unknown" rather
-   * than assumed on-site, so a remote customer is never sent directions.
+   * the value only ever lived in the notes text. Only an explicit "remote"
+   * suppresses the address (see {@link onSiteAddress}) - in practice `address`
+   * and `meetingType` are always written together, so a populated address with
+   * a null meetingType doesn't occur on current write paths.
    */
   meetingType?: "in_person" | "remote" | null;
   /** How many times the booking has moved; becomes the calendar SEQUENCE. */

@@ -204,7 +204,9 @@ export function ManualBookingModal({
   return (
     <Modal
       open
-      onClose={onClose}
+      // Block Escape/backdrop dismissal while the create POST is in flight -
+      // the booking would still save invisibly behind a closed modal.
+      onClose={submitting ? () => undefined : onClose}
       title="New booking"
       size="md"
       footer={

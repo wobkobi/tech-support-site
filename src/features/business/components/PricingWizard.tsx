@@ -406,7 +406,10 @@ export function PricingWizard({
   function reset(): void {
     setStep("issue");
     setIssueDescription("");
-    setMeeting("on-site");
+    // Back to null, not "on-site": the meeting step must always be an explicit
+    // pick, or a remote customer restarting the wizard can click straight past
+    // a pre-selected On-site and get a travel-inclusive quote by accident.
+    setMeeting(null);
     setAddress("");
     setAddressNotFound(false);
     setAiExplanation("");
