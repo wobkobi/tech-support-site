@@ -3,15 +3,31 @@
  * @description Booking request success page.
  */
 
+import {
+  buildAppointmentDescription,
+  combineUnitAndAddress,
+  parseBookingNotes,
+} from "@/features/booking/lib/booking";
+import { googleCalendarUrl } from "@/features/booking/lib/ics";
 import { cancellationCopy } from "@/features/business/lib/pricing-policy";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { Button } from "@/shared/components/Button";
 import { CARD } from "@/shared/components/PageLayout";
+import { getIdentity } from "@/shared/lib/business-identity.server";
 import { cn } from "@/shared/lib/cn";
+import { formatDateTimeLong } from "@/shared/lib/date-format";
 import { prisma } from "@/shared/lib/prisma";
+import { getSiteUrl } from "@/shared/lib/site-url";
 import type { Metadata } from "next";
 import type React from "react";
-import { FaCircleCheck, FaHouse, FaPenToSquare, FaTag } from "react-icons/fa6";
+import {
+  FaCalendarPlus,
+  FaCircleCheck,
+  FaDownload,
+  FaHouse,
+  FaPenToSquare,
+  FaTag,
+} from "react-icons/fa6";
 import { BookingConversion } from "./BookingConversion";
 
 // Post-booking confirmation, only reachable after submitting the form: keep
@@ -36,6 +52,45 @@ function renderEmphasised(text: string): React.ReactNode[] {
 }
 
 /**
+ * Human-readable appointment length, derived from the booked window rather than
+ * the optional `duration` enum so legacy rows (which never set it) still read
+ * correctly.
+ * @param startAt - Appointment start.
+ * @param endAt - Appointment end.
+ * @returns Length such as "45 minutes", "1 hour", "1 hour 30 minutes".
+ */
+function formatLength(startAt: Date, endAt: Date): string {
+  const mins = Math.max(0, Math.round((endAt.getTime() - startAt.getTime()) / 60_000));
+  const hours = Math.floor(mins / 60);
+  const rest = mins % 60;
+  const hourPart = hours === 1 ? "1 hour" : hours > 1 ? `${hours} hours` : "";
+  const minPart = rest === 1 ? "1 minute" : rest > 1 ? `${rest} minutes` : "";
+  return [hourPart, minPart].filter(Boolean).join(" ") || "Less than a minute";
+}
+
+/**
+ * One label/value row in the appointment details card.
+ * @param props - Component props.
+ * @param props.label - Row label.
+ * @param props.children - Row value.
+ * @returns A details row.
+ */
+function DetailRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}): React.ReactElement {
+  return (
+    <div className="flex flex-col gap-0.5 sm:flex-row sm:gap-3">
+      <dt className="shrink-0 font-semibold text-russian-violet sm:w-36">{label}</dt>
+      <dd className="text-rich-black/80">{children}</dd>
+    </div>
+  );
+}
+
+/**
  * Booking success page component.
  * @param props - Page props.
  * @param props.searchParams - URL search params.
@@ -49,25 +104,70 @@ export default async function BookingSuccessPage({
   const params = await searchParams;
   const tokenValue = params.cancelToken;
   const cancelToken = Array.isArray(tokenValue) ? tokenValue[0] : tokenValue;
+  // Edit-mode submits land here too; they must not count as new leads.
+  const edited = params.edited === "1";
 
-  // Surface the snapshotted promo title so customers see the rate is locked
-  // even if the offer expires before service.
+  // Restate the appointment itself (the details card below) plus the
+  // snapshotted promo title, so customers see the rate is locked even if the
+  // offer expires before service. Degrades to the generic page without a token.
   const booking = cancelToken
     ? await prisma.booking
         .findFirst({
           where: { cancelToken },
-          select: { promoTitleAtBooking: true },
+          select: {
+            promoTitleAtBooking: true,
+            startAt: true,
+            endAt: true,
+            address: true,
+            unit: true,
+            meetingType: true,
+            notes: true,
+            status: true,
+          },
         })
         .catch(() => null)
     : null;
   const promoTitle = booking?.promoTitleAtBooking ?? null;
-  const { CANCELLATION } = await getPolicy();
+  // Only restate an appointment that is still live - revisiting this URL after
+  // cancelling must not present the old slot as if it were still booked.
+  const appointment = booking && booking.status !== "cancelled" ? booking : null;
+  const [{ CANCELLATION }, identity] = await Promise.all([getPolicy(), getIdentity()]);
+
+  // Add-to-calendar targets. Google Calendar already invites the customer's
+  // email address; these cover everyone whose calendar isn't that address.
+  // Rejoined in the stored NZ form ("12/160 Kepa Road"); a comma between unit
+  // and street reads as a different address to a map lookup.
+  const calendarLocation =
+    appointment && appointment.meetingType !== "remote"
+      ? combineUnitAndAddress(appointment.unit ?? "", appointment.address ?? "")
+      : "";
+  const googleUrl =
+    appointment && cancelToken
+      ? googleCalendarUrl({
+          start: appointment.startAt,
+          end: appointment.endAt,
+          summary: `${identity.company} appointment`,
+          location: calendarLocation || undefined,
+          // Same blurb the .ics carries, so both calendar paths read alike.
+          description: buildAppointmentDescription({
+            company: identity.company,
+            phone: identity.phone,
+            email: identity.email,
+            isRemote: appointment.meetingType === "remote",
+            userNotes: parseBookingNotes(appointment.notes).userNotes,
+            manageUrl: `${getSiteUrl()}/booking/edit?token=${encodeURIComponent(cancelToken)}`,
+            cancelUrl: `${getSiteUrl()}/booking/cancel?token=${encodeURIComponent(cancelToken)}`,
+          }),
+        })
+      : null;
 
   return (
     <main id="main" className="relative min-h-dvh overflow-hidden">
-      <BookingConversion />
-      {/* Backdrop */}
-      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+      <BookingConversion bookingRef={cancelToken ?? null} edited={edited} />
+      {/* Backdrop. Fixed, not absolute: an absolute layer stretches to the full
+          page height, so once the content scrolls past one viewport the image
+          gets scaled over that taller box instead of staying put. */}
+      <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
         <picture>
           <source type="image/avif" srcSet="/source/backdrop-blur.avif" />
           <img
@@ -124,6 +224,58 @@ export default async function BookingSuccessPage({
                 )}
               </div>
             </section>
+
+            {appointment && (
+              <section className={cn(CARD)}>
+                <h2 className="mb-3 text-lg font-bold text-russian-violet sm:text-xl">
+                  Your appointment
+                </h2>
+                <dl className="space-y-2 text-base text-rich-black/80 sm:text-lg">
+                  <DetailRow label="When">{formatDateTimeLong(appointment.startAt)}</DetailRow>
+                  <DetailRow label="Length">
+                    {formatLength(appointment.startAt, appointment.endAt)}
+                  </DetailRow>
+                  {appointment.meetingType && (
+                    <DetailRow label="Type">
+                      {appointment.meetingType === "in_person" ? "In person" : "Remote (online)"}
+                    </DetailRow>
+                  )}
+                  {/* Remote jobs have no address; older rows may carry one without
+                      a meetingType, so show it whenever it exists and isn't remote. */}
+                  {appointment.address && appointment.meetingType !== "remote" && (
+                    <DetailRow label="Where">
+                      {combineUnitAndAddress(appointment.unit ?? "", appointment.address ?? "")}
+                    </DetailRow>
+                  )}
+                </dl>
+
+                <div className="mt-4 flex flex-wrap gap-3 border-t border-seasalt-400/60 pt-4">
+                  {googleUrl && (
+                    <Button
+                      href={googleUrl}
+                      variant="secondary"
+                      size="sm"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <FaCalendarPlus className="h-4 w-4" aria-hidden />
+                      Add to Google Calendar
+                    </Button>
+                  )}
+                  {cancelToken && (
+                    <Button
+                      href={`/api/booking/ics?token=${encodeURIComponent(cancelToken)}`}
+                      download="appointment.ics"
+                      variant="ghost"
+                      size="sm"
+                    >
+                      <FaDownload className="h-4 w-4" aria-hidden />
+                      Download calendar file
+                    </Button>
+                  )}
+                </div>
+              </section>
+            )}
 
             <section className={cn(CARD)}>
               <h2 className="mb-2 text-lg font-bold text-russian-violet sm:text-xl">

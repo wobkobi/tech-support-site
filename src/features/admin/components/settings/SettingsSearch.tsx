@@ -64,10 +64,10 @@ export function SettingsSearch({ onJump }: Props): React.ReactElement {
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Search settings (e.g. cancellation, GST, reminder)..."
-        className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-base focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+        className="w-full rounded-lg border border-admin-border-strong px-4 py-2.5 text-base focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
       />
       {results.length > 0 && (
-        <ul className="absolute z-20 mt-1 max-h-80 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
+        <ul className="absolute z-20 mt-1 max-h-80 w-full overflow-y-auto rounded-lg border border-admin-border bg-admin-surface shadow-lg">
           {results.map((it) => (
             <li key={`${it.group}.${it.fieldKey}`}>
               <button
@@ -76,11 +76,11 @@ export function SettingsSearch({ onJump }: Props): React.ReactElement {
                   onJump(it.group, it.fieldKey);
                   setQuery("");
                 }}
-                className="block w-full px-4 py-2.5 text-left hover:bg-slate-50 focus:bg-slate-50 focus:outline-none"
+                className="block w-full px-4 py-2.5 text-left hover:bg-admin-bg focus:bg-admin-bg focus:outline-none"
               >
-                <span className="text-sm font-medium text-slate-700">{it.fieldTitle}</span>
-                <span className="text-xs text-slate-400"> - {it.groupTitle}</span>
-                <p className="truncate text-xs text-slate-500">{it.description}</p>
+                <span className="text-sm font-medium text-admin-text">{it.fieldTitle}</span>
+                <span className="text-xs text-admin-faint"> - {it.groupTitle}</span>
+                <p className="truncate text-xs text-admin-muted">{it.description}</p>
               </button>
             </li>
           ))}

@@ -11,13 +11,13 @@
  * month falls outside the FY window and would always show zero.
  */
 
+import { StatCard, type StatTone } from "@/features/admin/components/ui/StatCard";
 import {
   BreakdownModal,
   type BreakdownData,
   type BreakdownRow,
 } from "@/features/business/components/BreakdownModal";
 import { formatNZD } from "@/features/business/lib/business";
-import { cn } from "@/shared/lib/cn";
 import { formatDateSlash } from "@/shared/lib/date-format";
 import type React from "react";
 import { useState } from "react";
@@ -52,7 +52,7 @@ export interface InvoiceRow {
 }
 
 /** Selected scope - drives card titles and which optional cards render. */
-export interface DashboardScope {
+interface DashboardScope {
   label: string;
   isAllTime: boolean;
   isCurrentFy: boolean;
@@ -163,7 +163,6 @@ export function BusinessDashboardCards({
   const monthIncome = inRange(income, monthStartISO, monthEndISO);
   const monthExpenses = inRange(expenses, monthStartISO, monthEndISO);
 
-  const tokenSuffix = ``;
   const showThisMonthCards = scope.isAllTime || scope.isCurrentFy;
   // Card titles read more naturally as "Income" / "Expenses" inside an FY
   // scope, but stay as "Total income" / "Total expenses" in the all-time view.
@@ -175,7 +174,7 @@ export function BusinessDashboardCards({
     title: incomePrefix,
     rows: incomeRows(income),
     total: { label: "Total", value: formatNZD(totalIncome) },
-    viewAll: { label: "View all income", href: `/admin/business/income${tokenSuffix}` },
+    viewAll: { label: "View all income", href: `/admin/business/income` },
   };
 
   /** All-expense (excl. GST) breakdown for the expenses card. */
@@ -183,7 +182,7 @@ export function BusinessDashboardCards({
     title: expensesPrefix,
     rows: expenseRows(expenses, "amountExcl"),
     total: { label: "Total", value: formatNZD(totalExpensesExcl) },
-    viewAll: { label: "View all expenses", href: `/admin/business/expenses${tokenSuffix}` },
+    viewAll: { label: "View all expenses", href: `/admin/business/expenses` },
   };
 
   /** Calculation walk-through for "Profit". */
@@ -213,7 +212,7 @@ export function BusinessDashboardCards({
     title: "This month income",
     rows: incomeRows(monthIncome),
     total: { label: "Total", value: formatNZD(sumIncome(monthIncome)) },
-    viewAll: { label: "View all income", href: `/admin/business/income${tokenSuffix}` },
+    viewAll: { label: "View all income", href: `/admin/business/income` },
   };
 
   /** This-month expense breakdown. */
@@ -221,7 +220,7 @@ export function BusinessDashboardCards({
     title: "This month expenses",
     rows: expenseRows(monthExpenses, "amountExcl"),
     total: { label: "Total", value: formatNZD(sumExpense(monthExpenses, "amountExcl")) },
-    viewAll: { label: "View all expenses", href: `/admin/business/expenses${tokenSuffix}` },
+    viewAll: { label: "View all expenses", href: `/admin/business/expenses` },
   };
 
   /** GST claimable breakdown - shows the GST amount per expense entry. */
@@ -229,7 +228,7 @@ export function BusinessDashboardCards({
     title: "GST claimable",
     rows: expenseRows(expenses, "gstAmount"),
     total: { label: "Total GST", value: formatNZD(totalGst) },
-    viewAll: { label: "View all expenses", href: `/admin/business/expenses${tokenSuffix}` },
+    viewAll: { label: "View all expenses", href: `/admin/business/expenses` },
   };
 
   /** Invoice list breakdown. */
@@ -245,37 +244,37 @@ export function BusinessDashboardCards({
         amount: inv.total,
       })),
     total: { label: "Count", value: String(invoices.length) },
-    viewAll: { label: "View all invoices", href: `/admin/business/invoices${tokenSuffix}` },
+    viewAll: { label: "View all invoices", href: `/admin/business/invoices` },
   };
 
   const cards: Array<{
     label: string;
     value: string;
-    color: string;
+    tone: StatTone;
     breakdown: BreakdownData;
   }> = [
     {
       label: incomePrefix,
       value: formatNZD(totalIncome),
-      color: "text-green-600",
+      tone: "success",
       breakdown: totalIncomeBreakdown,
     },
     {
       label: expensesPrefix,
       value: formatNZD(totalExpensesExcl),
-      color: "text-slate-700",
+      tone: "default",
       breakdown: totalExpensesBreakdown,
     },
     {
       label: "Profit",
       value: formatNZD(profit),
-      color: profit >= 0 ? "text-green-600" : "text-red-600",
+      tone: profit >= 0 ? "success" : "critical",
       breakdown: profitBreakdown,
     },
     {
       label: "Tax reserve (20%)",
       value: formatNZD(taxReserve),
-      color: "text-amber-600",
+      tone: "warning",
       breakdown: taxReserveBreakdown,
     },
     ...(showThisMonthCards
@@ -283,13 +282,13 @@ export function BusinessDashboardCards({
           {
             label: "This month income",
             value: formatNZD(sumIncome(monthIncome)),
-            color: "text-green-600",
+            tone: "success" as StatTone,
             breakdown: monthIncomeBreakdown,
           },
           {
             label: "This month expenses",
             value: formatNZD(sumExpense(monthExpenses, "amountExcl")),
-            color: "text-slate-700",
+            tone: "default" as StatTone,
             breakdown: monthExpensesBreakdown,
           },
         ]
@@ -297,33 +296,31 @@ export function BusinessDashboardCards({
     {
       label: "GST claimable",
       value: formatNZD(totalGst),
-      color: "text-moonstone-600",
+      tone: "info",
       breakdown: gstBreakdown,
     },
     {
       label: "Invoices",
       value: String(invoices.length),
-      color: "text-russian-violet",
+      tone: "violet",
       breakdown: invoicesBreakdown,
     },
   ];
 
   return (
     <>
-      <p className="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
+      <p className="mb-2 text-xs font-semibold tracking-wide text-admin-muted uppercase">
         Showing: {scope.label}
       </p>
       <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {cards.map((c) => (
-          <button
+          <StatCard
             key={c.label}
-            type="button"
+            label={c.label}
+            value={c.value}
+            tone={c.tone}
             onClick={() => setActive(c.breakdown)}
-            className="rounded-xl border border-slate-200 bg-white px-4 py-4 text-left shadow-sm transition-shadow hover:shadow-md"
-          >
-            <p className={cn("text-xl font-extrabold", c.color)}>{c.value}</p>
-            <p className="mt-0.5 text-xs text-slate-500">{c.label}</p>
-          </button>
+          />
         ))}
       </div>
 

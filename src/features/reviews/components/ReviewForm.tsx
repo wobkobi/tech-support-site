@@ -10,7 +10,6 @@ import { EmailInput } from "@/shared/components/EmailInput";
 import { PhoneInput } from "@/shared/components/PhoneInput";
 import { cn } from "@/shared/lib/cn";
 import { formatNZPhone, normalisePhone, validatePhone } from "@/shared/lib/normalise-phone";
-import { useRouter } from "next/navigation";
 import type React from "react";
 import { useId, useState } from "react";
 
@@ -55,7 +54,6 @@ export default function ReviewFormProtected({
   prefillPhone,
   existingReview,
 }: ReviewFormProtectedProps): React.ReactElement {
-  const router = useRouter();
   // Stable literal ids for fields the error summary links to, so the "#id"
   // anchors are URL-safe fragments (useId tokens are not). Unlinked fields
   // keep generated ids.
@@ -98,6 +96,8 @@ export default function ReviewFormProtected({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
+  /** True when the submission auto-approved, so the copy can say it's already live. */
+  const [liveNow, setLiveNow] = useState(false);
 
   const textMax = 1000;
   const textMin = 10;
@@ -182,12 +182,12 @@ export default function ReviewFormProtected({
         throw new Error(data?.error || `Request failed with ${res.status}`);
       }
 
-      // Show success then redirect home
+      // Persistent success view instead of a flash + auto-redirect: a 2-second
+      // banner is easy to miss, and being bounced home mid-read gives no chance
+      // to see what actually happened.
+      const data = (await res.json().catch(() => null)) as { status?: string } | null;
+      setLiveNow(data?.status === "approved");
       setSent(true);
-
-      setTimeout(() => {
-        router.push("/");
-      }, 2000);
     } catch (err: unknown) {
       setSubmitError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
@@ -197,6 +197,35 @@ export default function ReviewFormProtected({
 
   const errorEntries = Object.entries(errors);
   const hasFieldErrors = errorEntries.length > 0;
+
+  // Success replaces the form outright - leaving the filled-in fields on screen
+  // invites a second submission of the same review.
+  if (sent) {
+    return (
+      <div role="status" className="space-y-4 text-center">
+        <p className="text-2xl font-extrabold text-russian-violet sm:text-3xl">
+          {isEditing ? "Review updated!" : "Thanks for your review!"}
+        </p>
+        <p className="text-base text-rich-black/80 sm:text-lg">
+          {liveNow
+            ? "It's on the site now - thank you, it genuinely helps."
+            : isEditing
+              ? "It'll reappear on the site soon."
+              : "It'll appear on the site soon. Thank you - it genuinely helps."}
+        </p>
+        <div className="flex flex-wrap justify-center gap-3 pt-2">
+          <Button href="/" variant="secondary">
+            Back to home
+          </Button>
+          {liveNow && (
+            <Button href="/reviews" variant="ghost">
+              See all reviews
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={handleSubmit} aria-busy={loading} className="space-y-4">
@@ -248,20 +277,13 @@ export default function ReviewFormProtected({
           </ul>
         </div>
       )}
-      {!hasFieldErrors && (submitError || sent) && (
+      {/* Success is handled by the view above; only errors surface here. */}
+      {!hasFieldErrors && submitError && (
         <div
-          role={submitError ? "alert" : "status"}
-          className={cn(
-            "rounded-lg border p-3 text-base",
-            submitError
-              ? "border-coquelicot-500/50 bg-coquelicot-500/10 text-coquelicot-500"
-              : "border-moonstone-500/50 bg-moonstone-600/10 text-moonstone-600",
-          )}
+          role="alert"
+          className="rounded-lg border border-coquelicot-500/50 bg-coquelicot-500/10 p-3 text-base text-coquelicot-500"
         >
-          {submitError ??
-            (isEditing
-              ? "Review updated! It will reappear on the site after approval. Redirecting..."
-              : "Thanks for your review! It will appear on the site after approval. Redirecting...")}
+          {submitError}
         </div>
       )}
 

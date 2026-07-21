@@ -1,11 +1,10 @@
 // src/features/business/lib/sheets-import.ts
 // Sheet > site reconciliation for the Cashbook (income) and Expenses tabs. The
-// sheet is the source of truth: rows are matched to DB entries by the hidden
-// column-Z Sync ID, differing fields are updated in the DB, unmatched sheet
-// rows are (re)created, and manually-typed rows get a Sync ID backfilled so
-// they join the two-way sync. runSheetsImport also self-heals site entries
-// whose sheet append failed, and takes a Setting-backed lock so overlapping
-// runs cannot double-write.
+// sheet is the source of truth: rows match DB entries by the hidden column-Z
+// Sync ID, differing fields update the DB, unmatched rows are (re)created, and
+// manually-typed rows get a Sync ID backfilled. runSheetsImport also self-heals
+// site entries whose sheet append failed, and takes a Setting-backed lock so
+// overlapping runs cannot double-write.
 import { calcGstFromInclusive } from "@/features/business/lib/business";
 import { listSpreadsheetsInFolder } from "@/features/business/lib/google-drive";
 import { withRetry } from "@/features/business/lib/google-retry";
@@ -78,7 +77,7 @@ function parseGstRate(raw: string): number {
   return isNaN(n) ? 0.15 : n > 1 ? n / 100 : n;
 }
 
-export interface PerSheetCounts {
+interface PerSheetCounts {
   /** Drive file ID of the spreadsheet that was imported. */
   fileId: string;
   /** Display name of the spreadsheet. */
@@ -176,7 +175,7 @@ function incomeDiffers(db: IncomeEntry, data: IncomeRowData): boolean {
     db.date.getTime() !== data.date.getTime() ||
     db.customer !== data.customer ||
     db.description !== data.description ||
-    db.amount !== data.amount ||
+    amountDiffers(db.amount, data.amount) ||
     db.method !== data.method ||
     (db.notes ?? "") !== (data.notes ?? "")
   );
@@ -195,12 +194,27 @@ function expenseDiffers(db: ExpenseEntry, data: ExpenseRowData): boolean {
     db.supplier !== data.supplier ||
     db.description !== data.description ||
     db.category !== data.category ||
-    db.amountIncl !== data.amountIncl ||
-    db.gstAmount !== data.gstAmount ||
+    amountDiffers(db.amountIncl, data.amountIncl) ||
+    amountDiffers(db.gstAmount, data.gstAmount) ||
     db.method !== data.method ||
     db.receipt !== data.receipt ||
     (db.notes ?? "") !== (data.notes ?? "")
   );
+}
+
+/** 24-hex Mongo ObjectId shape - guards live findUnique({ id }) against legacy UUID Sync IDs. */
+const OBJECT_ID_RE = /^[a-f0-9]{24}$/i;
+
+/**
+ * Whether two money amounts differ by at least a cent. Both are rounded to
+ * cents first so float representation drift and the GST percent integer
+ * round-trip don't flag a spurious diff that rewrites the DB every hour.
+ * @param a - First amount.
+ * @param b - Second amount.
+ * @returns True when they round to different cents.
+ */
+function amountDiffers(a: number, b: number): boolean {
+  return Math.round(a * 100) !== Math.round(b * 100);
 }
 
 /**
@@ -274,11 +288,31 @@ async function importFromSheet(
 
     try {
       if (syncId) {
-        // Copy-pasted rows can duplicate a hidden Sync ID; reconciling both
-        // against one DB entry would flip-flop, so skip repeats with a warning.
+        // A duplicate Sync ID within this run is a copy-pasted sheet row. If the
+        // second row's data matches the first, it's a machine copy (a retried
+        // append, or an unedited paste) and skipping avoids double-counting. If
+        // it differs materially, it's a real second transaction that copied the
+        // hidden id - mint a fresh id and import it.
         if (state.seenSyncIds.has(syncId)) {
-          errors.push(`Income row ${i + 1}: duplicate Sync ID ${syncId} - row skipped`);
-          incomeSkipped++;
+          const first = state.incomeByKey.get(syncId);
+          if (!first || !incomeDiffers(first, data)) {
+            errors.push(`Income row ${i + 1}: duplicate Sync ID ${syncId} (identical) - skipped`);
+            incomeSkipped++;
+            continue;
+          }
+          const rowKey = randomUUID();
+          if (!dryRun) {
+            const created = await prisma.incomeEntry.create({
+              data: { ...data, sheetRowKey: rowKey },
+            });
+            cashBackfills.push({ rowIndex: i + 1, syncId: rowKey });
+            state.incomeByKey.set(rowKey, created);
+          }
+          state.seenSyncIds.add(rowKey);
+          errors.push(
+            `Income row ${i + 1}: duplicate Sync ID ${syncId} with edited data - imported as a new entry`,
+          );
+          incomeImported++;
           continue;
         }
         state.seenSyncIds.add(syncId);
@@ -292,16 +326,34 @@ async function importFromSheet(
             incomeSkipped++;
           }
         } else {
-          // Sheet is source of truth: a tracked row with no DB match is
-          // re-created. Site deletes remove the sheet row too, so this branch
-          // only sees rows that genuinely should exist.
-          if (!dryRun) {
-            const created = await prisma.incomeEntry.create({
-              data: { ...data, sheetRowKey: syncId },
-            });
-            state.incomeByKey.set(syncId, created);
+          // No snapshot match. The snapshot is taken at run start, so an entry
+          // created mid-run (e.g. an invoice /pay whose sheet row carries the
+          // entry id as its Sync ID) is invisible here. Look it up live by id
+          // before creating a DUPLICATE - a deterministic Sync ID equals the
+          // entry's Mongo id, so a hit means "already recorded - just link it".
+          // Gate on the ObjectId shape; a legacy UUID would throw on findUnique.
+          const idLink = OBJECT_ID_RE.test(syncId)
+            ? await prisma.incomeEntry.findUnique({ where: { id: syncId } })
+            : null;
+          if (idLink) {
+            if (!dryRun && !idLink.sheetRowKey) {
+              await prisma.incomeEntry.update({
+                where: { id: idLink.id },
+                data: { sheetRowKey: syncId },
+              });
+            }
+            idLink.sheetRowKey = syncId;
+            state.incomeByKey.set(syncId, idLink);
+            incomeSkipped++;
+          } else {
+            if (!dryRun) {
+              const created = await prisma.incomeEntry.create({
+                data: { ...data, sheetRowKey: syncId },
+              });
+              state.incomeByKey.set(syncId, created);
+            }
+            incomeImported++;
           }
-          incomeImported++;
         }
       } else {
         const key = dedupKey(date, amount, description);
@@ -383,9 +435,27 @@ async function importFromSheet(
 
     try {
       if (syncId) {
+        // Content-gated duplicate handling - see the income loop above.
         if (state.seenSyncIds.has(syncId)) {
-          errors.push(`Expense row ${i + 1}: duplicate Sync ID ${syncId} - row skipped`);
-          expensesSkipped++;
+          const first = state.expenseByKey.get(syncId);
+          if (!first || !expenseDiffers(first, data)) {
+            errors.push(`Expense row ${i + 1}: duplicate Sync ID ${syncId} (identical) - skipped`);
+            expensesSkipped++;
+            continue;
+          }
+          const rowKey = randomUUID();
+          if (!dryRun) {
+            const created = await prisma.expenseEntry.create({
+              data: { ...data, sheetRowKey: rowKey },
+            });
+            expBackfills.push({ rowIndex: i + 1, syncId: rowKey });
+            state.expenseByKey.set(rowKey, created);
+          }
+          state.seenSyncIds.add(rowKey);
+          errors.push(
+            `Expense row ${i + 1}: duplicate Sync ID ${syncId} with edited data - imported as a new entry`,
+          );
+          expensesImported++;
           continue;
         }
         state.seenSyncIds.add(syncId);
@@ -399,13 +469,30 @@ async function importFromSheet(
             expensesSkipped++;
           }
         } else {
-          if (!dryRun) {
-            const created = await prisma.expenseEntry.create({
-              data: { ...data, sheetRowKey: syncId },
-            });
-            state.expenseByKey.set(syncId, created);
+          // Live id-fallback link before creating a duplicate - see the income
+          // loop above for the full rationale.
+          const idLink = OBJECT_ID_RE.test(syncId)
+            ? await prisma.expenseEntry.findUnique({ where: { id: syncId } })
+            : null;
+          if (idLink) {
+            if (!dryRun && !idLink.sheetRowKey) {
+              await prisma.expenseEntry.update({
+                where: { id: idLink.id },
+                data: { sheetRowKey: syncId },
+              });
+            }
+            idLink.sheetRowKey = syncId;
+            state.expenseByKey.set(syncId, idLink);
+            expensesSkipped++;
+          } else {
+            if (!dryRun) {
+              const created = await prisma.expenseEntry.create({
+                data: { ...data, sheetRowKey: syncId },
+              });
+              state.expenseByKey.set(syncId, created);
+            }
+            expensesImported++;
           }
-          expensesImported++;
         }
       } else {
         const key = dedupKey(date, amountIncl, description);
@@ -471,17 +558,27 @@ async function importFromSheet(
  * @returns True when the lock was acquired.
  */
 async function acquireSyncLock(): Promise<boolean> {
-  const existing = await prisma.setting.findUnique({ where: { key: LOCK_KEY } });
-  if (existing && Date.now() - new Date(existing.value).getTime() < LOCK_TTL_MS) {
+  const nowIso = new Date().toISOString();
+  const staleThreshold = new Date(Date.now() - LOCK_TTL_MS).toISOString();
+  // Compare-and-set: atomically steal a stale lock. The value is an ISO
+  // timestamp, which sorts chronologically, so `value < staleThreshold` means
+  // older than the TTL. updateMany is a single atomic op per document, so two
+  // concurrent runs can't both match - after the first stamps `nowIso`, the
+  // row no longer satisfies the second's stale filter.
+  const stolen = await prisma.setting.updateMany({
+    where: { key: LOCK_KEY, value: { lt: staleThreshold } },
+    data: { value: nowIso },
+  });
+  if (stolen.count === 1) return true;
+  // Nothing stale to steal: either a fresh lock holds it, or no lock exists.
+  // Try to create the row - the unique `key` index makes concurrent creates
+  // race-safe (only one wins; the loser throws and returns false).
+  try {
+    await prisma.setting.create({ data: { key: LOCK_KEY, value: nowIso } });
+    return true;
+  } catch {
     return false;
   }
-  const now = new Date().toISOString();
-  await prisma.setting.upsert({
-    where: { key: LOCK_KEY },
-    update: { value: now },
-    create: { key: LOCK_KEY, value: now },
-  });
-  return true;
 }
 
 /** Releases the run lock. Never throws - a leftover lock expires via TTL. */

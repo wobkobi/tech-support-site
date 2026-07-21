@@ -1,24 +1,22 @@
 // src/app/api/business/parse-job/route.ts
 /**
- * @description Admin endpoint that turns a plain-English job description into a
- * structured quote. POST pre-computes the worked-minutes total from time ranges,
- * sends a prompt to the model, then resolves task templates and rates, attaches
- * round-trip travel from the extracted destination, caps durationMins to the
- * wall-clock span, and rebalances floating task quantities to match billable
- * hours. May instead return clarification questions when the input is ambiguous.
+ * @description Admin endpoint that turns a plain-English job description into
+ * a structured quote: prompts the model, resolves task templates and rates,
+ * attaches round-trip travel, caps durationMins to the wall-clock span, and
+ * rebalances task quantities. May return clarification questions instead.
  */
 
 import { composeDescription, effectiveHourlyRate } from "@/features/business/lib/business";
-import { floorBillableMins } from "@/features/business/lib/pricing-policy";
+import { clampBillableMins, MAX_JOB_MINS } from "@/features/business/lib/pricing-policy";
 import {
   buildParseJobContext,
   buildParseJobPrompt,
 } from "@/features/business/lib/prompts/parse-job";
+import { extractRanges } from "@/features/business/lib/time-parse";
 import { lookupDriveRoundTrip } from "@/features/business/lib/travel-distance";
 import type {
   ParseJobQuestion,
   ParseJobResponse,
-  ParsedRange,
   RateConfig,
 } from "@/features/business/types/business";
 import { errorResponse } from "@/shared/lib/api-response";
@@ -32,20 +30,17 @@ import OpenAI from "openai";
 // Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
 export const maxDuration = 60;
 
-/** Internal extension that carries the per-range duration (used by the pre-compute hint). */
-interface RangeWithDuration extends ParsedRange {
-  durationMins: number;
-}
-
 /**
- * Converts an operator-stated HH:MM (NZ wall clock, today) to a Date for the
- * traffic-aware travel lookup. Times already past today roll to tomorrow so
- * the quote stays inside Google's traffic-prediction horizon - mirrors the
- * calculator's client-side jobStartIsoFromTime.
+ * Converts an operator-stated HH:MM (NZ wall clock) to a Date for the
+ * traffic-aware travel lookup, anchored to the next occurrence of the job
+ * date's WEEKDAY. Google only quotes future departures, so a past job is
+ * priced at the same weekday + time as a proxy for that day's actual traffic.
+ * Mirrors the calculator's client-side jobStartIsoFromTime.
  * @param hhmm - HH:MM (24h) NZ wall-clock string, or null.
+ * @param anchorDate - NZ-local YYYY-MM-DD whose weekday to match (the job date); malformed/missing falls back to today.
  * @returns Date, or undefined when the input isn't a valid HH:MM.
  */
-function nzTimeToDate(hhmm: string | null | undefined): Date | undefined {
+function nzTimeToDate(hhmm: string | null | undefined, anchorDate?: string): Date | undefined {
   if (!hhmm || !/^\d{1,2}:\d{2}$/.test(hhmm)) return undefined;
   const [h, m] = hhmm.split(":").map(Number);
   if (h > 23 || m > 59) return undefined;
@@ -53,142 +48,29 @@ function nzTimeToDate(hhmm: string | null | undefined): Date | undefined {
     new Date(),
   );
   const [y, mo, d] = nzDateStr.split("-").map(Number);
+  // Weekday of a Y-M-D is timezone-independent when computed in UTC.
+  const todayDow = new Date(Date.UTC(y, mo - 1, d)).getUTCDay();
+  let daysAhead = 0;
+  if (anchorDate && /^\d{4}-\d{2}-\d{2}$/.test(anchorDate)) {
+    const [ay, am, ad] = anchorDate.split("-").map(Number);
+    const targetDow = new Date(Date.UTC(ay, am - 1, ad)).getUTCDay();
+    daysAhead = (targetDow - todayDow + 7) % 7;
+  }
   const offset = getPacificAucklandOffset(y, mo, d);
-  let utc = new Date(Date.UTC(y, mo - 1, d, h - offset, m, 0));
+  let utc = new Date(Date.UTC(y, mo - 1, d + daysAhead, h - offset, m, 0));
   if (utc.getTime() < Date.now()) {
-    utc = new Date(utc.getTime() + 24 * 60 * 60 * 1000);
+    // Same-day time already passed: next day without an anchor, next week
+    // with one (keeping the weekday).
+    utc = new Date(utc.getTime() + (daysAhead === 0 && !anchorDate ? 1 : 7) * 24 * 60 * 60 * 1000);
   }
   return utc;
 }
 
-// Two times on one line, captured as start/end. The separator is forgiving so
-// the operator does not have to type a dash: a dash (-/–/—), the word "to", or
-// just whitespace all split the pair. Regex backtracking lets the bare-space
-// case work even though each time captures an optional trailing meridiem.
-const TIME_RANGE_RE =
-  /(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)(?:\s*[-–—]\s*|\s+to\s+|\s+)(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/gi;
-
-type Meridiem = "am" | "pm" | null;
-
 /**
- * Extracts the am/pm marker from a time fragment.
- * @param s - Time fragment like "7", "9pm", "10:30am".
- * @returns "am" / "pm" / null.
- */
-function meridiemOf(s: string): Meridiem {
-  const t = s.toLowerCase();
-  if (/pm/.test(t)) return "pm";
-  if (/am/.test(t)) return "am";
-  return null;
-}
-
-/**
- * Parses a time string into minutes since midnight.
- * @param s - Time string (e.g. "7pm", "7:10", "10:22am").
- * @param assume - Meridiem to apply when the string has none (e.g. trailing "pm" in "7-9pm").
- * @returns Minutes since midnight, or null if unparseable.
- */
-function parseTimeMins(s: string, assume: Meridiem = null): number | null {
-  const t = s.trim().toLowerCase();
-  const meridiem: Meridiem = meridiemOf(t) ?? assume;
-  const clean = t.replace(/[apm\s]/g, "");
-  const [hStr, mStr = "0"] = clean.split(":");
-  const h = parseInt(hStr, 10);
-  const m = parseInt(mStr, 10);
-  if (isNaN(h) || isNaN(m)) return null;
-  if (meridiem === "pm") return (h === 12 ? 12 : h + 12) * 60 + m;
-  if (meridiem === "am") return (h === 12 ? 0 : h) * 60 + m;
-  return h * 60 + m;
-}
-
-/**
- * Formats minutes-since-midnight as a HH:MM string. Wraps at 24h boundaries
- * so a "11pm-1am" overnight range still serialises cleanly.
- * @param mins - Minutes since midnight (may exceed 1440 for cross-midnight ends).
- * @returns HH:MM string.
- */
-function minsToHHMM(mins: number): string {
-  const wrapped = ((mins % (24 * 60)) + 24 * 60) % (24 * 60);
-  const h = Math.floor(wrapped / 60);
-  const m = wrapped % 60;
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-}
-
-/**
- * Extracts every start/end time segment found on digit-led lines, accepting a
- * dash, "to", or plain whitespace between the two times. Used internally to
- * compute the worked-minutes hint passed to the AI as a "pre-computed session
- * total" annotation.
- * @param input - Raw job description text.
- * @returns Array of parsed time ranges (may be empty when nothing detected).
- */
-function extractRanges(input: string): RangeWithDuration[] {
-  const ranges: RangeWithDuration[] = [];
-  for (const line of input.split("\n")) {
-    if (!/^\d/.test(line.trim())) continue;
-    TIME_RANGE_RE.lastIndex = 0;
-    const m = TIME_RANGE_RE.exec(line);
-    if (!m) continue;
-    const startMeridiem = meridiemOf(m[1]);
-    const endMeridiem = meridiemOf(m[2]);
-    const start = parseTimeMins(m[1], startMeridiem ?? endMeridiem);
-    const end = parseTimeMins(m[2], endMeridiem ?? startMeridiem);
-    if (start === null || end === null) continue;
-    let endResolved = end;
-    let dur = end - start;
-    if (dur <= 0) {
-      const withNoon = dur + 12 * 60;
-      if (withNoon > 0 && withNoon <= 16 * 60) {
-        endResolved = end + 12 * 60;
-        dur = withNoon;
-      } else {
-        endResolved = end + 24 * 60;
-        dur = dur + 24 * 60;
-      }
-    }
-    ranges.push({
-      startTime: minsToHHMM(start),
-      endTime: minsToHHMM(endResolved),
-      durationMins: dur,
-    });
-  }
-  return ranges;
-}
-
-/**
- * Sums all HH:MM-HH:MM segments on lines that start with a digit. Feeds the
- * AI pre-compute hint so the model uses the operator-stated minutes verbatim.
- * @param input - Raw job description text.
- * @returns Total worked minutes, or null if no time ranges detected.
- */
-function calcSessionMins(input: string): number | null {
-  const ranges = extractRanges(input);
-  if (ranges.length === 0) return null;
-  return ranges.reduce((s, x) => s + x.durationMins, 0);
-}
-
-/**
- * Retired tag spellings the model can still emit (from older prompt wording or
- * its own paraphrasing), mapped to their canonical replacement in the template
- * taxonomy. Matched case-insensitively.
- */
-const TAG_ALIASES: Record<string, string> = {
-  transfer: "Data Transfer",
-  security: "Privacy & Security",
-  "privacy configuration": "Privacy & Security",
-  "cloud storage": "Cloud Service",
-  "bios update": "Firmware Update",
-  "bluetooth & radio setup": "Setup",
-  tv: "TV",
-  "desktop / pc": "Desktop / PC",
-};
-
-/**
- * Canonicalises one AI-emitted tag: retired spellings map through
- * {@link TAG_ALIASES}, then any case-variant of a tag already in the template
- * taxonomy snaps to the stored casing so near-duplicates ("Virus removal" vs
- * "Virus Removal") can't split the taxonomy or the price memory. Unknown tags
- * pass through trimmed - the vocabulary stays open.
+ * Canonicalises one AI-emitted tag: case-variants of a known tag snap to the
+ * stored casing so near-duplicates can't split the taxonomy or the price
+ * memory. Unknown tags pass through trimmed - the vocabulary stays open, and
+ * the caller warns the operator so a new tag is a visible decision, not drift.
  * @param tag - Device or action tag from the AI.
  * @param known - Lowercased tag > stored casing, built from the templates.
  * @returns Canonical tag, or null when the input was empty.
@@ -199,8 +81,7 @@ function canonicaliseTag(
 ): string | null {
   const trimmed = tag?.trim();
   if (!trimmed) return null;
-  const aliased = TAG_ALIASES[trimmed.toLowerCase()] ?? trimmed;
-  return known.get(aliased.toLowerCase()) ?? aliased;
+  return known.get(trimmed.toLowerCase()) ?? trimmed;
 }
 
 /**
@@ -238,7 +119,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   // Parse and validate body
   const body = await request.json();
-  const { input, answers } = body as { input: unknown; answers?: Record<string, unknown> };
+  const { input, answers, jobDate } = body as {
+    input: unknown;
+    answers?: Record<string, unknown>;
+    jobDate?: unknown;
+  };
+  // Job date (NZ-local YYYY-MM-DD) anchors travel quotes to the job's weekday.
+  const jobDateAnchor =
+    typeof jobDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(jobDate) ? jobDate : undefined;
 
   if (!input || typeof input !== "string" || input.trim().length === 0) {
     return errorResponse("input is required", 400);
@@ -307,7 +195,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       },
     );
 
-    const precomputed = calcSessionMins(input);
+    // Parse the stated time ranges once - reused below to attach parsed.ranges.
+    const extractedRanges = extractRanges(input);
+    const precomputed =
+      extractedRanges.length > 0
+        ? extractedRanges.reduce((sum, r) => sum + r.durationMins, 0)
+        : null;
     // Close the untrusted USER DATA block before any server-supplied trusted
     // annotations so the model knows where operator-controlled text ends.
     let userContent = `${context}${input.trim()}\n--- END USER DATA ---`;
@@ -355,13 +248,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     } else if (!parsed.noTravelCharge && parsed.destination) {
       // Look up both drive legs via Google Distance Matrix, each at its own
       // departure: outbound at the parsed job start, return at the parsed end
-      // (or start + duration). Missing/invalid times fall back to the
-      // lookup's defaults (now / +60 min). Direct call into the helper
-      // instead of a self-fetch so this works without NEXT_PUBLIC_BASE_URL
-      // set and doesn't burn the public route's rate-limit budget.
+      // (or start + duration); missing times use the lookup's defaults. Direct
+      // helper call, not a self-fetch - works without NEXT_PUBLIC_BASE_URL and
+      // doesn't burn the public route's rate-limit budget.
       const parsedRanges = parsed.ranges ?? [];
-      const departAt = nzTimeToDate(parsed.startTime ?? parsedRanges[0]?.startTime);
-      let returnAt = nzTimeToDate(parsed.endTime ?? parsedRanges[parsedRanges.length - 1]?.endTime);
+      const departAt = nzTimeToDate(parsed.startTime ?? parsedRanges[0]?.startTime, jobDateAnchor);
+      let returnAt = nzTimeToDate(
+        parsed.endTime ?? parsedRanges[parsedRanges.length - 1]?.endTime,
+        jobDateAnchor,
+      );
       if (departAt && returnAt && returnAt <= departAt) {
         // Independent roll-forward can invert the pair (start already past
         // rolls to tomorrow while a future end stays today) - keep the
@@ -411,6 +306,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           t.action ? [[t.action.toLowerCase(), t.action]] : [],
         ),
       );
+      // Tags the model coined that aren't in the taxonomy. Surfaced as a
+      // warning so a genuinely new tag is a visible operator decision and a
+      // drifted synonym gets corrected before it splits the price history.
+      const newTags = new Set<string>();
       parsed.tasks = parsed.tasks.map((task) => {
         const t = task as typeof task & {
           action?: string | null;
@@ -420,11 +319,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           modifierLabels?: string[];
           isShort?: boolean;
         };
-        // Canonicalise BEFORE the template snap so a retired spelling
-        // ("Transfer") still finds its template ("Data Transfer") and its
-        // remembered price.
+        // Canonicalise BEFORE the template snap so a case-drifted tag still
+        // finds its template and its remembered price.
         const device = canonicaliseTag(t.device, knownDevices);
         const action = canonicaliseTag(t.action, knownActions);
+        if (device && !knownDevices.has(device.toLowerCase())) newTags.add(device);
+        if (action && !knownActions.has(action.toLowerCase())) newTags.add(action);
         const snap = findTemplateByTags(device, action, templates);
         // Billing signals must not print on the invoice line. The prompt
         // forbids them in details, but the model still echoes speed hints
@@ -453,11 +353,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           })
           .filter((r): r is RateConfig => r !== null && r.hourlyDelta !== null);
         // Delivery channels (At home / Remote / Phone) are mutually exclusive -
-        // the prompt says so, but enforce it here so a model that stacks them
-        // anyway (e.g. a call that escalated to screen share emitting both
-        // Phone and Remote) cannot compound the discounts. Keep the channel
-        // with the highest effective rate; ties keep the first emitted.
-        // Matches the DEFAULT label names - renamed channels bypass this guard.
+        // the prompt says so, but enforce it so a model that stacks them cannot
+        // compound the discounts. Keep the channel with the highest effective
+        // rate; ties keep the first emitted. Matches the DEFAULT label names -
+        // renamed channels bypass this guard.
         const CHANNEL_LABELS = new Set(["at home", "remote", "phone"]);
         const channels = modifierRates.filter((r) => CHANNEL_LABELS.has(r.label.toLowerCase()));
         const keptChannel = channels.reduce<RateConfig | null>(
@@ -506,6 +405,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           )}. None match a current rate - check the modifier labels in Settings > Pricing.`,
         ];
       }
+      if (newTags.size > 0) {
+        parsed.warnings = [
+          ...(parsed.warnings ?? []),
+          `New tag(s) not in the current taxonomy: ${[...newTags].join(
+            ", ",
+          )}. Fine for genuinely new work - otherwise switch the task to the existing tag so the price history stays on one key.`,
+        ];
+      }
     }
 
     // Out-of-pocket travel disbursements (parking, tolls, ferry) pass through
@@ -525,8 +432,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Attach the operator-stated ranges so the calculator can render one row
     // per detected segment. Strip the internal durationMins - the calc derives
-    // it from start/end on its own.
-    const extractedRanges = extractRanges(input);
+    // it from start/end on its own (extractedRanges was parsed once, above).
     if (extractedRanges.length > 0) {
       parsed.ranges = extractedRanges.map(({ startTime, endTime }) => ({ startTime, endTime }));
     } else if (parsed.startTime && parsed.endTime) {
@@ -541,7 +447,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       typeof parsed.outOfSessionMins === "number" &&
       Number.isFinite(parsed.outOfSessionMins) &&
       parsed.outOfSessionMins > 0
-        ? Math.min(Math.round(parsed.outOfSessionMins), 8 * 60)
+        ? Math.min(Math.round(parsed.outOfSessionMins), MAX_JOB_MINS)
         : 0;
     parsed.outOfSessionMins = outOfSessionMins;
 
@@ -586,7 +492,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       const incHours = settings.pricing.billingIncrementMins / 60;
       const targetHours =
         Math.round(
-          (floorBillableMins(
+          (clampBillableMins(
             parsed.durationMins,
             settings.pricing.minBillableMins,
             settings.pricing.billingIncrementMins,
@@ -602,41 +508,49 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           .reduce((s, t) => s + (t.qty || 0), 0);
         const floatingTargets = targetHours - pinnedSum;
         const floatingSum = sumQty - pinnedSum;
+        // Operator-stated durations are EXACT - pinned tasks are never scaled
+        // or drift-parked. When nothing is floating (every task pinned), the
+        // sum simply stands and the mismatch surfaces as a warning for the
+        // operator instead of silently moving stated times.
         const canScaleFloating = floatingSum > 0 && floatingTargets > 0;
-        const multiplier = canScaleFloating ? floatingTargets / floatingSum : targetHours / sumQty;
-        parsed.tasks = parsed.tasks.map((t) => {
-          if (canScaleFloating && t.isExplicit) return t;
-          return {
-            ...t,
-            qty: Math.max(incHours, Math.round(t.qty * multiplier * 100) / 100),
-          };
-        });
-        // Park any rounding remainder on the largest floating task (or the
-        // largest task overall when nothing is floating) so the sum lands
-        // exactly on targetHours.
-        const adjustedSum = parsed.tasks.reduce((s, t) => s + t.qty, 0);
-        const drift = Math.round((targetHours - adjustedSum) * 100) / 100;
-        if (drift !== 0) {
-          const driftable = canScaleFloating
-            ? parsed.tasks.map((t, i) => ({ t, i })).filter(({ t }) => !t.isExplicit)
-            : parsed.tasks.map((t, i) => ({ t, i }));
-          if (driftable.length > 0) {
-            const largest = driftable.reduce((max, cur) => (cur.t.qty > max.t.qty ? cur : max));
-            parsed.tasks[largest.i] = {
-              ...parsed.tasks[largest.i],
-              qty: Math.max(
-                incHours,
-                Math.round((parsed.tasks[largest.i].qty + drift) * 100) / 100,
-              ),
+        if (canScaleFloating) {
+          const multiplier = floatingTargets / floatingSum;
+          parsed.tasks = parsed.tasks.map((t) => {
+            if (t.isExplicit) return t;
+            return {
+              ...t,
+              qty: Math.max(incHours, Math.round(t.qty * multiplier * 100) / 100),
             };
+          });
+          // Park any rounding remainder on the largest floating task so the
+          // sum lands exactly on targetHours.
+          const adjustedSum = parsed.tasks.reduce((s, t) => s + t.qty, 0);
+          const drift = Math.round((targetHours - adjustedSum) * 100) / 100;
+          if (drift !== 0) {
+            const driftable = parsed.tasks
+              .map((t, i) => ({ t, i }))
+              .filter(({ t }) => !t.isExplicit);
+            if (driftable.length > 0) {
+              const largest = driftable.reduce((max, cur) => (cur.t.qty > max.t.qty ? cur : max));
+              parsed.tasks[largest.i] = {
+                ...parsed.tasks[largest.i],
+                qty: Math.max(
+                  incHours,
+                  Math.round((parsed.tasks[largest.i].qty + drift) * 100) / 100,
+                ),
+              };
+            }
           }
+          parsed.warnings = [
+            ...(parsed.warnings ?? []),
+            `Rebalanced floating task quantities to match the ${targetHours}h total (stated durations untouched).`,
+          ];
+        } else {
+          parsed.warnings = [
+            ...(parsed.warnings ?? []),
+            `Task hours sum to ${Math.round(sumQty * 100) / 100}h but the stated times total ${targetHours}h - stated durations were left untouched; adjust manually if needed.`,
+          ];
         }
-        parsed.warnings = [
-          ...(parsed.warnings ?? []),
-          canScaleFloating
-            ? `Rebalanced floating task quantities to match the ${targetHours}h total (pinned tasks preserved).`
-            : `Rebalanced every task proportionally to match the ${targetHours}h total.`,
-        ];
       }
     }
 

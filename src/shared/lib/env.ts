@@ -1,22 +1,19 @@
 // src/shared/lib/env.ts
 /**
  * @description Required environment variable access plus a startup validation
- * pass. Most secrets in this app are read lazily and degrade gracefully (email
- * skips, calendar throws on first use), so only the handful the server cannot
- * run at all without are treated as fatal; the rest are warned about so a
+ * pass. Most secrets are read lazily and degrade gracefully, so only the
+ * handful the server cannot run without are fatal; the rest warn so a
  * misconfigured deploy is visible without taking the site down.
  */
 
 /**
- * Secrets the server reads directly from process.env and cannot function
- * without. Missing one in production is a hard failure at boot; in other
- * environments it only warns so local dev and preview builds are not blocked.
- *
- * DATABASE_URL is intentionally absent: Prisma resolves it itself (via
- * prisma.config.ts for the CLI and env("DATABASE_URL") in the schema at
- * runtime), so it never flows through process.env in app code.
+ * Secrets the server cannot function without. Missing one in production fails
+ * at boot; elsewhere it only warns. MONGODB_URI is validated here (not at
+ * Prisma module scope, where a throwing top-level side effect breaks some
+ * module-eval contexts) so a value blanked by dotenv-expand's `$` expansion
+ * fails by name instead of as a cryptic Prisma error on first query.
  */
-const REQUIRED_ENV = ["ADMIN_SECRET", "CRON_SECRET"] as const;
+const REQUIRED_ENV = ["MONGODB_URI", "ADMIN_SECRET", "CRON_SECRET"] as const;
 
 /**
  * Feature-specific vars. A missing one disables or degrades the related feature
@@ -49,7 +46,9 @@ const RECOMMENDED_ENV = [
 export function requireEnv(name: string): string {
   const value = process.env[name]?.trim();
   if (!value) {
-    throw new Error(`Missing required environment variable: ${name}`);
+    throw new Error(
+      `Missing or empty required environment variable: ${name} - if the value contains "$", check .env / Vercel escaping (dotenv-expand blanks an unescaped $VAR).`,
+    );
   }
   return value;
 }
@@ -71,10 +70,45 @@ export function validateEnv(): void {
   }
 
   if (missingRequired.length > 0) {
-    const message = `[env] Missing required vars: ${missingRequired.join(", ")}`;
+    const message = `[env] Missing required vars: ${missingRequired.join(
+      ", ",
+    )} - if a value contains "$", check .env / Vercel escaping (dotenv-expand blanks an unescaped $VAR)`;
     if (process.env.NODE_ENV === "production") {
       throw new Error(message);
     }
     console.warn(`${message} (allowed outside production)`);
   }
+}
+
+/** Presence snapshot for one env var - never carries the value itself. */
+export interface EnvReportEntry {
+  /** Environment variable name. */
+  name: string;
+  /** Whether a missing value is fatal (database + REQUIRED) vs feature-degrading (RECOMMENDED). */
+  required: boolean;
+  /** True when the var is set and non-blank after trimming. */
+  present: boolean;
+}
+
+/**
+ * Whether an env var is set and non-blank after trimming. The trim is what
+ * catches a `$`-expansion silent-blank (a var present but empty).
+ * @param name - Environment variable name.
+ * @returns True when the value is non-empty.
+ */
+function isEnvPresent(name: string): boolean {
+  return Boolean(process.env[name]?.trim());
+}
+
+/**
+ * Reports presence (never values) of every env var the app depends on, for the
+ * authed health endpoint. Composed from the same REQUIRED_ENV / RECOMMENDED_ENV
+ * sources the boot validation uses, so the list cannot drift.
+ * @returns One entry per tracked var, required (database + secrets) first.
+ */
+export function getEnvReport(): EnvReportEntry[] {
+  return [
+    ...REQUIRED_ENV.map((name) => ({ name, required: true, present: isEnvPresent(name) })),
+    ...RECOMMENDED_ENV.map((name) => ({ name, required: false, present: isEnvPresent(name) })),
+  ];
 }

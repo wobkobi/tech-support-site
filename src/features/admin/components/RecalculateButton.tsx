@@ -48,13 +48,13 @@ export function RecalculateButton(): React.ReactElement {
         className={cn(
           "rounded-lg px-4 py-2 text-sm font-semibold transition-colors",
           recalculating
-            ? "cursor-not-allowed bg-slate-100 text-slate-400"
+            ? "cursor-not-allowed bg-admin-bg text-admin-faint"
             : "bg-russian-violet text-white hover:bg-russian-violet/90",
         )}
       >
         {recalculating ? "Recalculating…" : "Recalculate travel times"}
       </button>
-      {result && <p className="text-xs text-slate-500">{result}</p>}
+      {result && <p className="text-xs text-admin-muted">{result}</p>}
     </div>
   );
 }

@@ -421,6 +421,16 @@ export async function matchReviewsToContacts(): Promise<number> {
 }
 
 /**
+ * Trims a name and collapses internal runs of whitespace to a single space, so
+ * a stray, doubled, or non-breaking space - invisible once HTML renders it -
+ * cannot be mistaken for a real difference between two otherwise-equal names.
+ * @param name - Raw name.
+ * @returns The name with surrounding and repeated whitespace normalised.
+ */
+function collapseWhitespace(name: string): string {
+  return name.replace(/\s+/g, " ").trim();
+}
+/**
  * Auto-fills missing contact fields (phone, address, full name) from the most
  * recent matching Booking and returns booking-sourced field conflicts for the
  * admin to resolve. Only touches live contacts.
@@ -504,13 +514,15 @@ export async function enrichContactsFromBookings(): Promise<ConflictEntry[]> {
       addressUpdates.set(contact.id, address);
     }
 
+    // Compare names whitespace-normalised so cosmetic spacing is not a difference.
+    const proposedName = collapseWhitespace(booking.name);
+    const contactName = collapseWhitespace(contact.name);
     // Fill name when contact has only a first name and the booking has the full one.
-    const proposedName = booking.name.trim();
     if (
       proposedName &&
-      contact.name &&
+      contactName &&
       !nameFilled.has(contact.id) &&
-      proposedName.toLowerCase().startsWith(contact.name.toLowerCase() + " ")
+      proposedName.toLowerCase().startsWith(contactName.toLowerCase() + " ")
     ) {
       nameFilled.add(contact.id);
       nameUpdates.set(contact.id, proposedName);
@@ -519,12 +531,12 @@ export async function enrichContactsFromBookings(): Promise<ConflictEntry[]> {
     if (!conflictSeen.has(contact.id)) {
       conflictSeen.add(contact.id);
       const conflictFields: ("name" | "phone")[] = [];
-      const contactNameLower = contact.name.toLowerCase();
+      const contactNameLower = contactName.toLowerCase();
       const proposedNameLower = proposedName.toLowerCase();
       // Only a genuine difference is a conflict - not merely a missing last name.
       if (
         proposedName &&
-        contact.name &&
+        contactName &&
         proposedNameLower !== contactNameLower &&
         !contactNameLower.startsWith(proposedNameLower + " ") &&
         !proposedNameLower.startsWith(contactNameLower + " ")
@@ -612,9 +624,13 @@ export async function enrichContactsFromReviews(): Promise<ConflictEntry[]> {
     seen.add(contact.id);
 
     if (!review.lastName) continue;
-    const proposedName = [review.firstName, review.lastName].filter(Boolean).join(" ").trim();
-    if (!proposedName || !contact.name) continue;
-    if (proposedName.toLowerCase() === contact.name.toLowerCase()) continue;
+    // Whitespace-normalised on both sides so cosmetic spacing is not a difference.
+    const proposedName = collapseWhitespace(
+      [review.firstName, review.lastName].filter(Boolean).join(" "),
+    );
+    const contactName = collapseWhitespace(contact.name);
+    if (!proposedName || !contactName) continue;
+    if (proposedName.toLowerCase() === contactName.toLowerCase()) continue;
 
     conflicts.push({
       contactId: contact.id,

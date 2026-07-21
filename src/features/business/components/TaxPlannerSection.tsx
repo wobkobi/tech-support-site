@@ -5,6 +5,7 @@
  * ACC, KiwiSaver), weekly/monthly targets, and a GST roll-up. Targets only -
  * Payment-log actuals are omitted. Server component.
  */
+import { Card } from "@/features/admin/components/ui/Card";
 import { formatNZD } from "@/features/business/lib/business";
 import {
   computeTaxPlan,
@@ -68,7 +69,7 @@ export function TaxPlannerSection({
     <section className="mb-8">
       <div className="mb-3 flex flex-wrap items-baseline gap-2">
         <h2 className="text-lg font-bold text-russian-violet">Tax planner</h2>
-        <span className="text-xs font-medium text-slate-500">{fyLabel}</span>
+        <span className="text-xs font-medium text-admin-muted">{fyLabel}</span>
       </div>
 
       <div
@@ -78,11 +79,11 @@ export function TaxPlannerSection({
         )}
       >
         {/* Tax account: income tax + ACC (+ GST when registered). Paid to IRD/ACC. */}
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <Card>
           <h3 className="mb-1 text-sm font-bold tracking-wide text-russian-violet uppercase">
             Tax account
           </h3>
-          <p className="mb-3 text-[11px] text-slate-400">Reserved for IRD + ACC bills.</p>
+          <p className="mb-3 text-[11px] text-admin-faint">Reserved for IRD + ACC bills.</p>
           <PlannerRow
             label={`Income tax @ ${incomeTaxPct}`}
             value={formatNZD(plan.setAsides.incomeTax)}
@@ -92,22 +93,22 @@ export function TaxPlannerSection({
             <PlannerRow label="GST to pay" value={formatNZD(Math.max(0, plan.gst.netToPay))} />
           )}
           <PlannerRow label="Tax account total" value={formatNZD(taxAccountTarget)} emphasis />
-          <div className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-100 pt-2">
+          <div className="mt-3 grid grid-cols-2 gap-2 border-t border-admin-border pt-2">
             <SmallStat label="Weekly target" value={formatNZD(taxAccountTarget / 52)} />
             <SmallStat label="Monthly target" value={formatNZD(taxAccountTarget / 12)} />
           </div>
-          <p className="mt-2 text-[11px] leading-snug text-slate-400">
+          <p className="mt-2 text-[11px] leading-snug text-admin-faint">
             This is the amount that should sit in your tax account. The weekly/monthly targets are
             what you'd need to transfer to be on pace by 31 March.
           </p>
-        </div>
+        </Card>
 
         {/* KiwiSaver - separate provider, separate reserve. */}
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <Card>
           <h3 className="mb-1 text-sm font-bold tracking-wide text-russian-violet uppercase">
             KiwiSaver
           </h3>
-          <p className="mb-3 text-[11px] text-slate-400">
+          <p className="mb-3 text-[11px] text-admin-faint">
             Voluntary - paid to your KiwiSaver provider, not IRD.
           </p>
           <PlannerRow
@@ -115,20 +116,20 @@ export function TaxPlannerSection({
             value={formatNZD(plan.setAsides.kiwiSaver)}
             emphasis
           />
-          <div className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-100 pt-2">
+          <div className="mt-3 grid grid-cols-2 gap-2 border-t border-admin-border pt-2">
             <SmallStat label="Weekly target" value={formatNZD(plan.setAsides.kiwiSaver / 52)} />
             <SmallStat label="Monthly target" value={formatNZD(plan.setAsides.kiwiSaver / 12)} />
           </div>
-          <p className="mt-2 text-[11px] leading-snug text-slate-400">
+          <p className="mt-2 text-[11px] leading-snug text-admin-faint">
             Aim for at least $1,042.86/year to capture the full ~$260.72 govt contribution (25c per
             $1, since 1 July 2025). Profit-based target ({formatNZD(plan.setAsides.kiwiSaver)}) is
             just the rate × profit.
           </p>
-        </div>
+        </Card>
 
         {/* GST - shown only when gstRegistered (live pricing setting) is true. */}
         {gstRegistered && (
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <Card>
             <h3 className="mb-3 text-sm font-bold tracking-wide text-russian-violet uppercase">
               GST
             </h3>
@@ -146,10 +147,10 @@ export function TaxPlannerSection({
               value={formatNZD(Math.abs(plan.gst.netToPay))}
               emphasis
             />
-            <p className="mt-2 text-[11px] leading-snug text-slate-400">
+            <p className="mt-2 text-[11px] leading-snug text-admin-faint">
               Output GST is calculated as 3/23 of GST-inclusive income.
             </p>
-          </div>
+          </Card>
         )}
       </div>
     </section>
@@ -179,20 +180,22 @@ function PlannerRow({
   return (
     <div
       className={cn(
-        "border-b border-slate-100 py-1.5 last:border-0",
-        emphasis && "border-t border-slate-200 pt-2 font-bold",
+        "border-b border-admin-border py-1.5 last:border-0",
+        emphasis && "border-t border-admin-border pt-2 font-bold",
       )}
     >
       <div className="flex items-baseline justify-between gap-3">
-        <span className={cn("text-sm", muted ? "text-slate-500" : "text-slate-700")}>{label}</span>
+        <span className={cn("text-sm", muted ? "text-admin-muted" : "text-admin-text")}>
+          {label}
+        </span>
         <span
           className={cn(
             "font-mono text-sm",
             emphasis
               ? "text-base text-russian-violet"
               : muted
-                ? "text-slate-500"
-                : "text-slate-800",
+                ? "text-admin-muted"
+                : "text-admin-text",
           )}
         >
           {value}
@@ -213,7 +216,7 @@ function PlannerRow({
 function SmallStat({ label, value }: { label: string; value: string }): React.ReactElement {
   return (
     <div>
-      <p className="text-[10px] tracking-wide text-slate-400 uppercase">{label}</p>
+      <p className="text-[10px] tracking-wide text-admin-faint uppercase">{label}</p>
       <p className="font-mono text-sm font-bold text-russian-violet">{value}</p>
     </div>
   );

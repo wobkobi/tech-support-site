@@ -22,6 +22,8 @@ export const SettingsAllContext = createContext<Settings | null>(null);
 export interface SettingsFormApi<G extends SettingsGroup> {
   draft: Settings[G];
   setDraft: React.Dispatch<React.SetStateAction<Settings[G]>>;
+  /** Last-saved value (advances on each successful save). The revert target. */
+  baseline: Settings[G];
   dirty: boolean;
   saving: boolean;
   /** Field path > message for inline errors. */
@@ -67,7 +69,7 @@ export function useSettingsForm<G extends SettingsGroup>(
   const all = useContext(SettingsAllContext);
   const live = useMemo(() => {
     if (!all) return { blocks: [] as string[], warns: [] as string[] };
-    const proposed = { ...all, [group]: draft } as Settings;
+    const proposed = { ...all, [group]: draft };
     const issues = checkGuardrails(proposed);
     return {
       blocks: issues.filter((i) => i.level === "block").map((i) => i.message),
@@ -155,6 +157,7 @@ export function useSettingsForm<G extends SettingsGroup>(
   return {
     draft,
     setDraft,
+    baseline,
     dirty,
     saving,
     fieldErrors,

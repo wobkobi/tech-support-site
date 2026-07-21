@@ -9,6 +9,7 @@
 
 import { NumberField } from "@/features/admin/components/settings/SettingsFields";
 import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
+import { SettingsSaveBar } from "@/features/admin/components/settings/SettingsSaveBar";
 import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
 import { SCHEDULING_FIELD_META } from "@/shared/lib/settings/field-meta";
 import type { SchedulingSettings } from "@/shared/lib/settings/types";
@@ -46,7 +47,7 @@ export function SchedulingTab({ initial, defaults }: Props): React.ReactElement 
           change them if you know you need to, and use &quot;Reset to defaults&quot; if unsure.
         </p>
       </div>
-      <div className="divide-y divide-slate-100">
+      <div className="divide-y divide-admin-border">
         <NumberField
           id="travelRoundBufferMin"
           meta={m.travelRoundBufferMin}
@@ -61,6 +62,7 @@ export function SchedulingTab({ initial, defaults }: Props): React.ReactElement 
           meta={m.minHomeDwellMin}
           value={draft.minHomeDwellMin}
           min={0}
+          minutesHint
           error={fieldErrors.minHomeDwellMin}
           customised={draft.minHomeDwellMin !== defaults.minHomeDwellMin}
           onChange={(v) => set({ minHomeDwellMin: v ?? 0 })}
@@ -84,6 +86,26 @@ export function SchedulingTab({ initial, defaults }: Props): React.ReactElement 
           customised={draft.smartOriginLookaheadHours !== defaults.smartOriginLookaheadHours}
           onChange={(v) => set({ smartOriginLookaheadHours: v ?? 0 })}
         />
+        <NumberField
+          id="travelQuoteHour"
+          meta={m.travelQuoteHour}
+          value={draft.travelQuoteHour}
+          min={0}
+          max={23}
+          error={fieldErrors.travelQuoteHour}
+          customised={draft.travelQuoteHour !== defaults.travelQuoteHour}
+          onChange={(v) => set({ travelQuoteHour: v ?? 0 })}
+        />
+        <NumberField
+          id="pastEditLockHours"
+          meta={m.pastEditLockHours}
+          value={draft.pastEditLockHours}
+          min={0}
+          max={720}
+          error={fieldErrors.pastEditLockHours}
+          customised={draft.pastEditLockHours !== defaults.pastEditLockHours}
+          onChange={(v) => set({ pastEditLockHours: v ?? 0 })}
+        />
       </div>
 
       {/* Guardrail blocks */}
@@ -98,27 +120,13 @@ export function SchedulingTab({ initial, defaults }: Props): React.ReactElement 
         </div>
       )}
 
-      {/* Save bar */}
-      <div className="mt-6 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => void form.save()}
-          disabled={!dirty || saving}
-          className="rounded-lg bg-russian-violet px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
-        >
-          {saving ? "Saving..." : "Save changes"}
-        </button>
-        <button
-          type="button"
-          onClick={form.resetToDefault}
-          disabled={saving}
-          className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-        >
-          Reset to defaults
-        </button>
-        {dirty && !saving && <span className="text-sm text-slate-400">Unsaved changes</span>}
-        {!dirty && savedAt && <span className="text-sm font-medium text-emerald-600">Saved</span>}
-      </div>
+      <SettingsSaveBar
+        dirty={dirty}
+        saving={saving}
+        savedAt={savedAt}
+        onSave={() => void form.save()}
+        onReset={form.resetToDefault}
+      />
 
       <SettingsHistory group="scheduling" onRestore={(v: SchedulingSettings) => setDraft(v)} />
     </div>

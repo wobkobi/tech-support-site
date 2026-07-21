@@ -6,6 +6,8 @@
  * database. Shows per-sheet counts and errors.
  */
 
+import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { Card } from "@/features/admin/components/ui/Card";
 import type React from "react";
 import { useState } from "react";
 
@@ -81,13 +83,13 @@ export function SheetImportButton(): React.ReactElement {
   }
 
   return (
-    <div className="mt-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h2 className="mb-3 font-semibold text-slate-700">Import from Google Sheets</h2>
+    <Card className="mt-6">
+      <h2 className="mb-3 font-semibold text-admin-text">Import from Google Sheets</h2>
 
-      {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
+      {error && <p className="mb-3 text-sm text-coquelicot-500">{error}</p>}
 
       {done && (
-        <div className="mb-3 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+        <div className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
           <p className="font-medium">
             Import complete
             {done.source === "folder" && done.perSheet && ` - ${done.perSheet.length} sheet(s)`}
@@ -99,7 +101,7 @@ export function SheetImportButton(): React.ReactElement {
             Expenses: {done.expensesImported} imported, {done.expensesSkipped} skipped
           </p>
           {done.perSheet && done.perSheet.length > 0 && (
-            <ul className="mt-2 list-inside list-disc text-xs text-green-900/80">
+            <ul className="mt-2 list-inside list-disc text-xs text-emerald-900/80">
               {done.perSheet.map((s) => (
                 <li key={s.fileId}>
                   <span className="font-medium">{s.name}</span>: {s.incomeImported} income,{" "}
@@ -116,7 +118,7 @@ export function SheetImportButton(): React.ReactElement {
       )}
 
       {preview && !done && (
-        <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+        <div className="mb-3 rounded-lg border border-admin-border bg-admin-bg px-4 py-3 text-sm text-admin-text">
           <p className="mb-1 font-medium">
             Preview (no changes made yet)
             {preview.source === "folder" &&
@@ -132,7 +134,7 @@ export function SheetImportButton(): React.ReactElement {
             or invalid
           </p>
           {preview.perSheet && preview.perSheet.length > 0 && (
-            <ul className="mt-2 list-inside list-disc text-xs text-slate-600">
+            <ul className="mt-2 list-inside list-disc text-xs text-admin-muted">
               {preview.perSheet.map((s) => (
                 <li key={s.fileId}>
                   <span className="font-medium">{s.name}</span>: {s.incomeImported} income,{" "}
@@ -146,48 +148,44 @@ export function SheetImportButton(): React.ReactElement {
 
       <div className="flex gap-2">
         {!preview && !done && (
-          <button
+          <AdminButton
+            variant="secondary"
+            busy={loading}
             onClick={() => {
               void handlePreview();
             }}
-            disabled={loading}
-            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
           >
-            {loading ? "Checking..." : "Preview import"}
-          </button>
+            Preview import
+          </AdminButton>
         )}
         {preview && !done && (
           <>
-            <button
+            <AdminButton
+              variant="primary"
+              busy={loading}
               onClick={() => {
                 void handleImport();
               }}
-              disabled={loading}
-              className="rounded-lg bg-russian-violet px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
             >
-              {loading ? "Importing..." : "Confirm import"}
-            </button>
-            <button
-              onClick={() => setPreview(null)}
-              disabled={loading}
-              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
-            >
+              Confirm import
+            </AdminButton>
+            <AdminButton variant="secondary" disabled={loading} onClick={() => setPreview(null)}>
               Cancel
-            </button>
+            </AdminButton>
           </>
         )}
         {done && (
-          <button
+          <AdminButton
+            variant="secondary"
             onClick={() => {
               setDone(null);
               setPreview(null);
             }}
-            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
           >
             Import again
-          </button>
+          </AdminButton>
         )}
       </div>
-    </div>
+    </Card>
   );
 }

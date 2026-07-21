@@ -9,6 +9,7 @@ import { MetaPixel } from "@/shared/components/MetaPixel";
 import { NavBar } from "@/shared/components/NavBar";
 import { PromoBanner } from "@/shared/components/PromoBanner";
 import { SiteFooter } from "@/shared/components/SiteFooter";
+import { DEFAULT_SETTINGS } from "@/shared/lib/settings/defaults";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import { getSiteUrl } from "@/shared/lib/site-url";
 import { Analytics } from "@vercel/analytics/next";
@@ -149,49 +150,20 @@ export default async function RootLayout({
       opens: `${String(availability.schedule[d].open).padStart(2, "0")}:00`,
       closes: `${String(availability.schedule[d].close).padStart(2, "0")}:00`,
     }));
-  const servedSuburbs = [
-    "Auckland Central",
-    "Auckland CBD",
-    "Ponsonby",
-    "Herne Bay",
-    "Grey Lynn",
-    "Westmere",
-    "Point Chevalier",
-    "Western Springs",
-    "Mount Albert",
-    "Kingsland",
-    "Sandringham",
-    "Mount Eden",
-    "Epsom",
-    "Newmarket",
-    "Parnell",
-    "Remuera",
-    "Mission Bay",
-    "Saint Heliers",
-    "Glen Innes",
-    "Onehunga",
-    "Royal Oak",
-    "Hillsborough",
-    "Three Kings",
-    "Mount Roskill",
-    "Avondale",
-    "New Lynn",
-    "Henderson",
-    "Te Atatu",
-    "Massey",
-    "Glen Eden",
-    "Titirangi",
-    "Devonport",
-    "Takapuna",
-    "Milford",
-    "Northcote",
-    "Birkenhead",
-    "Albany",
-    "Manukau",
-    "Botany",
-    "Howick",
-    "Pakuranga",
-  ];
+  // Fall back to the default suburb list when the stored list is empty - an
+  // identity row seeded before servedSuburbs existed stores [], which would
+  // otherwise blank the areaServed list.
+  const suburbSource = identity.servedSuburbs.length
+    ? identity.servedSuburbs
+    : DEFAULT_SETTINGS.identity.servedSuburbs;
+  const servedSuburbs = suburbSource.map((s) => s.trim()).filter(Boolean);
+  // One coverage circle centred on the base address; the radius is operator-set.
+  const geoMidpoint = {
+    "@type": "GeoCoordinates",
+    latitude: identity.baseAddress.lat ?? -36.8717,
+    longitude: identity.baseAddress.lng ?? 174.7185,
+  };
+  const geoRadius = String(identity.serviceRadiusKm * 1000);
 
   const localBusinessJsonLd = {
     "@context": "https://schema.org",
@@ -212,7 +184,7 @@ export default async function RootLayout({
     address: {
       "@type": "PostalAddress",
       addressLocality: identity.baseAddress.locality,
-      addressRegion: "Auckland",
+      addressRegion: identity.homeRegion,
       postalCode: identity.baseAddress.postcode,
       addressCountry: "NZ",
     },
@@ -222,22 +194,14 @@ export default async function RootLayout({
       longitude: identity.baseAddress.lng ?? 174.7185,
     },
     areaServed: [
-      {
-        "@type": "GeoCircle",
-        geoMidpoint: { "@type": "GeoCoordinates", latitude: -36.8485, longitude: 174.7633 },
-        geoRadius: "25000",
-      },
+      { "@type": "GeoCircle", geoMidpoint, geoRadius },
       ...servedSuburbs.map((name) => ({
         "@type": "City",
         name,
-        containedInPlace: { "@type": "AdministrativeArea", name: "Auckland" },
+        containedInPlace: { "@type": "AdministrativeArea", name: identity.homeRegion },
       })),
     ],
-    serviceArea: {
-      "@type": "GeoCircle",
-      geoMidpoint: { "@type": "GeoCoordinates", latitude: -36.8717, longitude: 174.7185 },
-      geoRadius: "15000",
-    },
+    serviceArea: { "@type": "GeoCircle", geoMidpoint, geoRadius },
     openingHoursSpecification,
     contactPoint: [
       {

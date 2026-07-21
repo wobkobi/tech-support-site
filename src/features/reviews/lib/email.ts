@@ -3,14 +3,18 @@
  * @description Shared Resend utility for sending transactional emails.
  */
 
+import { buildAppointmentDescription, parseBookingNotes } from "@/features/booking/lib/booking";
+import { buildIcs } from "@/features/booking/lib/ics";
 import { formatNZD } from "@/features/business/lib/business";
 import {
   DEFAULT_INVOICE_EMAIL_BODY,
   DEFAULT_VOID_EMAIL_BODY,
 } from "@/features/business/lib/invoice-email-defaults";
 import { cancellationCopy } from "@/features/business/lib/pricing-policy";
+import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { formatDateShort, formatDateTimeLong } from "@/shared/lib/date-format";
+import { getSettings } from "@/shared/lib/settings/get-settings";
 import { getSiteUrl } from "@/shared/lib/site-url";
 import { Resend } from "resend";
 
@@ -78,6 +82,17 @@ function getResend(): Resend {
 }
 
 /**
+ * Names the given email env vars that are unset or blank, so a "not configured"
+ * skip log says exactly which var to fix. The email layer deliberately skips
+ * (never throws) when unconfigured; this only makes the cause visible.
+ * @param names - Env var names the calling send path needs.
+ * @returns Comma-joined list of the blank vars.
+ */
+function missingEmailEnv(...names: string[]): string {
+  return names.filter((n) => !process.env[n]?.trim()).join(", ");
+}
+
+/**
  * Review data used for owner notification emails.
  */
 export interface ReviewNotificationData {
@@ -107,7 +122,9 @@ export async function sendOwnerReviewNotification(review: ReviewNotificationData
   const siteUrl = getSiteUrl();
 
   if (!adminEmail || !from || !process.env.RESEND_API_KEY) {
-    console.warn("[email] Resend not configured - skipping owner notification.");
+    console.warn(
+      `[email] Not configured (${missingEmailEnv("ADMIN_EMAIL", "EMAIL_FROM", "RESEND_API_KEY")}) - skipping owner notification.`,
+    );
     return;
   }
 
@@ -176,6 +193,92 @@ export interface BookingNotificationData {
   cancelToken: string;
   /** Promo title snapshotted at booking time, or null when none was active. */
   promoTitleAtBooking?: string | null;
+  /**
+   * Appointment address, already combined with any unit. Drives the map link
+   * and the calendar attachment's LOCATION. Omit for remote jobs.
+   */
+  address?: string | null;
+  /**
+   * Nullable on older bookings. Only an explicit "remote" suppresses the
+   * address ({@link onSiteAddress}); address and meetingType are written together.
+   */
+  meetingType?: "in_person" | "remote" | null;
+  /** How many times the booking has moved; becomes the calendar SEQUENCE. */
+  rescheduleCount?: number;
+}
+
+/**
+ * Cancellation copy from LIVE settings (fee terms must never drift from what
+ * is configured), narrowed to the tier that binds this booking.
+ * @param booking - The booking being emailed about.
+ * @returns Policy copy in the `**…**` emphasis convention.
+ */
+async function liveCancellationCopy(booking: BookingNotificationData): Promise<string> {
+  const { CANCELLATION: live } = await getPolicy();
+  // A null meetingType (older rows) can't be narrowed - show both tiers.
+  return cancellationCopy(live, booking.meetingType ? { only: booking.meetingType } : undefined);
+}
+
+/**
+ * On-site address for a booking, or "" when the job is remote or has none.
+ * @param booking - The booking being emailed about.
+ * @returns Trimmed address, or an empty string.
+ */
+function onSiteAddress(booking: BookingNotificationData): string {
+  const isRemote = booking.meetingType === "remote";
+  return !isRemote && booking.address ? booking.address.trim() : "";
+}
+
+/**
+ * Maps link for the OWNER's emails only - the customer's address is their own
+ * home; the operator is the one driving there.
+ * @param booking - The booking being emailed about.
+ * @returns HTML paragraph, or "" when there's nothing to map.
+ */
+function ownerMapHtml(booking: BookingNotificationData): string {
+  const address = onSiteAddress(booking);
+  if (!address) return "";
+  // Just the action - the notes block directly above already prints the full
+  // address, so repeating it here only makes the email longer.
+  return `<p style="margin:0 0 20px"><a href="https://www.google.com/maps/search/?api=1&amp;query=${encodeURIComponent(
+    address,
+  )}" style="color:#43bccd;font-size:14px;font-weight:600">📍 Get directions</a></p>`;
+}
+
+/**
+ * Builds the `.ics` attachment sent with the customer's booking emails.
+ * @param booking - The booking being emailed about.
+ * @returns A Resend attachment list holding one calendar file.
+ */
+async function bookingIcsAttachment(
+  booking: BookingNotificationData,
+): Promise<Array<{ filename: string; content: Buffer }>> {
+  const siteUrl = getSiteUrl();
+  const identity = await getIdentity();
+  const isRemote = booking.meetingType === "remote";
+  const address = onSiteAddress(booking);
+
+  const ics = buildIcs({
+    uid: `booking-${booking.id}@tothepointtech.co.nz`,
+    start: booking.startAt,
+    end: booking.endAt,
+    summary: `${identity.company} appointment`,
+    description: buildAppointmentDescription({
+      company: identity.company,
+      phone: identity.phone,
+      email: identity.email,
+      isRemote,
+      userNotes: parseBookingNotes(booking.notes).userNotes,
+      manageUrl: `${siteUrl}/booking/edit?token=${encodeURIComponent(booking.cancelToken)}`,
+      cancelUrl: `${siteUrl}/booking/cancel?token=${encodeURIComponent(booking.cancelToken)}`,
+    }),
+    location: address || undefined,
+    url: `${siteUrl}/booking/edit?token=${encodeURIComponent(booking.cancelToken)}`,
+    sequence: booking.rescheduleCount ?? 0,
+    organiserEmail: identity.email,
+  });
+
+  return [{ filename: "appointment.ics", content: Buffer.from(ics, "utf-8") }];
 }
 
 /**
@@ -195,7 +298,9 @@ export async function sendOwnerBookingNotification(
   const from = process.env.EMAIL_FROM;
 
   if (!adminEmail || !from || !process.env.RESEND_API_KEY) {
-    console.warn("[email] Resend not configured - skipping owner booking notification.");
+    console.warn(
+      `[email] Not configured (${missingEmailEnv("ADMIN_EMAIL", "EMAIL_FROM", "RESEND_API_KEY")}) - skipping owner booking notification.`,
+    );
     return;
   }
 
@@ -235,6 +340,8 @@ export async function sendOwnerBookingNotification(
       <p style="margin:0 0 12px;font-size:14px;color:#444"><a href="mailto:${safeMailto}" style="color:#43bccd">${safeEmail}</a></p>
       <p style="margin:0;font-size:14px;color:#444;line-height:1.6">${notesHtml}</p>
     </div>
+
+    ${ownerMapHtml(booking)}
   </div>
 </body>
 </html>`;
@@ -243,7 +350,8 @@ export async function sendOwnerBookingNotification(
   try {
     await getResend().emails.send({
       from,
-      replyTo: adminEmail,
+      // Reply goes to the customer who booked, not back to the owner inbox.
+      replyTo: booking.email,
       to: adminEmail,
       subject,
       html,
@@ -269,7 +377,9 @@ export async function sendCustomerBookingConfirmation(
   const siteUrl = getSiteUrl();
 
   if (!from || !process.env.RESEND_API_KEY) {
-    console.warn("[email] Resend not configured - skipping customer booking confirmation.");
+    console.warn(
+      `[email] Not configured (${missingEmailEnv("EMAIL_FROM", "RESEND_API_KEY")}) - skipping customer booking confirmation.`,
+    );
     return;
   }
 
@@ -281,7 +391,20 @@ export async function sendCustomerBookingConfirmation(
   const previous = options?.previousStartAt ? formatDateTimeLong(options.previousStartAt) : null;
   const cancelUrl = `${siteUrl}/booking/cancel?token=${encodeURIComponent(booking.cancelToken)}`;
   const editUrl = `${siteUrl}/booking/edit?token=${encodeURIComponent(booking.cancelToken)}`;
-  const notesHtml = escapeHtml(booking.notes).replace(/\n/g, "<br>");
+  // Only the customer's own words: the rest of the notes blob restates the time
+  // (already shown above) and the meeting type / address (now their own line).
+  const userNotesHtml = escapeHtml(parseBookingNotes(booking.notes).userNotes).replace(
+    /\n/g,
+    "<br>",
+  );
+  const onSite = onSiteAddress(booking);
+  const whereLine =
+    booking.meetingType === "remote"
+      ? `<p style="margin:0 0 20px;color:#444;font-size:14px">💻 Remote session - no visit needed.</p>`
+      : onSite
+        ? `<p style="margin:0 0 20px;color:#444;font-size:14px">📍 ${escapeHtml(onSite)}</p>`
+        : "";
+  const cancellationText = await liveCancellationCopy(booking);
 
   const heading =
     kind === "rescheduled"
@@ -297,6 +420,7 @@ export async function sendCustomerBookingConfirmation(
     kind === "rescheduled" && previous
       ? `<p style="margin:0 0 20px;color:#888;font-size:13px"><s>${escapeHtml(previous)}</s></p>`
       : "";
+  const attachments = await bookingIcsAttachment(booking);
   const promoLine = booking.promoTitleAtBooking
     ? `<div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;padding:12px 16px;margin-bottom:16px"><p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#0c0a3e">🏷 Rate locked in: ${escapeHtml(booking.promoTitleAtBooking)}</p><p style="margin:0;font-size:13px;color:#444;line-height:1.5">This rate applies to your appointment even if the offer ends before your visit.</p></div>`
     : "";
@@ -314,22 +438,28 @@ export async function sendCustomerBookingConfirmation(
     <p style="margin:0 0 8px;color:#888;font-size:13px;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Your appointment</p>
     <p style="margin:0 0 4px;font-size:16px;font-weight:600;color:#0c0a3e">${start}</p>
     ${previousLine}
+    ${whereLine}
 
     ${promoLine}
 
-    <div style="background:#f6f7f8;border-radius:8px;padding:16px;margin-bottom:24px">
-      <p style="margin:0;font-size:14px;color:#444;line-height:1.6">${notesHtml}</p>
-    </div>
+    ${
+      userNotesHtml
+        ? `<div style="background:#f6f7f8;border-radius:8px;padding:16px;margin-bottom:24px">
+      <p style="margin:0 0 4px;font-size:13px;color:#888">What you told me</p>
+      <p style="margin:0;font-size:14px;color:#444;line-height:1.6">${userNotesHtml}</p>
+    </div>`
+        : ""
+    }
 
     <p style="margin:0 0 20px;color:#444;font-size:14px;line-height:1.6">
-      If you need to change the time or any details, use the <strong>Change appointment</strong> button below. You can also <strong>propose a new time</strong> from the calendar invite, or just reply to this email and we'll sort something out.
+      Need to change anything? Use the buttons below, or just reply to this email.
     </p>
 
-    <a href="${editUrl}" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;margin-right:8px">✏️ Change appointment</a>
-    <a href="${cancelUrl}" style="display:inline-block;background:#e8e8e8;color:#333;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600">❌ Cancel appointment</a>
+    <a href="${editUrl}" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-size:13px;font-weight:600;margin:0 8px 10px 0">✏️ Change appointment</a>
+    <a href="${cancelUrl}" style="display:inline-block;background:#e8e8e8;color:#333;text-decoration:none;padding:12px 20px;border-radius:8px;font-size:13px;font-weight:600;margin:0 0 10px">❌ Cancel appointment</a>
 
     <p style="margin:28px 0 6px;color:#888;font-size:13px;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Cancellation policy</p>
-    <p style="margin:0;color:#444;font-size:13px;line-height:1.6">${renderEmphasisedHtml(cancellationCopy())}</p>
+    <p style="margin:0;color:#444;font-size:13px;line-height:1.6">${renderEmphasisedHtml(cancellationText)}</p>
 ${await buildEmailSignature(siteUrl)}
   </div>
 </body>
@@ -343,6 +473,7 @@ ${await buildEmailSignature(siteUrl)}
       to: booking.email,
       subject,
       html,
+      attachments,
     });
   } catch (error) {
     console.error(`[email] Failed to send booking confirmation for booking ${booking.id}:`, error);
@@ -360,7 +491,9 @@ export async function sendBookingReminderEmail(booking: BookingNotificationData)
   const siteUrl = getSiteUrl();
 
   if (!from || !process.env.RESEND_API_KEY) {
-    console.warn("[email] Resend not configured - skipping booking reminder email.");
+    console.warn(
+      `[email] Not configured (${missingEmailEnv("EMAIL_FROM", "RESEND_API_KEY")}) - skipping booking reminder email.`,
+    );
     return false;
   }
 
@@ -370,12 +503,25 @@ export async function sendBookingReminderEmail(booking: BookingNotificationData)
   const start = formatDateTimeLong(booking.startAt);
   const cancelUrl = `${siteUrl}/booking/cancel?token=${encodeURIComponent(booking.cancelToken)}`;
   const editUrl = `${siteUrl}/booking/edit?token=${encodeURIComponent(booking.cancelToken)}`;
-  const notesHtml = escapeHtml(booking.notes).replace(/\n/g, "<br>");
+  const userNotesHtml = escapeHtml(parseBookingNotes(booking.notes).userNotes).replace(
+    /\n/g,
+    "<br>",
+  );
+  const onSite = onSiteAddress(booking);
+  const whereLine =
+    booking.meetingType === "remote"
+      ? `<p style="margin:0 0 20px;color:#444;font-size:14px">💻 Remote session - no visit needed.</p>`
+      : onSite
+        ? `<p style="margin:0 0 20px;color:#444;font-size:14px">📍 ${escapeHtml(onSite)}</p>`
+        : "";
+  const cancellationText = await liveCancellationCopy(booking);
   const promoLine = booking.promoTitleAtBooking
     ? `<div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;padding:12px 16px;margin-bottom:16px"><p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#0c0a3e">🏷 Rate locked in: ${escapeHtml(booking.promoTitleAtBooking)}</p><p style="margin:0;font-size:13px;color:#444;line-height:1.5">This rate applies to your appointment even if the offer ends before your visit.</p></div>`
     : "";
+  const attachments = await bookingIcsAttachment(booking);
 
-  // Render the email body
+  // Render the email body. The "tomorrow" wording assumes comms.reminderLeadHours
+  // stays near 24h; revisit this copy if that lead time moves far from a day.
   const html = `
 <!DOCTYPE html>
 <html lang="en">
@@ -386,23 +532,29 @@ export async function sendBookingReminderEmail(booking: BookingNotificationData)
     <p style="margin:0 0 20px;color:#444;line-height:1.6">Your appointment with To The Point Tech is coming up tomorrow.</p>
 
     <p style="margin:0 0 8px;color:#888;font-size:13px;text-transform:uppercase;letter-spacing:.05em;font-weight:600">When</p>
-    <p style="margin:0 0 20px;font-size:16px;font-weight:600;color:#0c0a3e">${start}</p>
+    <p style="margin:0 0 4px;font-size:16px;font-weight:600;color:#0c0a3e">${start}</p>
+    ${whereLine}
 
     ${promoLine}
 
-    <div style="background:#f6f7f8;border-radius:8px;padding:16px;margin-bottom:24px">
-      <p style="margin:0;font-size:14px;color:#444;line-height:1.6">${notesHtml}</p>
-    </div>
+    ${
+      userNotesHtml
+        ? `<div style="background:#f6f7f8;border-radius:8px;padding:16px;margin-bottom:24px">
+      <p style="margin:0 0 4px;font-size:13px;color:#888">What you told me</p>
+      <p style="margin:0;font-size:14px;color:#444;line-height:1.6">${userNotesHtml}</p>
+    </div>`
+        : ""
+    }
 
     <p style="margin:0 0 20px;color:#444;font-size:14px;line-height:1.6">
       Need to change anything? Use the buttons below, or just reply to this email.
     </p>
 
-    <a href="${editUrl}" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;margin-right:8px">✏️ Change appointment</a>
-    <a href="${cancelUrl}" style="display:inline-block;background:#e8e8e8;color:#333;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600">❌ Cancel appointment</a>
+    <a href="${editUrl}" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-size:13px;font-weight:600;margin:0 8px 10px 0">✏️ Change appointment</a>
+    <a href="${cancelUrl}" style="display:inline-block;background:#e8e8e8;color:#333;text-decoration:none;padding:12px 20px;border-radius:8px;font-size:13px;font-weight:600;margin:0 0 10px">❌ Cancel appointment</a>
 
     <p style="margin:28px 0 6px;color:#888;font-size:13px;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Cancellation policy</p>
-    <p style="margin:0;color:#444;font-size:13px;line-height:1.6">${renderEmphasisedHtml(cancellationCopy())}</p>
+    <p style="margin:0;color:#444;font-size:13px;line-height:1.6">${renderEmphasisedHtml(cancellationText)}</p>
 ${await buildEmailSignature(siteUrl)}
   </div>
 </body>
@@ -416,10 +568,85 @@ ${await buildEmailSignature(siteUrl)}
       to: booking.email,
       subject: `Reminder: appointment tomorrow - ${start}`,
       html,
+      attachments,
     });
     return true;
   } catch (error) {
     console.error(`[email] Failed to send reminder for booking ${booking.id}:`, error);
+    return false;
+  }
+}
+
+/** One upcoming booking listed in the manage-links email. */
+export interface ManageLinksBooking {
+  /** Appointment start (UTC). */
+  startAt: Date;
+  /** Token behind the edit / cancel links. */
+  cancelToken: string;
+}
+
+/**
+ * Emails manage links after a find-my-booking lookup. Only ever sent to the
+ * address that owns the bookings, so carrying the tokens is safe.
+ * @param to - Recipient address (the booking email).
+ * @param bookings - Their upcoming bookings, soonest first.
+ * @returns True if Resend accepted the message, false on misconfig / failure.
+ */
+export async function sendBookingManageLinksEmail(
+  to: string,
+  bookings: ManageLinksBooking[],
+): Promise<boolean> {
+  const from = process.env.EMAIL_FROM;
+  const siteUrl = getSiteUrl();
+
+  if (!from || !process.env.RESEND_API_KEY) {
+    console.warn(
+      `[email] Not configured (${missingEmailEnv("EMAIL_FROM", "RESEND_API_KEY")}) - skipping manage-links email.`,
+    );
+    return false;
+  }
+  if (bookings.length === 0) return false;
+
+  const rows = bookings
+    .map((b) => {
+      const editUrl = `${siteUrl}/booking/edit?token=${encodeURIComponent(b.cancelToken)}`;
+      const cancelUrl = `${siteUrl}/booking/cancel?token=${encodeURIComponent(b.cancelToken)}`;
+      return `
+    <div style="background:#f6f7f8;border-radius:8px;padding:16px;margin-bottom:16px">
+      <p style="margin:0 0 12px;font-size:16px;font-weight:600;color:#0c0a3e">${formatDateTimeLong(b.startAt)}</p>
+      <a href="${editUrl}" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-size:13px;font-weight:600;margin:0 8px 10px 0">✏️ Change appointment</a>
+      <a href="${cancelUrl}" style="display:inline-block;background:#e8e8e8;color:#333;text-decoration:none;padding:12px 20px;border-radius:8px;font-size:13px;font-weight:600;margin:0 0 10px">❌ Cancel appointment</a>
+    </div>`;
+    })
+    .join("");
+
+  const plural = bookings.length === 1 ? "appointment" : "appointments";
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="font-family:system-ui,sans-serif;background:#f6f7f8;margin:0;padding:24px">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
+    <h2 style="margin:0 0 12px;color:#0c0a3e;font-size:20px">Your upcoming ${plural}</h2>
+    <p style="margin:0 0 20px;color:#444;line-height:1.6">Here are the links to change or cancel. If you didn't ask for this email you can safely ignore it.</p>
+    ${rows}
+    <p style="margin:20px 0 0;color:#444;font-size:14px;line-height:1.6">Prefer to talk it through? Just reply to this email.</p>
+${await buildEmailSignature(siteUrl)}
+  </div>
+</body>
+</html>`;
+
+  try {
+    await getResend().emails.send({
+      from,
+      replyTo: process.env.ADMIN_EMAIL,
+      to,
+      subject: `Your upcoming ${plural}`,
+      html,
+    });
+    return true;
+  } catch (error) {
+    console.error("[email] Failed to send manage-links email:", error);
     return false;
   }
 }
@@ -450,7 +677,9 @@ export async function sendCustomerReviewRequest(booking: ReviewRequestData): Pro
   const siteUrl = getSiteUrl();
 
   if (!from || !process.env.RESEND_API_KEY) {
-    console.warn("[email] Resend not configured - skipping customer review request.");
+    console.warn(
+      `[email] Not configured (${missingEmailEnv("EMAIL_FROM", "RESEND_API_KEY")}) - skipping customer review request.`,
+    );
     return true;
   }
 
@@ -467,9 +696,9 @@ export async function sendCustomerReviewRequest(booking: ReviewRequestData): Pro
   <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
     <h2 style="margin:0 0 12px;color:#0c0a3e;font-size:20px">Hi ${safeFirstName}, how did everything go?</h2>
     <p style="margin:0 0 12px;color:#444;line-height:1.6">It was great meeting you - I hope I managed to get everything sorted and left you feeling a bit less frustrated with technology!</p>
-    <p style="margin:0 0 12px;color:#444;line-height:1.6">If you have a spare moment, I'd love to hear how your experience was. A quick review makes a real difference for a small local business like mine, and helps other people find reliable tech support when they need it.</p>
-    <p style="margin:0 0 24px;color:#444;line-height:1.6">It only takes a minute - and honest feedback is always welcome.</p>
-    <a href="${reviewUrl}" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:15px">Share your experience</a>
+    <p style="margin:0 0 12px;color:#444;line-height:1.6">If you have a spare moment, I'd love to hear how it went. A quick review makes a real difference for a small local business like mine, and helps other people find reliable tech support when they need it.</p>
+    <p style="margin:0 0 24px;color:#444;line-height:1.6">It only takes a minute, and honest feedback is always welcome.</p>
+    <a href="${reviewUrl}" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:15px">Leave a review</a>
 
     <p style="margin:28px 0 20px;color:#444;font-size:14px;line-height:1.6">Thanks again for choosing ${identity.company} Tech. If you ever need a hand with anything else, don't hesitate to get in touch.</p>
 ${await buildEmailSignature(siteUrl)}
@@ -537,7 +766,9 @@ export async function sendPastClientReviewRequest(booking: ReviewRequestData): P
   const siteUrl = getSiteUrl();
 
   if (!from || !process.env.RESEND_API_KEY) {
-    console.warn("[email] Resend not configured - skipping past client review request.");
+    console.warn(
+      `[email] Not configured (${missingEmailEnv("EMAIL_FROM", "RESEND_API_KEY")}) - skipping past client review request.`,
+    );
     return true;
   }
 
@@ -620,7 +851,7 @@ export async function buildInvoiceEmail({
     ? `<p style="margin:0 0 16px;font-size:14px;color:#555">An online copy is also here: <a href="${escapeHtml(invoice.driveWebUrl)}" style="color:#43bccd">view invoice</a>.</p>`
     : "";
   const reviewLine = reviewUrl
-    ? `<p style="margin:24px 0 0;font-size:14px;color:#555">If you've got a moment, I'd love to hear how it went: <a href="${escapeHtml(reviewUrl)}" style="color:#43bccd">share your experience</a>. Quick and anonymous if you prefer.</p>`
+    ? `<p style="margin:24px 0 0;font-size:14px;color:#555">If you've got a moment, I'd love to hear how it went - you can <a href="${escapeHtml(reviewUrl)}" style="color:#43bccd">leave a quick review here</a>. It's anonymous if you'd prefer.</p>`
     : "";
 
   // Append " Tech" to match the signature and body brand name, so the subject
@@ -690,7 +921,9 @@ export async function sendInvoiceEmail({
 }: SendInvoiceEmailArgs): Promise<boolean> {
   const from = process.env.EMAIL_FROM;
   if (!from || !process.env.RESEND_API_KEY) {
-    console.warn("[email] Resend not configured - skipping invoice email.");
+    console.warn(
+      `[email] Not configured (${missingEmailEnv("EMAIL_FROM", "RESEND_API_KEY")}) - skipping invoice email.`,
+    );
     return false;
   }
   if (!invoice.clientEmail) {
@@ -721,6 +954,102 @@ export async function sendInvoiceEmail({
     return true;
   } catch (error) {
     console.error(`[email] Failed to send invoice ${invoice.number}:`, error);
+    return false;
+  }
+}
+
+interface SendInvoiceReminderEmailArgs {
+  invoice: InvoiceEmailData;
+  pdfBytes: Uint8Array;
+  /** 1 for the first nudge, 2 for the second-and-final. Sets the tone. */
+  reminderNumber: number;
+}
+
+/**
+ * Sends an overdue-invoice nudge with the PDF attached. No review-link
+ * machinery - chasing money and asking for a review don't mix. Never throws.
+ * @param args - Send inputs.
+ * @param args.invoice - Invoice row fields needed for the body.
+ * @param args.pdfBytes - Raw PDF bytes (OVERDUE watermark already applied by the caller's generate).
+ * @param args.reminderNumber - 1 or 2; the second says it's the last one.
+ * @returns True if Resend accepted the message, false on failure or misconfig.
+ */
+export async function sendInvoiceReminderEmail({
+  invoice,
+  pdfBytes,
+  reminderNumber,
+}: SendInvoiceReminderEmailArgs): Promise<boolean> {
+  const from = process.env.EMAIL_FROM;
+  if (!from || !process.env.RESEND_API_KEY) {
+    console.warn(
+      `[email] Not configured (${missingEmailEnv("EMAIL_FROM", "RESEND_API_KEY")}) - skipping invoice reminder.`,
+    );
+    return false;
+  }
+  if (!invoice.clientEmail) {
+    console.warn(`[email] Invoice ${invoice.number} has no clientEmail - skipping reminder.`);
+    return false;
+  }
+
+  const siteUrl = getSiteUrl();
+  const identity = await getIdentity();
+  const { comms } = await getSettings();
+  const greeting = escapeHtml((invoice.clientName.split(" ")[0] || invoice.clientName).trim());
+  const safeNumber = escapeHtml(invoice.number);
+  const dueDate = escapeHtml(formatDateShort(invoice.dueDate));
+  const totalLabel = escapeHtml(formatNZD(invoice.total));
+  const closing =
+    reminderNumber >= comms.invoiceReminderMaxCount
+      ? "This is the last automatic reminder I'll send. If something's holding payment up, just reply and we'll sort it out."
+      : "If you've already paid in the last day or two, please ignore this - bank transfers can cross over.";
+
+  const subject = `Friendly reminder - invoice ${invoice.number} (${totalLabel})`;
+  const html = `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8" /></head>
+<body style="margin:0;padding:24px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0c0a3e;background:#f6f7f8">
+  <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:12px;padding:24px">
+    <h1 style="margin:0 0 16px;font-size:20px;font-weight:700;color:#0c0a3e">Hi ${greeting},</h1>
+
+    <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#333">Just a friendly nudge - invoice ${safeNumber} was due on ${dueDate} and hasn't come through yet. A copy is attached.</p>
+
+    <div style="margin:0 0 16px;padding:12px 16px;background:#f3f4f6;border-radius:8px;font-size:14px;color:#333">
+      <p style="margin:0 0 4px"><strong>Invoice:</strong> ${safeNumber}</p>
+      <p style="margin:0 0 4px"><strong>Amount due:</strong> ${totalLabel}</p>
+      <p style="margin:0"><strong>Was due:</strong> ${dueDate}</p>
+    </div>
+
+    <p style="margin:0 0 8px;font-size:14px;color:#333"><strong>Bank transfer:</strong></p>
+    <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#333">
+      Payee: ${escapeHtml(identity.name)}<br />
+      Account: <strong>${escapeHtml(identity.bankAccount)}</strong><br />
+      Reference: <strong>${safeNumber}</strong>
+    </p>
+
+    <p style="margin:0;font-size:14px;color:#333">${closing}</p>
+
+    ${await buildEmailSignature(siteUrl)}
+  </div>
+</body>
+</html>`;
+
+  try {
+    await getResend().emails.send({
+      from,
+      replyTo: process.env.ADMIN_EMAIL,
+      to: invoice.clientEmail,
+      subject,
+      html,
+      attachments: [
+        {
+          filename: `Invoice ${invoice.number}.pdf`,
+          content: Buffer.from(pdfBytes),
+        },
+      ],
+    });
+    return true;
+  } catch (error) {
+    console.error(`[email] Failed to send reminder for invoice ${invoice.number}:`, error);
     return false;
   }
 }
@@ -812,7 +1141,9 @@ export async function sendVoidNotification({
 }: SendVoidNotificationArgs): Promise<boolean> {
   const from = process.env.EMAIL_FROM;
   if (!from || !process.env.RESEND_API_KEY) {
-    console.warn("[email] Resend not configured - skipping void notification.");
+    console.warn(
+      `[email] Not configured (${missingEmailEnv("EMAIL_FROM", "RESEND_API_KEY")}) - skipping void notification.`,
+    );
     return false;
   }
   if (!invoice.clientEmail) {

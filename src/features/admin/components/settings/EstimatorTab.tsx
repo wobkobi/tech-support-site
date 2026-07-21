@@ -8,8 +8,10 @@
  */
 
 import { BenchmarkListField } from "@/features/admin/components/settings/BenchmarkListField";
+import { EstimatorPreview } from "@/features/admin/components/settings/EstimatorPreview";
 import { NumberField } from "@/features/admin/components/settings/SettingsFields";
 import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
+import { SettingsSaveBar } from "@/features/admin/components/settings/SettingsSaveBar";
 import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
 import { ESTIMATOR_FIELD_META } from "@/shared/lib/settings/field-meta";
 import type { EstimatorSettings } from "@/shared/lib/settings/types";
@@ -60,12 +62,12 @@ export function EstimatorTab({ initial, defaults }: Props): React.ReactElement {
       {/* Price range width - the confidence-scaled band the public estimator shows. */}
       <div className="mt-8">
         <h3 className="text-lg font-semibold text-russian-violet">Estimate range width</h3>
-        <p className="mt-1 text-sm text-slate-500">
+        <p className="mt-1 text-sm text-admin-muted">
           How wide the customer-facing price range is, set by how clearly the job was described.
           Percentages are of the estimate; vaguer jobs get a wider, lower range so they read
           &ldquo;from $X&rdquo; without a scary top number.
         </p>
-        <div className="divide-y divide-slate-100">
+        <div className="divide-y divide-admin-border">
           <NumberField
             id="range.high.lowFactor"
             meta={m["range.high.lowFactor"]}
@@ -135,6 +137,62 @@ export function EstimatorTab({ initial, defaults }: Props): React.ReactElement {
         </div>
       </div>
 
+      {/* Estimate limits + multi-task stacking + the advertised low-end floor. */}
+      <div className="mt-8">
+        <h3 className="text-lg font-semibold text-russian-violet">Limits &amp; stacking</h3>
+        <p className="mt-1 text-sm text-admin-muted">
+          The ceiling on any single estimate, how much extra tasks add to a multi-task visit, and
+          the floor under the advertised low price.
+        </p>
+        <div className="divide-y divide-admin-border">
+          <NumberField
+            id="maxJobHours"
+            meta={m.maxJobHours}
+            value={draft.maxJobHours}
+            min={1}
+            max={24}
+            error={fieldErrors.maxJobHours}
+            customised={draft.maxJobHours !== defaults.maxJobHours}
+            onChange={(v) => setDraft((p) => ({ ...p, maxJobHours: v ?? 1 }))}
+          />
+          <NumberField
+            id="stackHandsOnFactor"
+            meta={m.stackHandsOnFactor}
+            value={Math.round(draft.stackHandsOnFactor * 100)}
+            min={0}
+            max={100}
+            step={1}
+            error={fieldErrors.stackHandsOnFactor}
+            customised={draft.stackHandsOnFactor !== defaults.stackHandsOnFactor}
+            onChange={(v) => setDraft((p) => ({ ...p, stackHandsOnFactor: (v ?? 0) / 100 }))}
+          />
+          <NumberField
+            id="stackBackgroundFactor"
+            meta={m.stackBackgroundFactor}
+            value={Math.round(draft.stackBackgroundFactor * 100)}
+            min={0}
+            max={100}
+            step={1}
+            error={fieldErrors.stackBackgroundFactor}
+            customised={draft.stackBackgroundFactor !== defaults.stackBackgroundFactor}
+            onChange={(v) => setDraft((p) => ({ ...p, stackBackgroundFactor: (v ?? 0) / 100 }))}
+          />
+          <NumberField
+            id="lowEndFloorFactor"
+            meta={m.lowEndFloorFactor}
+            value={Math.round(draft.lowEndFloorFactor * 100)}
+            min={0}
+            max={100}
+            step={1}
+            error={fieldErrors.lowEndFloorFactor}
+            customised={draft.lowEndFloorFactor !== defaults.lowEndFloorFactor}
+            onChange={(v) => setDraft((p) => ({ ...p, lowEndFloorFactor: (v ?? 0) / 100 }))}
+          />
+        </div>
+      </div>
+
+      <EstimatorPreview estimator={draft} />
+
       {/* Guardrail blocks - save was refused. */}
       {blocks.length > 0 && (
         <div className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4">
@@ -167,27 +225,13 @@ export function EstimatorTab({ initial, defaults }: Props): React.ReactElement {
         </div>
       )}
 
-      {/* Save bar */}
-      <div className="mt-6 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => void form.save()}
-          disabled={!dirty || saving}
-          className="rounded-lg bg-russian-violet px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
-        >
-          {saving ? "Saving..." : "Save changes"}
-        </button>
-        <button
-          type="button"
-          onClick={form.resetToDefault}
-          disabled={saving}
-          className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-        >
-          Reset to defaults
-        </button>
-        {dirty && !saving && <span className="text-sm text-slate-400">Unsaved changes</span>}
-        {!dirty && savedAt && <span className="text-sm font-medium text-emerald-600">Saved</span>}
-      </div>
+      <SettingsSaveBar
+        dirty={dirty}
+        saving={saving}
+        savedAt={savedAt}
+        onSave={() => void form.save()}
+        onReset={form.resetToDefault}
+      />
 
       <SettingsHistory group="estimator" onRestore={(v: EstimatorSettings) => setDraft(v)} />
     </div>

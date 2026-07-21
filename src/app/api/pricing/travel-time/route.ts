@@ -1,17 +1,17 @@
 // src/app/api/pricing/travel-time/route.ts
 /**
  * @description Public, rate-limited travel-time endpoint. POST looks up both
- * legs of the drive between the base address and a destination via
- * {@link lookupDriveRoundTrip} - outbound at `departureTimeIso`, return at
- * `returnDepartureTimeIso` - each traffic-aware. Returns zero durations for
- * no match, 503 on misconfig, and 502 on upstream errors. Each request costs
- * two Google Distance Matrix elements (one per leg); the 5/min rate limit
- * keeps that within quota.
+ * drive legs via {@link lookupDriveRoundTrip}, each traffic-aware at its own
+ * departure. Returns zero durations for no match, 503 on misconfig, 502 on
+ * upstream errors. Each request costs two Google Distance Matrix elements;
+ * the 5/min rate limit keeps that within quota.
  */
 
 import { lookupDriveRoundTrip } from "@/features/business/lib/travel-distance";
 import { errorResponse, okResponse } from "@/shared/lib/api-response";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
+import { getSettings } from "@/shared/lib/settings/get-settings";
+import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 import { NextRequest, NextResponse } from "next/server";
 
 // Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
@@ -29,10 +29,40 @@ function parseIsoField(value: unknown): Date | undefined {
 }
 
 /**
- * POST /api/pricing/travel-time - Both drive legs between the base address
+ * The next weekday at `hour` NZ time. Used when the caller has no chosen slot,
+ * so travel is quoted against a realistic visit rather than live traffic at
+ * page-load (an estimate opened at 11pm would otherwise price an empty motorway).
+ * @param hour - NZ-local hour to price against (live scheduling.travelQuoteHour).
+ * @param now - Reference time (defaults to now).
+ * @returns A UTC Date for that NZ-local moment.
+ */
+function representativeDepartureTime(hour: number, now: Date = new Date()): Date {
+  const [y, m, d] = now
+    .toLocaleDateString("en-CA", { timeZone: "Pacific/Auckland" })
+    .split("-")
+    .map(Number);
+
+  // Weekday maths on a UTC-midnight cursor built from the NZ calendar date, so
+  // the day-of-week is the NZ one rather than the server's.
+  const cursor = new Date(Date.UTC(y, m - 1, d));
+  cursor.setUTCDate(cursor.getUTCDate() + 1);
+  while (cursor.getUTCDay() === 0 || cursor.getUTCDay() === 6) {
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+
+  const yy = cursor.getUTCFullYear();
+  const mm = cursor.getUTCMonth() + 1;
+  const dd = cursor.getUTCDate();
+  const offset = getPacificAucklandOffset(yy, mm, dd);
+  return new Date(Date.UTC(yy, mm - 1, dd, hour - offset, 0, 0));
+}
+
+/**
+ * POST /api/pricing/travel-time - both drive legs between the base address
  * and a destination. Optional `departureTimeIso` / `returnDepartureTimeIso`
- * pin each leg's traffic prediction; malformed/missing values fall back to
- * "now" and "departure + 60 min" respectively.
+ * pin each leg's traffic prediction; missing/malformed ones quote against
+ * {@link representativeDepartureTime} (return 60 min later) so a late-night
+ * estimate doesn't price an empty motorway for a mid-afternoon job.
  * @param request - Body: `{ destination: string, departureTimeIso?: string, returnDepartureTimeIso?: string }`.
  * @returns `{ ok: true, durationMinsThere, durationMinsBack, distanceKm }` on
  *   success (distanceKm is the outbound leg), zero durations when
@@ -54,8 +84,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return errorResponse("destination is required", 400);
   }
 
-  const departureTime = parseIsoField(body?.departureTimeIso);
-  const returnTime = parseIsoField(body?.returnDepartureTimeIso);
+  // With no slot chosen (the /pricing wizard), quoting live traffic means an
+  // estimate opened at 11pm prices an empty motorway for a job that will
+  // actually happen mid-afternoon. Fall back to a representative bookable time
+  // instead of "now".
+  const { scheduling } = await getSettings();
+  const departureTime =
+    parseIsoField(body?.departureTimeIso) ??
+    representativeDepartureTime(scheduling.travelQuoteHour);
+  const returnTime =
+    parseIsoField(body?.returnDepartureTimeIso) ??
+    new Date(departureTime.getTime() + 60 * 60 * 1000);
 
   const result = await lookupDriveRoundTrip(raw, departureTime, returnTime);
   switch (result.status) {

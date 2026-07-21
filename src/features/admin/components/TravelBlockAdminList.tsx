@@ -43,6 +43,17 @@ export interface TravelBlockRow {
 
 type TransportMode = "transit" | "driving" | "walking" | "bicycling";
 
+/** Minutes returned by the travel PATCH route after its immediate reprice. */
+interface TravelPatchResponse {
+  ok?: boolean;
+  travel?: {
+    rawTravelMinutes: number | null;
+    roundedMinutes: number | null;
+    rawTravelBackMinutes: number | null;
+    roundedBackMinutes: number | null;
+  } | null;
+}
+
 const MODES: { value: TransportMode; label: string; icon: string }[] = [
   { value: "transit", label: "Transit", icon: "🚌" },
   { value: "driving", label: "Driving", icon: "🚗" },
@@ -136,16 +147,19 @@ export function TravelBlockAdminList({
         setActionError("Couldn't update the transport mode - try again.");
         return;
       }
+      // The route reprices immediately and returns the fresh minutes; apply them
+      // so the card updates without a reload (null legs mean the API had none).
+      const t = ((await res.json()) as TravelPatchResponse).travel ?? null;
       setBlocks((prev) =>
         prev.map((b) =>
           b.id === id
             ? {
                 ...b,
                 transportMode: mode,
-                rawTravelMinutes: null,
-                roundedMinutes: null,
-                rawTravelBackMinutes: null,
-                roundedBackMinutes: null,
+                rawTravelMinutes: t?.rawTravelMinutes ?? null,
+                roundedMinutes: t?.roundedMinutes ?? null,
+                rawTravelBackMinutes: t?.rawTravelBackMinutes ?? null,
+                roundedBackMinutes: t?.roundedBackMinutes ?? null,
               }
             : b,
         ),
@@ -202,16 +216,18 @@ export function TravelBlockAdminList({
         setActionError("Couldn't save the origin - try again.");
         return;
       }
+      // Apply the freshly repriced minutes the route returns for the new origin.
+      const t = ((await res.json()) as TravelPatchResponse).travel ?? null;
       setBlocks((prev) =>
         prev.map((b) =>
           b.id === id
             ? {
                 ...b,
                 customOrigin,
-                rawTravelMinutes: null,
-                roundedMinutes: null,
-                rawTravelBackMinutes: null,
-                roundedBackMinutes: null,
+                rawTravelMinutes: t?.rawTravelMinutes ?? null,
+                roundedMinutes: t?.roundedMinutes ?? null,
+                rawTravelBackMinutes: t?.rawTravelBackMinutes ?? null,
+                roundedBackMinutes: t?.roundedBackMinutes ?? null,
               }
             : b,
         ),
@@ -226,7 +242,7 @@ export function TravelBlockAdminList({
 
   if (blocks.length === 0) {
     return (
-      <p className="text-sm text-slate-400">
+      <p className="text-sm text-admin-faint">
         No travel blocks yet. Run the calendar cache cron to generate them.
       </p>
     );
@@ -248,13 +264,18 @@ export function TravelBlockAdminList({
           const isSaving = saving === b.id;
           const isEditingOrigin = editingOriginId === b.id;
           const effectiveOrigin = b.customOrigin ?? b.detectedOrigin ?? null;
+          // Past jobs have no live cache and the cron won't revisit them, so the
+          // cache-expiry and "recalculate" hints below are noise - hide them. A
+          // finished job is past by a wide margin, so this stays stable across
+          // SSR + hydration (unlike the sub-minute expiry text it gates).
+          const isPast = new Date(b.eventEndAt) < new Date();
 
           return (
             <div
               key={b.id}
               className={cn(
-                "rounded-xl border border-slate-200 p-4",
-                b.ignored ? "bg-slate-100/60 opacity-70" : "bg-white/50",
+                "rounded-xl border border-admin-border p-4",
+                b.ignored ? "bg-admin-bg/60 opacity-70" : "bg-admin-surface/50",
               )}
             >
               <div className="flex flex-col gap-2">
@@ -263,7 +284,7 @@ export function TravelBlockAdminList({
                   <span className="min-w-0 truncate text-sm font-semibold text-russian-violet">
                     {b.summary ?? b.sourceEventId}
                   </span>
-                  <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-400">
+                  <span className="shrink-0 rounded bg-admin-bg px-1.5 py-0.5 text-xs text-admin-faint">
                     {calendarLabels[b.calendarEmail] ?? b.calendarEmail}
                   </span>
                   {b.ignored && (
@@ -272,7 +293,7 @@ export function TravelBlockAdminList({
                     </span>
                   )}
                   {b.isCarEvent && (
-                    <label className="ml-auto flex shrink-0 cursor-pointer items-center gap-1.5 text-xs text-slate-600">
+                    <label className="ml-auto flex shrink-0 cursor-pointer items-center gap-1.5 text-xs text-admin-text-secondary">
                       <input
                         type="checkbox"
                         checked={b.ignored}
@@ -286,21 +307,21 @@ export function TravelBlockAdminList({
                 </div>
 
                 {/* Event time */}
-                <p className="text-xs text-slate-600">
+                <p className="text-xs text-admin-text-secondary">
                   {formatEventTime(b.eventStartAt, b.eventEndAt)}
                 </p>
 
                 {/* Destination address - wrap long unbroken strings on mobile. */}
                 {b.destination && (
-                  <p className="text-xs wrap-break-word text-slate-500">
-                    <span className="font-medium text-slate-400">To: </span>
+                  <p className="text-xs wrap-break-word text-admin-muted">
+                    <span className="font-medium text-admin-faint">To: </span>
                     {b.destination}
                   </p>
                 )}
 
                 {/* Transport mode selector */}
                 <div>
-                  <p className="mb-1 text-xs font-medium tracking-wide text-slate-400 uppercase">
+                  <p className="mb-1 text-xs font-medium tracking-wide text-admin-faint uppercase">
                     How I'm getting there
                   </p>
                   <div className="flex flex-wrap gap-1">
@@ -313,14 +334,15 @@ export function TravelBlockAdminList({
                           "rounded-lg px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50",
                           currentMode === m.value
                             ? "bg-russian-violet text-white"
-                            : "bg-slate-100 text-slate-500 hover:bg-slate-200",
+                            : "bg-admin-bg text-admin-muted hover:bg-admin-border",
                         )}
                       >
                         {m.icon} {m.label}
                       </button>
                     ))}
                   </div>
-                  {(b.rawTravelMinutes === null || b.rawTravelBackMinutes === null) &&
+                  {!isPast &&
+                    (b.rawTravelMinutes === null || b.rawTravelBackMinutes === null) &&
                     b.transportMode !== null && (
                       <p className="mt-1 text-xs text-amber-500">
                         Mode changed - recalculate to update travel times
@@ -330,7 +352,7 @@ export function TravelBlockAdminList({
 
                 {/* Origin */}
                 <div>
-                  <p className="mb-1 text-xs font-medium tracking-wide text-slate-400 uppercase">
+                  <p className="mb-1 text-xs font-medium tracking-wide text-admin-faint uppercase">
                     Departing from
                   </p>
                   {isEditingOrigin ? (
@@ -341,7 +363,7 @@ export function TravelBlockAdminList({
                         autoComplete="off"
                         onChange={(e) => setOriginInput(e.target.value)}
                         placeholder={b.detectedOrigin ?? "Enter address…"}
-                        className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs focus:border-slate-400 focus:outline-none"
+                        className="w-full rounded-lg border border-admin-border-strong px-2.5 py-1.5 text-xs focus:border-russian-violet focus:outline-none"
                         disabled={isSaving}
                       />
                       <div className="flex flex-wrap gap-1">
@@ -355,7 +377,7 @@ export function TravelBlockAdminList({
                         <button
                           disabled={isSaving}
                           onClick={() => setEditingOriginId(null)}
-                          className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500 hover:bg-slate-200 disabled:opacity-50"
+                          className="rounded-lg bg-admin-bg px-2.5 py-1 text-xs font-medium text-admin-muted hover:bg-admin-border disabled:opacity-50"
                         >
                           Cancel
                         </button>
@@ -372,7 +394,7 @@ export function TravelBlockAdminList({
                     </div>
                   ) : (
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-700">
+                      <span className="text-xs text-admin-text">
                         {effectiveOrigin ?? "Home (default)"}
                       </span>
                       {b.customOrigin ? (
@@ -380,7 +402,7 @@ export function TravelBlockAdminList({
                           override
                         </span>
                       ) : b.detectedOrigin ? (
-                        <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-400">
+                        <span className="rounded bg-admin-bg px-1.5 py-0.5 text-xs text-admin-faint">
                           auto
                         </span>
                       ) : null}
@@ -390,13 +412,14 @@ export function TravelBlockAdminList({
                           setEditingOriginId(b.id);
                           setOriginInput(b.customOrigin ?? "");
                         }}
-                        className="rounded px-1.5 py-0.5 text-xs text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-50"
+                        className="rounded px-1.5 py-0.5 text-xs text-admin-faint hover:bg-admin-bg hover:text-admin-text-secondary disabled:opacity-50"
                       >
                         Edit
                       </button>
                     </div>
                   )}
-                  {(b.rawTravelMinutes === null || b.rawTravelBackMinutes === null) &&
+                  {!isPast &&
+                    (b.rawTravelMinutes === null || b.rawTravelBackMinutes === null) &&
                     b.customOrigin !== null && (
                       <p className="mt-1 text-xs text-amber-500">
                         Origin changed - recalculate to update travel times
@@ -407,50 +430,52 @@ export function TravelBlockAdminList({
                 {/* Travel times grid */}
                 <div className="grid gap-2 sm:grid-cols-2">
                   <div>
-                    <p className="mb-0.5 text-xs font-medium tracking-wide text-slate-400 uppercase">
+                    <p className="mb-0.5 text-xs font-medium tracking-wide text-admin-faint uppercase">
                       Travel there
                     </p>
-                    <p className="text-sm text-slate-700">
+                    <p className="text-sm text-admin-text">
                       {formatMinutes(b.rawTravelMinutes, b.roundedMinutes)}
                     </p>
-                    <p
-                      className={cn(
-                        "text-xs",
-                        !b.beforeExpiresAt || new Date(b.beforeExpiresAt) < new Date()
-                          ? "text-red-500"
-                          : "text-slate-400",
-                      )}
-                      suppressHydrationWarning
-                    >
-                      {formatExpiry(b.beforeExpiresAt)}
-                    </p>
+                    {!isPast && (
+                      <p
+                        className={cn(
+                          "text-xs",
+                          !b.beforeExpiresAt || new Date(b.beforeExpiresAt) < new Date()
+                            ? "text-red-500"
+                            : "text-admin-faint",
+                        )}
+                        suppressHydrationWarning
+                      >
+                        {formatExpiry(b.beforeExpiresAt)}
+                      </p>
+                    )}
                   </div>
                   <div>
-                    <p className="mb-0.5 text-xs font-medium tracking-wide text-slate-400 uppercase">
+                    <p className="mb-0.5 text-xs font-medium tracking-wide text-admin-faint uppercase">
                       Travel back
                     </p>
-                    <p className="text-sm text-slate-700">
+                    <p className="text-sm text-admin-text">
                       {b.travelBackSuppressed
                         ? "chained to next event"
                         : formatMinutes(b.rawTravelBackMinutes, b.roundedBackMinutes)}
                     </p>
                     {b.travelBackSuppressed ? (
-                      <p className="text-xs text-slate-400">
+                      <p className="text-xs text-admin-faint">
                         no return trip - suppressed by design
                       </p>
-                    ) : (
+                    ) : !isPast ? (
                       <p
                         className={cn(
                           "text-xs",
                           !b.afterExpiresAt || new Date(b.afterExpiresAt) < new Date()
                             ? "text-red-500"
-                            : "text-slate-400",
+                            : "text-admin-faint",
                         )}
                         suppressHydrationWarning
                       >
                         {formatExpiry(b.afterExpiresAt)}
                       </p>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               </div>

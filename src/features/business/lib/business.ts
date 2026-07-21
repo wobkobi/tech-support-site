@@ -6,7 +6,6 @@
  */
 import {
   BILLING_INCREMENT_MINS,
-  floorBillableMins,
   GST_RATE,
   GST_REGISTERED,
   MIN_BILLABLE_MINS,
@@ -58,15 +57,6 @@ export function todayISO(): string {
  */
 export function calcGstFromInclusive(amountIncl: number, gstRate: number): number {
   return Math.round(((amountIncl * gstRate) / (1 + gstRate)) * 100) / 100;
-}
-
-/**
- * UTC slash date "DD/MM/YYYY" - safe for server-side sheet writes.
- * @param date - Date to format.
- * @returns Formatted string.
- */
-export function formatUTCDDMMYYYY(date: Date): string {
-  return formatDateSlash(date, { utc: true });
 }
 
 /**
@@ -146,12 +136,13 @@ export function nextInvoiceNumber(
  * rounding so customers are never bumped a full slot for a single minute of
  * overage; the operator gives back as often as they collect.
  * @param mins - Actual duration in minutes
- * @param incrementMins - Billing increment (live pricing setting); defaults to the code const.
+ * @param incrementMins - Billing increment (live pricing setting); defaults to the code const, and a non-positive value falls back to it (guards a divide-by-zero).
  * @returns Billable duration rounded to the nearest billing increment
  */
 export function billableMins(mins: number, incrementMins: number = BILLING_INCREMENT_MINS): number {
+  const inc = incrementMins > 0 ? incrementMins : BILLING_INCREMENT_MINS;
   if (mins <= 0) return 0;
-  return Math.round(mins / incrementMins) * incrementMins;
+  return Math.round(mins / inc) * inc;
 }
 
 /**
@@ -335,8 +326,13 @@ function parkHourRemainder(tasks: TaskLine[], windowMin: number): TaskLine[] {
   const sumQty = Math.round(hourly.reduce((s, t) => s + t.qty, 0) * 100) / 100;
   const diff = Math.round((targetHours - sumQty) * 100) / 100;
   if (diff === 0) return tasks;
-  let biggest = hourly[0];
-  for (const t of hourly) if (t.qty > biggest.qty) biggest = t;
+  // Operator-stated durations are exact: park the drift on the largest
+  // FLOATING task only. When every hourly task is pinned, leave the
+  // cent-level drift in place rather than move a stated time.
+  const floating = hourly.filter((t) => !t.isExplicit);
+  if (floating.length === 0) return tasks;
+  let biggest = floating[0];
+  for (const t of floating) if (t.qty > biggest.qty) biggest = t;
   const adjustedQty = Math.max(MIN_TASK_MINUTES / 60, Math.round((biggest.qty + diff) * 100) / 100);
   return tasks.map((t) =>
     t === biggest
@@ -413,17 +409,6 @@ export function composeDescription(
 }
 
 /**
- * Finds a rate config by ID, falling back to the default rate.
- * @param rates - Array of rate configurations
- * @param id - Rate config ID to search for, or null for default
- * @returns Matching rate config, or null if none found
- */
-export function matchRateById(rates: RateConfig[], id: string | null): RateConfig | null {
-  if (id === null) return null;
-  return rates.find((r) => r.id === id) ?? null;
-}
-
-/**
  * Computes the effective hourly rate for a task by composing the base rate
  * with its modifiers. Sums `hourlyDelta` first, then multiplies by any
  * `percentDelta` (e.g. Public Holiday +25%) so the uplift acts on the
@@ -449,48 +434,60 @@ export function effectiveHourlyRate(
 }
 
 /**
+ * Enforces the whole-job minimum-billable floor. When the hourly task lines
+ * carry some time but sum below minBillableMins, grows the most significant
+ * line so the billed labour is at least the minimum - the largest floating
+ * (non operator-stated) task, or the largest hourly task when every line is
+ * pinned. A job with no hourly time stays at 0 so the floor never invents a
+ * charge on an empty or parts-only job. Applied by both {@link calcJobTotal}
+ * and {@link jobToLineItems} so the on-screen total and the issued invoice
+ * agree, mirroring the {@link MIN_TRAVEL_CHARGE} floor.
+ * @param tasks - Task lines (`qty` in decimal hours); flat-rate lines pass through untouched.
+ * @param minBillableMins - Minimum billable labour minutes (live pricing setting); defaults to the code const.
+ * @returns Task list with the floor applied, or the input unchanged when already at/above the minimum.
+ */
+export function enforceMinBillable(
+  tasks: TaskLine[],
+  minBillableMins: number = MIN_BILLABLE_MINS,
+): TaskLine[] {
+  if (minBillableMins <= 0) return tasks;
+  const hourly = tasks.filter(isHourlyTask);
+  const totalMin = sumTaskMinutes(hourly);
+  if (totalMin <= 0 || totalMin >= minBillableMins) return tasks;
+  // Land the deficit on the most significant line: the largest floating task,
+  // falling back to the largest hourly task when the operator pinned them all.
+  const floating = hourly.filter((t) => !t.isExplicit);
+  const pool = floating.length > 0 ? floating : hourly;
+  let biggest = pool[0];
+  for (const t of pool) if (t.qty > biggest.qty) biggest = t;
+  const bumped = withMinutes(biggest, biggest.qty * 60 + (minBillableMins - totalMin));
+  return tasks.map((t) => (t === biggest ? bumped : t));
+}
+
+/**
  * Converts a job calculation into a flat array of invoice line items.
- * Emits one Labour row (when hours + rate are set), one row per task, one row
- * per part, and a single Travel row summed from `travelEntries`. Mirrors
- * {@link calcJobTotal}'s {@link floorBillableMins} and {@link MIN_TRAVEL_CHARGE}
- * floors so the issued invoice matches the operator's on-screen total.
- * @param job - Job calculation with time, tasks, parts.
- * @param incrementMins - Billing increment (live pricing setting); defaults to the code const.
+ * Emits one row per task, one row per part, and a single Travel row summed
+ * from `travelEntries`. Mirrors {@link calcJobTotal}'s {@link MIN_TRAVEL_CHARGE}
+ * and {@link enforceMinBillable} floors so the issued invoice matches the
+ * operator's on-screen total.
+ * @param job - Job calculation with tasks, parts, and travel.
  * @param holidayUplift - Public-holiday labour uplift fraction (0 = none); adds a surcharge line.
  * @param minTravelCharge - Minimum auto-travel charge (live pricing setting); defaults to the code const.
- * @param minBillableMins - Minimum billable time floor (live pricing setting); defaults to the code const.
+ * @param minBillableMins - Minimum billable labour minutes (live pricing setting); defaults to the code const.
  * @returns Array of line items ready for an invoice.
  */
 export function jobToLineItems(
   job: JobCalculation,
-  incrementMins: number = BILLING_INCREMENT_MINS,
   holidayUplift: number = 0,
   minTravelCharge: number = MIN_TRAVEL_CHARGE,
   minBillableMins: number = MIN_BILLABLE_MINS,
 ): LineItem[] {
   const items: LineItem[] = [];
-  // Running total of labour (time charge + hourly tasks) so the public-holiday
-  // surcharge line can uplift exactly that, never travel or parts.
+  // Running total of hourly-task labour so the public-holiday surcharge line
+  // can uplift exactly that, never travel or parts.
   let labourTotal = 0;
 
-  if (job.durationMins > 0 && job.hourlyRate) {
-    const billed = floorBillableMins(job.durationMins, minBillableMins, incrementMins);
-    const hours = billed / 60;
-    const rate = job.hourlyRate.ratePerHour ?? 0;
-    const lineTotal = Math.round(hours * rate * 100) / 100;
-    // Whole rates render as "$150/hr" (no trailing cents) to match the site's
-    // pricing copy; fractional rates keep their cents.
-    const rateLabel = Number.isInteger(rate) ? `$${rate}` : formatNZD(rate);
-    items.push({
-      description: `Labour - ${minsToHoursLabel(billed)} @ ${rateLabel}/hr`,
-      qty: 1,
-      unitPrice: lineTotal,
-      lineTotal,
-    });
-    labourTotal += lineTotal;
-  }
-
-  for (const task of job.tasks) {
+  for (const task of enforceMinBillable(job.tasks, minBillableMins)) {
     const lineTotal = Math.round(task.qty * task.unitPrice * 100) / 100;
     items.push({
       description: task.description,
@@ -530,8 +527,15 @@ export function jobToLineItems(
       ? minTravelCharge
       : rawTravelTotal;
   if (travelTotal > 0) {
+    // Drive minutes across auto entries (back leg falls back to outbound on
+    // legacy drafts) so the line reads "Round-trip travel (46 min drive)".
+    const driveMins = job.travelEntries.reduce((sum, e) => {
+      if (!e.isAuto || !e.durationMinsOneWay) return sum;
+      return sum + e.durationMinsOneWay + (e.durationMinsBack ?? e.durationMinsOneWay);
+    }, 0);
     items.push({
-      description: "Travel",
+      description:
+        driveMins > 0 ? `Round-trip travel (${driveMins} min drive)` : "Round-trip travel",
       qty: 1,
       unitPrice: travelTotal,
       lineTotal: travelTotal,
@@ -551,49 +555,32 @@ export interface JobPromo {
 export interface JobPricing {
   gstRegistered: boolean;
   minTravelCharge: number;
-  billingIncrementMins: number;
-  /** Minimum billable time floor in minutes (live setting); defaults to {@link MIN_BILLABLE_MINS} when absent. */
-  minBillableMins?: number;
+  /** Minimum billable labour minutes; the whole-job floor applied by {@link enforceMinBillable}. */
+  minBillableMins: number;
   /** Public-holiday labour uplift as a fraction (e.g. 0.25); 0/undefined when the job date isn't a holiday. */
   holidayUplift?: number;
+  /** Fraction charged for an unsuccessful visit (e.g. 0.5 = half); defaults to 0.5. */
+  unsuccessfulFactor?: number;
 }
 
 /**
- * Promo discount on a job's labour only (time charge + hourly tasks).
+ * Promo discount on a job's labour only (hourly task lines).
  * @param job - Job calculation.
  * @param promo - Active promo or null.
- * @param incrementMins - Billing increment (live pricing setting); defaults to the code const.
- * @param minBillableMins - Minimum billable floor (live pricing setting); defaults to the code const.
  * @returns Discount in dollars.
  */
-export function computeJobPromoDiscount(
-  job: JobCalculation,
-  promo: JobPromo | null,
-  incrementMins: number = BILLING_INCREMENT_MINS,
-  minBillableMins: number = MIN_BILLABLE_MINS,
-): number {
+function computeJobPromoDiscount(job: JobCalculation, promo: JobPromo | null): number {
   if (!promo) return 0;
 
   // A task is hourly if either: it has a baseRateId set (new rate model),
   // OR no flat rateConfigId. The double check survives stale AI output that
   // forgets to clear rateConfigId.
   const hourlyTasks = job.tasks.filter((t) => t.baseRateId != null || t.rateConfigId == null);
-  const hourlyTasksTotal = hourlyTasks.reduce((s, t) => s + t.qty * t.unitPrice, 0);
-  const hourlyTasksHours = hourlyTasks.reduce((s, t) => s + t.qty, 0);
-
-  const billed = floorBillableMins(job.durationMins, minBillableMins, incrementMins);
-  const timeHours = billed / 60;
-  const timeCharge = Math.round(timeHours * (job.hourlyRate?.ratePerHour ?? 0) * 100) / 100;
-
-  const labourSubtotal = timeCharge + hourlyTasksTotal;
+  const labourSubtotal = hourlyTasks.reduce((s, t) => s + t.qty * t.unitPrice, 0);
   if (labourSubtotal <= 0) return 0;
 
   if (promo.flatHourlyRate !== null) {
-    // Only count hours that actually contributed to labourSubtotal. When the
-    // top-level rate is null, timeHours is "phantom" duration with no charge
-    // behind it - including it inflates promoTotal and zeros the discount.
-    const billedTimeHours = timeCharge > 0 ? timeHours : 0;
-    const totalHours = billedTimeHours + hourlyTasksHours;
+    const totalHours = hourlyTasks.reduce((s, t) => s + t.qty, 0);
     const promoTotal = totalHours * promo.flatHourlyRate;
     const discount = labourSubtotal - promoTotal;
     return discount > 0 ? Math.round(discount * 100) / 100 : 0;
@@ -618,31 +605,31 @@ function isHourlyTask(task: TaskLine): boolean {
 
 /**
  * Cost breakdown for a job. Promo discount applies to labour only; travel +
- * parts stay at full price. The whole-job unsuccessful flag halves the entire
- * labour portion (time charge + hourly tasks); otherwise per-task `unsuccessful`
- * flags halve just those hourly task lines, leaving the time charge at full
- * price. Both fold into the single `unsuccessfulDiscount`. GST mode is driven
- * by {@link GST_REGISTERED} (see {@link calcInvoiceTotals});
- * job.gst is ignored. Travel floor ({@link MIN_TRAVEL_CHARGE}) only applies when an
- * auto entry contributed - manual-only travel passes through unchanged.
- * @param job - Job calculation with time, tasks, and parts.
+ * parts stay at full price. The whole-job unsuccessful flag discounts the entire
+ * labour portion (hourly task lines) by the unsuccessful-work factor; otherwise
+ * per-task `unsuccessful` flags discount just those lines. Both fold into the
+ * single `unsuccessfulDiscount`.
+ * GST mode is driven by {@link GST_REGISTERED} (see {@link calcInvoiceTotals}).
+ * Travel floor ({@link MIN_TRAVEL_CHARGE}) only applies when an auto entry
+ * contributed - manual-only travel passes through unchanged. The whole-job
+ * minimum-billable floor ({@link enforceMinBillable}) is applied up front so
+ * short jobs bill at least the configured minimum.
+ * @param jobIn - Job calculation with tasks, parts, and travel.
  * @param promo - Optional active promo to apply.
- * @param pricing - Live pricing (GST, min travel, billing increment); defaults to the code consts.
+ * @param pricing - Live pricing (GST, min travel, min billable, holiday uplift); defaults to the code consts.
  * @returns Cost breakdown with promo + unsuccessful discounts split out.
  */
 export function calcJobTotal(
-  job: JobCalculation,
+  jobIn: JobCalculation,
   promo: JobPromo | null = null,
   // Default built lazily (call-time, not module-eval) so reading the consts
   // here can't trip the circular-import TDZ with the pricing-policy module.
   pricing: JobPricing = {
     gstRegistered: GST_REGISTERED,
     minTravelCharge: MIN_TRAVEL_CHARGE,
-    billingIncrementMins: BILLING_INCREMENT_MINS,
     minBillableMins: MIN_BILLABLE_MINS,
   },
 ): {
-  timeCharge: number;
   tasksTotal: number;
   partsTotal: number;
   travelTotal: number;
@@ -653,14 +640,10 @@ export function calcJobTotal(
   gstAmount: number;
   total: number;
 } {
-  const billed = floorBillableMins(
-    job.durationMins,
-    pricing.minBillableMins ?? MIN_BILLABLE_MINS,
-    pricing.billingIncrementMins,
-  );
-  const hours = billed / 60;
-  const rate = job.hourlyRate?.ratePerHour ?? 0;
-  const timeCharge = Math.round(hours * rate * 100) / 100;
+  // Apply the whole-job minimum-billable floor once, up front, so every
+  // labour-derived figure below (tasks total, holiday uplift, promo and
+  // unsuccessful discounts) agrees with the floored invoice lines.
+  const job = { ...jobIn, tasks: enforceMinBillable(jobIn.tasks, pricing.minBillableMins) };
   const tasksTotal = job.tasks.reduce((s, t) => s + t.qty * t.unitPrice, 0);
   const partsTotal = job.parts.reduce((s, p) => s + p.cost, 0);
   const rawTravelTotal = travelEntriesTotal(job.travelEntries);
@@ -670,38 +653,30 @@ export function calcJobTotal(
     hasAutoEntry && rawTravelTotal > 0 && rawTravelTotal < pricing.minTravelCharge
       ? pricing.minTravelCharge
       : rawTravelTotal;
-  // Public-holiday surcharge uplifts labour only (time charge + hourly tasks),
-  // never travel or parts. 0 when the job date isn't a holiday.
+  // Public-holiday surcharge uplifts labour only (hourly task lines), never
+  // travel or parts. 0 when the job date isn't a holiday.
   const holidayUplift = pricing.holidayUplift ?? 0;
   const hourlyTasksTotal = job.tasks
     .filter(isHourlyTask)
     .reduce((s, t) => s + t.qty * t.unitPrice, 0);
   const holidaySurcharge =
-    holidayUplift > 0 ? Math.round((timeCharge + hourlyTasksTotal) * holidayUplift * 100) / 100 : 0;
+    holidayUplift > 0 ? Math.round(hourlyTasksTotal * holidayUplift * 100) / 100 : 0;
   const subtotal =
-    Math.round((timeCharge + tasksTotal + partsTotal + travelTotal + holidaySurcharge) * 100) / 100;
-  const promoDiscount = computeJobPromoDiscount(
-    job,
-    promo,
-    pricing.billingIncrementMins,
-    pricing.minBillableMins ?? MIN_BILLABLE_MINS,
-  );
+    Math.round((tasksTotal + partsTotal + travelTotal + holidaySurcharge) * 100) / 100;
+  const promoDiscount = computeJobPromoDiscount(job, promo);
+  // Fraction removed from an unsuccessful line: 1 - the charged share.
+  const unsuccessfulCut = 1 - (pricing.unsuccessfulFactor ?? 0.5);
   let unsuccessfulDiscount = 0;
   if (job.unsuccessful) {
-    // Whole-job flag halves the time charge plus every hourly task; per-task
-    // flags are subsumed here so a task can't be discounted twice.
-    const hourlyTasksTotal = job.tasks
-      .filter(isHourlyTask)
-      .reduce((s, t) => s + t.qty * t.unitPrice, 0);
-    const labourBase = timeCharge + hourlyTasksTotal;
-    unsuccessfulDiscount = Math.round(labourBase * 0.5 * 100) / 100;
+    // Whole-job flag discounts every hourly task; per-task flags are subsumed
+    // here so a task can't be discounted twice.
+    unsuccessfulDiscount = Math.round(hourlyTasksTotal * unsuccessfulCut * 100) / 100;
   } else {
-    // Per-task flags halve only the flagged hourly lines; the time charge bills
-    // full because those hours were worked regardless.
+    // Per-task flags discount only the flagged hourly lines.
     const flaggedTasksTotal = job.tasks
       .filter((t) => t.unsuccessful && isHourlyTask(t))
       .reduce((s, t) => s + t.qty * t.unitPrice, 0);
-    unsuccessfulDiscount = Math.round(flaggedTasksTotal * 0.5 * 100) / 100;
+    unsuccessfulDiscount = Math.round(flaggedTasksTotal * unsuccessfulCut * 100) / 100;
   }
   // GST applied to the discounted amount per NZ IRD price-reduction treatment.
   // Clamp at 0 (matching calcInvoiceTotals) so stacked promo + unsuccessful
@@ -713,7 +688,6 @@ export function calcJobTotal(
   );
   const gstAmount = pricing.gstRegistered ? calcGstFromInclusive(taxableAmount, GST_RATE) : 0;
   return {
-    timeCharge,
     tasksTotal,
     partsTotal,
     travelTotal,

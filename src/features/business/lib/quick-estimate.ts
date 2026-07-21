@@ -1,14 +1,17 @@
 // src/features/business/lib/quick-estimate.ts
 /**
- * @description Client-safe one-shot price estimate used by the booking form's
- * inline "get a rough estimate" affordance (for customers who skipped the
- * /pricing wizard). Orchestrates the same public endpoints the wizard uses and
- * reuses {@link priceRangeFor} so the two stay in sync, then logs the estimate
- * to capture an id the booking can snapshot.
+ * @description Client-safe one-shot price estimate for the booking form's
+ * inline "get a rough estimate" affordance. Orchestrates the same public
+ * endpoints the /pricing wizard uses and reuses {@link priceRangeFor} so the
+ * two stay in sync, then logs the estimate for the booking to snapshot.
  */
 
 import { priceRangeFor, remoteRateDelta } from "@/features/business/lib/estimate-range";
-import { calcTravelCharge } from "@/features/business/lib/pricing-policy";
+import {
+  calcTravelCharge,
+  FALLBACK_BASE_RATE,
+  FALLBACK_TRAVEL_RATE,
+} from "@/features/business/lib/pricing-policy";
 import { applyPromoToHourlyRate, type ActivePromo } from "@/features/business/lib/promos";
 import type { PublicRate } from "@/features/business/types/pricing";
 import type { EstimateConfidence, EstimatorRange } from "@/shared/lib/settings/types";
@@ -21,12 +24,29 @@ export interface QuickEstimateInput {
   estimatorRange: EstimatorRange;
   minBillableMins: number;
   minTravelCharge: number;
+  lowEndFloorFactor: number;
+  /**
+   * When the customer has already picked a slot, the drive is quoted at that
+   * time so the estimate matches what the booking will snapshot. Omitted before
+   * a slot is chosen, in which case the route prices a representative weekday.
+   */
+  departureTimeIso?: string;
+  /** End of the visit; the return leg is quoted from here. */
+  returnDepartureTimeIso?: string;
 }
 
 /** Result of a one-shot estimate. `estimateId` is null when logging failed. */
 export interface QuickEstimateResult {
+  /** Labour-only price band (travel excluded - see the travelCharge field). */
   low: number;
   high: number;
+  /** Round-trip travel charge (0 for remote or when the address didn't resolve); shown on its own line. */
+  travelCharge: number;
+  /** AI-estimated labour minutes (travel excluded); drives the "about N hours" display. */
+  estimatedMins: number;
+  /** Labour-time band (5-min steps, travel excluded) for the "15 - 30 min" range. */
+  minsLow: number;
+  minsHigh: number;
   estimateId: string | null;
   confidence: EstimateConfidence;
   explanation: string;
@@ -39,7 +59,15 @@ export interface QuickEstimateResult {
  * @returns The price range, the logged estimate id, and the AI confidence/explanation.
  */
 export async function fetchQuickEstimate(input: QuickEstimateInput): Promise<QuickEstimateResult> {
-  const { description, meeting, address, estimatorRange, minBillableMins, minTravelCharge } = input;
+  const {
+    description,
+    meeting,
+    address,
+    estimatorRange,
+    minBillableMins,
+    minTravelCharge,
+    lowEndFloorFactor,
+  } = input;
   const dest =
     meeting === "remote"
       ? ""
@@ -55,7 +83,11 @@ export async function fetchQuickEstimate(input: QuickEstimateInput): Promise<Qui
       ? fetch("/api/pricing/travel-time", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ destination: dest }),
+          body: JSON.stringify({
+            destination: dest,
+            departureTimeIso: input.departureTimeIso,
+            returnDepartureTimeIso: input.returnDepartureTimeIso,
+          }),
         }).then(
           (r) => r.json() as Promise<{ durationMinsThere?: number; durationMinsBack?: number }>,
         )
@@ -98,11 +130,11 @@ export async function fetchQuickEstimate(input: QuickEstimateInput): Promise<Qui
 
   // Resolve the live base + remote delta regardless of the AI duration call's
   // outcome, so a failed/timed-out estimate still prices against the operator's
-  // current rate instead of the hardcoded $65 fallback.
+  // current rate instead of the shared fallback rate.
   const baseStandard =
     rates.find((r) => r.ratePerHour !== null && r.isDefault)?.ratePerHour ??
     rates.find((r) => r.ratePerHour !== null)?.ratePerHour ??
-    65;
+    FALLBACK_BASE_RATE;
   const fullRate = baseStandard + remoteRateDelta(rates, meeting);
 
   let estimatedMins = 60;
@@ -118,13 +150,34 @@ export async function fetchQuickEstimate(input: QuickEstimateInput): Promise<Qui
   }
 
   const travelRatePerHour =
-    rates.find((r) => r.unit === "travel-hour" && r.ratePerHour !== null)?.ratePerHour ?? 40;
+    rates.find((r) => r.unit === "travel-hour" && r.ratePerHour !== null)?.ratePerHour ??
+    FALLBACK_TRAVEL_RATE;
   const promoRate = applyPromoToHourlyRate(fullRate, promo);
   const effectiveMins = Math.max(minBillableMins, estimatedMins);
-  const band = priceRangeFor(effectiveMins, promoRate, confidence, estimatorRange);
+  const band = priceRangeFor(
+    effectiveMins,
+    promoRate,
+    confidence,
+    estimatorRange,
+    lowEndFloorFactor,
+  );
   const travel = calcTravelCharge(travelMins, travelMinsBack, travelRatePerHour, minTravelCharge);
-  const low = band.low + travel;
-  const high = band.high + travel;
+  // Labour band is the range shown to the customer; travel is a (mostly fixed)
+  // add-on surfaced on its own line rather than folded into the range. The
+  // logged price below stays the all-in total so the booking snapshot is
+  // unchanged.
+  const low = band.low;
+  const high = band.high;
+  const totalLow = band.low + travel;
+  const totalHigh = band.high + travel;
+
+  // Labour-time band from the same confidence factors that widen the price,
+  // rounded to 5-min steps so the card can show a range ("15 - 30 min") that
+  // lines up with the price range. Travel is not counted here - it's a price
+  // add-on, not time the customer is billed for on-site work.
+  const timeBand = estimatorRange[confidence] ?? estimatorRange.medium;
+  const minsLow = Math.max(5, Math.round((effectiveMins * timeBand.lowFactor) / 5) * 5);
+  const minsHigh = Math.max(minsLow + 5, Math.round((effectiveMins * timeBand.highFactor) / 5) * 5);
 
   // Log the estimate (best effort) to capture the id for the booking snapshot.
   let estimateId: string | null = null;
@@ -142,8 +195,9 @@ export async function fetchQuickEstimate(input: QuickEstimateInput): Promise<Qui
         travelMinsBack,
         meetingType: meeting === "in-person" ? "in_person" : "remote",
         hourlyRate: promoRate,
-        priceLow: low,
-        priceHigh: high,
+        priceLow: totalLow,
+        priceHigh: totalHigh,
+        travelCharge: travel,
       }),
     }).then((r) => r.json() as Promise<{ id?: string }>);
     if (logged?.id) estimateId = logged.id;
@@ -151,5 +205,15 @@ export async function fetchQuickEstimate(input: QuickEstimateInput): Promise<Qui
     // Logging is best-effort; the range still shows without an id.
   }
 
-  return { low, high, estimateId, confidence, explanation };
+  return {
+    low,
+    high,
+    travelCharge: travel,
+    estimatedMins,
+    minsLow,
+    minsHigh,
+    estimateId,
+    confidence,
+    explanation,
+  };
 }

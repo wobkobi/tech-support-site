@@ -42,15 +42,11 @@ export const GROUP_META: Record<SettingsGroup, { title: string; blurb: string }>
   },
   tax: {
     title: "Tax planner",
-    blurb: "Income-tax, ACC and KiwiSaver reserve rates plus weekly transfer amounts.",
+    blurb: "Income-tax, ACC and KiwiSaver reserve rates.",
   },
   comms: {
     title: "Comms & automation",
     blurb: "Which emails send, when reminders fire, and how long logs are kept.",
-  },
-  holds: {
-    title: "Booking form & holds",
-    blurb: "How long a held slot stays reserved before it's released for others.",
   },
   scheduling: {
     title: "Scheduling & travel buffers",
@@ -86,9 +82,8 @@ export const AVAILABILITY_FIELD_META: Record<string, FieldMeta> = {
   },
   sameDayCutoffHour: {
     title: "Same-day cutoff",
-    description: "After this hour (24-hour clock) same-day booking closes for the rest of the day.",
-    unit: "hour 0-23",
-    off: "Leave blank for no same-day cutoff.",
+    description: "After this time, same-day booking closes for the rest of the day.",
+    off: "Choose 'No cutoff' to allow same-day booking all day.",
   },
   bufferMin: {
     title: "Calendar buffer",
@@ -122,6 +117,11 @@ export const AVAILABILITY_FIELD_META: Record<string, FieldMeta> = {
     unit: "hours",
     off: "Set 0 or leave blank for no daily limit.",
   },
+  morningGuards: {
+    title: "Morning guards",
+    description:
+      "Protect early slots once the night-before arrives (e.g. from Friday evening, block Sat/Sun before noon). Slots stay bookable if reserved earlier in the week.",
+  },
 };
 
 /** Field metadata for the comms group, keyed by field name. */
@@ -152,6 +152,28 @@ export const COMMS_FIELD_META: Record<string, FieldMeta> = {
     title: "Estimate-log retention",
     description: "Delete public price-estimate logs older than this many days.",
     unit: "days",
+  },
+  invoiceRemindersEnabled: {
+    title: "Overdue invoice reminders",
+    description:
+      "Email a polite nudge (invoice attached) when a sent invoice goes past its due date, up to the reminder cap.",
+    off: "When off, overdue invoices are never chased automatically - the manual Send reminder button still works.",
+  },
+  invoiceReminderFirstDays: {
+    title: "First reminder",
+    description: "Days past the due date before the first nudge.",
+    unit: "days overdue",
+  },
+  invoiceReminderSecondDays: {
+    title: "Second reminder",
+    description: "Days past the due date before the second nudge.",
+    unit: "days overdue",
+  },
+  invoiceReminderMaxCount: {
+    title: "Maximum reminders",
+    description: "Stop automatically chasing an invoice after this many reminders have been sent.",
+    unit: "reminders",
+    off: "Set 0 to never send an automatic reminder.",
   },
 };
 
@@ -197,7 +219,8 @@ export const IDENTITY_FIELD_META: Record<string, FieldMeta> = {
   },
   "baseAddress.line": {
     title: "Base address",
-    description: "Your home/base street address - the origin every travel charge is measured from.",
+    description:
+      "Your home/base address - the origin every travel charge is measured from. Pick a suggestion to auto-fill the suburb, postcode, and map coordinates below.",
   },
   "baseAddress.locality": {
     title: "Suburb / locality",
@@ -209,11 +232,11 @@ export const IDENTITY_FIELD_META: Record<string, FieldMeta> = {
   },
   "baseAddress.lat": {
     title: "Latitude",
-    description: "Map latitude for the business location (SEO).",
+    description: "Map latitude (SEO). Auto-fills when you pick an address; edit if needed.",
   },
   "baseAddress.lng": {
     title: "Longitude",
-    description: "Map longitude for the business location (SEO).",
+    description: "Map longitude (SEO). Auto-fills when you pick an address; edit if needed.",
   },
   paymentTermsDays: {
     title: "Payment terms",
@@ -234,23 +257,18 @@ export const IDENTITY_FIELD_META: Record<string, FieldMeta> = {
     title: "Bank account",
     description: "Account number shown on invoices for payment.",
   },
-  invoicePrefix: {
-    title: "Invoice prefix",
-    description: "Prefix for invoice numbers (e.g. TTP in TTP-2627-0001).",
-  },
   homeRegion: {
     title: "Home region",
     description: "Your region for the regional anniversary public holiday (e.g. Auckland).",
   },
-};
-
-/** Field metadata for the booking form & holds group, keyed by field name. */
-export const HOLDS_FIELD_META: Record<string, FieldMeta> = {
-  holdExpirationMinutes: {
-    title: "Hold expiry",
-    description:
-      "How long a slot stays reserved while a customer finishes booking, before it's released for others.",
-    unit: "minutes",
+  serviceRadiusKm: {
+    title: "Service-area radius",
+    description: "How far you travel for on-site jobs; advertised in the site's map data for SEO.",
+    unit: "km",
+  },
+  servedSuburbs: {
+    title: "Served suburbs",
+    description: "Suburbs you cover, listed in the site's map data for local SEO.",
   },
 };
 
@@ -259,25 +277,18 @@ export const TAX_FIELD_META: Record<string, FieldMeta> = {
   incomeTax: {
     title: "Income-tax reserve rate",
     description:
-      "Fraction of profit set aside for income tax (0.2 = 20%). Used by the dashboard planner; a per-FY workbook rate, when present, still takes precedence.",
+      "Percent of profit set aside for income tax. Used by the dashboard planner; a per-FY workbook rate, when present, still takes precedence.",
+    unit: "%",
   },
   acc: {
     title: "ACC levy rate",
-    description: "Fraction of profit reserved for the ACC levy (0.0146 = 1.46%).",
+    description: "Percent of profit reserved for the ACC levy (e.g. 1.46%).",
+    unit: "%",
   },
   kiwiSaver: {
     title: "KiwiSaver rate",
-    description: "Voluntary KiwiSaver contribution as a fraction of profit (0.12 = 12%).",
-  },
-  weeklyKiwiSaver: {
-    title: "Weekly KiwiSaver transfer",
-    description: "The amount moved to KiwiSaver each week, shown on the planner's savings target.",
-    unit: "$",
-  },
-  weeklyTax: {
-    title: "Weekly tax transfer",
-    description: "The amount moved to the tax account each week, shown on the planner.",
-    unit: "$",
+    description: "Voluntary KiwiSaver contribution as a percent of profit.",
+    unit: "%",
   },
 };
 
@@ -310,6 +321,19 @@ export const SCHEDULING_FIELD_META: Record<string, FieldMeta> = {
       "How far back to look for a preceding event to measure travel from, instead of always from home base.",
     unit: "hours",
     off: "Set 0 to always measure travel from the home base.",
+  },
+  pastEditLockHours: {
+    title: "Past-edit lock window",
+    description:
+      "How long after a job ends you can still edit it, change its status, or block the day. After this, past history locks to prevent accidental changes.",
+    unit: "hours",
+    off: "Set 0 to lock a job the moment it ends.",
+  },
+  travelQuoteHour: {
+    title: "Travel-quote time",
+    description:
+      "When a customer hasn't picked a slot yet, drive time is quoted against this hour of the day (a realistic-traffic proxy rather than whenever they opened the page).",
+    unit: "hour 0-23",
   },
 };
 
@@ -346,20 +370,47 @@ export const PRICING_FIELD_META: Record<string, FieldMeta> = {
     unit: "$",
     off: "Set 0 for no floor - bill the exact travel time.",
   },
+  unsuccessfulWorkFactor: {
+    title: "Unsuccessful-visit charge",
+    description:
+      "Fraction of the labour billed when a visit is unsuccessful - neither fixed nor diagnosed (50 = half price).",
+    unit: "%",
+    off: "Set 0 to charge nothing for an unsuccessful visit.",
+  },
   "cancellation.freeNoticeHours": {
-    title: "Free-cancellation window",
-    description: "Cancellations made more than this many hours before the appointment are free.",
+    title: "Free-cancellation window (in-person)",
+    description:
+      "In-person cancellations made more than this many hours before the appointment are free. Remote sessions have their own, shorter window below.",
     unit: "hours",
   },
   "cancellation.travelChargeHours": {
-    title: "Travel-charge window",
+    title: "Full call-out window",
     description:
-      "Cancelling within this many hours also bills round-trip travel (you'd already be on the way).",
+      "Cancelling within this many hours bills the full call-out plus round-trip travel, instead of the flat cancellation fee (you'd already be on the way).",
     unit: "hours",
   },
   "cancellation.callOutFee": {
-    title: "Call-out fee",
-    description: "Flat fee charged when a cancellation lands inside the free-cancellation window.",
+    title: "Cancellation fee",
+    description:
+      "Flat fee charged when a cancellation lands inside the free-cancellation window but outside the full call-out window.",
+    unit: "$",
+  },
+  "cancellation.fullCallOutFee": {
+    title: "Full call-out fee",
+    description:
+      "Charged instead of the cancellation fee when they cancel inside the full call-out window, or don't show at all. Round-trip travel is added on top.",
+    unit: "$",
+  },
+  "cancellation.remoteFreeNoticeHours": {
+    title: "Remote free-cancellation window",
+    description:
+      "Remote sessions can be cancelled free up to this many hours before. Shorter than the in-person window because there's no drive to plan around.",
+    unit: "hours",
+  },
+  "cancellation.remoteFee": {
+    title: "Remote cancellation fee",
+    description:
+      "Flat fee for a remote session cancelled inside its window, or a remote no-show. No call-out tier and no travel - a remote cancel only costs you the slot.",
     unit: "$",
   },
   "cancellation.autoSendCancellationInvoice": {
@@ -426,6 +477,30 @@ export const ESTIMATOR_FIELD_META: Record<string, FieldMeta> = {
       "Smallest dollar gap between low and high so tiny jobs don't look falsely precise.",
     unit: "$",
   },
+  maxJobHours: {
+    title: "Max job length",
+    description:
+      "Hard ceiling on any single-visit estimate, so a runaway estimate can't quote days.",
+    unit: "hours",
+  },
+  stackHandsOnFactor: {
+    title: "Extra hands-on task",
+    description:
+      "How much an additional hands-on task adds vs doing it alone (50 = half), since you're already on-site and set up.",
+    unit: "%",
+  },
+  stackBackgroundFactor: {
+    title: "Background task",
+    description:
+      "How much a background task (data transfer, virus scan, updates) adds vs alone (20 = a fifth), since it runs unattended while you work.",
+    unit: "%",
+  },
+  lowEndFloorFactor: {
+    title: "Low-end floor",
+    description:
+      "The advertised low price never drops below this share of straight-time cost (75 = 75%), so a vague job still quotes a fair minimum.",
+    unit: "%",
+  },
 };
 
 /** Per-group field metadata, keyed by group - powers the settings search. */
@@ -436,7 +511,6 @@ export const FIELD_META_BY_GROUP: Record<SettingsGroup, Record<string, FieldMeta
   identity: IDENTITY_FIELD_META,
   tax: TAX_FIELD_META,
   comms: COMMS_FIELD_META,
-  holds: HOLDS_FIELD_META,
   scheduling: SCHEDULING_FIELD_META,
   reviews: REVIEWS_FIELD_META,
 };

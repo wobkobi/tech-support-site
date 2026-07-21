@@ -4,17 +4,16 @@
  */
 
 import { createDraftCancellationInvoice } from "@/features/business/lib/cancellation-invoice";
-import {
-  isWithinCancellationWindow,
-  isWithinTravelWindow,
-} from "@/features/business/lib/pricing-policy";
+import { assessCancellation } from "@/features/business/lib/pricing-policy";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { deleteBookingEvent, SCHEDULE_CALENDAR_TAG } from "@/features/calendar/lib/google-calendar";
 import { sendCustomerReviewRequest } from "@/features/reviews/lib/email";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
+import { isPastEditWindow } from "@/shared/lib/edit-window";
 import { toE164NZ } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
+import { getSettings } from "@/shared/lib/settings/get-settings";
 import { revalidateTag } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -66,6 +65,21 @@ export async function PATCH(
     return errorResponse("Booking not found.", 404);
   }
 
+  // Lock past events: refuse state changes (complete / cancel / no-show) on a
+  // booking that ended more than the configured window ago. Metadata-only edits
+  // (name/email/phone/notes/address corrections) are still allowed.
+  const isStateChange = body.status !== undefined || body.markNoShow === true;
+  const { scheduling } = await getSettings();
+  if (
+    isStateChange &&
+    isPastEditWindow(booking.endAt.getTime(), Date.now(), scheduling.pastEditLockHours)
+  ) {
+    return errorResponse(
+      `Can't change a booking more than ${scheduling.pastEditLockHours}h after it ended.`,
+      409,
+    );
+  }
+
   // Sparse update: only fields present in the body get written.
   const data: Record<string, unknown> = {};
 
@@ -97,12 +111,21 @@ export async function PATCH(
         console.error("[admin/bookings] Failed to delete calendar event:", err);
       }
     }
+    const noShowAt = new Date();
+    const { CANCELLATION: noShowPolicy } = await getPolicy();
+    // A no-show always charges - they never called. The policy still decides
+    // whether a drive is billed, since a remote no-show has none.
+    const noShowCharge = assessCancellation(booking.startAt, noShowAt, {
+      reason: "no-show",
+      meetingType: booking.meetingType === "remote" ? "remote" : "in-person",
+      policy: noShowPolicy,
+    });
     data.status = "cancelled";
     data.activeSlotKey = `released:${id}`;
-    data.cancelledAt = new Date();
+    data.cancelledAt = noShowAt;
     data.cancelledBy = "customer";
     data.lateCancellation = true;
-    data.travelChargeApplies = true;
+    data.travelChargeApplies = noShowCharge.travelApplies;
     data.noShow = true;
   } else if (body.status === "cancelled" && booking.status !== "cancelled") {
     if (booking.calendarEventId) {
@@ -120,12 +143,15 @@ export async function PATCH(
     // Operator cancels never charge; on-behalf follows customer fee rules.
     data.cancelledBy = onBehalf ? "customer" : "operator";
     const { CANCELLATION } = await getPolicy();
-    data.lateCancellation = onBehalf
-      ? isWithinCancellationWindow(booking.startAt, now, CANCELLATION.freeNoticeHours)
-      : false;
-    data.travelChargeApplies = onBehalf
-      ? isWithinTravelWindow(booking.startAt, now, CANCELLATION.travelChargeHours)
-      : false;
+    // In-person and remote have their own windows and fees, so the policy reads
+    // the booking rather than one set of windows being applied to both.
+    const charge = assessCancellation(booking.startAt, now, {
+      reason: "late-cancellation",
+      meetingType: booking.meetingType === "remote" ? "remote" : "in-person",
+      policy: CANCELLATION,
+    });
+    data.lateCancellation = onBehalf ? charge.fee > 0 : false;
+    data.travelChargeApplies = onBehalf ? charge.travelApplies : false;
   } else if (body.status === "completed") {
     data.status = "completed";
     data.activeSlotKey = `released:${id}`;
@@ -143,7 +169,6 @@ export async function PATCH(
     booking.status !== "cancelled"
   ) {
     void createDraftCancellationInvoice(updated, {
-      includeTravel: updated.travelChargeApplies,
       reason: updated.noShow ? "no-show" : "late-cancellation",
     }).catch((err) => console.error("[admin/bookings] Failed to draft cancellation invoice:", err));
   }

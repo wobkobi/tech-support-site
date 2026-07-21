@@ -143,7 +143,10 @@ export async function DELETE(
 
   await prisma.incomeEntry.delete({ where: { id } });
 
-  // Remove the matching sheet row so the import can't resurrect the entry.
+  // Remove the matching sheet row so the import can't resurrect the entry. A
+  // failed delete leaves the row behind (the cron would re-import it), so
+  // surface a warning the caller can toast.
+  let sheetSyncWarning = false;
   if (existing.sheetRowKey) {
     try {
       const spreadsheetId = await resolveSheetIdForDate(existing.date);
@@ -152,8 +155,9 @@ export async function DELETE(
       }
     } catch (err) {
       console.error(`[income] Failed to delete sheet row for entry ${id}:`, err);
+      sheetSyncWarning = true;
     }
   }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, sheetSyncWarning });
 }

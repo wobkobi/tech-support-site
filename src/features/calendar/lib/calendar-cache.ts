@@ -8,7 +8,7 @@ import {
   getBookingCalendarId,
   type CalendarEvent,
 } from "@/features/calendar/lib/google-calendar";
-import { calculateTravelMinutes, type TransportMode } from "@/features/calendar/lib/travel-time";
+import { calculateTravelMinutes } from "@/features/calendar/lib/travel-time";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 
@@ -35,6 +35,82 @@ function roundTravelMinutes(raw: number, bufferMin: number): number {
   return Math.ceil((raw + bufferMin) / TRAVEL_ROUND_INCREMENT_MIN) * TRAVEL_ROUND_INCREMENT_MIN;
 }
 
+/** Raw + rounded minutes for both legs, as written back onto a TravelBlock. */
+export interface RecomputedTravel {
+  rawTravelMinutes: number | null;
+  roundedMinutes: number | null;
+  rawTravelBackMinutes: number | null;
+  roundedBackMinutes: number | null;
+}
+
+/**
+ * Recomputes and persists one TravelBlock's travel-there / travel-back minutes
+ * immediately, pricing from the block's own stored origin, destination, and
+ * event window rather than the live calendar fetch. The refresh cron only
+ * maintains upcoming events ({@link refreshCalendarCache} never revisits a
+ * finished job's block), so changing a past job's mode or origin would clear
+ * its minutes with nothing to refill them; this refills them on the spot from
+ * the block's frozen endpoints. Chaining and travel-back suppression are
+ * deliberately not re-derived - the next cron re-evaluates those for upcoming
+ * events, and an already-suppressed back stays empty.
+ * @param blockId - TravelBlock id to recompute.
+ * @returns The recomputed raw/rounded minutes, or null when the block is gone.
+ */
+export async function recomputeTravelBlock(blockId: string): Promise<RecomputedTravel | null> {
+  const block = await prisma.travelBlock.findUnique({ where: { id: blockId } });
+  if (!block) return null;
+
+  const settings = await getSettings();
+  const homeAddress = settings.identity.baseAddress.line || process.env.HOME_ADDRESS || "";
+  const bufferMin = settings.scheduling.travelRoundBufferMin;
+
+  const origin = block.customOrigin ?? block.detectedOrigin ?? homeAddress;
+  const destination = block.destination;
+  const backDestination = block.customTravelBackDestination ?? homeAddress;
+  // Match the cron's read-time default (null mode > driving).
+  const mode = block.transportMode ?? "driving";
+
+  const empty: RecomputedTravel = {
+    rawTravelMinutes: null,
+    roundedMinutes: null,
+    rawTravelBackMinutes: null,
+    roundedBackMinutes: null,
+  };
+
+  // No endpoints to price against - store blanks rather than guess.
+  if (!origin || !destination) {
+    await prisma.travelBlock.update({ where: { id: blockId }, data: empty });
+    return empty;
+  }
+
+  // Booking events get a wind-down buffer before the return departure, matching
+  // how refreshCalendarCache times the travel-back leg.
+  const backBufferMin = settings.scheduling.travelBackDepartureBufferMin;
+  const isBookingEvent = block.calendarEmail === getBookingCalendarId();
+  const departureForBack = isBookingEvent
+    ? new Date(block.eventEndAt.getTime() + backBufferMin * 60_000)
+    : block.eventEndAt;
+
+  const [rawThere, rawBack] = await Promise.all([
+    calculateTravelMinutes(origin, destination, block.eventStartAt, {
+      useArrivalTime: true,
+      mode,
+    }),
+    block.travelBackSuppressed
+      ? Promise.resolve(null)
+      : calculateTravelMinutes(destination, backDestination, departureForBack, { mode }),
+  ]);
+
+  const data: RecomputedTravel = {
+    rawTravelMinutes: rawThere,
+    roundedMinutes: rawThere !== null ? roundTravelMinutes(rawThere, bufferMin) : null,
+    rawTravelBackMinutes: rawBack,
+    roundedBackMinutes: rawBack !== null ? roundTravelMinutes(rawBack, bufferMin) : null,
+  };
+  await prisma.travelBlock.update({ where: { id: blockId }, data });
+  return data;
+}
+
 /**
  * Finds the best origin address for the travel-to leg of a given event.
  * Looks for a preceding event that ends within the lookahead window of the
@@ -46,7 +122,7 @@ function roundTravelMinutes(raw: number, bufferMin: number): number {
  * @param lookaheadHours - How far back to look for a preceding event (scheduling.smartOriginLookaheadHours).
  * @returns The best origin address to use.
  */
-export function findSmartOrigin(
+function findSmartOrigin(
   allEvents: CalendarEvent[],
   targetEvent: CalendarEvent,
   homeAddress: string,
@@ -83,7 +159,7 @@ export function findSmartOrigin(
  * @param excludeCalendarEmails - Calendars that must never be chained into.
  * @returns The candidate next event with its location and start, or null.
  */
-export function findNextChainedEvent(
+function findNextChainedEvent(
   allEvents: CalendarEvent[],
   currentEvent: CalendarEvent,
   effectiveDeparture: Date,
@@ -129,6 +205,11 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
   const maxDate = new Date(
     now.getTime() + settings.availability.maxAdvanceDays * 24 * 60 * 60 * 1000,
   );
+  // Also process jobs finished within the last few days so their travel bars stay
+  // on the schedule for the record (they'd otherwise be cleaned once the job passed).
+  // Past legs are priced at a near-future proxy inside calculateTravelMinutes.
+  const TRAVEL_RETENTION_DAYS = 7;
+  const travelWindowStart = new Date(now.getTime() - TRAVEL_RETENTION_DAYS * 24 * 60 * 60 * 1000);
   const scheduling = settings.scheduling;
   /**
    * Rounds raw travel minutes using the live travel-round buffer.
@@ -141,7 +222,7 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
   // Fetch fresh calendar events
   let rawEvents: CalendarEvent[] = [];
   try {
-    rawEvents = await fetchAllCalendarEvents(now, maxDate);
+    rawEvents = await fetchAllCalendarEvents(travelWindowStart, maxDate);
     console.log(`[refreshCalendarCache] Fetched ${rawEvents.length} calendar events`);
   } catch (error) {
     console.error("[refreshCalendarCache] Failed to fetch calendar events:", error);
@@ -258,11 +339,13 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
     }
   }
 
-  // Eligible-for-TravelBlock: every future event from any calendar that has a
-  // resolvable destination. Falls back to event.summary when no dedicated
-  // location field is set (e.g. business name as the title).
+  // Eligible-for-TravelBlock: every event within the travel window (recent past +
+  // future) from any calendar that has a resolvable destination. Recent past jobs
+  // are kept so their travel bars stay for the record; their legs are priced at a
+  // proxy time. Falls back to event.summary when no dedicated location field is set
+  // (e.g. business name as the title).
   const eligibleEvents = rawEvents.filter(
-    (e) => (e.location ?? e.summary) && new Date(e.start) > now,
+    (e) => (e.location ?? e.summary) && new Date(e.start) > travelWindowStart,
   );
 
   if (isDev) {
@@ -578,7 +661,7 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
       ? `${event.recurringEventId}|${event.calendarEmail}`
       : null;
     const seriesMode = seriesKey ? (seriesModeByKey.get(seriesKey) ?? null) : null;
-    const travelMode = (existing?.transportMode ?? seriesMode ?? "driving") as TransportMode;
+    const travelMode = existing?.transportMode ?? seriesMode ?? "driving";
 
     // Three Distance Matrix calls in parallel - the third (home>next) only
     // fires when a chaining candidate exists, and feeds the dwell calculation.

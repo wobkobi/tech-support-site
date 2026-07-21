@@ -13,7 +13,7 @@ import { randomUUID } from "crypto";
  * @param contactId - Contact ObjectId.
  * @returns Token string, or null if the contact doesn't exist or DB write failed.
  */
-export async function ensureContactReviewToken(contactId: string): Promise<string | null> {
+async function ensureContactReviewToken(contactId: string): Promise<string | null> {
   try {
     const contact = await prisma.contact.findUnique({
       where: { id: contactId },
@@ -51,7 +51,7 @@ interface InvoiceReviewLookupArgs {
  * @param args.siteUrl - Public origin to prefix the review URL with.
  * @returns Full review URL or null when no contact can be resolved.
  */
-export async function resolveInvoiceReviewUrl({
+async function resolveInvoiceReviewUrl({
   contactId,
   clientEmail,
   siteUrl,

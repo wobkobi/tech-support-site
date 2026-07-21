@@ -4,12 +4,20 @@
  * @description Admin promo CRUD - form-on-top + table-below + overlap warning.
  */
 
-import type { PromoRow } from "@/app/admin/promos/page";
+import type { PromoRow } from "@/app/admin/(shell)/promos/page";
+import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
+import { StatusPill, type StatusTone } from "@/features/admin/components/ui/StatusPill";
+import { useToast } from "@/features/admin/components/ui/Toast";
 import { formatNZD } from "@/features/business/lib/business";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
 import type React from "react";
 import { useState } from "react";
+
+/** Shared classes for the promo form inputs. */
+const inputClass =
+  "rounded-lg border border-admin-border bg-admin-surface px-3 py-2 text-sm text-admin-text focus:ring-2 focus:ring-russian-violet/30 focus:outline-none";
 
 type PromoType = "flat" | "percent";
 
@@ -112,6 +120,33 @@ function getStatus(p: PromoRow, now: Date = new Date()): Status {
 }
 
 /**
+ * StatusPill tone for a promo lifecycle status.
+ * @param status - Lifecycle status.
+ * @returns The pill tone.
+ */
+function statusTone(status: Status): StatusTone {
+  switch (status) {
+    case "active":
+      return "success";
+    case "upcoming":
+      return "info";
+    case "expired":
+      return "neutral";
+    case "disabled":
+      return "warning";
+  }
+}
+
+/**
+ * Title-cases a status for display.
+ * @param status - Lifecycle status.
+ * @returns Capitalised label.
+ */
+function statusLabel(status: Status): string {
+  return status[0].toUpperCase() + status.slice(1);
+}
+
+/**
  * True when two promo date ranges overlap (half-open).
  * @param a - First promo.
  * @param b - Second promo.
@@ -161,6 +196,9 @@ export function PromosView({ initial }: Props): React.ReactElement {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
+  const [confirmDelete, setConfirmDelete] = useState<PromoRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const overlaps = findOverlaps(promos);
 
@@ -260,21 +298,31 @@ export function PromosView({ initial }: Props): React.ReactElement {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ isActive: !p.isActive }),
     });
-    if (!res.ok) return;
+    if (!res.ok) {
+      toast("Couldn't update the promo.", { tone: "error" });
+      return;
+    }
     const d = (await res.json()) as { ok: boolean; promo: PromoRow };
     setPromos((prev) => prev.map((x) => (x.id === p.id ? d.promo : x)));
   }
 
-  /**
-   * Confirm + delete a promo.
-   * @param p - Promo to delete.
-   */
-  async function deletePromo(p: PromoRow): Promise<void> {
-    if (!confirm(`Delete promo "${p.title}"? Past invoices keep their snapshot.`)) return;
-    const res = await fetch(`/api/business/promos/${p.id}`, { method: "DELETE" });
-    if (!res.ok) return;
-    setPromos((prev) => prev.filter((x) => x.id !== p.id));
-    if (editingId === p.id) resetForm();
+  /** Deletes the promo held in the confirm dialog. Past invoices keep their snapshot. */
+  async function deletePromo(): Promise<void> {
+    const p = confirmDelete;
+    if (!p) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/business/promos/${p.id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("delete failed");
+      setPromos((prev) => prev.filter((x) => x.id !== p.id));
+      if (editingId === p.id) resetForm();
+      setConfirmDelete(null);
+      toast("Promo deleted.", { tone: "success" });
+    } catch {
+      toast("Couldn't delete the promo.", { tone: "error" });
+    } finally {
+      setDeleting(false);
+    }
   }
 
   return (
@@ -282,7 +330,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
       {/* Inline form */}
       <form
         onSubmit={(e) => void handleSubmit(e)}
-        className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
+        className="space-y-3 rounded-xl border border-admin-border bg-admin-surface p-5 shadow-sm"
       >
         <h2 className="text-sm font-semibold text-russian-violet">
           {editingId ? "Edit promo" : "New promo"}
@@ -290,61 +338,61 @@ export function PromosView({ initial }: Props): React.ReactElement {
 
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-slate-600">Title</span>
+            <span className="text-xs font-medium text-admin-muted">Title</span>
             <input
               type="text"
               required
               value={form.title}
               onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
               placeholder="e.g. Soft launch"
-              className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+              className={inputClass}
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-slate-600">Description (optional)</span>
+            <span className="text-xs font-medium text-admin-muted">Description (optional)</span>
             <input
               type="text"
               value={form.description}
               onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
               placeholder="Shown on the pricing page"
-              className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+              className={inputClass}
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-slate-600">Starts</span>
+            <span className="text-xs font-medium text-admin-muted">Starts</span>
             <input
               type="date"
               required
               value={form.startDate}
               onChange={(e) => setForm((p) => ({ ...p, startDate: e.target.value }))}
-              className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+              className={inputClass}
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-slate-600">Ends (inclusive)</span>
+            <span className="text-xs font-medium text-admin-muted">Ends (inclusive)</span>
             <input
               type="date"
               required
               value={form.endDate}
               onChange={(e) => setForm((p) => ({ ...p, endDate: e.target.value }))}
-              className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+              className={inputClass}
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-slate-600">Type</span>
+            <span className="text-xs font-medium text-admin-muted">Type</span>
             <select
               value={form.type}
               onChange={(e) =>
                 setForm((p) => ({ ...p, type: e.target.value as PromoType, amount: "" }))
               }
-              className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+              className={inputClass}
             >
               <option value="flat">Flat $/hr</option>
               <option value="percent">% discount</option>
             </select>
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-slate-600">
+            <span className="text-xs font-medium text-admin-muted">
               {form.type === "flat" ? "Amount ($/hr)" : "Discount (%)"}
             </span>
             <input
@@ -356,12 +404,12 @@ export function PromosView({ initial }: Props): React.ReactElement {
               value={form.amount}
               onChange={(e) => setForm((p) => ({ ...p, amount: e.target.value }))}
               placeholder={form.type === "flat" ? "50" : "20"}
-              className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+              className={inputClass}
             />
           </label>
         </div>
 
-        <label className="flex items-center gap-2 text-sm text-slate-600">
+        <label className="flex items-center gap-2 text-sm text-admin-muted">
           <input
             type="checkbox"
             checked={form.isActive}
@@ -371,24 +419,20 @@ export function PromosView({ initial }: Props): React.ReactElement {
           Active (uncheck to keep the promo on file but pause it)
         </label>
 
-        {error && <p className="rounded bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>}
+        {error && (
+          <p className="rounded bg-coquelicot-500/10 px-3 py-2 text-xs text-coquelicot-500">
+            {error}
+          </p>
+        )}
 
         <div className="flex gap-2">
-          <button
-            type="submit"
-            disabled={busy}
-            className="rounded-lg bg-russian-violet px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
-          >
-            {busy ? "Saving..." : editingId ? "Update promo" : "Create promo"}
-          </button>
+          <AdminButton type="submit" busy={busy}>
+            {editingId ? "Update promo" : "Create promo"}
+          </AdminButton>
           {editingId && (
-            <button
-              type="button"
-              onClick={resetForm}
-              className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
+            <AdminButton type="button" variant="secondary" onClick={resetForm}>
               Cancel
-            </button>
+            </AdminButton>
           )}
         </div>
       </form>
@@ -404,16 +448,16 @@ export function PromosView({ initial }: Props): React.ReactElement {
 
       {/* Promo list */}
       {promos.length === 0 ? (
-        <p className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-400">
+        <p className="rounded-xl border border-admin-border bg-admin-surface p-6 text-sm text-admin-faint">
           No promos yet. Create one above to surface an offer in the site banner, pricing wizard,
           and admin calculator.
         </p>
       ) : (
         <>
           {/* Desktop: table */}
-          <div className="hidden overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm sm:block">
+          <div className="hidden overflow-hidden rounded-xl border border-admin-border bg-admin-surface shadow-sm sm:block">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-xs text-slate-500 uppercase">
+              <thead className="bg-admin-bg text-xs text-admin-muted uppercase">
                 <tr>
                   <th className="px-4 py-2 text-left">Title</th>
                   <th className="px-4 py-2 text-left">Period</th>
@@ -422,21 +466,23 @@ export function PromosView({ initial }: Props): React.ReactElement {
                   <th className="px-4 py-2 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-admin-border">
                 {promos.map((p) => {
                   const status = getStatus(p);
                   const overlapping = overlaps.has(p.id);
                   return (
                     <tr key={p.id} className={cn(overlapping && "bg-amber-50/50")}>
                       <td className="px-4 py-3">
-                        <p className="font-medium text-slate-700">{p.title}</p>
-                        {p.description && <p className="text-xs text-slate-400">{p.description}</p>}
+                        <p className="font-medium text-admin-text">{p.title}</p>
+                        {p.description && (
+                          <p className="text-xs text-admin-faint">{p.description}</p>
+                        )}
                       </td>
-                      <td className="px-4 py-3 text-xs text-slate-500">
+                      <td className="px-4 py-3 text-xs text-admin-muted">
                         {formatDateShort(p.startAt)} -{" "}
                         {formatDateShort(endIsoToInclusiveDate(p.endAt))}
                       </td>
-                      <td className="px-4 py-3 text-xs text-slate-700">
+                      <td className="px-4 py-3 text-xs text-admin-text">
                         {p.flatHourlyRate !== null
                           ? `${formatNZD(p.flatHourlyRate)}/hr`
                           : p.percentDiscount !== null
@@ -444,35 +490,25 @@ export function PromosView({ initial }: Props): React.ReactElement {
                             : "-"}
                       </td>
                       <td className="px-4 py-3">
-                        <span
-                          className={cn(
-                            "rounded-full px-2 py-0.5 text-xs font-semibold",
-                            status === "active" && "bg-green-500/15 text-green-700",
-                            status === "upcoming" && "bg-blue-500/15 text-blue-700",
-                            status === "expired" && "bg-slate-200 text-slate-500",
-                            status === "disabled" && "bg-amber-500/15 text-amber-700",
-                          )}
-                        >
-                          {status[0].toUpperCase() + status.slice(1)}
-                        </span>
+                        <StatusPill tone={statusTone(status)}>{statusLabel(status)}</StatusPill>
                       </td>
                       <td className="px-4 py-3 text-right text-xs">
                         <div className="flex justify-end gap-3">
                           <button
                             onClick={() => void toggleActive(p)}
-                            className="text-slate-500 hover:text-slate-700"
+                            className="text-admin-muted hover:text-admin-text"
                           >
                             {p.isActive ? "Disable" : "Enable"}
                           </button>
                           <button
                             onClick={() => startEdit(p)}
-                            className="text-slate-500 hover:text-slate-700"
+                            className="text-admin-muted hover:text-admin-text"
                           >
                             Edit
                           </button>
                           <button
-                            onClick={() => void deletePromo(p)}
-                            className="text-red-500 hover:text-red-700"
+                            onClick={() => setConfirmDelete(p)}
+                            className="text-coquelicot-500 hover:text-coquelicot-600"
                           >
                             Delete
                           </button>
@@ -494,38 +530,30 @@ export function PromosView({ initial }: Props): React.ReactElement {
                 <div
                   key={p.id}
                   className={cn(
-                    "rounded-xl border border-slate-200 bg-white p-4 shadow-sm",
+                    "rounded-xl border border-admin-border bg-admin-surface p-4 shadow-sm",
                     overlapping && "border-amber-300 bg-amber-50/40",
                   )}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
-                      <p className="text-base font-semibold text-slate-700">{p.title}</p>
+                      <p className="text-base font-semibold text-admin-text">{p.title}</p>
                       {p.description && (
-                        <p className="mt-0.5 text-sm text-slate-500">{p.description}</p>
+                        <p className="mt-0.5 text-sm text-admin-muted">{p.description}</p>
                       )}
                     </div>
-                    <span
-                      className={cn(
-                        "shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold",
-                        status === "active" && "bg-green-500/15 text-green-700",
-                        status === "upcoming" && "bg-blue-500/15 text-blue-700",
-                        status === "expired" && "bg-slate-200 text-slate-500",
-                        status === "disabled" && "bg-amber-500/15 text-amber-700",
-                      )}
-                    >
-                      {status[0].toUpperCase() + status.slice(1)}
-                    </span>
+                    <StatusPill tone={statusTone(status)} className="shrink-0">
+                      {statusLabel(status)}
+                    </StatusPill>
                   </div>
 
                   <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-                    <dt className="text-slate-400">Period</dt>
-                    <dd className="text-slate-700">
+                    <dt className="text-admin-faint">Period</dt>
+                    <dd className="text-admin-text">
                       {formatDateShort(p.startAt)} -{" "}
                       {formatDateShort(endIsoToInclusiveDate(p.endAt))}
                     </dd>
-                    <dt className="text-slate-400">Type</dt>
-                    <dd className="text-slate-700">
+                    <dt className="text-admin-faint">Type</dt>
+                    <dd className="text-admin-text">
                       {p.flatHourlyRate !== null
                         ? `${formatNZD(p.flatHourlyRate)}/hr`
                         : p.percentDiscount !== null
@@ -535,24 +563,15 @@ export function PromosView({ initial }: Props): React.ReactElement {
                   </dl>
 
                   <div className="mt-4 flex flex-wrap gap-2">
-                    <button
-                      onClick={() => void toggleActive(p)}
-                      className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                    >
+                    <AdminButton variant="secondary" onClick={() => void toggleActive(p)}>
                       {p.isActive ? "Disable" : "Enable"}
-                    </button>
-                    <button
-                      onClick={() => startEdit(p)}
-                      className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                    >
+                    </AdminButton>
+                    <AdminButton variant="secondary" onClick={() => startEdit(p)}>
                       Edit
-                    </button>
-                    <button
-                      onClick={() => void deletePromo(p)}
-                      className="rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
-                    >
+                    </AdminButton>
+                    <AdminButton variant="danger" onClick={() => setConfirmDelete(p)}>
                       Delete
-                    </button>
+                    </AdminButton>
                   </div>
                 </div>
               );
@@ -560,6 +579,21 @@ export function PromosView({ initial }: Props): React.ReactElement {
           </div>
         </>
       )}
+
+      <ConfirmDialog
+        open={confirmDelete !== null}
+        title="Delete this promo?"
+        body={
+          confirmDelete
+            ? `"${confirmDelete.title}" is removed everywhere it shows. Past invoices keep their snapshot.`
+            : undefined
+        }
+        confirmLabel="Delete"
+        tone="danger"
+        busy={deleting}
+        onConfirm={() => void deletePromo()}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   );
 }

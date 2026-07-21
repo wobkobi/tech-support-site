@@ -70,24 +70,34 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     // Only query emails that are actually in this batch to avoid full-table scans.
     // Soft-deleted contacts don't count as "already emailed".
     const batchEmails = bookingsToEmail.map((b) => b.email);
-    const [alreadyEmailedBookings, alreadyEmailedContacts] = await Promise.all([
-      batchEmails.length > 0
-        ? prisma.booking.findMany({
-            where: { reviewSentAt: { not: null }, email: { in: batchEmails } },
-            select: { email: true },
-          })
-        : Promise.resolve([] as { email: string }[]),
-      batchEmails.length > 0
-        ? prisma.contact.findMany({
-            where: {
-              reviewLinkSentAt: { not: null },
-              deletedAt: null,
-              OR: [{ email: { in: batchEmails } }, { altEmails: { hasSome: batchEmails } }],
-            },
-            select: { email: true, altEmails: true },
-          })
-        : Promise.resolve([] as { email: string | null; altEmails: string[] }[]),
-    ]);
+    const [alreadyEmailedBookings, alreadyEmailedContacts, alreadyLinkedInvoices] =
+      await Promise.all([
+        batchEmails.length > 0
+          ? prisma.booking.findMany({
+              where: { reviewSentAt: { not: null }, email: { in: batchEmails } },
+              select: { email: true },
+            })
+          : Promise.resolve([] as { email: string }[]),
+        batchEmails.length > 0
+          ? prisma.contact.findMany({
+              where: {
+                reviewLinkSentAt: { not: null },
+                deletedAt: null,
+                OR: [{ email: { in: batchEmails } }, { altEmails: { hasSome: batchEmails } }],
+              },
+              select: { email: true, altEmails: true },
+            })
+          : Promise.resolve([] as { email: string | null; altEmails: string[] }[]),
+        // An invoice that already carried a review link suppresses the cron for
+        // that customer, mirroring the three-source check in getInvoiceReviewEligibility
+        // so an invoice-then-cron order can't double-ask.
+        batchEmails.length > 0
+          ? prisma.invoice.findMany({
+              where: { reviewLinkSentAt: { not: null }, clientEmail: { in: batchEmails } },
+              select: { clientEmail: true },
+            })
+          : Promise.resolve([] as { clientEmail: string | null }[]),
+      ]);
     // A contact who was sent a link suppresses any batch booking under its
     // primary OR alt emails, so a two-email person isn't asked twice.
     const batchEmailSet = new Set(batchEmails.map((e) => e.toLowerCase()));
@@ -99,6 +109,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           .map((e) => e.toLowerCase())
           .filter((e) => batchEmailSet.has(e)),
       ),
+      ...alreadyLinkedInvoices
+        .map((i) => i.clientEmail?.toLowerCase())
+        .filter((e): e is string => !!e),
     ]);
 
     // Within-batch dedup: only send once per email if multiple bookings for same person
@@ -155,7 +168,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       } catch (error) {
         console.error(`[review-email] Failed for booking ${booking.id}:`, error);
         results.failed++;
-        results.errors.push(`Booking ${booking.id}: ${error}`);
+        results.errors.push(`Booking ${booking.id}: ${String(error)}`);
       }
     }
 

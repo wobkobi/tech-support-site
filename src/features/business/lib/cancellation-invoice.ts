@@ -7,28 +7,37 @@
  */
 
 import { calcInvoiceTotals } from "@/features/business/lib/business";
-import { uploadInvoicePdf } from "@/features/business/lib/google-drive";
+import { syncInvoicePdfToDrive } from "@/features/business/lib/invoice-drive-sync";
 import {
   getNextInvoiceNumber,
   writeBackInvoiceCounter,
 } from "@/features/business/lib/invoice-numbering";
-import { extractYearCode, generateInvoicePdf } from "@/features/business/lib/invoice-pdf";
-import { calcTravelCharge, FALLBACK_TRAVEL_RATE } from "@/features/business/lib/pricing-policy";
+import { generateInvoicePdf, serializeInvoice } from "@/features/business/lib/invoice-pdf";
+import {
+  assessCancellation,
+  calcTravelCharge,
+  cancellationFeeLabel,
+  cancellationNotes,
+  FALLBACK_TRAVEL_RATE,
+  type CancellationReason,
+} from "@/features/business/lib/pricing-policy";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { lookupDriveRoundTrip } from "@/features/business/lib/travel-distance";
 import type { LineItem } from "@/features/business/types/business";
 import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-create";
 import { sendInvoiceEmail } from "@/features/reviews/lib/email";
 import { getIdentity } from "@/shared/lib/business-identity.server";
-import { formatDateShort } from "@/shared/lib/date-format";
 import { prisma } from "@/shared/lib/prisma";
 import type { Booking, Invoice } from "@prisma/client";
 
 export interface DraftCancellationInvoiceOptions {
-  /** True when the cancel lands inside CANCELLATION.travelChargeHours and round-trip travel should be billed. */
-  includeTravel: boolean;
+  /**
+   * When the client called it off. Defaults to the booking's stamped
+   * cancelledAt, then to now. The policy measures notice from this.
+   */
+  cancelledAt?: Date;
   /** Hint shown in the auto-draft's customer-facing notes (e.g. "Late cancellation" / "No-show"). */
-  reason?: "late-cancellation" | "no-show";
+  reason?: CancellationReason;
   /** When true, email the invoice and flip it to SENT instead of leaving it DRAFT. Best-effort: a send failure leaves the draft intact. */
   autoSend?: boolean;
 }
@@ -47,21 +56,37 @@ export async function createDraftCancellationInvoice(
 ): Promise<void> {
   const reason = options.reason ?? "late-cancellation";
   const { CANCELLATION, GST_REGISTERED, MIN_TRAVEL_CHARGE } = await getPolicy();
-  const headline =
-    reason === "no-show"
-      ? `No-show fee - ${formatDateShort(booking.startAt)}`
-      : `Late cancellation fee - ${formatDateShort(booking.startAt)}`;
+  // The policy reads the tier off the booking itself. In-person and remote are
+  // priced separately, so taking the tier from a caller flag would just be a
+  // chance for the two paths to drift.
+  const charge = assessCancellation(
+    booking.startAt,
+    options.cancelledAt ?? booking.cancelledAt ?? new Date(),
+    {
+      reason,
+      meetingType: booking.meetingType === "remote" ? "remote" : "in-person",
+      policy: CANCELLATION,
+    },
+  );
 
+  // Enough notice to be free. Callers gate on this too, but a draft for $0 is
+  // never right, so refuse it here rather than trust every caller.
+  if (charge.fee <= 0) {
+    console.log(`[cancellation-invoice] No fee applies for booking ${booking.id}; no draft.`);
+    return;
+  }
+
+  const headline = cancellationFeeLabel(reason, booking.startAt);
   const lineItems: LineItem[] = [
     {
       description: headline,
       qty: 1,
-      unitPrice: CANCELLATION.callOutFee,
-      lineTotal: CANCELLATION.callOutFee,
+      unitPrice: charge.fee,
+      lineTotal: charge.fee,
     },
   ];
 
-  if (options.includeTravel) {
+  if (charge.travelApplies) {
     let travelMins = booking.travelMinsAtBooking ?? 0;
     // Legacy rows missing the back-leg snapshot fall back to the outbound figure.
     let travelMinsBack = booking.travelMinsBackAtBooking ?? 0;
@@ -126,10 +151,7 @@ export async function createDraftCancellationInvoice(
     console.warn("[cancellation-invoice] contact link failed:", err);
   }
 
-  const customerNotes =
-    reason === "no-show"
-      ? `Charge for missing the appointment originally booked for ${formatDateShort(booking.startAt)}.`
-      : `Late cancellation fee for the appointment originally booked for ${formatDateShort(booking.startAt)}.`;
+  const customerNotes = cancellationNotes(reason, booking.startAt);
 
   const invoice = await prisma.invoice.create({
     data: {
@@ -148,6 +170,9 @@ export async function createDraftCancellationInvoice(
       status: "DRAFT",
       notes: customerNotes,
       contactId,
+      // Link the auto-draft to the booking it bills so the booking detail page
+      // (Phase 9) can surface it. Legacy cancellation invoices stay unlinked.
+      bookingId: booking.id,
     },
   });
   console.log(
@@ -173,7 +198,7 @@ export async function createDraftCancellationInvoice(
  */
 async function sendCancellationInvoice(
   invoice: Invoice,
-  reason: "late-cancellation" | "no-show",
+  reason: CancellationReason,
 ): Promise<void> {
   if (!invoice.clientEmail) {
     console.warn(`[cancellation-invoice] No client email on ${invoice.number}; left as draft.`);
@@ -186,13 +211,7 @@ async function sendCancellationInvoice(
       : `This invoice covers the late-cancellation fee for the appointment you cancelled inside the notice window. Please see the attached PDF for the details.`;
 
   try {
-    const pdfBytes = await generateInvoicePdf({
-      ...invoice,
-      issueDate: invoice.issueDate.toISOString(),
-      dueDate: invoice.dueDate.toISOString(),
-      createdAt: invoice.createdAt.toISOString(),
-      updatedAt: invoice.updatedAt.toISOString(),
-    });
+    const pdfBytes = await generateInvoicePdf(serializeInvoice(invoice));
 
     const ok = await sendInvoiceEmail({
       invoice: {
@@ -219,24 +238,7 @@ async function sendCancellationInvoice(
     console.log(`[cancellation-invoice] Auto-sent ${invoice.number}.`);
 
     // Sync the sent PDF to Drive so the archive matches what the client got.
-    // Drive failure is non-fatal - the email already went out.
-    try {
-      const yearCode = extractYearCode(invoice.number);
-      const drive = await uploadInvoicePdf(
-        pdfBytes,
-        invoice.number,
-        yearCode,
-        invoice.driveFileId ?? undefined,
-      );
-      if (drive.fileId !== invoice.driveFileId || drive.webUrl !== invoice.driveWebUrl) {
-        await prisma.invoice.update({
-          where: { id: invoice.id },
-          data: { driveFileId: drive.fileId, driveWebUrl: drive.webUrl },
-        });
-      }
-    } catch (err) {
-      console.error(`[cancellation-invoice] Drive sync failed for ${invoice.number}:`, err);
-    }
+    await syncInvoicePdfToDrive(invoice, pdfBytes, "[cancellation-invoice]");
   } catch (err) {
     console.error(`[cancellation-invoice] Auto-send failed for ${invoice.number}:`, err);
   }

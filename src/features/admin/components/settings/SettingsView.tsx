@@ -14,7 +14,6 @@ import type {
   AvailabilitySettings,
   CommsSettings,
   EstimatorSettings,
-  HoldsSettings,
   IdentitySettings,
   PricingSettings,
   ReviewsSettings,
@@ -32,7 +31,7 @@ import { useEffect, useState } from "react";
  * @returns Loading placeholder element.
  */
 function TabLoading(): React.ReactElement {
-  return <p className="py-8 text-center text-sm text-slate-400">Loading…</p>;
+  return <p className="py-8 text-center text-sm text-admin-faint">Loading…</p>;
 }
 
 // Tab editors load on demand: only the active tab's chunk ships, instead of
@@ -48,10 +47,6 @@ const CommsTab = dynamic(
 );
 const EstimatorTab = dynamic(
   () => import("@/features/admin/components/settings/EstimatorTab").then((m) => m.EstimatorTab),
-  { loading: TabLoading },
-);
-const HoldsTab = dynamic(
-  () => import("@/features/admin/components/settings/HoldsTab").then((m) => m.HoldsTab),
   { loading: TabLoading },
 );
 const IdentityTab = dynamic(
@@ -83,7 +78,6 @@ const TAB_ORDER: SettingsGroup[] = [
   "identity",
   "tax",
   "comms",
-  "holds",
   "scheduling",
   "reviews",
 ];
@@ -97,7 +91,6 @@ const IMPLEMENTED: ReadonlySet<SettingsGroup> = new Set<SettingsGroup>([
   "tax",
   "comms",
   "reviews",
-  "holds",
   "scheduling",
 ]);
 
@@ -112,8 +105,6 @@ interface Props {
   commsDefaults: CommsSettings;
   reviews: ReviewsSettings;
   reviewsDefaults: ReviewsSettings;
-  holds: HoldsSettings;
-  holdsDefaults: HoldsSettings;
   identity: IdentitySettings;
   identityDefaults: IdentitySettings;
   tax: TaxSettings;
@@ -135,8 +126,6 @@ interface Props {
  * @param props.commsDefaults - Code default comms settings.
  * @param props.reviews - Resolved current reviews settings.
  * @param props.reviewsDefaults - Code default reviews settings.
- * @param props.holds - Resolved current holds settings.
- * @param props.holdsDefaults - Code default holds settings.
  * @param props.identity - Resolved current identity settings.
  * @param props.identityDefaults - Code default identity settings.
  * @param props.tax - Resolved current tax settings.
@@ -156,8 +145,6 @@ export function SettingsView({
   commsDefaults,
   reviews,
   reviewsDefaults,
-  holds,
-  holdsDefaults,
   identity,
   identityDefaults,
   tax,
@@ -180,15 +167,20 @@ export function SettingsView({
   };
 
   // After a search jump, scroll the target field into view + focus it once the
-  // (possibly just-switched) tab has rendered. Field id === meta key for most
-  // fields; nested keys gracefully fall back to just the tab switch.
+  // (possibly just-switched) tab has rendered. Search indexes the meta key, but
+  // a tab renders a nested key's field under its last segment alone (the group
+  // prefix is implied by the tab it lives in), so "cancellation.callOutFee"
+  // has to also look for "callOutFee" or every nested field would only ever
+  // switch tabs without scrolling.
   useEffect(() => {
     if (!focusTarget) return;
     const t = setTimeout(() => {
-      const el = document.getElementById(focusTarget.id);
+      const short = focusTarget.id.split(".").pop() ?? focusTarget.id;
+      const el = document.getElementById(focusTarget.id) ?? document.getElementById(short) ?? null;
       if (el) {
-        el.scrollIntoView({ block: "center", behavior: "smooth" });
-        el.focus();
+        const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        el.scrollIntoView({ block: "center", behavior: prefersReduced ? "auto" : "smooth" });
+        el.focus({ preventScroll: true });
       }
     }, 60);
     return () => clearTimeout(t);
@@ -201,7 +193,6 @@ export function SettingsView({
     estimator,
     comms,
     reviews,
-    holds,
     identity,
     tax,
     scheduling,
@@ -213,7 +204,7 @@ export function SettingsView({
         <SettingsSearch onJump={handleJump} />
 
         {/* Tab bar - horizontally scrollable on phones. */}
-        <div className="mb-6 flex gap-1 overflow-x-auto border-b border-slate-200">
+        <div className="mb-6 flex gap-1 overflow-x-auto border-b border-admin-border">
           {TAB_ORDER.map((group) => {
             const isActive = group === active;
             const ready = IMPLEMENTED.has(group);
@@ -226,8 +217,8 @@ export function SettingsView({
                   "border-b-2 px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors",
                   isActive
                     ? "border-russian-violet text-russian-violet"
-                    : "border-transparent text-slate-500 hover:text-slate-700",
-                  !ready && "text-slate-400 italic",
+                    : "border-transparent text-admin-muted hover:text-admin-text",
+                  !ready && "text-admin-faint italic",
                 )}
               >
                 {GROUP_META[group].title}
@@ -236,9 +227,9 @@ export function SettingsView({
           })}
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+        <div className="rounded-xl border border-admin-border bg-admin-surface p-5 shadow-sm sm:p-6">
           <h2 className="text-lg font-bold text-russian-violet">{meta.title}</h2>
-          <p className="mt-1 text-sm text-slate-500">{meta.blurb}</p>
+          <p className="mt-1 text-sm text-admin-muted">{meta.blurb}</p>
           <div className="mt-4">
             {active === "availability" ? (
               <AvailabilityTab initial={availability} defaults={availabilityDefaults} />
@@ -252,14 +243,12 @@ export function SettingsView({
               <CommsTab initial={comms} defaults={commsDefaults} />
             ) : active === "reviews" ? (
               <ReviewsTab initial={reviews} defaults={reviewsDefaults} />
-            ) : active === "holds" ? (
-              <HoldsTab initial={holds} defaults={holdsDefaults} />
             ) : active === "tax" ? (
               <TaxTab initial={tax} defaults={taxDefaults} />
             ) : active === "scheduling" ? (
               <SchedulingTab initial={scheduling} defaults={schedulingDefaults} />
             ) : (
-              <p className="py-8 text-center text-sm text-slate-400">
+              <p className="py-8 text-center text-sm text-admin-faint">
                 This section is still managed in code - its editor is coming in a later step.
               </p>
             )}

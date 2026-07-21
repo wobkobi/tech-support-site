@@ -15,11 +15,12 @@ import {
   ToggleField,
 } from "@/features/admin/components/settings/SettingsFields";
 import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
+import { SettingsSaveBar } from "@/features/admin/components/settings/SettingsSaveBar";
 import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
 import { hourLabel } from "@/features/booking/lib/booking";
 import { cn } from "@/shared/lib/cn";
 import { AVAILABILITY_FIELD_META } from "@/shared/lib/settings/field-meta";
-import type { AvailabilitySettings, DayWindow } from "@/shared/lib/settings/types";
+import type { AvailabilitySettings, DayWindow, MorningGuard } from "@/shared/lib/settings/types";
 import type React from "react";
 
 interface Props {
@@ -74,7 +75,7 @@ function HourSelect({ value, onChange, from, to, close }: HourSelectProps): Reac
     <select
       value={value}
       onChange={(e) => onChange(Number(e.target.value))}
-      className="rounded-lg border border-slate-300 px-2 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+      className="rounded-lg border border-admin-border-strong px-2 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
     >
       {opts.map((h) => (
         <option key={h} value={h}>
@@ -117,10 +118,63 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
   const setTop = (patch: Partial<AvailabilitySettings>): void =>
     setDraft((p) => ({ ...p, ...patch }));
 
+  /**
+   * Patches one morning-guard rule in the draft.
+   * @param index - The rule's position in the list.
+   * @param patch - Partial rule fields to merge.
+   * @returns void
+   */
+  const setGuard = (index: number, patch: Partial<MorningGuard>): void =>
+    setDraft((p) => ({
+      ...p,
+      morningGuards: p.morningGuards.map((g, i) => (i === index ? { ...g, ...patch } : g)),
+    }));
+
+  /**
+   * Appends a new guard, defaulting to the weekend lie-in shape.
+   * @returns void
+   */
+  const addGuard = (): void =>
+    setDraft((p) => ({
+      ...p,
+      morningGuards: [
+        ...p.morningGuards,
+        {
+          enabled: true,
+          label: "New guard",
+          triggerDay: 5,
+          triggerHour: 18,
+          protectedDays: [6],
+          earliestHour: 12,
+        },
+      ],
+    }));
+
+  /**
+   * Removes the guard at the given index.
+   * @param index - The rule's position in the list.
+   * @returns void
+   */
+  const removeGuard = (index: number): void =>
+    setDraft((p) => ({ ...p, morningGuards: p.morningGuards.filter((_, i) => i !== index) }));
+
+  /**
+   * Toggles a protected day on/off for one guard.
+   * @param index - The rule's position in the list.
+   * @param dayIndex - The weekday's `getUTCDay()` index.
+   * @returns void
+   */
+  const toggleProtectedDay = (index: number, dayIndex: number): void =>
+    setGuard(index, {
+      protectedDays: draft.morningGuards[index].protectedDays.includes(dayIndex)
+        ? draft.morningGuards[index].protectedDays.filter((d) => d !== dayIndex)
+        : [...draft.morningGuards[index].protectedDays, dayIndex].sort((a, b) => a - b),
+    });
+
   return (
     <div>
       {/* Master switch + paused message */}
-      <div className="divide-y divide-slate-100">
+      <div className="divide-y divide-admin-border">
         <ToggleField
           id="acceptingBookings"
           meta={m.acceptingBookings}
@@ -138,7 +192,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
             value={draft.closedMessage}
             rows={2}
             onChange={(e) => setTop({ closedMessage: e.target.value })}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-base focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+            className="w-full rounded-lg border border-admin-border-strong px-3 py-2 text-base focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
           />
         </FieldShell>
       </div>
@@ -147,7 +201,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
       <h3 className="mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase">
         Weekly hours
       </h3>
-      <p className="mt-1 text-sm text-slate-500">
+      <p className="mt-1 text-sm text-admin-muted">
         Set the hours you take bookings each day. Turn a day off, or add a midday break that splits
         it into two windows.
       </p>
@@ -155,9 +209,9 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
         {DAY_ORDER.map(({ index, name }) => {
           const d = draft.schedule[index];
           return (
-            <div key={index} className="rounded-lg border border-slate-200 p-3">
+            <div key={index} className="rounded-lg border border-admin-border p-3">
               <div className="flex flex-wrap items-center gap-3">
-                <span className="w-24 text-sm font-semibold text-slate-700">{name}</span>
+                <span className="w-24 text-sm font-semibold text-admin-text">{name}</span>
                 <button
                   type="button"
                   role="switch"
@@ -165,18 +219,18 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
                   onClick={() => setDay(index, { enabled: !d.enabled })}
                   className={cn(
                     "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
-                    d.enabled ? "bg-russian-violet" : "bg-slate-300",
+                    d.enabled ? "bg-russian-violet" : "bg-admin-border-strong",
                   )}
                 >
                   <span
                     className={cn(
-                      "inline-block h-4 w-4 rounded-full bg-white shadow transition-[translate]",
+                      "inline-block h-4 w-4 rounded-full bg-admin-surface shadow transition-[translate]",
                       d.enabled ? "translate-x-6" : "translate-x-1",
                     )}
                   />
                 </button>
                 {d.enabled ? (
-                  <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+                  <div className="flex flex-wrap items-center gap-2 text-sm text-admin-text-secondary">
                     <HourSelect
                       value={d.open}
                       from={0}
@@ -227,7 +281,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
                     )}
                   </div>
                 ) : (
-                  <span className="text-sm text-slate-400 italic">Day off</span>
+                  <span className="text-sm text-admin-faint italic">Day off</span>
                 )}
               </div>
             </div>
@@ -239,7 +293,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
       <h3 className="mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase">
         Booking rules
       </h3>
-      <div className="divide-y divide-slate-100">
+      <div className="divide-y divide-admin-border">
         <NumberField
           id="maxAdvanceDays"
           meta={m.maxAdvanceDays}
@@ -259,22 +313,34 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
           customised={draft.minHoursNotice !== defaults.minHoursNotice}
           onChange={(v) => setTop({ minHoursNotice: v ?? 0 })}
         />
-        <NumberField
+        <FieldShell
           id="sameDayCutoffHour"
           meta={m.sameDayCutoffHour}
-          value={draft.sameDayCutoffHour}
-          nullable
-          min={0}
-          max={23}
           error={fieldErrors.sameDayCutoffHour}
           customised={draft.sameDayCutoffHour !== defaults.sameDayCutoffHour}
-          onChange={(v) => setTop({ sameDayCutoffHour: v })}
-        />
+        >
+          <select
+            id="sameDayCutoffHour"
+            value={draft.sameDayCutoffHour ?? ""}
+            onChange={(e) =>
+              setTop({ sameDayCutoffHour: e.target.value === "" ? null : Number(e.target.value) })
+            }
+            className="rounded-lg border border-admin-border-strong px-2 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+          >
+            <option value="">No cutoff</option>
+            {Array.from({ length: 24 }, (_, h) => (
+              <option key={h} value={h}>
+                {hourLabel(h)}
+              </option>
+            ))}
+          </select>
+        </FieldShell>
         <NumberField
           id="bufferMin"
           meta={m.bufferMin}
           value={draft.bufferMin}
           min={0}
+          minutesHint
           error={fieldErrors.bufferMin}
           customised={draft.bufferMin !== defaults.bufferMin}
           onChange={(v) => setTop({ bufferMin: v ?? 0 })}
@@ -284,6 +350,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
           meta={m.bookingBufferAfterMin}
           value={draft.bookingBufferAfterMin}
           min={0}
+          minutesHint
           error={fieldErrors.bookingBufferAfterMin}
           customised={draft.bookingBufferAfterMin !== defaults.bookingBufferAfterMin}
           onChange={(v) => setTop({ bookingBufferAfterMin: v ?? 0 })}
@@ -294,12 +361,13 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
       <h3 className="mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase">
         Job lengths &amp; daily limits
       </h3>
-      <div className="divide-y divide-slate-100">
+      <div className="divide-y divide-admin-border">
         <NumberField
-          id="durationShort"
+          id="durations.short"
           meta={m["durations.short"]}
           value={draft.durations.short}
           min={5}
+          minutesHint
           error={fieldErrors["durations.short"]}
           customised={draft.durations.short !== defaults.durations.short}
           onChange={(v) =>
@@ -307,10 +375,11 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
           }
         />
         <NumberField
-          id="durationLong"
+          id="durations.long"
           meta={m["durations.long"]}
           value={draft.durations.long}
           min={5}
+          minutesHint
           error={fieldErrors["durations.long"]}
           customised={draft.durations.long !== defaults.durations.long}
           onChange={(v) => setDraft((p) => ({ ...p, durations: { ...p.durations, long: v ?? 5 } }))}
@@ -335,6 +404,112 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
           customised={draft.maxBillableHoursPerDay !== defaults.maxBillableHoursPerDay}
           onChange={(v) => setTop({ maxBillableHoursPerDay: v })}
         />
+      </div>
+
+      {/* Morning guards - protect early slots once the night-before arrives. */}
+      <h3 className="mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase">
+        Morning guards
+      </h3>
+      <p className="mt-1 text-sm text-admin-muted">
+        Protect early slots once the night before arrives - e.g. from Friday evening, block Saturday
+        and Sunday before noon. Slots stay bookable if reserved earlier in the week.
+      </p>
+      <div className="mt-3 space-y-2">
+        {draft.morningGuards.map((g, gi) => (
+          <div key={gi} className="rounded-lg border border-admin-border p-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={g.enabled}
+                onClick={() => setGuard(gi, { enabled: !g.enabled })}
+                className={cn(
+                  "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                  g.enabled ? "bg-russian-violet" : "bg-admin-border-strong",
+                )}
+              >
+                <span
+                  className={cn(
+                    "inline-block h-4 w-4 rounded-full bg-admin-surface shadow transition-[translate]",
+                    g.enabled ? "translate-x-6" : "translate-x-1",
+                  )}
+                />
+              </button>
+              <input
+                type="text"
+                value={g.label}
+                aria-label="Guard name"
+                onChange={(e) => setGuard(gi, { label: e.target.value })}
+                className="flex-1 rounded-lg border border-admin-border px-3 py-1.5 text-sm text-admin-text focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => removeGuard(gi)}
+                className="text-sm font-medium text-red-600 hover:underline"
+              >
+                Remove
+              </button>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-admin-text-secondary">
+              <span>From</span>
+              <select
+                value={g.triggerDay}
+                aria-label="Trigger day"
+                onChange={(e) => setGuard(gi, { triggerDay: Number(e.target.value) })}
+                className="rounded-lg border border-admin-border px-2 py-2 text-sm text-admin-text focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+              >
+                {DAY_ORDER.map((d) => (
+                  <option key={d.index} value={d.index}>
+                    {d.name}
+                  </option>
+                ))}
+              </select>
+              <span>at</span>
+              <HourSelect
+                value={g.triggerHour}
+                from={0}
+                to={23}
+                onChange={(h) => setGuard(gi, { triggerHour: h })}
+              />
+              <span>, block</span>
+              {DAY_ORDER.map((d) => (
+                <button
+                  key={d.index}
+                  type="button"
+                  aria-pressed={g.protectedDays.includes(d.index)}
+                  onClick={() => toggleProtectedDay(gi, d.index)}
+                  className={cn(
+                    "rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
+                    g.protectedDays.includes(d.index)
+                      ? "bg-russian-violet text-white"
+                      : "border border-admin-border text-admin-muted hover:border-russian-violet",
+                  )}
+                >
+                  {d.name.slice(0, 3)}
+                </button>
+              ))}
+              <span>before</span>
+              <HourSelect
+                value={g.earliestHour}
+                from={1}
+                to={23}
+                onChange={(h) => setGuard(gi, { earliestHour: h })}
+              />
+            </div>
+            {fieldErrors[`morningGuards.${gi}.protectedDays`] && (
+              <p className="mt-2 text-xs font-medium text-red-600">
+                {fieldErrors[`morningGuards.${gi}.protectedDays`]}
+              </p>
+            )}
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={addGuard}
+          className="rounded-lg border border-admin-border px-3 py-1.5 text-sm font-medium text-admin-text hover:border-russian-violet"
+        >
+          + Add guard
+        </button>
       </div>
 
       {/* Guardrail blocks */}
@@ -371,27 +546,13 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
         </div>
       )}
 
-      {/* Save bar */}
-      <div className="mt-6 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => void form.save()}
-          disabled={!dirty || saving}
-          className="rounded-lg bg-russian-violet px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
-        >
-          {saving ? "Saving..." : "Save changes"}
-        </button>
-        <button
-          type="button"
-          onClick={form.resetToDefault}
-          disabled={saving}
-          className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-        >
-          Reset to defaults
-        </button>
-        {dirty && !saving && <span className="text-sm text-slate-400">Unsaved changes</span>}
-        {!dirty && savedAt && <span className="text-sm font-medium text-emerald-600">Saved</span>}
-      </div>
+      <SettingsSaveBar
+        dirty={dirty}
+        saving={saving}
+        savedAt={savedAt}
+        onSave={() => void form.save()}
+        onReset={form.resetToDefault}
+      />
 
       <SettingsHistory group="availability" onRestore={(v: AvailabilitySettings) => setDraft(v)} />
     </div>

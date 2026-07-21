@@ -6,11 +6,7 @@
  * Sheet failures are logged and swallowed so DB recording is never blocked.
  */
 
-import {
-  appendRowWithSyncId,
-  buildCashbookCells,
-  resolveSheetIdForDate,
-} from "@/features/business/lib/sheets-sync";
+import { recordIncome } from "@/features/business/lib/income-recording";
 import { parseAmount } from "@/features/business/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
@@ -56,37 +52,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return errorResponse("Invalid amount", 400);
   }
 
-  const entryDate = new Date(date);
-  const entry = await prisma.incomeEntry.create({
-    data: {
-      date: entryDate,
-      customer,
-      description,
-      amount: safeAmount,
-      method,
-      notes: notes ?? null,
-      invoiceId: invoiceId ?? null,
-    },
+  const { entry, sheetRowKey } = await recordIncome({
+    date: new Date(date),
+    customer,
+    description,
+    amount: safeAmount,
+    method,
+    notes,
+    invoiceId,
   });
-
-  // Append to the per-FY Cashbook sheet. Synchronous so the row is guaranteed
-  // written before the response (Vercel can otherwise terminate the function
-  // before a fire-and-forget Promise resolves). Failures are logged and swallowed
-  // so a sheet outage never blocks income recording in the DB.
-  let sheetRowKey: string | null = null;
-  try {
-    const spreadsheetId = await resolveSheetIdForDate(entryDate);
-    if (!spreadsheetId) {
-      console.warn(
-        `[income] No sheet found for ${entryDate.toISOString()} - cron self-heal will append later`,
-      );
-    } else {
-      sheetRowKey = await appendRowWithSyncId(spreadsheetId, "Cashbook", buildCashbookCells(entry));
-      await prisma.incomeEntry.update({ where: { id: entry.id }, data: { sheetRowKey } });
-    }
-  } catch (err) {
-    console.error(`[income] Failed to append to sheet for entry ${entry.id}:`, err);
-  }
 
   return NextResponse.json({ ok: true, entry: { ...entry, sheetRowKey } }, { status: 201 });
 }

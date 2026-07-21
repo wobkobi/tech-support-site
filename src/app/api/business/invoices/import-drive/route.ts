@@ -191,7 +191,7 @@ function parseLegacyInvoiceText(text: string): ParsedInvoiceData {
     text.search(/From\s+To\s+The\s+Point/i),
   );
   const searchArea = fromIdx > 0 ? text.slice(0, fromIdx) : text;
-  const emailMatch = searchArea.match(/\b([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})\b/);
+  const emailMatch = searchArea.match(/\b([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\b/);
   if (emailMatch) {
     const e = emailMatch[1];
     if (!e.includes("tothepoint.co.nz") && e !== "client@example.com") clientEmail = e;

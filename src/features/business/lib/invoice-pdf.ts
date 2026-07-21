@@ -5,10 +5,12 @@
  * InvoicePreviewPanel; keep the two layouts in sync.
  */
 import { formatNZD } from "@/features/business/lib/business";
+import { isInvoiceOverdue } from "@/features/business/lib/invoice-status";
 import type { Invoice } from "@/features/business/types/business";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { formatDateShort } from "@/shared/lib/date-format";
 import type { IdentitySettings } from "@/shared/lib/settings/types";
+import type { Invoice as PrismaInvoice } from "@prisma/client";
 import { readFileSync } from "fs";
 import path from "path";
 import { degrees, PDFDocument, PDFFont, PDFPage, rgb, StandardFonts } from "pdf-lib";
@@ -105,16 +107,52 @@ function parseWordmarkPaths(): LogoPath[] {
 }
 
 /**
+ * Serialises a Prisma Invoice row (Date columns) into the string-dated
+ * {@link Invoice} DTO that {@link generateInvoicePdf} and the web renderers
+ * expect. Explicit field mapping (not a spread) so a new schema column can't
+ * silently leak in with the wrong shape, and so every Date is converted.
+ * @param inv - Prisma Invoice row.
+ * @returns The Invoice DTO with ISO-string dates.
+ */
+export function serializeInvoice(inv: PrismaInvoice): Invoice {
+  return {
+    id: inv.id,
+    number: inv.number,
+    clientName: inv.clientName,
+    clientEmail: inv.clientEmail,
+    issueDate: inv.issueDate.toISOString(),
+    dueDate: inv.dueDate.toISOString(),
+    lineItems: inv.lineItems,
+    gst: inv.gst,
+    subtotal: inv.subtotal,
+    gstAmount: inv.gstAmount,
+    total: inv.total,
+    promoTitle: inv.promoTitle,
+    promoDiscount: inv.promoDiscount,
+    unsuccessful: inv.unsuccessful,
+    unsuccessfulDiscount: inv.unsuccessfulDiscount,
+    status: inv.status,
+    notes: inv.notes,
+    contactId: inv.contactId,
+    sentAt: inv.sentAt?.toISOString() ?? null,
+    paidAt: inv.paidAt?.toISOString() ?? null,
+    paymentMethod: inv.paymentMethod,
+    paymentReference: inv.paymentReference,
+    driveFileId: inv.driveFileId,
+    driveWebUrl: inv.driveWebUrl,
+    createdAt: inv.createdAt.toISOString(),
+    updatedAt: inv.updatedAt.toISOString(),
+  };
+}
+
+/**
  * Draws the diagonal PAID / VOID / OVERDUE watermark. Painted first so subsequent
  * sections sit on top of it. No-op when the invoice is in a neutral state.
  * @param ctx - PDF drawing context.
  * @param invoice - Invoice being rendered.
  */
 function drawStatusWatermark(ctx: PdfCtx, invoice: Invoice): void {
-  const dueDate = new Date(invoice.dueDate);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const isOverdue = invoice.status === "SENT" && dueDate < today;
+  const isOverdue = isInvoiceOverdue(invoice);
   const text =
     invoice.status === "PAID"
       ? "PAID"

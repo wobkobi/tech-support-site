@@ -86,7 +86,7 @@ export function SettingsHistory<T>({ group, onRestore }: Props<T>): React.ReactE
   };
 
   return (
-    <div className="mt-6 border-t border-slate-100 pt-4">
+    <div className="mt-6 border-t border-admin-border pt-4">
       <button
         type="button"
         onClick={toggle}
@@ -97,21 +97,21 @@ export function SettingsHistory<T>({ group, onRestore }: Props<T>): React.ReactE
 
       {open && (
         <div className="mt-3">
-          {loading && <p className="text-sm text-slate-400">Loading...</p>}
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {loading && <p className="text-sm text-admin-faint">Loading...</p>}
+          {error && <p className="text-sm text-coquelicot-500">{error}</p>}
           {entries && entries.length === 0 && (
-            <p className="text-sm text-slate-400">No changes recorded yet.</p>
+            <p className="text-sm text-admin-faint">No changes recorded yet.</p>
           )}
           {entries && entries.length > 0 && (
-            <ul className="divide-y divide-slate-100">
+            <ul className="divide-y divide-admin-border">
               {entries.map((e, i) => (
                 <li key={e.id} className="flex items-center justify-between gap-3 py-2">
                   <div className="min-w-0">
-                    <p className="text-sm text-slate-700">
+                    <p className="text-sm text-admin-text">
                       {formatDateTimeLong(new Date(e.changedAt))}
-                      {i === 0 && <span className="text-slate-400"> - current</span>}
+                      {i === 0 && <span className="text-admin-faint"> - current</span>}
                     </p>
-                    <p className="truncate text-xs text-slate-500">
+                    <p className="truncate text-xs text-admin-muted">
                       {e.isInitial
                         ? "First saved"
                         : e.changedKeys.length > 0
@@ -123,7 +123,7 @@ export function SettingsHistory<T>({ group, onRestore }: Props<T>): React.ReactE
                     <button
                       type="button"
                       onClick={() => restore(e)}
-                      className="shrink-0 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                      className="shrink-0 rounded-lg border border-admin-border-strong bg-admin-surface px-3 py-1.5 text-xs font-medium text-admin-text-secondary hover:bg-admin-bg"
                     >
                       {restoredId === e.id ? "Loaded" : "Restore"}
                     </button>

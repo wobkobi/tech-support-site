@@ -10,6 +10,7 @@ import {
   BOOKING_FIELD_LIMITS,
   combineUnitAndAddress,
   splitUnitFromAddress,
+  unitMatchesStreetNumber,
   validateEmail,
   type BookableDay,
   type JobDuration,
@@ -21,8 +22,11 @@ import { Button } from "@/shared/components/Button";
 import { EmailInput } from "@/shared/components/EmailInput";
 import { PhoneInput } from "@/shared/components/PhoneInput";
 import { cn } from "@/shared/lib/cn";
+import { suggestEmailCorrection } from "@/shared/lib/email-typo-suggestion";
+import { isPlausibleName, normaliseName } from "@/shared/lib/normalise-name";
 import { validatePhone } from "@/shared/lib/normalise-phone";
 import type { EstimatorRange } from "@/shared/lib/settings/types";
+import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 import { useRouter, useSearchParams } from "next/navigation";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
@@ -44,6 +48,34 @@ function durationText(mins: number): string {
     return `${h} hour${h === 1 ? "" : "s"}`;
   }
   return `${mins} min`;
+}
+
+/**
+ * Compact duration label ("45m", "1h", "1h 15m") - hours and minutes rather
+ * than a raw "75 min", so over-an-hour estimates read naturally.
+ * @param mins - Duration in minutes.
+ * @returns Compact label.
+ */
+function compactDuration(mins: number): string {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
+}
+
+/**
+ * Formats a low/high minute band as a compact range ("15 - 30m",
+ * "45m - 1h 15m"). Collapses to a single label when the ends match, and shares
+ * the "m" unit when both ends are under an hour.
+ * @param low - Low end in minutes.
+ * @param high - High end in minutes.
+ * @returns Human range label.
+ */
+function durationRangeText(low: number, high: number): string {
+  if (low >= high) return compactDuration(high);
+  if (high < 60) return `${low} - ${high}m`;
+  return `${compactDuration(low)} - ${compactDuration(high)}`;
 }
 
 interface BookingDraft {
@@ -86,6 +118,8 @@ export interface BookingFormProps {
   minBillableMins?: number;
   /** Travel floor (live setting) for the inline estimate. */
   minTravelCharge?: number;
+  /** Low-end floor fraction (live setting) for the inline estimate. */
+  lowEndFloorFactor?: number;
 }
 
 /**
@@ -98,6 +132,7 @@ export interface BookingFormProps {
  * @param props.estimatorRange - Live estimator range widths; enables the inline rough estimate.
  * @param props.minBillableMins - Min billable minutes for the inline estimate.
  * @param props.minTravelCharge - Travel floor for the inline estimate.
+ * @param props.lowEndFloorFactor - Low-end floor fraction for the inline estimate.
  * @returns Booking form element
  */
 export default function BookingForm({
@@ -108,6 +143,7 @@ export default function BookingForm({
   estimatorRange,
   minBillableMins,
   minTravelCharge,
+  lowEndFloorFactor,
 }: BookingFormProps): React.ReactElement {
   const router = useRouter();
   const isEditMode = Boolean(cancelToken);
@@ -120,10 +156,20 @@ export default function BookingForm({
   );
   // Inline "get a rough estimate" state (new bookings only).
   const [estimating, setEstimating] = useState(false);
-  const [quote, setQuote] = useState<{ low: number; high: number } | null>(null);
+  const [quote, setQuote] = useState<{
+    low: number;
+    high: number;
+    travelCharge: number;
+    minsLow: number;
+    minsHigh: number;
+  } | null>(null);
   const [quoteError, setQuoteError] = useState<string | null>(null);
   const canInlineEstimate =
-    !isEditMode && estimatorRange != null && minBillableMins != null && minTravelCharge != null;
+    !isEditMode &&
+    estimatorRange != null &&
+    minBillableMins != null &&
+    minTravelCharge != null &&
+    lowEndFloorFactor != null;
 
   // Duration choices built from the live settings; labels reflect the operator's
   // configured short/long lengths. Descriptions stay as fixed copy.
@@ -182,10 +228,34 @@ export default function BookingForm({
   // True after a failed submit-time geocode so a second click submits as-is.
   // Resets on any address change to re-check different mistypes.
   const [addressOverrideAcked, setAddressOverrideAcked] = useState(false);
+  // Google candidates for a typed-but-not-picked address. null = no prompt, one
+  // entry = "did you mean?", several = "which did you mean?" - never auto-picked.
+  const [addressCandidates, setAddressCandidates] = useState<string[] | null>(null);
+  // Apt/Unit is hidden by default (most customers are in a house) so nobody types
+  // their street number into it; revealed on request, pre-revealed in edit mode.
+  const [showUnit, setShowUnit] = useState(Boolean(initialSplit.unit));
+  // Likely email correction (e.g. gmial.com > gmail.com) surfaced at submit, so
+  // an autofilled typo that never triggered the blur hint still gets caught.
+  const [emailSuggestion, setEmailSuggestion] = useState<string | null>(null);
+  const [emailSuggestionAcked, setEmailSuggestionAcked] = useState(false);
   const [notes, setNotes] = useState(initialValues?.notes ?? "");
   // Honeypot value - see the hidden input in the form markup below.
   const [website, setWebsite] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  /**
+   * The chosen slot's start as an instant, applying the NZ offset for the
+   * slot's own date (DST-correct, unlike the browser's timezone).
+   * @returns The slot start, or null when day or time isn't chosen yet.
+   */
+  function slotStartInstant(): Date | null {
+    if (!selectedDay || !selectedTime) return null;
+    const window = selectedDay.timeWindows.find((w) => w.value === selectedTime);
+    if (!window) return null;
+    const [y, m, d] = selectedDay.dateKey.split("-").map(Number);
+    const offset = getPacificAucklandOffset(y, m, d);
+    return new Date(Date.UTC(y, m - 1, d, window.startHour - offset, selectedMinute, 0, 0));
+  }
 
   /**
    * Runs the inline rough estimate from the current description + meeting +
@@ -194,10 +264,23 @@ export default function BookingForm({
    * @returns Resolves when the estimate completes.
    */
   async function runInlineEstimate(): Promise<void> {
-    if (!estimatorRange || minBillableMins == null || minTravelCharge == null) return;
+    if (
+      !estimatorRange ||
+      minBillableMins == null ||
+      minTravelCharge == null ||
+      lowEndFloorFactor == null
+    )
+      return;
     setEstimating(true);
     setQuoteError(null);
     try {
+      // Quote the drive at the picked slot so the estimate matches what the
+      // booking snapshots at submit.
+      const slotStart = selectedDay && selectedTime ? slotStartInstant() : null;
+      const slotEnd = slotStart
+        ? new Date(slotStart.getTime() + durations[duration] * 60_000)
+        : null;
+
       const res = await fetchQuickEstimate({
         description: notes.trim(),
         meeting: meetingType === "remote" ? "remote" : "in-person",
@@ -205,8 +288,17 @@ export default function BookingForm({
         estimatorRange,
         minBillableMins,
         minTravelCharge,
+        lowEndFloorFactor,
+        departureTimeIso: slotStart?.toISOString(),
+        returnDepartureTimeIso: slotEnd?.toISOString(),
       });
-      setQuote({ low: res.low, high: res.high });
+      setQuote({
+        low: res.low,
+        high: res.high,
+        travelCharge: res.travelCharge,
+        minsLow: res.minsLow,
+        minsHigh: res.minsHigh,
+      });
       if (res.estimateId) setEstimateId(res.estimateId);
     } catch {
       setQuoteError("Couldn't get an estimate just now - you can still book.");
@@ -214,6 +306,46 @@ export default function BookingForm({
       setEstimating(false);
     }
   }
+
+  /**
+   * Removes a single inline field error (used by on-blur/on-change handlers so a
+   * corrected field clears without touching the others).
+   * @param key - Field-error key to clear.
+   */
+  function clearFieldError(key: string): void {
+    setFieldErrors((prev) => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  }
+
+  /**
+   * Applies a Google address candidate the customer picked from the "did you
+   * mean?" prompt: splits any unit prefix back into its own field, marks the
+   * address verified so it won't re-prompt, and dismisses the prompt.
+   * @param candidate - The chosen canonical address (may carry a "unit/" prefix).
+   */
+  function applyAddressCandidate(candidate: string): void {
+    const split = splitUnitFromAddress(candidate);
+    if (split.unit) setShowUnit(true);
+    setUnit(split.unit);
+    setAddress(split.rest);
+    setAddressVerified(true);
+    setAddressCandidates(null);
+    setAddressOverrideAcked(false);
+  }
+
+  /**
+   * Dismisses the address prompt and keeps the customer's typed text, letting the
+   * next submit go through as-is (some genuine new addresses don't geocode).
+   */
+  function keepTypedAddress(): void {
+    setAddressCandidates(null);
+    setAddressOverrideAcked(true);
+  }
+
   const [error, setError] = useState<string | null>(null);
   // Submit-time validation errors. Rendered both in a top summary and inline.
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -312,6 +444,7 @@ export default function BookingForm({
       }
       if (data.address && !address.trim() && !unit.trim()) {
         const split = splitUnitFromAddress(data.address);
+        if (split.unit) setShowUnit(true);
         setUnit(split.unit);
         setAddress(split.rest);
         filled.push("address");
@@ -368,7 +501,10 @@ export default function BookingForm({
       if (draft.meetingType === "in-person" || draft.meetingType === "remote") {
         setMeetingType(draft.meetingType);
       }
-      if (typeof draft.unit === "string") setUnit(draft.unit);
+      if (typeof draft.unit === "string") {
+        setUnit(draft.unit);
+        if (draft.unit) setShowUnit(true);
+      }
       if (typeof draft.address === "string" && draft.address) {
         setAddress(draft.address);
         // Only trust a restored address as verified when the draft recorded it
@@ -382,7 +518,7 @@ export default function BookingForm({
       if (draft.dateKey && draft.timeOfDay && availableDays.length > 0) {
         const day = availableDays.find((d) => d.dateKey === draft.dateKey);
         const win = day?.timeWindows.find((w) => w.value === draft.timeOfDay);
-        const minute = (draft.startMinute ?? 0) as StartMinute;
+        const minute = draft.startMinute ?? 0;
         const sub = win?.subSlots.find((s) => s.minute === minute);
         const desiredDuration = draft.duration === "long" ? "long" : "short";
         const available = desiredDuration === "short" ? sub?.availableShort : sub?.availableLong;
@@ -476,9 +612,11 @@ export default function BookingForm({
     setPhone("");
     setMeetingType("");
     setUnit("");
+    setShowUnit(false);
     setAddress("");
     setAddressVerified(false);
     setAddressOverrideAcked(false);
+    setAddressCandidates(null);
     setNotes("");
     setContactHint(null);
     setFieldErrors({});
@@ -549,6 +687,7 @@ export default function BookingForm({
     if (!selectedDay) fe.day = "Please select a day and time.";
     if (!selectedTime) fe.time = "Please select a time.";
     if (!name.trim()) fe.name = "Please enter your name.";
+    else if (!isPlausibleName(name)) fe.name = "Please enter your full name.";
     if (validateEmail(email) !== "ok") {
       fe.email = "Please enter a valid email address.";
     }
@@ -578,28 +717,49 @@ export default function BookingForm({
     // Field-errors guard above guarantees these are set; narrow for TS.
     if (!selectedDay || !selectedTime || !duration || !meetingType) return;
 
+    // Email typo catch: an autofilled address that never triggered the blur hint
+    // can still be a likely typo (gmial.com). Offer the correction once and block
+    // this submit until the customer confirms or dismisses it.
+    if (!emailSuggestionAcked) {
+      const suggestion = suggestEmailCorrection(email);
+      if (suggestion) {
+        setEmailSuggestion(suggestion);
+        return;
+      }
+    }
+
     submittingRef.current = true;
     setSubmitting(true);
 
-    // Soft geocode check for typed-but-not-picked addresses. First failure flips
-    // addressOverrideAcked so a second click submits anyway. Network errors
-    // don't block submission - clarify out-of-band if needed.
-    // Skipped entirely in maps-fallback mode because a verified pick can't be
-    // expected when the autocomplete widget is unavailable.
+    // Google-verify a typed-but-not-picked address before booking. When it
+    // resolves to more than one place we ask the customer which they meant - we
+    // never assume. Skipped in maps-fallback mode (no geocoder to check against)
+    // and once they've picked a candidate or chosen to use their text as-is.
     if (meetingType === "in-person" && !addressVerified && !addressOverrideAcked && !mapsFallback) {
       try {
-        const verifyRes = await fetch("/api/pricing/travel-time", {
+        const verifyRes = await fetch("/api/booking/verify-address", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ destination: combineUnitAndAddress(unit, address) }),
+          body: JSON.stringify({ address: combineUnitAndAddress(unit, address) }),
         });
         if (verifyRes.ok) {
-          const data = (await verifyRes.json()) as { distanceKm?: number };
-          if (!data.distanceKm) {
+          const { candidates } = (await verifyRes.json()) as { candidates: string[] };
+          if (candidates.length === 0) {
+            // Google found nothing precise - warn, then let a second click submit
+            // the typed text as-is (some new addresses genuinely don't geocode).
             setError(
               "We couldn't find that address on the map. Double-check the spelling, or click Submit again to use it as-is.",
             );
             setAddressOverrideAcked(true);
+            submittingRef.current = false;
+            setSubmitting(false);
+            return;
+          }
+          const typed = combineUnitAndAddress(unit, address).trim().toLowerCase();
+          const exact = candidates.some((c) => c.trim().toLowerCase() === typed);
+          if (!exact) {
+            // One candidate > "did you mean?"; several > "which did you mean?".
+            setAddressCandidates(candidates);
             submittingRef.current = false;
             setSubmitting(false);
             return;
@@ -677,9 +837,10 @@ export default function BookingForm({
         }
       }
 
-      // Redirect to the success page
+      // Redirect to the success page. Edit mode flags itself so the success
+      // page does not report the reschedule as a fresh lead conversion.
       if (isEditMode) {
-        router.push(`/booking/success?cancelToken=${encodeURIComponent(cancelToken!)}`);
+        router.push(`/booking/success?cancelToken=${encodeURIComponent(cancelToken!)}&edited=1`);
       } else {
         const successUrl = data.cancelToken
           ? `/booking/success?cancelToken=${encodeURIComponent(data.cancelToken)}`
@@ -982,7 +1143,19 @@ export default function BookingForm({
               aria-required
               maxLength={BOOKING_FIELD_LIMITS.name}
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                setName(e.target.value);
+                clearFieldError("name");
+              }}
+              onBlur={() => {
+                // Tidy casing/spacing in place (like phone formats on blur), then
+                // flag obvious non-names so the customer sees it before submit.
+                const tidied = normaliseName(name);
+                if (tidied !== name) setName(tidied);
+                if (tidied && !isPlausibleName(tidied)) {
+                  setFieldErrors((prev) => ({ ...prev, name: "Please enter your full name." }));
+                }
+              }}
               aria-invalid={!!fieldErrors.name || undefined}
               aria-describedby={fieldErrors.name ? "booking-name-error" : undefined}
               className={cn(
@@ -1008,6 +1181,9 @@ export default function BookingForm({
               onChange={(next) => {
                 setEmail(next);
                 setContactHint(null);
+                // A fresh edit invalidates any prior submit-time typo prompt.
+                setEmailSuggestion(null);
+                setEmailSuggestionAcked(false);
               }}
               onBlur={handleEmailBlur}
               error={fieldErrors.email}
@@ -1021,6 +1197,35 @@ export default function BookingForm({
               )}
             />
             {contactHint && <p className="text-sm text-rich-black/70">{contactHint}</p>}
+            {emailSuggestion && (
+              <div className="flex flex-col gap-1.5 rounded-md border border-amber-300 bg-amber-50 p-2.5 text-sm">
+                <span className="text-rich-black">
+                  Did you mean <strong>{emailSuggestion}</strong>?
+                </span>
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEmail(emailSuggestion);
+                      setEmailSuggestion(null);
+                    }}
+                    className="font-semibold text-russian-violet underline underline-offset-2 hover:text-russian-violet/80"
+                  >
+                    Yes, use it
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEmailSuggestion(null);
+                      setEmailSuggestionAcked(true);
+                    }}
+                    className="text-rich-black/70 underline underline-offset-2 hover:text-rich-black"
+                  >
+                    No, my email is correct
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -1106,35 +1311,11 @@ export default function BookingForm({
               </div>
               {/* Only mount when in-person so Google Maps script never loads for remote sessions */}
               {meetingType === "in-person" && (
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
-                  <div className="flex flex-col gap-1 sm:w-44">
-                    <label
-                      htmlFor="booking-unit"
-                      className="truncate text-sm font-medium text-rich-black/80"
-                    >
-                      Apt / Unit (optional)
-                    </label>
-                    <input
-                      id="booking-unit"
-                      type="text"
-                      value={unit}
-                      onChange={(e) => {
-                        setUnit(e.target.value);
-                        // Unit edits invalidate any prior submit-time geocode
-                        // override so the new combined address gets re-checked.
-                        setAddressOverrideAcked(false);
-                      }}
-                      placeholder="e.g. 12"
-                      inputMode="text"
-                      autoComplete="off"
-                      maxLength={8}
-                      className={cn(
-                        "w-full rounded-md border border-seasalt-400/80 bg-seasalt px-4 py-3 text-base text-rich-black",
-                        "focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
-                      )}
-                    />
-                  </div>
-                  <div className="flex flex-1 flex-col gap-1">
+                <div className="flex flex-col gap-3">
+                  {/* Street address takes the full width; the Apt/Unit box is
+                      revealed on demand below so nobody types their street
+                      number into it by mistake. */}
+                  <div className="flex flex-col gap-1">
                     <label
                       htmlFor="booking-address"
                       className="text-sm font-medium text-rich-black/80"
@@ -1147,6 +1328,7 @@ export default function BookingForm({
                       maxLength={BOOKING_FIELD_LIMITS.address}
                       onChange={(v) => {
                         setAddress(v);
+                        setAddressCandidates(null);
                         // Any keystroke invalidates the prior pick. onChange
                         // fires before onPlaceSelected on a real pick, so
                         // batched updates leave verified=true on suggestions.
@@ -1161,10 +1343,15 @@ export default function BookingForm({
                       onFallbackMode={() => {
                         setMapsFallback(true);
                         // No suggestions available > accept the typed address
-                        // outright; the existing submit-time geocode (skipped
-                        // in this mode) was the only thing that would have
-                        // gated submission.
+                        // outright; the submit-time verify (skipped in this
+                        // mode) was the only thing that would have gated it.
                         setAddressVerified(true);
+                      }}
+                      onRecovered={() => {
+                        // Autocomplete is back - restore the verify gate.
+                        setMapsFallback(false);
+                        setAddressVerified(false);
+                        setAddressOverrideAcked(false);
                       }}
                       placeholder="Start typing your street address..."
                       required
@@ -1193,6 +1380,106 @@ export default function BookingForm({
                         </p>
                       ))}
                   </div>
+
+                  {/* Apt/Unit: hidden until the customer says they have one. */}
+                  {showUnit ? (
+                    <div className="flex flex-col gap-1 sm:max-w-56">
+                      <div className="flex items-center justify-between gap-2">
+                        <label
+                          htmlFor="booking-unit"
+                          className="truncate text-sm font-medium text-rich-black/80"
+                        >
+                          Apt / Unit (optional)
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            // Collapse and clear so a hidden field never carries a
+                            // stale value into combineUnitAndAddress.
+                            setShowUnit(false);
+                            setUnit("");
+                            setAddressCandidates(null);
+                            setAddressOverrideAcked(false);
+                          }}
+                          className="text-sm text-rich-black/60 underline underline-offset-2 hover:text-rich-black"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                      <input
+                        id="booking-unit"
+                        type="text"
+                        value={unit}
+                        onChange={(e) => {
+                          setUnit(e.target.value);
+                          setAddressCandidates(null);
+                          // Unit edits invalidate any prior submit-time verify
+                          // override so the new combined address gets re-checked.
+                          setAddressOverrideAcked(false);
+                        }}
+                        placeholder="e.g. 12"
+                        inputMode="text"
+                        autoComplete="off"
+                        maxLength={8}
+                        aria-describedby="booking-unit-hint"
+                        className={cn(
+                          "w-full rounded-md border border-seasalt-400/80 bg-seasalt px-4 py-3 text-base text-rich-black",
+                          "focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
+                        )}
+                      />
+                      <p id="booking-unit-hint" className="text-sm text-slate-600">
+                        Only for apartments, units or flats - leave blank for a house.
+                      </p>
+                      {unitMatchesStreetNumber(unit, address) && (
+                        <p className="text-sm font-medium text-amber-700">
+                          That looks like your street number. If this is a standalone house, leave
+                          Apt / Unit blank.
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setShowUnit(true)}
+                      className="self-start text-sm font-medium text-russian-violet underline underline-offset-2 hover:text-russian-violet/80"
+                    >
+                      Live in an apartment, unit or flat? Add your unit number
+                    </button>
+                  )}
+
+                  {/* Google returned candidates for a typed address - let the
+                      customer pick; never assume when there's more than one. */}
+                  {addressCandidates && addressCandidates.length > 0 && (
+                    <div className="flex flex-col gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm">
+                      <p className="font-medium text-rich-black">
+                        {addressCandidates.length === 1
+                          ? "Did you mean this address?"
+                          : "Which address did you mean?"}
+                      </p>
+                      <div className="flex flex-col gap-1.5">
+                        {addressCandidates.map((candidate) => (
+                          <button
+                            key={candidate}
+                            type="button"
+                            onClick={() => applyAddressCandidate(candidate)}
+                            className={cn(
+                              "rounded-md border border-russian-violet/40 bg-white px-3 py-2 text-left text-rich-black",
+                              "hover:border-russian-violet hover:bg-russian-violet/5 focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
+                            )}
+                          >
+                            {candidate}
+                          </button>
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={keepTypedAddress}
+                        className="self-start text-rich-black/70 underline underline-offset-2 hover:text-rich-black"
+                      >
+                        None of these - use what I typed
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1222,7 +1509,20 @@ export default function BookingForm({
             aria-required
             maxLength={BOOKING_FIELD_LIMITS.notes}
             value={notes}
-            onChange={(e) => setNotes(e.target.value)}
+            onChange={(e) => {
+              setNotes(e.target.value);
+              clearFieldError("notes");
+            }}
+            onBlur={() => {
+              // Nudge before submit if there's some text but not enough context.
+              const trimmed = notes.trim();
+              if (trimmed && trimmed.length < BOOKING_FIELD_LIMITS.notesMin) {
+                setFieldErrors((prev) => ({
+                  ...prev,
+                  notes: `Please describe the issue in at least ${BOOKING_FIELD_LIMITS.notesMin} characters so I have enough context.`,
+                }));
+              }
+            }}
             onPaste={(e) => {
               // Detect when the paste would push the value past maxLength so the user
               // gets a hint that their text was trimmed (browsers silently
@@ -1300,22 +1600,62 @@ export default function BookingForm({
 
         {canInlineEstimate && (
           <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-0.5">
+              <h3 className="text-base font-semibold text-rich-black">Want a rough price first?</h3>
+              <p className="text-sm text-rich-black/70">
+                Get a ballpark estimate from your description before you book.
+              </p>
+            </div>
             <button
               type="button"
               onClick={() => void runInlineEstimate()}
               disabled={estimating || notes.trim().length < BOOKING_FIELD_LIMITS.notesMin}
               className="self-start rounded-md border border-russian-violet/40 px-4 py-2 text-sm font-semibold text-russian-violet transition-colors hover:bg-russian-violet/5 disabled:opacity-50"
             >
-              {estimating ? "Estimating..." : "Get a rough estimate"}
+              {estimating ? "Estimating..." : "Click here"}
             </button>
             {quote && (
-              <p className="text-sm text-rich-black">
-                Rough estimate:{" "}
-                <strong>
+              <div
+                role="status"
+                className="rounded-xl border border-russian-violet/20 bg-russian-violet/5 p-4"
+              >
+                <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                  <p className="text-sm font-medium text-rich-black/60">Rough estimate</p>
+                  <span className="rounded-full bg-russian-violet/10 px-2.5 py-0.5 text-sm font-semibold text-russian-violet">
+                    {durationRangeText(quote.minsLow, quote.minsHigh)}
+                  </span>
+                </div>
+                <p className="mt-1 text-3xl font-extrabold text-russian-violet">
                   ${quote.low} &ndash; ${quote.high}
-                </strong>
-                . A ballpark from your description - the final cost is confirmed before any work.
-              </p>
+                </p>
+                {quote.travelCharge > 0 && (
+                  <p className="mt-1 text-sm font-medium text-rich-black/80">
+                    + ${quote.travelCharge} round-trip travel
+                  </p>
+                )}
+                <p className="mt-2 text-sm text-rich-black/70">
+                  A ballpark from your description - the final cost is confirmed before any work.
+                </p>
+                {/* Gate on the MIDDLE of the range, not its high end: a wide
+                    band like 25m-1h10m has a typical case well under an hour,
+                    and nudging those to a 2-hour visit fires on almost every
+                    estimate. Only suggest it when the likely time runs over. */}
+                {duration === "short" && (quote.minsLow + quote.minsHigh) / 2 > 60 && (
+                  <div className="mt-3 flex flex-col gap-2 rounded-lg border border-amber-400/50 bg-amber-50 p-3 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-sm text-rich-black/80">
+                      This looks like it might take around 2 hours - you can book a 2-hour visit so
+                      we&apos;ve got the time set aside.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => handleDurationChange("long")}
+                      className="self-start rounded-md bg-russian-violet px-4 py-2 text-sm font-semibold text-white hover:bg-russian-violet/90 sm:shrink-0 sm:self-auto"
+                    >
+                      Book 2 hours
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
             {quoteError && <p className="text-sm text-coquelicot-600">{quoteError}</p>}
           </div>
@@ -1396,6 +1736,28 @@ export default function BookingForm({
                       <span className="text-rich-black/50">—</span>
                     )}
                   </dd>
+                </>
+              )}
+
+              {/* Contact details read back so a typo (wrong email/phone) is
+                  visible before submit - the cheapest catch for a mistyped
+                  address that would otherwise send the confirmation nowhere. */}
+              {name.trim() && (
+                <>
+                  <dt className="text-rich-black/60">Name</dt>
+                  <dd className="wrap-break-word text-rich-black">{name}</dd>
+                </>
+              )}
+              {email.trim() && (
+                <>
+                  <dt className="text-rich-black/60">Email</dt>
+                  <dd className="wrap-break-word text-rich-black">{email}</dd>
+                </>
+              )}
+              {phone.trim() && (
+                <>
+                  <dt className="text-rich-black/60">Phone</dt>
+                  <dd className="wrap-break-word text-rich-black">{phone}</dd>
                 </>
               )}
             </dl>

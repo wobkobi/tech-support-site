@@ -1,14 +1,9 @@
 "use client";
 // src/features/admin/components/DayAgendaView.tsx
 /**
- * @description Mobile-friendly single-day schedule view. Renders one NZ day at
- * a time as a vertical agenda list with prev/today/next-day navigation, swipe
- * gestures, and the same booking/block/travel data as the desktop week grid.
- *
- * Day-switching within the visible week stays client-side: state updates
- * instantly and the URL is mirrored via history.replaceState. Crossing the
- * week boundary falls back to a router.push so the server can fetch the next
- * week's calendar events.
+ * @description Mobile-friendly single-day schedule view: one NZ day as a
+ * vertical agenda with prev/today/next navigation, swipe gestures, and the
+ * same booking/block/travel data as the desktop week grid.
  */
 
 import { BlockDayButton } from "@/features/admin/components/BlockDayButton";
@@ -21,13 +16,15 @@ import {
   NZ_TZ,
   formatTimeRange,
   mondayOf,
+  optimisticBusyEvent,
   type WeekEvent,
 } from "@/features/admin/lib/schedule-types";
 import { cn } from "@/shared/lib/cn";
+import { isPastEditWindow, nzDayEndMs } from "@/shared/lib/edit-window";
 import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 import { useRouter } from "next/navigation";
 import type React from "react";
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { FaCalendarDay, FaChevronLeft, FaChevronRight, FaRegCalendar } from "react-icons/fa6";
 
 /**
@@ -81,6 +78,8 @@ interface DayAgendaViewProps {
   events: WeekEvent[];
   /** NZ public holidays for the buffered window, keyed by NZ YYYY-MM-DD. */
   holidaysByDateKey: Record<string, string>;
+  /** Live past-edit lock window (hours) - scheduling.pastEditLockHours. */
+  lockHours: number;
 }
 
 const SWIPE_MIN_DX = 60;
@@ -96,6 +95,7 @@ const SWIPE_MAX_MS = 500;
  * @param props.bufferedDayKeys - Day keys in the buffered 21-day window.
  * @param props.events - All events for the buffered window.
  * @param props.holidaysByDateKey - Public-holiday map for the buffered window.
+ * @param props.lockHours - Live past-edit lock window (hours).
  * @returns Day agenda element.
  */
 export function DayAgendaView({
@@ -104,14 +104,24 @@ export function DayAgendaView({
   bufferedDayKeys,
   events,
   holidaysByDateKey,
+  lockHours,
 }: DayAgendaViewProps): React.ReactElement {
   const router = useRouter();
   // Day selection and sheet state
   const [selectedDayKey, setSelectedDayKey] = useState(initialDayKey);
   const [modalStartAt, setModalStartAt] = useState<string | null>(null);
-  const [busyAction, setBusyAction] = useState<string | null>(null);
+  // Days with a block/unblock request in flight - a Set so several can run at
+  // once (each button disables only its own day, not the whole schedule).
+  const [pendingDays, setPendingDays] = useState<Set<string>>(() => new Set());
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
   const [actionSheetEvent, setActionSheetEvent] = useState<WeekEvent | null>(null);
+  // Stable "now" for the past-event lock (avoids an impure call during render).
+  const [renderedAt] = useState(() => Date.now());
+  // Optimistic block/unblock overrides per day (dateKey > blocked?), applied
+  // on click so the UI flips instantly - Google lags a write and the 30s cache
+  // can serve a stale read, so a plain refetch lags. Kept until the server
+  // refetch catches up; a failed request reverts it.
+  const [optimisticBlock, setOptimisticBlock] = useState<Map<string, boolean>>(() => new Map());
   // useTransition keeps the current view interactive while the next week
   // is being fetched, so crossing the week boundary doesn't blank the UI.
   const [isPending, startTransition] = useTransition();
@@ -217,10 +227,83 @@ export function DayAgendaView({
   }, [events, selectedDayKey, dayKeyFmt]);
 
   const holidayName = holidaysByDateKey[selectedDayKey] ?? null;
-  const busyEvent = allDayEvents.find((e) => e.kind === "booking");
+  // Optimistic override for a just-clicked day: true = blocked, false = free,
+  // undefined = use the real calendar. `busyEvent` (real event, for the unblock
+  // id) excludes the placeholder; the displayed list shows/hides the block to
+  // match the click instantly.
+  const override = optimisticBlock.get(selectedDayKey);
+  const realBusy = allDayEvents.find((e) => e.kind === "booking");
+  const effectiveBlocked = override ?? realBusy != null;
+  const busyEvent = override === false ? undefined : realBusy;
+  const visibleAllDayEvents =
+    override === false
+      ? allDayEvents.filter((e) => e.kind !== "booking")
+      : override === true && realBusy == null
+        ? [optimisticBusyEvent(selectedDayKey), ...allDayEvents]
+        : allDayEvents;
   const isToday = selectedDayKey === todayKey;
   const hasBookings = timedEvents.some((e) => e.kind === "booking");
   const bookingCount = timedEvents.filter((e) => e.kind === "booking").length;
+
+  /**
+   * Records the optimistic busy state for a just-clicked day so the UI flips
+   * before the server round-trip; the refetch reconciles (or the button reverts).
+   * @param dayKey - The toggled day (NZ YYYY-MM-DD).
+   * @param blocked - The new state (true = now blocked, false = now free).
+   */
+  function applyOptimisticBlock(dayKey: string, blocked: boolean): void {
+    setOptimisticBlock((prev) => new Map(prev).set(dayKey, blocked));
+  }
+
+  /**
+   * Adds/removes a day from the in-flight set as its request starts/finishes.
+   * @param dayKey - The day whose request changed state.
+   * @param pending - True when starting, false when finished.
+   */
+  function setPending(dayKey: string, pending: boolean): void {
+    setPendingDays((prev) => {
+      const next = new Set(prev);
+      if (pending) next.add(dayKey);
+      else next.delete(dayKey);
+      return next;
+    });
+  }
+
+  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /**
+   * Coalesces schedule refetches into ONE after rapid changes settle. Blocking
+   * several days fires one refresh, not one per click: each block busts the 30s
+   * cache, so N immediate refreshes would each re-hit Google and back the server
+   * up (locking out further clicks). The optimistic UI covers the 1.2s interim.
+   */
+  function debouncedRefresh(): void {
+    if (refreshTimer.current) clearTimeout(refreshTimer.current);
+    refreshTimer.current = setTimeout(() => router.refresh(), 1200);
+  }
+
+  // Reconcile optimistic overrides against fresh server data: an override only
+  // bridges click > next refresh, so drop overrides for days no longer in
+  // flight (a lost/merged block falls back to its real state). Pending lives
+  // in a ref so reconciliation fires on server data only, not when a request settles.
+  const pendingRef = useRef(pendingDays);
+  useEffect(() => {
+    pendingRef.current = pendingDays;
+  }, [pendingDays]);
+  useEffect(() => {
+    setOptimisticBlock((prev) => {
+      if (prev.size === 0) return prev;
+      let changed = false;
+      const next = new Map(prev);
+      for (const day of prev.keys()) {
+        if (!pendingRef.current.has(day)) {
+          next.delete(day);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [events]);
 
   // 7-day strip data: the Monday-to-Sunday week containing the selected day,
   // with a booking count per day. Booking count drives the dot indicators
@@ -448,20 +531,20 @@ export function DayAgendaView({
       <div className="mb-4 flex items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-extrabold text-russian-violet">Schedule</h1>
-          <p className="mt-1 text-sm text-slate-500">{yearLabel}</p>
+          <p className="mt-1 text-sm text-admin-muted">{yearLabel}</p>
         </div>
       </div>
 
       {/* Sticky header band - mini week strip + day-picker bar pinned to the
           top of the viewport while the events list scrolls under them. The
-          band sits at `top-14` to clear the mobile hamburger button (AdminPageLayout
-          uses pt-16 / 64px), and `-mx-4` / `-mx-6` so the slate-50 background
+          band sits at `top-14` to clear the mobile hamburger button (the admin
+          shell layout uses pt-16 / 64px), and `-mx-4` / `-mx-6` so the page background
           covers the page edges as content scrolls behind. */}
       <div
         data-no-swipe
         onPointerDown={stopPointer}
         onPointerUp={stopPointer}
-        className="sticky top-14 z-10 -mx-4 mb-4 bg-slate-50 px-4 pt-1 pb-2 sm:top-8 sm:-mx-6 sm:px-6"
+        className="sticky top-14 z-10 -mx-4 mb-4 bg-admin-bg px-4 pt-1 pb-2 sm:top-8 sm:-mx-6 sm:px-6"
       >
         {/* Mini 7-day strip - visible week containing the selected day. Dots
             indicate booking count per day (capped at 4). Compact so it
@@ -482,7 +565,7 @@ export function DayAgendaView({
                   "flex h-10 flex-col items-center justify-center rounded-md border transition-colors",
                   isSelected
                     ? "border-russian-violet bg-russian-violet text-white"
-                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
+                    : "border-admin-border bg-admin-surface text-admin-text hover:bg-admin-bg",
                   !isSelected && isTodayCell && "ring-2 ring-russian-violet/40 ring-inset",
                 )}
               >
@@ -495,7 +578,7 @@ export function DayAgendaView({
                           key={i}
                           className={cn(
                             "h-1 w-1 rounded-full",
-                            isSelected ? "bg-white/80" : "bg-russian-violet",
+                            isSelected ? "bg-admin-surface/80" : "bg-russian-violet",
                           )}
                         />
                       ))
@@ -508,12 +591,12 @@ export function DayAgendaView({
 
         {/* Day-picker bar. Generous spacing between the chevrons and the
             central label/today chip so finger-fat taps don't go wrong. */}
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-2 py-2 shadow-sm">
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-admin-border bg-admin-surface px-2 py-2 shadow-sm">
           <button
             type="button"
             onClick={handlePrev}
             aria-label="Previous day"
-            className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-50"
+            className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-lg text-admin-text-secondary hover:bg-admin-bg"
           >
             <FaChevronLeft className="h-5 w-5" />
           </button>
@@ -523,12 +606,12 @@ export function DayAgendaView({
               onClick={openDatePicker}
               aria-label="Pick a date"
               className={cn(
-                "inline-flex h-9 max-w-full items-center gap-1.5 rounded-md px-3 text-base font-bold hover:bg-slate-50",
-                isToday ? "text-russian-violet" : "text-slate-800",
+                "inline-flex h-9 max-w-full items-center gap-1.5 rounded-md px-3 text-base font-bold hover:bg-admin-bg",
+                isToday ? "text-russian-violet" : "text-admin-text",
               )}
             >
               <span className="truncate">{dayLabel}</span>
-              <FaRegCalendar className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+              <FaRegCalendar className="h-4 w-4 shrink-0 text-admin-faint" aria-hidden />
             </button>
             <div className="flex flex-wrap items-center justify-center gap-2 text-xs">
               {bookingCount > 0 && (
@@ -540,14 +623,14 @@ export function DayAgendaView({
                 <button
                   type="button"
                   onClick={handleToday}
-                  className="inline-flex h-8 items-center gap-1 rounded-full border border-slate-200 bg-white px-3 font-medium text-slate-600 hover:bg-slate-50"
+                  className="inline-flex h-8 items-center gap-1 rounded-full border border-admin-border bg-admin-surface px-3 font-medium text-admin-text-secondary hover:bg-admin-bg"
                 >
                   <FaCalendarDay className="h-3 w-3" />
                   Today
                 </button>
               )}
               {isToday && (
-                <span className="inline-flex h-7 items-center rounded-full bg-slate-100 px-2.5 text-[10px] font-semibold tracking-wide text-slate-500 uppercase">
+                <span className="inline-flex h-7 items-center rounded-full bg-admin-bg px-2.5 text-[10px] font-semibold tracking-wide text-admin-muted uppercase">
                   Today
                 </span>
               )}
@@ -557,7 +640,7 @@ export function DayAgendaView({
             type="button"
             onClick={handleNext}
             aria-label="Next day"
-            className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-50"
+            className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-lg text-admin-text-secondary hover:bg-admin-bg"
           >
             <FaChevronRight className="h-5 w-5" />
           </button>
@@ -584,17 +667,20 @@ export function DayAgendaView({
         <BlockDayButton
           dateKey={selectedDayKey}
           busyEventId={busyEvent?.id ?? null}
+          blocked={effectiveBlocked}
           hasBookings={hasBookings}
-          busyAction={busyAction}
-          onPending={setBusyAction}
-          onChanged={() => router.refresh()}
+          locked={isPastEditWindow(nzDayEndMs(selectedDayKey), renderedAt, lockHours)}
+          pending={pendingDays.has(selectedDayKey)}
+          onPending={setPending}
+          onChanged={debouncedRefresh}
+          onOptimisticChange={applyOptimisticBlock}
           variant="full"
         />
       </div>
 
-      {allDayEvents.length > 0 && (
+      {visibleAllDayEvents.length > 0 && (
         <div className="mb-3 flex flex-col gap-2">
-          {allDayEvents.map((ev) => (
+          {visibleAllDayEvents.map((ev) => (
             <div
               key={ev.id}
               data-no-swipe
@@ -615,7 +701,7 @@ export function DayAgendaView({
 
       <div className="flex flex-col gap-3">
         {agendaItems.length === 0 ? (
-          <p className="rounded-md border border-dashed border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-400">
+          <p className="rounded-md border border-dashed border-admin-border bg-admin-surface px-4 py-8 text-center text-sm text-admin-faint">
             No timed events on this day.
           </p>
         ) : (
@@ -624,12 +710,12 @@ export function DayAgendaView({
               return (
                 <div
                   key={`gap-${idx}`}
-                  className="flex items-center gap-2 px-2 text-[11px] font-medium tracking-wide text-slate-400 uppercase"
+                  className="flex items-center gap-2 px-2 text-[11px] font-medium tracking-wide text-admin-faint uppercase"
                   aria-hidden
                 >
-                  <span className="h-px flex-1 bg-slate-200" />
+                  <span className="h-px flex-1 bg-admin-border" />
                   {formatGap(item.minutes)}
-                  <span className="h-px flex-1 bg-slate-200" />
+                  <span className="h-px flex-1 bg-admin-border" />
                 </div>
               );
             }
@@ -650,14 +736,14 @@ export function DayAgendaView({
                 tabIndex={isInteractive ? 0 : undefined}
                 aria-expanded={isInteractive ? isExpanded : undefined}
                 className={cn(
-                  "flex overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm",
-                  isInteractive && "cursor-pointer transition-colors hover:bg-slate-50",
+                  "flex overflow-hidden rounded-md border border-admin-border bg-admin-surface shadow-sm",
+                  isInteractive && "cursor-pointer transition-colors hover:bg-admin-bg",
                 )}
               >
                 <div className={cn("w-1.5 shrink-0", KIND_BAR_BG[ev.kind])} />
                 <div className="min-w-0 flex-1 px-3 py-2">
                   <div className="flex items-center justify-between gap-2">
-                    <div className="text-xs font-semibold text-slate-500">
+                    <div className="text-xs font-semibold text-admin-muted">
                       {formatTimeRange(ev.startAt, ev.endAt)}
                     </div>
                     {ev.booking && (
@@ -671,12 +757,12 @@ export function DayAgendaView({
                       </span>
                     )}
                   </div>
-                  <div className="truncate text-sm font-semibold text-slate-800">{ev.title}</div>
+                  <div className="truncate text-sm font-semibold text-admin-text">{ev.title}</div>
                   {ev.location && (
-                    <div className="truncate text-xs text-slate-500">{ev.location}</div>
+                    <div className="truncate text-xs text-admin-muted">{ev.location}</div>
                   )}
                   {isExpanded && ev.booking && (
-                    <div className="mt-3 flex flex-col gap-3 border-t border-slate-100 pt-3 text-sm">
+                    <div className="mt-3 flex flex-col gap-3 border-t border-admin-border pt-3 text-sm">
                       <div className="flex flex-wrap gap-2">
                         {ev.booking.phone && (
                           <a
@@ -709,18 +795,18 @@ export function DayAgendaView({
                         )}
                       </div>
                       {ev.booking.address && (
-                        <div className="text-xs text-slate-500">
-                          <span className="text-slate-400">Address: </span>
+                        <div className="text-xs text-admin-muted">
+                          <span className="text-admin-faint">Address: </span>
                           {ev.booking.address}
                         </div>
                       )}
                       {ev.booking.notes && (
-                        <div className="text-xs whitespace-pre-wrap text-slate-600">
-                          <span className="text-slate-400">Notes: </span>
+                        <div className="text-xs whitespace-pre-wrap text-admin-text-secondary">
+                          <span className="text-admin-faint">Notes: </span>
                           {ev.booking.notes}
                         </div>
                       )}
-                      <div className="mt-1 flex items-center justify-between gap-2 text-[11px] text-slate-400">
+                      <div className="mt-1 flex items-center justify-between gap-2 text-[11px] text-admin-faint">
                         <span className="font-mono">#{ev.booking.id}</span>
                         <span className="italic">Hold to edit</span>
                       </div>
@@ -742,7 +828,7 @@ export function DayAgendaView({
         Add booking on this day
       </button>
 
-      <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+      <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-admin-muted">
         <LegendDot kind="booking" label="Booking" />
         <LegendDot kind="car" label="No car" />
         <LegendDot kind="personal" label="Personal" />
@@ -756,6 +842,7 @@ export function DayAgendaView({
       {actionSheetEvent?.booking && (
         <EventActionSheet
           event={actionSheetEvent as WeekEvent & { booking: NonNullable<WeekEvent["booking"]> }}
+          lockHours={lockHours}
           onChanged={() => router.refresh()}
           onClose={() => setActionSheetEvent(null)}
         />

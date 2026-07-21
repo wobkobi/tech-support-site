@@ -15,7 +15,10 @@ import { NextRequest, NextResponse } from "next/server";
 /**
  * Normalises a free-text taxonomy value (device or action): trims, collapses
  * whitespace, and title-cases the first letter of each word so "laptop" /
- * "LAPTOP" / "  laptop  " all dedupe as "Laptop". Returns null for empty input.
+ * "LAPTOP" / "  laptop  " all dedupe as "Laptop". Camel-cased brand words
+ * (iCloud, iPhone, eBay - lowercase letter followed by an interior capital)
+ * keep their official casing rather than being mangled to "Icloud".
+ * Returns null for empty input.
  * @param raw - Raw user/AI-supplied string.
  * @returns Normalised string or null.
  */
@@ -25,7 +28,11 @@ function normaliseTag(raw: unknown): string | null {
   if (!cleaned) return null;
   return cleaned
     .split(" ")
-    .map((w) => (w.length > 0 ? w[0].toUpperCase() + w.slice(1).toLowerCase() : w))
+    .map((w) => {
+      if (w.length === 0) return w;
+      if (/^[a-z]+[A-Z]/.test(w)) return w;
+      return w[0].toUpperCase() + w.slice(1).toLowerCase();
+    })
     .join(" ");
 }
 

@@ -6,7 +6,7 @@
  * what the customer receives.
  */
 
-import { generateInvoicePdf } from "@/features/business/lib/invoice-pdf";
+import { generateInvoicePdf, serializeInvoice } from "@/features/business/lib/invoice-pdf";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
@@ -39,13 +39,7 @@ export async function GET(
     return errorResponse("Invoice not found", 404);
   }
 
-  const pdfBytes = await generateInvoicePdf({
-    ...invoice,
-    issueDate: invoice.issueDate.toISOString(),
-    dueDate: invoice.dueDate.toISOString(),
-    createdAt: invoice.createdAt.toISOString(),
-    updatedAt: invoice.updatedAt.toISOString(),
-  });
+  const pdfBytes = await generateInvoicePdf(serializeInvoice(invoice));
   return new Response(new Uint8Array(pdfBytes), {
     headers: {
       "Content-Type": "application/pdf",

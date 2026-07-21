@@ -5,6 +5,9 @@
  * supplier, amount, GST, frequency, next due) and flags overdue ones.
  */
 
+import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
+import { StatusPill } from "@/features/admin/components/ui/StatusPill";
+import { useToast } from "@/features/admin/components/ui/Toast";
 import { formatNZD, todayISO } from "@/features/business/lib/business";
 import {
   EXPENSE_CATEGORIES,
@@ -83,23 +86,21 @@ function isDueToday(nextDue: string): boolean {
 
 /**
  * Subscriptions manager - list, add, edit, record payment, delete.
+ * @param props - Component props.
+ * @param props.reloadKey - Bumped by the parent to force a reload (e.g. after an expense migrate).
  * @returns Subscriptions view element.
  */
-export function SubscriptionsView(): React.ReactElement {
+export function SubscriptionsView({ reloadKey = 0 }: { reloadKey?: number }): React.ReactElement {
+  const { toast } = useToast();
   const [subs, setSubs] = useState<Subscription[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState<{ msg: string; warn?: boolean } | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
   const [recording, setRecording] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
-
-  const showToast = useCallback((msg: string, warn = false) => {
-    setToast({ msg, warn });
-    setTimeout(() => setToast(null), 4000);
-  }, []);
+  const [confirmDeleteSub, setConfirmDeleteSub] = useState<Subscription | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -115,7 +116,7 @@ export function SubscriptionsView(): React.ReactElement {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
-  }, [load]);
+  }, [load, reloadKey]);
 
   /**
    * Populates the form with an existing subscription's values and opens the edit form.
@@ -165,11 +166,11 @@ export function SubscriptionsView(): React.ReactElement {
       });
       const data = (await res.json()) as { ok: boolean };
       if (res.ok && data.ok) {
-        showToast(editId ? "Subscription updated." : "Subscription added.");
+        toast(editId ? "Subscription updated." : "Subscription added.", { tone: "success" });
         cancelForm();
         await load();
       } else {
-        showToast("Save failed.", true);
+        toast("Save failed.", { tone: "error" });
       }
     } finally {
       setSaving(false);
@@ -196,10 +197,10 @@ export function SubscriptionsView(): React.ReactElement {
         const msg = data.sheetSyncWarning
           ? "Payment recorded - sheet sync failed, add row manually."
           : "Payment recorded.";
-        showToast(msg, data.sheetSyncWarning);
+        toast(msg, { tone: data.sheetSyncWarning ? "warning" : "success" });
         await load();
       } else {
-        showToast("Record failed.", true);
+        toast("Record failed.", { tone: "error" });
       }
     } finally {
       setRecording(null);
@@ -224,14 +225,14 @@ export function SubscriptionsView(): React.ReactElement {
    * @param sub - Subscription to delete.
    */
   async function handleDelete(sub: Subscription): Promise<void> {
-    if (!confirm(`Delete subscription "${sub.description}"?`)) return;
+    setConfirmDeleteSub(null);
     setDeleting(sub.id);
     try {
       await fetch(`/api/business/subscriptions/${sub.id}`, {
         method: "DELETE",
         headers: {},
       });
-      showToast("Deleted.");
+      toast("Deleted.", { tone: "success" });
       await load();
     } finally {
       setDeleting(null);
@@ -240,19 +241,6 @@ export function SubscriptionsView(): React.ReactElement {
 
   return (
     <div>
-      {toast && (
-        <div
-          className={cn(
-            "mb-4 rounded-lg px-4 py-2 text-sm font-medium",
-            toast.warn
-              ? "border border-amber-200 bg-amber-50 text-amber-800"
-              : "border border-green-200 bg-green-50 text-green-800",
-          )}
-        >
-          {toast.msg}
-        </div>
-      )}
-
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-lg font-bold text-slate-800">Subscriptions</h2>
         {!showForm && (
@@ -444,17 +432,16 @@ export function SubscriptionsView(): React.ReactElement {
                       {overdue && " (overdue)"}
                     </span>
                     <button
-                      onClick={() => {
-                        void handleToggleActive(sub);
-                      }}
-                      className={cn(
-                        "ml-auto rounded-full px-2 py-0.5 text-xs font-medium",
-                        sub.isActive
-                          ? "bg-green-100 text-green-700"
-                          : "bg-slate-100 text-slate-500",
-                      )}
+                      type="button"
+                      onClick={() => void handleToggleActive(sub)}
+                      className="ml-auto"
+                      title={sub.isActive ? "Click to pause" : "Click to activate"}
                     >
-                      {sub.isActive ? "Active" : "Paused"}
+                      <StatusPill
+                        tone={!sub.isActive ? "neutral" : overdue ? "critical" : "success"}
+                      >
+                        {!sub.isActive ? "Paused" : overdue ? "Overdue" : "Active"}
+                      </StatusPill>
                     </button>
                   </div>
                   {sub.notes && <p className="mt-1 truncate text-xs text-slate-400">{sub.notes}</p>}
@@ -475,9 +462,7 @@ export function SubscriptionsView(): React.ReactElement {
                       Edit
                     </button>
                     <button
-                      onClick={() => {
-                        void handleDelete(sub);
-                      }}
+                      onClick={() => setConfirmDeleteSub(sub)}
                       disabled={deleting === sub.id}
                       className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
                     >
@@ -539,17 +524,15 @@ export function SubscriptionsView(): React.ReactElement {
                       </td>
                       <td className="px-4 py-3">
                         <button
-                          onClick={() => {
-                            void handleToggleActive(sub);
-                          }}
-                          className={cn(
-                            "rounded-full px-2 py-0.5 text-xs font-medium",
-                            sub.isActive
-                              ? "bg-green-100 text-green-700"
-                              : "bg-slate-100 text-slate-500",
-                          )}
+                          type="button"
+                          onClick={() => void handleToggleActive(sub)}
+                          title={sub.isActive ? "Click to pause" : "Click to activate"}
                         >
-                          {sub.isActive ? "Active" : "Paused"}
+                          <StatusPill
+                            tone={!sub.isActive ? "neutral" : overdue ? "critical" : "success"}
+                          >
+                            {!sub.isActive ? "Paused" : overdue ? "Overdue" : "Active"}
+                          </StatusPill>
                         </button>
                       </td>
                       <td className="px-4 py-3">
@@ -570,9 +553,7 @@ export function SubscriptionsView(): React.ReactElement {
                             Edit
                           </button>
                           <button
-                            onClick={() => {
-                              void handleDelete(sub);
-                            }}
+                            onClick={() => setConfirmDeleteSub(sub)}
                             disabled={deleting === sub.id}
                             className="rounded-lg border border-red-200 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
                           >
@@ -588,6 +569,20 @@ export function SubscriptionsView(): React.ReactElement {
           </div>
         </>
       )}
+
+      <ConfirmDialog
+        open={confirmDeleteSub !== null}
+        title="Delete subscription?"
+        body={
+          confirmDeleteSub
+            ? `Delete "${confirmDeleteSub.description}"? This stops future reminders; recorded payments stay on the ledger.`
+            : undefined
+        }
+        confirmLabel="Delete"
+        tone="danger"
+        onConfirm={() => confirmDeleteSub && void handleDelete(confirmDeleteSub)}
+        onCancel={() => setConfirmDeleteSub(null)}
+      />
     </div>
   );
 }

@@ -168,7 +168,7 @@ function CancelContent(): React.ReactElement {
   return (
     <main id="main" className="relative min-h-dvh overflow-hidden">
       {/* Backdrop */}
-      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+      <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
         <picture>
           <source type="image/avif" srcSet="/source/backdrop-blur.avif" />
           <img
@@ -227,7 +227,18 @@ function CancelContent(): React.ReactElement {
                     >
                       {submit.kind === "submitting" ? "Cancelling..." : "Confirm cancellation"}
                     </button>
-                    <Button href="/" variant="secondary" size="sm">
+                    {/* Moving the appointment is usually what someone actually
+                        wants when they land here - offer it before cancelling. */}
+                    {token && (
+                      <Button
+                        href={`/booking/edit?token=${encodeURIComponent(token)}`}
+                        variant="secondary"
+                        size="sm"
+                      >
+                        Reschedule instead
+                      </Button>
+                    )}
+                    <Button href="/" variant="ghost" size="sm">
                       Keep my booking
                     </Button>
                   </div>

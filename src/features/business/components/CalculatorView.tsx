@@ -6,11 +6,14 @@
  * a plain-English job description, and renders a live invoice preview.
  */
 
+import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
+import { useToast } from "@/features/admin/components/ui/Toast";
 import { validateEmail } from "@/features/booking/lib/booking";
 import { AddToContactsModal } from "@/features/business/components/AddToContactsModal";
 import { InvoicePreviewPanel } from "@/features/business/components/InvoicePreviewPanel";
 import { ParseConfidenceBanner } from "@/features/business/components/ParseConfidenceBanner";
 import { TaxonomyManageModal } from "@/features/business/components/TaxonomyManageModal";
+import { CancelFeeSection } from "@/features/business/components/calculator/CancelFeeSection";
 import { ClientPickerSection } from "@/features/business/components/calculator/ClientPickerSection";
 import { JobDetailsSection } from "@/features/business/components/calculator/JobDetailsSection";
 import { PartsSection } from "@/features/business/components/calculator/PartsSection";
@@ -23,13 +26,23 @@ import {
   collapseToWindow,
   composeDescription,
   effectiveHourlyRate,
+  enforceMinBillable,
   hourlyTaskMinutes,
   jobToLineItems,
   timeDiffMins,
   todayISO,
   type JobPricing,
 } from "@/features/business/lib/business";
-import { calcTravelCharge, FALLBACK_TRAVEL_RATE } from "@/features/business/lib/pricing-policy";
+import {
+  assessCancellation,
+  calcTravelCharge,
+  cancellationFeeLabel,
+  cancellationNotes,
+  FALLBACK_TRAVEL_RATE,
+  type CancellationPolicy,
+  type CancellationReason,
+  type CancelMeetingType,
+} from "@/features/business/lib/pricing-policy";
 import { summariseForBanner, type ActivePromo } from "@/features/business/lib/promos";
 import type {
   GoogleContact,
@@ -44,7 +57,6 @@ import type {
   TravelEntry,
 } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
-import { loadPlacesLibrary } from "@/shared/lib/google-maps-loader";
 import type { IdentitySettings } from "@/shared/lib/settings/types";
 import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 import { useRouter } from "next/navigation";
@@ -79,16 +91,29 @@ function addHour(t: string): string {
   const [h, m] = t.split(":").map(Number);
   return `${String((h + 1) % 24).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
+
 /**
- * Builds a UTC ISO timestamp for an HH:MM start time interpreted as NZ wall-clock.
- * Defaults to today; if the resulting time has already passed today's wall clock,
- * rolls forward to tomorrow so quotes for "later today" don't accidentally fall
- * outside Google's traffic-prediction horizon. Returns null when the input isn't
- * a valid HH:MM string.
+ * Adds minutes to a time string, clamped within the same day (00:00-23:59).
+ * @param t - A time string in HH:MM format.
+ * @param mins - Minutes to add (may be negative).
+ * @returns The shifted time string in HH:MM format.
+ */
+function addMinsToTime(t: string, mins: number): string {
+  const [h, m] = t.split(":").map(Number);
+  const total = Math.max(0, Math.min(24 * 60 - 1, h * 60 + m + Math.round(mins)));
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
+/**
+ * Builds a UTC ISO timestamp for an HH:MM NZ wall-clock start on the next
+ * occurrence of the job date's WEEKDAY (today counts while the time is still
+ * ahead). Google only quotes traffic for future departures, so a past job is
+ * priced at the same weekday + time as a proxy for that day's actual traffic.
+ * Returns null when the input isn't a valid HH:MM string.
  * @param hhmm - Start time in HH:MM (24h) NZ wall-clock.
+ * @param anchorDate - NZ-local YYYY-MM-DD whose weekday to match (the job date); malformed values fall back to today.
  * @returns ISO 8601 UTC timestamp, or null.
  */
-function jobStartIsoFromTime(hhmm: string): string | null {
+function jobStartIsoFromTime(hhmm: string, anchorDate?: string): string | null {
   if (!/^\d{1,2}:\d{2}$/.test(hhmm)) return null;
   const [h, m] = hhmm.split(":").map(Number);
   if (h < 0 || h > 23 || m < 0 || m > 59) return null;
@@ -99,10 +124,20 @@ function jobStartIsoFromTime(hhmm: string): string | null {
     day: "2-digit",
   }).format(new Date());
   const [y, mo, d] = nzDateStr.split("-").map(Number);
+  // Weekday of a Y-M-D is timezone-independent when computed in UTC.
+  const todayDow = new Date(Date.UTC(y, mo - 1, d)).getUTCDay();
+  let daysAhead = 0;
+  if (anchorDate && /^\d{4}-\d{2}-\d{2}$/.test(anchorDate)) {
+    const [ay, am, ad] = anchorDate.split("-").map(Number);
+    const targetDow = new Date(Date.UTC(ay, am - 1, ad)).getUTCDay();
+    daysAhead = (targetDow - todayDow + 7) % 7;
+  }
   const offset = getPacificAucklandOffset(y, mo, d);
-  let utc = new Date(Date.UTC(y, mo - 1, d, h - offset, m, 0));
+  let utc = new Date(Date.UTC(y, mo - 1, d + daysAhead, h - offset, m, 0));
   if (utc.getTime() < Date.now()) {
-    utc = new Date(utc.getTime() + 24 * 60 * 60 * 1000);
+    // Same-day time already passed: next day without an anchor, next week
+    // with one (keeping the weekday).
+    utc = new Date(utc.getTime() + (daysAhead === 0 && !anchorDate ? 1 : 7) * 24 * 60 * 60 * 1000);
   }
   return utc.toISOString();
 }
@@ -114,10 +149,9 @@ function jobStartIsoFromTime(hhmm: string): string | null {
 const DRAFT_KEY = "calculator-draft-v2";
 
 /**
- * Subset of CalculatorView state worth persisting across refreshes. Excludes
- * server-fetched data (rates, taskTemplates, contacts, activePromo), UI flags
- * (showParts, showRates etc), loading state, and the AI-parse results/clarify
- * session. The "Describe the job" input text itself IS persisted (`aiInput`).
+ * Subset of CalculatorView state persisted across refreshes. Excludes
+ * server-fetched data, UI flags, and the AI-parse session; the "Describe the
+ * job" text itself IS persisted (`aiInput`).
  */
 interface CalculatorDraft {
   v: 2;
@@ -144,10 +178,8 @@ interface CalculatorDraft {
 }
 
 /**
- * True when the draft has at least one field the operator clearly typed or
- * picked - used to decide whether to show the "Draft restored" toast.
- * Auto-seeded values (time slots, default hourly rate) on their own aren't
- * worth surfacing as a restore notification.
+ * True when the draft has at least one operator-entered field - auto-seeded
+ * values alone aren't worth a "Draft restored" toast.
  * @param d - Parsed draft.
  * @returns Whether the draft is worth announcing on restore.
  */
@@ -169,9 +201,8 @@ function isMeaningfulDraft(d: CalculatorDraft): boolean {
 }
 
 /**
- * Reads the saved draft from localStorage. Returns null when no draft exists,
- * the JSON is corrupt, or the schema version doesn't match (so old shapes are
- * ignored after a bump rather than crashing the form).
+ * Reads the saved draft from localStorage. Returns null when missing, corrupt,
+ * or schema-version mismatched (old shapes are ignored, not crashed on).
  * @returns Parsed draft, or null.
  */
 function loadDraft(): CalculatorDraft | null {
@@ -268,8 +299,14 @@ function todayNZDate(): string {
 interface CalculatorViewProps {
   /** Live business identity, threaded into the invoice preview. */
   identity: IdentitySettings;
-  /** Live pricing (GST, min travel, billing increment) for the job calculations. */
+  /** Live pricing (GST, min travel) for the job calculations. */
   pricing: JobPricing;
+  /**
+   * Live cancellation policy driving cancel mode: the notice windows decide
+   * whether a fee and the round trip apply, and callOutFee is the amount. Sits
+   * outside {@link JobPricing} because none of it is a calcJobTotal input.
+   */
+  cancellation: CancellationPolicy;
   /** Rate configs resolved server-side so the calculator renders without a fetch waterfall. */
   initialRates: RateConfig[];
   /** Task templates resolved server-side, ordered by usage. */
@@ -300,6 +337,12 @@ export interface EventPrefill {
   clientEmail: string;
   jobAddress: string;
   /**
+   * How the booking was to be met. Cancel mode bills no round trip on a remote
+   * session. Null when no Booking row backs the event, in which case the
+   * calculator infers it from whether there is an address or a drive.
+   */
+  meetingType: CancelMeetingType | null;
+  /**
    * Drive prediction made for the event's actual window, from the frozen
    * TravelBlock (raw minutes, no scheduling buffer) or the booking snapshot.
    * Null when neither exists - the operator looks up manually.
@@ -314,6 +357,7 @@ export interface EventPrefill {
  * @param props - Component props.
  * @param props.identity - Live business identity for the invoice preview.
  * @param props.pricing - Live pricing for the job calculations.
+ * @param props.cancellation - Live cancellation policy driving cancel mode.
  * @param props.initialRates - Server-resolved rate configs.
  * @param props.initialTaskTemplates - Server-resolved task templates.
  * @param props.initialPromo - Server-resolved active promo, or null.
@@ -323,6 +367,7 @@ export interface EventPrefill {
 export function CalculatorView({
   identity,
   pricing,
+  cancellation,
   initialRates,
   initialTaskTemplates,
   initialPromo,
@@ -330,11 +375,9 @@ export function CalculatorView({
 }: CalculatorViewProps): React.ReactElement {
   const router = useRouter();
 
-  // The saved draft lives in localStorage (client-only), so reading it during
-  // render made the server HTML and the client hydration disagree whenever a
-  // draft existed (React hydration error on every calculator load). State
-  // initialises to server-consistent defaults; the mount effect below
-  // restores the draft after hydration.
+  // Draft restore runs in the mount effect below - reading localStorage during
+  // render made server HTML and client hydration disagree whenever a draft
+  // existed. State initialises to server-consistent defaults.
   // True when a meaningful draft was restored; readable inside async .then()
   // callbacks without being a React dependency.
   const draftLoadedRef = useRef(false);
@@ -358,7 +401,7 @@ export function CalculatorView({
   // top of the slot sum. The AI parse seeds it from outOfSessionMins.
   const [followUpMins, setFollowUpMins] = useState(0);
   // Every travel charge (auto-lookup + any manual entries) lumped together.
-  // jobToLineItems sums them into a single "Travel" invoice line. An event
+  // jobToLineItems sums them into one "Round-trip travel" invoice line. An event
   // prefill seeds the entry from the drive prediction made for the event's
   // ACTUAL window (frozen TravelBlock / booking snapshot) - a fresh lookup on
   // a past job could only quote tomorrow's traffic, not that day's.
@@ -388,6 +431,25 @@ export function CalculatorView({
   const [notes, setNotes] = useState("");
   // Half off labour when ticked (per pricing-policy.unsuccessfulWorkCopy).
   const [unsuccessful, setUnsuccessful] = useState(false);
+  // Cancel mode: a cancelled job has no work to bill, so the job-shaped sections
+  // are swapped for CancelFeeSection and the fee is written into tasks as one
+  // flat line. Client picker, travel, invoice preview, and save are reused as-is.
+  const [cancelMode, setCancelMode] = useState(false);
+  const [cancelReason, setCancelReason] = useState<CancellationReason>("late-cancellation");
+  const [includeCancelTravel, setIncludeCancelTravel] = useState(true);
+  // The booking's start and the moment the client called it off. The policy
+  // windows are measured between these two, so both are operator-entered rather
+  // than read off the clock - this is usually written up after the fact.
+  const [cancelBookingTime, setCancelBookingTime] = useState("09:00");
+  const [cancelledAtDate, setCancelledAtDate] = useState("");
+  const [cancelledAtTime, setCancelledAtTime] = useState("09:00");
+  // On site or remote. The fee covers the held slot either way, but only an
+  // in-person booking has a drive, so the travel window never applies remotely.
+  const [cancelMeetingType, setCancelMeetingType] = useState<CancelMeetingType>("in-person");
+  const cancelSectionRef = useRef<HTMLDivElement>(null);
+  // Travel entries parked while the policy says no round trip, so flipping the
+  // decision back restores the figure instead of forcing a fresh lookup.
+  const [stashedTravel, setStashedTravel] = useState<TravelEntry[]>([]);
   // Client details
   const [clientName, setClientName] = useState(() => eventPrefill?.clientName ?? "");
   const [clientEmail, setClientEmail] = useState(() => eventPrefill?.clientEmail ?? "");
@@ -402,9 +464,15 @@ export function CalculatorView({
   // successful POST so handleAddContactClose can PATCH `contactId` once the
   // modal returns the new Contact's id, then navigate to the detail page.
   const [savingInvoice, setSavingInvoice] = useState(false);
+  // True while the in-flight save is a "Save & send" (routes to ?send=1 and
+  // skips the calculator's add-to-contacts gate); drives the two button labels.
+  const [saveSendMode, setSaveSendMode] = useState(false);
   const [saveInvoiceError, setSaveInvoiceError] = useState<string | null>(null);
   const [pendingInvoiceId, setPendingInvoiceId] = useState<string | null>(null);
-  const [sheetSyncToast, setSheetSyncToast] = useState<string | null>(null);
+  const { toast } = useToast();
+  // Rate confirm dialogs (replacing window.confirm on reset / delete-rate).
+  const [confirmResetOpen, setConfirmResetOpen] = useState(false);
+  const [confirmDeleteRateId, setConfirmDeleteRateId] = useState<string | null>(null);
 
   // "Bill a calendar event" picker: lazily fetched on first open so a normal
   // calculator load costs nothing; choosing an event reloads the page with
@@ -445,12 +513,10 @@ export function CalculatorView({
   // Travel lookup
   const [jobAddress, setJobAddress] = useState(() => eventPrefill?.jobAddress ?? "");
   const [lookingUpTravel, setLookingUpTravel] = useState(false);
-  const addressInputRef = useRef<HTMLInputElement>(null);
 
   // Contacts and income save
   const [contacts, setContacts] = useState<GoogleContact[]>([]);
   const [savingIncome, setSavingIncome] = useState(false);
-  const [incomeToast, setIncomeToast] = useState<string | null>(null);
   const [incomeError, setIncomeError] = useState<string | null>(null);
 
   // Rate management
@@ -511,50 +577,15 @@ export function CalculatorView({
     };
   }, [jobDate]);
 
-  // Google Maps address autocomplete
-  useEffect(() => {
-    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
-    if (!apiKey || !addressInputRef.current) return;
-
-    const inputEl = addressInputRef.current;
-    let cancelled = false;
-    let listener: google.maps.MapsEventListener | null = null;
-
-    loadPlacesLibrary(apiKey)
-      .then(() => {
-        if (cancelled || !inputEl) return;
-        const autocomplete = new google.maps.places.Autocomplete(inputEl, {
-          componentRestrictions: { country: "nz" },
-          fields: ["formatted_address", "address_components"],
-          types: ["geocode"],
-        });
-        listener = autocomplete.addListener("place_changed", () => {
-          const place = autocomplete.getPlace();
-          // Keep the full formatted address so it matches what the AI phraser
-          // receives; travel-time still resolves a suburb out of the full string.
-          const next =
-            place.formatted_address ??
-            place.address_components?.find(
-              (c) => c.types.includes("locality") || c.types.includes("sublocality_level_1"),
-            )?.long_name ??
-            "";
-          if (next) {
-            setJobAddress(next);
-            // Drop any stale auto entry so the operator runs a fresh lookup;
-            // manual entries (parking, etc.) survive.
-            setTravelEntries((prev) => prev.filter((e) => !e.isAuto));
-          }
-        });
-      })
-      .catch((err) => {
-        console.error("[calculator] Maps autocomplete failed to load:", err);
-      });
-
-    return () => {
-      cancelled = true;
-      if (listener) google.maps.event.removeListener(listener);
-    };
-  }, []);
+  /**
+   * Applies a picked Places suggestion: keep the full formatted address and
+   * drop the stale auto travel entry (manual entries survive).
+   * @param formattedAddress - The selected address.
+   */
+  function handleAddressSelected(formattedAddress: string): void {
+    setJobAddress(formattedAddress);
+    setTravelEntries((prev) => prev.filter((e) => !e.isAuto));
+  }
 
   // Mount seeding + contacts fetch. Rates/templates/promo arrive as server
   // props; the "now" times must still seed in an effect (nowTime() at render
@@ -662,9 +693,9 @@ export function CalculatorView({
   // out-of-session follow-up minutes.
   const sumRangesMin = timeRanges.reduce((s, r) => s + timeDiffMins(r.startTime, r.endTime), 0);
   const durationMins = sumRangesMin + followUpMins;
-  // Aggregate first start / last end - used for the travel departure ISO and
-  // the persisted JobCalculation. Sorted by startTime so out-of-order operator
-  // entries still produce sensible bounds.
+  // Aggregate first start / last end - used for the travel departure ISOs.
+  // Sorted by startTime so out-of-order operator entries still produce
+  // sensible bounds.
   const sortedRanges = [...timeRanges]
     .filter((r) => r.startTime)
     .sort((a, b) => a.startTime.localeCompare(b.startTime));
@@ -681,21 +712,33 @@ export function CalculatorView({
   const flatRates = rates.filter((r) => r.flatRate !== null);
 
   // Assemble the job and totals. Labour bills entirely through the per-task
-  // base + modifier rates, so the legacy top-level time charge stays null.
+  // base + modifier rates; durationMins is the rebalance window, not a charge.
   const job: JobCalculation = {
-    startTime: aggregateStart,
-    endTime: aggregateEnd,
     durationMins,
-    hourlyRate: null,
     tasks,
     parts,
     travelEntries,
     notes,
-    gst: false,
     unsuccessful,
     clientName,
     clientEmail,
   };
+  // Cancel-mode verdict for the form's explanation. Pure: new Date(string) is
+  // deterministic, unlike the argless new Date() / Date.now() the React Compiler
+  // purity rule rejects in render. The windows are measured from the booking's
+  // start back to the moment the client called it off.
+  const cancelBookingStart = new Date(`${jobDate}T${cancelBookingTime || "00:00"}`);
+  const cancelledAtStamp = new Date(`${cancelledAtDate || jobDate}T${cancelledAtTime || "00:00"}`);
+  const cancelNoticeHours =
+    (cancelBookingStart.getTime() - cancelledAtStamp.getTime()) / (60 * 60 * 1000);
+  // Same helper the charge itself goes through, so the explanation can never
+  // disagree with what lands on the invoice.
+  const cancelCharge = assessCancellation(cancelBookingStart, cancelledAtStamp, {
+    reason: cancelReason,
+    meetingType: cancelMeetingType,
+    policy: cancellation,
+  });
+
   // Apply the date's public-holiday uplift to labour (0 when not a holiday).
   const jobPricing = { ...pricing, holidayUplift: holiday.uplift };
   const totals = calcJobTotal(job, !skipPromo ? activePromo : null, jobPricing);
@@ -703,14 +746,7 @@ export function CalculatorView({
   // skip re-render when unrelated parent state changes (e.g. typing in the
   // AI input box). Recomputes when any meaningful input shifts.
   const previewLineItems = useMemo(
-    () =>
-      jobToLineItems(
-        job,
-        pricing.billingIncrementMins,
-        holiday.uplift,
-        pricing.minTravelCharge,
-        pricing.minBillableMins,
-      ),
+    () => jobToLineItems(job, holiday.uplift, pricing.minTravelCharge, pricing.minBillableMins),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       tasks,
@@ -759,22 +795,26 @@ export function CalculatorView({
         setTimeRanges([{ startTime: result.startTime, endTime: result.endTime }]);
         parsedWindowMin += timeDiffMins(result.startTime, result.endTime);
       } else if (result.startTime) {
-        const end = nowTime();
+        // Start stated but no end: close the slot at the event's end when billing
+        // a booked job, else at "now". Anchoring to now would end a past job at
+        // today's wall clock instead of inside its actual window.
+        const end = eventPrefill ? eventPrefill.endTime : nowTime();
         setTimeRanges([{ startTime: result.startTime, endTime: end }]);
         parsedWindowMin += timeDiffMins(result.startTime, end);
       } else if (result.durationMins !== null) {
+        // Duration only ("was there about 2 hours"): anchor the slot to the
+        // event's start when billing a booked job, else to now-minus-duration.
         const inSessionMins = Math.max(0, result.durationMins - outMins);
-        const now = new Date();
-        const endTotalMins = now.getHours() * 60 + now.getMinutes();
-        const startTotalMins = Math.max(0, endTotalMins - inSessionMins);
-        const sh = Math.floor(startTotalMins / 60);
-        const sm = startTotalMins % 60;
-        setTimeRanges([
-          {
-            startTime: `${String(sh).padStart(2, "0")}:${String(sm).padStart(2, "0")}`,
-            endTime: nowTime(),
-          },
-        ]);
+        let startTime: string;
+        let endTime: string;
+        if (eventPrefill) {
+          startTime = eventPrefill.startTime;
+          endTime = addMinsToTime(eventPrefill.startTime, inSessionMins);
+        } else {
+          endTime = nowTime();
+          startTime = addMinsToTime(endTime, -inSessionMins);
+        }
+        setTimeRanges([{ startTime, endTime }]);
         parsedWindowMin = outMins + inSessionMins;
       }
 
@@ -837,19 +877,33 @@ export function CalculatorView({
           pricing.minTravelCharge,
         );
         const label = result.destination?.trim() || `${result.travel.durationMins} min drive`;
-        setTravelEntries((prev) => [
-          {
-            label,
-            cost,
-            isAuto: true,
-            destination: result.destination ?? label,
-            durationMinsOneWay: result.travel?.durationMins,
-            durationMinsBack: result.travel?.durationMinsBack,
-            distanceKmOneWay: result.travel?.distanceKmOneWay,
-          },
-          ...parsedCostEntries,
-          ...prev.filter((e) => !e.isAuto && !e.isParsedCost),
-        ]);
+        const destination = result.destination ?? label;
+        setTravelEntries((prev) => {
+          // Google's live predictions drift between calls (minutes and even
+          // the chosen route change), so a reparse of the same destination
+          // keeps the existing auto entry rather than silently moving the
+          // travel price. "Look up" is the deliberate refresh.
+          const existingAuto = prev.find((e) => e.isAuto);
+          const sameDestination =
+            existingAuto?.destination?.trim().toLowerCase() === destination.trim().toLowerCase();
+          const autoEntry =
+            existingAuto && sameDestination
+              ? existingAuto
+              : {
+                  label,
+                  cost,
+                  isAuto: true,
+                  destination,
+                  durationMinsOneWay: result.travel?.durationMins,
+                  durationMinsBack: result.travel?.durationMinsBack,
+                  distanceKmOneWay: result.travel?.distanceKmOneWay,
+                };
+          return [
+            autoEntry,
+            ...parsedCostEntries,
+            ...prev.filter((e) => !e.isAuto && !e.isParsedCost),
+          ];
+        });
       } else {
         // No drive time from the parse (remote work or geocode-to-origin): drop
         // any stale auto entry, keep operator-typed manual entries, and still
@@ -860,12 +914,12 @@ export function CalculatorView({
           ...prev.filter((e) => !e.isAuto && !e.isParsedCost),
         ]);
       }
-      // Rebalance parsed tasks to fit the listed window so an AI over-estimating
-      // a single step doesn't silently over-bill. Tasks scale proportionally so
-      // the over-long ones absorb more of the correction; anything that scales
-      // below the minimum is dropped and the rest rescale.
+      // Rebalance parsed tasks proportionally to fit the listed window (over-
+      // long tasks absorb more of the correction; tasks scaling below the
+      // minimum drop), then floor the whole job to the minimum billable time
+      // so a sub-minimum job bills - and displays - at the floor.
       const collapsed = collapseToWindow(parsedTasks, parsedWindowMin);
-      setTasks(collapsed.tasks);
+      setTasks(enforceMinBillable(collapsed.tasks, pricing.minBillableMins));
       if (collapsed.rescaled || collapsed.dropped > 0) {
         const parts: string[] = ["Rebalanced tasks"];
         if (collapsed.dropped > 0) {
@@ -873,13 +927,12 @@ export function CalculatorView({
             `(dropped ${collapsed.dropped} tiny task${collapsed.dropped === 1 ? "" : "s"})`,
           );
         }
-        setIncomeToast(`${parts.join(" ")} to fit the ${parsedWindowMin}-min window.`);
-        setTimeout(() => setIncomeToast(null), 4000);
+        toast(`${parts.join(" ")} to fit the ${parsedWindowMin}-min window.`, { tone: "info" });
       }
       setParts(parsedParts);
       if (result.notes) setNotes(result.notes);
     },
-    [pricing.minTravelCharge],
+    [pricing.minTravelCharge, pricing.minBillableMins, eventPrefill, toast],
   );
 
   /**
@@ -894,7 +947,19 @@ export function CalculatorView({
     setParseResult(null);
     setClarifyQuestions([]);
     try {
-      const body: Record<string, unknown> = { input: aiInput };
+      // jobDate lets the server quote travel at the job's weekday traffic
+      // pattern rather than today's.
+      // When billing a booked job, hand the AI the booking's actual window so
+      // it bills the real session length. The parser reads a digit-led
+      // "HH:MM-HH:MM" line as the session range; only prepend it when the
+      // description doesn't state its own times, so operator-typed times win.
+      const eventWindow =
+        eventPrefill && eventPrefill.startTime && eventPrefill.endTime
+          ? `${eventPrefill.startTime}-${eventPrefill.endTime}`
+          : null;
+      const statesTime = /\d{1,2}:\d{2}|\d{1,2}\s?(?:am|pm)/i.test(aiInput);
+      const input = eventWindow && !statesTime ? `${eventWindow}\n${aiInput}` : aiInput;
+      const body: Record<string, unknown> = { input, jobDate };
       if (answers && Object.keys(answers).length > 0) body.answers = answers;
       const res = await fetch("/api/business/parse-job", {
         method: "POST",
@@ -1058,17 +1123,209 @@ export function CalculatorView({
     setClarifyQuestions([]);
     setClarifyAnswers({});
     setDraftRestoredAt(null);
+    setCancelMode(false);
     clearDraft();
+  }
+
+  /**
+   * The cancellation fee as a single flat task. baseRateId stays null so
+   * business.ts treats it as flat: bills qty * unitPrice, contributes no
+   * labour minutes, and collapseToWindow ignores it. No RateConfig needed -
+   * rateConfigId only links flat rate rows like Travel.
+   * @param reason - Which fee is being billed.
+   * @param date - The cancelled booking's date (YYYY-MM-DD).
+   * @param fee - Fee amount in NZD.
+   * @returns The single flat task representing the fee.
+   */
+  function buildCancelFeeTask(reason: CancellationReason, date: string, fee: number): TaskLine {
+    return {
+      rateConfigId: null,
+      baseRateId: null,
+      description: cancellationFeeLabel(reason, date),
+      qty: 1,
+      unitPrice: fee,
+      lineTotal: fee,
+    };
+  }
+
+  /**
+   * Bills the round trip or parks it. Parking stashes the entries rather than
+   * dropping them, so reversing the decision restores the figure instead of
+   * forcing a fresh address lookup.
+   * @param include - Whether to bill travel.
+   */
+  function applyCancelTravel(include: boolean): void {
+    setIncludeCancelTravel(include);
+    if (include) {
+      setTravelEntries((prev) => (prev.length === 0 ? stashedTravel : prev));
+    } else {
+      setTravelEntries((prev) => {
+        if (prev.length > 0) setStashedTravel(prev);
+        return [];
+      });
+    }
+  }
+
+  /**
+   * Applies the cancellation policy to the entered times and rewrites the fee
+   * line, note, and travel decision. Every cancel input funnels through here
+   * so the invoice always reflects the policy: more than freeNoticeHours'
+   * notice zeroes the fee, a no-show always bills (no notice to measure), and
+   * travel only ever applies to an in-person booking.
+   * @param next - The changed inputs; anything omitted keeps its current value.
+   * @param next.reason - Late cancellation or no-show.
+   * @param next.meetingType - On site or remote.
+   * @param next.bookingDate - The booking's date (YYYY-MM-DD).
+   * @param next.bookingTime - The booking's start time (HH:MM).
+   * @param next.cancelledDate - Date the client called it off (YYYY-MM-DD).
+   * @param next.cancelledTime - Time the client called it off (HH:MM).
+   */
+  function applyCancelPolicy(next: {
+    reason?: CancellationReason;
+    meetingType?: CancelMeetingType;
+    bookingDate?: string;
+    bookingTime?: string;
+    cancelledDate?: string;
+    cancelledTime?: string;
+  }): void {
+    const reason = next.reason ?? cancelReason;
+    const meetingType = next.meetingType ?? cancelMeetingType;
+    const bookingDate = next.bookingDate ?? jobDate;
+    const bookingTime = next.bookingTime ?? cancelBookingTime;
+    const offDate = (next.cancelledDate ?? cancelledAtDate) || bookingDate;
+    const offTime = next.cancelledTime ?? cancelledAtTime;
+
+    const charge = assessCancellation(
+      new Date(`${bookingDate}T${bookingTime}`),
+      new Date(`${offDate}T${offTime}`),
+      { reason, meetingType, policy: cancellation },
+    );
+
+    setTasks([buildCancelFeeTask(reason, bookingDate, charge.fee)]);
+    setNotes(cancellationNotes(reason, bookingDate));
+    applyCancelTravel(charge.travelApplies);
+  }
+
+  /**
+   * Enters cancel mode, replacing job work with the policy's verdict. Tasks
+   * and parts clear (nothing was done on site); the cancel moment seeds at the
+   * booking start so the worst case shows until the real time is entered.
+   */
+  function enterCancelMode(): void {
+    const bookingTime = eventPrefill?.startTime ?? timeRanges[0]?.startTime ?? "09:00";
+    // Prefer the booking's own answer. Without one (an event created straight on
+    // the calendar), infer from whether there is anywhere to drive to.
+    const meetingType: CancelMeetingType =
+      eventPrefill?.meetingType ??
+      (jobAddress.trim() || travelEntries.length > 0 ? "in-person" : "remote");
+    setCancelMode(true);
+    setCancelReason("late-cancellation");
+    setCancelMeetingType(meetingType);
+    setCancelBookingTime(bookingTime);
+    setCancelledAtDate(jobDate);
+    setCancelledAtTime(bookingTime);
+    setParts([]);
+    setUnsuccessful(false);
+    applyCancelPolicy({
+      reason: "late-cancellation",
+      meetingType,
+      bookingTime,
+      cancelledDate: jobDate,
+      cancelledTime: bookingTime,
+    });
+  }
+
+  /**
+   * Leaves cancel mode and clears the fee line so a half-finished cancel cannot
+   * leak into a job invoice.
+   */
+  function exitCancelMode(): void {
+    setCancelMode(false);
+    setTasks([]);
+    setNotes("");
+  }
+
+  // The button that opens cancel mode sits at the bottom of the column while the
+  // form renders at the top, so without this you would click it and watch
+  // nothing happen. Runs after the form exists; exiting is left alone, since the
+  // button you came back to is already under the cursor.
+  useEffect(() => {
+    if (!cancelMode) return;
+    const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    cancelSectionRef.current?.scrollIntoView({
+      block: "start",
+      behavior: prefersReduced ? "auto" : "smooth",
+    });
+  }, [cancelMode]);
+
+  /**
+   * Switches the fee type and re-applies the policy.
+   * @param reason - The newly-picked fee type.
+   */
+  function handleCancelReasonChange(reason: CancellationReason): void {
+    setCancelReason(reason);
+    applyCancelPolicy({ reason });
+  }
+
+  /**
+   * Switches between an on-site and a remote booking and re-applies the policy.
+   * Flipping to remote parks the round trip; flipping back restores it when the
+   * timing still warrants one.
+   * @param meetingType - The newly-picked meeting type.
+   */
+  function handleCancelMeetingTypeChange(meetingType: CancelMeetingType): void {
+    setCancelMeetingType(meetingType);
+    applyCancelPolicy({ meetingType });
+  }
+
+  /**
+   * Corrects the booking's date and re-applies the policy.
+   * @param date - The new date (YYYY-MM-DD).
+   */
+  function handleCancelledDateChange(date: string): void {
+    setJobDate(date);
+    applyCancelPolicy({ bookingDate: date });
+  }
+
+  /**
+   * Corrects the booking's start time and re-applies the policy.
+   * @param time - The new start time (HH:MM).
+   */
+  function handleCancelBookingTimeChange(time: string): void {
+    setCancelBookingTime(time);
+    applyCancelPolicy({ bookingTime: time });
+  }
+
+  /**
+   * Corrects the date the client called it off and re-applies the policy.
+   * @param date - The new date (YYYY-MM-DD).
+   */
+  function handleCancelledAtDateChange(date: string): void {
+    setCancelledAtDate(date);
+    applyCancelPolicy({ cancelledDate: date });
+  }
+
+  /**
+   * Corrects the time the client called it off and re-applies the policy.
+   * @param time - The new time (HH:MM).
+   */
+  function handleCancelledAtTimeChange(time: string): void {
+    setCancelledAtTime(time);
+    applyCancelPolicy({ cancelledTime: time });
   }
 
   /**
    * Direct save: POSTs the calculator state straight to the invoices API and
    * navigates to the detail page. Backdating / custom invoice number / custom
    * due date is handled by editing a saved DRAFT after the fact.
+   * @param send - When true ("Save & send"), skip the add-to-contacts gate and
+   *   route to the detail page with `?send=1` so it auto-opens the send preview
+   *   (which has its own add-to-contacts hook-in + contactId backfill).
    */
-  async function handleSaveInvoice(): Promise<void> {
+  async function handleSaveInvoice(send = false): Promise<void> {
     // Validate required fields
     setSaveInvoiceError(null);
+    setSaveSendMode(send);
     if (!clientName.trim()) {
       setSaveInvoiceError("Client name is required.");
       return;
@@ -1099,7 +1356,6 @@ export function CalculatorView({
       await saveTaskTemplates(tasks);
       const lineItems = jobToLineItems(
         job,
-        pricing.billingIncrementMins,
         holiday.uplift,
         pricing.minTravelCharge,
         pricing.minBillableMins,
@@ -1134,13 +1390,15 @@ export function CalculatorView({
         | { error: string };
       if ("error" in d) throw new Error(d.error);
       if (d.sheetSyncWarning) {
-        setSheetSyncToast("Invoice saved - sheet counter sync failed. Update SETTINGS!B17.");
-        setTimeout(() => setSheetSyncToast(null), 6000);
+        toast("Invoice saved - sheet counter sync failed. Update SETTINGS!B17.", {
+          tone: "warning",
+        });
       }
       const invoiceId = d.invoice.id;
       // Add-to-contacts gate: defer nav until the modal closes so
-      // handleAddContactClose can backfill contactId via PATCH.
-      if (clientEmail.trim()) {
+      // handleAddContactClose can backfill contactId via PATCH. "Save & send"
+      // skips this - the detail send flow runs its own add-to-contacts hook-in.
+      if (!send && clientEmail.trim()) {
         try {
           const checkRes = await fetch(
             `/api/admin/contacts/check?email=${encodeURIComponent(clientEmail.trim())}`,
@@ -1159,7 +1417,7 @@ export function CalculatorView({
       // operator opens it (mirrors the AddToContactsModal-gated path: the
       // backfill handler in handleAddContactClose ALSO clears the draft).
       clearDraft();
-      router.push(`/admin/business/invoices/${invoiceId}`);
+      router.push(`/admin/business/invoices/${invoiceId}${send ? "?send=1" : ""}`);
     } catch (err) {
       setSaveInvoiceError(err instanceof Error ? err.message : "Could not save invoice");
       setSavingInvoice(false);
@@ -1190,8 +1448,7 @@ export function CalculatorView({
       });
       const d = await res.json();
       if (d.ok) {
-        setIncomeToast("Income entry saved.");
-        setTimeout(() => setIncomeToast(null), 3000);
+        toast("Income entry saved.", { tone: "success" });
         resetFormState();
       } else {
         setIncomeError(d.error || "Could not save income entry.");
@@ -1204,12 +1461,10 @@ export function CalculatorView({
   }
 
   /**
-   * Calls the travel-time API with the current job address and replaces the
-   * single auto travel entry. Manual entries (parking, etc.) are preserved.
-   * Each leg is quoted at its own departure: outbound at the job start,
-   * return at the job end (or start + duration when no end time is set).
-   * Drive time of 0 (geocoded to origin or no match) leaves no auto entry;
-   * any non-zero drive time bills the $10 minimum via {@link calcTravelCharge}.
+   * Calls the travel-time API and replaces the single auto travel entry
+   * (manual entries survive). Each leg quotes at its own departure: outbound
+   * at job start, return at job end. Zero drive time leaves no auto entry;
+   * any non-zero drive bills the $10 minimum via {@link calcTravelCharge}.
    */
   async function handleTravelLookup(): Promise<void> {
     if (!jobAddress.trim()) return;
@@ -1218,12 +1473,13 @@ export function CalculatorView({
     // lookup is in flight; manual entries survive.
     setTravelEntries((prev) => prev.filter((e) => !e.isAuto));
     try {
-      const departureTimeIso = jobStartIsoFromTime(aggregateStart);
+      // Both legs anchor to the JOB DATE's weekday so a past job is quoted
+      // with the traffic pattern of the day it actually happened.
+      const departureTimeIso = jobStartIsoFromTime(aggregateStart, jobDate);
       // Return departure: the job's end time, guarded against
-      // jobStartIsoFromTime's independent roll-forward (a past start rolls to
-      // tomorrow while a future end stays today, inverting the pair); falls
-      // back to departure + estimated duration, else the server's default.
-      let returnDepartureTimeIso = jobStartIsoFromTime(aggregateEnd);
+      // jobStartIsoFromTime's independent roll-forward inverting the pair;
+      // falls back to departure + estimated duration, else the server's default.
+      let returnDepartureTimeIso = jobStartIsoFromTime(aggregateEnd, jobDate);
       if (
         departureTimeIso &&
         returnDepartureTimeIso &&
@@ -1339,13 +1595,6 @@ export function CalculatorView({
    * cancels any in-progress edit so the form doesn't hold a stale ID.
    */
   async function handleResetRates(): Promise<void> {
-    if (
-      !confirm(
-        "Wipe all rates and reseed the defaults (Standard, At home, Remote, Public Holiday, Travel)? Any custom rates you've added will be deleted.",
-      )
-    ) {
-      return;
-    }
     handleCancelEdit();
     setResettingRates(true);
     try {
@@ -1474,7 +1723,6 @@ export function CalculatorView({
    * @param id - The ID of the rate configuration to delete.
    */
   async function handleDeleteRate(id: string): Promise<void> {
-    if (!confirm("Delete this rate?")) return;
     const res = await fetch(`/api/business/rates/${id}`, { method: "DELETE" });
     if (!res.ok) {
       // 404 = already deleted server-side. Refresh so the row disappears
@@ -1511,6 +1759,32 @@ export function CalculatorView({
           }}
         />
       )}
+
+      <ConfirmDialog
+        open={confirmResetOpen}
+        title="Reset all rates?"
+        body="This wipes every rate and reseeds the defaults (Standard, At home, Remote, Public Holiday, Travel). Any custom rates you've added will be deleted."
+        confirmLabel="Reset rates"
+        tone="danger"
+        onConfirm={() => {
+          setConfirmResetOpen(false);
+          void handleResetRates();
+        }}
+        onCancel={() => setConfirmResetOpen(false)}
+      />
+
+      <ConfirmDialog
+        open={confirmDeleteRateId !== null}
+        title="Delete this rate?"
+        confirmLabel="Delete"
+        tone="danger"
+        onConfirm={() => {
+          const id = confirmDeleteRateId;
+          setConfirmDeleteRateId(null);
+          if (id) void handleDeleteRate(id);
+        }}
+        onCancel={() => setConfirmDeleteRateId(null)}
+      />
 
       {/* Job date - drives the public-holiday + promo lookup for this job. */}
       <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
@@ -1575,8 +1849,8 @@ export function CalculatorView({
           onSubmit={handleSubmitRate}
           onStartEdit={handleStartEdit}
           onCancelEdit={handleCancelEdit}
-          onDeleteRate={handleDeleteRate}
-          onResetRates={() => void handleResetRates()}
+          onDeleteRate={(id) => setConfirmDeleteRateId(id)}
+          onResetRates={() => setConfirmResetOpen(true)}
         />
       )}
 
@@ -1605,11 +1879,60 @@ export function CalculatorView({
               client, address, and frozen travel prediction. */}
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             {eventPrefill ? (
-              <p className="text-sm text-slate-600">
-                <span className="font-semibold text-russian-violet">Billing booked job:</span>{" "}
-                {eventPrefill.clientName || "(no name)"} - {eventPrefill.jobDate},{" "}
-                {eventPrefill.startTime}-{eventPrefill.endTime}
-              </p>
+              (() => {
+                // Live banner: reflect the CURRENT job date + slot (which the
+                // operator may have edited below), and flag when they drift from
+                // the event's original window so a stray edit is obvious.
+                const slotStart = timeRanges[0]?.startTime ?? "";
+                const slotEnd = timeRanges[timeRanges.length - 1]?.endTime ?? "";
+                const drifted =
+                  jobDate !== eventPrefill.jobDate ||
+                  slotStart !== eventPrefill.startTime ||
+                  slotEnd !== eventPrefill.endTime;
+                return (
+                  <div className="space-y-2 text-sm">
+                    <p className="text-slate-600">
+                      <span className="font-semibold text-russian-violet">Billing booked job:</span>{" "}
+                      {eventPrefill.clientName || "(no name)"} - {jobDate}, {slotStart || "--:--"}-
+                      {slotEnd || "--:--"}
+                      {eventPrefill.bookingId && (
+                        <>
+                          {" · "}
+                          <a
+                            href={`/admin/bookings/${eventPrefill.bookingId}`}
+                            className="font-medium text-russian-violet underline hover:opacity-80"
+                          >
+                            View booking ↗
+                          </a>
+                        </>
+                      )}
+                    </p>
+                    {drifted && (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs text-amber-700">
+                          Differs from the event window ({eventPrefill.jobDate},{" "}
+                          {eventPrefill.startTime}-{eventPrefill.endTime}).
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setJobDate(eventPrefill.jobDate);
+                            setTimeRanges([
+                              {
+                                startTime: eventPrefill.startTime,
+                                endTime: eventPrefill.endTime,
+                              },
+                            ]);
+                          }}
+                          className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-russian-violet hover:bg-slate-50"
+                        >
+                          Reset to event times
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()
             ) : (
               <>
                 <div className="flex items-center justify-between gap-2">
@@ -1662,166 +1985,219 @@ export function CalculatorView({
             )}
           </div>
 
-          {/* AI input */}
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="mb-3 text-sm font-semibold text-russian-violet">Describe the job</h2>
-            <textarea
-              value={aiInput}
-              onChange={(e) => {
-                setAiInput(e.target.value);
-                if (clarifyQuestions.length > 0) {
-                  setClarifyQuestions([]);
-                  setClarifyAnswers({});
+          {/* Early cancel: bills the call-out fee instead of job work, so every
+              job-shaped section below is swapped out while it is on. The button
+              that gets you here lives at the bottom - it is a rare action and
+              should not compete with the normal job flow. */}
+          {cancelMode && (
+            <div ref={cancelSectionRef}>
+              <CancelFeeSection
+                reason={cancelReason}
+                onReasonChange={handleCancelReasonChange}
+                meetingType={cancelMeetingType}
+                onMeetingTypeChange={handleCancelMeetingTypeChange}
+                bookingDate={jobDate}
+                onBookingDateChange={handleCancelledDateChange}
+                bookingTime={cancelBookingTime}
+                onBookingTimeChange={handleCancelBookingTimeChange}
+                cancelledAtDate={cancelledAtDate}
+                onCancelledAtDateChange={handleCancelledAtDateChange}
+                cancelledAtTime={cancelledAtTime}
+                onCancelledAtTimeChange={handleCancelledAtTimeChange}
+                fee={cancelCharge.fee}
+                includeTravel={includeCancelTravel}
+                hasTravel={travelEntries.length > 0 || stashedTravel.length > 0}
+                noticeHours={cancelNoticeHours}
+                feeApplies={cancelCharge.fee > 0}
+                travelApplies={cancelCharge.travelApplies}
+                isFullCallOut={cancelCharge.isFullCallOut}
+                freeNoticeHours={
+                  cancelMeetingType === "remote"
+                    ? cancellation.remoteFreeNoticeHours
+                    : cancellation.freeNoticeHours
                 }
-              }}
-              rows={6}
-              placeholder="e.g. Was at Dave's for 2 hours, removed some malware, set up his new router, had to drive out to Papakura"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
-            />
-            {parseError && <p className="mt-1 text-xs text-red-600">{parseError}</p>}
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button
-                onClick={() => void handleParse()}
-                suppressHydrationWarning
-                disabled={parsing || !aiInput.trim()}
-                className="rounded-lg bg-russian-violet px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
-              >
-                {parsing ? "Parsing..." : hasParsed ? "Re-parse" : "Parse with AI"}
-              </button>
-              {/* Clear the cached description + parse session (the textarea is
-                  draft-persisted, so old text reappears on every visit).
-                  Parsed tasks/travel below stay - only the AI box resets. */}
-              {(aiInput.trim() !== "" || hasParsed || clarifyQuestions.length > 0) && (
-                <button
-                  onClick={() => {
-                    setAiInput("");
-                    setParseResult(null);
-                    setParseError(null);
-                    setHasParsed(false);
+                travelChargeHours={cancellation.travelChargeHours}
+                onExit={exitCancelMode}
+              />
+            </div>
+          )}
+
+          {/* AI input */}
+          {!cancelMode && (
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <h2 className="mb-3 text-sm font-semibold text-russian-violet">Describe the job</h2>
+              <textarea
+                value={aiInput}
+                onChange={(e) => {
+                  setAiInput(e.target.value);
+                  if (clarifyQuestions.length > 0) {
                     setClarifyQuestions([]);
                     setClarifyAnswers({});
-                  }}
-                  disabled={parsing}
-                  aria-label="Clear job description"
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                  }
+                }}
+                rows={6}
+                placeholder="e.g. Was at Dave's for 2 hours, removed some malware, set up his new router, had to drive out to Papakura"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+              />
+              {parseError && <p className="mt-1 text-xs text-red-600">{parseError}</p>}
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  onClick={() => void handleParse()}
+                  suppressHydrationWarning
+                  disabled={parsing || !aiInput.trim()}
+                  className="rounded-lg bg-russian-violet px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
                 >
-                  Clear
+                  {parsing ? "Parsing..." : hasParsed ? "Re-parse" : "Parse with AI"}
                 </button>
-              )}
-              <span className="self-center text-xs text-slate-400">or build manually below</span>
-            </div>
-            {parseResult && !parseError && (
-              <div className="mt-3">
-                <ParseConfidenceBanner
-                  confidence={parseResult.confidence}
-                  warnings={parseResult.warnings}
-                  onDismiss={() => setParseResult(null)}
-                />
-              </div>
-            )}
-            {clarifyQuestions.length > 0 && (
-              <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
-                <p className="mb-3 text-xs font-medium text-amber-800">
-                  A few quick questions to fill in the gaps:
-                </p>
-                <div className="space-y-3">
-                  {clarifyQuestions.map((q) => (
-                    <div key={q.id}>
-                      <label className="mb-1 block text-xs font-medium text-slate-700">
-                        {q.question}
-                      </label>
-                      <input
-                        type="text"
-                        placeholder={q.hint}
-                        value={clarifyAnswers[q.id] ?? ""}
-                        onChange={(e) =>
-                          setClarifyAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))
-                        }
-                        className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
-                      />
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-3 flex gap-2">
-                  <button
-                    onClick={() => void handleParse(clarifyAnswers)}
-                    disabled={parsing}
-                    className="rounded-lg bg-russian-violet px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
-                  >
-                    {parsing ? "Parsing..." : "Submit answers"}
-                  </button>
+                {/* Clear the cached description + parse session (the textarea is
+                  draft-persisted, so old text reappears on every visit).
+                  Parsed tasks/travel below stay - only the AI box resets. */}
+                {(aiInput.trim() !== "" || hasParsed || clarifyQuestions.length > 0) && (
                   <button
                     onClick={() => {
+                      setAiInput("");
+                      setParseResult(null);
+                      setParseError(null);
+                      setHasParsed(false);
                       setClarifyQuestions([]);
                       setClarifyAnswers({});
                     }}
-                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                    disabled={parsing}
+                    aria-label="Clear job description"
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
                   >
-                    Skip
+                    Clear
                   </button>
-                </div>
+                )}
+                <span className="self-center text-xs text-slate-400">or build manually below</span>
               </div>
-            )}
-          </div>
+              {parseResult && !parseError && (
+                <div className="mt-3">
+                  <ParseConfidenceBanner
+                    confidence={parseResult.confidence}
+                    warnings={parseResult.warnings}
+                    onDismiss={() => setParseResult(null)}
+                  />
+                </div>
+              )}
+              {clarifyQuestions.length > 0 && (
+                <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
+                  <p className="mb-3 text-xs font-medium text-amber-800">
+                    A few quick questions to fill in the gaps:
+                  </p>
+                  <div className="space-y-3">
+                    {clarifyQuestions.map((q) => (
+                      <div key={q.id}>
+                        <label className="mb-1 block text-xs font-medium text-slate-700">
+                          {q.question}
+                        </label>
+                        <input
+                          type="text"
+                          placeholder={q.hint}
+                          value={clarifyAnswers[q.id] ?? ""}
+                          onChange={(e) =>
+                            setClarifyAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))
+                          }
+                          className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      onClick={() => void handleParse(clarifyAnswers)}
+                      disabled={parsing}
+                      className="rounded-lg bg-russian-violet px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
+                    >
+                      {parsing ? "Parsing..." : "Submit answers"}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setClarifyQuestions([]);
+                        setClarifyAnswers({});
+                      }}
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                    >
+                      Skip
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Time */}
-          <JobDetailsSection
-            timeRanges={timeRanges}
-            onTimeRangesChange={setTimeRanges}
-            followUpMins={followUpMins}
-            onFollowUpMinsChange={setFollowUpMins}
-            durationMins={durationMins}
-          />
+          {!cancelMode && (
+            <JobDetailsSection
+              timeRanges={timeRanges}
+              onTimeRangesChange={setTimeRanges}
+              followUpMins={followUpMins}
+              onFollowUpMinsChange={setFollowUpMins}
+              durationMins={durationMins}
+            />
+          )}
 
-          {/* Travel */}
-          <TravelSection
-            addressInputRef={addressInputRef}
-            jobAddress={jobAddress}
-            onJobAddressChange={setJobAddress}
-            travelEntries={travelEntries}
-            onTravelEntriesChange={setTravelEntries}
-            lookingUpTravel={lookingUpTravel}
-            onLookup={() => void handleTravelLookup()}
-            travelRatePerHour={
-              rates.find((r) => r.unit === "travel-hour" && r.ratePerHour !== null)?.ratePerHour ??
-              FALLBACK_TRAVEL_RATE
-            }
-            minTravelCharge={pricing.minTravelCharge}
-          />
+          {/* Travel. Stays available in cancel mode while the round trip is
+              being billed, so the amount can still be looked up or corrected. */}
+          {(!cancelMode || includeCancelTravel) && (
+            <TravelSection
+              jobAddress={jobAddress}
+              onJobAddressChange={setJobAddress}
+              onAddressSelected={handleAddressSelected}
+              travelEntries={travelEntries}
+              onTravelEntriesChange={setTravelEntries}
+              lookingUpTravel={lookingUpTravel}
+              onLookup={() => void handleTravelLookup()}
+              travelRatePerHour={
+                rates.find((r) => r.unit === "travel-hour" && r.ratePerHour !== null)
+                  ?.ratePerHour ?? FALLBACK_TRAVEL_RATE
+              }
+              minTravelCharge={pricing.minTravelCharge}
+            />
+          )}
 
           {/* Tasks - inline warning when hourly task minutes drift from the
               listed job window. AI parses auto-collapse in applyParseResult,
-              so this only fires on manual edits or window changes. */}
-          <TaskTimeWarning
-            tasks={tasks}
-            windowMin={durationMins}
-            onFix={() => {
-              const collapsed = collapseToWindow(tasks, durationMins);
-              setTasks(collapsed.tasks);
-            }}
-          />
-          <TasksSection
-            tasks={tasks}
-            onTasksChange={setTasks}
-            onUpdateTask={updateTask}
-            onSetTaskBase={setTaskBase}
-            onToggleTaskModifier={toggleTaskModifier}
-            onAddTask={() => setTasks((p) => [...p, emptyTask(rates)])}
-            onManageTags={() => setShowTaxonomyModal(true)}
-            taskTemplates={taskTemplates}
-            baseRates={baseRates}
-            modifierRates={modifierRates}
-            flatRates={flatRates}
-            jobUnsuccessful={unsuccessful}
-          />
+              so this only fires on manual edits or window changes. Cancel mode
+              has no work lines, so the whole block goes. */}
+          {!cancelMode && (
+            <>
+              <TaskTimeWarning
+                tasks={tasks}
+                windowMin={durationMins}
+                minBillableMins={pricing.minBillableMins}
+                onFix={() => {
+                  const collapsed = collapseToWindow(tasks, durationMins);
+                  setTasks(enforceMinBillable(collapsed.tasks, pricing.minBillableMins));
+                }}
+              />
+              <TasksSection
+                tasks={tasks}
+                onTasksChange={setTasks}
+                onUpdateTask={updateTask}
+                onSetTaskBase={setTaskBase}
+                onToggleTaskModifier={toggleTaskModifier}
+                onAddTask={() => setTasks((p) => [...p, emptyTask(rates)])}
+                onManageTags={() => setShowTaxonomyModal(true)}
+                taskTemplates={taskTemplates}
+                baseRates={baseRates}
+                modifierRates={modifierRates}
+                flatRates={flatRates}
+                jobUnsuccessful={unsuccessful}
+              />
+            </>
+          )}
 
-          {/* Parts */}
-          <PartsSection
-            parts={parts}
-            onPartsChange={setParts}
-            show={showParts}
-            onToggle={() => setShowParts((p) => !p)}
-          />
+          {/* Parts. Nothing was fitted on a cancelled job, so it is hidden and
+              enterCancelMode clears whatever was there. */}
+          {!cancelMode && (
+            <PartsSection
+              parts={parts}
+              onPartsChange={setParts}
+              show={showParts}
+              onToggle={() => setShowParts((p) => !p)}
+            />
+          )}
 
           {/* Notes */}
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -1833,6 +2209,18 @@ export function CalculatorView({
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
             />
           </div>
+
+          {/* Early cancel entry. Parked at the bottom: billing a job that never
+              happened is the rare case, so it stays out of the normal flow. */}
+          {!cancelMode && (
+            <button
+              type="button"
+              onClick={enterCancelMode}
+              className="rounded-lg border border-coquelicot-500/40 px-3 py-1.5 text-sm font-semibold text-coquelicot-500 transition-colors hover:bg-coquelicot-500/10"
+            >
+              Make early cancel
+            </button>
+          )}
         </div>
 
         {/* RIGHT column - live invoice preview (replaces the legacy Summary
@@ -1902,19 +2290,9 @@ export function CalculatorView({
 
           {/* Actions */}
           <div className="space-y-2">
-            {incomeToast && (
-              <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-700">
-                {incomeToast}
-              </div>
-            )}
             {incomeError && (
               <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
                 {incomeError}
-              </div>
-            )}
-            {sheetSyncToast && (
-              <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
-                {sheetSyncToast}
               </div>
             )}
             {saveInvoiceError && (
@@ -1923,12 +2301,21 @@ export function CalculatorView({
               </p>
             )}
             <button
-              onClick={() => void handleSaveInvoice()}
+              onClick={() => void handleSaveInvoice(false)}
               disabled={savingInvoice || parsing}
               suppressHydrationWarning
               className="w-full rounded-lg bg-russian-violet px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
             >
-              {savingInvoice ? "Saving..." : "Save invoice"}
+              {savingInvoice && !saveSendMode ? "Saving..." : "Save invoice"}
+            </button>
+            <button
+              onClick={() => void handleSaveInvoice(true)}
+              disabled={savingInvoice || parsing}
+              suppressHydrationWarning
+              title="Save the invoice and jump straight to the send-to-client step."
+              className="w-full rounded-lg border border-russian-violet px-4 py-2 text-sm font-semibold text-russian-violet hover:bg-russian-violet/5 disabled:opacity-50"
+            >
+              {savingInvoice && saveSendMode ? "Saving..." : "Save & send"}
             </button>
             <button
               onClick={handleSaveIncome}
@@ -1976,27 +2363,56 @@ export function CalculatorView({
 interface TaskTimeWarningProps {
   tasks: TaskLine[];
   windowMin: number;
+  minBillableMins: number;
   onFix: () => void;
 }
 
 /**
  * Inline banner shown above the tasks panel when hourly task minutes don't
- * match the listed job window. Stays hidden when the totals line up so the
- * panel doesn't have a permanent strip of UI in the steady state.
+ * match the listed job window, or when a short job sits below the minimum
+ * billable time. Stays hidden when everything lines up so the panel doesn't
+ * carry a permanent strip of UI in the steady state.
  * @param props - Component props.
  * @param props.tasks - Current task lines (hourly + flat).
  * @param props.windowMin - Job window in minutes (`durationMins`).
- * @param props.onFix - Handler that collapses hourly tasks to fit the window.
+ * @param props.minBillableMins - Minimum billable labour minutes; below this the floor banner shows.
+ * @param props.onFix - Handler that collapses tasks to the window and floors to the minimum.
  * @returns Warning element, or null when totals already match.
  */
 function TaskTimeWarning({
   tasks,
   windowMin,
+  minBillableMins,
   onFix,
 }: TaskTimeWarningProps): React.ReactElement | null {
-  if (windowMin <= 0) return null;
   const taskMin = hourlyTaskMinutes(tasks);
   if (taskMin === 0) return null;
+
+  // Sub-minimum job: the whole-job labour sits under the billable floor. Offer
+  // to bill it at the minimum (Fix floors the tasks). Checked before the window
+  // comparison because a short job usually has taskMin == windowMin, which the
+  // drift tolerance below would otherwise swallow.
+  if (taskMin < minBillableMins) {
+    return (
+      <div
+        role="status"
+        className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900"
+      >
+        <span>
+          Tasks total {Math.round(taskMin)} min - minimum charge is {minBillableMins} min.
+        </span>
+        <button
+          type="button"
+          onClick={onFix}
+          className="rounded-lg border border-sky-300 bg-white px-3 py-1.5 text-xs font-medium text-sky-900 hover:bg-sky-100"
+        >
+          Fix - bill the minimum
+        </button>
+      </div>
+    );
+  }
+
+  if (windowMin <= 0) return null;
   // Tolerance: qty rounds to 2 dp (= 0.6-min granularity), so a 3-task split
   // can drift up to ~1.5 min from windowMin while still being "correct" after
   // collapseToWindow has snapped each row to a 5-min boundary. Without this
@@ -2004,6 +2420,10 @@ function TaskTimeWarning({
   // the underlying float is 214.8 vs 215.
   if (Math.abs(taskMin - windowMin) < 2) return null;
   const over = taskMin > windowMin;
+  // Billing to the minimum floor legitimately exceeds a shorter worked window,
+  // so a floored job (taskMin at the minimum, window below it) isn't an
+  // over-estimate - only flag "over" when the tasks also clear the floor.
+  if (over && taskMin <= minBillableMins) return null;
   return (
     <div
       role="status"

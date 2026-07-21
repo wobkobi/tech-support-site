@@ -74,7 +74,7 @@ function renderEmphasised(text: string): React.ReactNode[] {
 export default async function FaqPage(): Promise<React.ReactElement> {
   const [pricing, policy] = await Promise.all([getPublicPricing(), getPolicy()]);
   const cancellationText = cancellationCopy(policy.CANCELLATION);
-  const unsuccessfulText = unsuccessfulWorkCopy();
+  const unsuccessfulText = unsuccessfulWorkCopy(policy.UNSUCCESSFUL_WORK_FACTOR);
   const gstText = gstCopy(policy.GST_REGISTERED);
 
   const faqItems: ReadonlyArray<FaqItem> = [

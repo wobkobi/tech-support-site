@@ -15,14 +15,7 @@ export interface PublicRate {
   isDefault: boolean;
 }
 
-export interface SelectedService {
-  label: string;
-  type: "flat" | "hourly";
-  flatRate: number | null;
-  ratePerHour: number | null;
-}
-
-export interface BreakdownLine {
+interface BreakdownLine {
   label: string;
   low: number;
   high: number;
@@ -34,6 +27,12 @@ export interface PriceRange {
   high: number;
   breakdown: BreakdownLine[];
   includesTravel: boolean;
+  /**
+   * The round-trip drive charge actually applied ($). Lets the UI tell a
+   * floored charge from a real one, so the "minimum" note only shows when the
+   * minimum is what's being billed.
+   */
+  travelCharge?: number;
   includesAfterHours: boolean;
   /** Pre-promo range, populated only when an active promo discounted the headline. */
   originalLow?: number;

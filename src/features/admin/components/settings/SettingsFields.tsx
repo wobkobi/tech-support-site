@@ -54,10 +54,10 @@ export function FieldShell({
           )}
         </span>
       </label>
-      <p className="mt-0.5 text-sm text-slate-500">{meta.description}</p>
-      {meta.off && <p className="mt-0.5 text-xs text-slate-400 italic">{meta.off}</p>}
+      <p className="mt-0.5 text-sm text-admin-muted">{meta.description}</p>
+      {meta.off && <p className="mt-0.5 text-xs text-admin-faint italic">{meta.off}</p>}
       <div className="mt-2">{children}</div>
-      {error && <p className="mt-1 text-xs font-medium text-red-600">{error}</p>}
+      {error && <p className="mt-1 text-xs font-medium text-coquelicot-500">{error}</p>}
     </div>
   );
 }
@@ -74,6 +74,19 @@ interface NumberFieldProps {
   step?: number;
   error?: string;
   customised?: boolean;
+  /** When the field is minutes, show a live "= 1h 30m" hint for values over an hour. */
+  minutesHint?: boolean;
+}
+
+/**
+ * Formats minutes as a friendly duration, e.g. 90 > "1h 30m", 120 > "2h".
+ * @param mins - Whole minutes.
+ * @returns Human-readable duration string.
+ */
+function formatMinutesHint(mins: number): string {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m === 0 ? `${h}h` : `${h}h ${m}m`;
 }
 
 /**
@@ -89,6 +102,7 @@ interface NumberFieldProps {
  * @param props.step - Input step.
  * @param props.error - Inline validation error.
  * @param props.customised - Whether the value differs from default.
+ * @param props.minutesHint - Whether to show a "= 1h 30m" hint for minute values over an hour.
  * @returns Number field element.
  */
 export function NumberField({
@@ -102,6 +116,7 @@ export function NumberField({
   step,
   error,
   customised,
+  minutesHint,
 }: NumberFieldProps): React.ReactElement {
   return (
     <FieldShell id={id} meta={meta} error={error} customised={customised}>
@@ -125,10 +140,13 @@ export function NumberField({
           }}
           className={cn(
             "w-32 rounded-lg border px-3 py-2.5 text-base focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-            error ? "border-red-400" : "border-slate-300",
+            error ? "border-coquelicot-400" : "border-admin-border-strong",
           )}
         />
-        {meta.unit && <span className="text-sm text-slate-500">{meta.unit}</span>}
+        {meta.unit && <span className="text-sm text-admin-muted">{meta.unit}</span>}
+        {minutesHint && value != null && value >= 60 && (
+          <span className="text-sm text-admin-faint">= {formatMinutesHint(value)}</span>
+        )}
       </div>
     </FieldShell>
   );
@@ -180,8 +198,8 @@ export function TextField({
 }: TextFieldProps): React.ReactElement {
   const [revealed, setRevealed] = useState(false);
   const inputClass = cn(
-    "focus:ring-russian-violet/30 w-full rounded-lg border px-3 py-2.5 text-base focus:outline-none focus:ring-2",
-    error ? "border-red-400" : "border-slate-300",
+    "w-full rounded-lg border px-3 py-2.5 text-base focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
+    error ? "border-coquelicot-400" : "border-admin-border-strong",
   );
   return (
     <FieldShell id={id} meta={meta} error={error} customised={customised}>
@@ -208,7 +226,7 @@ export function TextField({
             <button
               type="button"
               onClick={() => setRevealed((r) => !r)}
-              className="shrink-0 rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-600 hover:bg-slate-50"
+              className="shrink-0 rounded-lg border border-admin-border-strong px-3 py-2.5 text-sm text-admin-text-secondary hover:bg-admin-bg"
             >
               {revealed ? "Hide" : "Show"}
             </button>
@@ -254,17 +272,19 @@ export function ToggleField({
         onClick={() => onChange(!value)}
         className={cn(
           "relative inline-flex h-7 w-12 items-center rounded-full transition-colors",
-          value ? "bg-russian-violet" : "bg-slate-300",
+          value ? "bg-russian-violet" : "bg-admin-border-strong",
         )}
       >
         <span
           className={cn(
-            "inline-block h-5 w-5 rounded-full bg-white shadow transition-[translate]",
+            "inline-block h-5 w-5 rounded-full bg-admin-surface shadow transition-[translate]",
             value ? "translate-x-6" : "translate-x-1",
           )}
         />
       </button>
-      <span className="ml-3 align-middle text-sm text-slate-600">{value ? "On" : "Off"}</span>
+      <span className="ml-3 align-middle text-sm text-admin-text-secondary">
+        {value ? "On" : "Off"}
+      </span>
     </FieldShell>
   );
 }

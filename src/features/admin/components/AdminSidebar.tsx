@@ -32,7 +32,7 @@ import {
   FaXmark,
 } from "react-icons/fa6";
 
-export type AdminPage =
+type AdminPage =
   | "dashboard"
   | "reviews"
   | "contacts"
@@ -147,8 +147,22 @@ const SETTINGS_NAV_ITEM: NavItem = {
   path: "/admin/settings",
 };
 
-interface AdminSidebarProps {
-  current: AdminPage;
+/**
+ * The nav path that best matches the current pathname: exact for the dashboard
+ * ("/admin"), otherwise the longest path that is a prefix of the pathname (so
+ * `/admin/business/invoices/[id]/edit` still highlights Invoices, not Overview).
+ * @param pathname - The current pathname from usePathname.
+ * @param paths - All nav-item paths.
+ * @returns The best-matching path, or null when none match.
+ */
+function activeNavPath(pathname: string, paths: string[]): string | null {
+  let best: string | null = null;
+  for (const p of paths) {
+    const matches =
+      p === "/admin" ? pathname === "/admin" : pathname === p || pathname.startsWith(`${p}/`);
+    if (matches && (best === null || p.length > best.length)) best = p;
+  }
+  return best;
 }
 
 /**
@@ -156,15 +170,17 @@ interface AdminSidebarProps {
  * all times. Below `lg` it collapses behind a hamburger button and slides in
  * as a drawer over a backdrop, so phone-width admin pages get the full
  * viewport for content. The drawer auto-closes when the user navigates to a
- * different route. Auth is carried by the admin session cookie - no token
- * threading through hrefs.
- * @param props - Component props.
- * @param props.current - Identifies which page is currently active (highlighted in the nav).
+ * different route. The active item is derived from the current pathname. Auth
+ * is carried by the admin session cookie - no token threading through hrefs.
  * @returns Sidebar element with mobile drawer behaviour.
  */
-export function AdminSidebar({ current }: AdminSidebarProps): React.ReactElement {
+export function AdminSidebar(): React.ReactElement {
   const pathname = usePathname();
   const router = useRouter();
+  const active = activeNavPath(
+    pathname,
+    [...NAV_ITEMS, ...BUSINESS_NAV_ITEMS, PROMOS_NAV_ITEM, SETTINGS_NAV_ITEM].map((i) => i.path),
+  );
   // Pairing the drawer state with the pathname auto-closes it on navigation
   // without a setState-in-effect (which the React lint rule rejects).
   const [state, setState] = useState<{ open: boolean; pathname: string }>({
@@ -255,7 +271,7 @@ export function AdminSidebar({ current }: AdminSidebarProps): React.ReactElement
               onClick={() => setOpen(false)}
               className={cn(
                 "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                current === page
+                active === path
                   ? "bg-white/15 text-white"
                   : "text-white/60 hover:bg-white/10 hover:text-white/90",
               )}
@@ -275,7 +291,7 @@ export function AdminSidebar({ current }: AdminSidebarProps): React.ReactElement
               onClick={() => setOpen(false)}
               className={cn(
                 "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                current === page
+                active === path
                   ? "bg-white/15 text-white"
                   : "text-white/60 hover:bg-white/10 hover:text-white/90",
               )}
@@ -294,7 +310,7 @@ export function AdminSidebar({ current }: AdminSidebarProps): React.ReactElement
               onClick={() => setOpen(false)}
               className={cn(
                 "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                current === page
+                active === path
                   ? "bg-white/15 text-white"
                   : "text-white/60 hover:bg-white/10 hover:text-white/90",
               )}

@@ -84,7 +84,10 @@ function ReviewCard({
         <p className="line-clamp-4">
           <ReviewText text={r.text} />
         </p>
-        <p className="pt-3 text-right text-sm font-semibold text-russian-violet sm:text-base">
+        {/* mt-auto pins the name to the bottom of the card. Without it the name
+            trails the text, so cards in a row (equal height, unequal text)
+            end up with their names at different heights. */}
+        <p className="mt-auto pt-3 text-right text-sm font-semibold text-russian-violet sm:text-base">
           - {r.name}
         </p>
       </Link>
@@ -114,8 +117,8 @@ export default function Reviews({ items = [] }: ReviewsProps): React.ReactElemen
   if (!items.length) return null;
 
   const cardBase = cn(
-    "bg-seasalt-800/80 flex flex-col rounded-lg border-2",
-    "border-seasalt-400/60 hover:border-coquelicot-500/60 transition-colors",
+    "flex flex-col rounded-lg border-2 bg-seasalt-800/80",
+    "border-seasalt-400/60 transition-colors hover:border-coquelicot-500/60",
   );
 
   // Marquee when more than three reviews

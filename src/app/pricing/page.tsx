@@ -78,8 +78,8 @@ function renderEmphasised(text: string): React.ReactNode[] {
 const ACCORDION_DETAILS =
   "group rounded-xl border border-seasalt-400/60 bg-seasalt-900/40 p-0 open:bg-white open:shadow-sm";
 const ACCORDION_SUMMARY = cn(
-  "text-russian-violet flex cursor-pointer items-center justify-between gap-3 rounded-xl px-5 py-4 text-base font-semibold sm:text-lg",
-  "hover:bg-white/60 marker:hidden",
+  "flex cursor-pointer items-center justify-between gap-3 rounded-xl px-5 py-4 text-base font-semibold text-russian-violet sm:text-lg",
+  "marker:hidden hover:bg-white/60",
   "[&::-webkit-details-marker]:hidden",
 );
 const ACCORDION_BODY =
@@ -370,7 +370,9 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                     aria-hidden
                   />
                 </summary>
-                <div className={ACCORDION_BODY}>{renderEmphasised(unsuccessfulWorkCopy())}</div>
+                <div className={ACCORDION_BODY}>
+                  {renderEmphasised(unsuccessfulWorkCopy(policy.UNSUCCESSFUL_WORK_FACTOR))}
+                </div>
               </details>
 
               <details className={ACCORDION_DETAILS}>
@@ -434,6 +436,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
               minBillableMins={policy.MIN_BILLABLE_MINS}
               minTravelCharge={policy.MIN_TRAVEL_CHARGE}
               estimatorRange={settings.estimator.range}
+              lowEndFloorFactor={settings.estimator.lowEndFloorFactor}
             />
           </section>
 

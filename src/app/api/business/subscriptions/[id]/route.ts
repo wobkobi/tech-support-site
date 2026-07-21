@@ -12,6 +12,9 @@ import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
+// Raise the serverless ceiling so a slow Sheets round-trip cannot 504 on the default timeout.
+export const maxDuration = 60;
+
 /**
  * PATCH /api/business/subscriptions/[id] - Updates a subscription's fields.
  * @param request - Incoming Next.js request with fields to update in body.

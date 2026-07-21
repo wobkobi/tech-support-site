@@ -80,12 +80,13 @@ export const getPolicy = cache(async (): Promise<Policy> => {
     MIN_BILLABLE_MINS: pricing.minBillableMins,
     BILLING_INCREMENT_MINS: pricing.billingIncrementMins,
     PUBLIC_HOLIDAY_UPLIFT: pricing.publicHolidayUplift,
+    UNSUCCESSFUL_WORK_FACTOR: pricing.unsuccessfulWorkFactor,
     CANCELLATION: pricing.cancellation,
   };
 });
 
 /** One labour modifier as rendered on the pricing page accordion. */
-export interface PublicModifier {
+interface PublicModifier {
   label: string;
   /** Effective $/hr after applying the modifier to the base hourly rate. */
   effectiveRate: number;

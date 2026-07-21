@@ -17,6 +17,9 @@ import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
+// Raise the serverless ceiling so a slow Sheets round-trip cannot 504 on the default timeout.
+export const maxDuration = 60;
+
 /**
  * GET /api/business/expenses - Returns all expense entries ordered by date descending.
  * @param request - Incoming Next.js request

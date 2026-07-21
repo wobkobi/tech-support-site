@@ -61,14 +61,14 @@ export function BenchmarkListField({
    */
   const inputClass = (err?: string): string =>
     cn(
-      "focus:ring-russian-violet/30 rounded-lg border px-3 py-2.5 text-base focus:outline-none focus:ring-2",
-      err ? "border-red-400" : "border-slate-300",
+      "rounded-lg border px-3 py-2.5 text-base focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
+      err ? "border-coquelicot-400" : "border-admin-border-strong",
     );
 
   return (
     <div className="py-4">
       <p className="text-sm font-semibold text-russian-violet">{meta.title}</p>
-      <p className="mt-0.5 text-sm text-slate-500">{meta.description}</p>
+      <p className="mt-0.5 text-sm text-admin-muted">{meta.description}</p>
 
       {fieldErrors.benchmarks && (
         <p className="mt-1 text-xs font-medium text-red-600">{fieldErrors.benchmarks}</p>
@@ -102,12 +102,12 @@ export function BenchmarkListField({
                   }}
                   className={cn(inputClass(minsErr), "w-24")}
                 />
-                <span className="text-sm text-slate-500">{meta.unit}</span>
+                <span className="text-sm text-admin-muted">{meta.unit}</span>
                 <button
                   type="button"
                   aria-label={`Remove ${b.label || "benchmark"}`}
                   onClick={() => remove(i)}
-                  className="shrink-0 rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-500 hover:bg-red-50 hover:text-red-600"
+                  className="shrink-0 rounded-lg border border-admin-border-strong px-3 py-2.5 text-sm text-admin-muted hover:bg-red-50 hover:text-red-600"
                 >
                   Remove
                 </button>
@@ -123,7 +123,7 @@ export function BenchmarkListField({
       <button
         type="button"
         onClick={add}
-        className="mt-3 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+        className="mt-3 rounded-lg border border-admin-border-strong bg-admin-surface px-4 py-2 text-sm font-medium text-admin-text-secondary hover:bg-admin-bg"
       >
         + Add benchmark
       </button>

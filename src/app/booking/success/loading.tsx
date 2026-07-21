@@ -20,7 +20,7 @@ export default function BookingSuccessLoading(): React.ReactElement {
   return (
     <main className="relative min-h-dvh overflow-hidden">
       {/* Backdrop */}
-      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+      <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
         <picture>
           <source type="image/avif" srcSet="/source/backdrop-blur.avif" />
           <img

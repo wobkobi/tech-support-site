@@ -19,7 +19,7 @@ function estimateCardHeight(text: string): number {
 }
 
 /** A review tagged with its position in the original date order. */
-export interface OrderedReview<T> {
+interface OrderedReview<T> {
   /** The review payload. */
   review: T;
   /** Zero-based index in the newest-first order, used as the CSS `order` on mobile. */

@@ -1,13 +1,18 @@
 "use client";
 // src/shared/components/GoogleTag.tsx
 /**
- * @description Loads gtag.js for GA4 + Google Ads and reports tel: link taps.
+ * @description Loads gtag.js for GA4 + Google Ads and reports tel: and
+ * mailto: link taps.
  */
 
+import { usePathname } from "next/navigation";
 import Script from "next/script";
 import type React from "react";
 import { useEffect } from "react";
 
+// Scoped to the Production environment on Vercel: preview and local builds see
+// these undefined and load no tag, which keeps branch deploys out of the live
+// property. Adding them to Preview would silently start reporting test traffic.
 const GA4_ID = process.env.NEXT_PUBLIC_GA4_ID;
 const ADS_ID = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID;
 const CALL_LABEL = process.env.NEXT_PUBLIC_GOOGLE_ADS_CALL_LABEL;
@@ -17,24 +22,45 @@ const CALL_LABEL = process.env.NEXT_PUBLIC_GOOGLE_ADS_CALL_LABEL;
 const loaderId = ADS_ID ?? GA4_ID;
 
 /**
- * Injects the Google tag and reports phone-link taps as conversions. Renders
- * nothing when no measurement IDs are set, so the site runs untracked in dev
- * or before the Ads/GA4 IDs are configured.
- * @returns The gtag script tags, or null when unconfigured.
+ * Injects the Google tag and reports phone-link taps as conversions and
+ * email-link taps as GA4 events. Renders nothing when no measurement IDs are
+ * set (dev, preview) or on /admin pages, so back-office browsing never
+ * pollutes GA4/Ads data.
+ * @returns The gtag script tags, or null when unconfigured or on admin pages.
  */
 export function GoogleTag(): React.ReactElement | null {
-  // One delegated listener covers every tel: link (raw anchors and the Button
-  // component alike), so individual links never need their own handler.
+  const pathname = usePathname();
+  // Admin pages are operator-only; keep them out of analytics entirely.
+  const isAdmin = pathname === "/admin" || pathname.startsWith("/admin/");
+
+  // Unmounting does not unload gtag.js, and GA4 enhanced measurement reports a
+  // page_view on every history change - so client-side navigation into /admin
+  // would still send the admin path (which carries invoice and contact IDs).
+  // The `ga-disable-<ID>` flag is checked per hit, so toggling it suppresses
+  // those hits even though the tag is already live.
   useEffect(() => {
-    if (!loaderId) return;
+    if (!GA4_ID) return;
+    (window as unknown as Record<string, boolean>)[`ga-disable-${GA4_ID}`] = isAdmin;
+  }, [isAdmin]);
+
+  // One delegated listener covers every tel: and mailto: link (raw anchors and
+  // the Button component alike), so individual links never need their own
+  // handler. Mirrors MetaPixel's Contact tracking on the Google side.
+  useEffect(() => {
+    if (!loaderId || isAdmin) return;
     /**
-     * Reports a tel: link tap to GA4, and to Ads when a call label is set.
+     * Reports a tel: link tap to GA4 (and to Ads when a call label is set), and
+     * a mailto: link tap to GA4.
      * @param event - The bubbled document click.
      */
     const onClick = (event: MouseEvent): void => {
       const origin = event.target as HTMLElement | null;
-      const link = origin?.closest?.('a[href^="tel:"]');
-      if (!link || typeof window.gtag !== "function") return;
+      const link = origin?.closest?.('a[href^="tel:"], a[href^="mailto:"]');
+      if (!(link instanceof HTMLAnchorElement) || typeof window.gtag !== "function") return;
+      if (link.href.startsWith("mailto:")) {
+        window.gtag("event", "email_click");
+        return;
+      }
       window.gtag("event", "phone_call_click");
       if (ADS_ID && CALL_LABEL) {
         window.gtag("event", "conversion", { send_to: `${ADS_ID}/${CALL_LABEL}` });
@@ -42,9 +68,9 @@ export function GoogleTag(): React.ReactElement | null {
     };
     document.addEventListener("click", onClick);
     return () => document.removeEventListener("click", onClick);
-  }, []);
+  }, [isAdmin]);
 
-  if (!loaderId) return null;
+  if (!loaderId || isAdmin) return null;
 
   return (
     <>

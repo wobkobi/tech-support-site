@@ -1,51 +1,64 @@
 "use client";
 // src/features/booking/components/admin/BookingAdminList.tsx
 /**
- * @description Interactive admin component for viewing and editing bookings.
+ * @description Admin bookings list: summary StatCards, status pills, free-text
+ * search (name / email / phone), a start-date range filter, and sortable columns.
+ * Editing and the full action set (cancel, no-show, delete) live on the booking
+ * detail page now; the list keeps only the two common quick actions - mark
+ * completed and send / resend review - each behind a {@link ConfirmDialog} and
+ * routed through {@link useBookingActions}. Each row links to its detail page.
  */
 
-import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
+import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
+import { StatCard } from "@/features/admin/components/ui/StatCard";
+import { StatusPill, type StatusTone } from "@/features/admin/components/ui/StatusPill";
+import { useBookingActions } from "@/features/booking/hooks/use-booking-actions";
 import { cn } from "@/shared/lib/cn";
 import { formatDateTimeShort } from "@/shared/lib/date-format";
+import Link from "next/link";
 import type React from "react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 export interface AdminBookingRow {
   id: string;
   name: string;
   email: string;
   phone: string | null;
-  notes: string | null;
   startAt: string;
   endAt: string;
   createdAt: string;
   status: "held" | "confirmed" | "cancelled" | "completed";
   cancelToken: string;
   reviewSentAt: string | null;
+  cancelledAt: string | null;
+  noShow: boolean;
   /** Public quote the customer saw before booking (snapshot); null when they didn't get one. */
   quotedLow: number | null;
   quotedHigh: number | null;
 }
 
 type StatusFilter = "all" | "held" | "confirmed" | "cancelled" | "completed";
+type SortKey = "name" | "start" | "status";
+type SortDir = "asc" | "desc";
 
-interface EditState {
-  name: string;
-  email: string;
-  phone: string;
-  notes: string;
-  address: string;
-}
-
-const STATUS_COLORS: Record<string, string> = {
-  confirmed: "bg-moonstone-600/20 text-moonstone-600",
-  held: "bg-yellow-500/20 text-yellow-600",
-  cancelled: "bg-red-500/20 text-red-500",
-  completed: "bg-green-500/20 text-green-600",
+/** StatusPill tone for each booking status. */
+const STATUS_TONE: Record<AdminBookingRow["status"], StatusTone> = {
+  confirmed: "info",
+  held: "warning",
+  completed: "success",
+  cancelled: "critical",
 };
 
+/** Which quick action a confirm dialog is gating. */
+interface PendingAction {
+  id: string;
+  kind: "complete" | "review";
+  alreadySent: boolean;
+}
+
 /**
- * Admin booking list with filter, inline edit, status change, and cancel.
+ * Admin booking list with StatCards, filters, sortable columns, and per-row
+ * quick actions (mark completed, send review).
  * @param props - Component props.
  * @param props.bookings - Initial booking rows from the server.
  * @returns Booking admin list element.
@@ -55,14 +68,17 @@ export function BookingAdminList({
 }: {
   bookings: AdminBookingRow[];
 }): React.ReactElement {
+  const actions = useBookingActions();
   const [bookings, setBookings] = useState<AdminBookingRow[]>(initial);
   const [filter, setFilter] = useState<StatusFilter>("confirmed");
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [edits, setEdits] = useState<Record<string, EditState>>({});
-  const [saving, setSaving] = useState<string | null>(null);
-  const [resending, setResending] = useState<string | null>(null);
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  // Stable "now" so the no-show button check doesn't trigger react-hooks/purity.
+  const [query, setQuery] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [sortKey, setSortKey] = useState<SortKey>("start");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [pending, setPending] = useState<PendingAction | null>(null);
+  // Stable "now" so the upcoming/this-month checks don't trip react-hooks/purity.
   const [renderedAt] = useState(() => Date.now());
 
   const counts = {
@@ -72,449 +88,335 @@ export function BookingAdminList({
     completed: bookings.filter((b) => b.status === "completed").length,
   };
 
-  const filtered = filter === "all" ? bookings : bookings.filter((b) => b.status === filter);
+  // Summary stats. "This month" is derived from a stable render-time clock.
+  const monthStart = useMemo(() => {
+    const now = new Date(renderedAt);
+    return new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  }, [renderedAt]);
 
-  /**
-   * Expands a booking row for editing and seeds its edit state.
-   * @param b - Booking row to open.
-   */
-  function openEdit(b: AdminBookingRow): void {
-    setExpandedId(b.id);
-    if (!edits[b.id]) {
-      const address = (b.notes ?? "").match(/Address:\s*(.+)/i)?.[1]?.trim() ?? "";
-      setEdits((prev) => ({
-        ...prev,
-        [b.id]: {
-          name: b.name,
-          email: b.email,
-          phone: b.phone ?? "",
-          notes: b.notes ?? "",
-          address,
-        },
-      }));
-    }
-  }
-
-  /**
-   * Updates a single field in a booking's edit state.
-   * @param id - Booking ID.
-   * @param field - Field name to update.
-   * @param value - New value.
-   */
-  function setField(id: string, field: keyof EditState, value: string): void {
-    setEdits((prev) => ({ ...prev, [id]: { ...prev[id], [field]: value } }));
-  }
-
-  /**
-   * Sends a PATCH request to the admin bookings API.
-   * @param id - Booking ID to update.
-   * @param body - Fields to update.
-   * @returns True if the request succeeded.
-   */
-  async function patch(id: string, body: Record<string, unknown>): Promise<boolean> {
-    setSaving(id);
-    setErrors((prev) => ({ ...prev, [id]: "" }));
-    try {
-      const res = await fetch(`/api/admin/bookings/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) {
-        const data = (await res.json()) as { error?: string };
-        setErrors((prev) => ({ ...prev, [id]: data.error ?? "Failed." }));
-        return false;
+  const stats = useMemo(() => {
+    let upcoming = 0;
+    let completedThisMonth = 0;
+    let cancelledThisMonth = 0;
+    for (const b of bookings) {
+      if (b.status === "confirmed" && new Date(b.startAt).getTime() > renderedAt) upcoming++;
+      if (b.status === "completed" && new Date(b.startAt).getTime() >= monthStart) {
+        completedThisMonth++;
       }
+      if (
+        b.status === "cancelled" &&
+        b.cancelledAt &&
+        new Date(b.cancelledAt).getTime() >= monthStart
+      ) {
+        cancelledThisMonth++;
+      }
+    }
+    return { upcoming, completedThisMonth, cancelledThisMonth, held: counts.held };
+  }, [bookings, renderedAt, monthStart, counts.held]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const rows = bookings.filter((b) => {
+      if (filter !== "all" && b.status !== filter) return false;
+      if (q) {
+        const hay = `${b.name} ${b.email} ${b.phone ?? ""}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      const day = b.startAt.slice(0, 10);
+      if (dateFrom && day < dateFrom) return false;
+      if (dateTo && day > dateTo) return false;
       return true;
-    } finally {
-      setSaving(null);
-    }
-  }
-
-  /**
-   * Saves name, email, and notes edits for a booking.
-   * @param b - Booking row being edited.
-   */
-  async function saveEdit(b: AdminBookingRow): Promise<void> {
-    const edit = edits[b.id];
-    if (!edit) return;
-    const updatedNotes = edit.address
-      ? edit.notes.replace(/^(Address:\s*).*$/im, `$1${edit.address.trim()}`)
-      : edit.notes;
-    const ok = await patch(b.id, {
-      name: edit.name,
-      email: edit.email,
-      phone: edit.phone || undefined,
-      notes: updatedNotes,
-      address: edit.address || undefined,
     });
-    if (ok) {
-      setBookings((prev) =>
-        prev.map((r) =>
-          r.id === b.id
-            ? {
-                ...r,
-                name: edit.name,
-                email: edit.email,
-                phone: edit.phone || null,
-                notes: updatedNotes,
-              }
-            : r,
-        ),
-      );
-      setExpandedId(null);
+    const dir = sortDir === "asc" ? 1 : -1;
+    return rows.sort((a, b) => {
+      if (sortKey === "name") return a.name.localeCompare(b.name) * dir;
+      if (sortKey === "status") return a.status.localeCompare(b.status) * dir;
+      return (new Date(a.startAt).getTime() - new Date(b.startAt).getTime()) * dir;
+    });
+  }, [bookings, filter, query, dateFrom, dateTo, sortKey, sortDir]);
+
+  /**
+   * Toggles the sort direction when re-selecting the active column, else switches
+   * to the new column with a sensible default direction.
+   * @param key - Column to sort by.
+   */
+  function toggleSort(key: SortKey): void {
+    if (key === sortKey) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir(key === "start" ? "desc" : "asc");
     }
   }
 
   /**
-   * Changes a booking's status to cancelled or completed.
-   * @param id - Booking ID.
-   * @param status - New status to apply.
-   * @param cancelMode - When cancelling, distinguishes operator-side cancels (no fee)
-   *   from on-behalf-of-customer cancels (customer fee rules apply). Ignored for "completed".
+   * Runs the pending quick action (mark completed / send review), applies the
+   * optimistic local update on success, and closes the dialog.
    */
-  async function changeStatus(
-    id: string,
-    status: "cancelled" | "completed",
-    cancelMode: "operator" | "on-behalf" = "operator",
-  ): Promise<void> {
-    const body: Record<string, unknown> = { status };
-    if (status === "cancelled") body.cancelMode = cancelMode;
-    const ok = await patch(id, body);
-    if (ok) {
-      setBookings((prev) => prev.map((b) => (b.id === id ? { ...b, status } : b)));
-      setExpandedId(null);
-    }
-  }
-
-  /**
-   * Marks a booking as a no-show. Triggers the draft late-cancellation
-   * invoice (callout + travel) just like a same-time customer cancel would.
-   * @param id - Booking ID.
-   */
-  async function markNoShow(id: string): Promise<void> {
-    const ok = await patch(id, { markNoShow: true });
-    if (ok) {
-      setBookings((prev) => prev.map((b) => (b.id === id ? { ...b, status: "cancelled" } : b)));
-      setExpandedId(null);
-    }
-  }
-
-  /**
-   * Permanently deletes a booking and its calendar event.
-   * @param id - Booking ID to delete.
-   */
-  async function deleteBooking(id: string): Promise<void> {
-    setSaving(id);
-    setErrors((prev) => ({ ...prev, [id]: "" }));
-    try {
-      const res = await fetch(`/api/admin/bookings/${id}`, {
-        method: "DELETE",
-        headers: {},
-      });
-      if (!res.ok) {
-        const data = (await res.json()) as { error?: string };
-        setErrors((prev) => ({ ...prev, [id]: data.error ?? "Failed." }));
-        return;
-      }
-      setBookings((prev) => prev.filter((b) => b.id !== id));
-      setExpandedId(null);
-    } finally {
-      setSaving(null);
-    }
-  }
-
-  /**
-   * Sends or resends the review request email for a booking.
-   * @param id - Booking ID.
-   */
-  async function resendReview(id: string): Promise<void> {
-    setResending(id);
-    setErrors((prev) => ({ ...prev, [id]: "" }));
-    try {
-      const res = await fetch(`/api/admin/bookings/${id}/resend-review`, {
-        method: "POST",
-        headers: {},
-      });
-      if (!res.ok) {
-        const data = (await res.json()) as { error?: string };
-        setErrors((prev) => ({ ...prev, [id]: data.error ?? "Failed to send." }));
-        return;
-      }
-      setBookings((prev) =>
-        prev.map((b) => (b.id === id ? { ...b, reviewSentAt: new Date().toISOString() } : b)),
-      );
-    } finally {
-      setResending(null);
-    }
+  async function runPending(): Promise<void> {
+    if (!pending) return;
+    const { id, kind, alreadySent } = pending;
+    setBusyId(id);
+    const result =
+      kind === "complete"
+        ? await actions.completeBooking(id)
+        : await actions.resendReview(id, alreadySent);
+    setBusyId(null);
+    setPending(null);
+    if (!result.ok) return;
+    setBookings((prev) =>
+      prev.map((b) => {
+        if (b.id !== id) return b;
+        if (kind === "complete") {
+          return {
+            ...b,
+            status: "completed",
+            reviewSentAt: result.reviewSent ? new Date().toISOString() : b.reviewSentAt,
+          };
+        }
+        return { ...b, reviewSentAt: new Date().toISOString() };
+      }),
+    );
   }
 
   const FILTERS: StatusFilter[] = ["all", "confirmed", "held", "completed", "cancelled"];
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Status filter */}
-      <div className="inline-flex flex-wrap rounded-lg border border-slate-200 bg-slate-100 p-0.5">
-        {FILTERS.map((f) => {
-          const label = f === "all" ? "All" : f.charAt(0).toUpperCase() + f.slice(1);
-          const count = f === "all" ? bookings.length : counts[f as keyof typeof counts];
-          const isActive = filter === f;
-          return (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={cn(
-                "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
-                isActive
-                  ? "bg-white text-russian-violet shadow-sm"
-                  : "text-slate-500 hover:text-slate-700",
-              )}
-            >
-              {label}{" "}
-              <span className={cn(isActive ? "text-russian-violet/60" : "text-slate-400")}>
-                {count}
-              </span>
-            </button>
-          );
-        })}
+      {/* Summary StatCards. */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <StatCard label="Upcoming confirmed" value={stats.upcoming} tone="default" />
+        <StatCard label="Completed this month" value={stats.completedThisMonth} tone="success" />
+        <StatCard
+          label="Cancelled / no-show this month"
+          value={stats.cancelledThisMonth}
+          tone={stats.cancelledThisMonth > 0 ? "critical" : "default"}
+        />
+        <StatCard label="Held" value={stats.held} tone={stats.held > 0 ? "warning" : "default"} />
       </div>
 
-      {filtered.length === 0 && <p className="text-sm text-slate-400">No bookings found.</p>}
+      {/* Filters + search. */}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="inline-flex flex-wrap rounded-lg border border-slate-200 bg-slate-100 p-0.5">
+          {FILTERS.map((f) => {
+            const label = f === "all" ? "All" : f.charAt(0).toUpperCase() + f.slice(1);
+            const count = f === "all" ? bookings.length : counts[f];
+            const isActive = filter === f;
+            return (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                  isActive
+                    ? "bg-white text-russian-violet shadow-sm"
+                    : "text-slate-500 hover:text-slate-700",
+                )}
+              >
+                {label}{" "}
+                <span className={cn(isActive ? "text-russian-violet/60" : "text-slate-400")}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
 
-      <div className="flex flex-col gap-3">
-        {filtered.map((b) => {
-          const isExpanded = expandedId === b.id;
-          const edit = edits[b.id] ?? {
-            name: b.name,
-            email: b.email,
-            phone: b.phone ?? "",
-            notes: b.notes ?? "",
-            address: (b.notes ?? "").match(/Address:\s*(.+)/i)?.[1]?.trim() ?? "",
-          };
-          const isSaving = saving === b.id;
-          const isResending = resending === b.id;
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search name, email, phone"
+            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none sm:w-56"
+          />
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            aria-label="From date"
+            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none"
+          />
+          <span className="text-xs text-slate-400">to</span>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            aria-label="To date"
+            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none"
+          />
+          {(dateFrom || dateTo || query) && (
+            <button
+              onClick={() => {
+                setDateFrom("");
+                setDateTo("");
+                setQuery("");
+              }}
+              className="text-xs font-medium text-slate-500 underline hover:text-slate-700"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      </div>
 
-          return (
-            <div key={b.id} className="rounded-xl border border-slate-200 bg-white p-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="flex min-w-0 flex-col gap-1">
-                  <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    <span className="min-w-0 truncate font-semibold text-russian-violet">
-                      {b.name}
-                    </span>
-                    <span
-                      className={cn(
-                        "shrink-0 rounded-full px-2 py-0.5 text-xs font-medium",
-                        STATUS_COLORS[b.status],
-                      )}
-                    >
-                      {b.status}
-                    </span>
-                  </div>
-                  <span className="text-xs break-all text-slate-500">{b.email}</span>
-                  {b.phone && <span className="text-xs text-slate-500">{b.phone}</span>}
-                  <span className="text-xs text-slate-500">
-                    {formatDateTimeShort(b.startAt)} &ndash; {formatDateTimeShort(b.endAt)}
-                  </span>
-                  {b.quotedLow != null && b.quotedHigh != null && (
-                    <span className="text-xs text-slate-500">
-                      <span className="text-slate-400">Quoted: </span>${b.quotedLow} &ndash; $
-                      {b.quotedHigh}
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex flex-wrap gap-2 sm:shrink-0">
-                  {b.name.toLowerCase().includes("test") && (
-                    <button
-                      onClick={() => {
-                        if (
-                          confirm("Permanently delete this test booking? This cannot be undone.")
-                        ) {
-                          void deleteBooking(b.id);
-                        }
-                      }}
-                      disabled={isSaving}
-                      className="rounded-lg bg-red-500/20 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-500/30 disabled:opacity-50"
-                    >
-                      Delete
-                    </button>
-                  )}
-                  {b.status !== "cancelled" && (
-                    <>
-                      {new Date(b.startAt) > new Date() && (
-                        <a
-                          href={`/booking/edit?token=${b.cancelToken}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="rounded-lg bg-russian-violet/10 px-3 py-1.5 text-xs font-medium text-russian-violet transition-colors hover:bg-russian-violet/20"
-                        >
-                          Reschedule
-                        </a>
-                      )}
-                      <button
-                        onClick={() => (isExpanded ? setExpandedId(null) : openEdit(b))}
-                        className="rounded-lg bg-russian-violet/10 px-3 py-1.5 text-xs font-medium text-russian-violet transition-colors hover:bg-russian-violet/20"
+      {filtered.length === 0 ? (
+        <p className="text-sm text-slate-400">No bookings found.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-160 text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
+                <SortHeader
+                  label="Customer"
+                  active={sortKey === "name"}
+                  dir={sortDir}
+                  onClick={() => toggleSort("name")}
+                />
+                <SortHeader
+                  label="When"
+                  active={sortKey === "start"}
+                  dir={sortDir}
+                  onClick={() => toggleSort("start")}
+                />
+                <SortHeader
+                  label="Status"
+                  active={sortKey === "status"}
+                  dir={sortDir}
+                  onClick={() => toggleSort("status")}
+                />
+                <th className="px-3 py-2 font-semibold">Quoted</th>
+                <th className="px-3 py-2 text-right font-semibold">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((b) => {
+                const isBusy = busyId === b.id;
+                const reviewable = b.status === "confirmed" || b.status === "completed";
+                return (
+                  <tr key={b.id} className="border-b border-slate-100 last:border-0">
+                    <td className="px-3 py-3 align-top">
+                      <Link
+                        href={`/admin/bookings/${b.id}`}
+                        className="font-semibold text-russian-violet hover:underline"
                       >
-                        {isExpanded ? "Close" : "Edit"}
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {isExpanded && (
-                <div className="mt-4 flex flex-col gap-3 border-t border-slate-100 pt-4">
-                  <p className="text-xs text-slate-400">
-                    Booked on {formatDateTimeShort(b.createdAt)}
-                  </p>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="flex flex-col gap-1">
-                      <span className="text-xs font-semibold text-russian-violet">Name</span>
-                      <input
-                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none"
-                        value={edit.name}
-                        onChange={(e) => setField(b.id, "name", e.target.value)}
-                      />
-                    </label>
-                    <label className="flex flex-col gap-1">
-                      <span className="text-xs font-semibold text-russian-violet">Email</span>
-                      <input
-                        type="email"
-                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none"
-                        value={edit.email}
-                        onChange={(e) => setField(b.id, "email", e.target.value)}
-                      />
-                    </label>
-                    <label className="flex flex-col gap-1">
-                      <span className="text-xs font-semibold text-russian-violet">Phone</span>
-                      <input
-                        type="tel"
-                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none"
-                        value={edit.phone}
-                        onChange={(e) => setField(b.id, "phone", e.target.value)}
-                        placeholder="Phone number"
-                      />
-                    </label>
-                  </div>
-
-                  {edit.address !== undefined && edit.address !== "" && (
-                    <div className="flex flex-col gap-1">
-                      <span className="text-xs font-semibold text-russian-violet">Address</span>
-                      <AddressAutocomplete
-                        id={`edit-address-${b.id}`}
-                        value={edit.address}
-                        onChange={(v: string) => setField(b.id, "address", v)}
-                        placeholder="Full address for travel time calculations"
-                      />
-                    </div>
-                  )}
-
-                  <label className="flex flex-col gap-1">
-                    <span className="text-xs font-semibold text-russian-violet">Notes</span>
-                    <textarea
-                      className="min-h-25 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none"
-                      value={edit.notes}
-                      onChange={(e) => setField(b.id, "notes", e.target.value)}
-                    />
-                  </label>
-
-                  {errors[b.id] && <p className="text-xs text-red-500">{errors[b.id]}</p>}
-
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={() => saveEdit(b)}
-                      disabled={isSaving}
-                      className="rounded-lg bg-russian-violet px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-russian-violet/90 disabled:opacity-50"
-                    >
-                      {isSaving ? "Saving\u2026" : "Save changes"}
-                    </button>
-
-                    {b.status === "confirmed" && (
-                      <button
-                        onClick={() => changeStatus(b.id, "completed")}
-                        disabled={isSaving}
-                        className="rounded-lg bg-green-500/20 px-4 py-2 text-xs font-medium text-green-700 transition-colors hover:bg-green-500/30 disabled:opacity-50"
-                      >
-                        Mark completed
-                      </button>
-                    )}
-
-                    {b.status !== "cancelled" && (
-                      <>
-                        <button
-                          onClick={() => {
-                            if (
-                              confirm(
-                                "Cancel this booking on my end? No fee will be charged to the customer.",
-                              )
-                            ) {
-                              void changeStatus(b.id, "cancelled", "operator");
-                            }
-                          }}
-                          disabled={isSaving}
-                          className="rounded-lg bg-slate-200 px-4 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-300 disabled:opacity-50"
-                          title="Operator cancel (sick, scheduling clash, etc.) - never charges the customer"
-                        >
-                          Cancel (my call)
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (
-                              confirm(
-                                "Cancel for the customer? The standard cancellation fee rules will apply (callout + travel inside the fee windows).",
-                              )
-                            ) {
-                              void changeStatus(b.id, "cancelled", "on-behalf");
-                            }
-                          }}
-                          disabled={isSaving}
-                          className="rounded-lg bg-red-500/20 px-4 py-2 text-xs font-medium text-red-600 transition-colors hover:bg-red-500/30 disabled:opacity-50"
-                          title="Customer-initiated cancel they phoned/emailed in - uses the standard fee rules"
-                        >
-                          Cancel for customer
-                        </button>
-                        {new Date(b.startAt).getTime() < renderedAt && (
+                        {b.name}
+                      </Link>
+                      <div className="text-xs break-all text-slate-500">{b.email}</div>
+                      {b.phone && <div className="text-xs text-slate-500">{b.phone}</div>}
+                    </td>
+                    <td className="px-3 py-3 align-top whitespace-nowrap text-slate-600">
+                      {formatDateTimeShort(b.startAt)}
+                    </td>
+                    <td className="px-3 py-3 align-top">
+                      <StatusPill tone={STATUS_TONE[b.status]}>{b.status}</StatusPill>
+                    </td>
+                    <td className="px-3 py-3 align-top whitespace-nowrap text-slate-600">
+                      {b.quotedLow != null && b.quotedHigh != null ? (
+                        `$${b.quotedLow} - $${b.quotedHigh}`
+                      ) : (
+                        <span className="text-slate-300">-</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3 text-right align-top">
+                      <div className="flex flex-wrap justify-end gap-2">
+                        {b.status === "confirmed" && (
                           <button
-                            onClick={() => {
-                              if (
-                                confirm(
-                                  "Mark as no-show? A draft invoice will be created for the call-out fee plus round-trip travel.",
-                                )
-                              ) {
-                                void markNoShow(b.id);
-                              }
-                            }}
-                            disabled={isSaving}
-                            className="rounded-lg bg-amber-500/20 px-4 py-2 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-500/30 disabled:opacity-50"
-                            title="Customer didn't show up - bills the full call-out + travel"
+                            onClick={() =>
+                              setPending({ id: b.id, kind: "complete", alreadySent: false })
+                            }
+                            disabled={isBusy}
+                            className="rounded-lg bg-green-500/20 px-2.5 py-1.5 text-xs font-medium text-green-700 transition-colors hover:bg-green-500/30 disabled:opacity-50"
                           >
-                            Mark no-show
+                            Complete
                           </button>
                         )}
-                      </>
-                    )}
+                        {reviewable && (
+                          <button
+                            onClick={() =>
+                              setPending({
+                                id: b.id,
+                                kind: "review",
+                                alreadySent: b.reviewSentAt != null,
+                              })
+                            }
+                            disabled={isBusy}
+                            className="rounded-lg bg-moonstone-600/15 px-2.5 py-1.5 text-xs font-medium text-moonstone-700 transition-colors hover:bg-moonstone-600/25 disabled:opacity-50"
+                          >
+                            {b.reviewSentAt ? "Resend review" : "Send review"}
+                          </button>
+                        )}
+                        <Link
+                          href={`/admin/bookings/${b.id}`}
+                          className="rounded-lg bg-russian-violet/10 px-2.5 py-1.5 text-xs font-medium text-russian-violet transition-colors hover:bg-russian-violet/20"
+                        >
+                          View
+                        </Link>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
 
-                    {(b.status === "confirmed" || b.status === "completed") && (
-                      <button
-                        onClick={() => void resendReview(b.id)}
-                        disabled={isSaving || isResending}
-                        className="rounded-lg bg-moonstone-600/15 px-4 py-2 text-xs font-medium text-moonstone-700 transition-colors hover:bg-moonstone-600/25 disabled:opacity-50"
-                      >
-                        {isResending
-                          ? "Sending\u2026"
-                          : b.reviewSentAt
-                            ? "Resend review email"
-                            : "Send review email"}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+      <ConfirmDialog
+        open={pending !== null}
+        title={
+          pending?.kind === "complete"
+            ? "Mark this booking completed?"
+            : pending?.alreadySent
+              ? "Resend the review email?"
+              : "Send the review email?"
+        }
+        body={
+          pending?.kind === "complete"
+            ? "This also sends the review-request email if one hasn't gone out yet."
+            : "Emails the customer a link to leave a review for this booking."
+        }
+        confirmLabel={pending?.kind === "complete" ? "Mark completed" : "Send email"}
+        busy={busyId !== null}
+        onConfirm={() => void runPending()}
+        onCancel={() => busyId === null && setPending(null)}
+      />
     </div>
+  );
+}
+
+/**
+ * A sortable table header cell.
+ * @param props - Component props.
+ * @param props.label - Column label.
+ * @param props.active - Whether this column is the active sort.
+ * @param props.dir - Current sort direction.
+ * @param props.onClick - Click handler to toggle/select the sort.
+ * @returns The header cell element.
+ */
+function SortHeader({
+  label,
+  active,
+  dir,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  dir: SortDir;
+  onClick: () => void;
+}): React.ReactElement {
+  return (
+    <th className="px-3 py-2 font-semibold">
+      <button
+        onClick={onClick}
+        className={cn(
+          "inline-flex items-center gap-1 transition-colors hover:text-slate-700",
+          active && "text-russian-violet",
+        )}
+      >
+        {label}
+        <span className="text-[0.65rem]">{active ? (dir === "asc" ? "▲" : "▼") : ""}</span>
+      </button>
+    </th>
   );
 }

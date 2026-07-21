@@ -17,7 +17,7 @@ import { NextRequest } from "next/server";
  * @param token - Token to validate.
  * @returns True if the token matches ADMIN_SECRET.
  */
-export function isValidAdminToken(token: string | null | undefined): boolean {
+function isValidAdminToken(token: string | null | undefined): boolean {
   const secret = process.env.ADMIN_SECRET;
   if (!secret || !token) return false;
   try {

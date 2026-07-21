@@ -23,6 +23,7 @@ import { cn } from "@/shared/lib/cn";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import type { Metadata } from "next";
+import Link from "next/link";
 import type React from "react";
 import { Suspense } from "react";
 import { FaCalendarCheck, FaClock, FaEnvelopeOpenText, FaListCheck } from "react-icons/fa6";
@@ -297,6 +298,7 @@ async function BookingFormIsland(): Promise<React.ReactElement> {
         availableDays={days}
         durations={durations}
         estimatorRange={settings.estimator.range}
+        lowEndFloorFactor={settings.estimator.lowEndFloorFactor}
         minBillableMins={settings.pricing.minBillableMins}
         minTravelCharge={settings.pricing.minTravelCharge}
       />
@@ -410,6 +412,16 @@ export default function BookingPage(): React.ReactElement {
               details and send you a calendar invite.
               <br />
               Prefer to call or text? Feel free to reach out directly.
+            </p>
+            <p className="mt-3 text-sm text-rich-black sm:text-base">
+              Already booked?{" "}
+              <Link
+                href="/booking/manage"
+                className="font-semibold text-russian-violet underline underline-offset-2 hover:opacity-80"
+              >
+                Manage your booking
+              </Link>
+              .
             </p>
           </section>
 

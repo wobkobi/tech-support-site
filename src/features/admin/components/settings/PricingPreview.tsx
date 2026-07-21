@@ -24,11 +24,15 @@ export function PricingPreview({ config }: Props): React.ReactElement {
   const { cancellation: c, reschedule: r } = config;
   const lines: string[] = [];
 
-  lines.push(`Cancellations more than ${c.freeNoticeHours}h before the appointment are free.`);
+  // In person and remote are priced separately, so the preview shows both -
+  // reading only one line would hide half the policy from the operator.
   lines.push(
     c.travelChargeHours > 0
-      ? `Within ${c.freeNoticeHours}h a $${c.callOutFee} call-out applies; within ${c.travelChargeHours}h, round-trip travel is added too.`
-      : `Within ${c.freeNoticeHours}h a $${c.callOutFee} call-out applies.`,
+      ? `In person: free more than ${c.freeNoticeHours}h out. Inside that, a $${c.callOutFee} fee. Within ${c.travelChargeHours}h, or a no-show, the full $${c.fullCallOutFee} call-out plus round-trip travel.`
+      : `In person: free more than ${c.freeNoticeHours}h out. Inside that, a $${c.callOutFee} fee.`,
+  );
+  lines.push(
+    `Remote: free more than ${c.remoteFreeNoticeHours}h out. Inside that, or a no-show, a $${c.remoteFee} fee - no travel.`,
   );
 
   lines.push(
@@ -62,11 +66,11 @@ export function PricingPreview({ config }: Props): React.ReactElement {
   );
 
   return (
-    <div className="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-4">
+    <div className="mt-6 rounded-lg border border-admin-border bg-admin-bg p-4">
       <h3 className="text-xs font-bold tracking-wide text-russian-violet uppercase">
         Live preview
       </h3>
-      <ul className="mt-2 space-y-1 text-sm text-slate-600">
+      <ul className="mt-2 space-y-1 text-sm text-admin-text-secondary">
         {lines.map((line) => (
           <li key={line}>{line}</li>
         ))}

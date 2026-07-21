@@ -4,13 +4,15 @@
  * @description Form for sending a review link to a past client via email or SMS.
  */
 
+import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { Modal } from "@/features/admin/components/ui/Modal";
+import { useToast } from "@/features/admin/components/ui/Toast";
 import { EmailInput } from "@/shared/components/EmailInput";
 import { PhoneInput } from "@/shared/components/PhoneInput";
 import { cn } from "@/shared/lib/cn";
 import { formatNZPhone, validatePhone } from "@/shared/lib/normalise-phone";
 import type React from "react";
 import { useRef, useState } from "react";
-import { FaCaretLeft } from "react-icons/fa6";
 import { CopyLinkButton } from "./CopyLinkButton";
 
 /**
@@ -33,45 +35,49 @@ export interface ContactSuggestion {
  * Props for the {@link SendReviewLinkForm} component.
  */
 interface SendReviewLinkFormProps {
-  /** Contacts that have never received a review link, shown in a pre-fill dropdown */
+  /** Contacts worth asking - not already reviewed, and not sent a link recently. Shown in a pre-fill dropdown. */
   contactSuggestions?: ContactSuggestion[];
   /** Start the form expanded without needing to click the toggle */
   defaultOpen?: boolean;
+  /** Pre-fill the fields for one person, e.g. arriving from a contact's detail page. SMS mode is chosen when they have a phone but no email. */
+  prefill?: { name: string; email: string | null; phone: string | null };
 }
 
 /**
  * Form for sending a review link to a past client via email or generating SMS text.
  * Email mode shows a rendered preview before sending.
  * @param props - Component props.
- * @param props.contactSuggestions - Contacts that have never received a review link, shown in a pre-fill dropdown.
+ * @param props.contactSuggestions - Contacts worth asking (not already reviewed, not sent a link recently), shown in a pre-fill dropdown.
  * @param props.defaultOpen - Start the form expanded. Defaults to false.
+ * @param props.prefill - Pre-fill the fields for one person (name + email/phone).
  * @returns Send review link form element.
  */
 export function SendReviewLinkForm({
   contactSuggestions = [],
   defaultOpen = false,
+  prefill,
 }: SendReviewLinkFormProps): React.ReactElement {
+  const { toast } = useToast();
   const [open, setOpen] = useState(defaultOpen);
-  const [mode, setMode] = useState<"email" | "sms">("email");
+  // Prefer email; fall back to SMS only when there's a phone but no email.
+  const [mode, setMode] = useState<"email" | "sms">(
+    prefill && !prefill.email && prefill.phone ? "sms" : "email",
+  );
   const [contactSearch, setContactSearch] = useState("");
   const [listOpen, setListOpen] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phoneInput, setPhoneInput] = useState("");
+  const [name, setName] = useState(prefill?.name ?? "");
+  const [email, setEmail] = useState(prefill?.email ?? "");
+  const [phoneInput, setPhoneInput] = useState(prefill?.phone ? formatNZPhone(prefill.phone) : "");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
   const [smsText, setSmsText] = useState<string | null>(null);
   const [existingUrl, setExistingUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   /** Rendered HTML preview returned from the preview API (email mode only). */
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
 
-  /** Resets transient result state (errors, previews, success banners). Does NOT clear form fields. */
+  /** Resets transient results (preview, SMS text, existing-link). Does NOT clear form fields. */
   function resetState(): void {
-    setSuccess(false);
-    setError(null);
     setSmsText(null);
     setExistingUrl(null);
     setPreviewHtml(null);
@@ -92,7 +98,6 @@ export function SendReviewLinkForm({
   async function handlePreview(e: React.SyntheticEvent): Promise<void> {
     e.preventDefault();
     setLoading(true);
-    setError(null);
     try {
       const res = await fetch("/api/admin/preview-review-email", {
         method: "POST",
@@ -103,7 +108,7 @@ export function SendReviewLinkForm({
       if (!res.ok) throw new Error(data.error ?? "Request failed");
       setPreviewHtml(data.html ?? "");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      toast(err instanceof Error ? err.message : "Something went wrong.", { tone: "error" });
     } finally {
       setLoading(false);
     }
@@ -115,7 +120,6 @@ export function SendReviewLinkForm({
    */
   async function handleSend(): Promise<void> {
     setLoading(true);
-    setError(null);
     try {
       const res = await fetch("/api/admin/send-review-link", {
         method: "POST",
@@ -132,13 +136,15 @@ export function SendReviewLinkForm({
 
       setPreviewHtml(null);
       if (data.existing && data.reviewUrl) {
+        // Already sent one: surface the existing link to copy rather than send
+        // a second. Stays inline - it is a result to act on, not a notification.
         setExistingUrl(data.reviewUrl);
       } else {
-        setSuccess(true);
+        toast("Review link sent.", { tone: "success" });
         clearFields();
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      toast(err instanceof Error ? err.message : "Something went wrong.", { tone: "error" });
     } finally {
       setLoading(false);
     }
@@ -152,7 +158,6 @@ export function SendReviewLinkForm({
   async function handleSmsSubmit(e: React.SyntheticEvent): Promise<void> {
     e.preventDefault();
     setLoading(true);
-    setError(null);
     setSmsText(null);
     setExistingUrl(null);
     try {
@@ -179,7 +184,7 @@ export function SendReviewLinkForm({
         clearFields();
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      toast(err instanceof Error ? err.message : "Something went wrong.", { tone: "error" });
     } finally {
       setLoading(false);
     }
@@ -236,7 +241,7 @@ export function SendReviewLinkForm({
               ref={pickerRef}
               className="relative flex flex-col gap-1"
               onBlur={(e) => {
-                if (!pickerRef.current?.contains(e.relatedTarget as Node)) setListOpen(false);
+                if (!pickerRef.current?.contains(e.relatedTarget)) setListOpen(false);
               }}
             >
               <label className="text-xs font-medium text-slate-500">Pick an existing contact</label>
@@ -323,8 +328,10 @@ export function SendReviewLinkForm({
             ))}
           </div>
 
-          {/* Email mode: form > preview > confirm send */}
-          {mode === "email" && !previewHtml && (
+          {/* Email mode: form, with the preview + confirm send in a dialog over
+              it. The form stays mounted underneath so backing out of the preview
+              returns the typed details untouched. */}
+          {mode === "email" && (
             <form onSubmit={handlePreview} className="flex flex-col gap-3">
               <div className="flex flex-col gap-2">
                 <input
@@ -346,10 +353,6 @@ export function SendReviewLinkForm({
                   className="rounded-lg"
                 />
               </div>
-              {error && <p className="text-xs text-coquelicot-400">{error}</p>}
-              {success && (
-                <p className="text-xs text-moonstone-600">Review link sent successfully.</p>
-              )}
               <button
                 type="submit"
                 disabled={loading}
@@ -360,43 +363,32 @@ export function SendReviewLinkForm({
             </form>
           )}
 
-          {/* Email preview */}
-          {mode === "email" && previewHtml && (
-            <div className="flex flex-col gap-3">
-              <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
-                Preview - sending to {email}
-              </p>
-              <iframe
-                srcDoc={previewHtml}
-                title="Email preview"
-                className="w-full rounded-lg border border-slate-200"
-                style={{ height: "480px" }}
-                sandbox="allow-same-origin"
-              />
-              {error && <p className="text-xs text-coquelicot-400">{error}</p>}
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  disabled={loading}
-                  onClick={() => void handleSend()}
-                  className="rounded-lg bg-moonstone-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-moonstone-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {loading ? "Sending..." : "Send email"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPreviewHtml(null);
-                    setError(null);
-                  }}
-                  className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-600 transition-colors hover:border-slate-400"
-                >
-                  <FaCaretLeft className="h-4 w-4" aria-hidden />
+          {/* Email preview - exactly what the client receives, so the send is a
+              confirmation of something seen rather than a leap of faith. */}
+          <Modal
+            open={mode === "email" && previewHtml !== null}
+            onClose={() => setPreviewHtml(null)}
+            title="Preview review link email"
+            description={email ? `Sending to ${email}` : undefined}
+            size="lg"
+            footer={
+              <>
+                <AdminButton variant="secondary" onClick={() => setPreviewHtml(null)}>
                   Back
-                </button>
-              </div>
-            </div>
-          )}
+                </AdminButton>
+                <AdminButton onClick={() => void handleSend()} busy={loading}>
+                  {loading ? "Sending..." : "Send email"}
+                </AdminButton>
+              </>
+            }
+          >
+            <iframe
+              srcDoc={previewHtml ?? ""}
+              title="Email preview"
+              className="h-[60vh] w-full rounded-lg border border-slate-200"
+              sandbox="allow-same-origin"
+            />
+          </Modal>
 
           {/* SMS mode */}
           {mode === "sms" && (
@@ -431,7 +423,6 @@ export function SendReviewLinkForm({
                   {phoneValid ? `Stored as: ${phoneE164}` : "Invalid phone number"}
                 </p>
               )}
-              {error && <p className="text-xs text-coquelicot-400">{error}</p>}
               <button
                 type="submit"
                 disabled={loading || (!!phoneInput && !phoneValid)}

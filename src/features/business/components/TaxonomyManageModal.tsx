@@ -2,11 +2,18 @@
 // src/features/business/components/TaxonomyManageModal.tsx
 /**
  * @description Lightweight modal for the Calculator that lists every distinct
- * device + category currently in use and lets the operator clear individual
- * tags via the bulk-delete API. Tasks themselves stay; only the tag is unset.
- * Future parse-job runs will retag them.
+ * device + category currently in use and lets the operator RENAME a tag (the
+ * safe fix for a drifted or misspelt one - every task using it follows, and
+ * colliding rows merge) or CLEAR it.
+ *
+ * Clearing is permanent. The AI may only reuse tags from the live vocabulary,
+ * and that vocabulary is built from these tags, so a cleared tag is never
+ * offered back to the model and its rows go inert. The copy below says so
+ * plainly - it previously promised the next parse would retag them, which is
+ * not something the system can do.
  */
 
+import { Modal } from "@/features/admin/components/ui/Modal";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
 import { useEffect, useState } from "react";
@@ -21,6 +28,13 @@ interface TaxonomyResponse {
 interface DeleteResponse {
   ok: boolean;
   cleared?: number;
+  error?: string;
+}
+
+interface RenameResponse {
+  ok: boolean;
+  renamed?: number;
+  merged?: number;
   error?: string;
 }
 
@@ -51,6 +65,9 @@ export function TaxonomyManageModal({ onClose, onChanged }: Props): React.ReactE
   // Two-step confirm baked into the row instead of native window.confirm(),
   // because Firefox's "stop showing this dialog" option permanently suppresses it.
   const [pendingClear, setPendingClear] = useState<string | null>(null);
+  // `kind:name` currently being renamed, plus the draft value for its input.
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
 
   /**
    * Fetches the current taxonomy from the API and returns it.
@@ -103,19 +120,6 @@ export function TaxonomyManageModal({ onClose, onChanged }: Props): React.ReactE
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Close on Escape.
-  useEffect(() => {
-    /**
-     * Closes the modal when Escape is pressed.
-     * @param e - Keyboard event.
-     */
-    function onKey(e: KeyboardEvent): void {
-      if (e.key === "Escape") onClose();
-    }
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
   /**
    * Clears a tag from every task tagged with it. Caller must have confirmed
    * via the inline two-step (no window.confirm, Firefox suppresses it).
@@ -142,79 +146,104 @@ export function TaxonomyManageModal({ onClose, onChanged }: Props): React.ReactE
     }
   }
 
+  /**
+   * Renames a tag across every task using it. Colliding rows merge server-side,
+   * so this is safe to use for fixing a drifted spelling.
+   * @param kind - Whether to rename a device or an action.
+   * @param name - The current tag value.
+   * @param to - The replacement value.
+   */
+  async function renameTag(kind: "devices" | "actions", name: string, to: string): Promise<void> {
+    const target = to.trim();
+    if (!target || target === name) {
+      setRenaming(null);
+      return;
+    }
+    setBusy(`${kind}:${name}`);
+    setError(null);
+    try {
+      const res = await fetch(`/api/business/task-templates/${kind}/${encodeURIComponent(name)}`, {
+        method: "PATCH",
+        headers: { ...headers, "content-type": "application/json" },
+        body: JSON.stringify({ to: target }),
+      });
+      const data = (await res.json()) as RenameResponse;
+      if (!res.ok || !data.ok) throw new Error(data.error ?? "Rename failed");
+      setRenaming(null);
+      await reload();
+      onChanged?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Rename failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Manage task taxonomy"
-      onClick={onClose}
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-12 backdrop-blur-sm"
+    <Modal
+      open
+      onClose={onClose}
+      title="Manage tags"
+      size="lg"
+      description={
+        <>
+          <strong>Rename</strong> to fix a spelling - every task using the tag follows, and
+          duplicates merge. <strong>Clear</strong> only when that work is gone for good: it removes
+          the tag from the AI&apos;s vocabulary, so those tasks are not retagged later.
+        </>
+      }
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl"
-      >
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-          <div>
-            <h2 className="text-base font-bold text-russian-violet">Manage tags</h2>
-            <p className="mt-0.5 text-xs text-slate-500">
-              Clear devices or actions you no longer want; tasks tagged with them keep their other
-              fields and get retagged on the next AI parse.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="h-9 w-9 shrink-0 rounded-lg text-2xl leading-none text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-          >
-            ×
-          </button>
-        </div>
+      <div className="space-y-6">
+        {loading && <p className="text-sm text-admin-muted">Loading...</p>}
+        {error && <p className="rounded bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>}
 
-        <div className="max-h-[60vh] space-y-6 overflow-y-auto px-5 py-4">
-          {loading && <p className="text-sm text-slate-500">Loading...</p>}
-          {error && <p className="rounded bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>}
-
-          {!loading && (
-            <>
-              <TagSection
-                title="Devices"
-                tags={devices}
-                busyKey={busy}
-                pendingKey={pendingClear}
-                onRequestClear={(name) => setPendingClear(`devices:${name}`)}
-                onConfirmClear={(name) => void clearTag("devices", name)}
-                onCancelClear={() => setPendingClear(null)}
-                kind="devices"
-              />
-              <TagSection
-                title="Actions"
-                tags={actions}
-                busyKey={busy}
-                pendingKey={pendingClear}
-                onRequestClear={(name) => setPendingClear(`actions:${name}`)}
-                onConfirmClear={(name) => void clearTag("actions", name)}
-                onCancelClear={() => setPendingClear(null)}
-                kind="actions"
-              />
-            </>
-          )}
-        </div>
+        {!loading &&
+          (["devices", "actions"] as const).map((kind) => (
+            <TagSection
+              key={kind}
+              title={kind === "devices" ? "Devices" : "Actions"}
+              tags={kind === "devices" ? devices : actions}
+              kind={kind}
+              busyKey={busy}
+              pendingKey={pendingClear}
+              renamingKey={renaming}
+              renameValue={renameValue}
+              onRenameValue={setRenameValue}
+              onRequestRename={(name) => {
+                setPendingClear(null);
+                setRenaming(`${kind}:${name}`);
+                setRenameValue(name);
+              }}
+              onSubmitRename={(name) => void renameTag(kind, name, renameValue)}
+              onCancelRename={() => setRenaming(null)}
+              onRequestClear={(name) => {
+                setRenaming(null);
+                setPendingClear(`${kind}:${name}`);
+              }}
+              onConfirmClear={(name) => void clearTag(kind, name)}
+              onCancelClear={() => setPendingClear(null)}
+            />
+          ))}
       </div>
-    </div>
+    </Modal>
   );
 }
 
 /**
- * Taxonomy axis list. Two-step inline confirm (Firefox suppresses native
- * confirm dialogs once the user opts out for the origin).
+ * Taxonomy axis list. Rename is inline; clear uses a two-step inline confirm
+ * (Firefox suppresses native confirm dialogs once the user opts out).
  * @param props - Component props.
  * @param props.title - Section heading (e.g. "Devices").
  * @param props.tags - Tag values to render.
  * @param props.busyKey - Currently-busy `kind:name` key.
- * @param props.pendingKey - `kind:name` staged for confirm.
- * @param props.kind - Whether this section renders devices or categories.
+ * @param props.pendingKey - `kind:name` staged for clear confirmation.
+ * @param props.renamingKey - `kind:name` currently being renamed.
+ * @param props.renameValue - Draft value for the rename input.
+ * @param props.onRenameValue - Updates the rename draft.
+ * @param props.kind - Whether this section renders devices or actions.
+ * @param props.onRequestRename - Open the inline rename editor for a row.
+ * @param props.onSubmitRename - Commit the rename.
+ * @param props.onCancelRename - Abandon the rename.
  * @param props.onRequestClear - First click: stage the row for confirmation.
  * @param props.onConfirmClear - Second click: fire the delete.
  * @param props.onCancelClear - Cancel the pending confirmation.
@@ -225,7 +254,13 @@ function TagSection({
   tags,
   busyKey,
   pendingKey,
+  renamingKey,
+  renameValue,
+  onRenameValue,
   kind,
+  onRequestRename,
+  onSubmitRename,
+  onCancelRename,
   onRequestClear,
   onConfirmClear,
   onCancelClear,
@@ -234,7 +269,13 @@ function TagSection({
   tags: string[];
   busyKey: string | null;
   pendingKey: string | null;
+  renamingKey: string | null;
+  renameValue: string;
+  onRenameValue: (v: string) => void;
   kind: "devices" | "actions";
+  onRequestRename: (name: string) => void;
+  onSubmitRename: (name: string) => void;
+  onCancelRename: () => void;
   onRequestClear: (name: string) => void;
   onConfirmClear: (name: string) => void;
   onCancelClear: () => void;
@@ -245,49 +286,99 @@ function TagSection({
         {title}
       </h3>
       {tags.length === 0 ? (
-        <p className="text-xs text-slate-400 italic">None yet.</p>
+        <p className="text-xs text-admin-faint italic">None yet.</p>
       ) : (
         <ul className="flex flex-col gap-1">
           {tags.map((tag) => {
             const rowKey = `${kind}:${tag}`;
             const isBusy = busyKey === rowKey;
             const isPending = pendingKey === rowKey;
+            const isRenaming = renamingKey === rowKey;
             return (
               <li
                 key={tag}
                 className={cn(
                   "flex items-center justify-between gap-3 rounded-lg border px-3 py-2",
-                  isPending ? "border-red-300 bg-red-50" : "border-slate-200",
+                  isPending
+                    ? "border-red-300 bg-red-50"
+                    : isRenaming
+                      ? "border-admin-border-strong bg-admin-bg"
+                      : "border-admin-border",
                 )}
               >
-                <span className="truncate text-sm text-slate-700">{tag}</span>
-                {isPending ? (
-                  <div className="flex shrink-0 items-center gap-2">
-                    <span className="text-xs text-red-700">Clear this tag?</span>
-                    <button
-                      type="button"
-                      onClick={() => onConfirmClear(tag)}
-                      className="rounded bg-red-600 px-2 py-1 text-xs font-semibold text-white hover:bg-red-700"
-                    >
-                      Yes, clear
-                    </button>
-                    <button
-                      type="button"
-                      onClick={onCancelClear}
-                      className="rounded text-xs font-semibold text-slate-500 hover:text-slate-700"
-                    >
-                      Cancel
-                    </button>
-                  </div>
+                {isRenaming ? (
+                  <>
+                    <input
+                      autoFocus
+                      value={renameValue}
+                      onChange={(e) => onRenameValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") onSubmitRename(tag);
+                        if (e.key === "Escape") onCancelRename();
+                      }}
+                      aria-label={`Rename ${tag}`}
+                      className="min-w-0 flex-1 rounded border border-admin-border-strong px-2 py-1 text-sm text-admin-text"
+                    />
+                    <div className="flex shrink-0 items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={isBusy}
+                        onClick={() => onSubmitRename(tag)}
+                        className="rounded bg-russian-violet px-2 py-1 text-xs font-semibold text-white disabled:opacity-50"
+                      >
+                        {isBusy ? "Saving..." : "Save"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={onCancelRename}
+                        className="rounded text-xs font-semibold text-admin-muted hover:text-admin-text"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </>
                 ) : (
-                  <button
-                    type="button"
-                    disabled={isBusy}
-                    onClick={() => onRequestClear(tag)}
-                    className="shrink-0 rounded text-xs font-semibold text-red-500 hover:text-red-700 disabled:opacity-50"
-                  >
-                    {isBusy ? "Clearing..." : "Clear"}
-                  </button>
+                  <>
+                    <span className="truncate text-sm text-admin-text">{tag}</span>
+                    {isPending ? (
+                      <div className="flex shrink-0 items-center gap-2">
+                        <span className="text-xs text-red-700">Clear for good?</span>
+                        <button
+                          type="button"
+                          onClick={() => onConfirmClear(tag)}
+                          className="rounded bg-red-600 px-2 py-1 text-xs font-semibold text-white hover:bg-red-700"
+                        >
+                          Yes, clear
+                        </button>
+                        <button
+                          type="button"
+                          onClick={onCancelClear}
+                          className="rounded text-xs font-semibold text-admin-muted hover:text-admin-text"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex shrink-0 items-center gap-3">
+                        <button
+                          type="button"
+                          disabled={isBusy}
+                          onClick={() => onRequestRename(tag)}
+                          className="rounded text-xs font-semibold text-admin-muted hover:text-russian-violet disabled:opacity-50"
+                        >
+                          Rename
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isBusy}
+                          onClick={() => onRequestClear(tag)}
+                          className="rounded text-xs font-semibold text-red-500 hover:text-red-700 disabled:opacity-50"
+                        >
+                          {isBusy ? "Clearing..." : "Clear"}
+                        </button>
+                      </div>
+                    )}
+                  </>
                 )}
               </li>
             );

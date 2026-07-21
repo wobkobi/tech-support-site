@@ -27,7 +27,9 @@ import {
   sendOwnerBookingNotification,
 } from "@/features/reviews/lib/email";
 import { errorResponse } from "@/shared/lib/api-response";
-import { isValidPhone, toE164NZ } from "@/shared/lib/normalise-phone";
+import { normaliseAddress } from "@/shared/lib/normalise-address";
+import { normaliseName } from "@/shared/lib/normalise-name";
+import { validatePhone } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 import { getSettings } from "@/shared/lib/settings/get-settings";
@@ -100,6 +102,24 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (!payloadCheck.valid) {
       return errorResponse(payloadCheck.error, 400);
     }
+
+    // Tidy the name, validate the phone, and Google-canonicalise a typed address
+    // (unambiguous matches only - see normaliseAddress) so the edited booking,
+    // calendar event, and contact all carry a verified address. Falls back to
+    // the typed value when Google has no single confident match.
+    const cleanName = normaliseName(name) || name.trim();
+    const phoneValidation = validatePhone(phone ?? "");
+    if (phoneValidation.result === "invalid") {
+      return NextResponse.json(
+        { ok: false, error: "Please enter a valid phone number, or leave it blank." },
+        { status: 400 },
+      );
+    }
+    const phoneE164 = phoneValidation.e164 || null;
+    const canonicalAddress =
+      meetingType === "in-person" && address?.trim()
+        ? ((await normaliseAddress(address.trim())) ?? address.trim())
+        : (address?.trim() ?? null);
 
     const now = new Date();
 
@@ -205,15 +225,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         : timeOfDay.replace(/(am|pm)$/i, `:${String(startMinute).padStart(2, "0")}$1`);
     bookingNotes += `[${timeLabel} - ${durationLabel}]\n`;
     bookingNotes += `Meeting type: ${meetingType === "in-person" ? "In-person" : "Remote"}\n`;
-    if (meetingType === "in-person" && address) {
-      bookingNotes += `Address: ${address.trim()}\n`;
-    }
-    const phoneE164 = phone ? toE164NZ(phone) || null : null;
-    if (phone && (!phoneE164 || !isValidPhone(phoneE164))) {
-      return NextResponse.json(
-        { ok: false, error: "Please enter a valid phone number, or leave it blank." },
-        { status: 400 },
-      );
+    if (meetingType === "in-person" && canonicalAddress) {
+      bookingNotes += `Address: ${canonicalAddress}\n`;
     }
     if (phoneE164) {
       bookingNotes += `Phone: ${phoneE164}\n`;
@@ -231,7 +244,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Create new calendar event
     let calendarEventId: string | null = null;
     try {
-      const summary = `Tech Support: ${name.trim()} - ${cleanDurationLabel}`;
+      const summary = `Tech Support: ${cleanName} - ${cleanDurationLabel}`;
       const calendarResult = await createBookingEvent({
         summary,
         description: bookingNotes,
@@ -239,8 +252,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         endAt,
         timeZone: config.timeZone,
         attendeeEmail: booking.email,
-        attendeeName: name.trim(),
-        location: meetingType === "in-person" && address ? address.trim() : undefined,
+        attendeeName: cleanName,
+        location: meetingType === "in-person" && canonicalAddress ? canonicalAddress : undefined,
       });
       calendarEventId = calendarResult.eventId;
       console.log(`[booking/edit] Created new calendar event: ${calendarEventId}`);
@@ -262,9 +275,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // in-person > remote drops the old round-trip charge. Non-blocking on error.
     let travelMinsAtBooking: number | null = null;
     let travelMinsBackAtBooking: number | null = null;
-    if (meetingType === "in-person" && address && address.trim()) {
+    if (meetingType === "in-person" && canonicalAddress) {
       try {
-        const drive = await lookupDriveRoundTrip(address.trim(), startAt, endAt);
+        const drive = await lookupDriveRoundTrip(canonicalAddress, startAt, endAt);
         if (drive.status === "ok") {
           travelMinsAtBooking = drive.data.there.durationMins;
           travelMinsBackAtBooking = drive.data.back.durationMins;
@@ -279,7 +292,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       await prisma.booking.update({
         where: { id: booking.id },
         data: {
-          name: name.trim(),
+          name: cleanName,
           notes: bookingNotes,
           startAt,
           endAt,
@@ -287,12 +300,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           activeSlotKey: startAt.toISOString(),
           bufferAfterMin: config.bookingBufferAfterMin,
           rescheduleCount: { increment: 1 },
-          ...(phoneE164 !== undefined ? { phone: phoneE164 } : {}),
+          phone: phoneE164,
           // Keep the structured snapshots in step with the edit so the
           // cancellation invoice reads the current address / meeting type /
           // duration rather than the original booking's values.
-          address: address?.trim() ? splitUnitFromAddress(address.trim()).rest : null,
-          unit: address?.trim() ? splitUnitFromAddress(address.trim()).unit || null : null,
+          address: canonicalAddress ? splitUnitFromAddress(canonicalAddress).rest : null,
+          unit: canonicalAddress ? splitUnitFromAddress(canonicalAddress).unit || null : null,
           meetingType: meetingType === "in-person" ? "in_person" : "remote",
           duration,
           travelMinsAtBooking,
@@ -327,16 +340,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       // soft-delete-aware (never resurrecting a deleted contact), then keep the
       // contact's fields in step with the edited booking.
       const { contact } = await findOrCreateContactByEmail(booking.email, {
-        name: name.trim(),
-        phone: phoneE164 ?? null,
-        address: meetingType === "in-person" && address ? address.trim() : null,
+        name: cleanName,
+        phone: phoneE164,
+        address: canonicalAddress,
       });
       await prisma.contact.update({
         where: { id: contact.id },
         data: {
-          name: name.trim(),
-          ...(phoneE164 !== undefined ? { phone: phoneE164 } : {}),
-          ...(meetingType === "in-person" && address ? { address: address.trim() } : {}),
+          name: cleanName,
+          phone: phoneE164,
+          ...(canonicalAddress ? { address: canonicalAddress } : {}),
         },
       });
       await syncContactToGoogle(contact.id);
@@ -350,25 +363,33 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       sendCustomerBookingConfirmation(
         {
           id: booking.id,
-          name: name.trim(),
+          name: cleanName,
           email: booking.email,
           notes: bookingNotes,
           startAt,
           endAt,
           cancelToken: booking.cancelToken,
           promoTitleAtBooking: booking.promoTitleAtBooking,
+          address: canonicalAddress ?? "",
+          meetingType: meetingType === "in-person" ? "in_person" : "remote",
+          // The update above incremented it, so the stored count is one ahead
+          // of the value loaded into `booking` - use the incremented one or the
+          // calendar entry's SEQUENCE won't rise and clients ignore the update.
+          rescheduleCount: booking.rescheduleCount + 1,
         },
         { kind: "rescheduled", previousStartAt },
       ),
       sendOwnerBookingNotification(
         {
           id: booking.id,
-          name: name.trim(),
+          name: cleanName,
           email: booking.email,
           notes: bookingNotes,
           startAt,
           endAt,
           cancelToken: booking.cancelToken,
+          address: canonicalAddress ?? "",
+          meetingType: meetingType === "in-person" ? "in_person" : "remote",
         },
         { kind: "rescheduled", previousStartAt },
       ),

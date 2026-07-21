@@ -28,7 +28,7 @@ interface DistanceMatrixResponse {
 /**
  * Result of a successful one-leg lookup. Both fields are positive numbers.
  */
-export interface DriveDistance {
+interface DriveDistance {
   /** Drive duration in minutes (rounded). */
   durationMins: number;
   /** One-way distance in kilometres (one decimal). */
@@ -36,7 +36,7 @@ export interface DriveDistance {
 }
 
 /** Both legs of a round trip, each quoted at its own departure time. */
-export interface DriveRoundTrip {
+interface DriveRoundTrip {
   /** Base address > destination at the outbound departure time. */
   there: DriveDistance;
   /** Destination > base address at the return departure time. */

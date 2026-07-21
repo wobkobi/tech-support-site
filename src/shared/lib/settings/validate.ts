@@ -13,7 +13,6 @@ import type {
   AvailabilitySettings,
   CommsSettings,
   EstimatorSettings,
-  HoldsSettings,
   IdentitySettings,
   PricingSettings,
   ReviewsSettings,
@@ -94,6 +93,30 @@ function validateAvailability(a: AvailabilitySettings): FieldError[] {
   if (!Array.isArray(a.subSlotMinutes) || a.subSlotMinutes.some((m) => !inRange(m, 0, 59)))
     errors.push({ field: "subSlotMinutes", message: "Each sub-slot offset must be 0-59." });
 
+  if (!Array.isArray(a.morningGuards)) {
+    errors.push({ field: "morningGuards", message: "Must be a list of guard rules." });
+  } else {
+    a.morningGuards.forEach((g, i) => {
+      if (typeof g?.enabled !== "boolean")
+        errors.push({ field: `morningGuards.${i}.enabled`, message: "Must be on or off." });
+      if (!inRange(g?.triggerDay, 0, 6))
+        errors.push({ field: `morningGuards.${i}.triggerDay`, message: "Day must be 0-6." });
+      if (!inRange(g?.triggerHour, 0, 23))
+        errors.push({ field: `morningGuards.${i}.triggerHour`, message: "Hour must be 0-23." });
+      if (!inRange(g?.earliestHour, 0, 23))
+        errors.push({ field: `morningGuards.${i}.earliestHour`, message: "Hour must be 0-23." });
+      if (
+        !Array.isArray(g?.protectedDays) ||
+        g.protectedDays.length === 0 ||
+        g.protectedDays.some((d) => !inRange(d, 0, 6))
+      )
+        errors.push({
+          field: `morningGuards.${i}.protectedDays`,
+          message: "Pick at least one day (0-6).",
+        });
+    });
+  }
+
   for (let day = 0; day <= 6; day++) {
     const d = a.schedule?.[day];
     if (!d) {
@@ -135,12 +158,37 @@ function validatePricing(p: PricingSettings): FieldError[] {
     errors.push({ field: "publicHolidayUplift", message: "Must be a fraction 0-5 (0 = off)." });
   if (!nonNeg(p.minTravelCharge))
     errors.push({ field: "minTravelCharge", message: "Must be 0 or more (0 = no floor)." });
+  if (!inRange(p.unsuccessfulWorkFactor, 0, 1))
+    errors.push({
+      field: "unsuccessfulWorkFactor",
+      message: "Must be a fraction 0-1 (0.5 = half price, 0 = free).",
+    });
   if (!nonNeg(p.cancellation?.freeNoticeHours))
     errors.push({ field: "cancellation.freeNoticeHours", message: "Must be 0 or more hours." });
   if (!nonNeg(p.cancellation?.travelChargeHours))
     errors.push({ field: "cancellation.travelChargeHours", message: "Must be 0 or more hours." });
   if (!nonNeg(p.cancellation?.callOutFee))
     errors.push({ field: "cancellation.callOutFee", message: "Must be 0 or more dollars." });
+  if (!nonNeg(p.cancellation?.fullCallOutFee))
+    errors.push({ field: "cancellation.fullCallOutFee", message: "Must be 0 or more dollars." });
+  if (!nonNeg(p.cancellation?.remoteFreeNoticeHours))
+    errors.push({
+      field: "cancellation.remoteFreeNoticeHours",
+      message: "Must be 0 or more hours.",
+    });
+  if (!nonNeg(p.cancellation?.remoteFee))
+    errors.push({ field: "cancellation.remoteFee", message: "Must be 0 or more dollars." });
+  // The full call-out replaces the flat fee inside the travel window, so a
+  // smaller one would make cancelling later cheaper than cancelling earlier.
+  if (
+    nonNeg(p.cancellation?.callOutFee) &&
+    nonNeg(p.cancellation?.fullCallOutFee) &&
+    (p.cancellation?.fullCallOutFee ?? 0) < (p.cancellation?.callOutFee ?? 0)
+  )
+    errors.push({
+      field: "cancellation.fullCallOutFee",
+      message: "Must be at least the cancellation fee, or cancelling later would cost less.",
+    });
   if (typeof p.cancellation?.autoSendCancellationInvoice !== "boolean")
     errors.push({
       field: "cancellation.autoSendCancellationInvoice",
@@ -220,6 +268,15 @@ function validateEstimator(e: EstimatorSettings): FieldError[] {
         message: "Minimum spread must be 0 or more dollars.",
       });
   }
+
+  if (!inRange(e.maxJobHours, 1, 24))
+    errors.push({ field: "maxJobHours", message: "Max job length must be 1-24 hours." });
+  if (!inRange(e.stackHandsOnFactor, 0, 1))
+    errors.push({ field: "stackHandsOnFactor", message: "Must be a fraction 0-1 (0.5 = 50%)." });
+  if (!inRange(e.stackBackgroundFactor, 0, 1))
+    errors.push({ field: "stackBackgroundFactor", message: "Must be a fraction 0-1 (0.2 = 20%)." });
+  if (!inRange(e.lowEndFloorFactor, 0, 1))
+    errors.push({ field: "lowEndFloorFactor", message: "Must be a fraction 0-1 (0.75 = 75%)." });
   return errors;
 }
 
@@ -239,6 +296,19 @@ function validateComms(c: CommsSettings): FieldError[] {
     errors.push({ field: "reviewEmailDelayMins", message: "Must be 0 or more minutes." });
   if (!inRange(c.priceEstimateRetentionDays, 1, 3650))
     errors.push({ field: "priceEstimateRetentionDays", message: "Must be 1-3650 days." });
+  if (typeof c.invoiceRemindersEnabled !== "boolean")
+    errors.push({ field: "invoiceRemindersEnabled", message: "Must be on or off." });
+  if (!inRange(c.invoiceReminderFirstDays, 1, 365))
+    errors.push({ field: "invoiceReminderFirstDays", message: "Must be 1-365 days." });
+  if (!inRange(c.invoiceReminderSecondDays, 1, 365))
+    errors.push({ field: "invoiceReminderSecondDays", message: "Must be 1-365 days." });
+  if (c.invoiceReminderSecondDays <= c.invoiceReminderFirstDays)
+    errors.push({
+      field: "invoiceReminderSecondDays",
+      message: "Second reminder must be later than the first.",
+    });
+  if (!inRange(c.invoiceReminderMaxCount, 0, 10))
+    errors.push({ field: "invoiceReminderMaxCount", message: "Must be 0-10 reminders." });
   return errors;
 }
 
@@ -271,8 +341,8 @@ function validateIdentity(i: IdentitySettings): FieldError[] {
     errors.push({ field: "email", message: "Enter a valid email address." });
   if (!nonNeg(i.paymentTermsDays))
     errors.push({ field: "paymentTermsDays", message: "Must be 0 or more days." });
-  if (!i.invoicePrefix.trim())
-    errors.push({ field: "invoicePrefix", message: "Invoice prefix is required." });
+  if (!inRange(i.serviceRadiusKm, 1, 500))
+    errors.push({ field: "serviceRadiusKm", message: "Service radius must be 1-500 km." });
   if (i.baseAddress.lat !== null && !inRange(i.baseAddress.lat, -90, 90))
     errors.push({ field: "baseAddress.lat", message: "Latitude must be -90 to 90." });
   if (i.baseAddress.lng !== null && !inRange(i.baseAddress.lng, -180, 180))
@@ -281,20 +351,8 @@ function validateIdentity(i: IdentitySettings): FieldError[] {
 }
 
 /**
- * Validates the booking form & holds group's shape + bounds.
- * @param h - Proposed holds settings.
- * @returns List of field errors (empty when valid).
- */
-function validateHolds(h: HoldsSettings): FieldError[] {
-  const errors: FieldError[] = [];
-  if (!inRange(h.holdExpirationMinutes, 1, 240))
-    errors.push({ field: "holdExpirationMinutes", message: "Must be 1-240 minutes." });
-  return errors;
-}
-
-/**
  * Validates the tax-planner group's shape + bounds. Rates are fractions
- * (0.2 = 20%); weekly transfer amounts are non-negative dollar figures.
+ * (0.2 = 20%).
  * @param t - Proposed tax settings.
  * @returns List of field errors (empty when valid).
  */
@@ -306,9 +364,6 @@ function validateTax(t: TaxSettings): FieldError[] {
     errors.push({ field: "acc", message: "Must be a fraction 0-1 (e.g. 0.0146 = 1.46%)." });
   if (!inRange(t.kiwiSaver, 0, 1))
     errors.push({ field: "kiwiSaver", message: "Must be a fraction 0-1 (e.g. 0.12 = 12%)." });
-  if (!nonNeg(t.weeklyKiwiSaver))
-    errors.push({ field: "weeklyKiwiSaver", message: "Must be 0 or more." });
-  if (!nonNeg(t.weeklyTax)) errors.push({ field: "weeklyTax", message: "Must be 0 or more." });
   return errors;
 }
 
@@ -331,6 +386,10 @@ function validateScheduling(s: SchedulingSettings): FieldError[] {
     errors.push({ field: "travelBackDepartureBufferMin", message: "Must be 0 or more minutes." });
   if (!inRange(s.smartOriginLookaheadHours, 0, 24))
     errors.push({ field: "smartOriginLookaheadHours", message: "Must be 0-24 hours." });
+  if (!inRange(s.pastEditLockHours, 0, 720))
+    errors.push({ field: "pastEditLockHours", message: "Must be 0-720 hours." });
+  if (!inRange(s.travelQuoteHour, 0, 23))
+    errors.push({ field: "travelQuoteHour", message: "Must be an hour 0-23." });
   return errors;
 }
 
@@ -354,8 +413,6 @@ export function validateGroup<G extends SettingsGroup>(group: G, value: Settings
       return validateComms(value as CommsSettings);
     case "reviews":
       return validateReviews(value as ReviewsSettings);
-    case "holds":
-      return validateHolds(value as HoldsSettings);
     case "identity":
       return validateIdentity(value as IdentitySettings);
     case "tax":

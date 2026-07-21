@@ -1,9 +1,13 @@
 "use client";
 // src/features/reviews/components/admin/ReviewApprovalList.tsx
 /**
- * @description Interactive client component for approving, revoking, and deleting reviews.
+ * @description Interactive client component for approving, revoking, and deleting
+ * reviews, with search, filter chips (status / verified / unlinked), and sort.
  */
 
+import { StatusPill } from "@/features/admin/components/ui/StatusPill";
+import { useToast } from "@/features/admin/components/ui/Toast";
+import { cn } from "@/shared/lib/cn";
 import type React from "react";
 import { useState } from "react";
 import type { ReviewRow } from "./review-types";
@@ -38,6 +42,23 @@ interface ReviewApprovalListProps {
   showSendForm?: boolean;
 }
 
+type StatusFilter = "all" | "pending" | "approved";
+type Sort = "newest" | "oldest";
+
+/**
+ * Classes for a filter chip button.
+ * @param active - Whether the chip is selected.
+ * @returns Class string.
+ */
+function chipClass(active: boolean): string {
+  return cn(
+    "rounded-full border px-3 py-1 text-xs font-semibold transition-colors",
+    active
+      ? "border-russian-violet bg-russian-violet text-white"
+      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100",
+  );
+}
+
 /**
  * Renders the full admin review list with pending and approved sections.
  * Uses optimistic UI - cards are moved/removed immediately on action.
@@ -54,26 +75,35 @@ export function ReviewApprovalList({
   contacts,
   showSendForm = true,
 }: ReviewApprovalListProps): React.ReactElement {
+  const { toast } = useToast();
   const [pending, setPending] = useState<ReviewRow[]>(initialPending);
   const [approved, setApproved] = useState<ReviewRow[]>(initialApproved);
   const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [verifiedOnly, setVerifiedOnly] = useState(false);
+  const [unlinkedOnly, setUnlinkedOnly] = useState(false);
+  const [sort, setSort] = useState<Sort>("newest");
   const [linkingId, setLinkingId] = useState<string | null>(null);
   const [linkSaving, setLinkSaving] = useState<string | null>(null);
 
   /**
-   * Returns true if a review row matches the current search query.
+   * True when a row matches the current search query and filter chips.
    * @param row - Review row to test.
-   * @returns Whether the row matches.
+   * @returns Whether the row is visible.
    */
-  function matchesQuery(row: ReviewRow): boolean {
-    if (!query.trim()) return true;
-    const q = query.toLowerCase();
-    const name = [row.firstName, row.lastName].filter(Boolean).join(" ").toLowerCase();
-    return (
-      name.includes(q) ||
-      row.text.toLowerCase().includes(q) ||
-      (row.contactName?.toLowerCase().includes(q) ?? false)
-    );
+  function passesFilters(row: ReviewRow): boolean {
+    const q = query.trim().toLowerCase();
+    if (q) {
+      const name = [row.firstName, row.lastName].filter(Boolean).join(" ").toLowerCase();
+      const hit =
+        name.includes(q) ||
+        row.text.toLowerCase().includes(q) ||
+        (row.contactName?.toLowerCase().includes(q) ?? false);
+      if (!hit) return false;
+    }
+    if (verifiedOnly && row.verified !== true) return false;
+    if (unlinkedOnly && row.contactId !== null) return false;
+    return true;
   }
 
   /**
@@ -117,12 +147,13 @@ export function ReviewApprovalList({
     try {
       const res = await fetch(`/api/admin/reviews/${reviewId}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ contactId }),
       });
-      if (!res.ok) return;
+      if (!res.ok) {
+        toast("Couldn't update the linked contact.", { tone: "error" });
+        return;
+      }
       const contactName = contactId
         ? (contacts.find((c) => c.id === contactId)?.name ?? null)
         : null;
@@ -133,8 +164,9 @@ export function ReviewApprovalList({
         prev.map((r) => (r.id === reviewId ? { ...r, contactId, contactName } : r)),
       );
       setLinkingId(null);
+      toast(contactId ? "Contact linked." : "Contact unlinked.", { tone: "success" });
     } catch {
-      // silently ignore
+      toast("Network error - try again.", { tone: "error" });
     } finally {
       setLinkSaving(null);
     }
@@ -201,11 +233,26 @@ export function ReviewApprovalList({
     );
   }
 
-  const visiblePending = pending.filter(matchesQuery);
-  const visibleApproved = approved.filter(matchesQuery);
+  /**
+   * Compares two rows by creation time for the current sort direction.
+   * @param a - First row.
+   * @param b - Second row.
+   * @returns Negative/positive comparator result.
+   */
+  function bySort(a: ReviewRow, b: ReviewRow): number {
+    return sort === "newest"
+      ? b.createdAt.getTime() - a.createdAt.getTime()
+      : a.createdAt.getTime() - b.createdAt.getTime();
+  }
+
+  const visiblePending = pending.filter(passesFilters).sort(bySort);
+  const visibleApproved = approved.filter(passesFilters).sort(bySort);
+  const filtered = query.trim() !== "" || verifiedOnly || unlinkedOnly;
+  const showPending = statusFilter !== "approved";
+  const showApproved = statusFilter !== "pending";
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6">
       {/* Send review link to past client */}
       {showSendForm && <SendReviewLinkForm />}
 
@@ -218,70 +265,105 @@ export function ReviewApprovalList({
         className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:ring-1 focus:ring-russian-violet/30 focus:outline-none"
       />
 
-      {/* Pending */}
-      <section>
-        <h2 className="mb-3 text-lg font-bold text-russian-violet">
-          Pending{" "}
-          {visiblePending.length > 0 && (
-            <span className="ml-1 rounded-full bg-coquelicot-500/20 px-2 py-0.5 text-sm text-coquelicot-400">
-              {visiblePending.length}
-            </span>
-          )}
-        </h2>
-        {visiblePending.length === 0 ? (
-          <p className="text-sm text-slate-400">
-            {query ? "No matching pending reviews." : "No reviews pending approval."}
-          </p>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {visiblePending.map((row) => (
-              <div key={row.id} className="flex flex-col gap-1">
-                <ReviewCard
-                  row={row}
-                  onApprove={() => handleApprove(row.id)}
-                  onDelete={() => handleDelete(row.id)}
-                />
-                <div className="pl-1">{renderContactLink(row)}</div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+      {/* Filter chips + sort */}
+      <div className="flex flex-wrap items-center gap-2">
+        {(["all", "pending", "approved"] as const).map((s) => (
+          <button
+            key={s}
+            type="button"
+            onClick={() => setStatusFilter(s)}
+            className={chipClass(statusFilter === s)}
+          >
+            {s === "all" ? "All" : s === "pending" ? "Pending" : "Approved"}
+          </button>
+        ))}
+        <span className="mx-1 h-5 w-px bg-slate-200" />
+        <button
+          type="button"
+          onClick={() => setVerifiedOnly((v) => !v)}
+          className={chipClass(verifiedOnly)}
+        >
+          Verified only
+        </button>
+        <button
+          type="button"
+          onClick={() => setUnlinkedOnly((v) => !v)}
+          className={chipClass(unlinkedOnly)}
+        >
+          Unlinked only
+        </button>
+        <select
+          aria-label="Sort reviews"
+          value={sort}
+          onChange={(e) => setSort(e.target.value as Sort)}
+          className="ml-auto rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 focus:ring-1 focus:ring-russian-violet/30 focus:outline-none"
+        >
+          <option value="newest">Newest first</option>
+          <option value="oldest">Oldest first</option>
+        </select>
+      </div>
 
-      <hr className="border-slate-200" />
+      {/* Pending */}
+      {showPending && (
+        <section>
+          <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-russian-violet">
+            Pending
+            {visiblePending.length > 0 && (
+              <StatusPill tone="warning">{visiblePending.length}</StatusPill>
+            )}
+          </h2>
+          {visiblePending.length === 0 ? (
+            <p className="text-sm text-slate-400">
+              {filtered ? "No matching pending reviews." : "No reviews pending approval."}
+            </p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {visiblePending.map((row) => (
+                <div key={row.id} className="flex flex-col gap-1">
+                  <ReviewCard
+                    row={row}
+                    onApprove={() => handleApprove(row.id)}
+                    onDelete={() => handleDelete(row.id)}
+                  />
+                  <div className="pl-1">{renderContactLink(row)}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {showPending && showApproved && <hr className="border-slate-200" />}
 
       {/* Approved */}
-      <section>
-        <h2 className="mb-3 text-lg font-bold text-russian-violet">
-          Approved{" "}
-          {approved.length > 0 && (
-            <span className="ml-1 rounded-full bg-moonstone-600/20 px-2 py-0.5 text-sm text-moonstone-600">
-              {visibleApproved.length}
-            </span>
+      {showApproved && (
+        <section>
+          <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-russian-violet">
+            Approved
+            {visibleApproved.length > 0 && (
+              <StatusPill tone="success">{visibleApproved.length}</StatusPill>
+            )}
+          </h2>
+          {visibleApproved.length === 0 ? (
+            <p className="text-sm text-slate-400">
+              {filtered ? "No matching approved reviews." : "No approved reviews yet."}
+            </p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {visibleApproved.map((row) => (
+                <div key={row.id} className="flex flex-col gap-1">
+                  <ReviewCard
+                    row={row}
+                    onRevoke={() => handleRevoke(row.id)}
+                    onDelete={() => handleDelete(row.id)}
+                  />
+                  <div className="pl-1">{renderContactLink(row)}</div>
+                </div>
+              ))}
+            </div>
           )}
-        </h2>
-        {visibleApproved.length === 0 ? (
-          <p className="text-sm text-slate-400">
-            {query ? "No matching approved reviews." : "No approved reviews yet."}
-          </p>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {visibleApproved.map((row) => (
-              <div key={row.id} className="flex flex-col gap-1">
-                <ReviewCard
-                  row={row}
-                  onRevoke={() => handleRevoke(row.id)}
-                  onDelete={() => handleDelete(row.id)}
-                />
-                <div className="pl-1">{renderContactLink(row)}</div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+        </section>
+      )}
     </div>
   );
 }
-
-// Barrel exports for backward compatibility
-export type { ReviewRow } from "./review-types";

@@ -124,7 +124,7 @@ async function getTabSheetId(spreadsheetId: string, tabName: string): Promise<nu
  * @param spreadsheetId - The spreadsheet file ID.
  * @param tabName - Tab to prepare (e.g. "Cashbook" or "Expenses").
  */
-export async function ensureSyncIdSetup(spreadsheetId: string, tabName: string): Promise<void> {
+async function ensureSyncIdSetup(spreadsheetId: string, tabName: string): Promise<void> {
   const cached = setupCache.get(spreadsheetId);
   if (cached?.has(tabName)) return;
 
@@ -204,37 +204,81 @@ export async function ensureSyncIdSetup(spreadsheetId: string, tabName: string):
 }
 
 /**
- * Appends a row with a fresh Sync ID at column Z; pads to 25 columns.
+ * Writes a row (with its Sync ID at column Z) into the first empty-date row,
+ * padding to 25 columns. NOT a values.append - see {@link firstEmptyRow}.
+ * With a caller-supplied deterministic Sync ID (an entry's Mongo id) the write
+ * is idempotent: a row already carrying that id is returned WITHOUT writing a
+ * duplicate. The read-then-write is not atomic - live routes don't hold the
+ * sync lock - so the import's content-gated dedup and the cron self-heal
+ * backstop a concurrent collision.
  * @param spreadsheetId - Spreadsheet file ID.
- * @param tabName - Tab to append to (e.g. "Cashbook").
- * @param cells - Values for columns A..Y; right-padded with empty strings.
- * @returns The Sync ID written into column Z.
+ * @param tabName - Tab to write to (e.g. "Cashbook").
+ * @param cells - Values for columns A..Y; sheet-managed columns pass null to keep their formulas; right-padded with empty strings.
+ * @param syncId - Optional caller-supplied deterministic Sync ID; a fresh random one is minted when omitted.
+ * @returns The Sync ID written into (or already present in) column Z.
  */
 export async function appendRowWithSyncId(
   spreadsheetId: string,
   tabName: string,
   cells: (string | number | null)[],
+  syncId?: string,
 ): Promise<string> {
   await ensureSyncIdSetup(spreadsheetId, tabName);
-  const syncId = randomUUID();
+  const id = syncId ?? randomUUID();
+  // Append-if-absent for deterministic ids: reuse an existing row instead of
+  // doubling it. Random ids can't collide, so skip the extra read for them.
+  if (syncId) {
+    const existing = await readSyncIdColumn(spreadsheetId, tabName);
+    if (existing.has(syncId)) return syncId;
+  }
   const padded: (string | number | null)[] = cells.slice(0, SYNC_ID_COLUMN_INDEX);
   while (padded.length < SYNC_ID_COLUMN_INDEX) padded.push("");
-  padded.push(syncId);
+  padded.push(id);
 
+  // Write into the first empty row rather than values.append: the tabs are
+  // 1000-row templates with formula columns pre-filled down the grid, so
+  // values.append (which lands after the last populated cell in ANY searched
+  // column) strands new rows near row 1000. Null cells in `padded` are skipped
+  // by update, so sheet-managed formulas survive. A rare concurrent collision
+  // orphans one sheetRowKey, which the cron self-heal re-appends later.
+  const targetRow = await firstEmptyRow(spreadsheetId, tabName);
   const sheets = getSheetsClient();
   await withRetry(
     () =>
-      sheets.spreadsheets.values.append({
+      sheets.spreadsheets.values.update({
         spreadsheetId,
-        range: `${tabName}!A:${SYNC_ID_COLUMN_LETTER}`,
+        range: `${tabName}!A${targetRow}:${SYNC_ID_COLUMN_LETTER}${targetRow}`,
         valueInputOption: "USER_ENTERED",
-        insertDataOption: "INSERT_ROWS",
         requestBody: { values: [padded] },
       }),
     { label: "sheets-sync" },
   );
 
-  return syncId;
+  return id;
+}
+
+/**
+ * Finds the first data row whose date column (A) is empty - the contiguous
+ * insert point for a new entry (values.get trims trailing empties, so a
+ * fully-packed block returns its next row). Column A holds only real entry
+ * dates - never a fill-down formula - so it pinpoints the insert row; rows
+ * stranded low by the old append bug sit AFTER a gap and are skipped.
+ * @param spreadsheetId - Spreadsheet file ID.
+ * @param tabName - Tab to scan (e.g. "Cashbook").
+ * @returns 1-based row number of the first empty-date row (>= 2).
+ */
+async function firstEmptyRow(spreadsheetId: string, tabName: string): Promise<number> {
+  const sheets = getSheetsClient();
+  const res = await withRetry(
+    () => sheets.spreadsheets.values.get({ spreadsheetId, range: `${tabName}!A2:A` }),
+    { label: "sheets-sync" },
+  );
+  const rows = res.data.values ?? [];
+  for (let i = 0; i < rows.length; i++) {
+    const v = rows[i]?.[0];
+    if (v == null || String(v).trim() === "") return i + 2;
+  }
+  return rows.length + 2;
 }
 
 /**
@@ -292,11 +336,12 @@ export function buildCashbookCells(e: CashbookRowInput): (string | number | null
 
 /**
  * Builds the Expenses cells A..K for an expense entry. The GST rate (column H)
- * is derived from the stored GST split and written as a percent string (e.g.
- * "15%") to match what the importer's parser reads; I/J carry the derived GST
- * amount and excl-GST amount (informational - the importer recomputes them).
+ * is written as a percent string (e.g. "15%") to match the importer's parser.
+ * Columns I/J are sheet-managed formulas: null means "skip", so the app never
+ * overwrites them (hard values on top of them broke the sheet); the importer
+ * recomputes I/J on read anyway. Mirrors {@link buildCashbookCells}.
  * @param e - Expense entry fields.
- * @returns Cell values for columns A..K.
+ * @returns Cell values for columns A..K (I/J null so the sheet formulas stand).
  */
 export function buildExpenseCells(e: ExpenseRowInput): (string | number | null)[] {
   const gstPct = e.amountExcl > 0 ? Math.round((e.gstAmount / e.amountExcl) * 100) : 0;
@@ -309,8 +354,8 @@ export function buildExpenseCells(e: ExpenseRowInput): (string | number | null)[
     e.receipt ? "Yes" : "No",
     e.amountIncl,
     `${gstPct}%`,
-    e.gstAmount,
-    e.amountExcl,
+    null,
+    null,
     e.notes ?? "",
   ];
 }
@@ -323,7 +368,7 @@ export function buildExpenseCells(e: ExpenseRowInput): (string | number | null)[
  * @param tabName - Tab to read (e.g. "Cashbook").
  * @returns Map of Sync ID to 1-based row number.
  */
-export async function readSyncIdColumn(
+async function readSyncIdColumn(
   spreadsheetId: string,
   tabName: string,
 ): Promise<Map<string, number>> {
@@ -354,7 +399,7 @@ export async function readSyncIdColumn(
  * @param syncId - Sync ID to locate.
  * @returns 1-based row number, or null when not present.
  */
-export async function findRowIndexBySyncId(
+async function findRowIndexBySyncId(
   spreadsheetId: string,
   tabName: string,
   syncId: string,
@@ -383,7 +428,11 @@ export async function updateRowBySyncId(
 ): Promise<{ updated: boolean; syncId: string }> {
   const rowIndex = await findRowIndexBySyncId(spreadsheetId, tabName, syncId);
   if (rowIndex === null) {
-    const newSyncId = await appendRowWithSyncId(spreadsheetId, tabName, cells);
+    // Row vanished (sheet-side delete): re-append under the SAME Sync ID rather
+    // than minting a fresh random one, so the caller's persisted sheetRowKey
+    // stays valid and the import's id-fallback can re-link an orphan left by a
+    // failed re-persist.
+    const newSyncId = await appendRowWithSyncId(spreadsheetId, tabName, cells, syncId);
     return { updated: false, syncId: newSyncId };
   }
 

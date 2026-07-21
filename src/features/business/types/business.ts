@@ -54,6 +54,18 @@ export interface Invoice {
   status: InvoiceStatus;
   notes: string | null;
   contactId: string | null;
+  /** ISO timestamp when the invoice was first sent (DRAFT>SENT). Null on legacy rows. */
+  sentAt?: string | null;
+  /** ISO timestamp when payment was recorded (status>PAID). Null on legacy PAID rows. */
+  paidAt?: string | null;
+  /** Payment method recorded at pay time (an INCOME_METHODS value). */
+  paymentMethod?: string | null;
+  /** Optional operator reference/note recorded with the payment. */
+  paymentReference?: string | null;
+  /** When the most recent overdue reminder was emailed; null = never. */
+  reminderLastSentAt?: string | null;
+  /** How many overdue reminders have gone out; null reads as 0 (Mongo backfill rule). */
+  reminderCount?: number | null;
   driveFileId: string | null;
   driveWebUrl: string | null;
   createdAt: string;
@@ -93,18 +105,6 @@ export interface ExpenseEntry {
   createdAt: string;
   /** Null on legacy rows created before the field existed. */
   updatedAt?: string | null;
-}
-
-export interface BusinessSummary {
-  totalIncome: number;
-  totalExpensesExcl: number;
-  totalGstClaimable: number;
-  taxReserve: number;
-  profit: number;
-  currentMonthIncome: number;
-  currentMonthExpenses: number;
-  incomeCount: number;
-  expenseCount: number;
 }
 
 export interface GoogleContact {
@@ -170,21 +170,13 @@ export interface TravelEntry {
 }
 
 export interface JobCalculation {
-  /** HH:MM start time of the job. */
-  startTime: string;
-  /** HH:MM end time of the job. */
-  endTime: string;
-  /** Total billable minutes (time-slot sum + out-of-session follow-up). */
+  /** Total billable minutes (time-slot sum + out-of-session follow-up); informational - labour bills through the hourly task lines. */
   durationMins: number;
-  /** Legacy top-level time-charge rate. The calculator always passes null - labour bills through the hourly task lines instead. */
-  hourlyRate: RateConfig | null;
   tasks: TaskLine[];
   parts: PartLine[];
   /** Every travel charge for this job; summed into a single "Travel" invoice line. */
   travelEntries: TravelEntry[];
   notes: string;
-  /** @deprecated Ignored by calcJobTotal; GST mode comes from GST_REGISTERED in pricing-policy.ts. Pass `false`. */
-  gst: boolean;
   /**
    * Operator-set flag: when true, calcJobTotal halves the labour portion
    * (time charge + hourly tasks) per the published unsuccessful-work
@@ -194,11 +186,6 @@ export interface JobCalculation {
   unsuccessful?: boolean;
   clientName: string;
   clientEmail: string;
-}
-
-export interface ParseJobRequest {
-  input: string;
-  answers?: Record<string, string>;
 }
 
 export interface ParseJobQuestion {
@@ -213,7 +200,6 @@ export interface ParseJobResponse {
   outOfSessionMins?: number;
   startTime: string | null;
   endTime: string | null;
-  hourlyRateId: string | null;
   /** Out-of-pocket travel disbursements stated with a dollar amount (parking, tolls, ferry) - passed through at cost. */
   travelCosts?: { label: string; cost: number }[];
   tasks: ParsedTaskLine[];
@@ -235,7 +221,7 @@ export interface ParsedRange {
   endTime: string;
 }
 
-export interface ParsedTaskLine {
+interface ParsedTaskLine {
   rateConfigId: string | null;
   /** Resolved base rate ID (set by the server from baseRateLabel emitted by the AI). */
   baseRateId?: string | null;
@@ -256,7 +242,7 @@ export interface ParsedTaskLine {
   isExplicit?: boolean;
 }
 
-export interface ParsedPartLine {
+interface ParsedPartLine {
   description: string;
   cost: number;
 }
@@ -288,15 +274,7 @@ export interface Subscription {
   updatedAt: string;
 }
 
-export interface SheetCounterResponse {
-  lastNumber: number;
-  nextNumber: number;
-  yearCode: string;
-  nextFormatted: string;
-  prefix: string;
-}
-
-export interface TravelInfo {
+interface TravelInfo {
   /** One-way drive distance in km from the address lookup (outbound leg). */
   distanceKmOneWay: number;
   /** Outbound drive time in minutes; summed with durationMinsBack by calcTravelCharge. */

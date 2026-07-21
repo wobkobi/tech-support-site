@@ -4,6 +4,19 @@
  */
 
 /**
+ * Adds `n` days to a YYYY-MM-DD key. Uses UTC noon so a DST transition can't roll
+ * the date part backwards, then keeps just the date. Timezone-agnostic - operates
+ * purely on the calendar-date string (as used for all-day event date keys).
+ * @param dateKey - The base day (YYYY-MM-DD).
+ * @param n - Days to add (may be negative).
+ * @returns The shifted YYYY-MM-DD key.
+ */
+export function addDaysToDateKey(dateKey: string, n: number): string {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + n, 12, 0, 0)).toISOString().slice(0, 10);
+}
+
+/**
  * UTC offset (hours) for Pacific/Auckland on a given date.
  * Handles NZDT (UTC+13, Sep-Apr) and NZST (UTC+12, Apr-Sep) automatically.
  * @param year - Full year.

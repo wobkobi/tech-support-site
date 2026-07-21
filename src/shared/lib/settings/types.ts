@@ -22,6 +22,28 @@ export interface DayWindow {
 /** Seven-day availability map keyed by `getUTCDay()` (0 = Sunday .. 6 = Saturday). */
 export type WeeklySchedule = Record<number, DayWindow>;
 
+/**
+ * A "protect a morning once the night-before arrives" rule. Once `now` passes
+ * `triggerDay` at `triggerHour`, slots on any `protectedDays` before
+ * `earliestHour` are blocked - but stay bookable if reserved earlier. General
+ * enough to cover the weekend lie-in (Fri 18:00 > Sat/Sun before noon) or any
+ * other day. Days use `getUTCDay()` indexing (0 = Sunday .. 6 = Saturday).
+ */
+export interface MorningGuard {
+  /** When false the rule is ignored. */
+  enabled: boolean;
+  /** Operator-friendly name shown in the editor, e.g. "Weekend lie-in". */
+  label: string;
+  /** The "night before" weekday the guard switches on (0-6). */
+  triggerDay: number;
+  /** Hour on `triggerDay` after which the guard activates (0-23). */
+  triggerHour: number;
+  /** Weekdays whose morning is restricted while the guard is active. */
+  protectedDays: number[];
+  /** Earliest bookable hour on the protected days once active (0-23). */
+  earliestHour: number;
+}
+
 export interface AvailabilitySettings {
   /** Master switch - when false the public booking flow is paused. */
   acceptingBookings: boolean;
@@ -46,20 +68,28 @@ export interface AvailabilitySettings {
   maxJobsPerDay: number | null;
   /** Max billable hours bookable per day. null/0 = unlimited. */
   maxBillableHoursPerDay: number | null;
+  /** Morning-protection rules (e.g. weekend lie-in). Empty = no guards. */
+  morningGuards: MorningGuard[];
 }
 
-export interface CancellationSettings {
+interface CancellationSettings {
   /** Cancellations more than this many hours out are free. */
   freeNoticeHours: number;
   /** Inside this window a cancellation also bills round-trip travel. */
   travelChargeHours: number;
-  /** Flat call-out fee inside the free-notice window. */
+  /** Flat in-person cancellation fee inside the free-notice window but outside the travel window. */
   callOutFee: number;
+  /** Full call-out billed for an in-person cancel inside the travel window, or on a no-show. Replaces callOutFee rather than stacking, and travel is added on top. */
+  fullCallOutFee: number;
+  /** Remote cancellations more than this many hours out are free. Priced separately - a remote session costs the slot but no drive. */
+  remoteFreeNoticeHours: number;
+  /** Flat fee for a remote cancel inside its window, or a remote no-show. No call-out tier and no travel. */
+  remoteFee: number;
   /** When true, a customer self-cancel via the website auto-sends the fee invoice instead of leaving it as a draft. */
   autoSendCancellationInvoice: boolean;
 }
 
-export interface RescheduleSettings {
+interface RescheduleSettings {
   /** Can't reschedule within this many hours of the booking. 0 = no limit. */
   cutoffHours: number;
   /** Max times one booking can be rescheduled. null/0 = no limit. */
@@ -77,6 +107,8 @@ export interface PricingSettings {
   publicHolidayUplift: number;
   /** Minimum travel charge floor (NZD). 0 = no floor. */
   minTravelCharge: number;
+  /** Fraction charged when a visit is unsuccessful (0.5 = half price, 0 = free). */
+  unsuccessfulWorkFactor: number;
   cancellation: CancellationSettings;
   reschedule: RescheduleSettings;
 }
@@ -105,8 +137,9 @@ export interface IdentitySettings {
   startDateIso: string;
   gstNumber: string;
   bankAccount: string;
-  invoicePrefix: string;
   homeRegion: string;
+  /** Advertised service-area radius in km (drives the SEO GeoCircle). */
+  serviceRadiusKm: number;
 }
 
 /** One task-duration benchmark: a short label and its standalone minutes. */
@@ -120,7 +153,7 @@ export interface Benchmark {
 export type EstimateConfidence = "high" | "medium" | "low";
 
 /** Low/high multipliers applied to the point estimate for one confidence level. */
-export interface EstimatorRangeBand {
+interface EstimatorRangeBand {
   /** Multiplier for the LOW end of the range (e.g. 0.85 = 85% of the point estimate). */
   lowFactor: number;
   /** Multiplier for the HIGH end of the range (e.g. 1.2 = 120%). */
@@ -148,6 +181,14 @@ export interface EstimatorSettings {
   benchmarks: Benchmark[];
   /** Confidence-scaled width of the customer-facing price range. */
   range: EstimatorRange;
+  /** Hard ceiling on any single-visit estimate (hours). */
+  maxJobHours: number;
+  /** Fraction an additional hands-on task adds vs its standalone time (0.5 = 50%). */
+  stackHandsOnFactor: number;
+  /** Fraction a background task (transfer, scan, update) adds vs standalone (0.2 = 20%). */
+  stackBackgroundFactor: number;
+  /** The advertised low end never drops below this fraction of straight-time cost. */
+  lowEndFloorFactor: number;
 }
 
 export interface TaxSettings {
@@ -157,10 +198,6 @@ export interface TaxSettings {
   acc: number;
   /** KiwiSaver contribution rate (fraction). */
   kiwiSaver: number;
-  /** Weekly KiwiSaver transfer (NZD). */
-  weeklyKiwiSaver: number;
-  /** Weekly tax-account transfer (NZD). */
-  weeklyTax: number;
 }
 
 export interface CommsSettings {
@@ -173,11 +210,14 @@ export interface CommsSettings {
   reviewEmailDelayMins: number;
   /** How long price-estimate logs are kept before auto-purge (days). */
   priceEstimateRetentionDays: number;
-}
-
-export interface HoldsSettings {
-  /** How long a provisional slot hold lasts (minutes). */
-  holdExpirationMinutes: number;
+  /** Master switch for the overdue-invoice reminder emails. */
+  invoiceRemindersEnabled: boolean;
+  /** Days past due before the first overdue nudge. */
+  invoiceReminderFirstDays: number;
+  /** Days past due before the second (and final) nudge. */
+  invoiceReminderSecondDays: number;
+  /** Maximum number of automatic overdue reminders per invoice. */
+  invoiceReminderMaxCount: number;
 }
 
 export interface SchedulingSettings {
@@ -189,6 +229,10 @@ export interface SchedulingSettings {
   travelBackDepartureBufferMin: number;
   /** How far back to look for a preceding event to use as the origin (hours). */
   smartOriginLookaheadHours: number;
+  /** Hours after a job ends before it locks from further edits/status changes. */
+  pastEditLockHours: number;
+  /** NZ hour a no-slot travel quote is priced against (realistic-traffic proxy). */
+  travelQuoteHour: number;
 }
 
 export interface ReviewsSettings {
@@ -207,10 +251,9 @@ export interface Settings {
   identity: IdentitySettings;
   tax: TaxSettings;
   comms: CommsSettings;
-  holds: HoldsSettings;
   scheduling: SchedulingSettings;
   reviews: ReviewsSettings;
 }
 
-/** One of the eight top-level settings groups (also the `settings:<group>` key suffix). */
+/** One of the top-level settings groups (also the `settings:<group>` key suffix). */
 export type SettingsGroup = keyof Settings;

@@ -13,7 +13,7 @@
 import type { Settings, WeeklySchedule } from "@/shared/lib/settings/types";
 
 /** Bank-account placeholder shown when neither the DB nor the env var is set. */
-export const BANK_ACCOUNT_PLACEHOLDER = "[BANK ACCOUNT NOT SET - configure in admin settings]";
+const BANK_ACCOUNT_PLACEHOLDER = "[BANK ACCOUNT NOT SET - configure in admin settings]";
 
 /**
  * Builds the default weekly window: every day open 10:00-20:00, no break
@@ -29,7 +29,7 @@ function defaultSchedule(): WeeklySchedule {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  // Source: BOOKING_CONFIG + DURATION_OPTIONS + SUB_SLOT_MINUTES in booking.ts.
+  // Source: BOOKING_CONFIG + DURATION_OPTIONS in booking.ts.
   availability: {
     acceptingBookings: true,
     closedMessage:
@@ -44,6 +44,17 @@ export const DEFAULT_SETTINGS: Settings = {
     durations: { short: 60, long: 120 },
     maxJobsPerDay: null,
     maxBillableHoursPerDay: null,
+    // Weekend lie-in: from Friday 18:00, Sat/Sun slots before noon are blocked.
+    morningGuards: [
+      {
+        enabled: true,
+        label: "Weekend mornings",
+        triggerDay: 5,
+        triggerHour: 18,
+        protectedDays: [6, 0],
+        earliestHour: 12,
+      },
+    ],
   },
 
   // Source: pricing-policy.ts + MIN_TRAVEL_CHARGE in business.ts.
@@ -53,10 +64,14 @@ export const DEFAULT_SETTINGS: Settings = {
     billingIncrementMins: 5,
     publicHolidayUplift: 0.25,
     minTravelCharge: 10,
+    unsuccessfulWorkFactor: 0.5,
     cancellation: {
       freeNoticeHours: 12,
-      travelChargeHours: 2,
-      callOutFee: 30,
+      travelChargeHours: 1,
+      callOutFee: 35,
+      fullCallOutFee: 65,
+      remoteFreeNoticeHours: 4,
+      remoteFee: 25,
       autoSendCancellationInvoice: true,
     },
     reschedule: { cutoffHours: 0, maxReschedules: null },
@@ -88,6 +103,10 @@ export const DEFAULT_SETTINGS: Settings = {
       low: { lowFactor: 0.55, highFactor: 1.6 },
       minSpread: 20,
     },
+    maxJobHours: 8,
+    stackHandsOnFactor: 0.5,
+    stackBackgroundFactor: 0.2,
+    lowEndFloorFactor: 0.75,
   },
 
   // Source: business-identity.ts + layout.tsx JSON-LD + HOME_ADDRESS env.
@@ -106,14 +125,56 @@ export const DEFAULT_SETTINGS: Settings = {
       lat: -36.8717,
       lng: 174.7185,
     },
-    // Populated from layout.tsx's servedSuburbs when the identity group is wired.
-    servedSuburbs: [],
+    // Suburbs advertised in the JSON-LD areaServed; editable in the Identity tab.
+    servedSuburbs: [
+      "Auckland Central",
+      "Auckland CBD",
+      "Ponsonby",
+      "Herne Bay",
+      "Grey Lynn",
+      "Westmere",
+      "Point Chevalier",
+      "Western Springs",
+      "Mount Albert",
+      "Kingsland",
+      "Sandringham",
+      "Mount Eden",
+      "Epsom",
+      "Newmarket",
+      "Parnell",
+      "Remuera",
+      "Mission Bay",
+      "Saint Heliers",
+      "Glen Innes",
+      "Onehunga",
+      "Royal Oak",
+      "Hillsborough",
+      "Three Kings",
+      "Mount Roskill",
+      "Avondale",
+      "New Lynn",
+      "Henderson",
+      "Te Atatu",
+      "Massey",
+      "Glen Eden",
+      "Titirangi",
+      "Devonport",
+      "Takapuna",
+      "Milford",
+      "Northcote",
+      "Birkenhead",
+      "Albany",
+      "Manukau",
+      "Botany",
+      "Howick",
+      "Pakuranga",
+    ],
     paymentTermsDays: 7,
     startDateIso: "2025-10-01T00:00:00Z",
     gstNumber: process.env.NEXT_PUBLIC_BUSINESS_GST_NUMBER ?? "",
     bankAccount: process.env.NEXT_PUBLIC_BUSINESS_BANK_ACCOUNT ?? BANK_ACCOUNT_PLACEHOLDER,
-    invoicePrefix: "TTP",
     homeRegion: "Auckland",
+    serviceRadiusKm: 25,
   },
 
   // Source: DEFAULT_TAX_RATES in tax-planner.ts (sheet still overrides per-FY).
@@ -121,8 +182,6 @@ export const DEFAULT_SETTINGS: Settings = {
     incomeTax: 0.2,
     acc: 0.0146,
     kiwiSaver: 0.12,
-    weeklyKiwiSaver: 0,
-    weeklyTax: 0,
   },
 
   // Source: cron route literals + contact-review-token.ts.
@@ -133,20 +192,20 @@ export const DEFAULT_SETTINGS: Settings = {
     reminderLeadHours: 24,
     reviewEmailDelayMins: 30,
     priceEstimateRetentionDays: 30,
+    invoiceRemindersEnabled: true,
+    invoiceReminderFirstDays: 3,
+    invoiceReminderSecondDays: 10,
+    invoiceReminderMaxCount: 2,
   },
 
-  // Hold-expiry window (minutes) for "held" bookings, read by the release-holds
-  // cron. Currently inert - no route creates holds; bookings confirm directly.
-  holds: {
-    holdExpirationMinutes: 15,
-  },
-
-  // Source: calendar-cache.ts travel-block heuristics.
+  // Source: calendar-cache.ts travel-block heuristics + edit-window.ts + travel-time route.
   scheduling: {
     travelRoundBufferMin: 10,
     minHomeDwellMin: 60,
     travelBackDepartureBufferMin: 30,
     smartOriginLookaheadHours: 4,
+    pastEditLockHours: 18,
+    travelQuoteHour: 14,
   },
 
   // Source: page.tsx getApprovedReviews (take 20) + reviews POST + contact-review-token.ts.

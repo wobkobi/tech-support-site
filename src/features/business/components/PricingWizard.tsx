@@ -7,6 +7,7 @@
  */
 
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
+import { BOOKING_FIELD_LIMITS } from "@/features/booking/lib/booking";
 import { priceRangeFor, remoteRateDelta } from "@/features/business/lib/estimate-range";
 import {
   calcTravelCharge,
@@ -60,6 +61,8 @@ interface Props {
   minTravelCharge: number;
   /** Confidence-scaled price-range widths (live estimator setting). */
   estimatorRange: EstimatorRange;
+  /** Low-end floor fraction (live estimator setting). */
+  lowEndFloorFactor: number;
 }
 
 /**
@@ -69,19 +72,23 @@ interface Props {
  * @param props.minBillableMins - Minimum billable minutes used to floor the estimate.
  * @param props.minTravelCharge - Travel floor for the travel estimate.
  * @param props.estimatorRange - Confidence-scaled price-range widths (live estimator setting).
+ * @param props.lowEndFloorFactor - Low-end floor fraction (live estimator setting).
  * @returns The rendered wizard.
  */
 export function PricingWizard({
   minBillableMins,
   minTravelCharge,
   estimatorRange,
+  lowEndFloorFactor,
 }: Props): React.ReactElement {
   const [rates, setRates] = useState<PublicRate[]>([]);
   const [activePromo, setActivePromo] = useState<ActivePromo | null>(null);
   const [loading, setLoading] = useState(true);
   const [step, setStep] = useState<Step>("issue");
   const [issueDescription, setIssueDescription] = useState("");
-  const [meeting, setMeeting] = useState<MeetingMode>("on-site");
+  // Null until the customer explicitly picks - no silent on-site default, so a
+  // remote customer can't skip past and get a travel-inclusive quote by accident.
+  const [meeting, setMeeting] = useState<MeetingMode | null>(null);
   const [address, setAddress] = useState("");
   const [addressNotFound, setAddressNotFound] = useState(false);
   const [aiExplanation, setAiExplanation] = useState("");
@@ -95,7 +102,7 @@ export function PricingWizard({
 
   useEffect(() => {
     // Rates + active promo in parallel; promo may be null.
-    Promise.all([
+    void Promise.all([
       fetch("/api/pricing/rates")
         .then((r) => r.json())
         .catch(() => ({ ok: false, rates: [] })),
@@ -116,6 +123,9 @@ export function PricingWizard({
 
   /** Calls both APIs in parallel then computes a price range from the AI's time estimate. */
   async function getEstimate(): Promise<void> {
+    // Reachable only after the meeting step, which requires an explicit pick;
+    // guard anyway so `meeting` narrows to a concrete mode below.
+    if (!meeting) return;
     setIsCalculating(true);
     setAddressNotFound(false);
 
@@ -180,9 +190,17 @@ export function PricingWizard({
       setAddressNotFound(true);
     }
 
+    // Resolve the live base + remote delta regardless of the AI call's outcome,
+    // so a failed/timed-out estimate still prices against the operator's current
+    // rate instead of the hardcoded fallback (mirrors quick-estimate.ts).
+    const baseStandard =
+      rates.find((r) => r.ratePerHour !== null && r.isDefault)?.ratePerHour ??
+      rates.find((r) => r.ratePerHour !== null)?.ratePerHour ??
+      FALLBACK_BASE_RATE;
+    const fullRate = baseStandard + remoteRateDelta(rates, meeting);
+
     // Fallback defaults when the AI estimate fails
     let estimatedMins = 60;
-    let fullRate = FALLBACK_BASE_RATE;
     let explanation = "";
     let confidence: EstimateConfidence = "medium";
     let tasks: { label: string; mins: number }[] = [];
@@ -193,13 +211,6 @@ export function PricingWizard({
       explanation = ai.explanation;
       confidence = ai.confidence ?? "medium";
       tasks = Array.isArray(ai.tasks) ? ai.tasks : [];
-
-      // Mirror effectiveHourlyRate: Standard base + stacked modifier deltas.
-      const baseStandard =
-        rates.find((r) => r.ratePerHour !== null && r.isDefault)?.ratePerHour ??
-        rates.find((r) => r.ratePerHour !== null)?.ratePerHour ??
-        FALLBACK_BASE_RATE;
-      fullRate = baseStandard + remoteRateDelta(rates, meeting);
     }
 
     // Travel rate is decoupled from labour; Remote/promo never touch it.
@@ -227,7 +238,7 @@ export function PricingWizard({
      * @returns Whole-dollar low/high range.
      */
     const rangeFor = (mins: number, rate: number): { low: number; high: number } =>
-      priceRangeFor(mins, rate, confidence, estimatorRange);
+      priceRangeFor(mins, rate, confidence, estimatorRange, lowEndFloorFactor);
 
     // Travel uses the dedicated Travel rate (never promo-discounted, never
     // labour-rate). Routes through calcTravelCharge so the floor + leg
@@ -235,13 +246,17 @@ export function PricingWizard({
     const travel = calcTravelCharge(travelMins, travelMinsBack, travelRatePerHour, minTravelCharge);
 
     /**
-     * Visit total (floor applied) plus flat travel surcharge.
+     * Labour-only band (floor applied), with the drive-time charge alongside it
+     * for the separate travel line - not folded into low/high.
      * @param rate - Effective $/hr for labour.
-     * @returns Visit low/high plus the (rate-invariant) drive-time charge.
+     * @returns Labour low/high plus the (rate-invariant) drive-time charge.
      */
     const buildVisitRange = (rate: number): { low: number; high: number; travel: number } => {
       const { low, high } = rangeFor(effectiveMins, rate);
-      return { low: low + travel, high: high + travel, travel };
+      // Labour-only band; travel is surfaced on its own line (matching the
+      // booking form) rather than folded into the headline. The logged total
+      // below stays all-in so the booking snapshot is unchanged.
+      return { low, high, travel };
     };
 
     const promoRange = buildVisitRange(promoRate);
@@ -259,7 +274,17 @@ export function PricingWizard({
     const taskLines = (() => {
       const visitJob = rangeFor(effectiveMins, promoRate);
       if (tasks.length <= 1) {
-        return [{ label: "Tech support", low: visitJob.low, high: visitJob.high, note: null }];
+        // Use the AI's own label ("Wi-Fi troubleshooting") rather than a generic
+        // one - the multi-task branch below already does. "Tech support" stays
+        // as the fallback for a parse that returned no tasks at all.
+        return [
+          {
+            label: tasks[0]?.label || "Tech support",
+            low: visitJob.low,
+            high: visitJob.high,
+            note: null,
+          },
+        ];
       }
       const totalTaskMins = tasks.reduce((s, t) => s + t.mins, 0) || 1;
       const lines = tasks.map((t) => ({
@@ -302,6 +327,7 @@ export function PricingWizard({
           : []),
       ],
       includesTravel: promoRange.travel > 0,
+      travelCharge: promoRange.travel,
       includesAfterHours: false,
       ...(original
         ? {
@@ -315,6 +341,13 @@ export function PricingWizard({
     setResult(range);
     setIsCalculating(false);
     setStep("results");
+
+    // Reaching a quote is the strongest intent signal short of booking: the
+    // customer has described a real problem and seen a price. Report it so the
+    // funnel shows where estimates stall instead of turning into bookings.
+    if (typeof window.gtag === "function") {
+      window.gtag("event", "price_estimate");
+    }
 
     // Audit log: fire-and-forget so failures don't break the UX. Captures
     // the raw text, AI interpretation, meeting mode the customer picked, and
@@ -332,8 +365,11 @@ export function PricingWizard({
         travelMinsBack,
         meetingType: meeting === "on-site" ? "in_person" : "remote",
         hourlyRate: promoRate,
-        priceLow: promoRange.low,
-        priceHigh: promoRange.high,
+        // Logged total stays all-in (labour + travel) so the booking snapshot
+        // and legacy consumers keep the full price; the headline shows labour only.
+        priceLow: promoRange.low + promoRange.travel,
+        priceHigh: promoRange.high + promoRange.travel,
+        travelCharge: promoRange.travel,
         promoTitle: activePromo?.title ?? null,
         promoLabel: activePromo ? summariseForBanner(activePromo) : null,
       }),
@@ -381,7 +417,8 @@ export function PricingWizard({
   function reset(): void {
     setStep("issue");
     setIssueDescription("");
-    setMeeting("on-site");
+    // Null, not "on-site" - the meeting step must always be an explicit pick.
+    setMeeting(null);
     setAddress("");
     setAddressNotFound(false);
     setAiExplanation("");
@@ -395,7 +432,8 @@ export function PricingWizard({
    * @returns True if the user can proceed
    */
   function canAdvance(): boolean {
-    if (step === "issue") return issueDescription.trim().length > 0;
+    if (step === "issue") return issueDescription.trim().length >= BOOKING_FIELD_LIMITS.notesMin;
+    if (step === "meeting") return meeting !== null;
     return true;
   }
 
@@ -441,6 +479,7 @@ export function PricingWizard({
             rows={4}
             value={issueDescription}
             onChange={(e) => setIssueDescription(e.target.value)}
+            maxLength={BOOKING_FIELD_LIMITS.notes}
             aria-label="Describe the issue or job you need help with"
             placeholder="e.g. My laptop is running really slow and I think it has a virus. Also want to set up my new phone."
             className={cn(
@@ -449,6 +488,12 @@ export function PricingWizard({
               "focus:border-coquelicot focus:ring-2 focus:ring-coquelicot/30",
             )}
           />
+          {issueDescription.trim().length > 0 &&
+            issueDescription.trim().length < BOOKING_FIELD_LIMITS.notesMin && (
+              <p className="mt-2 text-sm text-slate-500">
+                Add a bit more detail for a better estimate.
+              </p>
+            )}
         </div>
       )}
 
@@ -535,6 +580,11 @@ export function PricingWizard({
             <p className="text-4xl font-extrabold text-russian-violet sm:text-5xl">
               {formatPriceRound(result.low)} - {formatPriceRound(result.high)}
             </p>
+            {meeting !== "remote" && result.includesTravel && (result.travelCharge ?? 0) > 0 && (
+              <p className="mt-1 text-lg font-semibold text-slate-600">
+                + {formatPriceRound(result.travelCharge ?? 0)} round-trip travel
+              </p>
+            )}
             {result.promoLabel && (
               <p className="mt-2 text-sm font-semibold text-amber-700">⚡ {result.promoLabel}</p>
             )}
@@ -546,7 +596,12 @@ export function PricingWizard({
               {meeting === "remote"
                 ? "Remote session - no travel charge. "
                 : result.includesTravel
-                  ? `Includes round-trip drive time at the Travel rate, ${formatPriceRound(minTravelCharge)} minimum. `
+                  ? // Only mention the minimum when the minimum is what's being
+                    // charged - saying "$10 minimum" beside a $40 drive reads as
+                    // if the customer is being quoted the floor.
+                    (result.travelCharge ?? 0) <= minTravelCharge
+                    ? `Round-trip drive time is charged at the Travel rate, ${formatPriceRound(minTravelCharge)} minimum. `
+                    : "Round-trip drive time is charged at the Travel rate. "
                   : addressNotFound
                     ? "Address not found - actual travel will be confirmed before work begins. "
                     : ""}

@@ -2,15 +2,21 @@
 // src/features/admin/components/settings/IdentityTab.tsx
 /**
  * @description Editor for the business identity group: contact details, the
- * unified base address (which also drives the travel origin + SEO once wired),
- * payment terms, GST number, bank account, and invoice prefix. Sensitive fields
- * (GST number, bank account) are masked with a reveal toggle. Saving stores to
- * the DB; the public/invoice/email consumers read these in the follow-up step.
+ * unified base address (which also drives the travel origin + SEO), payment
+ * terms, GST number, bank account, home region, and the SEO service area
+ * (radius + served suburbs). Sensitive fields (GST number, bank account) are
+ * masked with a reveal toggle.
  */
 
-import { NumberField, TextField } from "@/features/admin/components/settings/SettingsFields";
+import {
+  FieldShell,
+  NumberField,
+  TextField,
+} from "@/features/admin/components/settings/SettingsFields";
 import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
+import { SettingsSaveBar } from "@/features/admin/components/settings/SettingsSaveBar";
 import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
+import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import { IDENTITY_FIELD_META } from "@/shared/lib/settings/field-meta";
 import type { BaseAddress, IdentitySettings } from "@/shared/lib/settings/types";
 import type React from "react";
@@ -64,7 +70,7 @@ export function IdentityTab({ initial, defaults }: Props): React.ReactElement {
   return (
     <div>
       <SectionHeading>Contact</SectionHeading>
-      <div className="divide-y divide-slate-100">
+      <div className="divide-y divide-admin-border">
         <TextField
           id="name"
           meta={m.name}
@@ -120,14 +126,31 @@ export function IdentityTab({ initial, defaults }: Props): React.ReactElement {
       </div>
 
       <SectionHeading>Base address (travel origin + map)</SectionHeading>
-      <div className="divide-y divide-slate-100">
-        <TextField
+      <div className="divide-y divide-admin-border">
+        <FieldShell
           id="addrLine"
           meta={m["baseAddress.line"]}
-          value={draft.baseAddress.line}
           customised={draft.baseAddress.line !== defaults.baseAddress.line}
-          onChange={(v) => setAddr({ line: v })}
-        />
+        >
+          <AddressAutocomplete
+            id="addrLine"
+            value={draft.baseAddress.line}
+            fetchDetails
+            aria-label="Base address"
+            placeholder="Start typing the base address..."
+            inputClassName="w-full rounded-lg border border-admin-border-strong px-3 py-2.5 text-base focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+            onChange={(v) => setAddr({ line: v })}
+            onPlaceSelected={(p) =>
+              setAddr({
+                line: p.formattedAddress,
+                ...(p.locality ? { locality: p.locality } : {}),
+                ...(p.postcode ? { postcode: p.postcode } : {}),
+                ...(p.lat != null ? { lat: Math.round(p.lat * 1e6) / 1e6 } : {}),
+                ...(p.lng != null ? { lng: Math.round(p.lng * 1e6) / 1e6 } : {}),
+              })
+            }
+          />
+        </FieldShell>
         <TextField
           id="addrLocality"
           meta={m["baseAddress.locality"]}
@@ -161,7 +184,7 @@ export function IdentityTab({ initial, defaults }: Props): React.ReactElement {
       </div>
 
       <SectionHeading>Invoicing</SectionHeading>
-      <div className="divide-y divide-slate-100">
+      <div className="divide-y divide-admin-border">
         <NumberField
           id="paymentTermsDays"
           meta={m.paymentTermsDays}
@@ -198,20 +221,40 @@ export function IdentityTab({ initial, defaults }: Props): React.ReactElement {
           onChange={(v) => set({ bankAccount: v })}
         />
         <TextField
-          id="invoicePrefix"
-          meta={m.invoicePrefix}
-          value={draft.invoicePrefix}
-          error={fieldErrors.invoicePrefix}
-          customised={draft.invoicePrefix !== defaults.invoicePrefix}
-          onChange={(v) => set({ invoicePrefix: v })}
-        />
-        <TextField
           id="homeRegion"
           meta={m.homeRegion}
           value={draft.homeRegion}
           customised={draft.homeRegion !== defaults.homeRegion}
           onChange={(v) => set({ homeRegion: v })}
         />
+      </div>
+
+      <SectionHeading>Service area (SEO)</SectionHeading>
+      <div className="divide-y divide-admin-border">
+        <NumberField
+          id="serviceRadiusKm"
+          meta={m.serviceRadiusKm}
+          value={draft.serviceRadiusKm}
+          min={1}
+          max={500}
+          error={fieldErrors.serviceRadiusKm}
+          customised={draft.serviceRadiusKm !== defaults.serviceRadiusKm}
+          onChange={(v) => set({ serviceRadiusKm: v ?? 1 })}
+        />
+        <FieldShell
+          id="servedSuburbs"
+          meta={m.servedSuburbs}
+          customised={draft.servedSuburbs.join("\n") !== defaults.servedSuburbs.join("\n")}
+        >
+          <textarea
+            id="servedSuburbs"
+            value={draft.servedSuburbs.join("\n")}
+            rows={6}
+            placeholder="One suburb per line"
+            onChange={(e) => set({ servedSuburbs: e.target.value.split("\n") })}
+            className="w-full rounded-lg border border-admin-border-strong px-3 py-2 text-base focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+          />
+        </FieldShell>
       </div>
 
       {/* Guardrail blocks */}
@@ -226,27 +269,13 @@ export function IdentityTab({ initial, defaults }: Props): React.ReactElement {
         </div>
       )}
 
-      {/* Save bar */}
-      <div className="mt-6 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => void form.save()}
-          disabled={!dirty || saving}
-          className="rounded-lg bg-russian-violet px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
-        >
-          {saving ? "Saving..." : "Save changes"}
-        </button>
-        <button
-          type="button"
-          onClick={form.resetToDefault}
-          disabled={saving}
-          className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-        >
-          Reset to defaults
-        </button>
-        {dirty && !saving && <span className="text-sm text-slate-400">Unsaved changes</span>}
-        {!dirty && savedAt && <span className="text-sm font-medium text-emerald-600">Saved</span>}
-      </div>
+      <SettingsSaveBar
+        dirty={dirty}
+        saving={saving}
+        savedAt={savedAt}
+        onSave={() => void form.save()}
+        onReset={form.resetToDefault}
+      />
 
       <SettingsHistory group="identity" onRestore={(v: IdentitySettings) => setDraft(v)} />
     </div>

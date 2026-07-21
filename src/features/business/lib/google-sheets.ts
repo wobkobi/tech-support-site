@@ -4,6 +4,7 @@
  * prefix, financial year, and last-issued number from the SETTINGS tab and
  * writes back the incremented counter. Cell layout matches the current template.
  */
+import { withRetry } from "@/features/business/lib/google-retry";
 import { getOAuth2Client } from "@/features/calendar/lib/google-calendar";
 import { google } from "googleapis";
 
@@ -44,10 +45,14 @@ export function getSheetId(): string {
 export async function getInvoiceCounter(): Promise<InvoiceCounterData> {
   const sheets = getSheetsClient();
   const spreadsheetId = getSheetId();
-  const res = await sheets.spreadsheets.values.batchGet({
-    spreadsheetId,
-    ranges: ["SETTINGS!B8", "SETTINGS!B11", "SETTINGS!B19"],
-  });
+  const res = await withRetry(
+    () =>
+      sheets.spreadsheets.values.batchGet({
+        spreadsheetId,
+        ranges: ["SETTINGS!B8", "SETTINGS!B11", "SETTINGS!B19"],
+      }),
+    { label: "invoice-counter-read" },
+  );
   const ranges = res.data.valueRanges ?? [];
   const prefix = (ranges[0]?.values?.[0]?.[0] as string | undefined) ?? "TTP";
   const yearRaw = ((ranges[1]?.values?.[0]?.[0] as string | undefined) ?? "").trim();
@@ -77,10 +82,14 @@ export async function getInvoiceCounter(): Promise<InvoiceCounterData> {
 export async function setInvoiceCounter(newCount: number): Promise<void> {
   const sheets = getSheetsClient();
   const spreadsheetId = getSheetId();
-  await sheets.spreadsheets.values.update({
-    spreadsheetId,
-    range: "SETTINGS!B19",
-    valueInputOption: "RAW",
-    requestBody: { values: [[newCount]] },
-  });
+  await withRetry(
+    () =>
+      sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: "SETTINGS!B19",
+        valueInputOption: "RAW",
+        requestBody: { values: [[newCount]] },
+      }),
+    { label: "invoice-counter-write" },
+  );
 }

@@ -335,16 +335,30 @@ export function TasksSection({
 }
 
 /**
+ * Recomposes decimal hours from whole hours + minutes, rounded to 2dp - the same
+ * convention as `withMinutes` in business.ts, so the round-trip is stable.
+ * @param h - Whole hours.
+ * @param m - Minutes (0-59).
+ * @returns Decimal hours.
+ */
+function hoursFromHM(h: number, m: number): number {
+  return Math.round(((h * 60 + m) / 60) * 100) / 100;
+}
+
+/**
  * Compact qty + unit-price + total + delete row shared by both flat-rate and
  * device/action task rows. Stacks on mobile; at sm+ it becomes an inline strip -
  * compact for flat-rate rows, or full width when `spread` is set so the line
- * total lines up under the effective-rate readout above.
+ * total lines up under the effective-rate readout above. Task rows (`spread`)
+ * edit time as separate hrs + mins inputs; flat-rate rows keep a single unit-count
+ * input. Either way `task.qty` stays decimal hours/units - the pricing maths is
+ * unchanged.
  * @param props - Component props.
  * @param props.task - The task line to render controls for.
- * @param props.onQty - Called when the operator edits the hours / qty input.
+ * @param props.onQty - Called with the new decimal qty when hrs/mins/qty change.
  * @param props.onPrice - Called when the operator edits the $/unit input.
  * @param props.onDelete - Called when the × button is pressed.
- * @param props.spread - When true (task rows) the strip fills the row and right-aligns the total; flat-rate rows leave it false to stay compact.
+ * @param props.spread - When true (task rows) the strip fills the row, right-aligns the total, and splits time into hrs + mins; flat-rate rows leave it false to stay compact with a single unit-count input.
  * @returns Totals strip element.
  */
 function TaskTotalsRow({
@@ -360,31 +374,79 @@ function TaskTotalsRow({
   onDelete: () => void;
   spread?: boolean;
 }): React.ReactElement {
+  // Task rows edit time as hrs + mins; task.qty stays decimal hours. Decompose
+  // for display (round-trips cleanly through 2dp qty, e.g. 50 min > 0.83 > 50).
+  const totalMins = Math.round(task.qty * 60);
+  const hrs = Math.floor(totalMins / 60);
+  const mins = totalMins % 60;
+  const numInput =
+    "number-input-clean w-full rounded-lg border border-slate-200 bg-white px-2 py-2.5 text-right text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none sm:py-2 sm:text-xs";
   return (
     <div
       className={cn(
-        "grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_44px] items-center gap-2",
+        "grid items-center gap-2",
         spread
-          ? "sm:flex sm:w-full sm:items-center sm:gap-2"
-          : "sm:flex sm:flex-none sm:items-center sm:gap-2",
+          ? "grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_44px] sm:flex sm:w-full sm:items-center sm:gap-2"
+          : "grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_44px] sm:flex sm:flex-none sm:items-center sm:gap-2",
       )}
     >
-      <label className="flex flex-col gap-0.5 sm:contents">
-        <span className="text-[10px] font-medium tracking-wide text-slate-400 uppercase sm:hidden">
-          Hrs
-        </span>
-        <input
-          type="number"
-          min="0"
-          step="0.25"
-          inputMode="decimal"
-          value={task.qty}
-          onChange={(e) => onQty(parseFloat(e.target.value) || 0)}
-          aria-label="Quantity"
-          className="number-input-clean w-full rounded-lg border border-slate-200 bg-white px-2 py-2.5 text-right text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none sm:w-20 sm:py-2 sm:text-xs"
-        />
-      </label>
-      {spread && <span className="hidden text-xs text-slate-400 sm:inline">hrs</span>}
+      {spread ? (
+        <>
+          <label className="flex flex-col gap-0.5 sm:contents">
+            <span className="text-[10px] font-medium tracking-wide text-slate-400 uppercase sm:hidden">
+              Hrs
+            </span>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              inputMode="numeric"
+              value={hrs || ""}
+              onChange={(e) => onQty(hoursFromHM(parseInt(e.target.value, 10) || 0, mins))}
+              aria-label="Hours"
+              className={cn(numInput, "sm:w-14")}
+            />
+          </label>
+          <span className="hidden text-xs text-slate-400 sm:inline">hr</span>
+          <label className="flex flex-col gap-0.5 sm:contents">
+            <span className="text-[10px] font-medium tracking-wide text-slate-400 uppercase sm:hidden">
+              Min
+            </span>
+            <input
+              type="number"
+              min="0"
+              max="59"
+              step="5"
+              inputMode="numeric"
+              value={mins || ""}
+              onChange={(e) =>
+                onQty(
+                  hoursFromHM(hrs, Math.min(59, Math.max(0, parseInt(e.target.value, 10) || 0))),
+                )
+              }
+              aria-label="Minutes"
+              className={cn(numInput, "sm:w-14")}
+            />
+          </label>
+          <span className="hidden text-xs text-slate-400 sm:inline">min</span>
+        </>
+      ) : (
+        <label className="flex flex-col gap-0.5 sm:contents">
+          <span className="text-[10px] font-medium tracking-wide text-slate-400 uppercase sm:hidden">
+            Qty
+          </span>
+          <input
+            type="number"
+            min="0"
+            step="1"
+            inputMode="numeric"
+            value={task.qty}
+            onChange={(e) => onQty(parseFloat(e.target.value) || 0)}
+            aria-label="Quantity"
+            className={cn(numInput, "sm:w-20")}
+          />
+        </label>
+      )}
       <label className="flex flex-col gap-0.5 sm:contents">
         <span className="text-[10px] font-medium tracking-wide text-slate-400 uppercase sm:hidden">
           {spread ? "$/hr" : "$/unit"}

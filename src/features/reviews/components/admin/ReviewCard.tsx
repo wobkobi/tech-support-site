@@ -4,6 +4,9 @@
  * @description Single review card with approve/revoke/delete actions.
  */
 
+import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
+import { StatusPill } from "@/features/admin/components/ui/StatusPill";
+import { useToast } from "@/features/admin/components/ui/Toast";
 import { formatReviewerName } from "@/features/reviews/lib/formatting";
 import { SOFT_CARD } from "@/shared/components/PageLayout";
 import { cn } from "@/shared/lib/cn";
@@ -41,10 +44,10 @@ export function ReviewCard({
   onRevoke,
   onDelete,
 }: ReviewCardProps): React.ReactElement {
+  const { toast } = useToast();
   const [loading, setLoading] = useState<"approve" | "revoke" | "delete" | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -54,10 +57,7 @@ export function ReviewCard({
      * @param e - The mouse event.
      */
     function handleClickOutside(e: MouseEvent): void {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-        setConfirmDelete(false);
-      }
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -70,7 +70,6 @@ export function ReviewCard({
    */
   async function patch(action: "approve" | "revoke"): Promise<void> {
     setLoading(action);
-    setError(null);
     try {
       const res = await fetch(`/api/admin/reviews/${row.id}`, {
         method: "PATCH",
@@ -81,7 +80,7 @@ export function ReviewCard({
       if (action === "approve") onApprove?.();
       else onRevoke?.();
     } catch {
-      setError("Something went wrong.");
+      toast("Something went wrong.", { tone: "error" });
     } finally {
       setLoading(null);
     }
@@ -93,31 +92,26 @@ export function ReviewCard({
    */
   async function remove(): Promise<void> {
     setLoading("delete");
-    setError(null);
     try {
-      const res = await fetch(`/api/admin/reviews/${row.id}`, {
-        method: "DELETE",
-        headers: {},
-      });
+      const res = await fetch(`/api/admin/reviews/${row.id}`, { method: "DELETE", headers: {} });
       if (!res.ok) throw new Error("Request failed");
       onDelete();
     } catch {
-      setError("Something went wrong.");
+      toast("Something went wrong.", { tone: "error" });
     } finally {
       setLoading(null);
+      setConfirmOpen(false);
     }
   }
+
+  const isTest = `${row.firstName ?? ""} ${row.lastName ?? ""}`.toLowerCase().includes("test");
 
   return (
     <div className={cn(SOFT_CARD, "flex flex-col gap-3")}>
       {/* Header row */}
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-semibold text-russian-violet">{formatReviewerName(row)}</span>
-        {row.verified && (
-          <span className="rounded-full bg-moonstone-600/20 px-2 py-0.5 text-xs font-medium text-moonstone-600">
-            Verified
-          </span>
-        )}
+        {row.verified && <StatusPill tone="success">Verified</StatusPill>}
         <span className="ml-auto shrink-0 text-xs text-slate-400">
           {formatDateShort(row.createdAt)}
         </span>
@@ -126,18 +120,12 @@ export function ReviewCard({
       {/* Review text */}
       <p className="leading-relaxed text-slate-700">{row.text}</p>
 
-      {/* Error */}
-      {error && <p className="text-xs text-coquelicot-400">{error}</p>}
-
       {/* Actions */}
       <div className="flex flex-wrap items-center gap-2">
-        {`${row.firstName ?? ""} ${row.lastName ?? ""}`.toLowerCase().includes("test") && (
+        {/* Test reviews get a quick delete; both delete paths open the confirm. */}
+        {isTest && (
           <button
-            onClick={() => {
-              if (confirm("Permanently delete this test review? This cannot be undone.")) {
-                void remove();
-              }
-            }}
+            onClick={() => setConfirmOpen(true)}
             disabled={loading !== null}
             className="rounded-lg bg-red-500/20 px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-500/30 disabled:opacity-50"
           >
@@ -180,52 +168,35 @@ export function ReviewCard({
                   {loading === "revoke" ? "Revoking…" : "Revoke"}
                 </button>
               )}
-              {confirmDelete ? (
-                <div
-                  className={cn(
-                    "flex flex-col gap-1 px-4 py-2",
-                    onRevoke ? "rounded-b-lg" : "rounded-lg",
-                  )}
-                >
-                  <span className="text-xs text-slate-600">Delete permanently?</span>
-                  <div className="flex gap-3">
-                    <button
-                      type="button"
-                      disabled={loading !== null}
-                      onClick={() => {
-                        setMenuOpen(false);
-                        void remove();
-                      }}
-                      className="text-xs font-semibold text-coquelicot-500 disabled:opacity-50"
-                    >
-                      {loading === "delete" ? "Deleting…" : "Yes, delete"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setConfirmDelete(false)}
-                      className="text-xs text-slate-400 hover:text-slate-600"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setConfirmDelete(true)}
-                  disabled={loading !== null}
-                  className={cn(
-                    "px-4 py-2 text-left text-sm font-medium text-coquelicot-500 transition-colors hover:bg-coquelicot-500/10 disabled:opacity-50",
-                    onRevoke ? "rounded-b-lg" : "rounded-lg",
-                  )}
-                >
-                  Delete
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setConfirmOpen(true);
+                }}
+                disabled={loading !== null}
+                className={cn(
+                  "px-4 py-2 text-left text-sm font-medium text-coquelicot-500 transition-colors hover:bg-coquelicot-500/10 disabled:opacity-50",
+                  onRevoke ? "rounded-b-lg" : "rounded-lg",
+                )}
+              >
+                Delete
+              </button>
             </div>
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Delete this review?"
+        body="This permanently deletes the review and cannot be undone."
+        confirmLabel="Delete"
+        tone="danger"
+        busy={loading === "delete"}
+        onConfirm={() => void remove()}
+        onCancel={() => setConfirmOpen(false)}
+      />
     </div>
   );
 }

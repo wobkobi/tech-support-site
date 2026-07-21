@@ -452,6 +452,20 @@ model Invoice {
   voidedAt         DateTime?
   // Stamped when send-email included the review link; powers the 30-day cooldown.
   reviewLinkSentAt DateTime?
+  // Stamped when send-email promotes DRAFT>SENT - a real timestamp, unlike the
+  // updatedAt proxy the route returned before. Null on legacy SENT rows.
+  sentAt           DateTime?
+  // Payment record, stamped by POST /pay when the invoice becomes PAID.
+  // paymentMethod is an INCOME_METHODS value; paymentReference is an optional
+  // operator note. Null on legacy PAID rows (the timeline degrades gracefully;
+  // never approximated from updatedAt).
+  paidAt           DateTime?
+  paymentMethod    String?
+  paymentReference String?
+  // Overdue-reminder tracking, stamped only after Resend accepts. Nullable per
+  // the Mongo no-backfill rule; readers treat null count as 0.
+  reminderLastSentAt DateTime?
+  reminderCount      Int?
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
@@ -621,10 +635,14 @@ model PriceEstimateLog {
   // the customer was quoted an on-site rate (with travel) or remote.
   meetingType MeetingType?
 
-  // Final price range shown to the user, post-promo.
-  hourlyRate Float
-  priceLow   Int
-  priceHigh  Int
+  // Final price range shown to the user, post-promo. priceLow/priceHigh are the
+  // all-in total (labour + travel); travelCharge is the round-trip travel slice
+  // of that total (null on rows logged before travel was broken out, 0 for
+  // remote), letting the booking notes show the labour/travel split.
+  hourlyRate   Float
+  priceLow     Int
+  priceHigh    Int
+  travelCharge Int?
 
   // Promo snapshot so old quotes remain reconstructable after promos change.
   promoTitle String?

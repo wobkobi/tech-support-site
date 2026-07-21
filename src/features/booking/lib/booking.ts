@@ -3,8 +3,81 @@
  * @description Booking system with duration selection (1hr quick jobs vs 2hr standard jobs).
  */
 
-import type { AvailabilitySettings } from "@/shared/lib/settings/types";
+import type { AvailabilitySettings, MorningGuard } from "@/shared/lib/settings/types";
 import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
+
+/**
+ * Parses the structured booking notes blob back into its parts.
+ * Format: `{userNotes}\n\n[{timeLabel} - {durationLabel}]\nMeeting type: ...\n[Address: ...]\n[Phone: ...]`
+ * The structured columns (`address`, `meetingType`) are preferred now; this
+ * stays because legacy rows carry the values only inside the notes text, and
+ * `userNotes` - what the customer actually typed - has no column of its own.
+ * @param raw - Raw notes string from the DB.
+ * @returns The customer's own text plus the parsed metadata fields.
+ */
+export function parseBookingNotes(raw: string | null): {
+  userNotes: string;
+  meetingType: "in-person" | "remote" | "";
+  address: string;
+  phone: string;
+} {
+  if (!raw) return { userNotes: "", meetingType: "", address: "", phone: "" };
+
+  const metaSeparatorIdx = raw.indexOf("\n\n[");
+  const userNotes = metaSeparatorIdx >= 0 ? raw.slice(0, metaSeparatorIdx).trim() : raw.trim();
+  const meta = metaSeparatorIdx >= 0 ? raw.slice(metaSeparatorIdx) : "";
+
+  const meetingTypeLine = meta.match(/Meeting type:\s*(.+)/i)?.[1]?.trim() ?? "";
+  const meetingType: "in-person" | "remote" | "" = meetingTypeLine
+    .toLowerCase()
+    .includes("in-person")
+    ? "in-person"
+    : meetingTypeLine.toLowerCase().includes("remote")
+      ? "remote"
+      : "";
+
+  const address = meta.match(/Address:\s*(.+)/i)?.[1]?.trim() ?? "";
+  const phone = meta.match(/Phone:\s*(.+)/i)?.[1]?.trim() ?? "";
+
+  return { userNotes, meetingType, address, phone };
+}
+
+/**
+ * Builds the customer-facing blurb that goes in a calendar entry (both the
+ * `.ics` DESCRIPTION and the Google Calendar "details" field), so the two never
+ * drift apart. Deliberately omits the time and address - a calendar entry
+ * already shows those in its own fields.
+ * @param input - The pieces to assemble.
+ * @param input.company - Business name.
+ * @param input.phone - Contact phone.
+ * @param input.email - Contact email.
+ * @param input.isRemote - Whether the appointment is remote.
+ * @param input.userNotes - What the customer typed when booking.
+ * @param input.manageUrl - Absolute reschedule link.
+ * @param input.cancelUrl - Absolute cancel link.
+ * @returns Plain-text description with newline separators.
+ */
+export function buildAppointmentDescription(input: {
+  company: string;
+  phone: string;
+  email: string;
+  isRemote: boolean;
+  userNotes: string;
+  manageUrl: string;
+  cancelUrl: string;
+}): string {
+  const { company, phone, email, isRemote, userNotes, manageUrl, cancelUrl } = input;
+  return [
+    isRemote
+      ? `Remote session with ${company} - no visit required.`
+      : `${company} is coming to you.`,
+    userNotes ? `\nWhat you told us:\n${userNotes}` : "",
+    `\nNeed to change or cancel?\nReschedule: ${manageUrl}\nCancel: ${cancelUrl}`,
+    `\nQuestions? ${phone} or ${email}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
 
 /**
  * Splits an NZ-style apartment-prefixed address ("12/160 Kepa Road Orakei")
@@ -34,6 +107,22 @@ export function combineUnitAndAddress(unit: string, rest: string): string {
   const u = unit.trim();
   const r = rest.trim();
   return u ? `${u}/${r}` : r;
+}
+
+/**
+ * True when the entered unit duplicates the leading street number (e.g. unit
+ * "500" against "500 Pt Chev Road") - warns customers in standalone houses who
+ * put their street number in the Apt/Unit box. Same `1-4 digit + optional
+ * letter` shape as {@link splitUnitFromAddress} so unit semantics stay consistent.
+ * @param unit - Apartment / unit number as typed.
+ * @param rest - Street address + suburb as typed.
+ * @returns Whether the unit duplicates the leading street number.
+ */
+export function unitMatchesStreetNumber(unit: string, rest: string): boolean {
+  const u = unit.trim();
+  if (!u) return false;
+  const m = rest.trim().match(/^(\d{1,4}[A-Za-z]?)\b/);
+  return !!m && m[1].toLowerCase() === u.toLowerCase();
 }
 
 export const BOOKING_CONFIG = {
@@ -95,9 +184,6 @@ export const TIME_OF_DAY_OPTIONS: ReadonlyArray<TimeOfDayOption> = [
 // operator's schedule, so the type is a plain string rather than a fixed enum.
 export type TimeOfDay = string;
 
-// Default 15-minute sub-slot offsets within each hour. The live offsets come
-// from the availability settings; this constant is the default + edit-page shape.
-export const SUB_SLOT_MINUTES = [0, 15, 30, 45] as const;
 export type StartMinute = number;
 
 /**
@@ -143,7 +229,7 @@ export function parseHourLabel(label: string): number | null {
  * @param longestDurationMins - Longest selectable job length, in minutes.
  * @returns Sorted list of start hours (empty when no job can fit).
  */
-export function startHoursForDay(
+function startHoursForDay(
   window: { open: number; close: number; break: { start: number; end: number } | null },
   longestDurationMins: number,
 ): number[] {
@@ -156,13 +242,13 @@ export function startHoursForDay(
   return hours;
 }
 
-export interface SubSlot {
+interface SubSlot {
   minute: StartMinute;
   availableShort: boolean;
   availableLong: boolean;
 }
 
-export interface TimeWindow {
+interface TimeWindow {
   value: TimeOfDay;
   label: string;
   startHour: number; // used for sub-slot label generation in the UI
@@ -198,12 +284,6 @@ export interface ExistingBooking {
   endAt: Date;
   bufferBeforeMin: number;
   bufferAfterMin: number;
-}
-
-export interface ExistingEvent {
-  id: string;
-  start: string;
-  end: string;
 }
 
 /**
@@ -247,6 +327,48 @@ function isSlotFree(
   }
 
   return true;
+}
+
+/**
+ * Whether a slot falls under an active morning guard. A guard blocks slots on
+ * its protectedDays before earliestHour once "now" has passed the most recent
+ * triggerDay@triggerHour on or before the slot's date - so a weekend-morning
+ * rule (Fri 18:00 > Sat/Sun before noon) only bites the imminent weekend, while
+ * the same slots stay bookable if reserved earlier in the week.
+ * @param year - Slot's NZ calendar year.
+ * @param month - Slot's NZ calendar month (1-12).
+ * @param day - Slot's NZ calendar day.
+ * @param dayOfWeek - Slot's weekday (0 = Sunday .. 6 = Saturday).
+ * @param slotHour - Slot's NZ-local start hour.
+ * @param now - Current time.
+ * @param guards - The live morning-guard rules.
+ * @returns True when an enabled guard blocks the slot.
+ */
+function isSlotMorningGuarded(
+  year: number,
+  month: number,
+  day: number,
+  dayOfWeek: number,
+  slotHour: number,
+  now: Date,
+  guards: MorningGuard[],
+): boolean {
+  for (const g of guards) {
+    if (!g.enabled || slotHour >= g.earliestHour || !g.protectedDays.includes(dayOfWeek)) {
+      continue;
+    }
+    // The most recent triggerDay on or before the slot's date (UTC noon avoids
+    // any DST date-boundary shift when reading the trigger date's components).
+    const daysBack = (dayOfWeek - g.triggerDay + 7) % 7;
+    const trigger = new Date(Date.UTC(year, month - 1, day - daysBack, 12, 0, 0));
+    const ty = trigger.getUTCFullYear();
+    const tm = trigger.getUTCMonth() + 1;
+    const td = trigger.getUTCDate();
+    const tOffset = getPacificAucklandOffset(ty, tm, td);
+    const triggerInstant = Date.UTC(ty, tm - 1, td, g.triggerHour - tOffset, 0, 0);
+    if (now.getTime() >= triggerInstant) return true;
+  }
+  return false;
 }
 
 /**
@@ -396,6 +518,15 @@ export function buildAvailableDays(
             }
           }
 
+          // Morning guards apply on every day, not just today (a weekend rule
+          // triggered on Friday evening blocks the coming Sat/Sun mornings).
+          if (
+            isSlotMorningGuarded(year, month, day, dayOfWeek, slotHour, now, config.morningGuards)
+          ) {
+            subAvailableShort = false;
+            subAvailableLong = false;
+          }
+
           subSlots.push({
             minute,
             availableShort: subAvailableShort,
@@ -535,6 +666,25 @@ export function validateBookingRequest(
     return {
       valid: false,
       error: `Bookings need at least ${config.minHoursNotice} hours notice`,
+    };
+  }
+
+  // Authoritative morning-guard check (mirrors the day-grid filter) so a direct
+  // API call can't book an early slot the guard has closed for that day.
+  if (
+    isSlotMorningGuarded(
+      year,
+      month,
+      day,
+      selectedDate.getUTCDay(),
+      startHour,
+      now,
+      config.morningGuards,
+    )
+  ) {
+    return {
+      valid: false,
+      error: "That time isn't available - early slots close ahead of the day",
     };
   }
 

@@ -1,21 +1,31 @@
 // src/app/api/admin/travel/[id]/route.ts
 /**
  * @description Admin endpoint to update a TravelBlock's transport mode, custom
- * origin, or custom travel-back destination. Setting any clears cached raw
- * minutes so the next refresh recalculates.
+ * origin, or custom travel-back destination. A travel-affecting change reprices
+ * the block's two legs immediately - the 15-min cron only maintains upcoming
+ * events, so a past job would otherwise sit blank after the change.
  */
 
+import {
+  recomputeTravelBlock,
+  type RecomputedTravel,
+} from "@/features/calendar/lib/calendar-cache";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { TransportMode } from "@prisma/client";
-import { type NextRequest, NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+
+// A mode/origin change makes up to two Distance Matrix calls (there + back), so
+// lift the ceiling above the default to avoid a 504 on a slow upstream.
+export const maxDuration = 60;
 
 const VALID_MODES = new Set<string>(Object.values(TransportMode));
 
 /**
- * Updates the transport mode and/or custom origin for a travel block.
- * Clears raw travel minutes so the next cache refresh recalculates with the new values.
+ * Updates the transport mode and/or custom origin for a travel block, then
+ * reprices its travel-there / travel-back minutes immediately so the change
+ * lands even on a past job the cron won't revisit.
  * @param request - Incoming admin request.
  * @param root0 - Route params.
  * @param root0.params - Route params with id.
@@ -67,7 +77,8 @@ export async function PATCH(
           customTravelBackDestination: body.customTravelBackDestination ?? null,
         }),
         ...(hasIgnored && { ignored: body.ignored }),
-        // Clear raw minutes so the next recalculate uses the updated values
+        // Clear the stale minutes up front; the recompute below refills them
+        // (they stay blank as a safe fallback only if that call fails).
         rawTravelMinutes: null,
         roundedMinutes: null,
         rawTravelBackMinutes: null,
@@ -122,7 +133,21 @@ export async function PATCH(
       });
     }
 
-    return NextResponse.json({ ok: true });
+    // Refill the minutes now, from the block's stored endpoints, rather than
+    // waiting on a cron that only touches upcoming events. An ignored-only
+    // toggle changes no route, so it skips the repricing.
+    let travel: RecomputedTravel | null = null;
+    if (hasMode || hasOrigin || hasBackDest) {
+      try {
+        travel = await recomputeTravelBlock(id);
+      } catch (err) {
+        // The field change already saved; leave the minutes blank and let the
+        // operator retry (an upcoming job also self-heals on the next cron).
+        console.error("[travel/[id]] Immediate recompute failed:", err);
+      }
+    }
+
+    return NextResponse.json({ ok: true, travel });
   } catch (error) {
     console.error("[travel/[id]] Error:", error);
     return errorResponse("Update failed", 500);
