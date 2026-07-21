@@ -3,10 +3,9 @@
 /**
  * @description Bottom-sheet of quick mutations for a booking event, opened by
  * a long-press on a booking card in DayAgendaView: view details, complete,
- * cancel (operator/on-behalf), no-show, reschedule, bill in calculator, resend
- * review email, delete (test bookings only). Mutations route through the shared
- * {@link useBookingActions} hook so the schedule view and the bookings list stay
- * behaviourally identical, with toasts surfaced by the global admin toaster.
+ * cancel, no-show, reschedule, bill in calculator, resend review email, delete
+ * (test bookings only). Mutations route through the shared
+ * {@link useBookingActions} hook, with toasts from the global admin toaster.
  */
 
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
@@ -46,9 +45,9 @@ interface EventActionSheetProps {
 }
 
 /**
- * Renders the action sheet + handles its API calls. Reuses {@link useBookingActions}
- * (the same wrappers the bookings list and detail page use) so the schedule view
- * and the bookings list stay behaviourally identical.
+ * Renders the action sheet and runs its mutations through
+ * {@link useBookingActions} (the same wrappers the bookings list and detail
+ * page use) so the schedule view stays behaviourally identical to them.
  * @param props - Component props.
  * @param props.event - Event with attached booking data.
  * @param props.onChanged - Parent callback after a successful mutation.

@@ -2,9 +2,8 @@
 // src/features/admin/components/settings/CommsTab.tsx
 /**
  * @description Editor for the comms & automation group: which emails send
- * (confirmation, reminder, review request) and the timings (reminder lead time,
- * review-request delay, estimate-log retention). Saves through the shared
- * settings form hook.
+ * (confirmation, reminder, review request) and their timings. Saves through
+ * the shared settings form hook.
  */
 
 import { NumberField, ToggleField } from "@/features/admin/components/settings/SettingsFields";

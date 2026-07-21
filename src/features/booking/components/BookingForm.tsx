@@ -236,10 +236,8 @@ export default function BookingForm({
   const [submitting, setSubmitting] = useState(false);
 
   /**
-   * The chosen slot's start as a real instant. The picker works in NZ-local
-   * parts (date key + hour + sub-slot minute), so the NZ offset for that
-   * calendar date is applied to get UTC - DST-correct, unlike using the
-   * browser's own timezone.
+   * The chosen slot's start as an instant, applying the NZ offset for the
+   * slot's own date (DST-correct, unlike the browser's timezone).
    * @returns The slot start, or null when day or time isn't chosen yet.
    */
   function slotStartInstant(): Date | null {
@@ -262,9 +260,8 @@ export default function BookingForm({
     setEstimating(true);
     setQuoteError(null);
     try {
-      // Quote the drive at the slot the customer actually picked, so the
-      // estimate lines up with what the booking snapshots at submit time. The
-      // submit payload sends raw date/time parts, so build the instant here.
+      // Quote the drive at the picked slot so the estimate matches what the
+      // booking snapshots at submit.
       const slotStart = selectedDay && selectedTime ? slotStartInstant() : null;
       const slotEnd = slotStart
         ? new Date(slotStart.getTime() + durations[duration] * 60_000)
@@ -1336,9 +1333,7 @@ export default function BookingForm({
                         setAddressVerified(true);
                       }}
                       onRecovered={() => {
-                        // Autocomplete is back: restore the verify gate so the
-                        // address is picked/verified again rather than waved
-                        // through on the outage-mode exemption.
+                        // Autocomplete is back - restore the verify gate.
                         setMapsFallback(false);
                         setAddressVerified(false);
                         setAddressOverrideAcked(false);

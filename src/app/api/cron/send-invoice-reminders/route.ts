@@ -1,12 +1,6 @@
 // src/app/api/cron/send-invoice-reminders/route.ts
-/**
- * @description Cron that chases overdue SENT invoices - a polite nudge with the
- * (OVERDUE-watermarked) PDF attached, at most two per invoice. First reminder
- * at `invoiceReminderFirstDays` past due, second at `invoiceReminderSecondDays`,
- * then it stops chasing. Idempotent via Invoice.reminderCount, stamped only
- * after Resend accepts. Registered on cron-job.org (~daily) with the
- * `Authorization: Bearer CRON_SECRET` header - see docs/CRON.md.
- */
+// Daily cron chasing overdue SENT invoices: max two nudges per invoice at the
+// comms-settings offsets, idempotent via reminderCount. See docs/CRON.md.
 
 import { sendOverdueReminder } from "@/features/business/lib/invoice-reminders";
 import { errorResponse } from "@/shared/lib/api-response";
@@ -35,10 +29,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
 
     const now = new Date();
-    // Coarse DB filter: SENT and at least first-offset days past due. The
-    // per-invoice tier check below decides which reminder (if any) is due -
-    // reminderCount can't be compared against in the same query cheaply
-    // because null must read as 0.
+    // Coarse filter only - the per-invoice tier check decides what's due,
+    // since reminderCount's null-reads-as-0 can't be queried cheaply.
     const firstThreshold = new Date(
       now.getTime() - comms.invoiceReminderFirstDays * 24 * 60 * 60 * 1000,
     );
@@ -51,8 +43,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     for (const inv of candidates) {
       const count = inv.reminderCount ?? 0;
-      // Max two reminders, ever - after the second the invoice is the
-      // operator's problem, not the robot's.
+      // Max two reminders ever - after that it's the operator's problem.
       if (count >= 2) {
         results.skipped++;
         continue;

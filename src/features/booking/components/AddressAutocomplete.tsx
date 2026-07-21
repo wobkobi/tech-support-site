@@ -1,24 +1,8 @@
-// src/features/booking/components/AddressAutocomplete.tsx
-/**
- * @description Address input backed by the Places "AutocompleteSuggestion" API
- * (the GA replacement for the deprecated legacy widget). Suggestions are
- * fetched programmatically and rendered in a component-owned combobox dropdown,
- * so styling is ours (no Google shadow DOM) and keyboard/screen-reader
- * behaviour follows the standard combobox pattern.
- *
- * Billing: every lookup runs under an AutocompleteSessionToken. A session ends
- * either at selection (the token rides into the first `fetchFields` call, which
- * closes it at session rates) or at abandonment (dropdown dismissed without a
- * pick), after which the token is discarded - a token is never reused across
- * lookups.
- *
- * Fallback ladder: a missing API key, script failure, or fetch failure drops
- * the field to a plain text input with a visible warning, and `onFallbackMode`
- * tells the parent to relax any pick-a-suggestion gates. Script/fetch failures
- * are NOT permanent: further typing retries, and a success clears the warning
- * and fires `onRecovered` so the parent can restore its gates. The booking
- * flow must never break on a Google-side problem.
- */
+// src/features/booking/components/AddressAutocomplete.tsx - Places
+// AutocompleteSuggestion input with a component-owned combobox dropdown.
+// One session token per lookup (concluded by fetchFields, discarded on
+// abandonment, never reused). Any failure falls back to a plain input +
+// warning; typing retries, and recovery fires onRecovered.
 
 "use client";
 
@@ -35,12 +19,9 @@ const FETCH_DEBOUNCE_MS = 250;
 const MIN_FETCH_CHARS = 2;
 
 /**
- * Hard filter: suggestions only from the greater Auckland region (Wellsford
- * down past Pukekohe, west coast to Great Barrier). A soft locationBias was
- * tried first and text relevance still ranked same-named streets in Levin /
- * Christchurch above local ones. The service area is Auckland-only, so a
- * restriction is honest - and an out-of-area address can still be typed in
- * full, the field has always accepted free text.
+ * Suggestions come only from the greater Auckland region (the service area).
+ * A soft locationBias still ranked same-named Levin/Christchurch streets first;
+ * out-of-area addresses can always be typed in full.
  */
 const LOCATION_RESTRICTION = {
   north: -35.9,
@@ -122,10 +103,7 @@ export interface AddressAutocompleteProps {
   maxLength?: number;
   /** Input ID for label association */
   id?: string;
-  /**
-   * Extra key handling for keys the dropdown didn't consume - lets the admin
-   * calculator keep its Enter-to-look-up shortcut while the dropdown is closed.
-   */
+  /** Handles keys the dropdown didn't consume (e.g. the calculator's Enter-to-look-up). */
   onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
   /** Class override for the input, e.g. the compact admin styling. */
   inputClassName?: string;
@@ -206,11 +184,7 @@ export default function AddressAutocomplete({
     setScriptError(true);
   }
 
-  /**
-   * Clears the fallback after a successful retry: the warning disappears, the
-   * parent is told autocomplete is back, and the one-shot onFallbackMode latch
-   * re-arms for any future outage.
-   */
+  /** Clears the fallback: warning gone, onRecovered fired, outage latch re-armed. */
   function markRecovered(): void {
     if (!errorRef.current) return;
     errorRef.current = false;
@@ -219,9 +193,7 @@ export default function AddressAutocomplete({
     onRecovered?.();
   }
 
-  // Notify the parent that the field is in fallback mode (no autocomplete
-  // available). Fires whether the cause is a missing key, a script error, or a
-  // failed fetch; once per outage.
+  // Tell the parent the field is in fallback mode - once per outage.
   useEffect(() => {
     if (fallbackFiredRef.current) return;
     if (apiKeyMissing || scriptError) {
@@ -251,11 +223,7 @@ export default function AddressAutocomplete({
     };
   }, [isVisible, apiKey]);
 
-  /**
-   * Retries the library load after an earlier failure, throttled to one
-   * attempt at a time. Called from typing, so a customer whose connection
-   * blipped gets autocomplete back just by continuing to type.
-   */
+  /** Retries a failed library load (one attempt in flight); called from typing. */
   function retryLoad(): void {
     if (!apiKey || placesRef.current || loadingLibRef.current) return;
     loadingLibRef.current = true;
@@ -280,11 +248,7 @@ export default function AddressAutocomplete({
     };
   }, []);
 
-  /**
-   * Cancels any pending debounce and invalidates in-flight fetches, so a slow
-   * response can't reopen a dropdown the user has already dismissed (or pick a
-   * fresh session token after one was concluded).
-   */
+  /** Cancels the pending debounce and invalidates in-flight fetches. */
   function cancelPendingFetch(): void {
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
@@ -356,12 +320,9 @@ export default function AddressAutocomplete({
   function handleInput(e: React.ChangeEvent<HTMLInputElement>): void {
     const raw = e.target.value;
     onChange(raw);
-    // Cancel the previous keystroke's pending work either way - in the short-
-    // input branch an in-flight fetch for the longer text would otherwise come
-    // back and reopen the dropdown the user just typed away from.
+    // Cancel first: a stale in-flight fetch would reopen the dropdown.
     cancelPendingFetch();
-    // After a failed script load, each keystroke retries (throttled to one
-    // in-flight attempt) so a connection blip fixes itself as the user types.
+    // Each keystroke retries a failed script load, so a blip self-heals.
     if (!placesRef.current && errorRef.current) retryLoad();
     const trimmed = raw.trim();
     if (!placesRef.current || trimmed.length < MIN_FETCH_CHARS) {
@@ -378,9 +339,7 @@ export default function AddressAutocomplete({
    * @param item - The chosen suggestion.
    */
   async function selectSuggestion(item: SuggestionItem): Promise<void> {
-    // A debounced fetch may still be pending from the last keystroke - cancel
-    // it, or it would fire after this selection, reopen the dropdown over the
-    // chosen address, and start a fresh (billed) session.
+    // A pending fetch would reopen the dropdown and start a fresh billed session.
     cancelPendingFetch();
     setOpen(false);
     setActiveIndex(-1);
@@ -468,10 +427,7 @@ export default function AddressAutocomplete({
       />
 
       {open && suggestions.length > 0 && (
-        // Container/row treatment mirrors the deleted `.pac-container` CSS so
-        // the dropdown looks the same as the legacy widget did: seasalt
-        // gradient, 12px radius, moonstone inner ring, pin column, hover
-        // gradient, matched text in coquelicot.
+        // Styling mirrors the deleted .pac-container CSS (legacy-widget parity).
         <ul
           id={listboxId}
           role="listbox"

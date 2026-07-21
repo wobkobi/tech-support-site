@@ -1,22 +1,19 @@
 // src/shared/lib/normalise-address.ts
-// Server-side address canonicalisation via the Google Geocoding API. Manual
-// entry points (booking form, contact edit) already produce Places-formatted
-// addresses via autocomplete; this helper covers the paths that bypass it -
-// Google Contacts imports typed by hand on a phone, and legacy rows. Callers
-// normalise at write time so steady-state API usage stays near zero.
+// Server-side address canonicalisation via the Google Geocoding API. Covers
+// paths that bypass the Places autocomplete (hand-typed Google Contacts
+// imports, legacy rows). Callers normalise at write time so steady-state API
+// usage stays near zero.
 
 /** Result types precise enough to overwrite a stored address with. */
 const PRECISE_TYPES = new Set(["street_address", "premise", "subpremise"]);
 const PRECISE_LOCATION_TYPES = new Set(["ROOFTOP", "RANGE_INTERPOLATED"]);
 
 /**
- * Geocodes a free-text address against Google (Auckland, NZ constrained) and
- * returns every confident, precise NZ candidate in Google's formatted form (the
- * same shape the Places autocomplete stores). Deduped, order preserved. Returns
- * an empty array when the input is blank, no API key is configured, the lookup
- * fails, or nothing resolves precisely inside New Zealand - so callers can tell
- * "not found" (0), "unambiguous" (1), and "ambiguous" (>1) apart. A leading unit
- * like "2/15" is preserved when Google's formatted address drops it. Never throws.
+ * Geocodes a free-text address (Auckland, NZ constrained) and returns every
+ * confident, precise NZ candidate in Google's formatted form, deduped. Empty
+ * on blank input, missing key, failure, or nothing precise in NZ - so callers
+ * can tell "not found" (0), "unambiguous" (1), and "ambiguous" (>1) apart. A
+ * leading unit like "2/15" is preserved when Google drops it. Never throws.
  * @param raw - Free-text address to geocode.
  * @returns Confident candidate addresses; empty when none resolve.
  */
@@ -107,11 +104,9 @@ export async function geocodeAddressCandidates(raw: string | null | undefined): 
 
 /**
  * Canonicalises a free-text address to Google's formatted form, but only when
- * the match is UNAMBIGUOUS. Returns the single formatted address when exactly
- * one confident candidate resolves; returns null when zero resolve OR when more
- * than one does - so this never guesses between two same-named streets. Callers
- * keep their original value on null, and any genuine disambiguation is expected
- * to have happened upstream (e.g. the customer picking a candidate). Never throws.
+ * the match is UNAMBIGUOUS: null on zero candidates OR more than one, so it
+ * never guesses between two same-named streets. Callers keep their original
+ * value on null. Never throws.
  * @param raw - Free-text address to normalise.
  * @returns Canonical formatted address, or null when no single confident match exists.
  */

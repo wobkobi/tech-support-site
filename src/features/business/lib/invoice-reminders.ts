@@ -1,7 +1,5 @@
-// src/features/business/lib/invoice-reminders.ts
-// Overdue-invoice reminder send-and-stamp, shared by the daily cron and the
-// manual "Send reminder" action so the two paths cannot drift: same PDF, same
-// email variant, same stamp-only-after-Resend-accepts rule.
+// src/features/business/lib/invoice-reminders.ts - overdue-reminder
+// send-and-stamp shared by the daily cron and the manual action.
 
 import { generateInvoicePdf, serializeInvoice } from "@/features/business/lib/invoice-pdf";
 import { sendInvoiceReminderEmail } from "@/features/reviews/lib/email";
@@ -17,12 +15,9 @@ export interface ReminderSendResult {
 }
 
 /**
- * Generates the invoice PDF (which carries the OVERDUE watermark for an
- * overdue SENT invoice), emails the polite nudge, and stamps
- * `reminderLastSentAt` / `reminderCount` ONLY after Resend accepts - the
- * booking-reminder idempotency pattern. Stamping first would silently drop the
- * reminder forever on a transient send failure; a rare duplicate (crash
- * between send and stamp) is recoverable, a never-sent chase is not.
+ * Emails the nudge (OVERDUE-watermarked PDF attached) and stamps the reminder
+ * fields ONLY after Resend accepts - stamping first would silently drop the
+ * chase forever on a transient send failure.
  * @param invoice - The full invoice row (must be SENT and past due; callers gate).
  * @returns Whether the send happened and which reminder number it was.
  */

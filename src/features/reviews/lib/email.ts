@@ -198,11 +198,8 @@ export interface BookingNotificationData {
    */
   address?: string | null;
   /**
-   * Whether this is an on-site or remote job. Nullable on older bookings, where
-   * the value only ever lived in the notes text. Only an explicit "remote"
-   * suppresses the address (see {@link onSiteAddress}) - in practice `address`
-   * and `meetingType` are always written together, so a populated address with
-   * a null meetingType doesn't occur on current write paths.
+   * Nullable on older bookings. Only an explicit "remote" suppresses the
+   * address ({@link onSiteAddress}); address and meetingType are written together.
    */
   meetingType?: "in_person" | "remote" | null;
   /** How many times the booking has moved; becomes the calendar SEQUENCE. */
@@ -210,10 +207,8 @@ export interface BookingNotificationData {
 }
 
 /**
- * Cancellation policy text for a booking email, read from the LIVE settings
- * (not the hardcoded policy default) and narrowed to the tier that actually
- * binds this customer. Emails quote fees the customer can be charged, so they
- * must never drift from what the operator has configured.
+ * Cancellation copy from LIVE settings (fee terms must never drift from what
+ * is configured), narrowed to the tier that binds this booking.
  * @param booking - The booking being emailed about.
  * @returns Policy copy in the `**…**` emphasis convention.
  */
@@ -234,9 +229,8 @@ function onSiteAddress(booking: BookingNotificationData): string {
 }
 
 /**
- * "Open in Google Maps" line for the OWNER's emails. Deliberately not sent to
- * the customer: the appointment address is almost always their own home, so
- * directions to it are noise. The operator is the one who has to drive there.
+ * Maps link for the OWNER's emails only - the customer's address is their own
+ * home; the operator is the one driving there.
  * @param booking - The booking being emailed about.
  * @returns HTML paragraph, or "" when there's nothing to map.
  */
@@ -590,9 +584,8 @@ export interface ManageLinksBooking {
 }
 
 /**
- * Emails someone their own manage links after a find-my-booking lookup. Only
- * ever sent to the address that owns the bookings, so it is safe for it to
- * carry the tokens - that is the same thing the original confirmation did.
+ * Emails manage links after a find-my-booking lookup. Only ever sent to the
+ * address that owns the bookings, so carrying the tokens is safe.
  * @param to - Recipient address (the booking email).
  * @param bookings - Their upcoming bookings, soonest first.
  * @returns True if Resend accepted the message, false on misconfig / failure.
@@ -971,10 +964,8 @@ interface SendInvoiceReminderEmailArgs {
 }
 
 /**
- * Sends a polite overdue-invoice nudge with the PDF attached. Deliberately has
- * none of the invoice email's review-link machinery - chasing money and asking
- * for a review do not belong in the same message. Failures are caught and
- * logged - never throws.
+ * Sends an overdue-invoice nudge with the PDF attached. No review-link
+ * machinery - chasing money and asking for a review don't mix. Never throws.
  * @param args - Send inputs.
  * @param args.invoice - Invoice row fields needed for the body.
  * @param args.pdfBytes - Raw PDF bytes (OVERDUE watermark already applied by the caller's generate).

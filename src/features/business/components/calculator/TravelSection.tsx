@@ -93,9 +93,7 @@ export function TravelSection({
             onPlaceSelected={(p) => onAddressSelected(p.formattedAddress)}
             placeholder="Client address or suburb"
             aria-label="Client address or suburb"
-            // Enter only reaches here when the suggestion dropdown is closed
-            // (the combobox consumes it while open), so a picked/typed address
-            // still triggers the lookup shortcut.
+            // Only fires with the dropdown closed (the combobox consumes Enter while open).
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();

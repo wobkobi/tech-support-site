@@ -1,10 +1,8 @@
 // src/features/business/lib/time-parse.ts
 // Canonical time-range parser shared by the admin parse-job route and the eval
-// auditor, so both compute stated-session minutes from ONE implementation. Reads
-// start/end time ranges from digit-led lines and sums their durations; a
-// non-positive span first retries as an am/pm pair (+12h) and only then rolls
-// overnight (+24h). Pure and dependency-free so it is safe in a route handler
-// and importable by the tsx eval harness.
+// auditor, so both compute stated-session minutes from ONE implementation. A
+// non-positive span first retries as an am/pm pair (+12h), then rolls
+// overnight (+24h). Pure and dependency-free so the tsx eval harness can import it.
 
 /** am/pm marker, or null when a time fragment carries none. */
 export type Meridiem = "am" | "pm" | null;

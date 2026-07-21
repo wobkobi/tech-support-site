@@ -1,10 +1,6 @@
 // src/app/api/booking/ics/route.ts
-/**
- * @description Token-gated `.ics` download for a booking. The cancel token is
- * the same secret already used by the edit/cancel links, so no extra auth is
- * needed - but it does mean the response must never be cached by a shared
- * cache, and must not leak booking data for a cancelled slot.
- */
+// Token-gated .ics download (cancel-token auth) - never shared-cacheable, and
+// must not leak data for a cancelled slot.
 
 import {
   buildAppointmentDescription,

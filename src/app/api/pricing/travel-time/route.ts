@@ -1,12 +1,10 @@
 // src/app/api/pricing/travel-time/route.ts
 /**
  * @description Public, rate-limited travel-time endpoint. POST looks up both
- * legs of the drive between the base address and a destination via
- * {@link lookupDriveRoundTrip} - outbound at `departureTimeIso`, return at
- * `returnDepartureTimeIso` - each traffic-aware. Returns zero durations for
- * no match, 503 on misconfig, and 502 on upstream errors. Each request costs
- * two Google Distance Matrix elements (one per leg); the 5/min rate limit
- * keeps that within quota.
+ * drive legs via {@link lookupDriveRoundTrip}, each traffic-aware at its own
+ * departure. Returns zero durations for no match, 503 on misconfig, 502 on
+ * upstream errors. Each request costs two Google Distance Matrix elements;
+ * the 5/min rate limit keeps that within quota.
  */
 
 import { lookupDriveRoundTrip } from "@/features/business/lib/travel-distance";
@@ -65,12 +63,11 @@ function representativeDepartureTime(now: Date = new Date()): Date {
 }
 
 /**
- * POST /api/pricing/travel-time - Both drive legs between the base address
+ * POST /api/pricing/travel-time - both drive legs between the base address
  * and a destination. Optional `departureTimeIso` / `returnDepartureTimeIso`
- * pin each leg's traffic prediction. When they're missing or malformed the
- * drive is quoted against {@link representativeDepartureTime} (return 60 min
- * later) rather than live traffic, so a late-night estimate doesn't price an
- * empty motorway for a job that will happen mid-afternoon.
+ * pin each leg's traffic prediction; missing/malformed ones quote against
+ * {@link representativeDepartureTime} (return 60 min later) so a late-night
+ * estimate doesn't price an empty motorway for a mid-afternoon job.
  * @param request - Body: `{ destination: string, departureTimeIso?: string, returnDepartureTimeIso?: string }`.
  * @returns `{ ok: true, durationMinsThere, durationMinsBack, distanceKm }` on
  *   success (distanceKm is the outbound leg), zero durations when

@@ -1,10 +1,6 @@
 // src/app/api/business/invoices/[id]/send-reminder/route.ts
-/**
- * @description Manual "Send reminder" for an overdue invoice. Same email
- * variant and stamping as the cron ({@link sendOverdueReminder}), but operator-
- * triggered from the invoice detail page, and NOT capped at two - the cap is a
- * courtesy limit on the robot, not on the operator's own judgement.
- */
+// Manual "Send reminder" - same send-and-stamp as the cron, but NOT capped at
+// two (the cap limits the robot, not the operator).
 
 import { sendOverdueReminder } from "@/features/business/lib/invoice-reminders";
 import { isInvoiceOverdue } from "@/features/business/lib/invoice-status";

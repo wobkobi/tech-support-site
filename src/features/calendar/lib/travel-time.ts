@@ -50,13 +50,10 @@ export type TransportMode = "transit" | "driving" | "walking" | "bicycling";
 /**
  * Travel time between two addresses, in minutes (ceiling). Driving lookups use
  * Google's traffic prediction (duration_in_traffic) for the sampled departure.
- *
- * Arrive-by (useArrivalTime) differs by mode. Distance Matrix supports
- * arrival_time only for TRANSIT - far-future transit departures snap to the
- * nearest same-day-of-week within {@link SCHEDULE_HORIZON_DAYS}. For DRIVING,
- * Google ignores arrival_time, so it iterates the departure instead: price the
- * drive departing AT the target arrival (rough), then re-price departing that
- * many minutes earlier so the sampled traffic matches when you'd actually leave.
+ * Arrive-by (useArrivalTime) differs by mode: Distance Matrix supports
+ * arrival_time only for TRANSIT; for DRIVING Google ignores it, so the drive
+ * is priced departing AT the target arrival, then re-priced departing that
+ * many minutes earlier so the sampled traffic matches the real leave time.
  * @param origin - Starting address or coordinates.
  * @param destination - Destination address or coordinates.
  * @param departureTime - Departure time, or the target arrival when useArrivalTime is set.

@@ -1,12 +1,10 @@
 // src/app/api/admin/blocked-days/[eventId]/route.ts
 /**
- * @description Admin endpoint to unblock a day. A blocked day is an all-day
- * "Busy" event on the Google Calendar booking calendar, and a multi-day block is
- * ONE event spanning the range - so unblocking a single day must trim or split
- * that event, not delete the whole thing. Given `?date=YYYY-MM-DD`: unblocking an
- * edge day shortens the block, a middle day splits it into two, and the last
- * remaining day deletes it. Without `?date` (legacy callers) it falls back to
- * deleting the whole event.
+ * @description Admin endpoint to unblock a day. A multi-day block is ONE
+ * all-day "Busy" event spanning the range, so unblocking a single day must
+ * trim or split that event: an edge day shortens it, a middle day splits it,
+ * the last remaining day deletes it. Without `?date` (legacy callers) the
+ * whole event is deleted.
  */
 
 import {
@@ -35,11 +33,8 @@ interface Segment {
 
 /**
  * Splits an all-day block [startKey, endKey) (end exclusive) around a removed
- * day, returning the surviving segments. Assumes `removedDay` is within the span
- * (the caller guards otherwise):
- * - removing the only day > [] (0 segments, the event is deleted)
- * - removing an edge day > 1 segment (the block is shortened)
- * - removing a middle day > 2 segments (the block is split)
+ * day, returning the surviving segments (caller guards that `removedDay` is in
+ * the span): the only day > [], an edge day > 1 segment, a middle day > 2.
  * @param startKey - Block start (inclusive, YYYY-MM-DD).
  * @param endKey - Block end (exclusive, YYYY-MM-DD).
  * @param removedDay - The day being unblocked (YYYY-MM-DD).

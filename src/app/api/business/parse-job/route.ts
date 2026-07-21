@@ -1,11 +1,9 @@
 // src/app/api/business/parse-job/route.ts
 /**
- * @description Admin endpoint that turns a plain-English job description into a
- * structured quote. POST pre-computes the worked-minutes total from time ranges,
- * sends a prompt to the model, then resolves task templates and rates, attaches
- * round-trip travel from the extracted destination, caps durationMins to the
- * wall-clock span, and rebalances floating task quantities to match billable
- * hours. May instead return clarification questions when the input is ambiguous.
+ * @description Admin endpoint that turns a plain-English job description into
+ * a structured quote: prompts the model, resolves task templates and rates,
+ * attaches round-trip travel, caps durationMins to the wall-clock span, and
+ * rebalances task quantities. May return clarification questions instead.
  */
 
 import { composeDescription, effectiveHourlyRate } from "@/features/business/lib/business";
@@ -35,10 +33,9 @@ export const maxDuration = 60;
 /**
  * Converts an operator-stated HH:MM (NZ wall clock) to a Date for the
  * traffic-aware travel lookup, anchored to the next occurrence of the job
- * date's WEEKDAY (today counts while the time is still ahead). Google only
- * quotes future departures, so a past job is priced at the same weekday +
- * time - the closest proxy for the traffic that day actually had. Mirrors
- * the calculator's client-side jobStartIsoFromTime.
+ * date's WEEKDAY. Google only quotes future departures, so a past job is
+ * priced at the same weekday + time as a proxy for that day's actual traffic.
+ * Mirrors the calculator's client-side jobStartIsoFromTime.
  * @param hhmm - HH:MM (24h) NZ wall-clock string, or null.
  * @param anchorDate - NZ-local YYYY-MM-DD whose weekday to match (the job date); malformed/missing falls back to today.
  * @returns Date, or undefined when the input isn't a valid HH:MM.
@@ -70,12 +67,10 @@ function nzTimeToDate(hhmm: string | null | undefined, anchorDate?: string): Dat
 }
 
 /**
- * Canonicalises one AI-emitted tag: any case-variant of a tag already in the
- * template taxonomy snaps to the stored casing so near-duplicates ("Virus
- * removal" vs "Virus Removal") can't split the taxonomy or the price memory.
- * Unknown tags pass through trimmed - the vocabulary stays open, and the
- * caller warns the operator so a genuinely new tag is a visible decision, not
- * silent drift.
+ * Canonicalises one AI-emitted tag: case-variants of a known tag snap to the
+ * stored casing so near-duplicates can't split the taxonomy or the price
+ * memory. Unknown tags pass through trimmed - the vocabulary stays open, and
+ * the caller warns the operator so a new tag is a visible decision, not drift.
  * @param tag - Device or action tag from the AI.
  * @param known - Lowercased tag > stored casing, built from the templates.
  * @returns Canonical tag, or null when the input was empty.
@@ -253,10 +248,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     } else if (!parsed.noTravelCharge && parsed.destination) {
       // Look up both drive legs via Google Distance Matrix, each at its own
       // departure: outbound at the parsed job start, return at the parsed end
-      // (or start + duration). Missing/invalid times fall back to the
-      // lookup's defaults (now / +60 min). Direct call into the helper
-      // instead of a self-fetch so this works without NEXT_PUBLIC_BASE_URL
-      // set and doesn't burn the public route's rate-limit budget.
+      // (or start + duration); missing times use the lookup's defaults. Direct
+      // helper call, not a self-fetch - works without NEXT_PUBLIC_BASE_URL and
+      // doesn't burn the public route's rate-limit budget.
       const parsedRanges = parsed.ranges ?? [];
       const departAt = nzTimeToDate(parsed.startTime ?? parsedRanges[0]?.startTime, jobDateAnchor);
       let returnAt = nzTimeToDate(
@@ -359,11 +353,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           })
           .filter((r): r is RateConfig => r !== null && r.hourlyDelta !== null);
         // Delivery channels (At home / Remote / Phone) are mutually exclusive -
-        // the prompt says so, but enforce it here so a model that stacks them
-        // anyway (e.g. a call that escalated to screen share emitting both
-        // Phone and Remote) cannot compound the discounts. Keep the channel
-        // with the highest effective rate; ties keep the first emitted.
-        // Matches the DEFAULT label names - renamed channels bypass this guard.
+        // the prompt says so, but enforce it so a model that stacks them cannot
+        // compound the discounts. Keep the channel with the highest effective
+        // rate; ties keep the first emitted. Matches the DEFAULT label names -
+        // renamed channels bypass this guard.
         const CHANNEL_LABELS = new Set(["at home", "remote", "phone"]);
         const channels = modifierRates.filter((r) => CHANNEL_LABELS.has(r.label.toLowerCase()));
         const keptChannel = channels.reduce<RateConfig | null>(

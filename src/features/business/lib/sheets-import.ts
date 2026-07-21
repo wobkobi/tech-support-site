@@ -1,11 +1,10 @@
 // src/features/business/lib/sheets-import.ts
 // Sheet > site reconciliation for the Cashbook (income) and Expenses tabs. The
-// sheet is the source of truth: rows are matched to DB entries by the hidden
-// column-Z Sync ID, differing fields are updated in the DB, unmatched sheet
-// rows are (re)created, and manually-typed rows get a Sync ID backfilled so
-// they join the two-way sync. runSheetsImport also self-heals site entries
-// whose sheet append failed, and takes a Setting-backed lock so overlapping
-// runs cannot double-write.
+// sheet is the source of truth: rows match DB entries by the hidden column-Z
+// Sync ID, differing fields update the DB, unmatched rows are (re)created, and
+// manually-typed rows get a Sync ID backfilled. runSheetsImport also self-heals
+// site entries whose sheet append failed, and takes a Setting-backed lock so
+// overlapping runs cannot double-write.
 import { calcGstFromInclusive } from "@/features/business/lib/business";
 import { listSpreadsheetsInFolder } from "@/features/business/lib/google-drive";
 import { withRetry } from "@/features/business/lib/google-retry";
@@ -327,14 +326,12 @@ async function importFromSheet(
             incomeSkipped++;
           }
         } else {
-          // No snapshot match. The snapshot is taken once at run start, so an
-          // entry created since - e.g. an invoice /pay landing mid-run, whose
-          // sheet row carries the entry id as its Sync ID - is invisible here.
-          // Before treating the sheet as source-of-truth and creating a
-          // DUPLICATE, look the entry up live by id: a deterministic Sync ID
-          // equals the entry's Mongo id, so a hit means "already recorded - just
-          // link it". Gate on the 24-hex ObjectId shape; a legacy random-UUID
-          // Sync ID would throw "Malformed ObjectID" on findUnique({ id }).
+          // No snapshot match. The snapshot is taken at run start, so an entry
+          // created mid-run (e.g. an invoice /pay whose sheet row carries the
+          // entry id as its Sync ID) is invisible here. Look it up live by id
+          // before creating a DUPLICATE - a deterministic Sync ID equals the
+          // entry's Mongo id, so a hit means "already recorded - just link it".
+          // Gate on the ObjectId shape; a legacy UUID would throw on findUnique.
           const idLink = OBJECT_ID_RE.test(syncId)
             ? await prisma.incomeEntry.findUnique({ where: { id: syncId } })
             : null;

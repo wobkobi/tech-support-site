@@ -1,16 +1,9 @@
-// src/features/booking/lib/ics.ts
-// Minimal RFC 5545 iCalendar builder for booking confirmations. Hand-rolled
-// rather than pulling a dependency: a single VEVENT needs very little, and the
-// parts that actually break real calendar clients (TEXT escaping, CRLF line
-// folding, UTC stamps, a stable UID) are all handled here.
+// src/features/booking/lib/ics.ts - minimal dependency-free RFC 5545 builder
+// (TEXT escaping, CRLF folding, UTC stamps, stable UID).
 
 /** A single calendar event to serialise. */
 export interface IcsEvent {
-  /**
-   * Stable identifier for the event. Use the booking id - reusing it on a
-   * reschedule makes calendar apps UPDATE the existing entry instead of adding
-   * a second one.
-   */
+  /** Stable id (the booking id) - reuse makes clients UPDATE, not duplicate. */
   uid: string;
   /** Appointment start (UTC). */
   start: Date;
@@ -22,11 +15,7 @@ export interface IcsEvent {
   description?: string;
   /** Optional location (the appointment address for in-person jobs). */
   location?: string;
-  /**
-   * Revision counter. Must increase when a previously-sent event changes, or
-   * many clients ignore the update even though the UID matches - pass the
-   * booking's `rescheduleCount`.
-   */
+  /** Revision counter (rescheduleCount) - without a rise, clients ignore updates. */
   sequence?: number;
   /** Organiser email, surfaced as ORGANIZER. */
   organiserEmail?: string;

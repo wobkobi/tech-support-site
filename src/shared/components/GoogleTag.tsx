@@ -24,9 +24,8 @@ const loaderId = ADS_ID ?? GA4_ID;
 /**
  * Injects the Google tag and reports phone-link taps as conversions and
  * email-link taps as GA4 events. Renders nothing when no measurement IDs are
- * set, so the site runs untracked in dev, in preview deploys and before the
- * Ads/GA4 IDs are configured. Also renders nothing on /admin pages, so
- * back-office browsing never pollutes GA4/Ads data.
+ * set (dev, preview) or on /admin pages, so back-office browsing never
+ * pollutes GA4/Ads data.
  * @returns The gtag script tags, or null when unconfigured or on admin pages.
  */
 export function GoogleTag(): React.ReactElement | null {
@@ -34,12 +33,11 @@ export function GoogleTag(): React.ReactElement | null {
   // Admin pages are operator-only; keep them out of analytics entirely.
   const isAdmin = pathname === "/admin" || pathname.startsWith("/admin/");
 
-  // Unmounting this component does not unload gtag.js: once loaded on a public
-  // page it keeps running, and GA4 enhanced measurement reports a page_view on
-  // every browser history change - so a client-side navigation into /admin
+  // Unmounting does not unload gtag.js, and GA4 enhanced measurement reports a
+  // page_view on every history change - so client-side navigation into /admin
   // would still send the admin path (which carries invoice and contact IDs).
-  // The documented `ga-disable-<ID>` flag is checked per hit, so toggling it
-  // suppresses those hits even though the tag is already live.
+  // The `ga-disable-<ID>` flag is checked per hit, so toggling it suppresses
+  // those hits even though the tag is already live.
   useEffect(() => {
     if (!GA4_ID) return;
     (window as unknown as Record<string, boolean>)[`ga-disable-${GA4_ID}`] = isAdmin;

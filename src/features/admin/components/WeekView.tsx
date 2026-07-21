@@ -81,10 +81,9 @@ export function WeekView({
     });
   }
 
-  // Optimistic block/unblock overrides per day (dateKey > blocked?). Applied the
-  // moment the operator clicks so the header button + spanning bars match the
-  // action instantly - the booking calendar is eventually consistent (Google lags
-  // a write and the 30s cache can serve a stale read), so a plain refetch lags.
+  // Optimistic block/unblock overrides per day (dateKey > blocked?), applied
+  // on click so the header button + spanning bars flip instantly - Google lags
+  // a write and the 30s cache can serve a stale read, so a plain refetch lags.
   // Applied when bucketing all-day events; a failed request reverts it.
   const [optimisticBlock, setOptimisticBlock] = useState<Map<string, boolean>>(() => new Map());
 
@@ -111,12 +110,10 @@ export function WeekView({
     refreshTimer.current = setTimeout(() => router.refresh(), 1200);
   }
 
-  // Reconcile optimistic overrides against fresh server data. An override only
-  // needs to bridge click > next refresh; once refreshed server events arrive,
-  // trust them and drop overrides for days no longer in flight (a lost/merged
-  // block then falls back to its real state instead of sticking). Track pending
-  // in a ref (updated in its own effect, not during render) so reconciliation
-  // fires on server data only, not when a request settles.
+  // Reconcile optimistic overrides against fresh server data: an override only
+  // bridges click > next refresh, so drop overrides for days no longer in
+  // flight (a lost/merged block falls back to its real state). Pending lives
+  // in a ref so reconciliation fires on server data only, not when a request settles.
   const pendingRef = useRef(pendingDays);
   useEffect(() => {
     pendingRef.current = pendingDays;
@@ -271,10 +268,9 @@ export function WeekView({
     const raw: RawBar[] = [];
 
     // Blocks (booking-kind all-day, incl. optimistic placeholders): merge ANY
-    // contiguous run of blocked days into ONE "Busy" span, regardless of how many
-    // underlying events cover it. This keeps the bar visually stable while the
-    // server reconciles rapid blocks into a merged event - no appearing /
-    // disappearing / re-merging flicker as the calendar catches up.
+    // contiguous run of blocked days into ONE "Busy" span so the bar stays
+    // stable while the server reconciles rapid blocks into a merged event -
+    // no flicker as the calendar catches up.
     const blocked = days.map((d) => d.allDayEvents.some((e) => e.kind === "booking"));
     for (let i = 0; i < days.length;) {
       if (!blocked[i]) {
@@ -562,10 +558,9 @@ interface DayColumnProps {
 }
 
 /**
- * Renders a single day column with its events overlaid as absolute-positioned
- * blocks. Clicking the column background opens the booking modal; clicking a
- * booking card opens that booking's detail page for editing. Today's column
- * also draws a live current-time line.
+ * Renders a single day column with its events as absolute-positioned blocks.
+ * Clicking the background opens the booking modal; clicking a booking card
+ * opens its detail page. Today's column draws a live current-time line.
  * @param props - Component props.
  * @param props.day - Day bucket with the day key and its events.
  * @param props.onClick - Click handler forwarded from the parent week view.
@@ -604,12 +599,10 @@ function DayColumn({
         const durationMin =
           (new Date(ev.endAt).getTime() - new Date(ev.startAt).getTime()) / 60_000;
         const height = Math.max(18, durationMin * PX_PER_MINUTE);
-        // Bookings open on click for editing. Single click: a card has no other
-        // action, and double-click silently fails if the two clicks drift a pixel.
-        // With a DB row > in-app detail page; a booking added straight into Google
-        // Calendar (no row) > open there. stopPropagation always runs so a card
-        // click never falls through to the add-booking modal; car/personal/travel
-        // have no link and just swallow the click.
+        // Bookings open on single click (double-click silently fails if the
+        // clicks drift a pixel). With a DB row > in-app detail page; no row
+        // (added straight in Google Calendar) > open there. stopPropagation
+        // always runs so a card click never falls through to the add-booking modal.
         const bookingId = ev.kind === "booking" ? ev.booking?.id : undefined;
         const calendarLink =
           ev.kind === "booking" && !bookingId ? (ev.htmlLink ?? undefined) : undefined;

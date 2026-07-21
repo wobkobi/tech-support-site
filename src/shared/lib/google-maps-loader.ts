@@ -1,20 +1,12 @@
-// src/shared/lib/google-maps-loader.ts
-/**
- * @description Loads the Maps JS API once (async, per Google's loading guidance)
- * and resolves the Places library via `google.maps.importLibrary`. Callers get
- * the library object holding the new Places classes (AutocompleteSuggestion,
- * AutocompleteSessionToken, Place) - the legacy `places.Autocomplete` widget is
- * no longer used anywhere.
- */
+// src/shared/lib/google-maps-loader.ts - loads the Maps JS API once
+// (loading=async) and resolves the Places library via importLibrary.
 
 /** Global callback name the Maps bootstrap invokes when the API is ready. */
 const READY_CALLBACK = "__gmapsLoaderReady";
 
 /**
- * Module-level bootstrap promise so concurrent callers share one script load.
- * With `loading=async` the script tag's own `load` event fires BEFORE the API
- * has initialised (importLibrary isn't defined yet) - readiness is signalled
- * only through the `callback` query param, which is what resolves this.
+ * Shared bootstrap promise. With loading=async the script's load event fires
+ * BEFORE importLibrary exists - only the callback param signals readiness.
  */
 let bootstrapPromise: Promise<void> | null = null;
 
@@ -25,9 +17,8 @@ let bootstrapPromise: Promise<void> | null = null;
  */
 function bootstrap(apiKey: string): Promise<void> {
   bootstrapPromise ??= new Promise<void>((resolve, reject) => {
-    // A tag can already exist while this module's promise cache is fresh (dev
-    // HMR re-evaluates the module). Appending a second bootstrap would
-    // double-load the API, so poll for readiness off the existing tag instead.
+    // Dev HMR can reset the promise cache while a tag exists - poll it rather
+    // than double-loading the API with a second bootstrap.
     const existing = document.querySelector<HTMLScriptElement>('script[data-gmaps-loader="true"]');
     if (existing) {
       const poll = setInterval(() => {
@@ -52,14 +43,12 @@ function bootstrap(apiKey: string): Promise<void> {
     (window as unknown as Record<string, unknown>)[READY_CALLBACK] = onReady;
     const script = document.createElement("script");
     script.dataset.gmapsLoader = "true";
-    // No `libraries=` param - importLibrary fetches Places on demand.
-    // `loading=async` is Google's recommended pattern and silences the
-    // "loaded directly without loading=async" console warning.
+    // No libraries= param (importLibrary fetches on demand); loading=async
+    // silences Google's loading-pattern console warning.
     script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&loading=async&callback=${READY_CALLBACK}`;
     script.async = true;
     script.addEventListener("error", () => {
-      // Clear the cache so a later call can retry with a fresh tag instead of
-      // waiting forever on a script whose error event has already fired.
+      // Reset the cache so a later call retries with a fresh tag.
       bootstrapPromise = null;
       script.remove();
       reject(new Error("Maps script failed to load"));
@@ -78,9 +67,7 @@ export async function loadPlacesLibrary(apiKey: string): Promise<google.maps.Pla
   if (typeof window === "undefined") {
     throw new Error("loadPlacesLibrary is browser-only");
   }
-  // Already initialised (e.g. by a previous page in the same session) -
-  // importLibrary caches per-library, so repeat awaits are cheap. typeof check
-  // rather than truthiness: the typings declare importLibrary non-optional,
+  // typeof, not truthiness: the typings declare importLibrary non-optional,
   // but at runtime it only exists once the bootstrap has run.
   if (typeof window.google?.maps?.importLibrary !== "function") {
     await bootstrap(apiKey);

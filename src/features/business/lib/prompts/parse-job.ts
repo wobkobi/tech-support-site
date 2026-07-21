@@ -8,13 +8,10 @@ import type { RateConfig, TaskTemplate } from "@/features/business/types/busines
 
 /**
  * Builds the static OpenAI system prompt - rules, structure, examples, output
- * schema. Takes no per-call parameters so the entire system message is
- * byte-identical across calls and benefits from OpenAI's automatic prompt
- * caching (~50% input-token discount on repeats within the cache TTL).
- *
- * Per-call data (current rates, recently-used templates, current NZ time,
- * the job description itself) is appended via {@link buildParseJobContext}
- * onto the user message instead, so this prompt prefix stays cache-friendly.
+ * schema. Takes no per-call parameters so the system message is byte-identical
+ * across calls and benefits from OpenAI's automatic prompt caching (~50%
+ * input-token discount). Per-call data is appended to the user message via
+ * {@link buildParseJobContext} instead, keeping this prefix cache-friendly.
  * @returns Static system prompt string for the OpenAI API.
  */
 export function buildParseJobPrompt(): string {
@@ -276,15 +273,13 @@ Return this exact JSON shape (when not asking for clarification):
 }
 
 /**
- * Builds the per-call context block that is prepended to the user message:
- * current rate config, the live device/action tag vocabulary, the applicable
- * modifier labels, recently-used (device, action) templates, the billing step,
- * current NZ time, then the "--- BEGIN USER DATA ---" sentinel. Lives in the
- * user message (not the system prompt) so the system prompt stays
- * byte-identical across calls and OpenAI's automatic prompt cache can hit
- * reliably. The tag lists, modifier list, and billing step are derived from
- * live data here so the static prompt never hardcodes a tag name, a label
- * name, or a rounding grid.
+ * Builds the per-call context block prepended to the user message: current
+ * rate config, live device/action tag vocabulary, modifier labels, recent
+ * (device, action) templates, the billing step, current NZ time, then the
+ * "--- BEGIN USER DATA ---" sentinel. Lives in the user message so the system
+ * prompt stays byte-identical and OpenAI's prompt cache can hit; everything is
+ * derived from live data so the static prompt never hardcodes a tag, label, or
+ * rounding grid.
  * @param rates - Current rate configurations.
  * @param templates - Previously used task templates.
  * @param currentTime - Current NZ local time as HH:MM, used for open-ended session end times.

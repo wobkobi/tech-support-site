@@ -46,17 +46,13 @@ export interface RecomputedTravel {
 /**
  * Recomputes and persists one TravelBlock's travel-there / travel-back minutes
  * immediately, pricing from the block's own stored origin, destination, and
- * event window rather than the live calendar fetch.
- *
- * The 15-min refresh cron only maintains upcoming events - a finished job drops
- * out of the fetch and its block freezes ({@link refreshCalendarCache} never
- * revisits it). So changing a past job's mode or origin would clear its minutes
- * with nothing to refill them. This fills them on the spot, for past and future
- * jobs alike, by reusing the block's frozen endpoints. Chaining and travel-back
- * suppression are deliberately not re-derived here - those are scheduling
- * concerns the next cron re-evaluates for upcoming events; a finished job just
- * needs its two legs priced for the record, and an already-suppressed back
- * stays empty.
+ * event window rather than the live calendar fetch. The refresh cron only
+ * maintains upcoming events ({@link refreshCalendarCache} never revisits a
+ * finished job's block), so changing a past job's mode or origin would clear
+ * its minutes with nothing to refill them; this refills them on the spot from
+ * the block's frozen endpoints. Chaining and travel-back suppression are
+ * deliberately not re-derived - the next cron re-evaluates those for upcoming
+ * events, and an already-suppressed back stays empty.
  * @param blockId - TravelBlock id to recompute.
  * @returns The recomputed raw/rounded minutes, or null when the block is gone.
  */

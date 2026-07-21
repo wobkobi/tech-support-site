@@ -36,14 +36,9 @@ export function remoteRateDelta(rates: RemoteRateLike[], meeting: string): numbe
 }
 
 /**
- * Hard floor on the low end, as a fraction of straight-time cost.
- *
- * This is a guard rail, not a tuning knob - the tunable part is the confidence
- * band in Settings > estimator. A wide low-confidence band (lowFactor 0.55)
- * multiplied by a short job produced quotes implying roughly half the hourly
- * rate, which reads as a price the job can actually be done for. Whatever the
- * band is tuned to, the advertised low stays within this fraction of what the
- * time would really cost.
+ * Hard floor on the low end as a fraction of straight-time cost - a guard
+ * rail, not a tuning knob (the band in Settings stays tunable). Stops a wide
+ * low-confidence band advertising roughly half the hourly rate.
  */
 export const LOW_END_FLOOR_FACTOR = 0.75;
 
@@ -67,10 +62,8 @@ export function priceRangeFor(
 ): { low: number; high: number } {
   const band = range[confidence] ?? range.medium;
   const cost = (mins / 60) * rate;
-  // The band's own low rounds DOWN to $5 (never overquote the cheap end). The
-  // floor rounds to the NEAREST $5 instead - rounding it down too would push
-  // the result back under the guarantee it exists to enforce, which on a short
-  // job is the difference between $30 and $25.
+  // Band low rounds DOWN to $5; the floor rounds to NEAREST - rounding the
+  // floor down too would push it back under the guarantee it enforces.
   const bandLow = Math.floor((cost * band.lowFactor) / 5) * 5;
   const flooredLow = Math.round((cost * LOW_END_FLOOR_FACTOR) / 5) * 5;
   const low = Math.max(bandLow, flooredLow);

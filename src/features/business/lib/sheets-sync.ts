@@ -205,17 +205,12 @@ export async function ensureSyncIdSetup(spreadsheetId: string, tabName: string):
 
 /**
  * Writes a row (with its Sync ID at column Z) into the first empty-date row,
- * padding to 25 columns. NOT a values.append - see {@link firstEmptyRow} for why
- * the tabs' fill-down formula templates make append strand rows at the grid
- * bottom.
- *
- * When the caller supplies a deterministic Sync ID (an entry's Mongo id), the
- * write is idempotent: if a row already carries that id (a retry after a
- * succeeded-but-unacknowledged write, or a re-persist), the existing id is
- * returned WITHOUT writing a duplicate. Legacy callers pass none and get a fresh
- * random id. The read-then-write is not atomic - live routes don't hold the sync
- * lock - so a concurrent collision is still possible; the import's content-gated
- * dedup and the cron self-heal are the backstops for that.
+ * padding to 25 columns. NOT a values.append - see {@link firstEmptyRow}.
+ * With a caller-supplied deterministic Sync ID (an entry's Mongo id) the write
+ * is idempotent: a row already carrying that id is returned WITHOUT writing a
+ * duplicate. The read-then-write is not atomic - live routes don't hold the
+ * sync lock - so the import's content-gated dedup and the cron self-heal
+ * backstop a concurrent collision.
  * @param spreadsheetId - Spreadsheet file ID.
  * @param tabName - Tab to write to (e.g. "Cashbook").
  * @param cells - Values for columns A..Y; sheet-managed columns pass null to keep their formulas; right-padded with empty strings.
@@ -240,14 +235,11 @@ export async function appendRowWithSyncId(
   while (padded.length < SYNC_ID_COLUMN_INDEX) padded.push("");
   padded.push(id);
 
-  // Write into the first empty row rather than values.append. The Cashbook /
-  // Expenses tabs are 1000-row templates whose sheet-managed formula columns are
-  // pre-filled down the whole grid, so values.append (which lands after the last
-  // populated cell in ANY searched column) strands new rows near row 1000
-  // instead of below the last entry. Targeting the first empty-date row keeps
-  // entries contiguous and drops each onto its pre-built formula row; the null
-  // cells in `padded` (sheet-managed columns) are skipped by update, so those
-  // formulas survive. Sequential writers are safe; a rare concurrent collision
+  // Write into the first empty row rather than values.append: the tabs are
+  // 1000-row templates with formula columns pre-filled down the grid, so
+  // values.append (which lands after the last populated cell in ANY searched
+  // column) strands new rows near row 1000. Null cells in `padded` are skipped
+  // by update, so sheet-managed formulas survive. A rare concurrent collision
   // orphans one sheetRowKey, which the cron self-heal re-appends later.
   const targetRow = await firstEmptyRow(spreadsheetId, tabName);
   const sheets = getSheetsClient();
@@ -266,14 +258,11 @@ export async function appendRowWithSyncId(
 }
 
 /**
- * Finds the first data row whose date column (A) is empty - the slot a new entry
- * should fill. The tabs are 1000-row templates with formulas pre-filled below
- * the data, so "first empty date" is the contiguous insert point (values.get
- * trims trailing empties, so a fully-packed block returns its next row). Column
- * A holds only real entry dates - never a fill-down formula - so it pinpoints
- * the insert row regardless of which other column's formulas reach the grid
- * bottom. Rows stranded low by the old append bug sit AFTER a gap, so a
- * first-empty scan skips over them.
+ * Finds the first data row whose date column (A) is empty - the contiguous
+ * insert point for a new entry (values.get trims trailing empties, so a
+ * fully-packed block returns its next row). Column A holds only real entry
+ * dates - never a fill-down formula - so it pinpoints the insert row; rows
+ * stranded low by the old append bug sit AFTER a gap and are skipped.
  * @param spreadsheetId - Spreadsheet file ID.
  * @param tabName - Tab to scan (e.g. "Cashbook").
  * @returns 1-based row number of the first empty-date row (>= 2).
@@ -347,12 +336,10 @@ export function buildCashbookCells(e: CashbookRowInput): (string | number | null
 
 /**
  * Builds the Expenses cells A..K for an expense entry. The GST rate (column H)
- * is derived from the stored GST split and written as a percent string (e.g.
- * "15%") to match what the importer's parser reads. Columns I (GST amount) and
- * J (excl-GST amount) are sheet-managed formulas: null means "skip", so the
- * app never overwrites the sheet's own formulas there (which broke the sheet
- * when hard values landed on top of them). The importer recomputes I/J on read
- * anyway, so the DB round-trip is unaffected. Mirrors {@link buildCashbookCells}.
+ * is written as a percent string (e.g. "15%") to match the importer's parser.
+ * Columns I/J are sheet-managed formulas: null means "skip", so the app never
+ * overwrites them (hard values on top of them broke the sheet); the importer
+ * recomputes I/J on read anyway. Mirrors {@link buildCashbookCells}.
  * @param e - Expense entry fields.
  * @returns Cell values for columns A..K (I/J null so the sheet formulas stand).
  */

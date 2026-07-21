@@ -1,23 +1,17 @@
 // src/shared/lib/env.ts
 /**
  * @description Required environment variable access plus a startup validation
- * pass. Most secrets in this app are read lazily and degrade gracefully (email
- * skips, calendar throws on first use), so only the handful the server cannot
- * run at all without are treated as fatal; the rest are warned about so a
+ * pass. Most secrets are read lazily and degrade gracefully, so only the
+ * handful the server cannot run without are fatal; the rest warn so a
  * misconfigured deploy is visible without taking the site down.
  */
 
 /**
- * Secrets the server reads directly from process.env and cannot function
- * without. Missing one in production is a hard failure at boot; in other
- * environments it only warns so local dev and preview builds are not blocked.
- *
- * MONGODB_URI is included even though Prisma reads it from the schema datasource
- * itself: a blanked value (an unescaped `$` swallowed by dotenv-expand) would
- * otherwise surface only as a cryptic Prisma error on first query, so validating
- * it here catches it by name at boot. It is deliberately NOT asserted at the
- * Prisma client module scope - a throwing top-level side effect there breaks
- * page rendering in some module-eval contexts (Turbopack dev, cached loaders).
+ * Secrets the server cannot function without. Missing one in production fails
+ * at boot; elsewhere it only warns. MONGODB_URI is validated here (not at
+ * Prisma module scope, where a throwing top-level side effect breaks some
+ * module-eval contexts) so a value blanked by dotenv-expand's `$` expansion
+ * fails by name instead of as a cryptic Prisma error on first query.
  */
 const REQUIRED_ENV = ["MONGODB_URI", "ADMIN_SECRET", "CRON_SECRET"] as const;
 

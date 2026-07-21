@@ -1,11 +1,9 @@
 // src/shared/lib/server-timing.ts
 /**
  * @description Lightweight Server-Timing collector for locating slow server
- * work. Route handlers can emit the collected spans as a `Server-Timing`
- * response header (visible in the browser Network tab's Timing panel) via
- * {@link ServerTimer.toHeader}; server components, which cannot set response
- * headers, call {@link ServerTimer.log} to print the breakdown to the server
- * logs. Durations use the high-resolution `performance` clock.
+ * work. Route handlers emit spans as a `Server-Timing` response header via
+ * {@link ServerTimer.toHeader}; server components (no response headers) call
+ * {@link ServerTimer.log} instead. Durations use the `performance` clock.
  */
 
 /** One recorded span: a token-safe name and its duration in milliseconds. */

@@ -124,20 +124,13 @@ export interface CancellationCharge {
 
 /**
  * Applies the cancellation policy to one booking. Single source of truth for
- * which tier a cancel lands in, shared by the customer/operator auto-draft and
- * the calculator's cancel mode so they cannot drift apart.
- *
- * In person, three tiers: outside freeNoticeHours is free; inside it bills the
- * flat callOutFee; inside travelChargeHours (or a no-show, where the client
- * never called at all) bills the full call-out instead, plus the round trip.
- *
- * Remote is its own two-tier rule, not a discount on the in-person one: outside
- * remoteFreeNoticeHours is free, inside it (or a no-show) bills the flat
- * remoteFee. There is no drive, so no call-out tier and no travel however late
- * it is dropped.
- *
- * A no-show never called, so there is no notice to measure - it always lands in
- * the charged tier.
+ * which tier a cancel lands in, shared by the auto-draft and the calculator's
+ * cancel mode so they cannot drift apart. In person, three tiers: outside
+ * freeNoticeHours free; inside it the flat callOutFee; inside travelChargeHours
+ * (or a no-show) the full call-out plus the round trip. Remote is its own
+ * two-tier rule: free outside remoteFreeNoticeHours, else the flat remoteFee -
+ * no drive, so never travel. A no-show has no notice to measure, so it always
+ * lands in the charged tier.
  * @param bookingStart - When the booking was due to start.
  * @param cancelledAt - When the client called it off; ignored for a no-show.
  * @param options - Booking shape.
@@ -217,12 +210,9 @@ export interface TravelChargeBreakdown {
 /**
  * Step-by-step travel-charge math. Single source of truth for both
  * {@link calcTravelCharge} and the operator-side breakdown display, so the
- * displayed math always matches what's billed.
- *
- * Each leg is quoted at its own departure time (out at job start, back at job
- * end); callers with only one figure pass it for both legs, which reproduces
- * the old symmetric doubling. Returns zeros for no travel (remote, or
- * geocoded to origin).
+ * displayed math always matches what's billed. Callers with only one leg
+ * figure pass it for both, reproducing the old symmetric doubling. Returns
+ * zeros for no travel (remote, or geocoded to origin).
  * @param thereMins - Outbound drive time in minutes.
  * @param backMins - Return drive time in minutes; pass thereMins again when no separate figure exists.
  * @param travelRatePerHour - Travel hourly rate, sourced from the `Travel` RateConfig.
@@ -326,11 +316,9 @@ export const MAX_JOB_MINS = 8 * 60;
 
 /**
  * Snaps to the nearest billing increment, applies the minimum-billable floor,
- * then optionally caps at a ceiling. The snap+floor is identical to
- * {@link floorBillableMins} for any positive input; unlike it, a zero/negative
- * raw value floors to the minimum (not 0) - mirroring the AI estimate route's
- * clamp - and an optional ceiling caps a genuinely huge figure. Shared by the
- * public estimate route and the admin job parser so both bill identically.
+ * then optionally caps at a ceiling. Unlike {@link floorBillableMins}, a
+ * zero/negative raw value floors to the minimum (not 0). Shared by the public
+ * estimate route and the admin job parser so both bill identically.
  * @param rawMins - Raw duration in minutes (may be 0 or negative).
  * @param minBillableMins - Minimum billable floor (live setting; defaults to the const).
  * @param incrementMins - Rounding increment (live setting; defaults to the const).

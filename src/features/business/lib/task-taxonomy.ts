@@ -1,14 +1,10 @@
 // src/features/business/lib/task-taxonomy.ts
-// Renaming a task-template tag (device or action) across every row that uses it.
-// This is the safe way to fix a drifted or misspelt tag ("Desktop / Pc" >
-// "Desktop / PC"): clearing a tag instead is permanent, because parse-job may
-// only reuse tags that are in the live vocabulary and that vocabulary is built
-// from these very fields - a cleared tag is never offered back to the model.
-//
-// Renaming can collide: if "Desktop / Pc + Troubleshooting" is renamed onto an
-// existing "Desktop / PC + Troubleshooting", two rows would claim the same
-// (device, action) pair and findTemplateByTags would silently shadow one. So a
-// collision MERGES - usage counts add up and the duplicate row is removed.
+// Renames a task-template tag (device or action) across every row that uses
+// it - the safe way to fix a drifted or misspelt tag. Clearing a tag instead
+// is permanent: parse-job may only reuse tags in the live vocabulary, which is
+// built from these very fields. A rename can collide with an existing
+// (device, action) pair - findTemplateByTags would silently shadow one row -
+// so a collision MERGES: usage counts add up and the duplicate row is removed.
 
 import { composeDescription } from "@/features/business/lib/business";
 import { prisma } from "@/shared/lib/prisma";

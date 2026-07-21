@@ -1,10 +1,9 @@
 // src/features/business/components/invoice/InvoiceTimeline.tsx
 /**
  * @description Vertical lifecycle timeline for an invoice: Created > Sent >
- * Review link sent > Paid > Voided. Each step renders only once the invoice has
- * reached it; a reached step whose timestamp is null (legacy rows created before
- * the stamp fields existed) degrades to a muted "date not recorded" rather than
- * vanishing, so the trail stays truthful about what happened. Server component.
+ * Review link sent > Paid > Voided. Steps render only once reached; a reached
+ * step with a null timestamp (legacy rows) degrades to a muted "date not
+ * recorded" rather than vanishing. Server component.
  */
 
 import type { InvoiceStatus } from "@/features/business/types/business";

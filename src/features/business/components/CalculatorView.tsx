@@ -104,13 +104,11 @@ function addMinsToTime(t: string, mins: number): string {
   return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
 }
 /**
- * Builds a UTC ISO timestamp for an HH:MM start time interpreted as NZ
- * wall-clock on the next occurrence of the job date's WEEKDAY (today counts
- * while the time is still ahead). Google only quotes traffic for future
- * departures, so a past job is priced at the same weekday + time - the
- * closest proxy for the traffic that day actually had (a Wednesday-afternoon
- * job quoted on a Thursday must not get Thursday's pattern). Returns null
- * when the input isn't a valid HH:MM string.
+ * Builds a UTC ISO timestamp for an HH:MM NZ wall-clock start on the next
+ * occurrence of the job date's WEEKDAY (today counts while the time is still
+ * ahead). Google only quotes traffic for future departures, so a past job is
+ * priced at the same weekday + time as a proxy for that day's actual traffic.
+ * Returns null when the input isn't a valid HH:MM string.
  * @param hhmm - Start time in HH:MM (24h) NZ wall-clock.
  * @param anchorDate - NZ-local YYYY-MM-DD whose weekday to match (the job date); malformed values fall back to today.
  * @returns ISO 8601 UTC timestamp, or null.
@@ -151,10 +149,9 @@ function jobStartIsoFromTime(hhmm: string, anchorDate?: string): string | null {
 const DRAFT_KEY = "calculator-draft-v2";
 
 /**
- * Subset of CalculatorView state worth persisting across refreshes. Excludes
- * server-fetched data (rates, taskTemplates, contacts, activePromo), UI flags
- * (showParts, showRates etc), loading state, and the AI-parse results/clarify
- * session. The "Describe the job" input text itself IS persisted (`aiInput`).
+ * Subset of CalculatorView state persisted across refreshes. Excludes
+ * server-fetched data, UI flags, and the AI-parse session; the "Describe the
+ * job" text itself IS persisted (`aiInput`).
  */
 interface CalculatorDraft {
   v: 2;
@@ -181,10 +178,8 @@ interface CalculatorDraft {
 }
 
 /**
- * True when the draft has at least one field the operator clearly typed or
- * picked - used to decide whether to show the "Draft restored" toast.
- * Auto-seeded values (time slots, default hourly rate) on their own aren't
- * worth surfacing as a restore notification.
+ * True when the draft has at least one operator-entered field - auto-seeded
+ * values alone aren't worth a "Draft restored" toast.
  * @param d - Parsed draft.
  * @returns Whether the draft is worth announcing on restore.
  */
@@ -206,9 +201,8 @@ function isMeaningfulDraft(d: CalculatorDraft): boolean {
 }
 
 /**
- * Reads the saved draft from localStorage. Returns null when no draft exists,
- * the JSON is corrupt, or the schema version doesn't match (so old shapes are
- * ignored after a bump rather than crashing the form).
+ * Reads the saved draft from localStorage. Returns null when missing, corrupt,
+ * or schema-version mismatched (old shapes are ignored, not crashed on).
  * @returns Parsed draft, or null.
  */
 function loadDraft(): CalculatorDraft | null {
@@ -381,11 +375,9 @@ export function CalculatorView({
 }: CalculatorViewProps): React.ReactElement {
   const router = useRouter();
 
-  // The saved draft lives in localStorage (client-only), so reading it during
-  // render made the server HTML and the client hydration disagree whenever a
-  // draft existed (React hydration error on every calculator load). State
-  // initialises to server-consistent defaults; the mount effect below
-  // restores the draft after hydration.
+  // Draft restore runs in the mount effect below - reading localStorage during
+  // render made server HTML and client hydration disagree whenever a draft
+  // existed. State initialises to server-consistent defaults.
   // True when a meaningful draft was restored; readable inside async .then()
   // callbacks without being a React dependency.
   const draftLoadedRef = useRef(false);
@@ -586,11 +578,8 @@ export function CalculatorView({
   }, [jobDate]);
 
   /**
-   * A Places suggestion was picked in the travel section: keep the full
-   * formatted address (matches what the AI phraser receives; travel-time still
-   * resolves a suburb out of the full string) and drop any stale auto travel
-   * entry so the operator runs a fresh lookup. Manual entries (parking, etc.)
-   * survive.
+   * Applies a picked Places suggestion: keep the full formatted address and
+   * drop the stale auto travel entry (manual entries survive).
    * @param formattedAddress - The selected address.
    */
   function handleAddressSelected(formattedAddress: string): void {
@@ -925,13 +914,10 @@ export function CalculatorView({
           ...prev.filter((e) => !e.isAuto && !e.isParsedCost),
         ]);
       }
-      // Rebalance parsed tasks to fit the listed window so an AI over-estimating
-      // a single step doesn't silently over-bill. Tasks scale proportionally so
-      // the over-long ones absorb more of the correction; anything that scales
-      // below the minimum is dropped and the rest rescale.
-      // Rebalance to the window, then floor the whole job to the minimum
-      // billable time so a sub-minimum job (e.g. a 15-min task under a 30-min
-      // minimum) bills - and displays - at the floor rather than the raw time.
+      // Rebalance parsed tasks proportionally to fit the listed window (over-
+      // long tasks absorb more of the correction; tasks scaling below the
+      // minimum drop), then floor the whole job to the minimum billable time
+      // so a sub-minimum job bills - and displays - at the floor.
       const collapsed = collapseToWindow(parsedTasks, parsedWindowMin);
       setTasks(enforceMinBillable(collapsed.tasks, pricing.minBillableMins));
       if (collapsed.rescaled || collapsed.dropped > 0) {
@@ -963,11 +949,10 @@ export function CalculatorView({
     try {
       // jobDate lets the server quote travel at the job's weekday traffic
       // pattern rather than today's.
-      // When billing a booked job, hand the AI the booking's actual window so it
-      // bills the real session length instead of assuming a minimum. The parser
-      // reads a digit-led "HH:MM-HH:MM" line as the session range; only prepend it
-      // when the description doesn't already state its own times, so an operator's
-      // typed times still win.
+      // When billing a booked job, hand the AI the booking's actual window so
+      // it bills the real session length. The parser reads a digit-led
+      // "HH:MM-HH:MM" line as the session range; only prepend it when the
+      // description doesn't state its own times, so operator-typed times win.
       const eventWindow =
         eventPrefill && eventPrefill.startTime && eventPrefill.endTime
           ? `${eventPrefill.startTime}-${eventPrefill.endTime}`
@@ -1143,11 +1128,10 @@ export function CalculatorView({
   }
 
   /**
-   * The cancellation fee as a single flat task. baseRateId stays null so the
-   * totals code treats it as flat (business.ts splits hourly from flat on
-   * `baseRateId != null`): it bills qty * unitPrice, contributes no labour
-   * minutes, and collapseToWindow early-returns for want of an hourly task. No
-   * RateConfig is needed - rateConfigId only links flat rate rows like Travel.
+   * The cancellation fee as a single flat task. baseRateId stays null so
+   * business.ts treats it as flat: bills qty * unitPrice, contributes no
+   * labour minutes, and collapseToWindow ignores it. No RateConfig needed -
+   * rateConfigId only links flat rate rows like Travel.
    * @param reason - Which fee is being billed.
    * @param date - The cancelled booking's date (YYYY-MM-DD).
    * @param fee - Fee amount in NZD.
@@ -1184,15 +1168,10 @@ export function CalculatorView({
 
   /**
    * Applies the cancellation policy to the entered times and rewrites the fee
-   * line, the note, and the travel decision to match. Every cancel input funnels
-   * through here so the invoice always reflects the policy rather than whatever
-   * was last typed.
-   *
-   * Cancels made with more than freeNoticeHours' notice are free, so the fee
-   * drops to 0 rather than the form quietly billing for something the policy
-   * gives away. A no-show has no notice to measure - the client never called -
-   * so it always bills the fee. Travel only ever applies to an in-person
-   * booking: a remote session has no drive to bill however late it is dropped.
+   * line, note, and travel decision. Every cancel input funnels through here
+   * so the invoice always reflects the policy: more than freeNoticeHours'
+   * notice zeroes the fee, a no-show always bills (no notice to measure), and
+   * travel only ever applies to an in-person booking.
    * @param next - The changed inputs; anything omitted keeps its current value.
    * @param next.reason - Late cancellation or no-show.
    * @param next.meetingType - On site or remote.
@@ -1228,10 +1207,9 @@ export function CalculatorView({
   }
 
   /**
-   * Enters cancel mode, replacing any job work with the policy's verdict. Tasks
-   * and parts are cleared because nothing was done on site. The booking's start
-   * seeds from the billed event, and the cancel moment starts alongside it so
-   * the worst case (no notice) shows until the real time is entered.
+   * Enters cancel mode, replacing job work with the policy's verdict. Tasks
+   * and parts clear (nothing was done on site); the cancel moment seeds at the
+   * booking start so the worst case shows until the real time is entered.
    */
   function enterCancelMode(): void {
     const bookingTime = eventPrefill?.startTime ?? timeRanges[0]?.startTime ?? "09:00";
@@ -1483,12 +1461,10 @@ export function CalculatorView({
   }
 
   /**
-   * Calls the travel-time API with the current job address and replaces the
-   * single auto travel entry. Manual entries (parking, etc.) are preserved.
-   * Each leg is quoted at its own departure: outbound at the job start,
-   * return at the job end (or start + duration when no end time is set).
-   * Drive time of 0 (geocoded to origin or no match) leaves no auto entry;
-   * any non-zero drive time bills the $10 minimum via {@link calcTravelCharge}.
+   * Calls the travel-time API and replaces the single auto travel entry
+   * (manual entries survive). Each leg quotes at its own departure: outbound
+   * at job start, return at job end. Zero drive time leaves no auto entry;
+   * any non-zero drive bills the $10 minimum via {@link calcTravelCharge}.
    */
   async function handleTravelLookup(): Promise<void> {
     if (!jobAddress.trim()) return;

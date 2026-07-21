@@ -1,12 +1,10 @@
 // src/app/api/admin/schedule/suggest-times/route.ts
 /**
- * @description Admin "find open times" tool. Returns the next N genuinely-bookable
- * slots for a given job length + date range, so the operator can offer times to a
- * customer on the phone and one-click create the booking. Reuses the PUBLIC
- * availability engine (buildAvailableDays) so suggestions match exactly what the
- * public booking page would allow - working hours, breaks, buffers, caps, notice,
- * blocked days - and additionally injects existing TravelBlock rows as occupied
- * padding so a suggested slot leaves room for the drive to/from nearby jobs.
+ * @description Admin "find open times" tool: returns the next N genuinely-
+ * bookable slots for a job length + date range. Reuses the PUBLIC availability
+ * engine (buildAvailableDays) so suggestions match exactly what the booking
+ * page would allow, and injects TravelBlock rows as occupied padding so a
+ * suggested slot leaves room for the drive to/from nearby jobs.
  */
 
 import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
@@ -121,10 +119,9 @@ function bookingLocation(b: { address: string | null; notes: string | null }): s
 
 /**
  * Filters candidate slots to those that fit the real drive to a new customer's
- * address: you must be able to reach it from the preceding located job in time
- * and still leave for the following one. Prices only the first GATE_CAP candidates
- * (a bounded pair of Distance Matrix calls each, run in parallel) and annotates the
- * survivors with the drive from the previous job.
+ * address: reachable from the preceding located job in time, leaving in time
+ * for the following one. Prices only the first GATE_CAP candidates (bounded
+ * Distance Matrix calls) and annotates survivors with the incoming drive.
  * @param rawSlots - Candidate slots in chronological order.
  * @param address - The new job's address.
  * @param durationMin - Job length in minutes, for the slot's end time.
@@ -266,11 +263,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const calendarEvents = rawEvents.map((e) => ({ id: e.id, start: e.start, end: e.end }));
 
   // Inject travel as synthetic occupied blocks. isSlotFree recognises the
-  // `travel-before:`/`travel-after:` id prefixes and applies NO extra buffer to
-  // them (the rounded minutes already include the buffer), so a suggested slot
-  // won't overlap the drive to or from an adjacent job. Same guards as the
-  // schedule grid: a leg only exists when its rounded minutes are set, and the
-  // return leg is skipped when it was suppressed (operator stayed out).
+  // `travel-before:`/`travel-after:` id prefixes and applies NO extra buffer
+  // (the rounded minutes already include it). Same guards as the schedule
+  // grid: a leg only exists when its rounded minutes are set, and the return
+  // leg is skipped when suppressed (operator stayed out).
   for (const b of travelBlocks) {
     if (b.beforeEventId && b.roundedMinutes != null && b.roundedMinutes > 0) {
       calendarEvents.push({

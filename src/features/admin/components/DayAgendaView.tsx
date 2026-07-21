@@ -1,14 +1,9 @@
 "use client";
 // src/features/admin/components/DayAgendaView.tsx
 /**
- * @description Mobile-friendly single-day schedule view. Renders one NZ day at
- * a time as a vertical agenda list with prev/today/next-day navigation, swipe
- * gestures, and the same booking/block/travel data as the desktop week grid.
- *
- * Day-switching within the visible week stays client-side: state updates
- * instantly and the URL is mirrored via history.replaceState. Crossing the
- * week boundary falls back to a router.push so the server can fetch the next
- * week's calendar events.
+ * @description Mobile-friendly single-day schedule view: one NZ day as a
+ * vertical agenda with prev/today/next navigation, swipe gestures, and the
+ * same booking/block/travel data as the desktop week grid.
  */
 
 import { BlockDayButton } from "@/features/admin/components/BlockDayButton";
@@ -118,11 +113,10 @@ export function DayAgendaView({
   const [actionSheetEvent, setActionSheetEvent] = useState<WeekEvent | null>(null);
   // Stable "now" for the past-event lock (avoids an impure call during render).
   const [renderedAt] = useState(() => Date.now());
-  // Optimistic block/unblock overrides per day (dateKey > blocked?). Applied the
-  // moment the operator clicks, so the UI matches the action instantly - the
-  // booking calendar is eventually consistent (Google lags a write and the 30s
-  // cache can serve a stale read), so a plain refetch would otherwise lag. Kept
-  // until the server refetch catches up; a failed request reverts it.
+  // Optimistic block/unblock overrides per day (dateKey > blocked?), applied
+  // on click so the UI flips instantly - Google lags a write and the 30s cache
+  // can serve a stale read, so a plain refetch lags. Kept until the server
+  // refetch catches up; a failed request reverts it.
   const [optimisticBlock, setOptimisticBlock] = useState<Map<string, boolean>>(() => new Map());
   // useTransition keeps the current view interactive while the next week
   // is being fetched, so crossing the week boundary doesn't blank the UI.
@@ -284,12 +278,10 @@ export function DayAgendaView({
     refreshTimer.current = setTimeout(() => router.refresh(), 1200);
   }
 
-  // Reconcile optimistic overrides against fresh server data. An override only
-  // needs to bridge click > next refresh; once refreshed server events arrive,
-  // trust them and drop overrides for days no longer in flight (a lost/merged
-  // block then falls back to its real state instead of sticking). Track pending
-  // in a ref (updated in its own effect, not during render) so reconciliation
-  // fires on server data only, not when a request settles.
+  // Reconcile optimistic overrides against fresh server data: an override only
+  // bridges click > next refresh, so drop overrides for days no longer in
+  // flight (a lost/merged block falls back to its real state). Pending lives
+  // in a ref so reconciliation fires on server data only, not when a request settles.
   const pendingRef = useRef(pendingDays);
   useEffect(() => {
     pendingRef.current = pendingDays;

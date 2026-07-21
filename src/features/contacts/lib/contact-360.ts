@@ -1,11 +1,9 @@
 // src/features/contacts/lib/contact-360.ts
-// One loader for everything a contact touches - bookings, invoices, income, and
-// reviews - so the customer-360 detail page and any future caller share ONE set
-// of matching rules rather than each re-deriving them. The rules mirror the
-// contact-sync matchers in maintenance.ts exactly: email is the primary key
-// (primary + altEmails, lowercased), phone is the fallback (normaliseContactPhone,
-// mobile keys only - a shared landline may be a household). Income has no contact
-// link of its own; it is reached through the contact's invoices.
+// One loader for everything a contact touches, so the customer-360 page and
+// any future caller share ONE set of matching rules. Rules mirror the
+// contact-sync matchers in maintenance.ts exactly: email primary (lowercased,
+// incl. alts), phone fallback (normaliseContactPhone, mobile keys only - a
+// shared landline may be a household). Income is reached through the invoices.
 
 import { isNZMobileKey, normaliseContactPhone } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";

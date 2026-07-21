@@ -9,11 +9,9 @@ import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 /**
  * Parses the structured booking notes blob back into its parts.
  * Format: `{userNotes}\n\n[{timeLabel} - {durationLabel}]\nMeeting type: ...\n[Address: ...]\n[Phone: ...]`
- *
- * The structured columns (`address`, `meetingType`) are the preferred source
- * now; this stays because legacy rows only carry the values inside the notes
- * text, and because `userNotes` - what the customer actually typed - has no
- * column of its own.
+ * The structured columns (`address`, `meetingType`) are preferred now; this
+ * stays because legacy rows carry the values only inside the notes text, and
+ * `userNotes` - what the customer actually typed - has no column of its own.
  * @param raw - Raw notes string from the DB.
  * @returns The customer's own text plus the parsed metadata fields.
  */
@@ -112,12 +110,10 @@ export function combineUnitAndAddress(unit: string, rest: string): string {
 }
 
 /**
- * True when the entered unit looks like it is actually the street number - the
- * unit value equals the leading number of the street address (e.g. unit "500"
- * against "500 Pt Chev Road"). Used to warn customers in standalone houses who
- * put their street number in the Apt/Unit box. Case-insensitive on the optional
- * letter suffix ("12A"). Same `1-4 digit + optional letter` shape as
- * {@link splitUnitFromAddress}, so unit-number semantics stay consistent.
+ * True when the entered unit duplicates the leading street number (e.g. unit
+ * "500" against "500 Pt Chev Road") - warns customers in standalone houses who
+ * put their street number in the Apt/Unit box. Same `1-4 digit + optional
+ * letter` shape as {@link splitUnitFromAddress} so unit semantics stay consistent.
  * @param unit - Apartment / unit number as typed.
  * @param rest - Street address + suburb as typed.
  * @returns Whether the unit duplicates the leading street number.
