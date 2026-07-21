@@ -109,6 +109,8 @@ export interface PricingSettings {
   minTravelCharge: number;
   /** Fraction charged when a visit is unsuccessful (0.5 = half price, 0 = free). */
   unsuccessfulWorkFactor: number;
+  /** Days after a visit during which fallout from that visit's changes is fixed free. 0 = no stated guarantee. */
+  workmanshipWindowDays: number;
   cancellation: CancellationSettings;
   reschedule: RescheduleSettings;
 }

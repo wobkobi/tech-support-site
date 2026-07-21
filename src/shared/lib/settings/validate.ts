@@ -163,6 +163,11 @@ function validatePricing(p: PricingSettings): FieldError[] {
       field: "unsuccessfulWorkFactor",
       message: "Must be a fraction 0-1 (0.5 = half price, 0 = free).",
     });
+  if (!nonNeg(p.workmanshipWindowDays))
+    errors.push({
+      field: "workmanshipWindowDays",
+      message: "Must be 0 or more days (0 = no stated guarantee).",
+    });
   if (!nonNeg(p.cancellation?.freeNoticeHours))
     errors.push({ field: "cancellation.freeNoticeHours", message: "Must be 0 or more hours." });
   if (!nonNeg(p.cancellation?.travelChargeHours))

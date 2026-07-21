@@ -377,6 +377,13 @@ export const PRICING_FIELD_META: Record<string, FieldMeta> = {
     unit: "%",
     off: "Set 0 to charge nothing for an unsuccessful visit.",
   },
+  workmanshipWindowDays: {
+    title: "Workmanship guarantee window",
+    description:
+      "Days after a visit during which a new problem caused by that visit's changes is put right free - labour and travel.",
+    unit: "days",
+    off: "Set 0 to drop the guarantee from the pricing and FAQ pages.",
+  },
   "cancellation.freeNoticeHours": {
     title: "Free-cancellation window (in-person)",
     description:

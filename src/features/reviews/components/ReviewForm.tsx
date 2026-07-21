@@ -229,7 +229,7 @@ export default function ReviewFormProtected({
 
   return (
     <form onSubmit={handleSubmit} aria-busy={loading} className="space-y-4">
-      {/* Verified badge */}
+      {/* Personal-link banner: reassures without the "Verified" jargon. */}
       {isVerified && (
         <div className="flex items-center gap-2 rounded-lg border border-moonstone-500/50 bg-moonstone-600/10 p-3 text-base text-moonstone-600">
           <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
@@ -239,8 +239,8 @@ export default function ReviewFormProtected({
               clipRule="evenodd"
             />
           </svg>
-          <span className="font-semibold">Verified Review</span>
-          <span className="text-moonstone-600/80">• Your review will be marked as verified</span>
+          <span className="font-semibold">Your personal review link</span>
+          <span className="text-moonstone-600/80">• tied to your appointment, no sign-in needed</span>
         </div>
       )}
 

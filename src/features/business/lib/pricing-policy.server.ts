@@ -81,6 +81,7 @@ export const getPolicy = cache(async (): Promise<Policy> => {
     BILLING_INCREMENT_MINS: pricing.billingIncrementMins,
     PUBLIC_HOLIDAY_UPLIFT: pricing.publicHolidayUplift,
     UNSUCCESSFUL_WORK_FACTOR: pricing.unsuccessfulWorkFactor,
+    WORKMANSHIP_WINDOW_DAYS: pricing.workmanshipWindowDays,
     CANCELLATION: pricing.cancellation,
   };
 });

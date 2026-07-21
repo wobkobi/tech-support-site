@@ -115,6 +115,16 @@ export function PricingTab({ initial, defaults }: Props): React.ReactElement {
           customised={draft.unsuccessfulWorkFactor !== defaults.unsuccessfulWorkFactor}
           onChange={(v) => setTop({ unsuccessfulWorkFactor: (v ?? 0) / 100 })}
         />
+        <NumberField
+          id="workmanshipWindowDays"
+          meta={m.workmanshipWindowDays}
+          value={draft.workmanshipWindowDays}
+          min={0}
+          step={1}
+          error={fieldErrors.workmanshipWindowDays}
+          customised={draft.workmanshipWindowDays !== defaults.workmanshipWindowDays}
+          onChange={(v) => setTop({ workmanshipWindowDays: v ?? 0 })}
+        />
       </div>
 
       <h3 className="mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase">

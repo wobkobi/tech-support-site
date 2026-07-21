@@ -45,7 +45,6 @@ export default async function ReviewsPage(): Promise<React.ReactElement> {
       firstName: true,
       lastName: true,
       isAnonymous: true,
-      verified: true,
       createdAt: true,
     },
     where: { status: "approved" },
