@@ -2,13 +2,17 @@
 // src/features/admin/components/settings/IdentityTab.tsx
 /**
  * @description Editor for the business identity group: contact details, the
- * unified base address (which also drives the travel origin + SEO once wired),
- * payment terms, GST number, bank account, and invoice prefix. Sensitive fields
- * (GST number, bank account) are masked with a reveal toggle. Saving stores to
- * the DB; the public/invoice/email consumers read these in the follow-up step.
+ * unified base address (which also drives the travel origin + SEO), payment
+ * terms, GST number, bank account, home region, and the SEO service area
+ * (radius + served suburbs). Sensitive fields (GST number, bank account) are
+ * masked with a reveal toggle.
  */
 
-import { NumberField, TextField } from "@/features/admin/components/settings/SettingsFields";
+import {
+  FieldShell,
+  NumberField,
+  TextField,
+} from "@/features/admin/components/settings/SettingsFields";
 import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
 import { SettingsSaveBar } from "@/features/admin/components/settings/SettingsSaveBar";
 import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
@@ -205,6 +209,34 @@ export function IdentityTab({ initial, defaults }: Props): React.ReactElement {
           customised={draft.homeRegion !== defaults.homeRegion}
           onChange={(v) => set({ homeRegion: v })}
         />
+      </div>
+
+      <SectionHeading>Service area (SEO)</SectionHeading>
+      <div className="divide-y divide-admin-border">
+        <NumberField
+          id="serviceRadiusKm"
+          meta={m.serviceRadiusKm}
+          value={draft.serviceRadiusKm}
+          min={1}
+          max={500}
+          error={fieldErrors.serviceRadiusKm}
+          customised={draft.serviceRadiusKm !== defaults.serviceRadiusKm}
+          onChange={(v) => set({ serviceRadiusKm: v ?? 1 })}
+        />
+        <FieldShell
+          id="servedSuburbs"
+          meta={m.servedSuburbs}
+          customised={draft.servedSuburbs.join("\n") !== defaults.servedSuburbs.join("\n")}
+        >
+          <textarea
+            id="servedSuburbs"
+            value={draft.servedSuburbs.join("\n")}
+            rows={6}
+            placeholder="One suburb per line"
+            onChange={(e) => set({ servedSuburbs: e.target.value.split("\n") })}
+            className="w-full rounded-lg border border-admin-border-strong px-3 py-2 text-base focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+          />
+        </FieldShell>
       </div>
 
       {/* Guardrail blocks */}

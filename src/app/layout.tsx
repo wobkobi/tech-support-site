@@ -149,49 +149,14 @@ export default async function RootLayout({
       opens: `${String(availability.schedule[d].open).padStart(2, "0")}:00`,
       closes: `${String(availability.schedule[d].close).padStart(2, "0")}:00`,
     }));
-  const servedSuburbs = [
-    "Auckland Central",
-    "Auckland CBD",
-    "Ponsonby",
-    "Herne Bay",
-    "Grey Lynn",
-    "Westmere",
-    "Point Chevalier",
-    "Western Springs",
-    "Mount Albert",
-    "Kingsland",
-    "Sandringham",
-    "Mount Eden",
-    "Epsom",
-    "Newmarket",
-    "Parnell",
-    "Remuera",
-    "Mission Bay",
-    "Saint Heliers",
-    "Glen Innes",
-    "Onehunga",
-    "Royal Oak",
-    "Hillsborough",
-    "Three Kings",
-    "Mount Roskill",
-    "Avondale",
-    "New Lynn",
-    "Henderson",
-    "Te Atatu",
-    "Massey",
-    "Glen Eden",
-    "Titirangi",
-    "Devonport",
-    "Takapuna",
-    "Milford",
-    "Northcote",
-    "Birkenhead",
-    "Albany",
-    "Manukau",
-    "Botany",
-    "Howick",
-    "Pakuranga",
-  ];
+  const servedSuburbs = identity.servedSuburbs.map((s) => s.trim()).filter(Boolean);
+  // One coverage circle centred on the base address; the radius is operator-set.
+  const geoMidpoint = {
+    "@type": "GeoCoordinates",
+    latitude: identity.baseAddress.lat ?? -36.8717,
+    longitude: identity.baseAddress.lng ?? 174.7185,
+  };
+  const geoRadius = String(identity.serviceRadiusKm * 1000);
 
   const localBusinessJsonLd = {
     "@context": "https://schema.org",
@@ -212,7 +177,7 @@ export default async function RootLayout({
     address: {
       "@type": "PostalAddress",
       addressLocality: identity.baseAddress.locality,
-      addressRegion: "Auckland",
+      addressRegion: identity.homeRegion,
       postalCode: identity.baseAddress.postcode,
       addressCountry: "NZ",
     },
@@ -222,22 +187,14 @@ export default async function RootLayout({
       longitude: identity.baseAddress.lng ?? 174.7185,
     },
     areaServed: [
-      {
-        "@type": "GeoCircle",
-        geoMidpoint: { "@type": "GeoCoordinates", latitude: -36.8485, longitude: 174.7633 },
-        geoRadius: "25000",
-      },
+      { "@type": "GeoCircle", geoMidpoint, geoRadius },
       ...servedSuburbs.map((name) => ({
         "@type": "City",
         name,
-        containedInPlace: { "@type": "AdministrativeArea", name: "Auckland" },
+        containedInPlace: { "@type": "AdministrativeArea", name: identity.homeRegion },
       })),
     ],
-    serviceArea: {
-      "@type": "GeoCircle",
-      geoMidpoint: { "@type": "GeoCoordinates", latitude: -36.8717, longitude: 174.7185 },
-      geoRadius: "15000",
-    },
+    serviceArea: { "@type": "GeoCircle", geoMidpoint, geoRadius },
     openingHoursSpecification,
     contactPoint: [
       {
