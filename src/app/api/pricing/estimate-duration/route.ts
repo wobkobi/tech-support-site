@@ -271,7 +271,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // stale estimates can't survive. maxJobMins joins the key since it clamps the
     // result but isn't in the context. Rate-limit + validation stay outside the cache.
     const estimateKey = normaliseEstimateKey(trimmed);
-    const contextHash = createHash("sha1").update(context).digest("hex");
+    const contextHash = createHash("sha256").update(context).digest("hex");
     const getEstimate = unstable_cache(
       () =>
         generateEstimate(
