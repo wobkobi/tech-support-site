@@ -74,6 +74,19 @@ interface NumberFieldProps {
   step?: number;
   error?: string;
   customised?: boolean;
+  /** When the field is minutes, show a live "= 1h 30m" hint for values over an hour. */
+  minutesHint?: boolean;
+}
+
+/**
+ * Formats minutes as a friendly duration, e.g. 90 > "1h 30m", 120 > "2h".
+ * @param mins - Whole minutes.
+ * @returns Human-readable duration string.
+ */
+function formatMinutesHint(mins: number): string {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m === 0 ? `${h}h` : `${h}h ${m}m`;
 }
 
 /**
@@ -89,6 +102,7 @@ interface NumberFieldProps {
  * @param props.step - Input step.
  * @param props.error - Inline validation error.
  * @param props.customised - Whether the value differs from default.
+ * @param props.minutesHint - Whether to show a "= 1h 30m" hint for minute values over an hour.
  * @returns Number field element.
  */
 export function NumberField({
@@ -102,6 +116,7 @@ export function NumberField({
   step,
   error,
   customised,
+  minutesHint,
 }: NumberFieldProps): React.ReactElement {
   return (
     <FieldShell id={id} meta={meta} error={error} customised={customised}>
@@ -129,6 +144,9 @@ export function NumberField({
           )}
         />
         {meta.unit && <span className="text-sm text-admin-muted">{meta.unit}</span>}
+        {minutesHint && value != null && value >= 60 && (
+          <span className="text-sm text-admin-faint">= {formatMinutesHint(value)}</span>
+        )}
       </div>
     </FieldShell>
   );

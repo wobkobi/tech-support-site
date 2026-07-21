@@ -277,15 +277,18 @@ export const TAX_FIELD_META: Record<string, FieldMeta> = {
   incomeTax: {
     title: "Income-tax reserve rate",
     description:
-      "Fraction of profit set aside for income tax (0.2 = 20%). Used by the dashboard planner; a per-FY workbook rate, when present, still takes precedence.",
+      "Percent of profit set aside for income tax. Used by the dashboard planner; a per-FY workbook rate, when present, still takes precedence.",
+    unit: "%",
   },
   acc: {
     title: "ACC levy rate",
-    description: "Fraction of profit reserved for the ACC levy (0.0146 = 1.46%).",
+    description: "Percent of profit reserved for the ACC levy (e.g. 1.46%).",
+    unit: "%",
   },
   kiwiSaver: {
     title: "KiwiSaver rate",
-    description: "Voluntary KiwiSaver contribution as a fraction of profit (0.12 = 12%).",
+    description: "Voluntary KiwiSaver contribution as a percent of profit.",
+    unit: "%",
   },
 };
 

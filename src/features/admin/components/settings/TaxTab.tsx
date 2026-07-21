@@ -42,39 +42,40 @@ export function TaxTab({ initial, defaults }: Props): React.ReactElement {
   return (
     <div>
       <p className="mb-4 text-sm text-admin-muted">
-        Rates are entered as fractions (0.2 = 20%). If a per-FY workbook fills the matching rate
-        cell, that value is used for that year and these act as the fallback.
+        Enter each rate as a percentage. If a per-FY workbook fills the matching rate cell, that
+        value is used for that year and these act as the fallback.
       </p>
       <div className="divide-y divide-admin-border">
         <NumberField
           id="incomeTax"
           meta={m.incomeTax}
-          value={draft.incomeTax}
+          // Stored as a fraction; shown + edited as a percent (2dp, so ACC's 1.46% survives).
+          value={Math.round(draft.incomeTax * 10000) / 100}
           min={0}
-          max={1}
+          max={100}
           error={fieldErrors.incomeTax}
           customised={draft.incomeTax !== defaults.incomeTax}
-          onChange={(v) => set({ incomeTax: v ?? 0 })}
+          onChange={(v) => set({ incomeTax: (v ?? 0) / 100 })}
         />
         <NumberField
           id="acc"
           meta={m.acc}
-          value={draft.acc}
+          value={Math.round(draft.acc * 10000) / 100}
           min={0}
-          max={1}
+          max={100}
           error={fieldErrors.acc}
           customised={draft.acc !== defaults.acc}
-          onChange={(v) => set({ acc: v ?? 0 })}
+          onChange={(v) => set({ acc: (v ?? 0) / 100 })}
         />
         <NumberField
           id="kiwiSaver"
           meta={m.kiwiSaver}
-          value={draft.kiwiSaver}
+          value={Math.round(draft.kiwiSaver * 10000) / 100}
           min={0}
-          max={1}
+          max={100}
           error={fieldErrors.kiwiSaver}
           customised={draft.kiwiSaver !== defaults.kiwiSaver}
-          onChange={(v) => set({ kiwiSaver: v ?? 0 })}
+          onChange={(v) => set({ kiwiSaver: (v ?? 0) / 100 })}
         />
       </div>
 

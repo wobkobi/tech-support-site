@@ -329,6 +329,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
           meta={m.bufferMin}
           value={draft.bufferMin}
           min={0}
+          minutesHint
           error={fieldErrors.bufferMin}
           customised={draft.bufferMin !== defaults.bufferMin}
           onChange={(v) => setTop({ bufferMin: v ?? 0 })}
@@ -338,6 +339,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
           meta={m.bookingBufferAfterMin}
           value={draft.bookingBufferAfterMin}
           min={0}
+          minutesHint
           error={fieldErrors.bookingBufferAfterMin}
           customised={draft.bookingBufferAfterMin !== defaults.bookingBufferAfterMin}
           onChange={(v) => setTop({ bookingBufferAfterMin: v ?? 0 })}
@@ -354,6 +356,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
           meta={m["durations.short"]}
           value={draft.durations.short}
           min={5}
+          minutesHint
           error={fieldErrors["durations.short"]}
           customised={draft.durations.short !== defaults.durations.short}
           onChange={(v) =>
@@ -365,6 +368,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
           meta={m["durations.long"]}
           value={draft.durations.long}
           min={5}
+          minutesHint
           error={fieldErrors["durations.long"]}
           customised={draft.durations.long !== defaults.durations.long}
           onChange={(v) => setDraft((p) => ({ ...p, durations: { ...p.durations, long: v ?? 5 } }))}

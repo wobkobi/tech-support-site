@@ -94,6 +94,7 @@ export function CommsTab({ initial, defaults }: Props): React.ReactElement {
           meta={m.reviewEmailDelayMins}
           value={draft.reviewEmailDelayMins}
           min={0}
+          minutesHint
           error={fieldErrors.reviewEmailDelayMins}
           customised={draft.reviewEmailDelayMins !== defaults.reviewEmailDelayMins}
           onChange={(v) => set({ reviewEmailDelayMins: v ?? 0 })}

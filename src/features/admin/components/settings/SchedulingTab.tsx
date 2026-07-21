@@ -62,6 +62,7 @@ export function SchedulingTab({ initial, defaults }: Props): React.ReactElement 
           meta={m.minHomeDwellMin}
           value={draft.minHomeDwellMin}
           min={0}
+          minutesHint
           error={fieldErrors.minHomeDwellMin}
           customised={draft.minHomeDwellMin !== defaults.minHomeDwellMin}
           onChange={(v) => set({ minHomeDwellMin: v ?? 0 })}
