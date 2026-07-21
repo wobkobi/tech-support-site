@@ -136,6 +136,60 @@ export function EstimatorTab({ initial, defaults }: Props): React.ReactElement {
         </div>
       </div>
 
+      {/* Estimate limits + multi-task stacking + the advertised low-end floor. */}
+      <div className="mt-8">
+        <h3 className="text-lg font-semibold text-russian-violet">Limits &amp; stacking</h3>
+        <p className="mt-1 text-sm text-admin-muted">
+          The ceiling on any single estimate, how much extra tasks add to a multi-task visit, and
+          the floor under the advertised low price.
+        </p>
+        <div className="divide-y divide-admin-border">
+          <NumberField
+            id="maxJobHours"
+            meta={m.maxJobHours}
+            value={draft.maxJobHours}
+            min={1}
+            max={24}
+            error={fieldErrors.maxJobHours}
+            customised={draft.maxJobHours !== defaults.maxJobHours}
+            onChange={(v) => setDraft((p) => ({ ...p, maxJobHours: v ?? 1 }))}
+          />
+          <NumberField
+            id="stackHandsOnFactor"
+            meta={m.stackHandsOnFactor}
+            value={Math.round(draft.stackHandsOnFactor * 100)}
+            min={0}
+            max={100}
+            step={1}
+            error={fieldErrors.stackHandsOnFactor}
+            customised={draft.stackHandsOnFactor !== defaults.stackHandsOnFactor}
+            onChange={(v) => setDraft((p) => ({ ...p, stackHandsOnFactor: (v ?? 0) / 100 }))}
+          />
+          <NumberField
+            id="stackBackgroundFactor"
+            meta={m.stackBackgroundFactor}
+            value={Math.round(draft.stackBackgroundFactor * 100)}
+            min={0}
+            max={100}
+            step={1}
+            error={fieldErrors.stackBackgroundFactor}
+            customised={draft.stackBackgroundFactor !== defaults.stackBackgroundFactor}
+            onChange={(v) => setDraft((p) => ({ ...p, stackBackgroundFactor: (v ?? 0) / 100 }))}
+          />
+          <NumberField
+            id="lowEndFloorFactor"
+            meta={m.lowEndFloorFactor}
+            value={Math.round(draft.lowEndFloorFactor * 100)}
+            min={0}
+            max={100}
+            step={1}
+            error={fieldErrors.lowEndFloorFactor}
+            customised={draft.lowEndFloorFactor !== defaults.lowEndFloorFactor}
+            onChange={(v) => setDraft((p) => ({ ...p, lowEndFloorFactor: (v ?? 0) / 100 }))}
+          />
+        </div>
+      </div>
+
       {/* Guardrail blocks - save was refused. */}
       {blocks.length > 0 && (
         <div className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4">

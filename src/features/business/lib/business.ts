@@ -568,6 +568,8 @@ export interface JobPricing {
   minBillableMins: number;
   /** Public-holiday labour uplift as a fraction (e.g. 0.25); 0/undefined when the job date isn't a holiday. */
   holidayUplift?: number;
+  /** Fraction charged for an unsuccessful visit (e.g. 0.5 = half); defaults to 0.5. */
+  unsuccessfulFactor?: number;
 }
 
 /**
@@ -612,9 +614,10 @@ function isHourlyTask(task: TaskLine): boolean {
 
 /**
  * Cost breakdown for a job. Promo discount applies to labour only; travel +
- * parts stay at full price. The whole-job unsuccessful flag halves the entire
- * labour portion (hourly task lines); otherwise per-task `unsuccessful` flags
- * halve just those lines. Both fold into the single `unsuccessfulDiscount`.
+ * parts stay at full price. The whole-job unsuccessful flag discounts the entire
+ * labour portion (hourly task lines) by the unsuccessful-work factor; otherwise
+ * per-task `unsuccessful` flags discount just those lines. Both fold into the
+ * single `unsuccessfulDiscount`.
  * GST mode is driven by {@link GST_REGISTERED} (see {@link calcInvoiceTotals}).
  * Travel floor ({@link MIN_TRAVEL_CHARGE}) only applies when an auto entry
  * contributed - manual-only travel passes through unchanged. The whole-job
@@ -670,17 +673,19 @@ export function calcJobTotal(
   const subtotal =
     Math.round((tasksTotal + partsTotal + travelTotal + holidaySurcharge) * 100) / 100;
   const promoDiscount = computeJobPromoDiscount(job, promo);
+  // Fraction removed from an unsuccessful line: 1 - the charged share.
+  const unsuccessfulCut = 1 - (pricing.unsuccessfulFactor ?? 0.5);
   let unsuccessfulDiscount = 0;
   if (job.unsuccessful) {
-    // Whole-job flag halves every hourly task; per-task flags are subsumed
+    // Whole-job flag discounts every hourly task; per-task flags are subsumed
     // here so a task can't be discounted twice.
-    unsuccessfulDiscount = Math.round(hourlyTasksTotal * 0.5 * 100) / 100;
+    unsuccessfulDiscount = Math.round(hourlyTasksTotal * unsuccessfulCut * 100) / 100;
   } else {
-    // Per-task flags halve only the flagged hourly lines.
+    // Per-task flags discount only the flagged hourly lines.
     const flaggedTasksTotal = job.tasks
       .filter((t) => t.unsuccessful && isHourlyTask(t))
       .reduce((s, t) => s + t.qty * t.unitPrice, 0);
-    unsuccessfulDiscount = Math.round(flaggedTasksTotal * 0.5 * 100) / 100;
+    unsuccessfulDiscount = Math.round(flaggedTasksTotal * unsuccessfulCut * 100) / 100;
   }
   // GST applied to the discounted amount per NZ IRD price-reduction treatment.
   // Clamp at 0 (matching calcInvoiceTotals) so stacked promo + unsuccessful

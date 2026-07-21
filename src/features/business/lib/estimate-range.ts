@@ -52,6 +52,7 @@ export const LOW_END_FLOOR_FACTOR = 0.75;
  * @param rate - Effective $/hr for labour.
  * @param confidence - How confident the estimate is; selects the band width.
  * @param range - The live, settings-driven confidence band config.
+ * @param lowEndFloorFactor - Live low-end floor fraction (defaults to the constant).
  * @returns Whole-dollar `{ low, high }`.
  */
 export function priceRangeFor(
@@ -59,13 +60,14 @@ export function priceRangeFor(
   rate: number,
   confidence: EstimateConfidence,
   range: EstimatorRange,
+  lowEndFloorFactor: number = LOW_END_FLOOR_FACTOR,
 ): { low: number; high: number } {
   const band = range[confidence] ?? range.medium;
   const cost = (mins / 60) * rate;
   // Band low rounds DOWN to $5; the floor rounds to NEAREST - rounding the
   // floor down too would push it back under the guarantee it enforces.
   const bandLow = Math.floor((cost * band.lowFactor) / 5) * 5;
-  const flooredLow = Math.round((cost * LOW_END_FLOOR_FACTOR) / 5) * 5;
+  const flooredLow = Math.round((cost * lowEndFloorFactor) / 5) * 5;
   const low = Math.max(bandLow, flooredLow);
   const high = Math.max(Math.ceil((cost * band.highFactor) / 5) * 5, low + range.minSpread);
   return { low, high };

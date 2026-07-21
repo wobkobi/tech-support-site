@@ -103,6 +103,18 @@ export function PricingTab({ initial, defaults }: Props): React.ReactElement {
           customised={draft.minTravelCharge !== defaults.minTravelCharge}
           onChange={(v) => setTop({ minTravelCharge: v ?? 0 })}
         />
+        <NumberField
+          id="unsuccessfulWorkFactor"
+          meta={m.unsuccessfulWorkFactor}
+          // Stored as a fraction; shown + edited as a whole percent for readability.
+          value={Math.round(draft.unsuccessfulWorkFactor * 100)}
+          min={0}
+          max={100}
+          step={1}
+          error={fieldErrors.unsuccessfulWorkFactor}
+          customised={draft.unsuccessfulWorkFactor !== defaults.unsuccessfulWorkFactor}
+          onChange={(v) => setTop({ unsuccessfulWorkFactor: (v ?? 0) / 100 })}
+        />
       </div>
 
       <h3 className="mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase">

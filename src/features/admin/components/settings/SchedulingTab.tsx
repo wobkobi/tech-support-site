@@ -85,6 +85,16 @@ export function SchedulingTab({ initial, defaults }: Props): React.ReactElement 
           customised={draft.smartOriginLookaheadHours !== defaults.smartOriginLookaheadHours}
           onChange={(v) => set({ smartOriginLookaheadHours: v ?? 0 })}
         />
+        <NumberField
+          id="travelQuoteHour"
+          meta={m.travelQuoteHour}
+          value={draft.travelQuoteHour}
+          min={0}
+          max={23}
+          error={fieldErrors.travelQuoteHour}
+          customised={draft.travelQuoteHour !== defaults.travelQuoteHour}
+          onChange={(v) => set({ travelQuoteHour: v ?? 0 })}
+        />
       </div>
 
       {/* Guardrail blocks */}

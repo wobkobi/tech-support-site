@@ -39,6 +39,9 @@ export const BILLING_INCREMENT_MINS = 5;
 /** Multiplier applied to labour on NZ public holidays. Travel and parts are not uplifted. */
 export const PUBLIC_HOLIDAY_UPLIFT = 0.25;
 
+/** Fallback fraction charged for an unsuccessful visit (0.5 = half price). */
+export const UNSUCCESSFUL_WORK_FACTOR = 0.5;
+
 /** Fallback Standard base rate ($/hr) when no default hourly RateConfig row exists; mirrors the seed default. */
 export const FALLBACK_BASE_RATE = 65;
 /** Fallback travel rate ($/hr) when no `travel-hour` RateConfig row exists; mirrors the seed default. */
@@ -389,15 +392,23 @@ export function cancellationCopy(
 }
 
 /**
- * Two-test definition for "unsuccessful" so neither party can argue it.
- * @returns Multi-paragraph copy describing the half-price rule.
+ * Two-test definition for "unsuccessful" so neither party can argue it. The
+ * charge phrase tracks the live factor so the copy never disagrees with the bill.
+ * @param factor - Unsuccessful-visit charge fraction (defaults to the constant).
+ * @returns Multi-paragraph copy describing the unsuccessful-visit rule.
  */
-export function unsuccessfulWorkCopy(): string {
+export function unsuccessfulWorkCopy(factor: number = UNSUCCESSFUL_WORK_FACTOR): string {
+  const chargePhrase =
+    factor <= 0
+      ? "**No charge**"
+      : factor === 0.5
+        ? "**Half price**"
+        : `**${Math.round(factor * 100)}% of the agreed rate**`;
   return (
     "Two outcomes count as a successful visit, charged at the agreed rate:\n\n" +
     "1. **Fixed**: the issue described no longer reproduces by the end of the visit.\n" +
     "2. **Diagnosed**: I leave you with a written explanation of the root cause and what would be needed to resolve it (for example, 'your hard drive is failing - here is the data recovery specialist you will need to use').\n\n" +
-    "**Half price** applies only when I leave with neither - the symptom is still happening AND I cannot tell you why. Remote sessions are **free** in that case.\n\n" +
+    `${chargePhrase} applies only when I leave with neither - the symptom is still happening AND I cannot tell you why. Remote sessions are **free** in that case.\n\n` +
     "A partial fix counts as a fix. A confirmed external blocker (for example, 'you need a part from the manufacturer, here is the part number') counts as a diagnosis."
   );
 }
@@ -477,5 +488,6 @@ export interface Policy {
   MIN_BILLABLE_MINS: number;
   BILLING_INCREMENT_MINS: number;
   PUBLIC_HOLIDAY_UPLIFT: number;
+  UNSUCCESSFUL_WORK_FACTOR: number;
   CANCELLATION: CancellationPolicy;
 }

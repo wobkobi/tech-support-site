@@ -370,7 +370,9 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                     aria-hidden
                   />
                 </summary>
-                <div className={ACCORDION_BODY}>{renderEmphasised(unsuccessfulWorkCopy())}</div>
+                <div className={ACCORDION_BODY}>
+                  {renderEmphasised(unsuccessfulWorkCopy(policy.UNSUCCESSFUL_WORK_FACTOR))}
+                </div>
               </details>
 
               <details className={ACCORDION_DETAILS}>
@@ -434,6 +436,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
               minBillableMins={policy.MIN_BILLABLE_MINS}
               minTravelCharge={policy.MIN_TRAVEL_CHARGE}
               estimatorRange={settings.estimator.range}
+              lowEndFloorFactor={settings.estimator.lowEndFloorFactor}
             />
           </section>
 

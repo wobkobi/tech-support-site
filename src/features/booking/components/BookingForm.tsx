@@ -118,6 +118,8 @@ export interface BookingFormProps {
   minBillableMins?: number;
   /** Travel floor (live setting) for the inline estimate. */
   minTravelCharge?: number;
+  /** Low-end floor fraction (live setting) for the inline estimate. */
+  lowEndFloorFactor?: number;
 }
 
 /**
@@ -130,6 +132,7 @@ export interface BookingFormProps {
  * @param props.estimatorRange - Live estimator range widths; enables the inline rough estimate.
  * @param props.minBillableMins - Min billable minutes for the inline estimate.
  * @param props.minTravelCharge - Travel floor for the inline estimate.
+ * @param props.lowEndFloorFactor - Low-end floor fraction for the inline estimate.
  * @returns Booking form element
  */
 export default function BookingForm({
@@ -140,6 +143,7 @@ export default function BookingForm({
   estimatorRange,
   minBillableMins,
   minTravelCharge,
+  lowEndFloorFactor,
 }: BookingFormProps): React.ReactElement {
   const router = useRouter();
   const isEditMode = Boolean(cancelToken);
@@ -161,7 +165,11 @@ export default function BookingForm({
   } | null>(null);
   const [quoteError, setQuoteError] = useState<string | null>(null);
   const canInlineEstimate =
-    !isEditMode && estimatorRange != null && minBillableMins != null && minTravelCharge != null;
+    !isEditMode &&
+    estimatorRange != null &&
+    minBillableMins != null &&
+    minTravelCharge != null &&
+    lowEndFloorFactor != null;
 
   // Duration choices built from the live settings; labels reflect the operator's
   // configured short/long lengths. Descriptions stay as fixed copy.
@@ -256,7 +264,13 @@ export default function BookingForm({
    * @returns Resolves when the estimate completes.
    */
   async function runInlineEstimate(): Promise<void> {
-    if (!estimatorRange || minBillableMins == null || minTravelCharge == null) return;
+    if (
+      !estimatorRange ||
+      minBillableMins == null ||
+      minTravelCharge == null ||
+      lowEndFloorFactor == null
+    )
+      return;
     setEstimating(true);
     setQuoteError(null);
     try {
@@ -274,6 +288,7 @@ export default function BookingForm({
         estimatorRange,
         minBillableMins,
         minTravelCharge,
+        lowEndFloorFactor,
         departureTimeIso: slotStart?.toISOString(),
         returnDepartureTimeIso: slotEnd?.toISOString(),
       });

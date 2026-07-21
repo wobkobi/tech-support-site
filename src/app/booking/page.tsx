@@ -298,6 +298,7 @@ async function BookingFormIsland(): Promise<React.ReactElement> {
         availableDays={days}
         durations={durations}
         estimatorRange={settings.estimator.range}
+        lowEndFloorFactor={settings.estimator.lowEndFloorFactor}
         minBillableMins={settings.pricing.minBillableMins}
         minTravelCharge={settings.pricing.minTravelCharge}
       />

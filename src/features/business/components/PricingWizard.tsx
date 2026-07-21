@@ -61,6 +61,8 @@ interface Props {
   minTravelCharge: number;
   /** Confidence-scaled price-range widths (live estimator setting). */
   estimatorRange: EstimatorRange;
+  /** Low-end floor fraction (live estimator setting). */
+  lowEndFloorFactor: number;
 }
 
 /**
@@ -70,12 +72,14 @@ interface Props {
  * @param props.minBillableMins - Minimum billable minutes used to floor the estimate.
  * @param props.minTravelCharge - Travel floor for the travel estimate.
  * @param props.estimatorRange - Confidence-scaled price-range widths (live estimator setting).
+ * @param props.lowEndFloorFactor - Low-end floor fraction (live estimator setting).
  * @returns The rendered wizard.
  */
 export function PricingWizard({
   minBillableMins,
   minTravelCharge,
   estimatorRange,
+  lowEndFloorFactor,
 }: Props): React.ReactElement {
   const [rates, setRates] = useState<PublicRate[]>([]);
   const [activePromo, setActivePromo] = useState<ActivePromo | null>(null);
@@ -234,7 +238,7 @@ export function PricingWizard({
      * @returns Whole-dollar low/high range.
      */
     const rangeFor = (mins: number, rate: number): { low: number; high: number } =>
-      priceRangeFor(mins, rate, confidence, estimatorRange);
+      priceRangeFor(mins, rate, confidence, estimatorRange, lowEndFloorFactor);
 
     // Travel uses the dedicated Travel rate (never promo-discounted, never
     // labour-rate). Routes through calcTravelCharge so the floor + leg

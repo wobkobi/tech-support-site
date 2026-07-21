@@ -147,6 +147,7 @@ export default async function CalculatorPage({
     gstRegistered: policy.GST_REGISTERED,
     minTravelCharge: policy.MIN_TRAVEL_CHARGE,
     minBillableMins: policy.MIN_BILLABLE_MINS,
+    unsuccessfulFactor: policy.UNSUCCESSFUL_WORK_FACTOR,
   };
 
   // Flatten Dates to the ISO strings the client types expect (matches what

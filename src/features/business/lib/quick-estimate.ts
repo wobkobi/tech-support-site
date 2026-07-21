@@ -24,6 +24,7 @@ export interface QuickEstimateInput {
   estimatorRange: EstimatorRange;
   minBillableMins: number;
   minTravelCharge: number;
+  lowEndFloorFactor: number;
   /**
    * When the customer has already picked a slot, the drive is quoted at that
    * time so the estimate matches what the booking will snapshot. Omitted before
@@ -58,7 +59,15 @@ export interface QuickEstimateResult {
  * @returns The price range, the logged estimate id, and the AI confidence/explanation.
  */
 export async function fetchQuickEstimate(input: QuickEstimateInput): Promise<QuickEstimateResult> {
-  const { description, meeting, address, estimatorRange, minBillableMins, minTravelCharge } = input;
+  const {
+    description,
+    meeting,
+    address,
+    estimatorRange,
+    minBillableMins,
+    minTravelCharge,
+    lowEndFloorFactor,
+  } = input;
   const dest =
     meeting === "remote"
       ? ""
@@ -145,7 +154,13 @@ export async function fetchQuickEstimate(input: QuickEstimateInput): Promise<Qui
     FALLBACK_TRAVEL_RATE;
   const promoRate = applyPromoToHourlyRate(fullRate, promo);
   const effectiveMins = Math.max(minBillableMins, estimatedMins);
-  const band = priceRangeFor(effectiveMins, promoRate, confidence, estimatorRange);
+  const band = priceRangeFor(
+    effectiveMins,
+    promoRate,
+    confidence,
+    estimatorRange,
+    lowEndFloorFactor,
+  );
   const travel = calcTravelCharge(travelMins, travelMinsBack, travelRatePerHour, minTravelCharge);
   // Labour band is the range shown to the customer; travel is a (mostly fixed)
   // add-on surfaced on its own line rather than folded into the range. The
