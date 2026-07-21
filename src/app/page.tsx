@@ -37,10 +37,11 @@ import {
 } from "react-icons/fa6";
 
 export const metadata: Metadata = {
-  alternates: {
-    canonical: "/",
-    languages: { "en-NZ": "/" },
-  },
+  // Self-canonical only. A lone en-NZ hreflang with no x-default and no sibling
+  // locales is malformed (hreflang describes multi-locale clusters, which this
+  // single-language site does not have) and only muddies Google's signals, so
+  // match every other page and emit just the canonical.
+  alternates: { canonical: "/" },
 };
 
 // Rely on on-demand revalidation (revalidateReviewPaths fires on every review change).
