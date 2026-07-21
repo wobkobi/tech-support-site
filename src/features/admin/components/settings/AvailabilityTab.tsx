@@ -20,7 +20,7 @@ import { useSettingsForm } from "@/features/admin/components/settings/useSetting
 import { hourLabel } from "@/features/booking/lib/booking";
 import { cn } from "@/shared/lib/cn";
 import { AVAILABILITY_FIELD_META } from "@/shared/lib/settings/field-meta";
-import type { AvailabilitySettings, DayWindow } from "@/shared/lib/settings/types";
+import type { AvailabilitySettings, DayWindow, MorningGuard } from "@/shared/lib/settings/types";
 import type React from "react";
 
 interface Props {
@@ -117,6 +117,59 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
    */
   const setTop = (patch: Partial<AvailabilitySettings>): void =>
     setDraft((p) => ({ ...p, ...patch }));
+
+  /**
+   * Patches one morning-guard rule in the draft.
+   * @param index - The rule's position in the list.
+   * @param patch - Partial rule fields to merge.
+   * @returns void
+   */
+  const setGuard = (index: number, patch: Partial<MorningGuard>): void =>
+    setDraft((p) => ({
+      ...p,
+      morningGuards: p.morningGuards.map((g, i) => (i === index ? { ...g, ...patch } : g)),
+    }));
+
+  /**
+   * Appends a new guard, defaulting to the weekend lie-in shape.
+   * @returns void
+   */
+  const addGuard = (): void =>
+    setDraft((p) => ({
+      ...p,
+      morningGuards: [
+        ...p.morningGuards,
+        {
+          enabled: true,
+          label: "New guard",
+          triggerDay: 5,
+          triggerHour: 18,
+          protectedDays: [6],
+          earliestHour: 12,
+        },
+      ],
+    }));
+
+  /**
+   * Removes the guard at the given index.
+   * @param index - The rule's position in the list.
+   * @returns void
+   */
+  const removeGuard = (index: number): void =>
+    setDraft((p) => ({ ...p, morningGuards: p.morningGuards.filter((_, i) => i !== index) }));
+
+  /**
+   * Toggles a protected day on/off for one guard.
+   * @param index - The rule's position in the list.
+   * @param dayIndex - The weekday's `getUTCDay()` index.
+   * @returns void
+   */
+  const toggleProtectedDay = (index: number, dayIndex: number): void =>
+    setGuard(index, {
+      protectedDays: draft.morningGuards[index].protectedDays.includes(dayIndex)
+        ? draft.morningGuards[index].protectedDays.filter((d) => d !== dayIndex)
+        : [...draft.morningGuards[index].protectedDays, dayIndex].sort((a, b) => a - b),
+    });
 
   return (
     <div>
@@ -336,6 +389,112 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
           customised={draft.maxBillableHoursPerDay !== defaults.maxBillableHoursPerDay}
           onChange={(v) => setTop({ maxBillableHoursPerDay: v })}
         />
+      </div>
+
+      {/* Morning guards - protect early slots once the night-before arrives. */}
+      <h3 className="mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase">
+        Morning guards
+      </h3>
+      <p className="mt-1 text-sm text-admin-muted">
+        Protect early slots once the night before arrives - e.g. from Friday evening, block Saturday
+        and Sunday before noon. Slots stay bookable if reserved earlier in the week.
+      </p>
+      <div className="mt-3 space-y-2">
+        {draft.morningGuards.map((g, gi) => (
+          <div key={gi} className="rounded-lg border border-admin-border p-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={g.enabled}
+                onClick={() => setGuard(gi, { enabled: !g.enabled })}
+                className={cn(
+                  "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                  g.enabled ? "bg-russian-violet" : "bg-admin-border-strong",
+                )}
+              >
+                <span
+                  className={cn(
+                    "inline-block h-4 w-4 rounded-full bg-admin-surface shadow transition-[translate]",
+                    g.enabled ? "translate-x-6" : "translate-x-1",
+                  )}
+                />
+              </button>
+              <input
+                type="text"
+                value={g.label}
+                aria-label="Guard name"
+                onChange={(e) => setGuard(gi, { label: e.target.value })}
+                className="flex-1 rounded-lg border border-admin-border px-3 py-1.5 text-sm text-admin-text focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => removeGuard(gi)}
+                className="text-sm font-medium text-red-600 hover:underline"
+              >
+                Remove
+              </button>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-admin-text-secondary">
+              <span>From</span>
+              <select
+                value={g.triggerDay}
+                aria-label="Trigger day"
+                onChange={(e) => setGuard(gi, { triggerDay: Number(e.target.value) })}
+                className="rounded-lg border border-admin-border px-2 py-2 text-sm text-admin-text focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+              >
+                {DAY_ORDER.map((d) => (
+                  <option key={d.index} value={d.index}>
+                    {d.name}
+                  </option>
+                ))}
+              </select>
+              <span>at</span>
+              <HourSelect
+                value={g.triggerHour}
+                from={0}
+                to={23}
+                onChange={(h) => setGuard(gi, { triggerHour: h })}
+              />
+              <span>, block</span>
+              {DAY_ORDER.map((d) => (
+                <button
+                  key={d.index}
+                  type="button"
+                  aria-pressed={g.protectedDays.includes(d.index)}
+                  onClick={() => toggleProtectedDay(gi, d.index)}
+                  className={cn(
+                    "rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
+                    g.protectedDays.includes(d.index)
+                      ? "bg-russian-violet text-white"
+                      : "border border-admin-border text-admin-muted hover:border-russian-violet",
+                  )}
+                >
+                  {d.name.slice(0, 3)}
+                </button>
+              ))}
+              <span>before</span>
+              <HourSelect
+                value={g.earliestHour}
+                from={1}
+                to={23}
+                onChange={(h) => setGuard(gi, { earliestHour: h })}
+              />
+            </div>
+            {fieldErrors[`morningGuards.${gi}.protectedDays`] && (
+              <p className="mt-2 text-xs font-medium text-red-600">
+                {fieldErrors[`morningGuards.${gi}.protectedDays`]}
+              </p>
+            )}
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={addGuard}
+          className="rounded-lg border border-admin-border px-3 py-1.5 text-sm font-medium text-admin-text hover:border-russian-violet"
+        >
+          + Add guard
+        </button>
       </div>
 
       {/* Guardrail blocks */}

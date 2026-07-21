@@ -3,7 +3,7 @@
  * @description Booking system with duration selection (1hr quick jobs vs 2hr standard jobs).
  */
 
-import type { AvailabilitySettings } from "@/shared/lib/settings/types";
+import type { AvailabilitySettings, MorningGuard } from "@/shared/lib/settings/types";
 import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 
 /**
@@ -339,6 +339,48 @@ function isSlotFree(
 }
 
 /**
+ * Whether a slot falls under an active morning guard. A guard blocks slots on
+ * its protectedDays before earliestHour once "now" has passed the most recent
+ * triggerDay@triggerHour on or before the slot's date - so a weekend-morning
+ * rule (Fri 18:00 > Sat/Sun before noon) only bites the imminent weekend, while
+ * the same slots stay bookable if reserved earlier in the week.
+ * @param year - Slot's NZ calendar year.
+ * @param month - Slot's NZ calendar month (1-12).
+ * @param day - Slot's NZ calendar day.
+ * @param dayOfWeek - Slot's weekday (0 = Sunday .. 6 = Saturday).
+ * @param slotHour - Slot's NZ-local start hour.
+ * @param now - Current time.
+ * @param guards - The live morning-guard rules.
+ * @returns True when an enabled guard blocks the slot.
+ */
+export function isSlotMorningGuarded(
+  year: number,
+  month: number,
+  day: number,
+  dayOfWeek: number,
+  slotHour: number,
+  now: Date,
+  guards: MorningGuard[],
+): boolean {
+  for (const g of guards) {
+    if (!g.enabled || slotHour >= g.earliestHour || !g.protectedDays.includes(dayOfWeek)) {
+      continue;
+    }
+    // The most recent triggerDay on or before the slot's date (UTC noon avoids
+    // any DST date-boundary shift when reading the trigger date's components).
+    const daysBack = (dayOfWeek - g.triggerDay + 7) % 7;
+    const trigger = new Date(Date.UTC(year, month - 1, day - daysBack, 12, 0, 0));
+    const ty = trigger.getUTCFullYear();
+    const tm = trigger.getUTCMonth() + 1;
+    const td = trigger.getUTCDate();
+    const tOffset = getPacificAucklandOffset(ty, tm, td);
+    const triggerInstant = Date.UTC(ty, tm - 1, td, g.triggerHour - tOffset, 0, 0);
+    if (now.getTime() >= triggerInstant) return true;
+  }
+  return false;
+}
+
+/**
  * Build available days with duration-aware slot checking.
  * @param existingBookings - Array of existing bookings from database
  * @param calendarEvents - Array of calendar events to block
@@ -485,6 +527,15 @@ export function buildAvailableDays(
             }
           }
 
+          // Morning guards apply on every day, not just today (a weekend rule
+          // triggered on Friday evening blocks the coming Sat/Sun mornings).
+          if (
+            isSlotMorningGuarded(year, month, day, dayOfWeek, slotHour, now, config.morningGuards)
+          ) {
+            subAvailableShort = false;
+            subAvailableLong = false;
+          }
+
           subSlots.push({
             minute,
             availableShort: subAvailableShort,
@@ -624,6 +675,25 @@ export function validateBookingRequest(
     return {
       valid: false,
       error: `Bookings need at least ${config.minHoursNotice} hours notice`,
+    };
+  }
+
+  // Authoritative morning-guard check (mirrors the day-grid filter) so a direct
+  // API call can't book an early slot the guard has closed for that day.
+  if (
+    isSlotMorningGuarded(
+      year,
+      month,
+      day,
+      selectedDate.getUTCDay(),
+      startHour,
+      now,
+      config.morningGuards,
+    )
+  ) {
+    return {
+      valid: false,
+      error: "That time isn't available - early slots close ahead of the day",
     };
   }
 
