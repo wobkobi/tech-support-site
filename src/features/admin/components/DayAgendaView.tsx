@@ -78,6 +78,8 @@ interface DayAgendaViewProps {
   events: WeekEvent[];
   /** NZ public holidays for the buffered window, keyed by NZ YYYY-MM-DD. */
   holidaysByDateKey: Record<string, string>;
+  /** Live past-edit lock window (hours) - scheduling.pastEditLockHours. */
+  lockHours: number;
 }
 
 const SWIPE_MIN_DX = 60;
@@ -93,6 +95,7 @@ const SWIPE_MAX_MS = 500;
  * @param props.bufferedDayKeys - Day keys in the buffered 21-day window.
  * @param props.events - All events for the buffered window.
  * @param props.holidaysByDateKey - Public-holiday map for the buffered window.
+ * @param props.lockHours - Live past-edit lock window (hours).
  * @returns Day agenda element.
  */
 export function DayAgendaView({
@@ -101,6 +104,7 @@ export function DayAgendaView({
   bufferedDayKeys,
   events,
   holidaysByDateKey,
+  lockHours,
 }: DayAgendaViewProps): React.ReactElement {
   const router = useRouter();
   // Day selection and sheet state
@@ -665,7 +669,7 @@ export function DayAgendaView({
           busyEventId={busyEvent?.id ?? null}
           blocked={effectiveBlocked}
           hasBookings={hasBookings}
-          locked={isPastEditWindow(nzDayEndMs(selectedDayKey), renderedAt)}
+          locked={isPastEditWindow(nzDayEndMs(selectedDayKey), renderedAt, lockHours)}
           pending={pendingDays.has(selectedDayKey)}
           onPending={setPending}
           onChanged={debouncedRefresh}
@@ -838,6 +842,7 @@ export function DayAgendaView({
       {actionSheetEvent?.booking && (
         <EventActionSheet
           event={actionSheetEvent as WeekEvent & { booking: NonNullable<WeekEvent["booking"]> }}
+          lockHours={lockHours}
           onChanged={() => router.refresh()}
           onClose={() => setActionSheetEvent(null)}
         />

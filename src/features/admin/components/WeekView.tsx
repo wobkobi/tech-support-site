@@ -37,6 +37,8 @@ interface WeekViewProps {
   events: WeekEvent[];
   /** Map of NZ-local YYYY-MM-DD > holiday name for days falling inside the buffer. */
   holidaysByDateKey: Record<string, string>;
+  /** Live past-edit lock window (hours) - scheduling.pastEditLockHours. */
+  lockHours: number;
 }
 
 const DAY_START_HOUR = 6;
@@ -52,6 +54,7 @@ const DAY_HEIGHT_PX = DAY_HOURS * 60 * PX_PER_MINUTE;
  * @param props.bufferedDayKeys - Day keys in the buffered 21-day window.
  * @param props.events - Events to render across the buffered window.
  * @param props.holidaysByDateKey - NZ-local YYYY-MM-DD > holiday name lookup.
+ * @param props.lockHours - Live past-edit lock window (hours).
  * @returns Week view element.
  */
 export function WeekView({
@@ -59,6 +62,7 @@ export function WeekView({
   bufferedDayKeys,
   events,
   holidaysByDateKey,
+  lockHours,
 }: WeekViewProps): React.ReactElement {
   const router = useRouter();
   const [weekStartIso, setWeekStartIso] = useState(initialWeekStartIso);
@@ -451,7 +455,7 @@ export function WeekView({
                         busyEventId={realBusy?.id ?? null}
                         blocked={anyBusy}
                         hasBookings={hasBookings}
-                        locked={isPastEditWindow(nzDayEndMs(day.key), renderedAt)}
+                        locked={isPastEditWindow(nzDayEndMs(day.key), renderedAt, lockHours)}
                         pending={pendingDays.has(day.key)}
                         onPending={setPending}
                         onChanged={debouncedRefresh}

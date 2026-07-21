@@ -15,7 +15,7 @@ import type {
   WeekEventBooking,
 } from "@/features/admin/lib/schedule-types";
 import { useBookingActions } from "@/features/booking/hooks/use-booking-actions";
-import { isPastEditWindow, MAX_PAST_EDIT_HOURS } from "@/shared/lib/edit-window";
+import { isPastEditWindow } from "@/shared/lib/edit-window";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 
@@ -38,6 +38,8 @@ interface EventActionSheetProps {
    * opening the sheet when `ev.kind === "booking"` and `ev.booking` exists.
    */
   event: WeekEvent & { booking: WeekEventBooking };
+  /** Live past-edit lock window (hours) - scheduling.pastEditLockHours. */
+  lockHours: number;
   /** Called after a successful mutation - parent should refresh data. */
   onChanged: () => void;
   /** Closes the sheet without changing anything. */
@@ -50,12 +52,14 @@ interface EventActionSheetProps {
  * page use) so the schedule view stays behaviourally identical to them.
  * @param props - Component props.
  * @param props.event - Event with attached booking data.
+ * @param props.lockHours - Live past-edit lock window (hours).
  * @param props.onChanged - Parent callback after a successful mutation.
  * @param props.onClose - Closes the sheet.
  * @returns Action sheet element.
  */
 export function EventActionSheet({
   event,
+  lockHours,
   onChanged,
   onClose,
 }: EventActionSheetProps): React.ReactElement {
@@ -108,7 +112,7 @@ export function EventActionSheet({
   // mirroring the server guard - disable them here so the operator sees it up
   // front instead of firing a request that bounces back as a rejection toast.
   // Billing, review resend, reschedule (future-only), and delete stay available.
-  const isEditLocked = isPastEditWindow(new Date(event.endAt).getTime(), renderedAt);
+  const isEditLocked = isPastEditWindow(new Date(event.endAt).getTime(), renderedAt, lockHours);
 
   /**
    * Runs a mutation, then closes + refreshes on success. Toasts (including
@@ -212,7 +216,7 @@ export function EventActionSheet({
 
           {isEditLocked && !isCancelled && (
             <p className="px-1 text-center text-xs text-admin-faint">
-              Status changes lock {MAX_PAST_EDIT_HOURS}h after a booking ends.
+              Status changes lock {lockHours}h after a booking ends.
             </p>
           )}
 

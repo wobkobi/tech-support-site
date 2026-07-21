@@ -16,6 +16,7 @@ import { lookupPublicHolidaysForKeys } from "@/features/business/lib/pricing-pol
 import { getCachedScheduleEvents } from "@/features/calendar/lib/google-calendar";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
+import { getSettings } from "@/shared/lib/settings/get-settings";
 import type { Metadata } from "next";
 import type React from "react";
 
@@ -50,6 +51,10 @@ export default async function AdminSchedulePage({
 }): Promise<React.ReactElement> {
   await requireAdminAuth("/admin/schedule");
   const { weekStart, day } = await searchParams;
+  // Live past-edit lock window so the grid's pre-disable + copy match the
+  // server-enforced value (scheduling.pastEditLockHours).
+  const { scheduling } = await getSettings();
+  const lockHours = scheduling.pastEditLockHours;
 
   const now = new Date();
   // Prefer ?day=YYYY-MM-DD when set so the buffered fetch centres on the
@@ -261,6 +266,7 @@ export default async function AdminSchedulePage({
           bufferedDayKeys={bufferedDayKeys}
           events={events}
           holidaysByDateKey={holidaysByDateKey}
+          lockHours={lockHours}
         />
       </div>
       <div className={"hidden lg:block"}>
@@ -272,6 +278,7 @@ export default async function AdminSchedulePage({
           bufferedDayKeys={bufferedDayKeys}
           events={events}
           holidaysByDateKey={holidaysByDateKey}
+          lockHours={lockHours}
         />
       </div>
     </>
