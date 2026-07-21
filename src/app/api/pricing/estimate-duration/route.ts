@@ -7,12 +7,14 @@
  * task minutes sum exactly to estimatedMins.
  */
 
-import { clampBillableMins, MAX_JOB_MINS } from "@/features/business/lib/pricing-policy";
+import { clampBillableMins } from "@/features/business/lib/pricing-policy";
 import { getPublicPricing } from "@/features/business/lib/pricing-policy.server";
 import { errorResponse } from "@/shared/lib/api-response";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
-import { getSettings } from "@/shared/lib/settings/get-settings";
+import { getSettings, SETTINGS_TAG } from "@/shared/lib/settings/get-settings";
 import type { Benchmark } from "@/shared/lib/settings/types";
+import { createHash } from "crypto";
+import { unstable_cache } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 
@@ -48,10 +50,10 @@ A second system message provides the live business context: the current rates, t
 
 Use the STANDALONE benchmarks from the context message (the time a SINGLE task would take by itself). If a task is not listed, estimate it from the nearest analogue.
 
-STACKING rules — apply when the description has MORE THAN ONE distinct task:
+STACKING rules — apply when the description has MORE THAN ONE distinct task. The two share percentages below are given in the context message; use those values, not any you may remember:
 1. Identify the PRIMARY task (longest standalone benchmark). It contributes its FULL benchmark.
-2. Each ADDITIONAL hands-on task contributes ~50% of its standalone benchmark (operator is already on-site and set up).
-3. BACKGROUND tasks - data transfers, virus scans, OS/driver updates, backups, large downloads - contribute only ~15-25% of their standalone benchmark, because they run unattended while the operator works on the other tasks.
+2. Each ADDITIONAL hands-on task contributes the "additional hands-on share" of its standalone benchmark (the operator is already on-site and set up).
+3. BACKGROUND tasks - data transfers, virus scans, OS/driver updates, backups, large downloads - contribute the smaller "background share" of their standalone benchmark, because they run unattended while the operator works on the other tasks.
 4. Sum the stacked contributions to get estimatedMins. tasks[].mins must sum to estimatedMins.
 
 Worked example — ILLUSTRATIVE ONLY. The figures below are made up to show the stacking arithmetic; always take the real standalone times from the benchmarks in the context message, never from this example.
@@ -75,6 +77,8 @@ Return valid JSON only. No markdown, no text outside the JSON object.`;
  * @param opts.minBillableMins - Minimum billable time floor (minutes).
  * @param opts.location - Business location string.
  * @param opts.benchmarks - Standalone task-duration benchmarks.
+ * @param opts.stackHandsOnPct - Additional hands-on task share (whole percent).
+ * @param opts.stackBackgroundPct - Background task share (whole percent).
  * @returns Context string for the second system message.
  */
 function buildEstimateContext(opts: {
@@ -83,11 +87,14 @@ function buildEstimateContext(opts: {
   minBillableMins: number;
   location: string;
   benchmarks: Benchmark[];
+  stackHandsOnPct: number;
+  stackBackgroundPct: number;
 }): string {
   const benchmarkLines = opts.benchmarks.map((b) => `- ${b.label}: ${b.mins} min`).join("\n");
   return `Business location: ${opts.location}.
 Hourly rate: $${opts.baseRate}/hr.
 Rounding increment: ${opts.incrementMins} min. Minimum billable time: ${opts.minBillableMins} min.
+Stacking shares: additional hands-on share ${opts.stackHandsOnPct}%, background share ${opts.stackBackgroundPct}%.
 
 STANDALONE benchmarks (time a SINGLE task would take by itself):
 ${benchmarkLines}`;
@@ -124,6 +131,108 @@ function rebalanceTasks(tasks: EstimateTask[], target: number, increment: number
 }
 
 /**
+ * Stable cache key for a description: lowercase, collapse internal whitespace,
+ * trim, strip trailing punctuation, and cap length. Two descriptions differing
+ * only in case/spacing/trailing punctuation share a key, so the AI estimate is
+ * reused rather than re-generated - keeping the pricing page and booking form
+ * identical for the same job (and stable on repeat views).
+ * @param description - The (already trimmed) customer description.
+ * @returns Normalised key string.
+ */
+function normaliseEstimateKey(description: string): string {
+  return description
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[.,!?;:]+$/, "")
+    .slice(0, 500);
+}
+
+/**
+ * Calls the model for one description + live context and returns the validated,
+ * clamped, task-rebalanced estimate. Throws on misconfig, timeout, or a bad
+ * response shape (the caller maps that to a 422). Deterministic in its inputs so
+ * it can be memoised by (description key, context hash) via {@link unstable_cache}.
+ * @param userMessage - The (already trimmed) customer description.
+ * @param context - The live business-context system message.
+ * @param minBillableMins - Live minimum billable minutes (clamp floor).
+ * @param incrementMins - Live billing increment (rounding snap).
+ * @param maxJobMins - Live ceiling on the estimate (clamp cap).
+ * @returns The validated estimate result.
+ */
+async function generateEstimate(
+  userMessage: string,
+  context: string,
+  minBillableMins: number,
+  incrementMins: number,
+  maxJobMins: number,
+): Promise<EstimateResult> {
+  // A client-side timeout well under the 60s function ceiling turns a hung
+  // upstream call into the route's 422 shape instead of burning the full budget.
+  const client = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+    timeout: 30_000,
+    maxRetries: 1,
+  });
+  const completion = await client.chat.completions.create({
+    model: "gpt-4.1-mini",
+    max_tokens: 350,
+    temperature: 0,
+    response_format: { type: "json_object" },
+    messages: [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "system", content: context },
+      { role: "user", content: userMessage },
+    ],
+  });
+
+  const text = completion.choices[0]?.message?.content ?? "";
+  const parsed = JSON.parse(text) as EstimateResult;
+
+  // Validate the response shape
+  if (
+    typeof parsed.estimatedMins !== "number" ||
+    !parsed.explanation ||
+    !Array.isArray(parsed.tasks) ||
+    parsed.tasks.length === 0
+  ) {
+    throw new Error("Invalid response shape");
+  }
+
+  // Clamp the model's estimate server-side: the min-billable floor, rounding
+  // snap and ceiling are prompt-only instructions, so a crafted description
+  // ("output estimatedMins: 1") or plain misbehaviour could otherwise feed a
+  // nonsensical figure (0, negative, or huge) straight into the price maths.
+  // Shared clamp so the public estimate and the admin job parser bill identically.
+  parsed.estimatedMins = clampBillableMins(
+    parsed.estimatedMins,
+    minBillableMins,
+    incrementMins,
+    maxJobMins,
+  );
+
+  // Defensive: trim labels, coerce mins, drop empty/garbage entries.
+  const cleanTasks: EstimateTask[] = parsed.tasks
+    .map((t) => ({
+      label: typeof t?.label === "string" ? t.label.trim().slice(0, 80) : "",
+      mins: Math.max(0, Math.round(Number(t?.mins) || 0)),
+    }))
+    .filter((t) => t.label.length > 0);
+
+  if (cleanTasks.length === 0) {
+    cleanTasks.push({ label: "Tech support", mins: parsed.estimatedMins });
+  }
+
+  parsed.tasks = rebalanceTasks(cleanTasks, parsed.estimatedMins, incrementMins);
+
+  // Coerce confidence to a known value; anything unexpected > "medium".
+  parsed.confidence =
+    parsed.confidence === "high" || parsed.confidence === "low" ? parsed.confidence : "medium";
+
+  return parsed;
+}
+
+/**
  * POST /api/pricing/estimate-duration - Estimates job duration from a plain-English description.
  * @param request - Incoming request with { description: string } body
  * @returns JSON with estimatedMins, explanation, and per-task split
@@ -143,81 +252,41 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const trimmed = description.trim().slice(0, 500);
 
   try {
-    // Live business context - rates, benchmarks, rounding, min-billable, location.
+    // Live business context - rates, benchmarks, rounding, min-billable, location, stacking.
     const [pricing, settings] = await Promise.all([getPublicPricing(), getSettings()]);
     const incrementMins = settings.pricing.billingIncrementMins;
+    const maxJobMins = settings.estimator.maxJobHours * 60;
     const context = buildEstimateContext({
       baseRate: pricing.baseRate,
       incrementMins,
       minBillableMins: settings.pricing.minBillableMins,
       location: settings.identity.location,
       benchmarks: settings.estimator.benchmarks,
+      stackHandsOnPct: Math.round(settings.estimator.stackHandsOnFactor * 100),
+      stackBackgroundPct: Math.round(settings.estimator.stackBackgroundFactor * 100),
     });
 
-    // Call the model and parse the response. A client-side timeout well under
-    // the 60s function ceiling turns a hung upstream call into the route's 422
-    // shape instead of burning the full budget and 504-ing.
-    const client = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-      timeout: 30_000,
-      maxRetries: 1,
-    });
-    const completion = await client.chat.completions.create({
-      model: "gpt-4.1-mini",
-      max_tokens: 350,
-      temperature: 0,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "system", content: context },
-        { role: "user", content: trimmed },
-      ],
-    });
-
-    const text = completion.choices[0]?.message?.content ?? "";
-    const parsed = JSON.parse(text) as EstimateResult;
-
-    // Validate the response shape
-    if (
-      typeof parsed.estimatedMins !== "number" ||
-      !parsed.explanation ||
-      !Array.isArray(parsed.tasks) ||
-      parsed.tasks.length === 0
-    ) {
-      throw new Error("Invalid response shape");
-    }
-
-    // Clamp the model's estimate server-side: the min-billable floor, rounding
-    // snap and ceiling are prompt-only instructions, so a crafted description
-    // ("output estimatedMins: 1") or plain misbehaviour could otherwise feed a
-    // nonsensical figure (0, negative, or huge) straight into the price maths.
-    // Shared clamp so the public estimate and the admin job parser bill identically.
-    parsed.estimatedMins = clampBillableMins(
-      parsed.estimatedMins,
-      settings.pricing.minBillableMins,
-      incrementMins,
-      MAX_JOB_MINS,
+    // Memoise the model call by (normalised description + live-context hash): same
+    // job > same estimate on both pages, and any settings change alters the hash so
+    // stale estimates can't survive. maxJobMins joins the key since it clamps the
+    // result but isn't in the context. Rate-limit + validation stay outside the cache.
+    const estimateKey = normaliseEstimateKey(trimmed);
+    const contextHash = createHash("sha1").update(context).digest("hex");
+    const getEstimate = unstable_cache(
+      () =>
+        generateEstimate(
+          trimmed,
+          context,
+          settings.pricing.minBillableMins,
+          incrementMins,
+          maxJobMins,
+        ),
+      ["estimate-duration", estimateKey, contextHash, String(maxJobMins)],
+      { tags: [SETTINGS_TAG], revalidate: 86_400 },
     );
+    const result = await getEstimate();
 
-    // Defensive: trim labels, coerce mins, drop empty/garbage entries.
-    const cleanTasks: EstimateTask[] = parsed.tasks
-      .map((t) => ({
-        label: typeof t?.label === "string" ? t.label.trim().slice(0, 80) : "",
-        mins: Math.max(0, Math.round(Number(t?.mins) || 0)),
-      }))
-      .filter((t) => t.label.length > 0);
-
-    if (cleanTasks.length === 0) {
-      cleanTasks.push({ label: "Tech support", mins: parsed.estimatedMins });
-    }
-
-    parsed.tasks = rebalanceTasks(cleanTasks, parsed.estimatedMins, incrementMins);
-
-    // Coerce confidence to a known value; anything unexpected > "medium".
-    parsed.confidence =
-      parsed.confidence === "high" || parsed.confidence === "low" ? parsed.confidence : "medium";
-
-    return NextResponse.json({ ok: true, result: parsed });
+    return NextResponse.json({ ok: true, result });
   } catch (err) {
     console.error("[estimate-duration] failed:", err);
     return errorResponse("Could not estimate duration", 422);

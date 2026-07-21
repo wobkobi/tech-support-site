@@ -186,9 +186,17 @@ export function PricingWizard({
       setAddressNotFound(true);
     }
 
+    // Resolve the live base + remote delta regardless of the AI call's outcome,
+    // so a failed/timed-out estimate still prices against the operator's current
+    // rate instead of the hardcoded fallback (mirrors quick-estimate.ts).
+    const baseStandard =
+      rates.find((r) => r.ratePerHour !== null && r.isDefault)?.ratePerHour ??
+      rates.find((r) => r.ratePerHour !== null)?.ratePerHour ??
+      FALLBACK_BASE_RATE;
+    const fullRate = baseStandard + remoteRateDelta(rates, meeting);
+
     // Fallback defaults when the AI estimate fails
     let estimatedMins = 60;
-    let fullRate = FALLBACK_BASE_RATE;
     let explanation = "";
     let confidence: EstimateConfidence = "medium";
     let tasks: { label: string; mins: number }[] = [];
@@ -199,13 +207,6 @@ export function PricingWizard({
       explanation = ai.explanation;
       confidence = ai.confidence ?? "medium";
       tasks = Array.isArray(ai.tasks) ? ai.tasks : [];
-
-      // Mirror effectiveHourlyRate: Standard base + stacked modifier deltas.
-      const baseStandard =
-        rates.find((r) => r.ratePerHour !== null && r.isDefault)?.ratePerHour ??
-        rates.find((r) => r.ratePerHour !== null)?.ratePerHour ??
-        FALLBACK_BASE_RATE;
-      fullRate = baseStandard + remoteRateDelta(rates, meeting);
     }
 
     // Travel rate is decoupled from labour; Remote/promo never touch it.
@@ -241,13 +242,17 @@ export function PricingWizard({
     const travel = calcTravelCharge(travelMins, travelMinsBack, travelRatePerHour, minTravelCharge);
 
     /**
-     * Visit total (floor applied) plus flat travel surcharge.
+     * Labour-only band (floor applied), with the drive-time charge alongside it
+     * for the separate travel line - not folded into low/high.
      * @param rate - Effective $/hr for labour.
-     * @returns Visit low/high plus the (rate-invariant) drive-time charge.
+     * @returns Labour low/high plus the (rate-invariant) drive-time charge.
      */
     const buildVisitRange = (rate: number): { low: number; high: number; travel: number } => {
       const { low, high } = rangeFor(effectiveMins, rate);
-      return { low: low + travel, high: high + travel, travel };
+      // Labour-only band; travel is surfaced on its own line (matching the
+      // booking form) rather than folded into the headline. The logged total
+      // below stays all-in so the booking snapshot is unchanged.
+      return { low, high, travel };
     };
 
     const promoRange = buildVisitRange(promoRate);
@@ -356,8 +361,10 @@ export function PricingWizard({
         travelMinsBack,
         meetingType: meeting === "on-site" ? "in_person" : "remote",
         hourlyRate: promoRate,
-        priceLow: promoRange.low,
-        priceHigh: promoRange.high,
+        // Logged total stays all-in (labour + travel) so the booking snapshot
+        // and legacy consumers keep the full price; the headline shows labour only.
+        priceLow: promoRange.low + promoRange.travel,
+        priceHigh: promoRange.high + promoRange.travel,
         travelCharge: promoRange.travel,
         promoTitle: activePromo?.title ?? null,
         promoLabel: activePromo ? summariseForBanner(activePromo) : null,
@@ -569,6 +576,11 @@ export function PricingWizard({
             <p className="text-4xl font-extrabold text-russian-violet sm:text-5xl">
               {formatPriceRound(result.low)} - {formatPriceRound(result.high)}
             </p>
+            {meeting !== "remote" && result.includesTravel && (result.travelCharge ?? 0) > 0 && (
+              <p className="mt-1 text-lg font-semibold text-slate-600">
+                + {formatPriceRound(result.travelCharge ?? 0)} round-trip travel
+              </p>
+            )}
             {result.promoLabel && (
               <p className="mt-2 text-sm font-semibold text-amber-700">⚡ {result.promoLabel}</p>
             )}
@@ -584,8 +596,8 @@ export function PricingWizard({
                     // charged - saying "$10 minimum" beside a $40 drive reads as
                     // if the customer is being quoted the floor.
                     (result.travelCharge ?? 0) <= minTravelCharge
-                    ? `Includes round-trip drive time at the Travel rate, ${formatPriceRound(minTravelCharge)} minimum. `
-                    : "Includes round-trip drive time at the Travel rate. "
+                    ? `Round-trip drive time is charged at the Travel rate, ${formatPriceRound(minTravelCharge)} minimum. `
+                    : "Round-trip drive time is charged at the Travel rate. "
                   : addressNotFound
                     ? "Address not found - actual travel will be confirmed before work begins. "
                     : ""}

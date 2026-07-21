@@ -10,6 +10,7 @@
 import { lookupDriveRoundTrip } from "@/features/business/lib/travel-distance";
 import { errorResponse, okResponse } from "@/shared/lib/api-response";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
+import { getSettings } from "@/shared/lib/settings/get-settings";
 import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -28,20 +29,14 @@ function parseIsoField(value: unknown): Date | undefined {
 }
 
 /**
- * Hour (NZ local) a no-slot estimate is priced at - mid-window of the 10am-6pm
- * bookable day, so the quote reflects typical daytime traffic rather than
- * whenever the customer happened to open the page.
- */
-const REPRESENTATIVE_HOUR_NZ = 14;
-
-/**
- * The next weekday at {@link REPRESENTATIVE_HOUR_NZ} NZ time. Used when the
- * caller has no chosen slot, so travel is quoted against a realistic visit
- * rather than live traffic at page-load.
+ * The next weekday at `hour` NZ time. Used when the caller has no chosen slot,
+ * so travel is quoted against a realistic visit rather than live traffic at
+ * page-load (an estimate opened at 11pm would otherwise price an empty motorway).
+ * @param hour - NZ-local hour to price against (live scheduling.travelQuoteHour).
  * @param now - Reference time (defaults to now).
  * @returns A UTC Date for that NZ-local moment.
  */
-function representativeDepartureTime(now: Date = new Date()): Date {
+function representativeDepartureTime(hour: number, now: Date = new Date()): Date {
   const [y, m, d] = now
     .toLocaleDateString("en-CA", { timeZone: "Pacific/Auckland" })
     .split("-")
@@ -59,7 +54,7 @@ function representativeDepartureTime(now: Date = new Date()): Date {
   const mm = cursor.getUTCMonth() + 1;
   const dd = cursor.getUTCDate();
   const offset = getPacificAucklandOffset(yy, mm, dd);
-  return new Date(Date.UTC(yy, mm - 1, dd, REPRESENTATIVE_HOUR_NZ - offset, 0, 0));
+  return new Date(Date.UTC(yy, mm - 1, dd, hour - offset, 0, 0));
 }
 
 /**
@@ -93,7 +88,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // estimate opened at 11pm prices an empty motorway for a job that will
   // actually happen mid-afternoon. Fall back to a representative bookable time
   // instead of "now".
-  const departureTime = parseIsoField(body?.departureTimeIso) ?? representativeDepartureTime();
+  const { scheduling } = await getSettings();
+  const departureTime =
+    parseIsoField(body?.departureTimeIso) ??
+    representativeDepartureTime(scheduling.travelQuoteHour);
   const returnTime =
     parseIsoField(body?.returnDepartureTimeIso) ??
     new Date(departureTime.getTime() + 60 * 60 * 1000);

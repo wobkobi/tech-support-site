@@ -7,7 +7,11 @@
  */
 
 import { priceRangeFor, remoteRateDelta } from "@/features/business/lib/estimate-range";
-import { calcTravelCharge } from "@/features/business/lib/pricing-policy";
+import {
+  calcTravelCharge,
+  FALLBACK_BASE_RATE,
+  FALLBACK_TRAVEL_RATE,
+} from "@/features/business/lib/pricing-policy";
 import { applyPromoToHourlyRate, type ActivePromo } from "@/features/business/lib/promos";
 import type { PublicRate } from "@/features/business/types/pricing";
 import type { EstimateConfidence, EstimatorRange } from "@/shared/lib/settings/types";
@@ -117,11 +121,11 @@ export async function fetchQuickEstimate(input: QuickEstimateInput): Promise<Qui
 
   // Resolve the live base + remote delta regardless of the AI duration call's
   // outcome, so a failed/timed-out estimate still prices against the operator's
-  // current rate instead of the hardcoded $65 fallback.
+  // current rate instead of the shared fallback rate.
   const baseStandard =
     rates.find((r) => r.ratePerHour !== null && r.isDefault)?.ratePerHour ??
     rates.find((r) => r.ratePerHour !== null)?.ratePerHour ??
-    65;
+    FALLBACK_BASE_RATE;
   const fullRate = baseStandard + remoteRateDelta(rates, meeting);
 
   let estimatedMins = 60;
@@ -137,7 +141,8 @@ export async function fetchQuickEstimate(input: QuickEstimateInput): Promise<Qui
   }
 
   const travelRatePerHour =
-    rates.find((r) => r.unit === "travel-hour" && r.ratePerHour !== null)?.ratePerHour ?? 40;
+    rates.find((r) => r.unit === "travel-hour" && r.ratePerHour !== null)?.ratePerHour ??
+    FALLBACK_TRAVEL_RATE;
   const promoRate = applyPromoToHourlyRate(fullRate, promo);
   const effectiveMins = Math.max(minBillableMins, estimatedMins);
   const band = priceRangeFor(effectiveMins, promoRate, confidence, estimatorRange);

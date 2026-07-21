@@ -519,7 +519,8 @@ export async function sendBookingReminderEmail(booking: BookingNotificationData)
     : "";
   const attachments = await bookingIcsAttachment(booking);
 
-  // Render the email body
+  // Render the email body. The "tomorrow" wording assumes comms.reminderLeadHours
+  // stays near 24h; revisit this copy if that lead time moves far from a day.
   const html = `
 <!DOCTYPE html>
 <html lang="en">
