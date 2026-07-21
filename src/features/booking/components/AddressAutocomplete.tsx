@@ -12,10 +12,12 @@
  * pick), after which the token is discarded - a token is never reused across
  * lookups.
  *
- * Fallback ladder: missing API key or any script/fetch failure permanently
- * drops the field to a plain text input with a visible warning, and
- * `onFallbackMode` tells the parent to relax any pick-a-suggestion gates. The
- * booking flow must never break on a Google-side problem.
+ * Fallback ladder: a missing API key, script failure, or fetch failure drops
+ * the field to a plain text input with a visible warning, and `onFallbackMode`
+ * tells the parent to relax any pick-a-suggestion gates. Script/fetch failures
+ * are NOT permanent: further typing retries, and a success clears the warning
+ * and fires `onRecovered` so the parent can restore its gates. The booking
+ * flow must never break on a Google-side problem.
  */
 
 "use client";
@@ -25,12 +27,27 @@ import { loadPlacesLibrary } from "@/shared/lib/google-maps-loader";
 import useOnVisible from "@/shared/lib/useOnVisible";
 import type React from "react";
 import { useEffect, useId, useRef, useState } from "react";
-import { FaTriangleExclamation } from "react-icons/fa6";
+import { FaLocationDot, FaTriangleExclamation } from "react-icons/fa6";
 
 /** Debounce between the last keystroke and the suggestion fetch. */
 const FETCH_DEBOUNCE_MS = 250;
 /** Minimum typed characters before suggestions are fetched. */
-const MIN_FETCH_CHARS = 3;
+const MIN_FETCH_CHARS = 2;
+
+/**
+ * Hard filter: suggestions only from the greater Auckland region (Wellsford
+ * down past Pukekohe, west coast to Great Barrier). A soft locationBias was
+ * tried first and text relevance still ranked same-named streets in Levin /
+ * Christchurch above local ones. The service area is Auckland-only, so a
+ * restriction is honest - and an out-of-area address can still be typed in
+ * full, the field has always accepted free text.
+ */
+const LOCATION_RESTRICTION = {
+  north: -35.9,
+  south: -37.35,
+  east: 175.6,
+  west: 174.0,
+};
 
 /** Normalised selection payload handed to `onPlaceSelected`. */
 export interface SelectedPlace {
@@ -44,10 +61,39 @@ interface SuggestionItem {
   id: string;
   /** Bold main line (street address). */
   mainText: string;
+  /** Ranges of {@link SuggestionItem.mainText} that matched the typed input. */
+  mainMatches: Array<{ start: number; end: number }>;
   /** Muted secondary line (suburb / city). */
   secondaryText: string;
   /** The prediction, kept for `toPlace()` on selection. */
   prediction: google.maps.places.PlacePrediction;
+}
+
+/**
+ * Renders a suggestion's main line with the typed-input matches highlighted,
+ * mirroring the legacy widget's `.pac-matched` treatment (coquelicot, bold).
+ * @param text - The full main line.
+ * @param matches - Matched ranges within it.
+ * @returns Interleaved plain / highlighted spans.
+ */
+function renderHighlighted(
+  text: string,
+  matches: Array<{ start: number; end: number }>,
+): React.ReactNode[] {
+  if (matches.length === 0) return [text];
+  const out: React.ReactNode[] = [];
+  let cursor = 0;
+  for (const [i, m] of matches.entries()) {
+    if (m.start > cursor) out.push(text.slice(cursor, m.start));
+    out.push(
+      <span key={i} className="font-bold text-coquelicot-500">
+        {text.slice(m.start, m.end)}
+      </span>,
+    );
+    cursor = m.end;
+  }
+  if (cursor < text.length) out.push(text.slice(cursor));
+  return out;
 }
 
 /**
@@ -61,11 +107,13 @@ export interface AddressAutocompleteProps {
   /** Fired when a suggestion is selected, with the normalised payload. */
   onPlaceSelected?: (place: SelectedPlace) => void;
   /**
-   * Fired exactly once when the Places API can't be used (missing key, script
-   * load failure, or a failing suggestion fetch) so the parent can bypass any
-   * "must pick a suggestion" gates.
+   * Fired when the Places API can't be used (missing key, script load failure,
+   * or a failing suggestion fetch) so the parent can bypass any "must pick a
+   * suggestion" gates. Fires once per outage - a recovery re-arms it.
    */
   onFallbackMode?: () => void;
+  /** Fired when autocomplete comes back after a failure, so the parent can restore its gates. */
+  onRecovered?: () => void;
   /** Input placeholder text */
   placeholder?: string;
   /** Whether the field is required */
@@ -95,7 +143,8 @@ export interface AddressAutocompleteProps {
  * @param props.value - Current address value.
  * @param props.onChange - Callback when address changes.
  * @param props.onPlaceSelected - Callback when a suggestion is selected.
- * @param props.onFallbackMode - Fired once if the Places API can't be used.
+ * @param props.onFallbackMode - Fired once per outage when the Places API can't be used.
+ * @param props.onRecovered - Fired when autocomplete comes back after a failure.
  * @param props.placeholder - Input placeholder text.
  * @param props.required - Whether the field is required.
  * @param props.maxLength - Optional max character length for the input.
@@ -112,6 +161,7 @@ export default function AddressAutocomplete({
   onChange,
   onPlaceSelected,
   onFallbackMode,
+  onRecovered,
   placeholder = "Start typing your address...",
   required = false,
   maxLength,
@@ -143,12 +193,35 @@ export default function AddressAutocomplete({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Monotonic fetch counter so a slow response can't overwrite a newer one.
   const fetchSeqRef = useRef(0);
+  // Ref mirror of scriptError so async handlers see the current value, and a
+  // guard against overlapping load retries.
+  const errorRef = useRef(false);
+  const loadingLibRef = useRef(false);
 
   const isVisible = useOnVisible(wrapperRef);
 
-  // Notify the parent that the field is permanently in fallback mode (no
-  // autocomplete available). Fires whether the cause is a missing key, a
-  // script error, or a failed fetch.
+  /** Enters the visible-warning fallback state (idempotent). */
+  function markFailed(): void {
+    errorRef.current = true;
+    setScriptError(true);
+  }
+
+  /**
+   * Clears the fallback after a successful retry: the warning disappears, the
+   * parent is told autocomplete is back, and the one-shot onFallbackMode latch
+   * re-arms for any future outage.
+   */
+  function markRecovered(): void {
+    if (!errorRef.current) return;
+    errorRef.current = false;
+    setScriptError(false);
+    fallbackFiredRef.current = false;
+    onRecovered?.();
+  }
+
+  // Notify the parent that the field is in fallback mode (no autocomplete
+  // available). Fires whether the cause is a missing key, a script error, or a
+  // failed fetch; once per outage.
   useEffect(() => {
     if (fallbackFiredRef.current) return;
     if (apiKeyMissing || scriptError) {
@@ -171,12 +244,34 @@ export default function AddressAutocomplete({
       })
       .catch((err) => {
         console.error("[AddressAutocomplete] Failed to load Maps API:", err);
-        if (!cancelled) setScriptError(true);
+        if (!cancelled) markFailed();
       });
     return () => {
       cancelled = true;
     };
   }, [isVisible, apiKey]);
+
+  /**
+   * Retries the library load after an earlier failure, throttled to one
+   * attempt at a time. Called from typing, so a customer whose connection
+   * blipped gets autocomplete back just by continuing to type.
+   */
+  function retryLoad(): void {
+    if (!apiKey || placesRef.current || loadingLibRef.current) return;
+    loadingLibRef.current = true;
+    loadPlacesLibrary(apiKey)
+      .then((lib) => {
+        placesRef.current = lib;
+        markRecovered();
+      })
+      .catch((err) => {
+        console.error("[AddressAutocomplete] Maps retry failed:", err);
+        markFailed();
+      })
+      .finally(() => {
+        loadingLibRef.current = false;
+      });
+  }
 
   // Clear any pending debounce on unmount.
   useEffect(() => {
@@ -208,7 +303,7 @@ export default function AddressAutocomplete({
 
   /**
    * Fetches suggestions for the typed input under the current session token.
-   * Any failure latches the permanent plain-input fallback.
+   * A failure shows the plain-input fallback warning; a later success clears it.
    * @param input - The typed address fragment.
    */
   async function fetchSuggestions(input: string): Promise<void> {
@@ -222,26 +317,34 @@ export default function AddressAutocomplete({
           input,
           sessionToken: tokenRef.current,
           includedRegionCodes: ["nz"],
+          locationRestriction: LOCATION_RESTRICTION,
         });
       if (seq !== fetchSeqRef.current) return; // stale response
       const items: SuggestionItem[] = results
         .map((s, i) => {
           const p = s.placePrediction;
           if (!p) return null;
+          const main = p.mainText;
           return {
             id: `${listboxId}-option-${i}`,
-            mainText: p.mainText?.toString() ?? p.text.toString(),
+            mainText: main?.toString() ?? p.text.toString(),
+            mainMatches: (main?.matches ?? []).map((r) => ({
+              start: r.startOffset,
+              end: r.endOffset,
+            })),
             secondaryText: p.secondaryText?.toString() ?? "",
             prediction: p,
           };
         })
         .filter((x): x is SuggestionItem => x !== null);
+      // A working fetch after an outage clears the warning + restores gates.
+      markRecovered();
       setSuggestions(items);
       setOpen(items.length > 0);
       setActiveIndex(-1);
     } catch (err) {
       console.error("[AddressAutocomplete] Suggestion fetch failed:", err);
-      setScriptError(true);
+      markFailed();
       setOpen(false);
     }
   }
@@ -257,6 +360,9 @@ export default function AddressAutocomplete({
     // input branch an in-flight fetch for the longer text would otherwise come
     // back and reopen the dropdown the user just typed away from.
     cancelPendingFetch();
+    // After a failed script load, each keystroke retries (throttled to one
+    // in-flight attempt) so a connection blip fixes itself as the user types.
+    if (!placesRef.current && errorRef.current) retryLoad();
     const trimmed = raw.trim();
     if (!placesRef.current || trimmed.length < MIN_FETCH_CHARS) {
       setSuggestions([]);
@@ -362,11 +468,15 @@ export default function AddressAutocomplete({
       />
 
       {open && suggestions.length > 0 && (
+        // Container/row treatment mirrors the deleted `.pac-container` CSS so
+        // the dropdown looks the same as the legacy widget did: seasalt
+        // gradient, 12px radius, moonstone inner ring, pin column, hover
+        // gradient, matched text in coquelicot.
         <ul
           id={listboxId}
           role="listbox"
           aria-label="Address suggestions"
-          className="absolute top-full right-0 left-0 z-50 mt-1 overflow-hidden rounded-md border border-seasalt-400/80 bg-seasalt shadow-lg"
+          className="absolute top-full right-0 left-0 z-50 mt-1.5 rounded-xl bg-linear-to-b from-seasalt-800 to-seasalt-600 p-1.5 shadow-[0_10px_24px_rgba(12,10,62,0.12),inset_0_0_0_1px_rgba(122,178,192,0.35)]"
         >
           {suggestions.map((s, i) => (
             <li
@@ -380,16 +490,22 @@ export default function AddressAutocomplete({
               onClick={() => void selectSuggestion(s)}
               onMouseEnter={() => setActiveIndex(i)}
               className={cn(
-                "cursor-pointer px-4 py-2.5 text-base text-rich-black",
-                i === activeIndex && "bg-russian-violet/10",
+                "flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm text-rich-black",
+                i === activeIndex &&
+                  "bg-linear-to-r from-russian-violet-800/15 to-moonstone-700/15",
               )}
             >
-              <span className="font-medium">{s.mainText}</span>
-              {s.secondaryText && <span className="text-rich-black/60"> {s.secondaryText}</span>}
+              <FaLocationDot className="h-4 w-4 shrink-0 text-rich-black/40" aria-hidden />
+              <span className="min-w-0 truncate">
+                <span className="font-semibold">
+                  {renderHighlighted(s.mainText, s.mainMatches)}
+                </span>
+                {s.secondaryText && <span className="text-rich-black/60"> {s.secondaryText}</span>}
+              </span>
             </li>
           ))}
           {/* Required attribution: predictions shown outside a Google map. */}
-          <li aria-hidden className="px-4 py-1.5 text-right text-xs text-rich-black/40">
+          <li aria-hidden className="px-3 py-1 text-right text-xs text-rich-black/40">
             powered by Google
           </li>
         </ul>

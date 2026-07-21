@@ -1335,6 +1335,14 @@ export default function BookingForm({
                         // mode) was the only thing that would have gated it.
                         setAddressVerified(true);
                       }}
+                      onRecovered={() => {
+                        // Autocomplete is back: restore the verify gate so the
+                        // address is picked/verified again rather than waved
+                        // through on the outage-mode exemption.
+                        setMapsFallback(false);
+                        setAddressVerified(false);
+                        setAddressOverrideAcked(false);
+                      }}
                       placeholder="Start typing your street address..."
                       required
                       aria-invalid={!!fieldErrors.address || undefined}
