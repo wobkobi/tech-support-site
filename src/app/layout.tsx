@@ -9,6 +9,7 @@ import { MetaPixel } from "@/shared/components/MetaPixel";
 import { NavBar } from "@/shared/components/NavBar";
 import { PromoBanner } from "@/shared/components/PromoBanner";
 import { SiteFooter } from "@/shared/components/SiteFooter";
+import { DEFAULT_SETTINGS } from "@/shared/lib/settings/defaults";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import { getSiteUrl } from "@/shared/lib/site-url";
 import { Analytics } from "@vercel/analytics/next";
@@ -149,7 +150,13 @@ export default async function RootLayout({
       opens: `${String(availability.schedule[d].open).padStart(2, "0")}:00`,
       closes: `${String(availability.schedule[d].close).padStart(2, "0")}:00`,
     }));
-  const servedSuburbs = identity.servedSuburbs.map((s) => s.trim()).filter(Boolean);
+  // Fall back to the default suburb list when the stored list is empty - an
+  // identity row seeded before servedSuburbs existed stores [], which would
+  // otherwise blank the areaServed list.
+  const suburbSource = identity.servedSuburbs.length
+    ? identity.servedSuburbs
+    : DEFAULT_SETTINGS.identity.servedSuburbs;
+  const servedSuburbs = suburbSource.map((s) => s.trim()).filter(Boolean);
   // One coverage circle centred on the base address; the radius is operator-set.
   const geoMidpoint = {
     "@type": "GeoCoordinates",
