@@ -240,7 +240,9 @@ export default function ReviewFormProtected({
             />
           </svg>
           <span className="font-semibold">Your personal review link</span>
-          <span className="text-moonstone-600/80">• tied to your appointment, no sign-in needed</span>
+          <span className="text-moonstone-600/80">
+            • tied to your appointment, no sign-in needed
+          </span>
         </div>
       )}
 
