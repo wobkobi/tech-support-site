@@ -67,6 +67,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     email?: string;
     address?: string;
     reviewToken?: string;
+    retainerTier?: string;
+    retainerPrice?: number;
+    retainerHours?: number;
+    retainerSince?: Date;
+    retainerNotes?: string;
+    siteNotes?: string;
     altEmails: { set: string[] };
     altPhones: { set: string[] };
     altReviewTokens: { set: string[] };
@@ -75,6 +81,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!primary.email && secondary.email) data.email = secondary.email;
   if (!primary.address && secondary.address) data.address = secondary.address;
   if (!primary.reviewToken && secondary.reviewToken) data.reviewToken = secondary.reviewToken;
+  if (!primary.siteNotes && secondary.siteNotes) data.siteNotes = secondary.siteNotes;
+  // Retainer arrangement survives a merge: when only the secondary is the
+  // retainer client, its whole arrangement moves over as a unit (gated on the
+  // primary's tier so a partial mix of two arrangements can't result).
+  if (!primary.retainerTier && secondary.retainerTier) {
+    data.retainerTier = secondary.retainerTier;
+    if (secondary.retainerPrice !== null) data.retainerPrice = secondary.retainerPrice;
+    if (secondary.retainerHours !== null) data.retainerHours = secondary.retainerHours;
+    if (secondary.retainerSince !== null) data.retainerSince = secondary.retainerSince;
+    if (secondary.retainerNotes !== null) data.retainerNotes = secondary.retainerNotes;
+  }
 
   // Fold every email both contacts know into altEmails (minus the surviving
   // primary address). This is what stops the pair re-splitting: a future booking

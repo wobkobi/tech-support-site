@@ -52,6 +52,7 @@ export default async function AdminContactsPage(): Promise<React.ReactElement> {
         address: true,
         createdAt: true,
         googleContactId: true,
+        retainerTier: true,
       },
     }),
     prisma.review.findMany({
@@ -101,6 +102,7 @@ export default async function AdminContactsPage(): Promise<React.ReactElement> {
     address: c.address ?? null,
     createdAt: c.createdAt.toISOString(),
     googleContactId: c.googleContactId ?? null,
+    retainerTier: c.retainerTier ?? null,
     reviews: reviewsByContactId.get(c.id) ?? [],
   }));
 

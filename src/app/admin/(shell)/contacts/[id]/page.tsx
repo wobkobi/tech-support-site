@@ -138,6 +138,12 @@ export default async function ContactDetailPage({
             phone={contact.phone}
             address={contact.address}
             googleContactId={contact.googleContactId}
+            retainerTier={contact.retainerTier}
+            retainerPrice={contact.retainerPrice}
+            retainerHours={contact.retainerHours}
+            retainerSince={contact.retainerSince?.toISOString().slice(0, 10) ?? null}
+            retainerNotes={contact.retainerNotes}
+            siteNotes={contact.siteNotes}
           />
         }
       />
@@ -221,6 +227,45 @@ export default async function ContactDetailPage({
               <InfoRow label="Added">{formatDateShort(contact.createdAt.toISOString())}</InfoRow>
             </dl>
           </Card>
+
+          {contact.siteNotes && (
+            <Card>
+              <CardHeader title="Site notes" description="Environment details from past visits." />
+              <p className="text-sm font-medium whitespace-pre-wrap text-admin-text">
+                {contact.siteNotes}
+              </p>
+            </Card>
+          )}
+
+          {contact.retainerTier && (
+            <Card>
+              <CardHeader title="Retainer" />
+              <dl className="space-y-2 text-sm">
+                <InfoRow label="Tier">
+                  <StatusPill tone="violet">{contact.retainerTier}</StatusPill>
+                </InfoRow>
+                <InfoRow label="Monthly">
+                  {contact.retainerPrice !== null ? formatNZD(contact.retainerPrice) : NONE}
+                </InfoRow>
+                <InfoRow label="Included hrs">
+                  {contact.retainerHours !== null ? `${contact.retainerHours}h/month` : NONE}
+                </InfoRow>
+                <InfoRow label="Since">
+                  {contact.retainerSince
+                    ? formatDateShort(contact.retainerSince.toISOString())
+                    : NONE}
+                </InfoRow>
+                {contact.retainerNotes && (
+                  <div>
+                    <dt className="text-admin-muted">Notes</dt>
+                    <dd className="mt-1 font-medium whitespace-pre-wrap text-admin-text">
+                      {contact.retainerNotes}
+                    </dd>
+                  </div>
+                )}
+              </dl>
+            </Card>
+          )}
 
           <Card>
             <CardHeader title="Review link" />
