@@ -40,7 +40,7 @@ export function ManageLookupForm({ phone, phoneTel }: ManageLookupFormProps): Re
    * Submits the lookup.
    * @param e - Form submit event.
    */
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>): Promise<void> {
+  async function handleSubmit(e: React.SubmitEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault();
     setState({ kind: "sending" });
     try {

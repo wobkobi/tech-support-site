@@ -9,7 +9,7 @@
 
 import { useRouter } from "next/navigation";
 import type React from "react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 interface LoginFormProps {
   /** Validated relative path to land on after a successful sign-in. */
@@ -29,14 +29,20 @@ export function LoginForm({ nextPath }: LoginFormProps): React.ReactElement {
   const [secret, setSecret] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const secretRef = useRef<HTMLInputElement>(null);
 
   /**
    * Submits the secret. On 2xx response, navigates to nextPath. On any other
    * response (4xx, 5xx, network) shows a generic error.
    * @param e - Form submit event.
    */
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>): Promise<void> {
+  async function handleSubmit(e: React.SubmitEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault();
+    // Read the live DOM value, not React state: a password-manager autofill
+    // can populate the field without firing an input event, leaving state
+    // empty while the input visibly holds the secret.
+    const value = secretRef.current?.value ?? secret;
+    if (!value) return;
     setError(null);
     setBusy(true);
     try {
@@ -44,7 +50,7 @@ export function LoginForm({ nextPath }: LoginFormProps): React.ReactElement {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ secret }),
+        body: JSON.stringify({ secret: value }),
       });
       if (!res.ok) {
         setError("Sign-in failed. Try again.");
@@ -63,10 +69,26 @@ export function LoginForm({ nextPath }: LoginFormProps): React.ReactElement {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+      {/* Visually-hidden username: password managers key saved logins on a
+          username field, so a password-only form saves with a blank username
+          and autofill gets flaky. Off-screen (not display:none) so managers
+          still see it. */}
+      <input
+        type="text"
+        name="username"
+        autoComplete="username"
+        defaultValue="admin"
+        readOnly
+        aria-hidden="true"
+        tabIndex={-1}
+        style={{ position: "absolute", left: "-9999px", width: 1, height: 1 }}
+      />
       <label className="flex flex-col gap-1">
         <span className="text-xs font-semibold text-slate-600">Admin secret</span>
         <input
+          ref={secretRef}
           type="password"
+          name="password"
           autoComplete="current-password"
           autoFocus
           required
@@ -83,7 +105,7 @@ export function LoginForm({ nextPath }: LoginFormProps): React.ReactElement {
       )}
       <button
         type="submit"
-        disabled={busy || secret.length === 0}
+        disabled={busy}
         className="inline-flex h-11 items-center justify-center rounded-lg bg-russian-violet px-4 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
       >
         {busy ? "Signing in..." : "Sign in"}
