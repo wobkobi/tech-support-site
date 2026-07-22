@@ -33,6 +33,18 @@ const DEFAULTS = [
     isDefault: true,
   },
   {
+    // Business callouts: on-site work for companies bills above the home
+    // Standard rate. Surfaced on /business as baseRate + this delta; kept off
+    // the consumer pricing accordion.
+    label: "Business",
+    ratePerHour: null,
+    flatRate: null,
+    hourlyDelta: 20,
+    percentDelta: null,
+    unit: "modifier",
+    isDefault: false,
+  },
+  {
     label: "At home",
     ratePerHour: null,
     flatRate: null,
@@ -208,7 +220,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
 /**
  * DELETE /api/business/rates - Wipes every rate row and reseeds the defaults
- * (Standard base + modifier set + Travel flat rate).
+ * (Standard base + modifier set).
  * @param request - Incoming Next.js request
  * @returns JSON with the freshly-seeded rates array
  */

@@ -46,6 +46,9 @@ const WORKMANSHIP_WINDOW_DAYS = 30;
 /** Fallback Standard base rate ($/hr) when no default hourly RateConfig row exists; mirrors the seed default. */
 export const FALLBACK_BASE_RATE = 65;
 
+/** Fallback Business modifier ($/hr on top of the base rate) when no Business RateConfig row exists; mirrors the seed default. */
+export const FALLBACK_BUSINESS_DELTA = 20;
+
 /** Region label for nationwide NZ public holidays in the PublicHoliday table. */
 export const NZ_REGION = "NZ";
 /** Region for the operator's regional anniversary day (also charged the uplift). */

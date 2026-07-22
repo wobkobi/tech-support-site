@@ -255,6 +255,26 @@ export default async function Home(): Promise<React.ReactElement> {
             </div>
           </section>
 
+          {/* Business strip */}
+          <section
+            aria-labelledby="business-strip-heading"
+            className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-300 text-center")}
+          >
+            <h2
+              id="business-strip-heading"
+              className="mb-2 text-xl font-bold text-russian-violet sm:text-2xl"
+            >
+              Run a small business?
+            </h2>
+            <p className="mx-auto mb-4 max-w-2xl text-base text-rich-black/90 sm:text-lg">
+              Ad-hoc IT help when things break, or a monthly retainer for ongoing cover - no
+              lock-in.
+            </p>
+            <Button href="/business" variant="tertiary" size="md">
+              Business IT support
+            </Button>
+          </section>
+
           {/* About & Approach */}
           <section aria-label="About and approach" className="grid gap-5 md:grid-cols-2 md:gap-6">
             <article className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-300")}>

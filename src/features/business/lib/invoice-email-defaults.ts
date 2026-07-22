@@ -9,6 +9,10 @@
 export const DEFAULT_INVOICE_EMAIL_BODY =
   "Thanks so much for the work - I really appreciate you choosing me for your tech support. Your invoice is attached below.";
 
+/** Default intro for quote emails - acceptance instructions live in the details block + PDF. */
+export const DEFAULT_QUOTE_EMAIL_BODY =
+  "Thanks for getting in touch - your quote is attached. If you're happy with it, just reply to this email or give me a ring and I'll get it booked in.";
+
 /**
  * Default body for the "your invoice has been voided" notification email.
  * Sent atomically when the operator voids a SENT or PAID invoice and ticks the

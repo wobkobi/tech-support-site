@@ -7,6 +7,7 @@
 
 import {
   FALLBACK_BASE_RATE,
+  FALLBACK_BUSINESS_DELTA,
   GST_RATE,
   HOME_REGION,
   NZ_REGION,
@@ -103,6 +104,8 @@ export interface PublicPricing {
   baseRate: number;
   /** Travel hourly rate, used for round-trip drive billing. */
   travelRatePerHour: number;
+  /** Effective business hourly rate (base + Business modifier delta); shown on /business only. */
+  businessRate: number;
   /** Customer-facing modifier list rendered in the Modifiers accordion. */
   modifiers: PublicModifier[];
   /** Most-recent updatedAt across all RateConfig rows; powers the "rates last updated" footer. */
@@ -137,6 +140,14 @@ export const getPublicPricing = cache(async (): Promise<PublicPricing> => {
   // Travel rate is a pricing setting, not a rate row - the operator edits it
   // in Settings > Pricing and it can't drift via the calculator's rate panel.
   const travelRatePerHour = pricing.travelRatePerHour;
+
+  // Business rate = base + the Business modifier row's delta. The row is
+  // deliberately absent from the consumer accordion allowlist below; only the
+  // /business page renders this figure.
+  const businessDelta =
+    rows.find((r) => r.label === "Business" && r.unit === "modifier")?.hourlyDelta ??
+    FALLBACK_BUSINESS_DELTA;
+  const businessRate = Math.round((baseRate + businessDelta) * 100) / 100;
 
   // Public Holiday uses percentDelta; the rest use hourlyDelta.
   const modifiers: PublicModifier[] = [];
@@ -180,6 +191,7 @@ export const getPublicPricing = cache(async (): Promise<PublicPricing> => {
   return {
     baseRate,
     travelRatePerHour,
+    businessRate,
     modifiers,
     ratesUpdatedAt: isoMax ? new Date(isoMax) : null,
   };

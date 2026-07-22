@@ -313,8 +313,15 @@ export default async function ServicesPage(): Promise<React.ReactElement> {
               </ul>
 
               <p className="mt-3 text-base text-rich-black/90 sm:text-lg">
-                No ongoing contracts required. You call when you need help.
+                No lock-in required - call when you need help, or set up a monthly retainer for
+                ongoing cover.
               </p>
+
+              <div className="mt-4">
+                <Button href="/business" variant="tertiary" size="md">
+                  Business IT support
+                </Button>
+              </div>
             </section>
           </div>
 

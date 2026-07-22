@@ -8,6 +8,7 @@ import { buildIcs } from "@/features/booking/lib/ics";
 import { formatNZD } from "@/features/business/lib/business";
 import {
   DEFAULT_INVOICE_EMAIL_BODY,
+  DEFAULT_QUOTE_EMAIL_BODY,
   DEFAULT_VOID_EMAIL_BODY,
 } from "@/features/business/lib/invoice-email-defaults";
 import { cancellationCopy } from "@/features/business/lib/pricing-policy";
@@ -806,6 +807,10 @@ export interface InvoiceEmailData {
   dueDate: Date;
   total: number;
   driveWebUrl?: string | null;
+  /** True when the row is a quote - switches subject/body to quote wording. */
+  isQuote?: boolean | null;
+  /** Quote validity end; shown in place of the due date. */
+  quoteValidUntil?: Date | null;
 }
 
 interface BuildInvoiceEmailArgs {
@@ -833,10 +838,12 @@ export async function buildInvoiceEmail({
 }: BuildInvoiceEmailArgs): Promise<{ subject: string; html: string }> {
   const siteUrl = getSiteUrl();
   const identity = await getIdentity();
-  const bodyText = (customBody ?? DEFAULT_INVOICE_EMAIL_BODY).trim();
+  const isQuote = invoice.isQuote === true;
+  const defaultBody = isQuote ? DEFAULT_QUOTE_EMAIL_BODY : DEFAULT_INVOICE_EMAIL_BODY;
+  const bodyText = (customBody ?? defaultBody).trim();
   // pre-wrap preserves line breaks the operator typed; escape first so the
   // body can never inject markup.
-  const safeBody = escapeHtml(bodyText || DEFAULT_INVOICE_EMAIL_BODY);
+  const safeBody = escapeHtml(bodyText || defaultBody);
   // Greeting: caller-supplied override wins; otherwise fall back to the first
   // word of clientName. The Send modal lets the operator type the right name
   // per send, so there's no auto-detection of company vs person here.
@@ -848,15 +855,35 @@ export async function buildInvoiceEmail({
   const dueDate = escapeHtml(formatDateShort(invoice.dueDate));
   const totalLabel = escapeHtml(formatNZD(invoice.total));
   const driveLink = invoice.driveWebUrl
-    ? `<p style="margin:0 0 16px;font-size:14px;color:#555">An online copy is also here: <a href="${escapeHtml(invoice.driveWebUrl)}" style="color:#43bccd">view invoice</a>.</p>`
+    ? `<p style="margin:0 0 16px;font-size:14px;color:#555">An online copy is also here: <a href="${escapeHtml(invoice.driveWebUrl)}" style="color:#43bccd">view ${isQuote ? "quote" : "invoice"}</a>.</p>`
     : "";
-  const reviewLine = reviewUrl
-    ? `<p style="margin:24px 0 0;font-size:14px;color:#555">If you've got a moment, I'd love to hear how it went - you can <a href="${escapeHtml(reviewUrl)}" style="color:#43bccd">leave a quick review here</a>. It's anonymous if you'd prefer.</p>`
-    : "";
+  // No review ask on a quote - the job hasn't happened yet.
+  const reviewLine =
+    reviewUrl && !isQuote
+      ? `<p style="margin:24px 0 0;font-size:14px;color:#555">If you've got a moment, I'd love to hear how it went - you can <a href="${escapeHtml(reviewUrl)}" style="color:#43bccd">leave a quick review here</a>. It's anonymous if you'd prefer.</p>`
+      : "";
+
+  // Quote emails swap the due line for validity and drop the bank block -
+  // payment details come with the invoice after acceptance.
+  const dateLine = isQuote
+    ? invoice.quoteValidUntil
+      ? `<p style="margin:0"><strong>Valid until:</strong> ${escapeHtml(formatDateShort(invoice.quoteValidUntil))}</p>`
+      : ""
+    : `<p style="margin:0"><strong>Due:</strong> ${dueDate} (${identity.paymentTermsDays} days from issue)</p>`;
+  const paymentBlock = isQuote
+    ? ""
+    : `<p style="margin:0 0 8px;font-size:14px;color:#333"><strong>Bank transfer:</strong></p>
+    <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#333">
+      Payee: ${escapeHtml(identity.name)}<br />
+      Account: <strong>${escapeHtml(identity.bankAccount)}</strong><br />
+      Reference: <strong>${safeNumber}</strong>
+    </p>`;
 
   // Append " Tech" to match the signature and body brand name, so the subject
   // and the rest of the same email show one consistent business name.
-  const subject = `Your invoice from ${identity.company} Tech (${invoice.number})`;
+  const subject = isQuote
+    ? `Your quote from ${identity.company} Tech (${invoice.number})`
+    : `Your invoice from ${identity.company} Tech (${invoice.number})`;
   const html = `<!doctype html>
 <html lang="en">
 <head><meta charset="utf-8" /></head>
@@ -867,19 +894,14 @@ export async function buildInvoiceEmail({
     <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#333;white-space:pre-wrap">${safeBody}</p>
 
     <div style="margin:0 0 16px;padding:12px 16px;background:#f3f4f6;border-radius:8px;font-size:14px;color:#333">
-      <p style="margin:0 0 4px"><strong>Invoice:</strong> ${safeNumber}</p>
+      <p style="margin:0 0 4px"><strong>${isQuote ? "Quote" : "Invoice"}:</strong> ${safeNumber}</p>
       <p style="margin:0 0 4px"><strong>Total:</strong> ${totalLabel}</p>
-      <p style="margin:0"><strong>Due:</strong> ${dueDate} (${identity.paymentTermsDays} days from issue)</p>
+      ${dateLine}
     </div>
 
     ${driveLink}
 
-    <p style="margin:0 0 8px;font-size:14px;color:#333"><strong>Bank transfer:</strong></p>
-    <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#333">
-      Payee: ${escapeHtml(identity.name)}<br />
-      Account: <strong>${escapeHtml(identity.bankAccount)}</strong><br />
-      Reference: <strong>${safeNumber}</strong>
-    </p>
+    ${paymentBlock}
 
     <p style="margin:0;font-size:14px;color:#333">Any questions, just reply.</p>
 
@@ -946,7 +968,7 @@ export async function sendInvoiceEmail({
       html,
       attachments: [
         {
-          filename: `Invoice ${invoice.number}.pdf`,
+          filename: `${invoice.isQuote ? "Quote" : "Invoice"} ${invoice.number}.pdf`,
           content: Buffer.from(pdfBytes),
         },
       ],
@@ -1186,5 +1208,150 @@ export async function sendVoidNotification({
   } catch (error) {
     console.error(`[email] Failed to send void notification for ${invoice.number}:`, error);
     return false;
+  }
+}
+
+/** Business enquiry data used for the operator notification + enquirer ack. */
+export interface BusinessEnquiryData {
+  /** Company or trading name; null for a personal enquiry. */
+  company: string | null;
+  /** Contact person's name. */
+  name: string;
+  /** Contact email (reply-to target for the notification). */
+  email: string;
+  /** Contact phone in E.164, or null when not supplied. */
+  phone: string | null;
+  /** What they need help with (free text). */
+  needs: string;
+  /** Interest level: one-off job, retainer, or unsure. Optional. */
+  interest: string | null;
+  /** Urgency: this week / this month / exploring. Optional. */
+  urgency: string | null;
+}
+
+/**
+ * Sends the operator a notification email for a new business enquiry.
+ * Failures are caught and logged - never throws.
+ * @param enquiry - The enquiry details.
+ * @returns Promise that resolves when the email is sent (or silently fails).
+ */
+export async function sendBusinessEnquiryNotification(enquiry: BusinessEnquiryData): Promise<void> {
+  const adminEmail = process.env.ADMIN_EMAIL;
+  const from = process.env.EMAIL_FROM;
+
+  if (!adminEmail || !from || !process.env.RESEND_API_KEY) {
+    console.warn(
+      `[email] Not configured (${missingEmailEnv("ADMIN_EMAIL", "EMAIL_FROM", "RESEND_API_KEY")}) - skipping business enquiry notification.`,
+    );
+    return;
+  }
+
+  const safeName = escapeHtml(enquiry.name);
+  const safeEmail = escapeHtml(enquiry.email);
+  const safeMailto = encodeURIComponent(enquiry.email);
+  const needsHtml = escapeHtml(enquiry.needs).replace(/\n/g, "<br>");
+  const companyBlock = enquiry.company
+    ? `<p style="margin:0 0 4px;font-size:14px;color:#888">Company</p>
+      <p style="margin:0 0 12px;font-size:15px;color:#0c0a3e;font-weight:600">${escapeHtml(enquiry.company)}</p>`
+    : `<p style="margin:0 0 12px;font-size:14px;color:#888">Personal enquiry (no company)</p>`;
+  const metaLine = [enquiry.interest, enquiry.urgency]
+    .filter(Boolean)
+    .map((v) => escapeHtml(v as string))
+    .join(" · ");
+  const phoneLine = enquiry.phone
+    ? `<p style="margin:0 0 12px;font-size:14px;color:#444"><a href="tel:${escapeHtml(enquiry.phone)}" style="color:#43bccd">${escapeHtml(enquiry.phone)}</a></p>`
+    : "";
+
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="font-family:system-ui,sans-serif;background:#f6f7f8;margin:0;padding:24px">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
+    <h2 style="margin:0 0 4px;color:#0c0a3e;font-size:20px">New business enquiry</h2>
+    ${metaLine ? `<p style="margin:0 0 16px;color:#555;font-size:14px">${metaLine}</p>` : ""}
+
+    <div style="background:#f6f7f8;border-radius:8px;padding:16px;margin-bottom:20px">
+      ${companyBlock}
+      <p style="margin:0 0 4px;font-size:14px;color:#888">Contact</p>
+      <p style="margin:0 0 4px;font-size:15px;color:#0c0a3e;font-weight:600">${safeName}</p>
+      <p style="margin:0 0 12px;font-size:14px;color:#444"><a href="mailto:${safeMailto}" style="color:#43bccd">${safeEmail}</a></p>
+      ${phoneLine}
+      <p style="margin:0 0 4px;font-size:14px;color:#888">What they need</p>
+      <p style="margin:0;font-size:14px;color:#444;line-height:1.6">${needsHtml}</p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  try {
+    await getResend().emails.send({
+      from,
+      // Reply goes straight back to the enquirer, not the owner inbox.
+      replyTo: enquiry.email,
+      to: adminEmail,
+      subject: enquiry.company
+        ? `Business enquiry - ${enquiry.company} (${enquiry.name})`
+        : `Business enquiry - ${enquiry.name} (personal)`,
+      html,
+    });
+  } catch (error) {
+    console.error("[email] Failed to send business enquiry notification:", error);
+  }
+}
+
+/**
+ * Sends the enquirer a short acknowledgement of their business enquiry.
+ * Failures are caught and logged - never throws.
+ * @param enquiry - The enquiry details.
+ * @returns Promise that resolves when the email is sent (or silently fails).
+ */
+export async function sendBusinessEnquiryAck(enquiry: BusinessEnquiryData): Promise<void> {
+  const from = process.env.EMAIL_FROM;
+  const siteUrl = getSiteUrl();
+
+  if (!from || !process.env.RESEND_API_KEY) {
+    console.warn(
+      `[email] Not configured (${missingEmailEnv("EMAIL_FROM", "RESEND_API_KEY")}) - skipping business enquiry ack.`,
+    );
+    return;
+  }
+
+  const firstName = enquiry.name.split(" ")[0];
+  const safeFirstName = escapeHtml(firstName);
+  // Personal enquiries thank the person directly rather than a company.
+  const aboutTarget = enquiry.company ? ` for ${escapeHtml(enquiry.company)}` : "";
+  const signature = await buildEmailSignature(siteUrl);
+
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="font-family:system-ui,sans-serif;background:#f6f7f8;margin:0;padding:24px">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
+    <h2 style="margin:0 0 16px;color:#0c0a3e;font-size:20px">Thanks for getting in touch</h2>
+    <p style="margin:0 0 12px;color:#222;font-size:15px;line-height:1.6">Hi ${safeFirstName},</p>
+    <p style="margin:0 0 12px;color:#222;font-size:15px;line-height:1.6">
+      Thanks for your enquiry about IT support${aboutTarget}. I'll come back to you within
+      one business day - usually sooner.
+    </p>
+    <p style="margin:0;color:#222;font-size:15px;line-height:1.6">
+      If it's urgent, feel free to ring me directly.
+    </p>
+    ${signature}
+  </div>
+</body>
+</html>`;
+
+  try {
+    await getResend().emails.send({
+      from,
+      replyTo: process.env.ADMIN_EMAIL,
+      to: enquiry.email,
+      subject: "Thanks for your enquiry - To The Point Tech",
+      html,
+    });
+  } catch (error) {
+    console.error("[email] Failed to send business enquiry ack:", error);
   }
 }
