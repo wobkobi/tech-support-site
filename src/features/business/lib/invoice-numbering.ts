@@ -8,7 +8,12 @@
  */
 
 import { nextInvoiceNumber } from "@/features/business/lib/business";
-import { getInvoiceCounter, setInvoiceCounter } from "@/features/business/lib/google-sheets";
+import {
+  getInvoiceCounter,
+  getQuoteCounter,
+  setInvoiceCounter,
+  setQuoteCounter,
+} from "@/features/business/lib/google-sheets";
 import { prisma } from "@/shared/lib/prisma";
 
 export interface NextInvoiceNumber {
@@ -32,7 +37,12 @@ export interface NextInvoiceNumber {
 export async function getNextInvoiceNumber(): Promise<NextInvoiceNumber> {
   try {
     const data = await getInvoiceCounter();
+    // Quote rows share the table + unique index but number from their own
+    // counter - exclude them so a Q- number can never seed the invoice
+    // sequence (isQuote catches converted rows whose flag was later cleared;
+    // the prefix filter catches any legacy row).
     const last = await prisma.invoice.findFirst({
+      where: { NOT: { number: { startsWith: "Q-" } } },
       orderBy: { number: "desc" },
       select: { number: true },
     });
@@ -47,7 +57,10 @@ export async function getNextInvoiceNumber(): Promise<NextInvoiceNumber> {
         : `${data.prefix}-${data.yearCode}-${String(nextNumber).padStart(4, "0")}`;
     return { number, sheetNextCount: nextNumber, sheetSyncWarning: false };
   } catch {
-    const last = await prisma.invoice.findFirst({ orderBy: { number: "desc" } });
+    const last = await prisma.invoice.findFirst({
+      where: { NOT: { number: { startsWith: "Q-" } } },
+      orderBy: { number: "desc" },
+    });
     const now = new Date();
     const fy = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
     const yearCode = String(fy) + String(fy + 1).slice(2);
@@ -56,6 +69,57 @@ export async function getNextInvoiceNumber(): Promise<NextInvoiceNumber> {
       sheetNextCount: null,
       sheetSyncWarning: true,
     };
+  }
+}
+
+/**
+ * Fetches the next QUOTE number as `max(sheet quote counter, highest existing
+ * Q- number in the DB)` - the same convergence rule as invoices, against the
+ * dedicated SETTINGS!B12 counter. Falls back to the DB max alone when Sheets
+ * is unreachable. Callers pass `sheetNextCount` to
+ * {@link writeBackQuoteCounter} after the row is created.
+ * @returns Next Q- number plus the write-back counter (or null on fallback).
+ */
+export async function getNextQuoteNumber(): Promise<NextInvoiceNumber> {
+  // Highest existing Q- row; shared by both paths below.
+  const last = await prisma.invoice.findFirst({
+    where: { number: { startsWith: "Q-" } },
+    orderBy: { number: "desc" },
+    select: { number: true },
+  });
+  const dbMatch = last?.number.match(/-(\d+)$/);
+  const dbNext = (dbMatch ? parseInt(dbMatch[1], 10) : 0) + 1;
+  try {
+    const data = await getQuoteCounter();
+    const nextNumber = Math.max(data.nextNumber, dbNext);
+    const number =
+      nextNumber === data.nextNumber
+        ? data.nextFormatted
+        : `Q-${data.yearCode}-${String(nextNumber).padStart(4, "0")}`;
+    return { number, sheetNextCount: nextNumber, sheetSyncWarning: false };
+  } catch {
+    const now = new Date();
+    const fy = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+    const yearCode = String(fy) + String(fy + 1).slice(2);
+    return {
+      number: `Q-${yearCode}-${String(dbNext).padStart(4, "0")}`,
+      sheetNextCount: null,
+      sheetSyncWarning: true,
+    };
+  }
+}
+
+/**
+ * Writes the just-used quote counter back to SETTINGS!B12. Same no-op /
+ * swallow semantics as {@link writeBackInvoiceCounter}.
+ * @param count - The numeric counter that was just consumed.
+ */
+export async function writeBackQuoteCounter(count: number | null): Promise<void> {
+  if (count === null) return;
+  try {
+    await setQuoteCounter(count);
+  } catch (err) {
+    console.error("[invoice-numbering] Sheets quote-counter write-back failed:", err);
   }
 }
 

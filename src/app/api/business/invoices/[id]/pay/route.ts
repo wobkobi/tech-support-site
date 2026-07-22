@@ -48,6 +48,9 @@ export async function POST(
   if (invoice.status === "VOIDED") {
     return errorResponse("Cannot record payment on a voided invoice.", 409);
   }
+  if (invoice.isQuote) {
+    return errorResponse("Convert the quote to an invoice before recording payment.", 409);
+  }
 
   const body = (await request.json().catch(() => ({}))) as {
     paidAt?: unknown;

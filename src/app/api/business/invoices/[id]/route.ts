@@ -125,6 +125,7 @@ export async function PATCH(
       unsuccessfulDiscount: true,
       sentAt: true,
       paidAt: true,
+      isQuote: true,
     },
   });
   if (!current) {
@@ -231,6 +232,11 @@ export async function PATCH(
   const { status } = body;
   if (!["DRAFT", "SENT", "PAID", "VOIDED"].includes(status)) {
     return errorResponse("Invalid status", 400);
+  }
+  // Quotes can't be marked PAID - conversion is the only path to a payable
+  // invoice (the /pay route carries the same guard).
+  if (current.isQuote && status === "PAID") {
+    return errorResponse("Convert the quote to an invoice before recording payment.", 409);
   }
   const transitionErr = validateTransition(current.status, status as InvoiceStatus);
   if (transitionErr) {

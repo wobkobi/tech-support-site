@@ -75,6 +75,71 @@ export async function getInvoiceCounter(): Promise<InvoiceCounterData> {
   return { prefix, yearCode, lastNumber, nextNumber, nextFormatted };
 }
 
+export interface QuoteCounterData {
+  yearCode: string;
+  lastNumber: number;
+  nextNumber: number;
+  nextFormatted: string;
+}
+
+/**
+ * Reads the quote counter state from the SETTINGS tab. Quotes number from
+ * their own cell (B12) so they never consume the invoice counter; the format
+ * is `Q-{yearCode}-{NNNN}` (no operator prefix - "Q" IS the prefix).
+ * Cell layout (current template):
+ *   - B11: Financial Year (shared with the invoice counter)
+ *   - B12: Quote counter (last issued number; blank = 0)
+ * @returns Quote counter data including next formatted number
+ */
+export async function getQuoteCounter(): Promise<QuoteCounterData> {
+  const sheets = getSheetsClient();
+  const spreadsheetId = getSheetId();
+  const res = await withRetry(
+    () =>
+      sheets.spreadsheets.values.batchGet({
+        spreadsheetId,
+        ranges: ["SETTINGS!B11", "SETTINGS!B12"],
+      }),
+    { label: "quote-counter-read" },
+  );
+  const ranges = res.data.valueRanges ?? [];
+  const yearRaw = ((ranges[0]?.values?.[0]?.[0] as string | undefined) ?? "").trim();
+  const lastRaw = ranges[1]?.values?.[0]?.[0];
+  const yearCode = yearRaw.replace("-", "");
+  // Same malformed-cell guards as the invoice counter: throwing hands off to
+  // the DB-max fallback instead of minting a poisoned number.
+  if (!/^\d{4,6}$/.test(yearCode)) {
+    throw new Error(`Quote counter: SETTINGS!B11 financial year is malformed ("${yearRaw}")`);
+  }
+  const lastNumber =
+    lastRaw != null && String(lastRaw).trim() !== "" ? parseInt(String(lastRaw), 10) : 0;
+  if (!Number.isInteger(lastNumber) || lastNumber < 0) {
+    throw new Error(`Quote counter: SETTINGS!B12 is not a valid number ("${String(lastRaw)}")`);
+  }
+  const nextNumber = lastNumber + 1;
+  const nextFormatted = `Q-${yearCode}-${String(nextNumber).padStart(4, "0")}`;
+  return { yearCode, lastNumber, nextNumber, nextFormatted };
+}
+
+/**
+ * Writes a new quote count back to the SETTINGS tab at B12.
+ * @param newCount - The new quote count to persist
+ */
+export async function setQuoteCounter(newCount: number): Promise<void> {
+  const sheets = getSheetsClient();
+  const spreadsheetId = getSheetId();
+  await withRetry(
+    () =>
+      sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: "SETTINGS!B12",
+        valueInputOption: "RAW",
+        requestBody: { values: [[newCount]] },
+      }),
+    { label: "quote-counter-write" },
+  );
+}
+
 /**
  * Writes a new invoice count back to the Google Sheet SETTINGS tab at B19.
  * @param newCount - The new invoice count to persist

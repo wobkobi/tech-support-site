@@ -312,6 +312,7 @@ export default async function InvoiceViewPage({
             autoOpenSend={send === "1"}
             isOverdue={isInvoiceOverdue(invoice)}
             reminderCount={invoice.reminderCount}
+            isQuote={invoice.isQuote === true}
           />
         }
       />
@@ -332,7 +333,7 @@ export default async function InvoiceViewPage({
             />
             <div className="text-right">
               <p className="text-xl leading-none font-extrabold text-russian-violet sm:text-2xl">
-                {identity.gstNumber ? "TAX INVOICE" : "INVOICE"}
+                {invoice.isQuote ? "QUOTE" : identity.gstNumber ? "TAX INVOICE" : "INVOICE"}
               </p>
               <p className="mt-2 font-mono text-sm font-semibold text-slate-700">
                 {invoice.number}
@@ -342,14 +343,20 @@ export default async function InvoiceViewPage({
                   "mt-1 text-xs",
                   invoice.status === "PAID"
                     ? "font-semibold text-green-600"
-                    : invoice.status === "SENT"
-                      ? "font-semibold text-blue-600"
-                      : invoice.status === "VOIDED"
-                        ? "font-semibold text-[#5a2a82] line-through"
-                        : "text-slate-400",
+                    : invoice.isQuote && invoice.status !== "VOIDED"
+                      ? "font-semibold text-russian-violet"
+                      : invoice.status === "SENT"
+                        ? "font-semibold text-blue-600"
+                        : invoice.status === "VOIDED"
+                          ? "font-semibold text-[#5a2a82] line-through"
+                          : "text-slate-400",
                 )}
               >
-                {invoice.status}
+                {invoice.isQuote && invoice.status !== "VOIDED"
+                  ? invoice.quoteValidUntil
+                    ? `Valid until ${formatDateShort(invoice.quoteValidUntil)}`
+                    : "QUOTE"
+                  : invoice.status}
               </p>
               {invoice.status === "VOIDED" && invoice.voidedAt && (
                 <p className="mt-0.5 text-xs text-slate-400">
