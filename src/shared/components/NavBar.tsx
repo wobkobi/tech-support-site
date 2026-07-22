@@ -24,6 +24,7 @@ const HIDDEN_PATHS: ReadonlyArray<string> = ["/poster"];
 const HIDDEN_PREFIXES: ReadonlyArray<string> = ["/admin"];
 const NAV_ITEMS: ReadonlyArray<NavItem> = [
   { label: "Services", href: "/services", activePrefix: "/services" },
+  { label: "Business", href: "/business", activePrefix: "/business" },
   { label: "Pricing", href: "/pricing", activePrefix: "/pricing" },
   { label: "About", href: "/about", activePrefix: "/about" },
   { label: "FAQ", href: "/faq", activePrefix: "/faq" },

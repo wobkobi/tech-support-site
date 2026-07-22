@@ -160,7 +160,8 @@ export default function AboutPage(): React.ReactElement {
               <li className="flex gap-3">
                 <span className="mt-1 text-lg text-moonstone-600">•</span>
                 <span>
-                  Sole traders and small teams who need occasional IT support without a contract.
+                  Sole traders and small teams who need occasional IT help, or ongoing cover with a
+                  simple monthly retainer.
                 </span>
               </li>
             </ul>

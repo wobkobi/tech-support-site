@@ -283,6 +283,22 @@ model Contact {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
+  // Retainer arrangement (null tier = not a retainer client). Marketing tiers
+  // live on /business; these fields record the AGREED deal per client. Billing
+  // stays manual - the dashboard "Retainers due" panel derives invoiced-this-
+  // month from invoices linked by contactId with a "retainer" line item.
+  retainerTier  String?
+  retainerPrice Float?
+  // Included support hours per month (0 = none included, e.g. Essentials).
+  retainerHours Float?
+  retainerSince DateTime?
+  retainerNotes String?
+
+  // Operator's environment notes for repeat/business clients (router model,
+  // ISP, M365 tenant, where the NAS lives). Never passwords - it renders in
+  // the admin UI and has no extra protection. Not synced to Google.
+  siteNotes String?
+
   // Admin reviews tab: list send history sorted by most-recent send.
   @@index([reviewLinkSentAt])
 }
@@ -466,6 +482,14 @@ model Invoice {
   // the Mongo no-backfill rule; readers treat null count as 0.
   reminderLastSentAt DateTime?
   reminderCount      Int?
+  // Quote mode: true = this row is a QUOTE (Q- number, QUOTE watermark, no
+  // payment/income until converted). Convert-to-invoice allocates a real
+  // invoice number, clears the flag, and restamps issue/due dates. Nullable
+  // per the Mongo no-backfill rule; readers treat null as false.
+  isQuote          Boolean?
+  // Quote validity end (shown on the PDF); past this date the quote renders
+  // as expired in the admin UI. Null = no stated expiry.
+  quoteValidUntil  DateTime?
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 

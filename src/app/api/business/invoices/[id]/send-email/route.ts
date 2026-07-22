@@ -74,8 +74,10 @@ export async function POST(
 
   // Server-side gate: if the customer is in cooldown or already reviewed, an
   // explicit `includeReview: true` from a stale client is ignored - the UI
-  // blocks the checkbox but client state is not trusted.
-  const includeReview = (includeReviewOverride ?? eligibility.canSend) && eligibility.canSend;
+  // blocks the checkbox but client state is not trusted. Quotes never carry a
+  // review ask - the job hasn't happened yet.
+  const includeReview =
+    !invoice.isQuote && (includeReviewOverride ?? eligibility.canSend) && eligibility.canSend;
   const reviewUrl =
     includeReview && "reviewUrl" in eligibility ? (eligibility.reviewUrl ?? null) : null;
 
@@ -98,6 +100,8 @@ export async function POST(
       dueDate: invoice.dueDate,
       total: invoice.total,
       driveWebUrl: invoice.driveWebUrl,
+      isQuote: invoice.isQuote,
+      quoteValidUntil: invoice.quoteValidUntil,
     },
     pdfBytes,
     reviewUrl,

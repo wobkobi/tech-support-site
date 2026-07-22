@@ -18,6 +18,7 @@ const HIDDEN_PREFIXES: ReadonlyArray<string> = ["/admin"];
 
 const LINKS: ReadonlyArray<{ label: string; href: string }> = [
   { label: "Services", href: "/services" },
+  { label: "Business", href: "/business" },
   { label: "Pricing", href: "/pricing" },
   { label: "About", href: "/about" },
   { label: "FAQ", href: "/faq" },

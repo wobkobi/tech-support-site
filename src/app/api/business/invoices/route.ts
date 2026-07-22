@@ -2,16 +2,19 @@
 /**
  * @description Admin invoices collection endpoint. GET lists every invoice
  * (newest issue date first). POST creates one: validates line items, allocates
- * the next TTP-YYYY-XXXX number, computes totals via {@link calcInvoiceTotals}
- * (promo + unsuccessful-work discounts reduce the taxable amount), writes back
- * the Sheets counter, then fire-and-forget renders the PDF and uploads it to Drive.
+ * the next TTP-YYYY-XXXX number (or Q-YYYY-XXXX from the quote counter when
+ * `isQuote`), computes totals via {@link calcInvoiceTotals} (promo +
+ * unsuccessful-work discounts reduce the taxable amount), writes back the
+ * matching Sheets counter, then renders the PDF and uploads it to Drive.
  */
 
 import { calcInvoiceTotals, isValidLineItem } from "@/features/business/lib/business";
 import { syncInvoicePdfToDrive } from "@/features/business/lib/invoice-drive-sync";
 import {
   getNextInvoiceNumber,
+  getNextQuoteNumber,
   writeBackInvoiceCounter,
+  writeBackQuoteCounter,
 } from "@/features/business/lib/invoice-numbering";
 import { generateInvoicePdf, serializeInvoice } from "@/features/business/lib/invoice-pdf";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
@@ -69,6 +72,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Optional match back to the billed job (calculator event-prefill flow).
     bookingId,
     calendarEventId,
+    // Quote mode: Q- number from the quote counter, QUOTE PDF, no payment
+    // until converted to a real invoice.
+    isQuote,
+    quoteValidUntil,
   } = body as {
     clientName?: string;
     clientEmail?: string;
@@ -83,6 +90,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     unsuccessfulDiscount?: number | null;
     bookingId?: string | null;
     calendarEventId?: string | null;
+    isQuote?: boolean;
+    quoteValidUntil?: string | null;
   };
 
   if (!clientName || !clientEmail || !Array.isArray(lineItems)) {
@@ -102,6 +111,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const dueDateValue = dueDate
     ? new Date(dueDate)
     : new Date(Date.now() + identity.paymentTermsDays * 24 * 60 * 60 * 1000);
+  // Quote validity: explicit date wins; default 30 days out. dueDate still
+  // gets a value (schema requires one) but quotes never render or enforce it.
+  const quoteValidValue = isQuote
+    ? quoteValidUntil
+      ? new Date(quoteValidUntil)
+      : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+    : null;
+  if (quoteValidValue && Number.isNaN(quoteValidValue.getTime())) {
+    return errorResponse("Invalid quote validity date", 400);
+  }
 
   // Validate the optional discount snapshots through the shared money parser so
   // a non-finite or absurd magnitude (e.g. Infinity, 1e12) can't reach the
@@ -139,13 +158,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   let sheetNextCount: number | null = null;
   let sheetSyncWarning = false;
   for (let attempt = 0; attempt < 5; attempt++) {
-    const alloc = await getNextInvoiceNumber();
+    const alloc = isQuote ? await getNextQuoteNumber() : await getNextInvoiceNumber();
     sheetNextCount = alloc.sheetNextCount;
     sheetSyncWarning = alloc.sheetSyncWarning;
     try {
       invoice = await prisma.invoice.create({
         data: {
           number: alloc.number,
+          isQuote: isQuote === true ? true : null,
+          quoteValidUntil: quoteValidValue,
           clientName,
           clientEmail,
           issueDate: issueDateValue,
@@ -187,8 +208,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   // Keep the Sheets counter in sync; the helper swallows + logs failures so the
-  // just-saved invoice isn't compromised by a transient Sheets hiccup.
-  await writeBackInvoiceCounter(sheetNextCount);
+  // just-saved invoice isn't compromised by a transient Sheets hiccup. Quotes
+  // write back their own counter (SETTINGS!B12), invoices B19.
+  if (isQuote) {
+    await writeBackQuoteCounter(sheetNextCount);
+  } else {
+    await writeBackInvoiceCounter(sheetNextCount);
+  }
 
   // Generate the PDF and sync it to Drive. Awaited (not fire-and-forget) so it
   // completes before the response - Vercel freezes the instance once the

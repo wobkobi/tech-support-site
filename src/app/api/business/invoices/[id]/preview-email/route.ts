@@ -59,7 +59,8 @@ export async function POST(
 
   // includeReviewOverride wins when set (so unchecking the box updates the
   // preview to drop the review line). Default is whatever eligibility says.
-  const includeReview = includeReviewOverride ?? eligibility.canSend;
+  // Quotes never carry a review ask, matching the send route.
+  const includeReview = !invoice.isQuote && (includeReviewOverride ?? eligibility.canSend);
   const reviewUrl =
     includeReview && "reviewUrl" in eligibility ? (eligibility.reviewUrl ?? null) : null;
 
@@ -72,6 +73,8 @@ export async function POST(
       dueDate: invoice.dueDate,
       total: invoice.total,
       driveWebUrl: invoice.driveWebUrl,
+      isQuote: invoice.isQuote,
+      quoteValidUntil: invoice.quoteValidUntil,
     },
     reviewUrl,
     greetingName,

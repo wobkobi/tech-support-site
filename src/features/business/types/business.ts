@@ -66,6 +66,10 @@ export interface Invoice {
   reminderLastSentAt?: string | null;
   /** How many overdue reminders have gone out; null reads as 0 (Mongo backfill rule). */
   reminderCount?: number | null;
+  /** True when this row is a quote (Q- number, no payment until converted). Null reads as false. */
+  isQuote?: boolean | null;
+  /** ISO date the quote's pricing is honoured until; null = no stated expiry. */
+  quoteValidUntil?: string | null;
   driveFileId: string | null;
   driveWebUrl: string | null;
   createdAt: string;

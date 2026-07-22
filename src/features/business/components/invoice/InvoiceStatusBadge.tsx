@@ -19,6 +19,10 @@ const TONE: Record<string, StatusTone> = {
   PAID: "success",
   OVERDUE: "critical",
   VOIDED: "violet",
+  // Quote states: violet matches the PDF's brand-coloured QUOTE treatment
+  // (VOIDED shares the tone but never the text); EXPIRED warns without alarm.
+  QUOTE: "violet",
+  EXPIRED: "warning",
 };
 
 /** Props for {@link InvoiceStatusBadge}. */

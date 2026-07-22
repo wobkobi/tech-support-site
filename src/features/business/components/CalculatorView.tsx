@@ -467,6 +467,8 @@ export function CalculatorView({
   // True while the in-flight save is a "Save & send" (routes to ?send=1 and
   // skips the calculator's add-to-contacts gate); drives the two button labels.
   const [saveSendMode, setSaveSendMode] = useState(false);
+  // True while the in-flight save is a "Save as quote"; drives its busy label.
+  const [saveQuoteMode, setSaveQuoteMode] = useState(false);
   const [saveInvoiceError, setSaveInvoiceError] = useState<string | null>(null);
   const [pendingInvoiceId, setPendingInvoiceId] = useState<string | null>(null);
   const { toast } = useToast();
@@ -1348,11 +1350,15 @@ export function CalculatorView({
    * @param send - When true ("Save & send"), skip the add-to-contacts gate and
    *   route to the detail page with `?send=1` so it auto-opens the send preview
    *   (which has its own add-to-contacts hook-in + contactId backfill).
+   * @param quote - When true ("Save as quote"), the row saves as a QUOTE: a
+   *   Q- number from the quote counter, QUOTE PDF, 30-day validity default,
+   *   convertible to a real invoice from the detail page.
    */
-  async function handleSaveInvoice(send = false): Promise<void> {
+  async function handleSaveInvoice(send = false, quote = false): Promise<void> {
     // Validate required fields
     setSaveInvoiceError(null);
     setSaveSendMode(send);
+    setSaveQuoteMode(quote);
     if (!clientName.trim()) {
       setSaveInvoiceError("Client name is required.");
       return;
@@ -1404,6 +1410,8 @@ export function CalculatorView({
           // schedule's "Bill in calculator" action.
           bookingId: eventPrefill?.bookingId ?? null,
           calendarEventId: eventPrefill?.calendarEventId ?? null,
+          // Quote mode: server allocates a Q- number + 30-day validity.
+          isQuote: quote || undefined,
           // issueDate, dueDate, number all defaulted server-side.
         }),
       });
@@ -1416,9 +1424,12 @@ export function CalculatorView({
         | { error: string };
       if ("error" in d) throw new Error(d.error);
       if (d.sheetSyncWarning) {
-        toast("Invoice saved - sheet counter sync failed. Update SETTINGS!B17.", {
-          tone: "warning",
-        });
+        toast(
+          quote
+            ? "Quote saved - sheet counter sync failed. Update SETTINGS!B12."
+            : "Invoice saved - sheet counter sync failed. Update SETTINGS!B19.",
+          { tone: "warning" },
+        );
       }
       const invoiceId = d.invoice.id;
       // Add-to-contacts gate: defer nav until the modal closes so
@@ -1613,9 +1624,9 @@ export function CalculatorView({
   }
 
   /**
-   * Wipes every rate row and reseeds the defaults (Standard base + modifier set
-   * + Travel flat). Confirms first since this drops any custom rates. Also
-   * cancels any in-progress edit so the form doesn't hold a stale ID.
+   * Wipes every rate row and reseeds the defaults (Standard base + modifier
+   * set). Confirms first since this drops any custom rates. Also cancels any
+   * in-progress edit so the form doesn't hold a stale ID.
    */
   async function handleResetRates(): Promise<void> {
     handleCancelEdit();
@@ -1786,7 +1797,7 @@ export function CalculatorView({
       <ConfirmDialog
         open={confirmResetOpen}
         title="Reset all rates?"
-        body="This wipes every rate and reseeds the defaults (Standard, At home, Remote, Public Holiday, Travel). Any custom rates you've added will be deleted."
+        body="This wipes every rate and reseeds the defaults (Standard, Business, At home, Remote, Phone, Public Holiday). Any custom rates you've added will be deleted."
         confirmLabel="Reset rates"
         tone="danger"
         onConfirm={() => {
@@ -2315,6 +2326,15 @@ export function CalculatorView({
               className="w-full rounded-lg border border-russian-violet px-4 py-2 text-sm font-semibold text-russian-violet hover:bg-russian-violet/5 disabled:opacity-50"
             >
               {savingInvoice && saveSendMode ? "Saving..." : "Save & send"}
+            </button>
+            <button
+              onClick={() => void handleSaveInvoice(false, true)}
+              disabled={savingInvoice || parsing}
+              suppressHydrationWarning
+              title="Save as a Q-numbered quote - convert it to an invoice once the client accepts."
+              className="w-full rounded-lg border border-russian-violet px-4 py-2 text-sm font-semibold text-russian-violet hover:bg-russian-violet/5 disabled:opacity-50"
+            >
+              {savingInvoice && saveQuoteMode ? "Saving..." : "Save as quote"}
             </button>
             <button
               onClick={handleSaveIncome}

@@ -17,6 +17,7 @@ import { SheetImportButton } from "@/features/business/components/SheetImportBut
 import { TaxPlannerSection } from "@/features/business/components/TaxPlannerSection";
 import { listFinancialYears } from "@/features/business/lib/financial-year";
 import { listSpreadsheetsInFolder } from "@/features/business/lib/google-drive";
+import { NOT_A_QUOTE_FILTER } from "@/features/business/lib/invoice-status";
 import { getFySheetIdForDate } from "@/features/business/lib/sheets-sync";
 import {
   clearTaxCache,
@@ -191,6 +192,9 @@ export default async function BusinessPage({
       },
     }),
     prisma.invoice.findMany({
+      // Quotes are excluded: this feed drives FY revenue aggregates and a
+      // quoted total is not revenue.
+      where: { ...NOT_A_QUOTE_FILTER },
       orderBy: { issueDate: "desc" },
       select: {
         id: true,

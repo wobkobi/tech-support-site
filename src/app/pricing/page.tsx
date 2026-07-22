@@ -140,7 +140,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                     ${applyPromoToHourlyRate(baseRate, promo).toFixed(0)}/hr
                   </p>
                   <p className="text-base text-rich-black/80 sm:text-lg">
-                    One rate for every job - troubleshooting, setup, software, tune-ups, Wi-Fi,
+                    One rate for every home job - troubleshooting, setup, software, tune-ups, Wi-Fi,
                     backups, data recovery, hardware repairs, and more.
                   </p>
                 </div>
@@ -161,7 +161,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                   ${baseRate}/hr
                 </p>
                 <p className="text-base text-rich-black/80 sm:text-lg">
-                  One rate for every job - troubleshooting, setup, software, tune-ups, Wi-Fi,
+                  One rate for every home job - troubleshooting, setup, software, tune-ups, Wi-Fi,
                   backups, data recovery, hardware repairs, and more.
                 </p>
               </div>
@@ -189,6 +189,17 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                 <span>
                   <strong>Not sure which rate applies?</strong> Just ask - I'll confirm before
                   starting.
+                </span>
+              </p>
+              <p className="flex gap-3 text-base text-rich-black/90 sm:text-lg">
+                <FaCheck className="mt-1.5 h-4 w-4 shrink-0 text-moonstone-600" aria-hidden />
+                <span>
+                  <strong>Running a business?</strong> Business rates and monthly retainers are on
+                  the{" "}
+                  <Link href="/business" className={linkStyle}>
+                    business page
+                  </Link>
+                  .
                 </span>
               </p>
             </div>

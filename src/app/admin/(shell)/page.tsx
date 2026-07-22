@@ -11,6 +11,7 @@ import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";
 import { formatNZD } from "@/features/business/lib/business";
+import { NOT_A_QUOTE_FILTER } from "@/features/business/lib/invoice-status";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort, formatDateTimeShort } from "@/shared/lib/date-format";
@@ -131,6 +132,7 @@ export default async function AdminPage(): Promise<React.ReactElement> {
     outstandingInvoices,
     recentInvoices,
     latestCacheEntry,
+    retainerContacts,
   ] = await Promise.all([
     prisma.review.count({ where: { status: "pending" } }),
     prisma.review.count({ where: { status: "approved" } }),
@@ -209,8 +211,9 @@ export default async function AdminPage(): Promise<React.ReactElement> {
       _sum: { amount: true },
     }),
     // Outstanding (DRAFT or SENT). Overdue flagged separately on the card.
+    // Quotes ride on DRAFT/SENT but aren't money owed - excluded.
     prisma.invoice.findMany({
-      where: { status: { in: ["DRAFT", "SENT"] } },
+      where: { status: { in: ["DRAFT", "SENT"] }, ...NOT_A_QUOTE_FILTER },
       orderBy: { dueDate: "asc" },
       select: {
         id: true,
@@ -231,6 +234,7 @@ export default async function AdminPage(): Promise<React.ReactElement> {
         clientName: true,
         total: true,
         status: true,
+        isQuote: true,
         createdAt: true,
       },
     }),
@@ -239,7 +243,39 @@ export default async function AdminPage(): Promise<React.ReactElement> {
       orderBy: { fetchedAt: "desc" },
       select: { fetchedAt: true },
     }),
+    // Retainer clients - feeds the "Retainers due" panel. isSet guards rows
+    // created before the field existed (MongoDB gotcha, as above).
+    prisma.contact.findMany({
+      where: { deletedAt: null, retainerTier: { isSet: true, not: null } },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, retainerTier: true, retainerPrice: true },
+    }),
   ]);
+
+  // --- Retainers due this month ---
+  // A retainer client counts as invoiced once an invoice linked by contactId,
+  // issued this month, carries a line item mentioning "retainer". lineItems is
+  // an embedded composite type, so the text match runs in JS - the Mongo
+  // connector can't regex-filter composite string content.
+  let retainersDue: typeof retainerContacts = [];
+  if (retainerContacts.length > 0) {
+    const monthInvoices = await prisma.invoice.findMany({
+      where: {
+        contactId: { in: retainerContacts.map((r) => r.id) },
+        issueDate: { gte: monthStart },
+        status: { not: "VOIDED" },
+        // A QUOTE for a retainer must not count as invoiced.
+        ...NOT_A_QUOTE_FILTER,
+      },
+      select: { contactId: true, lineItems: true },
+    });
+    const invoicedIds = new Set(
+      monthInvoices
+        .filter((inv) => inv.lineItems.some((li) => /retainer/i.test(li.description)))
+        .map((inv) => inv.contactId),
+    );
+    retainersDue = retainerContacts.filter((r) => !invoicedIds.has(r.id));
+  }
 
   // --- Review-link coverage ---
   const sentEmails = new Set<string>([
@@ -295,8 +331,10 @@ export default async function AdminPage(): Promise<React.ReactElement> {
     ...recentInvoices.map((inv) => ({
       kind: "invoice" as const,
       timestamp: inv.createdAt,
-      title: `Invoice ${inv.number}: ${inv.clientName}`,
-      detail: `${inv.status} - ${inv.total < 0 ? "-" : ""}$${Math.abs(inv.total).toFixed(2)}`,
+      title: `${inv.isQuote ? "Quote" : "Invoice"} ${inv.number}: ${inv.clientName}`,
+      detail: inv.isQuote
+        ? `QUOTE - ${inv.total < 0 ? "-" : ""}$${Math.abs(inv.total).toFixed(2)}`
+        : `${inv.status} - ${inv.total < 0 ? "-" : ""}$${Math.abs(inv.total).toFixed(2)}`,
     })),
   ]
     .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
@@ -480,6 +518,42 @@ export default async function AdminPage(): Promise<React.ReactElement> {
             </ul>
           )}
         </Panel>
+
+        {/* Retainers due - retainer clients with no "retainer" invoice issued
+            this month. Hidden entirely until at least one retainer client exists. */}
+        {retainerContacts.length > 0 && (
+          <Panel
+            title="Retainers due"
+            badge={
+              retainersDue.length > 0 ? (
+                <StatusPill tone="warning">{retainersDue.length}</StatusPill>
+              ) : undefined
+            }
+            action={{ label: "New invoice", href: "/admin/business/calculator" }}
+            empty="All retainers invoiced this month."
+          >
+            {retainersDue.length === 0 ? null : (
+              <ul className="divide-y divide-admin-border">
+                {retainersDue.map((r) => (
+                  <li key={r.id}>
+                    <Link
+                      href={`/admin/contacts/${r.id}`}
+                      className="flex items-start justify-between gap-3 px-5 py-3 transition-colors hover:bg-admin-bg"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-admin-text">{r.name}</p>
+                        <p className="truncate text-xs text-admin-faint">{r.retainerTier}</p>
+                      </div>
+                      <p className="shrink-0 text-right text-xs text-admin-muted">
+                        {r.retainerPrice !== null ? formatNZD(r.retainerPrice) : ""}
+                      </p>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Panel>
+        )}
 
         {/* Recent activity - unified timeline of bookings, reviews, contacts, invoices. */}
         <Panel title="Recent activity" empty="No activity yet.">

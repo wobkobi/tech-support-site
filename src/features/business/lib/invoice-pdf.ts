@@ -138,6 +138,8 @@ export function serializeInvoice(inv: PrismaInvoice): Invoice {
     paidAt: inv.paidAt?.toISOString() ?? null,
     paymentMethod: inv.paymentMethod,
     paymentReference: inv.paymentReference,
+    isQuote: inv.isQuote,
+    quoteValidUntil: inv.quoteValidUntil?.toISOString() ?? null,
     driveFileId: inv.driveFileId,
     driveWebUrl: inv.driveWebUrl,
     createdAt: inv.createdAt.toISOString(),
@@ -152,9 +154,12 @@ export function serializeInvoice(inv: PrismaInvoice): Invoice {
  * @param invoice - Invoice being rendered.
  */
 function drawStatusWatermark(ctx: PdfCtx, invoice: Invoice): void {
-  const isOverdue = isInvoiceOverdue(invoice);
-  const text =
-    invoice.status === "PAID"
+  // Quotes short-circuit: a quote is never PAID/OVERDUE, and even a voided
+  // quote reads better watermarked QUOTE with the VOID status line beside it.
+  const isOverdue = !invoice.isQuote && isInvoiceOverdue(invoice);
+  const text = invoice.isQuote
+    ? "QUOTE"
+    : invoice.status === "PAID"
       ? "PAID"
       : invoice.status === "VOIDED"
         ? "VOID"
@@ -162,8 +167,9 @@ function drawStatusWatermark(ctx: PdfCtx, invoice: Invoice): void {
           ? "OVERDUE"
           : null;
   if (!text) return;
-  const color =
-    invoice.status === "PAID"
+  const color = invoice.isQuote
+    ? BRAND
+    : invoice.status === "PAID"
       ? PAID_COLOR
       : invoice.status === "VOIDED"
         ? VOID_COLOR
@@ -208,8 +214,9 @@ function drawHeader(ctx: PdfCtx, invoice: Invoice, logoPaths: LogoPath[]): numbe
   }
 
   const rightX = MARGIN + CONTENT_W;
-  // IRD requires "Tax invoice" wording when GST-registered.
-  const invTitle = ctx.identity.gstNumber ? "TAX INVOICE" : "INVOICE";
+  // IRD requires "Tax invoice" wording when GST-registered; a quote is never
+  // a tax document, so QUOTE wins regardless of registration.
+  const invTitle = invoice.isQuote ? "QUOTE" : ctx.identity.gstNumber ? "TAX INVOICE" : "INVOICE";
   let rightY = HEADER_TOP - 20;
   ctx.page.drawText(invTitle, {
     x: rightX - ctx.bold.widthOfTextAtSize(invTitle, 20),
@@ -227,16 +234,27 @@ function drawHeader(ctx: PdfCtx, invoice: Invoice, logoPaths: LogoPath[]): numbe
     color: DARK,
   });
   rightY -= 16;
+  // Quotes hide the DRAFT/SENT lifecycle (meaningless to the customer) and
+  // show the validity date instead; a voided quote still shows VOID.
+  const statusText = invoice.isQuote
+    ? invoice.status === "VOIDED"
+      ? "VOID"
+      : invoice.quoteValidUntil
+        ? `Valid until ${formatDateShort(invoice.quoteValidUntil)}`
+        : "QUOTE"
+    : invoice.status;
   const statusColor =
     invoice.status === "PAID"
       ? PAID_COLOR
-      : invoice.status === "SENT"
-        ? rgb(0.1, 0.35, 0.75)
-        : invoice.status === "VOIDED"
-          ? VOID_COLOR
-          : MID;
-  ctx.page.drawText(invoice.status, {
-    x: rightX - ctx.bold.widthOfTextAtSize(invoice.status, 11),
+      : invoice.status === "VOIDED"
+        ? VOID_COLOR
+        : invoice.isQuote
+          ? BRAND
+          : invoice.status === "SENT"
+            ? rgb(0.1, 0.35, 0.75)
+            : MID;
+  ctx.page.drawText(statusText, {
+    x: rightX - ctx.bold.widthOfTextAtSize(statusText, 11),
     y: rightY,
     size: 11,
     font: ctx.bold,
@@ -313,7 +331,15 @@ function drawBillToBlock(ctx: PdfCtx, invoice: Invoice, y: number): number {
     });
   };
   drawDateRow("Issued:", formatDateShort(invoice.issueDate), 0);
-  drawDateRow("Due:", formatDateShort(invoice.dueDate), -18);
+  if (invoice.isQuote) {
+    // A quote has no payment due date - the second row shows how long the
+    // quoted prices are honoured instead.
+    if (invoice.quoteValidUntil) {
+      drawDateRow("Valid to:", formatDateShort(invoice.quoteValidUntil), -18);
+    }
+  } else {
+    drawDateRow("Due:", formatDateShort(invoice.dueDate), -18);
+  }
 
   const sepY = infoY - 48;
   ctx.page.drawLine({
@@ -597,6 +623,62 @@ function drawPaymentCallout(ctx: PdfCtx, invoice: Invoice, y: number): number {
 }
 
 /**
+ * Quote variant of the call-out box: how to accept, plus the validity line.
+ * No bank details - payment comes with the invoice after acceptance.
+ * @param ctx - PDF drawing context.
+ * @param invoice - Quote being rendered.
+ * @param y - Top of the block.
+ * @returns Y coordinate below the box, including the gap before notes.
+ */
+function drawQuoteCallout(ctx: PdfCtx, invoice: Invoice, y: number): number {
+  const boxTop = y - 8;
+  const BOX_PAD_X = 14;
+  const BOX_PAD_Y = 14;
+  const lineH = 16;
+  const boxLines = 3; // heading + accept line + validity line
+  const BOX_H = BOX_PAD_Y * 2 + 22 + (boxLines - 1) * lineH;
+  ctx.page.drawRectangle({
+    x: MARGIN,
+    y: boxTop - BOX_H,
+    width: CONTENT_W,
+    height: BOX_H,
+    borderColor: LIGHT,
+    borderWidth: 0.8,
+  });
+
+  let by = boxTop - BOX_PAD_Y - 2;
+  ctx.page.drawText("Accepting this quote", {
+    x: MARGIN + BOX_PAD_X,
+    y: by,
+    size: 14,
+    font: ctx.bold,
+    color: BRAND,
+  });
+  by -= 22;
+  ctx.page.drawText(`Reply to the email or ring ${ctx.identity.phone} to go ahead.`, {
+    x: MARGIN + BOX_PAD_X,
+    y: by,
+    size: 12,
+    font: ctx.font,
+    color: DARK,
+  });
+  by -= lineH;
+  ctx.page.drawText(
+    invoice.quoteValidUntil
+      ? `Prices are held until ${formatDateShort(invoice.quoteValidUntil)}.`
+      : "Prices may change if the scope does - anything extra is agreed first.",
+    {
+      x: MARGIN + BOX_PAD_X,
+      y: by,
+      size: 12,
+      font: ctx.font,
+      color: MID,
+    },
+  );
+  return boxTop - BOX_H - 14;
+}
+
+/**
  * Draws the operator-supplied notes line, if any. Wraps to the page width.
  * @param ctx - PDF drawing context.
  * @param invoice - Invoice being rendered.
@@ -661,7 +743,7 @@ export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
   y = drawBillToBlock(ctx, invoice, y);
   y = drawLineItemsTable(ctx, invoice, y);
   y = drawTotalsBlock(ctx, invoice, y);
-  y = drawPaymentCallout(ctx, invoice, y);
+  y = invoice.isQuote ? drawQuoteCallout(ctx, invoice, y) : drawPaymentCallout(ctx, invoice, y);
   drawNotes(ctx, invoice, y);
   drawFooter(ctx);
 

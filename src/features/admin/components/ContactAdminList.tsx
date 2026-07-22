@@ -31,6 +31,8 @@ export interface ContactRow {
   createdAt: string;
   /** Google People API resource name if synced, or null */
   googleContactId: string | null;
+  /** Retainer tier label when this contact is a retainer client, or null. */
+  retainerTier: string | null;
   /** Reviews linked to this contact */
   reviews: Array<{
     id: string;
@@ -491,6 +493,7 @@ export function ContactAdminList({
   // since a contact is exactly one of synced or not.
   const [syncFilter, setSyncFilter] = useState<"all" | "synced" | "unsynced">("all");
   const [reviewedOnly, setReviewedOnly] = useState(false);
+  const [retainerOnly, setRetainerOnly] = useState(false);
   const [noEmail, setNoEmail] = useState(false);
   const [noPhone, setNoPhone] = useState(false);
   const [sort, setSort] = useState<"name" | "newest" | "oldest">("name");
@@ -548,11 +551,12 @@ export function ContactAdminList({
       )
     : contacts;
 
-  const anyFilter = syncFilter !== "all" || reviewedOnly || noEmail || noPhone;
+  const anyFilter = syncFilter !== "all" || reviewedOnly || retainerOnly || noEmail || noPhone;
   const filtered = visible.filter((c) => {
     if (syncFilter === "synced" && !c.googleContactId) return false;
     if (syncFilter === "unsynced" && c.googleContactId) return false;
     if (reviewedOnly && c.reviews.length === 0) return false;
+    if (retainerOnly && !c.retainerTier) return false;
     if (noEmail && c.email) return false;
     if (noPhone && c.phone) return false;
     return true;
@@ -915,6 +919,13 @@ export function ContactAdminList({
         >
           Has reviews
         </button>
+        <button
+          type="button"
+          onClick={() => setRetainerOnly((v) => !v)}
+          className={chipClass(retainerOnly)}
+        >
+          Retainer
+        </button>
         <button type="button" onClick={() => setNoEmail((v) => !v)} className={chipClass(noEmail)}>
           No email
         </button>
@@ -927,6 +938,7 @@ export function ContactAdminList({
             onClick={() => {
               setSyncFilter("all");
               setReviewedOnly(false);
+              setRetainerOnly(false);
               setNoEmail(false);
               setNoPhone(false);
             }}

@@ -21,6 +21,7 @@ import { formatNZD } from "@/features/business/lib/business";
 import type { InvoiceReviewEligibility } from "@/features/business/lib/contact-review-token";
 import {
   DEFAULT_INVOICE_EMAIL_BODY,
+  DEFAULT_QUOTE_EMAIL_BODY,
   DEFAULT_VOID_EMAIL_BODY,
 } from "@/features/business/lib/invoice-email-defaults";
 import { cn } from "@/shared/lib/cn";
@@ -58,6 +59,8 @@ interface InvoiceActionsProps {
   isOverdue?: boolean;
   /** Reminders already sent (null reads as 0); shown in the confirm copy. */
   reminderCount?: number | null;
+  /** True when the row is a quote - swaps email copy, hides payment actions, adds Convert. */
+  isQuote?: boolean;
 }
 
 const INPUT_CLS = cn(
@@ -85,6 +88,7 @@ const headers = { "Content-Type": "application/json" };
  * @param props.autoOpenSend - Open the send preview on mount when true.
  * @param props.isOverdue - Whether the invoice is SENT and past due.
  * @param props.reminderCount - Reminders already sent (null reads as 0).
+ * @param props.isQuote - Whether the row is a quote.
  * @returns Invoice actions element with its modals.
  */
 export function InvoiceActions({
@@ -102,6 +106,7 @@ export function InvoiceActions({
   autoOpenSend = false,
   isOverdue = false,
   reminderCount = null,
+  isQuote = false,
 }: InvoiceActionsProps): React.ReactElement {
   const router = useRouter();
   const { toast } = useToast();
@@ -120,8 +125,14 @@ export function InvoiceActions({
   const [currentStatus, setCurrentStatus] = useState(status);
   // Operator-typed greeting override. Empty = use the first word of clientName.
   const [greetingName, setGreetingName] = useState("");
-  // Editable email body, pre-populated with the default copy.
-  const [customBody, setCustomBody] = useState(DEFAULT_INVOICE_EMAIL_BODY);
+  // Editable email body, pre-populated with the default copy (quote wording
+  // when the row is a quote).
+  const [customBody, setCustomBody] = useState(
+    isQuote ? DEFAULT_QUOTE_EMAIL_BODY : DEFAULT_INVOICE_EMAIL_BODY,
+  );
+  // Convert-to-invoice confirm + busy flags.
+  const [converting, setConverting] = useState(false);
+  const [confirmConvertOpen, setConfirmConvertOpen] = useState(false);
   // Review-link inclusion. Defaults to whatever eligibility says when the modal opens.
   const [includeReview, setIncludeReview] = useState(true);
   const [eligibility, setEligibility] = useState<InvoiceReviewEligibility | null>(null);
@@ -361,6 +372,34 @@ export function InvoiceActions({
   }
 
   /**
+   * Promotes the quote to a real invoice: the server allocates the next TTP
+   * number, clears the quote flag, and restamps issue/due dates from today.
+   * The page refreshes in place - same row, new number.
+   */
+  async function convertToInvoice(): Promise<void> {
+    setConverting(true);
+    try {
+      const res = await fetch(`/api/business/invoices/${invoiceId}/convert`, {
+        method: "POST",
+        headers,
+      });
+      const d = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        invoice?: { number: string };
+        error?: string;
+      };
+      if (!res.ok || !d.ok) throw new Error(d.error ?? "Convert failed");
+      toast(`Quote converted to invoice ${d.invoice?.number ?? ""}.`, { tone: "success" });
+      setConfirmConvertOpen(false);
+      router.refresh();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Could not convert", { tone: "error" });
+    } finally {
+      setConverting(false);
+    }
+  }
+
+  /**
    * Opens the send modal and fetches the rendered email preview. Only spins on
    * the FIRST load so edit re-fetches keep the preview visible.
    * @param forceAdopt - Re-adopt the server's fresh eligibility verdict (and sync
@@ -513,12 +552,12 @@ export function InvoiceActions({
         )}
         {isDraft && (
           <AdminButton variant="danger" onClick={() => setConfirmDeleteOpen(true)} busy={deleting}>
-            Delete draft
+            {isQuote ? "Delete quote" : "Delete draft"}
           </AdminButton>
         )}
         {!isDraft && !isPaid && !isVoided && (
           <AdminButton variant="secondary" onClick={openVoidModal} busy={voiding}>
-            Void invoice
+            {isQuote ? "Void quote" : "Void invoice"}
           </AdminButton>
         )}
         {isVoided && clientEmail && (
@@ -526,9 +565,14 @@ export function InvoiceActions({
             Resend void notification
           </AdminButton>
         )}
-        {!isPaid && !isVoided && (
+        {!isPaid && !isVoided && !isQuote && (
           <AdminButton variant="secondary" onClick={() => setPayOpen(true)}>
             Mark as paid
+          </AdminButton>
+        )}
+        {isQuote && !isVoided && (
+          <AdminButton onClick={() => setConfirmConvertOpen(true)} busy={converting}>
+            Convert to invoice
           </AdminButton>
         )}
         {isOverdue && !isPaid && !isVoided && clientEmail && (
@@ -557,10 +601,21 @@ export function InvoiceActions({
         )}
       </div>
 
+      {/* Convert-to-invoice confirm. */}
+      <ConfirmDialog
+        open={confirmConvertOpen}
+        title={`Convert ${invoiceNumber} to an invoice?`}
+        body="Allocates the next invoice number and starts the payment clock from today. The quote number is retired; this can't be undone."
+        confirmLabel="Convert"
+        busy={converting}
+        onConfirm={() => void convertToInvoice()}
+        onCancel={() => setConfirmConvertOpen(false)}
+      />
+
       {/* Delete-draft confirm. */}
       <ConfirmDialog
         open={confirmDeleteOpen}
-        title={`Delete invoice ${invoiceNumber}?`}
+        title={`Delete ${isQuote ? "quote" : "invoice"} ${invoiceNumber}?`}
         body="This cannot be undone."
         confirmLabel="Delete"
         tone="danger"

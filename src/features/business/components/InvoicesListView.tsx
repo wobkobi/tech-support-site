@@ -27,8 +27,8 @@ import type React from "react";
 import { useEffect, useMemo, useState } from "react";
 import { FaCaretRight } from "react-icons/fa6";
 
-/** Status filter buckets (OVERDUE is derived, not a stored status). */
-type FilterKey = "all" | "DRAFT" | "SENT" | "OVERDUE" | "PAID" | "VOIDED";
+/** Status filter buckets (OVERDUE and QUOTE are derived, not stored statuses). */
+type FilterKey = "all" | "QUOTE" | "DRAFT" | "SENT" | "OVERDUE" | "PAID" | "VOIDED";
 /** Sortable column keys. */
 type SortKey = "number" | "client" | "issued" | "due" | "total" | "status";
 /** Sort direction. */
@@ -49,6 +49,7 @@ const COLUMNS: { key: SortKey; label: string }[] = [
 /** Status-filter dropdown options. */
 const FILTER_OPTIONS: { value: FilterKey; label: string }[] = [
   { value: "all", label: "All statuses" },
+  { value: "QUOTE", label: "Quotes" },
   { value: "DRAFT", label: "Draft" },
   { value: "SENT", label: "Sent" },
   { value: "OVERDUE", label: "Overdue" },
@@ -71,7 +72,7 @@ const PAGE_SIZE = 25;
  * @returns True when the Record-payment action should show.
  */
 function canPay(inv: Invoice): boolean {
-  return inv.status === "SENT";
+  return inv.status === "SENT" && !inv.isQuote;
 }
 
 /**
@@ -193,6 +194,8 @@ export function InvoicesListView(): React.ReactElement {
 
   // Summary across ALL invoices (not the filtered view). Legacy PAID rows with no
   // paidAt are excluded from "paid this month" - their pay date is unknown.
+  // Quotes are not money owed - they get their own counter and stay out of
+  // every dollar stat.
   const summary = useMemo(() => {
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     let outstanding = 0;
@@ -202,7 +205,16 @@ export function InvoicesListView(): React.ReactElement {
     let paidCount = 0;
     let draftCount = 0;
     let draftSum = 0;
+    let quoteCount = 0;
+    let quoteSum = 0;
     for (const inv of invoices) {
+      if (inv.isQuote) {
+        if (inv.status !== "VOIDED") {
+          quoteCount += 1;
+          quoteSum += inv.total;
+        }
+        continue;
+      }
       if (inv.status === "SENT") {
         outstanding += inv.total;
         if (isInvoiceOverdue(inv, now)) {
@@ -219,7 +231,17 @@ export function InvoicesListView(): React.ReactElement {
         draftSum += inv.total;
       }
     }
-    return { outstanding, overdue, overdueCount, paidThisMonth, paidCount, draftCount, draftSum };
+    return {
+      outstanding,
+      overdue,
+      overdueCount,
+      paidThisMonth,
+      paidCount,
+      draftCount,
+      draftSum,
+      quoteCount,
+      quoteSum,
+    };
   }, [invoices, now]);
 
   const filtered = useMemo(() => {
@@ -232,7 +254,11 @@ export function InvoicesListView(): React.ReactElement {
       }
       if (statusFilter === "OVERDUE") {
         if (!isInvoiceOverdue(inv, now)) return false;
-      } else if (statusFilter !== "all" && inv.status !== statusFilter) {
+      } else if (statusFilter === "QUOTE") {
+        if (!inv.isQuote) return false;
+      } else if (statusFilter !== "all" && (inv.status !== statusFilter || inv.isQuote)) {
+        // Stored-status buckets are invoice-only: a quote is DRAFT/SENT under
+        // the hood but must not surface under those filters.
         return false;
       }
       const issued = new Date(inv.issueDate);
@@ -308,7 +334,7 @@ export function InvoicesListView(): React.ReactElement {
       />
 
       {/* Summary cards double as one-click status filters. */}
-      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-5">
         <StatCard
           label="Outstanding"
           value={formatNZD(summary.outstanding)}
@@ -339,6 +365,13 @@ export function InvoicesListView(): React.ReactElement {
           sub={formatNZD(summary.draftSum)}
           onClick={() => toggleFilter("DRAFT")}
           active={statusFilter === "DRAFT"}
+        />
+        <StatCard
+          label="Quotes"
+          value={summary.quoteCount}
+          sub={`${formatNZD(summary.quoteSum)} quoted`}
+          onClick={() => toggleFilter("QUOTE")}
+          active={statusFilter === "QUOTE"}
         />
       </div>
 
@@ -470,9 +503,9 @@ export function InvoicesListView(): React.ReactElement {
                     size="xs"
                     variant="secondary"
                     href={`/admin/business/invoices/${inv.id}?send=1`}
-                    aria-label={`Send invoice ${inv.number}`}
+                    aria-label={`Send ${inv.isQuote ? "quote" : "invoice"} ${inv.number}`}
                   >
-                    Send invoice
+                    {inv.isQuote ? "Send quote" : "Send invoice"}
                   </AdminButton>
                 </div>
               )}
@@ -569,9 +602,9 @@ export function InvoicesListView(): React.ReactElement {
                           size="xs"
                           variant="secondary"
                           href={`/admin/business/invoices/${inv.id}?send=1`}
-                          aria-label={`Send invoice ${inv.number}`}
+                          aria-label={`Send ${inv.isQuote ? "quote" : "invoice"} ${inv.number}`}
                         >
-                          Send invoice
+                          {inv.isQuote ? "Send quote" : "Send invoice"}
                         </AdminButton>
                       )}
                       {canPay(inv) && (

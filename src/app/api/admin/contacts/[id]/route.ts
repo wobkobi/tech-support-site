@@ -18,12 +18,22 @@ interface ContactPatchBody {
   email?: string;
   phone?: string;
   address?: string;
+  /** Retainer tier label, or null/"" to clear the retainer arrangement. */
+  retainerTier?: string | null;
+  retainerPrice?: number | null;
+  retainerHours?: number | null;
+  /** ISO date string (yyyy-mm-dd) or null. */
+  retainerSince?: string | null;
+  retainerNotes?: string | null;
+  /** Operator environment notes (router, ISP, tenant); never passwords. */
+  siteNotes?: string | null;
 }
 
 /**
  * PATCH /api/admin/contacts/[id]
- * Updates a contact's name, phone, and/or address in the local DB,
- * then best-effort syncs the updated contact to Google Contacts.
+ * Updates a contact's name, phone, address, and/or retainer arrangement in the
+ * local DB, then best-effort syncs the updated contact to Google Contacts
+ * (retainer fields stay local - the Google mapping doesn't carry them).
  * Requires X-Admin-Secret header.
  * @param request - Incoming request with optional name, phone, address fields.
  * @param params - Route parameters containing the contact ID.
@@ -92,16 +102,55 @@ export async function PATCH(
     return errorResponse("Please enter a valid phone number.", 400);
   }
 
-  const updateData: Record<string, string | null> = {};
+  // Numeric retainer fields must be finite (NaN from an empty form field must
+  // not persist); dates must parse.
+  for (const key of ["retainerPrice", "retainerHours"] as const) {
+    const val = body[key];
+    if (val !== undefined && val !== null && (typeof val !== "number" || !Number.isFinite(val))) {
+      return errorResponse(`Invalid ${key}.`, 400);
+    }
+  }
+  if (
+    body.retainerSince !== undefined &&
+    body.retainerSince !== null &&
+    body.retainerSince !== "" &&
+    Number.isNaN(new Date(body.retainerSince).getTime())
+  ) {
+    return errorResponse("Invalid retainerSince date.", 400);
+  }
+
+  const updateData: Record<string, string | number | Date | null> = {};
   if (body.name !== undefined) updateData.name = body.name.trim();
   if (body.email !== undefined) updateData.email = body.email.trim().toLowerCase() || null;
   if (body.phone !== undefined) updateData.phone = toE164NZ(body.phone) || null;
   if (body.address !== undefined) updateData.address = body.address.trim() || null;
+  if (body.retainerTier !== undefined) updateData.retainerTier = body.retainerTier?.trim() || null;
+  if (body.retainerPrice !== undefined) updateData.retainerPrice = body.retainerPrice;
+  if (body.retainerHours !== undefined) updateData.retainerHours = body.retainerHours;
+  if (body.retainerSince !== undefined) {
+    updateData.retainerSince = body.retainerSince ? new Date(body.retainerSince) : null;
+  }
+  if (body.retainerNotes !== undefined) {
+    updateData.retainerNotes = body.retainerNotes?.trim() || null;
+  }
+  if (body.siteNotes !== undefined) updateData.siteNotes = body.siteNotes?.trim() || null;
 
   const contact = await prisma.contact.update({
     where: { id },
     data: updateData,
-    select: { id: true, name: true, email: true, phone: true, address: true },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      phone: true,
+      address: true,
+      retainerTier: true,
+      retainerPrice: true,
+      retainerHours: true,
+      retainerSince: true,
+      retainerNotes: true,
+      siteNotes: true,
+    },
   });
 
   // Best-effort Google Contacts sync - never fail the request if it errors.

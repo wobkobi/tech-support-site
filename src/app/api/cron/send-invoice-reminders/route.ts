@@ -3,6 +3,7 @@
 // invoice at the comms-settings offsets, idempotent via reminderCount. See docs/CRON.md.
 
 import { sendOverdueReminder } from "@/features/business/lib/invoice-reminders";
+import { NOT_A_QUOTE_FILTER } from "@/features/business/lib/invoice-status";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isCronAuthorized } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
@@ -35,7 +36,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       now.getTime() - comms.invoiceReminderFirstDays * 24 * 60 * 60 * 1000,
     );
     const candidates = await prisma.invoice.findMany({
-      where: { status: "SENT", dueDate: { lte: firstThreshold } },
+      // A SENT quote has a placeholder dueDate, not a payment deadline -
+      // never remind on quotes.
+      where: { status: "SENT", dueDate: { lte: firstThreshold }, ...NOT_A_QUOTE_FILTER },
       orderBy: { dueDate: "asc" },
     });
 
