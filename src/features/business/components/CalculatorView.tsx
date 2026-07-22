@@ -181,7 +181,6 @@ interface CalculatorDraft {
   pickedContactCompany: string | null;
   pickedContactGoogleId: string | null;
   addressMode: "name" | "company" | "custom";
-  unsuccessful: boolean;
 }
 
 /**
@@ -202,7 +201,6 @@ function isMeaningfulDraft(d: CalculatorDraft): boolean {
     d.jobAddress.trim().length > 0 ||
     d.pickedContactName !== null ||
     d.pickedContactCompany !== null ||
-    d.unsuccessful ||
     d.followUpMins > 0
   );
 }
@@ -433,8 +431,6 @@ export function CalculatorView({
   const [showParts, setShowParts] = useState(false);
   const [showTaxonomyModal, setShowTaxonomyModal] = useState(false);
   const [notes, setNotes] = useState("");
-  // Half off labour when ticked (per pricing-policy.unsuccessfulWorkCopy).
-  const [unsuccessful, setUnsuccessful] = useState(false);
   // Cancel mode: a cancelled job has no work to bill, so the job-shaped sections
   // are swapped for CancelFeeSection and the fee is written into tasks as one
   // flat line. Client picker, travel, invoice preview, and save are reused as-is.
@@ -626,7 +622,6 @@ export function CalculatorView({
       setPickedContactCompany(draft.pickedContactCompany ?? null);
       setPickedContactGoogleId(draft.pickedContactGoogleId ?? null);
       setAddressModeState(draft.addressMode ?? "custom");
-      setUnsuccessful(draft.unsuccessful ?? false);
       /* eslint-enable react-hooks/set-state-in-effect */
     } else if (!eventPrefill) {
       const now = nowTime();
@@ -683,7 +678,6 @@ export function CalculatorView({
         pickedContactCompany,
         pickedContactGoogleId,
         addressMode,
-        unsuccessful,
       });
     }, 500);
     return () => clearTimeout(t);
@@ -703,7 +697,6 @@ export function CalculatorView({
     pickedContactCompany,
     pickedContactGoogleId,
     addressMode,
-    unsuccessful,
   ]);
 
   // Auto-dismiss the "Draft restored" toast 8s after it appears.
@@ -743,7 +736,6 @@ export function CalculatorView({
     parts,
     travelEntries,
     notes,
-    unsuccessful,
     clientName,
     clientEmail,
   };
@@ -782,7 +774,6 @@ export function CalculatorView({
       clientName,
       clientEmail,
       notes,
-      unsuccessful,
     ],
   );
 
@@ -870,14 +861,12 @@ export function CalculatorView({
           details,
           isShort: t.isShort ?? false,
           isExplicit: t.isExplicit ?? false,
+          // Per-line halving: an AI-flagged unresolved task bills half its
+          // labour via calcJobTotal; completed tasks in the same job are
+          // unaffected. The chip on the task row is the operator override.
           unsuccessful: t.unsuccessful ?? false,
         };
       });
-      // When the AI read EVERY task as unresolved, tick the whole-job
-      // unsuccessful box (per-task flags are subsumed by it); a mixed job
-      // keeps the halving per-line. Reparse semantics: the new parse is the
-      // truth, so a parse with no failure signal clears the box again.
-      setUnsuccessful(parsedTasks.length > 0 && parsedTasks.every((t) => t.unsuccessful));
       const parsedParts = result.parts.map((p) => ({ description: p.description, cost: p.cost }));
 
       // Reparse semantics: the new parse result is the new truth for the auto
@@ -1155,7 +1144,6 @@ export function CalculatorView({
     setPickedContactCompany(null);
     setPickedContactGoogleId(null);
     setAddressModeState("custom");
-    setUnsuccessful(false);
     setAiInput("");
     // Non-persisted parse-session results, but still part of "starting fresh".
     setParseResult(null);
@@ -1265,7 +1253,6 @@ export function CalculatorView({
     setCancelledAtDate(jobDate);
     setCancelledAtTime(bookingTime);
     setParts([]);
-    setUnsuccessful(false);
     applyCancelPolicy({
       reason: "late-cancellation",
       meetingType,
@@ -1411,7 +1398,6 @@ export function CalculatorView({
           notes: notes || null,
           promoTitle: promoActive ? activePromo.title : null,
           promoDiscount: promoActive ? totals.promoDiscount : null,
-          unsuccessful,
           unsuccessfulDiscount:
             totals.unsuccessfulDiscount > 0 ? totals.unsuccessfulDiscount : null,
           // Match back to the billed job when this session came from the
@@ -2225,7 +2211,6 @@ export function CalculatorView({
                 baseRates={baseRates}
                 modifierRates={modifierRates}
                 flatRates={flatRates}
-                jobUnsuccessful={unsuccessful}
               />
             </>
           )}
@@ -2301,34 +2286,6 @@ export function CalculatorView({
               setClientEmail("");
             }}
           />
-
-          {/* Half off labour when ticked (couldn't fix AND couldn't diagnose). */}
-          <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-            <label
-              className="flex cursor-pointer items-start gap-2 text-sm"
-              title="Tick only when you left with neither a fix nor a diagnosis."
-            >
-              <input
-                type="checkbox"
-                checked={unsuccessful}
-                onChange={(e) => setUnsuccessful(e.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-russian-violet focus:ring-russian-violet/30"
-              />
-              <span>
-                <span className="font-medium text-slate-700">
-                  Mark as unsuccessful (half-price labour)
-                </span>
-                <span className="mt-0.5 block text-xs text-slate-500">
-                  Half off the labour portion. Travel + parts unchanged.
-                </span>
-              </span>
-            </label>
-            {unsuccessful && totals.unsuccessfulDiscount > 0 && (
-              <p className="mt-2 text-xs font-semibold text-amber-700">
-                -${totals.unsuccessfulDiscount.toFixed(2)} applied to labour
-              </p>
-            )}
-          </div>
 
           {/* Actions */}
           <div className="space-y-2">
