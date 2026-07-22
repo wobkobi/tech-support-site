@@ -108,7 +108,8 @@ function findTemplateByTags<T extends { device: string | null; action: string | 
 
 /**
  * POST /api/business/parse-job - Parses a plain-English job description using gpt-4.1.
- * Pre-computes session total from time ranges and attaches travel info from the AI-extracted destination.
+ * Pre-computes session total from time ranges and attaches travel info from the AI-extracted
+ * destination, falling back to the caller-supplied `fallbackDestination` when the text names none.
  * @param request - Incoming Next.js request with input string in body
  * @returns JSON with structured ParseJobResponse or a 422 error
  */
@@ -119,14 +120,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   // Parse and validate body
   const body = await request.json();
-  const { input, answers, jobDate } = body as {
+  const { input, answers, jobDate, fallbackDestination } = body as {
     input: unknown;
     answers?: Record<string, unknown>;
     jobDate?: unknown;
+    fallbackDestination?: unknown;
   };
   // Job date (NZ-local YYYY-MM-DD) anchors travel quotes to the job's weekday.
   const jobDateAnchor =
     typeof jobDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(jobDate) ? jobDate : undefined;
+  // Calculator-supplied address (booked-job prefill or the Travel card) used
+  // only when the AI extracts no destination from the text. Never enters the
+  // prompt - it feeds the Distance Matrix lookup alone.
+  const fallbackDest =
+    typeof fallbackDestination === "string"
+      ? fallbackDestination.trim().slice(0, 200) || undefined
+      : undefined;
 
   if (!input || typeof input !== "string" || input.trim().length === 0) {
     return errorResponse("input is required", 400);
@@ -233,6 +242,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     if ("clarify" in parsed && Array.isArray(parsed.clarify)) {
       return NextResponse.json({ ok: true, clarify: parsed.clarify });
+    }
+
+    // Descriptions of booked jobs rarely restate the address, so when the AI
+    // found no destination fall back to the calculator's address. From here the
+    // travel branches (and the response's destination echo) treat it exactly
+    // like an operator-typed address; an explicit no-travel parse still wins.
+    if (!parsed.destination && !parsed.noTravelCharge && fallbackDest) {
+      parsed.destination = fallbackDest;
     }
 
     if (!parsed.noTravelCharge && parsed.statedDistanceKm && parsed.statedDistanceKm > 0) {

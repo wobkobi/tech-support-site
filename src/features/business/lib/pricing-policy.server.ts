@@ -7,7 +7,6 @@
 
 import {
   FALLBACK_BASE_RATE,
-  FALLBACK_TRAVEL_RATE,
   GST_RATE,
   HOME_REGION,
   NZ_REGION,
@@ -77,6 +76,7 @@ export const getPolicy = cache(async (): Promise<Policy> => {
     GST_REGISTERED: pricing.gstRegistered,
     GST_RATE,
     MIN_TRAVEL_CHARGE: pricing.minTravelCharge,
+    TRAVEL_RATE_PER_HOUR: pricing.travelRatePerHour,
     MIN_BILLABLE_MINS: pricing.minBillableMins,
     BILLING_INCREMENT_MINS: pricing.billingIncrementMins,
     PUBLIC_HOLIDAY_UPLIFT: pricing.publicHolidayUplift,
@@ -121,8 +121,9 @@ const MODIFIER_DESCRIPTIONS: Record<string, string> = {
  * Public pricing snapshot for the pricing + FAQ pages and the layout JSON-LD.
  * Reads the tag-cached rate rows ({@link getRateRows}) alongside the cached
  * settings, and dedupes repeat calls within one request via React `cache`
- * (layout + generateMetadata + page body all call it). Falls back to
- * hardcoded $65 / $40 defaults when a row is missing.
+ * (layout + generateMetadata + page body all call it). The base rate falls
+ * back to the hardcoded $65 default when no hourly row exists; the travel
+ * rate comes from the pricing settings.
  * @returns Live pricing snapshot.
  */
 export const getPublicPricing = cache(async (): Promise<PublicPricing> => {
@@ -133,9 +134,9 @@ export const getPublicPricing = cache(async (): Promise<PublicPricing> => {
     rows.find((r) => r.ratePerHour !== null && r.unit === "hour")?.ratePerHour ??
     FALLBACK_BASE_RATE;
 
-  const travelRatePerHour =
-    rows.find((r) => r.unit === "travel-hour" && r.ratePerHour !== null)?.ratePerHour ??
-    FALLBACK_TRAVEL_RATE;
+  // Travel rate is a pricing setting, not a rate row - the operator edits it
+  // in Settings > Pricing and it can't drift via the calculator's rate panel.
+  const travelRatePerHour = pricing.travelRatePerHour;
 
   // Public Holiday uses percentDelta; the rest use hourlyDelta.
   const modifiers: PublicModifier[] = [];

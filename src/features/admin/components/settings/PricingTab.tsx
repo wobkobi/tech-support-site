@@ -104,6 +104,15 @@ export function PricingTab({ initial, defaults }: Props): React.ReactElement {
           onChange={(v) => setTop({ minTravelCharge: v ?? 0 })}
         />
         <NumberField
+          id="travelRatePerHour"
+          meta={m.travelRatePerHour}
+          value={draft.travelRatePerHour}
+          min={0}
+          error={fieldErrors.travelRatePerHour}
+          customised={draft.travelRatePerHour !== defaults.travelRatePerHour}
+          onChange={(v) => setTop({ travelRatePerHour: v ?? 0 })}
+        />
+        <NumberField
           id="unsuccessfulWorkFactor"
           meta={m.unsuccessfulWorkFactor}
           // Stored as a fraction; shown + edited as a whole percent for readability.

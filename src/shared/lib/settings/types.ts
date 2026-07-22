@@ -107,6 +107,8 @@ export interface PricingSettings {
   publicHolidayUplift: number;
   /** Minimum travel charge floor (NZD). 0 = no floor. */
   minTravelCharge: number;
+  /** Hourly rate for drive time (NZD/hr); prices every round trip. */
+  travelRatePerHour: number;
   /** Fraction charged when a visit is unsuccessful (0.5 = half price, 0 = free). */
   unsuccessfulWorkFactor: number;
   /** Days after a visit during which fallout from that visit's changes is fixed free. 0 = no stated guarantee. */

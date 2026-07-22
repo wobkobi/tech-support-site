@@ -370,10 +370,16 @@ export const PRICING_FIELD_META: Record<string, FieldMeta> = {
     unit: "$",
     off: "Set 0 for no floor - bill the exact travel time.",
   },
+  travelRatePerHour: {
+    title: "Travel rate",
+    description:
+      "Hourly rate for drive time. Prices every round trip - the calculator, booking estimates, and cancellation call-outs all read it from here.",
+    unit: "$/hr",
+  },
   unsuccessfulWorkFactor: {
     title: "Unsuccessful-visit charge",
     description:
-      "Fraction of the labour billed when a visit is unsuccessful - neither fixed nor diagnosed (50 = half price).",
+      "Fraction of the labour billed when the problem isn't put right by the end of the visit, diagnosis or not (50 = half price).",
     unit: "%",
     off: "Set 0 to charge nothing for an unsuccessful visit.",
   },

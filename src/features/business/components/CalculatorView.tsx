@@ -38,7 +38,6 @@ import {
   calcTravelCharge,
   cancellationFeeLabel,
   cancellationNotes,
-  FALLBACK_TRAVEL_RATE,
   type CancellationPolicy,
   type CancellationReason,
   type CancelMeetingType,
@@ -147,6 +146,14 @@ function jobStartIsoFromTime(hhmm: string, anchorDate?: string): string | null {
  * CalculatorDraft fields change so stale shapes can't crash the form.
  */
 const DRAFT_KEY = "calculator-draft-v2";
+
+/**
+ * sessionStorage key for the one-shot "Describe the job" handoff across the
+ * event picker's navigation. The page keys this component by eventId, so
+ * picking an event remounts it and resets all state; a part-typed description
+ * is stashed here just before the push and consumed on the next mount.
+ */
+const AI_INPUT_HANDOFF_KEY = "calculator-ai-input-handoff";
 
 /**
  * Subset of CalculatorView state persisted across refreshes. Excludes
@@ -299,8 +306,8 @@ function todayNZDate(): string {
 interface CalculatorViewProps {
   /** Live business identity, threaded into the invoice preview. */
   identity: IdentitySettings;
-  /** Live pricing (GST, min travel) for the job calculations. */
-  pricing: JobPricing;
+  /** Live pricing (GST, min travel, travel $/hr from settings) for the job calculations. */
+  pricing: JobPricing & { travelRatePerHour: number };
   /**
    * Live cancellation policy driving cancel mode: the notice windows decide
    * whether a fee and the round trip apply, and callOutFee is the amount. Sits
@@ -409,13 +416,10 @@ export function CalculatorView({
     if (!eventPrefill?.travelMinsThere || eventPrefill.travelMinsThere <= 0) return [];
     const there = eventPrefill.travelMinsThere;
     const back = eventPrefill.travelMinsBack ?? there;
-    const travelRatePerHour =
-      initialRates.find((r) => r.unit === "travel-hour" && r.ratePerHour !== null)?.ratePerHour ??
-      FALLBACK_TRAVEL_RATE;
     return [
       {
         label: eventPrefill.jobAddress || `${there} min drive`,
-        cost: calcTravelCharge(there, back, travelRatePerHour, pricing.minTravelCharge),
+        cost: calcTravelCharge(there, back, pricing.travelRatePerHour, pricing.minTravelCharge),
         isAuto: true,
         destination: eventPrefill.jobAddress || `${there} min drive`,
         durationMinsOneWay: there,
@@ -475,8 +479,10 @@ export function CalculatorView({
   const [confirmDeleteRateId, setConfirmDeleteRateId] = useState<string | null>(null);
 
   // "Bill a calendar event" picker: lazily fetched on first open so a normal
-  // calculator load costs nothing; choosing an event reloads the page with
-  // ?eventId= and the server prefills times, client, address, and travel.
+  // calculator load costs nothing. Choosing an event pushes ?eventId= and the
+  // server prefills times, client, address, and travel; the page keys this
+  // component by eventId, so that navigation MUST remount it - the prefill
+  // only lands through useState initialisers, never a prop update.
   const [eventPickerOpen, setEventPickerOpen] = useState(false);
   const [recentEvents, setRecentEvents] = useState<
     { id: string; summary: string; start: string; end: string }[] | null
@@ -626,6 +632,24 @@ export function CalculatorView({
       const now = nowTime();
       setTimeRanges([{ startTime: now, endTime: addHour(now) }]);
     }
+    // Carry the typed description into event billing. The prefill deliberately
+    // outranks the draft for dates/client/travel, but the description is the
+    // operator's own words about the job being billed, so it survives: prefer
+    // the picker's sessionStorage stash (fresher than the 500ms-debounced
+    // draft), else the draft's text - which covers the schedule's "Bill in
+    // calculator" path, where no stash exists. Read it before the draft
+    // writer's first 500ms tick overwrites the stored draft with this mount's
+    // empty box.
+    try {
+      const handoff = sessionStorage.getItem(AI_INPUT_HANDOFF_KEY);
+      if (handoff) sessionStorage.removeItem(AI_INPUT_HANDOFF_KEY);
+      const carried = handoff ?? (eventPrefill ? (loadDraft()?.aiInput ?? "") : "");
+      if (carried) {
+        setAiInput(carried);
+      }
+    } catch {
+      // Storage unavailable; nothing to restore.
+    }
     fetch("/api/business/contacts")
       .then((r) => r.json())
       .then((d: { ok: boolean; contacts: GoogleContact[] }) => {
@@ -768,10 +792,9 @@ export function CalculatorView({
    * created whenever the parser found any drive time; {@link calcTravelCharge}
    * applies the $10 minimum so a 1-min drive still bills the published floor.
    * @param result - The parsed job response returned by the AI.
-   * @param rateList - The current list of rate configurations (used for travel rate lookup).
    */
   const applyParseResult = useCallback(
-    (result: ParseJobResponse, rateList: RateConfig[]) => {
+    (result: ParseJobResponse) => {
       const includeTravelDefault = (result.travel?.durationMins ?? 0) > 0;
 
       // Out-of-session work (a call after the visit) goes into the follow-up
@@ -847,8 +870,14 @@ export function CalculatorView({
           details,
           isShort: t.isShort ?? false,
           isExplicit: t.isExplicit ?? false,
+          unsuccessful: t.unsuccessful ?? false,
         };
       });
+      // When the AI read EVERY task as unresolved, tick the whole-job
+      // unsuccessful box (per-task flags are subsumed by it); a mixed job
+      // keeps the halving per-line. Reparse semantics: the new parse is the
+      // truth, so a parse with no failure signal clears the box again.
+      setUnsuccessful(parsedTasks.length > 0 && parsedTasks.every((t) => t.unsuccessful));
       const parsedParts = result.parts.map((p) => ({ description: p.description, cost: p.cost }));
 
       // Reparse semantics: the new parse result is the new truth for the auto
@@ -867,13 +896,10 @@ export function CalculatorView({
       }));
 
       if (result.travel && includeTravelDefault) {
-        const travelRatePerHour =
-          rateList.find((r) => r.unit === "travel-hour" && r.ratePerHour !== null)?.ratePerHour ??
-          FALLBACK_TRAVEL_RATE;
         const cost = calcTravelCharge(
           result.travel.durationMins,
           result.travel.durationMinsBack,
-          travelRatePerHour,
+          pricing.travelRatePerHour,
           pricing.minTravelCharge,
         );
         const label = result.destination?.trim() || `${result.travel.durationMins} min drive`;
@@ -932,7 +958,13 @@ export function CalculatorView({
       setParts(parsedParts);
       if (result.notes) setNotes(result.notes);
     },
-    [pricing.minTravelCharge, pricing.minBillableMins, eventPrefill, toast],
+    [
+      pricing.travelRatePerHour,
+      pricing.minTravelCharge,
+      pricing.minBillableMins,
+      eventPrefill,
+      toast,
+    ],
   );
 
   /**
@@ -960,6 +992,14 @@ export function CalculatorView({
       const statesTime = /\d{1,2}:\d{2}|\d{1,2}\s?(?:am|pm)/i.test(aiInput);
       const input = eventWindow && !statesTime ? `${eventWindow}\n${aiInput}` : aiInput;
       const body: Record<string, unknown> = { input, jobDate };
+      // Typed descriptions of booked jobs rarely repeat the address, so hand
+      // the current job address (event prefill or Travel card) to the route as
+      // a travel fallback. The AI's own extracted destination still wins, and
+      // a remote booking bills no drive so nothing is sent.
+      const fallbackDestination = jobAddress.trim();
+      if (fallbackDestination && eventPrefill?.meetingType !== "remote") {
+        body.fallbackDestination = fallbackDestination;
+      }
       if (answers && Object.keys(answers).length > 0) body.answers = answers;
       const res = await fetch("/api/business/parse-job", {
         method: "POST",
@@ -971,7 +1011,7 @@ export function CalculatorView({
         setClarifyQuestions(d.clarify as ParseJobQuestion[]);
       } else if (d.ok && d.result) {
         setParseResult(d.result);
-        applyParseResult(d.result, rates);
+        applyParseResult(d.result);
         setHasParsed(true);
         setClarifyAnswers({});
       } else {
@@ -1509,16 +1549,13 @@ export function CalculatorView({
         durationMinsBack?: number;
       };
       if (d.durationMinsThere && d.durationMinsThere > 0) {
-        const travelRatePerHour =
-          rates.find((r) => r.unit === "travel-hour" && r.ratePerHour !== null)?.ratePerHour ??
-          FALLBACK_TRAVEL_RATE;
         const backMins = d.durationMinsBack || d.durationMinsThere;
         // calcTravelCharge sums the legs and floors at MIN_TRAVEL_CHARGE, so
         // a 1-min drive still bills the $10 minimum.
         const cost = calcTravelCharge(
           d.durationMinsThere,
           backMins,
-          travelRatePerHour,
+          pricing.travelRatePerHour,
           pricing.minTravelCharge,
         );
         const label = jobAddress.trim() || `${d.durationMinsThere} min drive`;
@@ -1959,11 +1996,19 @@ export function CalculatorView({
                       <button
                         key={ev.id}
                         type="button"
-                        onClick={() =>
+                        onClick={() => {
+                          // Stash a part-typed description so the remount the
+                          // navigation triggers doesn't wipe it.
+                          try {
+                            if (aiInput.trim())
+                              sessionStorage.setItem(AI_INPUT_HANDOFF_KEY, aiInput);
+                          } catch {
+                            // Storage unavailable; the description won't carry over.
+                          }
                           router.push(
                             `/admin/business/calculator?eventId=${encodeURIComponent(ev.id)}`,
-                          )
-                        }
+                          );
+                        }}
                         className="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-100 px-3 py-2 text-left text-sm hover:border-russian-violet/30 hover:bg-russian-violet/5"
                       >
                         <span className="truncate font-medium text-slate-700">{ev.summary}</span>
@@ -2148,10 +2193,7 @@ export function CalculatorView({
               onTravelEntriesChange={setTravelEntries}
               lookingUpTravel={lookingUpTravel}
               onLookup={() => void handleTravelLookup()}
-              travelRatePerHour={
-                rates.find((r) => r.unit === "travel-hour" && r.ratePerHour !== null)
-                  ?.ratePerHour ?? FALLBACK_TRAVEL_RATE
-              }
+              travelRatePerHour={pricing.travelRatePerHour}
               minTravelCharge={pricing.minTravelCharge}
             />
           )}

@@ -7,11 +7,7 @@
  */
 
 import { priceRangeFor, remoteRateDelta } from "@/features/business/lib/estimate-range";
-import {
-  calcTravelCharge,
-  FALLBACK_BASE_RATE,
-  FALLBACK_TRAVEL_RATE,
-} from "@/features/business/lib/pricing-policy";
+import { calcTravelCharge, FALLBACK_BASE_RATE } from "@/features/business/lib/pricing-policy";
 import { applyPromoToHourlyRate, type ActivePromo } from "@/features/business/lib/promos";
 import type { PublicRate } from "@/features/business/types/pricing";
 import type { EstimateConfidence, EstimatorRange } from "@/shared/lib/settings/types";
@@ -24,6 +20,8 @@ export interface QuickEstimateInput {
   estimatorRange: EstimatorRange;
   minBillableMins: number;
   minTravelCharge: number;
+  /** Travel $/hr (live pricing setting); prices the round trip. */
+  travelRatePerHour: number;
   lowEndFloorFactor: number;
   /**
    * When the customer has already picked a slot, the drive is quoted at that
@@ -66,6 +64,7 @@ export async function fetchQuickEstimate(input: QuickEstimateInput): Promise<Qui
     estimatorRange,
     minBillableMins,
     minTravelCharge,
+    travelRatePerHour,
     lowEndFloorFactor,
   } = input;
   const dest =
@@ -149,9 +148,6 @@ export async function fetchQuickEstimate(input: QuickEstimateInput): Promise<Qui
     tasks = Array.isArray(ai.tasks) ? ai.tasks : [];
   }
 
-  const travelRatePerHour =
-    rates.find((r) => r.unit === "travel-hour" && r.ratePerHour !== null)?.ratePerHour ??
-    FALLBACK_TRAVEL_RATE;
   const promoRate = applyPromoToHourlyRate(fullRate, promo);
   const effectiveMins = Math.max(minBillableMins, estimatedMins);
   const band = priceRangeFor(

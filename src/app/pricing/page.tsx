@@ -464,6 +464,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
             <PricingWizard
               minBillableMins={policy.MIN_BILLABLE_MINS}
               minTravelCharge={policy.MIN_TRAVEL_CHARGE}
+              travelRatePerHour={policy.TRAVEL_RATE_PER_HOUR}
               estimatorRange={settings.estimator.range}
               lowEndFloorFactor={settings.estimator.lowEndFloorFactor}
             />

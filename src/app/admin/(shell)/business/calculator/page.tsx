@@ -101,10 +101,15 @@ async function buildEventPrefill(eventId: string): Promise<EventPrefill | null> 
     endTime: formatNz(event.end, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" }),
     clientName: booking?.name ?? event.summary ?? "",
     clientEmail: booking?.email ?? "",
-    jobAddress:
+    // Calendar locations are often multi-line; <input> values strip newlines
+    // into run-together text ("RoadEpsom"), so flatten to one comma-joined line.
+    jobAddress: (
       (booking?.address
         ? [booking.unit, booking.address].filter(Boolean).join("/")
-        : event.location) ?? "",
+        : event.location) ?? ""
+    )
+      .replace(/,?\s*[\r\n]+\s*/g, ", ")
+      .trim(),
     // Cancel mode bills no round trip on a remote session. Map the Prisma enum
     // to the hyphenated form the client side uses; null when no booking backs
     // the event, and the calculator falls back to inferring from the address.
@@ -146,6 +151,7 @@ export default async function CalculatorPage({
   const pricing = {
     gstRegistered: policy.GST_REGISTERED,
     minTravelCharge: policy.MIN_TRAVEL_CHARGE,
+    travelRatePerHour: policy.TRAVEL_RATE_PER_HOUR,
     minBillableMins: policy.MIN_BILLABLE_MINS,
     unsuccessfulFactor: policy.UNSUCCESSFUL_WORK_FACTOR,
   };
@@ -181,7 +187,11 @@ export default async function CalculatorPage({
         description="Parse a job with AI or build it by hand, then save it as an invoice or income."
       />
       <Suspense>
+        {/* Keyed by event so the in-page picker's client-side navigation
+            remounts the view - the prefill lands via useState initialisers,
+            which never re-run on a prop change alone. */}
         <CalculatorView
+          key={eventId ?? "blank"}
           identity={identity}
           pricing={pricing}
           cancellation={policy.CANCELLATION}
