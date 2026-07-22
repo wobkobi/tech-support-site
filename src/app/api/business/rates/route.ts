@@ -2,22 +2,26 @@
 /**
  * @description Admin rate-config collection endpoint. GET returns every rate,
  * seeding any missing DEFAULTS and running passive migrations (drop Student /
- * Complex, convert legacy per-km Travel to time-based, backfill updatedAt).
- * POST creates a rate (clearing other defaults when isDefault is set); DELETE
- * wipes all rows and reseeds the DEFAULTS.
+ * Complex, retire the Travel row into the pricing settings, backfill
+ * updatedAt). POST creates a rate (clearing other defaults when isDefault is
+ * set); DELETE wipes all rows and reseeds the DEFAULTS.
  */
 
 import { RATE_CONFIG_TAG } from "@/features/business/lib/pricing-policy.server";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
+import { SETTINGS_KEY_PREFIX } from "@/shared/lib/settings/get-settings";
+import { saveSettingsGroup } from "@/shared/lib/settings/set-settings";
+import type { Settings } from "@/shared/lib/settings/types";
 import { revalidateTag } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 
 // Seed shape: one base hourly rate (Standard), modifier rates that shift the
-// effective $/hr (At home -$10, Remote -$10), a percentage modifier for Public
-// Holiday (+25%), and the Travel time rate. There is no separate Complex tier
-// - everything bills at the Standard rate plus the other modifiers.
+// effective $/hr (At home -$10, Remote -$10), and a percentage modifier for
+// Public Holiday (+25%). There is no separate Complex tier - everything bills
+// at the Standard rate plus the other modifiers. The travel $/hr is a pricing
+// setting (Settings > Pricing), not a rate row.
 const DEFAULTS = [
   {
     label: "Standard",
@@ -67,18 +71,6 @@ const DEFAULTS = [
     unit: "modifier",
     isDefault: false,
   },
-  {
-    label: "Travel",
-    // Time-based travel rate ($40/hr round-trip, $10 minimum) - sidesteps any
-    // IRD per-km comparison and matches "you pay for my time, including drive
-    // time". Round-trip + floor enforcement live in calcTravelCharge.
-    ratePerHour: 40,
-    flatRate: null,
-    hourlyDelta: null,
-    percentDelta: null,
-    unit: "travel-hour",
-    isDefault: false,
-  },
 ];
 
 /**
@@ -108,15 +100,36 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     await prisma.rateConfig.deleteMany({ where: { label: { in: ["Student", "Complex"] } } });
   }
 
-  // Travel rate migration: legacy rows still carry { flatRate: 1.2, unit: "km" }
-  // from the per-km model. Switch to { ratePerHour: 40, unit: "travel-hour" }
-  // so time-based travel math (calcTravelCharge) reads the correct rate.
-  const hasLegacyTravel = rates.some((r) => r.label === "Travel" && r.unit === "km");
-  if (hasLegacyTravel) {
-    await prisma.rateConfig.updateMany({
-      where: { label: "Travel", unit: "km" },
-      data: { ratePerHour: 40, flatRate: null, unit: "travel-hour" },
-    });
+  // Travel-row retirement: the travel $/hr is a pricing setting now. Carry a
+  // surviving row's rate into the settings blob first when the blob doesn't
+  // state one yet - a customised rate must never silently reset to the
+  // default - then delete the row(s) so the rate panel can no longer edit the
+  // rate. Legacy per-km rows carry no hourly rate; they just delete.
+  const travelRows = rates.filter((r) => r.unit === "travel-hour" || r.unit === "km");
+  let travelRetired = false;
+  if (travelRows.length > 0) {
+    const rowRate = travelRows.find((r) => r.ratePerHour != null)?.ratePerHour;
+    try {
+      if (rowRate != null) {
+        const raw = await prisma.setting.findUnique({
+          where: { key: SETTINGS_KEY_PREFIX + "pricing" },
+        });
+        // Sparse blob: only operator-set keys exist; resolveSettings fills the
+        // rest from defaults, so add the key rather than a full group value.
+        const blob = raw?.value ? (JSON.parse(raw.value) as Record<string, unknown>) : {};
+        if (blob.travelRatePerHour === undefined) {
+          await saveSettingsGroup("pricing", {
+            ...blob,
+            travelRatePerHour: rowRate,
+          } as Settings["pricing"]);
+        }
+      }
+      await prisma.rateConfig.deleteMany({ where: { id: { in: travelRows.map((r) => r.id) } } });
+      travelRetired = true;
+    } catch (err) {
+      // Leave the row in place so the next GET retries the carry-over.
+      console.warn("[rates] travel-row retirement failed; will retry:", err);
+    }
   }
 
   // updatedAt backfill: rows created before the field existed have no value in
@@ -132,7 +145,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   // Re-read and bust the public pricing cache only when a migration wrote.
-  if (missing.length > 0 || hasRetiredLabels || hasLegacyTravel || needsUpdatedAtBackfill) {
+  if (missing.length > 0 || hasRetiredLabels || travelRetired || needsUpdatedAtBackfill) {
     rates = await prisma.rateConfig.findMany({ orderBy: { label: "asc" } });
     // Next 16's revalidateTag requires a second CacheLifeConfig arg.
     revalidateTag(RATE_CONFIG_TAG, {});

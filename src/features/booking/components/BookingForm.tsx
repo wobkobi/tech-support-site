@@ -118,6 +118,8 @@ export interface BookingFormProps {
   minBillableMins?: number;
   /** Travel floor (live setting) for the inline estimate. */
   minTravelCharge?: number;
+  /** Travel $/hr (live setting) for the inline estimate. */
+  travelRatePerHour?: number;
   /** Low-end floor fraction (live setting) for the inline estimate. */
   lowEndFloorFactor?: number;
 }
@@ -132,6 +134,7 @@ export interface BookingFormProps {
  * @param props.estimatorRange - Live estimator range widths; enables the inline rough estimate.
  * @param props.minBillableMins - Min billable minutes for the inline estimate.
  * @param props.minTravelCharge - Travel floor for the inline estimate.
+ * @param props.travelRatePerHour - Travel $/hr for the inline estimate.
  * @param props.lowEndFloorFactor - Low-end floor fraction for the inline estimate.
  * @returns Booking form element
  */
@@ -143,6 +146,7 @@ export default function BookingForm({
   estimatorRange,
   minBillableMins,
   minTravelCharge,
+  travelRatePerHour,
   lowEndFloorFactor,
 }: BookingFormProps): React.ReactElement {
   const router = useRouter();
@@ -169,6 +173,7 @@ export default function BookingForm({
     estimatorRange != null &&
     minBillableMins != null &&
     minTravelCharge != null &&
+    travelRatePerHour != null &&
     lowEndFloorFactor != null;
 
   // Duration choices built from the live settings; labels reflect the operator's
@@ -268,6 +273,7 @@ export default function BookingForm({
       !estimatorRange ||
       minBillableMins == null ||
       minTravelCharge == null ||
+      travelRatePerHour == null ||
       lowEndFloorFactor == null
     )
       return;
@@ -288,6 +294,7 @@ export default function BookingForm({
         estimatorRange,
         minBillableMins,
         minTravelCharge,
+        travelRatePerHour,
         lowEndFloorFactor,
         departureTimeIso: slotStart?.toISOString(),
         returnDepartureTimeIso: slotEnd?.toISOString(),

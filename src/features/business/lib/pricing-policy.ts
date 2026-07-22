@@ -40,10 +40,11 @@ const PUBLIC_HOLIDAY_UPLIFT = 0.25;
 /** Fallback fraction charged for an unsuccessful visit (0.5 = half price). */
 const UNSUCCESSFUL_WORK_FACTOR = 0.5;
 
+/** Fallback workmanship-guarantee window (days): fallout from a prior visit's changes is fixed free inside it. */
+const WORKMANSHIP_WINDOW_DAYS = 30;
+
 /** Fallback Standard base rate ($/hr) when no default hourly RateConfig row exists; mirrors the seed default. */
 export const FALLBACK_BASE_RATE = 65;
-/** Fallback travel rate ($/hr) when no `travel-hour` RateConfig row exists; mirrors the seed default. */
-export const FALLBACK_TRAVEL_RATE = 40;
 
 /** Region label for nationwide NZ public holidays in the PublicHoliday table. */
 export const NZ_REGION = "NZ";
@@ -216,7 +217,7 @@ export interface TravelChargeBreakdown {
  * zeros for no travel (remote, or geocoded to origin).
  * @param thereMins - Outbound drive time in minutes.
  * @param backMins - Return drive time in minutes; pass thereMins again when no separate figure exists.
- * @param travelRatePerHour - Travel hourly rate, sourced from the `Travel` RateConfig.
+ * @param travelRatePerHour - Travel hourly rate, sourced from the pricing settings.
  * @param minTravelCharge - Travel floor (live pricing setting); defaults to the code const.
  * @returns Per-step breakdown of the round-trip charge.
  */
@@ -246,7 +247,7 @@ export function breakdownTravelCharge(
  * to origin) so the floor doesn't invent a charge.
  * @param thereMins - Outbound drive time in minutes.
  * @param backMins - Return drive time in minutes; pass thereMins again when no separate figure exists.
- * @param travelRatePerHour - Travel hourly rate, sourced from the `Travel` RateConfig.
+ * @param travelRatePerHour - Travel hourly rate, sourced from the pricing settings.
  * @param minTravelCharge - Travel floor (live pricing setting); defaults to the code const.
  * @returns Charge in NZD (whole dollars after $5 rounding), or 0 when no travel.
  */
@@ -335,6 +336,16 @@ function hours(n: number): string {
 }
 
 /**
+ * Renders a day count for customer-facing copy. The window is a setting, so a
+ * value of 1 is reachable and "1 days" would read as a bug to a client.
+ * @param n - Number of days.
+ * @returns e.g. "1 day", "30 days".
+ */
+function days(n: number): string {
+  return `${n} day${n === 1 ? "" : "s"}`;
+}
+
+/**
  * Cancellation policy text (pricing accordion + booking emails + cancel page).
  * @param p - Cancellation policy (defaults to the module constant).
  * @param opts - Optional narrowing for a context that knows the meeting type.
@@ -371,8 +382,11 @@ export function cancellationCopy(
 }
 
 /**
- * Two-test definition for "unsuccessful" so neither party can argue it. The
- * charge phrase tracks the live factor so the copy never disagrees with the bill.
+ * Fixed-or-discounted definition of the unsuccessful-visit rule: full rate
+ * only when the problem is put right; an unfixed visit discounts the labour
+ * even when it ends with a clear diagnosis (a no-fix, no-diagnosis remote
+ * session is free). The charge phrase tracks the live factor so the copy
+ * never disagrees with the bill.
  * @param factor - Unsuccessful-visit charge fraction (defaults to the constant).
  * @returns Multi-paragraph copy describing the unsuccessful-visit rule.
  */
@@ -384,18 +398,49 @@ export function unsuccessfulWorkCopy(factor: number = UNSUCCESSFUL_WORK_FACTOR):
         ? "**Half price**"
         : `**${Math.round(factor * 100)}% of the agreed rate**`;
   return (
-    "Two outcomes count as a successful visit, charged at the agreed rate:\n\n" +
-    "1. **Fixed**: the issue described no longer reproduces by the end of the visit.\n" +
-    "2. **Diagnosed**: I leave you with a written explanation of the root cause and what would be needed to resolve it (for example, 'your hard drive is failing - here is the data recovery specialist you will need to use').\n\n" +
-    `${chargePhrase} applies only when I leave with neither - the symptom is still happening AND I cannot tell you why. Remote sessions are **free** in that case.\n\n` +
-    "A partial fix counts as a fix. A confirmed external blocker (for example, 'you need a part from the manufacturer, here is the part number') counts as a diagnosis."
+    "A visit bills at the agreed rate when the problem is **fixed** - the issue described no longer reproduces by the end of the visit. A partial fix counts as a fix.\n\n" +
+    `${chargePhrase} applies to the labour whenever I can't put the problem right - even when I leave you with a clear diagnosis of what's wrong and what to do next (for example, 'the drive is failing - here is the replacement to order'). Travel and any parts are charged as normal.\n\n` +
+    "A remote session where I can't fix the problem or explain the cause is **free**."
+  );
+}
+
+/**
+ * Workmanship-guarantee text (pricing accordion + FAQ). Distinct from the
+ * unsuccessful-work rule, which covers the outcome of the current visit; this
+ * one stands behind work already delivered - fallout from a prior visit's own
+ * changes is put right free inside the window. Takes the live window so the
+ * copy never disagrees with the promise; callers hide the section entirely
+ * when the window is 0.
+ * @param windowDays - Days after a visit the guarantee covers (defaults to the constant).
+ * @returns Copy describing the workmanship guarantee.
+ */
+export function workmanshipCopy(windowDays: number = WORKMANSHIP_WINDOW_DAYS): string {
+  return (
+    `If something I changed on a previous visit causes a new problem within ` +
+    `**${days(windowDays)}**, I put it right at **no charge** - labour and travel. ` +
+    `That is how I stand behind my work.\n\n` +
+    `This covers fallout from my own work. A separate new issue, or a fault ` +
+    `outside what I touched, is billed as its own job at the agreed rate.`
+  );
+}
+
+/**
+ * Parts-billing text (pricing accordion + FAQ). No settings input - the
+ * at-cost promise has no figure to track.
+ * @returns Copy describing how parts and hardware are billed.
+ */
+export function partsCopy(): string {
+  return (
+    `Parts and hardware are billed **at cost** - what the supplier charged, ` +
+    `receipt included, **no markup** and no commission. You approve the price ` +
+    `before I buy anything on your behalf.`
   );
 }
 
 /**
  * Travel-policy text. Caller passes the live Travel rate so the page always
  * quotes the figure the operator is actually billing.
- * @param travelRatePerHour - Current Travel rate from the RateConfig row.
+ * @param travelRatePerHour - Current travel rate from the pricing settings.
  * @param minTravelCharge - Live minimum travel charge (defaults to the constant).
  * @returns Copy describing the travel charge model.
  */
@@ -464,9 +509,11 @@ export interface Policy {
   GST_REGISTERED: boolean;
   GST_RATE: number;
   MIN_TRAVEL_CHARGE: number;
+  TRAVEL_RATE_PER_HOUR: number;
   MIN_BILLABLE_MINS: number;
   BILLING_INCREMENT_MINS: number;
   PUBLIC_HOLIDAY_UPLIFT: number;
   UNSUCCESSFUL_WORK_FACTOR: number;
+  WORKMANSHIP_WINDOW_DAYS: number;
   CANCELLATION: CancellationPolicy;
 }

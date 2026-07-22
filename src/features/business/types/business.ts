@@ -240,6 +240,8 @@ interface ParsedTaskLine {
   isShort?: boolean;
   /** True when the AI pinned this task to an operator-stated explicit duration. Pinned tasks are skipped by the post-parse safety-net rebalance. */
   isExplicit?: boolean;
+  /** True when the AI read the task's problem as not resolved ("couldn't fix it"); the calculator halves that line's labour per the unsuccessful-work policy. */
+  unsuccessful?: boolean;
 }
 
 interface ParsedPartLine {

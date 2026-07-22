@@ -11,9 +11,11 @@ import {
   cancellationCopy,
   gstCopy,
   minimumsCopy,
+  partsCopy,
   publicHolidayCopy,
   travelCopy,
   unsuccessfulWorkCopy,
+  workmanshipCopy,
 } from "@/features/business/lib/pricing-policy";
 import { getPolicy, getPublicPricing } from "@/features/business/lib/pricing-policy.server";
 import {
@@ -351,6 +353,17 @@ export default async function PricingPage(): Promise<React.ReactElement> {
 
               <details className={ACCORDION_DETAILS}>
                 <summary className={ACCORDION_SUMMARY}>
+                  <span>Parts</span>
+                  <FaCaretDown
+                    className="h-4 w-4 transition-transform group-open:rotate-180"
+                    aria-hidden
+                  />
+                </summary>
+                <div className={ACCORDION_BODY}>{renderEmphasised(partsCopy())}</div>
+              </details>
+
+              <details className={ACCORDION_DETAILS}>
+                <summary className={ACCORDION_SUMMARY}>
                   <span>Cancellation</span>
                   <FaCaretDown
                     className="h-4 w-4 transition-transform group-open:rotate-180"
@@ -374,6 +387,22 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                   {renderEmphasised(unsuccessfulWorkCopy(policy.UNSUCCESSFUL_WORK_FACTOR))}
                 </div>
               </details>
+
+              {/* A 0-day window means no stated guarantee, so the section is hidden. */}
+              {policy.WORKMANSHIP_WINDOW_DAYS > 0 && (
+                <details className={ACCORDION_DETAILS}>
+                  <summary className={ACCORDION_SUMMARY}>
+                    <span>Workmanship guarantee</span>
+                    <FaCaretDown
+                      className="h-4 w-4 transition-transform group-open:rotate-180"
+                      aria-hidden
+                    />
+                  </summary>
+                  <div className={ACCORDION_BODY}>
+                    {renderEmphasised(workmanshipCopy(policy.WORKMANSHIP_WINDOW_DAYS))}
+                  </div>
+                </details>
+              )}
 
               <details className={ACCORDION_DETAILS}>
                 <summary className={ACCORDION_SUMMARY}>
@@ -435,6 +464,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
             <PricingWizard
               minBillableMins={policy.MIN_BILLABLE_MINS}
               minTravelCharge={policy.MIN_TRAVEL_CHARGE}
+              travelRatePerHour={policy.TRAVEL_RATE_PER_HOUR}
               estimatorRange={settings.estimator.range}
               lowEndFloorFactor={settings.estimator.lowEndFloorFactor}
             />

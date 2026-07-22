@@ -9,11 +9,7 @@
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import { BOOKING_FIELD_LIMITS } from "@/features/booking/lib/booking";
 import { priceRangeFor, remoteRateDelta } from "@/features/business/lib/estimate-range";
-import {
-  calcTravelCharge,
-  FALLBACK_BASE_RATE,
-  FALLBACK_TRAVEL_RATE,
-} from "@/features/business/lib/pricing-policy";
+import { calcTravelCharge, FALLBACK_BASE_RATE } from "@/features/business/lib/pricing-policy";
 import {
   applyPromoToHourlyRate,
   summariseForBanner,
@@ -59,6 +55,8 @@ interface Props {
   minBillableMins: number;
   /** Travel floor (live pricing setting) for the travel estimate. */
   minTravelCharge: number;
+  /** Travel $/hr (live pricing setting); prices the round trip. */
+  travelRatePerHour: number;
   /** Confidence-scaled price-range widths (live estimator setting). */
   estimatorRange: EstimatorRange;
   /** Low-end floor fraction (live estimator setting). */
@@ -71,6 +69,7 @@ interface Props {
  * @param props - Component props.
  * @param props.minBillableMins - Minimum billable minutes used to floor the estimate.
  * @param props.minTravelCharge - Travel floor for the travel estimate.
+ * @param props.travelRatePerHour - Travel $/hr pricing the round trip.
  * @param props.estimatorRange - Confidence-scaled price-range widths (live estimator setting).
  * @param props.lowEndFloorFactor - Low-end floor fraction (live estimator setting).
  * @returns The rendered wizard.
@@ -78,6 +77,7 @@ interface Props {
 export function PricingWizard({
   minBillableMins,
   minTravelCharge,
+  travelRatePerHour,
   estimatorRange,
   lowEndFloorFactor,
 }: Props): React.ReactElement {
@@ -212,11 +212,6 @@ export function PricingWizard({
       confidence = ai.confidence ?? "medium";
       tasks = Array.isArray(ai.tasks) ? ai.tasks : [];
     }
-
-    // Travel rate is decoupled from labour; Remote/promo never touch it.
-    const travelRatePerHour =
-      rates.find((r) => r.unit === "travel-hour" && r.ratePerHour !== null)?.ratePerHour ??
-      FALLBACK_TRAVEL_RATE;
 
     const promoRate = applyPromoToHourlyRate(fullRate, activePromo);
     const promoApplied = promoRate < fullRate;

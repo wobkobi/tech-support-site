@@ -321,9 +321,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }),
     ]);
     const baseRow = rates.find((r) => r.ratePerHour !== null && r.isDefault) ?? null;
-    const travelRow = rates.find((r) => r.unit === "travel-hour") ?? null;
     const baseRateAtBooking = baseRow?.ratePerHour ?? null;
-    const travelRatePerHourAtBooking = travelRow?.ratePerHour ?? null;
+    // Travel rate is a pricing setting; snapshot it so later settings edits
+    // can't reprice an already-quoted booking.
+    const travelRatePerHourAtBooking = (await getSettings()).pricing.travelRatePerHour;
 
     // Drive-time snapshot for in-person bookings: outbound quoted at the
     // booking's start, return at its end - genuine traffic predictions for

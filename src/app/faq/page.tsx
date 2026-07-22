@@ -10,12 +10,15 @@
 import {
   cancellationCopy,
   gstCopy,
+  partsCopy,
   unsuccessfulWorkCopy,
+  workmanshipCopy,
 } from "@/features/business/lib/pricing-policy";
 import { getPolicy, getPublicPricing } from "@/features/business/lib/pricing-policy.server";
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
 import { CARD, FrostedSection, PageShell, SOFT_CARD } from "@/shared/components/PageLayout";
 import { cn } from "@/shared/lib/cn";
+import { getSettings } from "@/shared/lib/settings/get-settings";
 import type { Metadata } from "next";
 import Link from "next/link";
 import type React from "react";
@@ -72,9 +75,16 @@ function renderEmphasised(text: string): React.ReactNode[] {
  * @returns FAQ page element.
  */
 export default async function FaqPage(): Promise<React.ReactElement> {
-  const [pricing, policy] = await Promise.all([getPublicPricing(), getPolicy()]);
+  const [pricing, policy, settings] = await Promise.all([
+    getPublicPricing(),
+    getPolicy(),
+    getSettings(),
+  ]);
+  const paymentTermsDays = settings.identity.paymentTermsDays;
   const cancellationText = cancellationCopy(policy.CANCELLATION);
   const unsuccessfulText = unsuccessfulWorkCopy(policy.UNSUCCESSFUL_WORK_FACTOR);
+  const workmanshipText = workmanshipCopy(policy.WORKMANSHIP_WINDOW_DAYS);
+  const partsText = partsCopy();
   const gstText = gstCopy(policy.GST_REGISTERED);
 
   const faqItems: ReadonlyArray<FaqItem> = [
@@ -108,6 +118,26 @@ export default async function FaqPage(): Promise<React.ReactElement> {
           <p className="mt-2 text-rich-black/80">
             If it turns out the issue really needs hands on a router, printer, or cable, we can
             switch to an on-site visit instead.
+          </p>
+        </>
+      ),
+    },
+    {
+      question: "Is remote access safe?",
+      plainAnswer:
+        "Yes - you stay in control the whole time. A remote session only happens at a time we've arranged: you let me in, you can watch everything I do on your screen, and you can end the session at any moment. When the session ends, so does my access - I cannot connect to your computer without you. And if anyone rings you out of the blue claiming to be tech support and asking for remote access, that's a scam: hang up. I only ever connect at a time you've booked with me.",
+      answer: (
+        <>
+          <p>
+            Yes - you stay in control the whole time. A remote session only happens at a time we've
+            arranged: you let me in, you can watch everything I do on your screen, and you can end
+            the session at any moment. When the session ends, so does my access -{" "}
+            <strong>I cannot connect to your computer without you</strong>.
+          </p>
+          <p className="mt-2 text-rich-black/80">
+            And a word of warning: if anyone rings you out of the blue claiming to be "tech support"
+            and asking for remote access, that's a scam - hang up. I only ever connect at a time
+            you've booked with me.
           </p>
         </>
       ),
@@ -161,9 +191,27 @@ export default async function FaqPage(): Promise<React.ReactElement> {
       ),
     },
     {
-      question: "Do you sell hardware or push unnecessary upgrades?",
+      question: "What if the job takes longer than the estimate?",
       plainAnswer:
-        "No. I don't resell hardware and I don't earn commission on anything, so there's no incentive to nudge you towards extras you don't need. The aim is to leave the existing setup working properly. If a replacement part or upgrade genuinely makes sense, I'll lay out the options and the trade-offs and let you decide. If you're not sure what to buy - whether it's a part, a cable, a new device, or any other piece of tech - I can suggest the right thing to get, or pick one up and bring it along, so you don't end up with the wrong product.",
+        "You'll never be surprised by the bill. I confirm the expected cost before starting, and if the work is heading past it, I pause and check with you before carrying on - you decide whether to continue. A booked time slot isn't a hard cutoff either: if the job needs longer and the calendar allows, I stay until it's sorted. And if it genuinely needs a second visit, the extra trip's travel is on me.",
+      answer: (
+        <>
+          <p>
+            You'll never be surprised by the bill. I confirm the expected cost before starting, and
+            if the work is heading past it, <strong>I pause and check with you</strong> before
+            carrying on - you decide whether to continue.
+          </p>
+          <p className="mt-2 text-rich-black/80">
+            A booked time slot isn't a hard cutoff either: if the job needs longer and the calendar
+            allows, I stay until it's sorted. And if it genuinely needs a second visit, the extra
+            trip's travel is on me.
+          </p>
+        </>
+      ),
+    },
+    {
+      question: "Do you sell hardware or push unnecessary upgrades?",
+      plainAnswer: `No. I don't resell hardware and I don't earn commission on anything, so there's no incentive to nudge you towards extras you don't need. The aim is to leave the existing setup working properly. If a replacement part or upgrade genuinely makes sense, I'll lay out the options and the trade-offs and let you decide. If you're not sure what to buy - whether it's a part, a cable, a new device, or any other piece of tech - I can suggest the right thing to get, or pick one up and bring it along, so you don't end up with the wrong product. ${stripEmphasis(partsText)}`,
       answer: (
         <>
           <p>
@@ -179,6 +227,7 @@ export default async function FaqPage(): Promise<React.ReactElement> {
             piece of tech - I can suggest the right thing to get, or pick it up and bring it along
             so you don't end up with the wrong product.
           </p>
+          <p className="mt-2 text-rich-black/80">{renderEmphasised(partsText)}</p>
         </>
       ),
     },
@@ -250,11 +299,58 @@ export default async function FaqPage(): Promise<React.ReactElement> {
       ),
     },
     {
+      question: "Will my files and photos be safe?",
+      plainAnswer:
+        "Your files get treated as the most valuable thing on the machine. Before anything risky - work on a failing drive, a hardware repair, a system reinstall - I'll explain the risk and, wherever practical, back up your important files first. Nothing gets deleted without checking with you. One honest caveat: recovery from a drive that's already failing can never be guaranteed - a dying disk can give out even when it's handled carefully. I'll always tell you where you stand before any work starts.",
+      answer: (
+        <>
+          <p>
+            Your files get treated as the most valuable thing on the machine. Before anything risky
+            - work on a failing drive, a hardware repair, a system reinstall - I'll explain the risk
+            and, wherever practical, <strong>back up your important files first</strong>. Nothing
+            gets deleted without checking with you.
+          </p>
+          <p className="mt-2 text-rich-black/80">
+            One honest caveat: recovery from a drive that's already failing can never be guaranteed
+            - a dying disk can give out even when it's handled carefully. I'll always tell you where
+            you stand before any work starts.
+          </p>
+        </>
+      ),
+    },
+    {
       question: "What if you can't fix the problem?",
       plainAnswer: stripEmphasis(unsuccessfulText),
       answer: (
         <>
           <p className="whitespace-pre-line">{renderEmphasised(unsuccessfulText)}</p>
+        </>
+      ),
+    },
+    // A 0-day window means no stated guarantee, so the question is dropped
+    // rather than rendered with nonsense copy.
+    ...(policy.WORKMANSHIP_WINDOW_DAYS > 0
+      ? [
+          {
+            question: "What if a problem comes back after your visit?",
+            plainAnswer: stripEmphasis(workmanshipText),
+            answer: <p className="whitespace-pre-line">{renderEmphasised(workmanshipText)}</p>,
+          },
+        ]
+      : []),
+    {
+      question: "How and when do I pay?",
+      plainAnswer: `Nothing is due up front. After the job you'll get an itemised invoice by email - work, travel, and any parts. Pay by bank transfer within ${paymentTermsDays} days, or cash on the day if you prefer.`,
+      answer: (
+        <>
+          <p>
+            Nothing is due up front. After the job you'll get an itemised invoice by email - work,
+            travel, and any parts.
+          </p>
+          <p className="mt-2 text-rich-black/80">
+            Pay by <strong>bank transfer</strong> within {paymentTermsDays} days (the account
+            details are on the invoice), or <strong>cash on the day</strong> if you prefer.
+          </p>
         </>
       ),
     },

@@ -133,6 +133,7 @@ Let step = the billing increment from the BILLING context line expressed in hour
 6. EMIT FLAGS:
    - "isShort": true for every task in S (short pinned tasks). False otherwise.
    - "isExplicit": true for every task in P (any pinned task — short or long). The calculator uses this flag to keep the parser-emitted qty unchanged during the post-parse safety-net rebalance, so window mismatches only redistribute the floating tasks.
+   - "unsuccessful": true when the description says that task's problem was NOT resolved — "couldn't fix", "wasn't able to", "no luck", "still broken/not working", "gave up", "needs replacement instead". Emit the task with its normal time (qty) anyway; the calculator halves that line's labour per the published unsuccessful-work policy. A task that succeeded with caveats ("fixed, but it's slow") is NOT unsuccessful, and other completed tasks in the same job keep false.
 
 Worked examples (worked at a 15-min step = 0.25h for legibility - they teach the apportionment, i.e. which task gets more; on the live grid substitute the step from the BILLING line):
 - Job with totalHours = 1.5h, 3 tasks: "connected printer to wifi (30 mins)", "advised on M365/Norton subs", "QoL tweaks (15 mins)".
@@ -254,7 +255,8 @@ Return this exact JSON shape (when not asking for clarification):
       "details": string | null,
       "qty": number,
       "isShort": boolean,
-      "isExplicit": boolean
+      "isExplicit": boolean,
+      "unsuccessful": boolean
     }
   ],
   "parts": [

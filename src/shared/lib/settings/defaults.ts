@@ -64,7 +64,9 @@ export const DEFAULT_SETTINGS: Settings = {
     billingIncrementMins: 5,
     publicHolidayUplift: 0.25,
     minTravelCharge: 10,
+    travelRatePerHour: 40,
     unsuccessfulWorkFactor: 0.5,
+    workmanshipWindowDays: 30,
     cancellation: {
       freeNoticeHours: 12,
       travelChargeHours: 1,

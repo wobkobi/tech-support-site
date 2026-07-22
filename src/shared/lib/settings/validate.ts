@@ -158,10 +158,17 @@ function validatePricing(p: PricingSettings): FieldError[] {
     errors.push({ field: "publicHolidayUplift", message: "Must be a fraction 0-5 (0 = off)." });
   if (!nonNeg(p.minTravelCharge))
     errors.push({ field: "minTravelCharge", message: "Must be 0 or more (0 = no floor)." });
+  if (!nonNeg(p.travelRatePerHour))
+    errors.push({ field: "travelRatePerHour", message: "Must be 0 or more (0 = free travel)." });
   if (!inRange(p.unsuccessfulWorkFactor, 0, 1))
     errors.push({
       field: "unsuccessfulWorkFactor",
       message: "Must be a fraction 0-1 (0.5 = half price, 0 = free).",
+    });
+  if (!nonNeg(p.workmanshipWindowDays))
+    errors.push({
+      field: "workmanshipWindowDays",
+      message: "Must be 0 or more days (0 = no stated guarantee).",
     });
   if (!nonNeg(p.cancellation?.freeNoticeHours))
     errors.push({ field: "cancellation.freeNoticeHours", message: "Must be 0 or more hours." });

@@ -2,8 +2,7 @@
 // src/features/reviews/components/ReviewsList.tsx
 /**
  * @description Public reviews grid. Reveals a batch at a time rather than
- * rendering every approved review at once, and shows each review's date plus a
- * Verified badge when it came from a real booking.
+ * rendering every approved review at once, with each review's date and name.
  */
 
 import { formatReviewerName } from "@/features/reviews/lib/formatting";
@@ -12,7 +11,6 @@ import { Button } from "@/shared/components/Button";
 import { formatDateShort } from "@/shared/lib/date-format";
 import type React from "react";
 import { useState } from "react";
-import { FaCircleCheck } from "react-icons/fa6";
 
 /** One approved review as rendered publicly. Dates arrive as ISO strings. */
 export interface PublicReview {
@@ -21,8 +19,6 @@ export interface PublicReview {
   firstName: string | null;
   lastName: string | null;
   isAnonymous: boolean;
-  /** True when the review came through a booking/contact token. */
-  verified: boolean;
   /** ISO timestamp - Date objects can't cross the server > client boundary. */
   createdAt: string;
 }
@@ -61,18 +57,7 @@ export function ReviewsList({ reviews }: { reviews: PublicReview[] }): React.Rea
               >
                 <p className="text-base text-rich-black sm:text-lg">{r.text}</p>
                 <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 pt-3">
-                  <span className="flex items-center gap-2 text-sm text-rich-black/60">
-                    {formatDateShort(r.createdAt)}
-                    {r.verified && (
-                      <span
-                        className="inline-flex items-center gap-1 font-semibold text-moonstone-600"
-                        title="Left by a customer after a real appointment"
-                      >
-                        <FaCircleCheck className="h-3.5 w-3.5" aria-hidden />
-                        Verified
-                      </span>
-                    )}
-                  </span>
+                  <span className="text-sm text-rich-black/60">{formatDateShort(r.createdAt)}</span>
                   <span className="text-base font-semibold text-russian-violet sm:text-lg">
                     - {formatReviewerName(r)}
                   </span>

@@ -104,6 +104,15 @@ export function PricingTab({ initial, defaults }: Props): React.ReactElement {
           onChange={(v) => setTop({ minTravelCharge: v ?? 0 })}
         />
         <NumberField
+          id="travelRatePerHour"
+          meta={m.travelRatePerHour}
+          value={draft.travelRatePerHour}
+          min={0}
+          error={fieldErrors.travelRatePerHour}
+          customised={draft.travelRatePerHour !== defaults.travelRatePerHour}
+          onChange={(v) => setTop({ travelRatePerHour: v ?? 0 })}
+        />
+        <NumberField
           id="unsuccessfulWorkFactor"
           meta={m.unsuccessfulWorkFactor}
           // Stored as a fraction; shown + edited as a whole percent for readability.
@@ -114,6 +123,16 @@ export function PricingTab({ initial, defaults }: Props): React.ReactElement {
           error={fieldErrors.unsuccessfulWorkFactor}
           customised={draft.unsuccessfulWorkFactor !== defaults.unsuccessfulWorkFactor}
           onChange={(v) => setTop({ unsuccessfulWorkFactor: (v ?? 0) / 100 })}
+        />
+        <NumberField
+          id="workmanshipWindowDays"
+          meta={m.workmanshipWindowDays}
+          value={draft.workmanshipWindowDays}
+          min={0}
+          step={1}
+          error={fieldErrors.workmanshipWindowDays}
+          customised={draft.workmanshipWindowDays !== defaults.workmanshipWindowDays}
+          onChange={(v) => setTop({ workmanshipWindowDays: v ?? 0 })}
         />
       </div>
 

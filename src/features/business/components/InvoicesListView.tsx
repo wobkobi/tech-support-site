@@ -63,13 +63,15 @@ const CONTROL_CLS =
 const PAGE_SIZE = 25;
 
 /**
- * Whether a payment can be recorded from the list: DRAFT or SENT only (PAID is
- * already settled, VOIDED can't be paid).
+ * Whether a payment can be recorded from the list: SENT only. A DRAFT row
+ * offers "Send invoice" instead (send comes before payment; recording payment
+ * on an unsent draft stays possible from the detail page), and PAID is already
+ * settled, VOIDED can't be paid.
  * @param inv - The invoice.
  * @returns True when the Record-payment action should show.
  */
 function canPay(inv: Invoice): boolean {
-  return inv.status === "DRAFT" || inv.status === "SENT";
+  return inv.status === "SENT";
 }
 
 /**
@@ -462,6 +464,18 @@ export function InvoicesListView(): React.ReactElement {
                   </a>
                 ) : null}
               </div>
+              {inv.status === "DRAFT" && (
+                <div className="mt-2">
+                  <AdminButton
+                    size="xs"
+                    variant="secondary"
+                    href={`/admin/business/invoices/${inv.id}?send=1`}
+                    aria-label={`Send invoice ${inv.number}`}
+                  >
+                    Send invoice
+                  </AdminButton>
+                </div>
+              )}
               {canPay(inv) && (
                 <div className="mt-2">
                   <AdminButton
@@ -550,6 +564,16 @@ export function InvoicesListView(): React.ReactElement {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-2">
+                      {inv.status === "DRAFT" && (
+                        <AdminButton
+                          size="xs"
+                          variant="secondary"
+                          href={`/admin/business/invoices/${inv.id}?send=1`}
+                          aria-label={`Send invoice ${inv.number}`}
+                        >
+                          Send invoice
+                        </AdminButton>
+                      )}
                       {canPay(inv) && (
                         <AdminButton
                           size="xs"

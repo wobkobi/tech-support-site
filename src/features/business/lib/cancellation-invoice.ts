@@ -18,7 +18,6 @@ import {
   calcTravelCharge,
   cancellationFeeLabel,
   cancellationNotes,
-  FALLBACK_TRAVEL_RATE,
   type CancellationReason,
 } from "@/features/business/lib/pricing-policy";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
@@ -55,7 +54,8 @@ export async function createDraftCancellationInvoice(
   options: DraftCancellationInvoiceOptions,
 ): Promise<void> {
   const reason = options.reason ?? "late-cancellation";
-  const { CANCELLATION, GST_REGISTERED, MIN_TRAVEL_CHARGE } = await getPolicy();
+  const { CANCELLATION, GST_REGISTERED, MIN_TRAVEL_CHARGE, TRAVEL_RATE_PER_HOUR } =
+    await getPolicy();
   // The policy reads the tier off the booking itself. In-person and remote are
   // priced separately, so taking the tier from a caller flag would just be a
   // chance for the two paths to drift.
@@ -109,14 +109,9 @@ export async function createDraftCancellationInvoice(
       }
     }
     if (travelMins > 0) {
-      // Snapshot wins to lock in the rate the customer was quoted.
-      let travelRatePerHour = booking.travelRatePerHourAtBooking ?? 0;
-      if (!travelRatePerHour) {
-        const travelRow = await prisma.rateConfig.findFirst({
-          where: { unit: "travel-hour" },
-        });
-        travelRatePerHour = travelRow?.ratePerHour ?? FALLBACK_TRAVEL_RATE;
-      }
+      // Snapshot wins to lock in the rate the customer was quoted; pre-snapshot
+      // bookings fall back to the live pricing setting.
+      const travelRatePerHour = booking.travelRatePerHourAtBooking || TRAVEL_RATE_PER_HOUR;
       const travelCost = calcTravelCharge(
         travelMins,
         travelMinsBack || travelMins,

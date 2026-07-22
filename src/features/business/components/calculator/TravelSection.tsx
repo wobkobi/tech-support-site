@@ -22,7 +22,7 @@ interface Props {
   onTravelEntriesChange: (entries: TravelEntry[]) => void;
   lookingUpTravel: boolean;
   onLookup: () => void;
-  /** Travel-rate $/hr sourced from the Travel RateConfig; used for the operator-side breakdown. */
+  /** Travel-rate $/hr from the pricing settings; used for the operator-side breakdown. */
   travelRatePerHour: number;
   /** Travel floor (live pricing setting) applied to the breakdown + minimum note. */
   minTravelCharge: number;
@@ -42,7 +42,7 @@ interface Props {
  * @param props.onTravelEntriesChange - Replaces the entries array.
  * @param props.lookingUpTravel - True while a lookup is in flight.
  * @param props.onLookup - "Look up" / Enter handler.
- * @param props.travelRatePerHour - Travel $/hr from the Travel RateConfig.
+ * @param props.travelRatePerHour - Travel $/hr from the pricing settings.
  * @param props.minTravelCharge - Travel floor (live pricing setting).
  * @returns Travel section element.
  */
