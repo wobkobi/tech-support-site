@@ -17,7 +17,7 @@ export async function ensureDir(dir: string): Promise<void> {
 
 /**
  * Create a frosted white card/box SVG centred on the canvas (like the website's cards).
- * Matches the website's bg-seasalt-800/60 style (60% opacity #fcfcfc).
+ * Near-white frosted card like the website's cards (60% opacity #fcfcfc).
  * @param w - Canvas width in pixels.
  * @param h - Canvas height in pixels.
  * @param logoScale - Scale factor of the logo (to size the card appropriately).

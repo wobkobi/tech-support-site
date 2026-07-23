@@ -7,7 +7,7 @@
 
 export const PALETTE = {
   seasalt500: "#f6f7f8",
-  seasalt800: "#fcfcfc",
+  seasalt800: "#fcfcfc", // legacy near-white card (pre-flip seasalt-800); not a slot in the current scale
   richBlack500: "#001514",
   russianViolet500: "#0c0a3e",
   coquelicot500: "#f34213",

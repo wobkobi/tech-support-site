@@ -8,7 +8,7 @@ import { JSDOM } from "jsdom";
 import fs from "node:fs/promises";
 import { createRequire } from "node:module";
 import pngToIco from "png-to-ico";
-import sharp from "sharp";
+import sharp, { type Color, type Sharp } from "sharp";
 import {
   ADDITIONAL_ASSETS,
   BACKDROP,
@@ -53,7 +53,7 @@ async function renderFavicon(
   logoSvg: Buffer,
   size: number,
   opaque: boolean,
-  background: sharp.Color,
+  background: Color,
   logoScale: number,
 ): Promise<Buffer> {
   if (!opaque) {
@@ -258,7 +258,7 @@ export async function buildAdditionalAssets(): Promise<void> {
   const logoFullBuffer = await fs.readFile(LOGO_FULL);
 
   for (const { name, width, height, type, format } of ADDITIONAL_ASSETS) {
-    let output: sharp.Sharp;
+    let output: Sharp;
 
     if (type === "logo-only") {
       // Full wordmark on transparent background
@@ -452,7 +452,7 @@ export async function buildManifest(): Promise<void> {
   console.log("📋 Building site.webmanifest...");
 
   const webManifest = {
-    name: "To The Point Tech",
+    name: "To the Point Tech",
     short_name: "ToThePoint",
     description: "Local tech support in Point Chevalier, Auckland",
     start_url: "/",
