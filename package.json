@@ -81,7 +81,7 @@
     "eslint-plugin-tailwind-canonical-classes": "^1.4.1",
     "globals": "^17.7.0",
     "jsdom": "^29.1.1",
-    "lint-staged": "^17.1.1",
+    "lint-staged": "^17.2.0",
     "png-to-ico": "^3.0.2",
     "postcss": "^8.5.22",
     "prettier": "^3.9.6",
