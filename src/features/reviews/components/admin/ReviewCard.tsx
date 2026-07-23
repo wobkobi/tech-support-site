@@ -176,7 +176,7 @@ export function ReviewCard({
                 }}
                 disabled={loading !== null}
                 className={cn(
-                  "px-4 py-2 text-left text-sm font-medium text-coquelicot-500 transition-colors hover:bg-coquelicot-500/10 disabled:opacity-50",
+                  "px-4 py-2 text-left text-sm font-medium text-coquelicot-400 transition-colors hover:bg-coquelicot-500/10 disabled:opacity-50",
                   onRevoke ? "rounded-b-lg" : "rounded-lg",
                 )}
               >

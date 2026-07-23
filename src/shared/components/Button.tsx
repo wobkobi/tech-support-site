@@ -72,8 +72,9 @@ function getVariantClasses(variant: ButtonVariant): string {
   switch (variant) {
     case "primary":
       // coquelicot-400 on seasalt clears WCAG AA (4.5:1) for the 16px label;
-      // coquelicot-500 fails at ~3.5:1. Hover lightens one step, as before.
-      return cn("bg-coquelicot-400 text-seasalt", "hover:bg-coquelicot-500", "transition-colors");
+      // coquelicot-500 fails at ~3.5:1, so hover darkens to coquelicot-300
+      // (~7.7:1) to keep the label readable in every state.
+      return cn("bg-coquelicot-400 text-seasalt", "hover:bg-coquelicot-300", "transition-colors");
     case "secondary":
       return cn(
         "bg-russian-violet text-seasalt",
@@ -135,7 +136,11 @@ export function Button(props: ButtonProps): React.ReactElement {
   const baseClasses = cn(
     "inline-flex items-center justify-center gap-2",
     "rounded-lg font-bold",
-    "whitespace-nowrap",
+    // Links render selectable text by default; match the native-button behaviour.
+    "whitespace-nowrap select-none",
+    // Explicit keyboard focus ring: browser defaults vary and can sit
+    // low-contrast against the coloured fills. Matches AdminButton.
+    "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-russian-violet",
     fullWidth && "w-full",
     getVariantClasses(variant),
     getSizeClasses(size),

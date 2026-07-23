@@ -341,7 +341,7 @@ export default async function BusinessPage({
               role="tab"
               aria-selected={active}
               className={cn(
-                "rounded-lg border px-3 py-1.5 text-sm font-semibold transition-colors",
+                "rounded-lg border px-3 py-1.5 text-sm font-semibold transition-colors select-none",
                 active
                   ? "border-russian-violet bg-russian-violet text-white"
                   : "border-admin-border bg-admin-surface text-admin-muted hover:border-russian-violet/50 hover:text-russian-violet",

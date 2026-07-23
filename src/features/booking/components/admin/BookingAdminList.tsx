@@ -348,7 +348,7 @@ export function BookingAdminList({
                         )}
                         <Link
                           href={`/admin/bookings/${b.id}`}
-                          className="rounded-lg bg-russian-violet/10 px-2.5 py-1.5 text-xs font-medium text-russian-violet transition-colors hover:bg-russian-violet/20"
+                          className="rounded-lg bg-russian-violet/10 px-2.5 py-1.5 text-xs font-medium text-russian-violet transition-colors select-none hover:bg-russian-violet/20"
                         >
                           View
                         </Link>

@@ -270,7 +270,7 @@ export function AdminSidebar(): React.ReactElement {
               href={path}
               onClick={() => setOpen(false)}
               className={cn(
-                "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors select-none",
                 active === path
                   ? "bg-white/15 text-white"
                   : "text-white/60 hover:bg-white/10 hover:text-white/90",
@@ -290,7 +290,7 @@ export function AdminSidebar(): React.ReactElement {
               href={path}
               onClick={() => setOpen(false)}
               className={cn(
-                "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors select-none",
                 active === path
                   ? "bg-white/15 text-white"
                   : "text-white/60 hover:bg-white/10 hover:text-white/90",
@@ -309,7 +309,7 @@ export function AdminSidebar(): React.ReactElement {
               href={path}
               onClick={() => setOpen(false)}
               className={cn(
-                "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors select-none",
                 active === path
                   ? "bg-white/15 text-white"
                   : "text-white/60 hover:bg-white/10 hover:text-white/90",
@@ -326,7 +326,7 @@ export function AdminSidebar(): React.ReactElement {
           <Link
             href="/"
             onClick={() => setOpen(false)}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-white/60 transition-colors hover:bg-white/10 hover:text-white/90"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-white/60 transition-colors select-none hover:bg-white/10 hover:text-white/90"
           >
             <FaArrowUpRightFromSquare className="shrink-0" />
             Back to site
@@ -334,7 +334,7 @@ export function AdminSidebar(): React.ReactElement {
           <button
             type="button"
             onClick={() => void handleSignOut()}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-white/60 transition-colors hover:bg-white/10 hover:text-white/90"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-white/60 transition-colors select-none hover:bg-white/10 hover:text-white/90"
           >
             <FaArrowRightFromBracket className="shrink-0" />
             Sign out

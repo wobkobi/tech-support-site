@@ -640,13 +640,13 @@ export function PricingWizard({
           <div className="flex flex-wrap gap-3">
             <Link
               href={estimateId ? `/booking?estimate=${estimateId}` : "/booking"}
-              className="rounded-xl bg-russian-violet px-5 py-2.5 text-base font-semibold text-white hover:bg-russian-violet/90"
+              className="rounded-xl bg-russian-violet px-5 py-2.5 text-base font-semibold text-white select-none hover:bg-russian-violet/90"
             >
               Book now
             </Link>
             <Link
               href="/contact"
-              className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-base font-semibold text-slate-700 hover:bg-slate-50"
+              className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-base font-semibold text-slate-700 select-none hover:bg-slate-50"
             >
               Ask a question
             </Link>
@@ -665,7 +665,7 @@ export function PricingWizard({
           {(step === "meeting" || step === "address") && (
             <button
               onClick={prevStep}
-              className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-base font-semibold text-slate-700 hover:bg-slate-50"
+              className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-base font-semibold text-slate-700 select-none hover:bg-slate-50"
             >
               Back
             </button>

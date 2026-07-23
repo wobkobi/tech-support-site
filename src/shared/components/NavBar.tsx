@@ -491,7 +491,7 @@ export function NavBar(): React.ReactElement | null {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "shrink-0 rounded-lg px-4 py-2.5 text-lg font-semibold whitespace-nowrap transition-all duration-200 xl:text-xl",
+                    "shrink-0 rounded-lg px-4 py-2.5 text-lg font-semibold whitespace-nowrap transition-all duration-200 select-none xl:text-xl",
                     active
                       ? "bg-moonstone-600/20 text-russian-violet shadow-sm"
                       : "text-rich-black hover:scale-105 hover:bg-moonstone-600/15 hover:text-russian-violet hover:shadow-md",
@@ -595,7 +595,7 @@ export function NavBar(): React.ReactElement | null {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "rounded-lg px-4 py-3 text-base font-semibold transition-all duration-200",
+                  "rounded-lg px-4 py-3 text-base font-semibold transition-all duration-200 select-none",
                   active
                     ? "bg-moonstone-600/20 text-russian-violet shadow-sm"
                     : "text-rich-black hover:scale-[1.02] hover:bg-moonstone-600/15 hover:text-russian-violet hover:shadow-md",

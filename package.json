@@ -1,6 +1,6 @@
 {
   "name": "tech-support-site",
-  "version": "4.7.0",
+  "version": "4.7.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -73,7 +73,7 @@
     "canvas": "^3.2.3",
     "dotenv": "^17.4.2",
     "dotenv-cli": "^11.0.0",
-    "eslint": "^9.39.5",
+    "eslint": "9.39.5",
     "eslint-config-next": "^16.2.11",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-jsdoc": "^63.2.0",
@@ -83,7 +83,7 @@
     "jsdom": "^29.1.1",
     "lint-staged": "^17.1.1",
     "png-to-ico": "^3.0.2",
-    "postcss": "^8.5.21",
+    "postcss": "^8.5.22",
     "prettier": "^3.9.6",
     "prettier-plugin-organize-imports": "^4.3.0",
     "prettier-plugin-packagejson": "^3.0.2",

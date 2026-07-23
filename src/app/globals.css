@@ -51,8 +51,10 @@
   --color-russian-violet-300: #070625;
   --color-russian-violet-400: #090831;
   --color-russian-violet-500: #0c0a3e;
-  --color-russian-violet-600: #1a1689;
-  --color-russian-violet-700: #2823d4;
+  /* 600/700 are hand-tuned lighter navies (hue-matched to the 500 base) so
+     button hovers lighten subtly instead of jumping to electric blue */
+  --color-russian-violet-600: #171457;
+  --color-russian-violet-700: #211d7c;
   --color-russian-violet-800: #6c68e6;
   --color-russian-violet-900: #b6b4f3;
 
@@ -122,30 +124,36 @@ body {
 }
 
 /* ============================================
-   Text Selection Fix (Tailwind v4 override)
+   Text Selection Defaults
+   --------------------------------------------
+   Inside `@layer base` so Tailwind `select-*` utilities (which live in the
+   later `utilities` layer) can override per element. Unlayered rules would
+   silently defeat every `select-none`/`select-text` class in the codebase.
    ============================================ */
+@layer base {
+  /* Normalise selection behaviour across browsers */
+  * {
+    -webkit-user-select: auto;
+    user-select: auto;
+  }
 
-/* Reset Tailwind v4's default user-select: none on interactive elements */
-* {
-  -webkit-user-select: auto;
-  user-select: auto;
-}
+  /* Keep buttons and form controls non-selectable (expected UX). Anchors
+     styled as buttons opt in with the `select-none` utility instead. */
+  button,
+  [role="button"],
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"] {
+    -webkit-user-select: none;
+    user-select: none;
+  }
 
-/* Keep buttons and form controls non-selectable (expected UX) */
-button,
-[role="button"],
-input[type="button"],
-input[type="submit"],
-input[type="reset"] {
-  -webkit-user-select: none;
-  user-select: none;
-}
-
-/* Inputs/textareas should allow selection of their content */
-input,
-textarea {
-  -webkit-user-select: text;
-  user-select: text;
+  /* Inputs/textareas should allow selection of their content */
+  input,
+  textarea {
+    -webkit-user-select: text;
+    user-select: text;
+  }
 }
 
 /* Hide the up/down spinner buttons on number inputs site-wide. They use a
