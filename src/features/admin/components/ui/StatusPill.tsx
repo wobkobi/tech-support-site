@@ -29,7 +29,7 @@ function toneClasses(tone: StatusTone): string {
     case "warning":
       return "bg-amber-100 text-amber-800";
     case "critical":
-      return "bg-coquelicot-900 text-coquelicot-300";
+      return "bg-coquelicot-100 text-coquelicot-700";
     case "violet":
       return "bg-[#5a2a82]/12 text-[#5a2a82]";
   }

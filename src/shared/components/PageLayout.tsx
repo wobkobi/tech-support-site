@@ -6,10 +6,10 @@
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
 
-export const CARD = "border-seasalt-400/80 bg-seasalt-800 rounded-xl border p-5 shadow-sm sm:p-6";
+export const CARD = "border-seasalt-200/80 bg-white rounded-xl border p-5 shadow-sm sm:p-6";
 
 export const SOFT_CARD =
-  "border-seasalt-400/80 bg-seasalt-900/60 rounded-xl border p-3 text-base sm:p-4 sm:text-lg";
+  "border-seasalt-200/80 bg-white/60 rounded-xl border p-3 text-base sm:p-4 sm:text-lg";
 
 /** Props for PageShell. */
 export interface PageShellProps {
@@ -74,7 +74,7 @@ export function FrostedSection({
       className={cn("mx-auto w-full px-4 py-6 sm:px-6 sm:py-8 md:px-8 md:py-10", className)}
       style={{ maxWidth }}
     >
-      <div className="rounded-2xl border border-seasalt-400/40 bg-seasalt-800/60 p-4 shadow-lg backdrop-blur-md sm:p-6 md:p-8">
+      <div className="rounded-2xl border border-seasalt-200/40 bg-white/60 p-4 shadow-lg backdrop-blur-md sm:p-6 md:p-8">
         {children}
       </div>
     </div>

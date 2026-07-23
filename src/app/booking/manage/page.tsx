@@ -18,7 +18,7 @@ export const metadata: Metadata = {
     "Lost your confirmation email? Enter the address you booked with and we'll re-send the links to change or cancel your appointment.",
   alternates: { canonical: "/booking/manage" },
   openGraph: {
-    title: "Manage your booking - To The Point Tech",
+    title: "Manage your booking - To the Point Tech",
     description: "Re-send the links to change or cancel your appointment.",
     url: "/booking/manage",
   },

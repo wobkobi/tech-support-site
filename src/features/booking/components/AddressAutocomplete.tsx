@@ -466,7 +466,7 @@ export default function AddressAutocomplete({
         className={cn(
           inputClassName ??
             cn(
-              "w-full rounded-md border border-seasalt-400/80 bg-seasalt px-4 py-3 text-base text-rich-black",
+              "w-full rounded-md border border-seasalt-200/80 bg-seasalt px-4 py-3 text-base text-rich-black",
               "focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
             ),
           showWarning && "border-yellow-500/60",
@@ -480,7 +480,7 @@ export default function AddressAutocomplete({
           id={listboxId}
           role="listbox"
           aria-label="Address suggestions"
-          className="absolute top-full right-0 left-0 z-50 mt-1.5 rounded-xl bg-linear-to-b from-seasalt-800 to-seasalt-600 p-1.5 shadow-[0_10px_24px_rgba(12,10,62,0.12),inset_0_0_0_1px_rgba(122,178,192,0.35)]"
+          className="absolute top-full right-0 left-0 z-50 mt-1.5 rounded-xl bg-linear-to-b from-white to-seasalt-50 p-1.5 shadow-[0_10px_24px_rgba(12,10,62,0.12),inset_0_0_0_1px_rgba(122,178,192,0.35)]"
         >
           {suggestions.map((s, i) => (
             <li
@@ -496,7 +496,7 @@ export default function AddressAutocomplete({
               className={cn(
                 "flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm text-rich-black",
                 i === activeIndex &&
-                  "bg-linear-to-r from-russian-violet-800/15 to-moonstone-700/15",
+                  "bg-linear-to-r from-russian-violet-300/15 to-moonstone-300/15",
               )}
             >
               <FaLocationDot className="h-4 w-4 shrink-0 text-rich-black/40" aria-hidden />

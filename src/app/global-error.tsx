@@ -28,13 +28,13 @@ export default function GlobalError({
 
   return (
     <html lang="en-NZ">
-      <body className="min-h-screen bg-seasalt-900 text-rich-black">
+      <body className="min-h-screen bg-white text-rich-black">
         <main className="mx-auto w-full max-w-5xl px-3 py-8 sm:px-6 sm:py-12">
           <h1 className="mb-3 text-center text-2xl font-bold sm:mb-4 sm:text-3xl md:text-4xl">
             Something went wrong
           </h1>
 
-          <div className="rounded-lg border border-seasalt-400/60 bg-seasalt-800 p-4 shadow-sm sm:p-6">
+          <div className="rounded-lg border border-seasalt-200/60 bg-white p-4 shadow-sm sm:p-6">
             <p
               className="mb-3 text-base font-medium sm:mb-4 sm:text-lg"
               role="status"
@@ -48,8 +48,8 @@ export default function GlobalError({
                 type="button"
                 onClick={reset}
                 className={cn(
-                  "inline-flex items-center gap-2 rounded-md bg-russian-violet px-4 py-2 text-base font-semibold text-seasalt-800",
-                  "hover:bg-russian-violet-600 disabled:opacity-60",
+                  "inline-flex items-center gap-2 rounded-md bg-russian-violet px-4 py-2 text-base font-semibold text-white",
+                  "hover:bg-russian-violet-800 disabled:opacity-60",
                 )}
               >
                 <FaArrowRotateRight className="h-4 w-4" aria-hidden />
@@ -67,7 +67,7 @@ export default function GlobalError({
 
             <details className="mt-4 text-base text-rich-black/80">
               <summary className="cursor-pointer">Technical details</summary>
-              <pre className="mt-2 overflow-auto rounded-md border border-seasalt-400/60 bg-seasalt-800 p-3">
+              <pre className="mt-2 overflow-auto rounded-md border border-seasalt-200/60 bg-white p-3">
                 {String(error?.stack || error)}
               </pre>
             </details>

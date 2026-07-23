@@ -182,11 +182,11 @@ export default async function BookingSuccessPage({
 
       {/* Frosted container */}
       <div className="mx-auto my-5 w-full max-w-[min(100vw-2rem,56rem)] sm:my-10">
-        <div className="rounded-2xl border border-seasalt-400/40 bg-seasalt-800/60 p-5 shadow-lg backdrop-blur-xl sm:p-10">
+        <div className="rounded-2xl border border-seasalt-200/40 bg-white/60 p-5 shadow-lg backdrop-blur-xl sm:p-10">
           <div className="flex flex-col gap-4 sm:gap-5">
             <section className={cn(CARD, "text-center")}>
               <div className="mb-4 flex justify-center">
-                <FaCircleCheck className="h-16 w-16 text-moonstone-600" aria-hidden />
+                <FaCircleCheck className="h-16 w-16 text-moonstone-400" aria-hidden />
               </div>
 
               <h1 className="mb-3 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl">
@@ -249,7 +249,7 @@ export default async function BookingSuccessPage({
                   )}
                 </dl>
 
-                <div className="mt-4 flex flex-wrap gap-3 border-t border-seasalt-400/60 pt-4">
+                <div className="mt-4 flex flex-wrap gap-3 border-t border-seasalt-200/60 pt-4">
                   {googleUrl && (
                     <Button
                       href={googleUrl}
@@ -294,7 +294,7 @@ export default async function BookingSuccessPage({
             </section>
 
             {promoTitle && (
-              <section className="flex items-start gap-3 rounded-xl border border-mustard-400 bg-mustard-900 p-5 shadow-sm sm:p-6">
+              <section className="flex items-start gap-3 rounded-xl border border-mustard-400 bg-mustard-50 p-5 shadow-sm sm:p-6">
                 <FaTag className="mt-1 h-5 w-5 shrink-0 text-russian-violet" aria-hidden />
                 <div>
                   <h2 className="mb-1 text-base font-bold text-russian-violet sm:text-lg">

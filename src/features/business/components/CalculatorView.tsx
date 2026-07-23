@@ -2254,7 +2254,7 @@ export function CalculatorView({
             <button
               type="button"
               onClick={enterCancelMode}
-              className="rounded-lg border border-coquelicot-500/40 px-3 py-1.5 text-sm font-semibold text-coquelicot-400 transition-colors hover:bg-coquelicot-500/10"
+              className="rounded-lg border border-coquelicot-500/40 px-3 py-1.5 text-sm font-semibold text-coquelicot-600 transition-colors hover:bg-coquelicot-500/10"
             >
               Make early cancel
             </button>

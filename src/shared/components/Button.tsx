@@ -71,20 +71,20 @@ export type ButtonProps = ButtonAsLink | ButtonAsButton;
 function getVariantClasses(variant: ButtonVariant): string {
   switch (variant) {
     case "primary":
-      // coquelicot-400 on seasalt clears WCAG AA (4.5:1) for the 16px label;
-      // coquelicot-500 fails at ~3.5:1, so hover darkens to coquelicot-300
+      // coquelicot-600 on seasalt clears WCAG AA (4.5:1) for the 16px label;
+      // coquelicot-500 fails at ~3.5:1, so hover darkens to coquelicot-700
       // (~7.7:1) to keep the label readable in every state.
-      return cn("bg-coquelicot-400 text-seasalt", "hover:bg-coquelicot-300", "transition-colors");
+      return cn("bg-coquelicot-600 text-seasalt", "hover:bg-coquelicot-700", "transition-colors");
     case "secondary":
       return cn(
         "bg-russian-violet text-seasalt",
-        "hover:bg-russian-violet-600",
+        "hover:bg-russian-violet-800",
         "transition-colors",
       );
     case "tertiary":
       return cn(
-        "bg-moonstone-600 text-russian-violet",
-        "hover:bg-moonstone-700",
+        "bg-moonstone-400 text-russian-violet",
+        "hover:bg-moonstone-300",
         "shadow-md hover:shadow-lg",
         "transition-all",
       );
@@ -149,8 +149,8 @@ export function Button(props: ButtonProps): React.ReactElement {
     // resolves bg/text/border conflicts in favour of the disabled look.
     disabled && [
       "cursor-not-allowed",
-      "border-seasalt-400/50 bg-seasalt-400 text-rich-black/70",
-      "hover:border-seasalt-400/50 hover:bg-seasalt-400 hover:text-rich-black/70",
+      "border-seasalt-200/50 bg-seasalt-200 text-rich-black/70",
+      "hover:border-seasalt-200/50 hover:bg-seasalt-200 hover:text-rich-black/70",
       "shadow-none hover:shadow-none",
     ],
     className,

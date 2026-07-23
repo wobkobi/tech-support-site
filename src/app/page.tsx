@@ -123,7 +123,7 @@ export default async function Home(): Promise<React.ReactElement> {
             <div className="mb-6 grid place-items-center">
               <Image
                 src="/source/logo-full.svg"
-                alt="To The Point Tech - computer and IT support in Auckland"
+                alt="To the Point Tech - computer and IT support in Auckland"
                 width={2000}
                 height={674}
                 priority
@@ -174,8 +174,8 @@ export default async function Home(): Promise<React.ReactElement> {
                 "animate-slide-up animate-fill-both animate-delay-100 text-center",
               )}
             >
-              <div className="mx-auto mb-3 grid size-16 place-items-center rounded-full border-2 border-moonstone-500/50 bg-moonstone-600/30">
-                <FaCircleCheck className="h-8 w-8 text-moonstone-600" aria-hidden />
+              <div className="mx-auto mb-3 grid size-16 place-items-center rounded-full border-2 border-moonstone-500/50 bg-moonstone-400/30">
+                <FaCircleCheck className="h-8 w-8 text-moonstone-400" aria-hidden />
               </div>
               <h3 className="mb-2 text-xl font-bold text-russian-violet sm:text-2xl">
                 Computer Science Graduate
@@ -191,8 +191,8 @@ export default async function Home(): Promise<React.ReactElement> {
                 "animate-slide-up animate-fill-both animate-delay-200 text-center",
               )}
             >
-              <div className="mx-auto mb-3 grid size-16 place-items-center rounded-full border-2 border-moonstone-500/50 bg-moonstone-600/30">
-                <FaMapLocationDot className="h-8 w-8 text-moonstone-600" aria-hidden />
+              <div className="mx-auto mb-3 grid size-16 place-items-center rounded-full border-2 border-moonstone-500/50 bg-moonstone-400/30">
+                <FaMapLocationDot className="h-8 w-8 text-moonstone-400" aria-hidden />
               </div>
               <h3 className="mb-2 text-xl font-bold text-russian-violet sm:text-2xl">
                 Proudly Local
@@ -208,8 +208,8 @@ export default async function Home(): Promise<React.ReactElement> {
                 "animate-slide-up animate-fill-both animate-delay-300 text-center",
               )}
             >
-              <div className="mx-auto mb-3 grid size-16 place-items-center rounded-full border-2 border-moonstone-500/50 bg-moonstone-600/30">
-                <FaHandshake className="h-8 w-8 text-moonstone-600" aria-hidden />
+              <div className="mx-auto mb-3 grid size-16 place-items-center rounded-full border-2 border-moonstone-500/50 bg-moonstone-400/30">
+                <FaHandshake className="h-8 w-8 text-moonstone-400" aria-hidden />
               </div>
               <h3 className="mb-2 text-xl font-bold text-russian-violet sm:text-2xl">
                 No Upselling
@@ -236,10 +236,10 @@ export default async function Home(): Promise<React.ReactElement> {
               {supportItems.map(({ label, icon: Icon }) => (
                 <li
                   key={label}
-                  className="flex items-center gap-3 rounded-xl border border-seasalt-400/60 bg-seasalt-800 p-3 shadow-sm transition-all hover:shadow-md"
+                  className="flex items-center gap-3 rounded-xl border border-seasalt-200/60 bg-white p-3 shadow-sm transition-all hover:shadow-md"
                 >
-                  <span className="grid size-12 shrink-0 place-items-center rounded-lg border border-moonstone-500/50 bg-moonstone-600/30 sm:size-14">
-                    <Icon className="h-7 w-7 text-moonstone-600 sm:h-8 sm:w-8" aria-hidden />
+                  <span className="grid size-12 shrink-0 place-items-center rounded-lg border border-moonstone-500/50 bg-moonstone-400/30 sm:size-14">
+                    <Icon className="h-7 w-7 text-moonstone-400 sm:h-8 sm:w-8" aria-hidden />
                   </span>
                   <span className="line-clamp-2 text-left text-base leading-tight font-medium text-rich-black sm:text-lg">
                     {label}
@@ -296,19 +296,19 @@ export default async function Home(): Promise<React.ReactElement> {
               </h2>
               <ul className="space-y-3 text-base text-rich-black sm:text-lg">
                 <li className="flex gap-3">
-                  <FaCircleCheck className="mt-1 h-5 w-5 shrink-0 text-moonstone-600" aria-hidden />
+                  <FaCircleCheck className="mt-1 h-5 w-5 shrink-0 text-moonstone-400" aria-hidden />
                   <span>Listen first, understand your needs</span>
                 </li>
                 <li className="flex gap-3">
-                  <FaCircleCheck className="mt-1 h-5 w-5 shrink-0 text-moonstone-600" aria-hidden />
+                  <FaCircleCheck className="mt-1 h-5 w-5 shrink-0 text-moonstone-400" aria-hidden />
                   <span>Explain everything as clearly as possible</span>
                 </li>
                 <li className="flex gap-3">
-                  <FaCircleCheck className="mt-1 h-5 w-5 shrink-0 text-moonstone-600" aria-hidden />
+                  <FaCircleCheck className="mt-1 h-5 w-5 shrink-0 text-moonstone-400" aria-hidden />
                   <span>Leave clear notes you can refer back to</span>
                 </li>
                 <li className="flex gap-3">
-                  <FaCircleCheck className="mt-1 h-5 w-5 shrink-0 text-moonstone-600" aria-hidden />
+                  <FaCircleCheck className="mt-1 h-5 w-5 shrink-0 text-moonstone-400" aria-hidden />
                   <span>Transparent pricing, no hidden fees</span>
                 </li>
               </ul>
@@ -321,8 +321,8 @@ export default async function Home(): Promise<React.ReactElement> {
             className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-500")}
           >
             <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-center sm:text-left">
-              <div className="grid size-16 shrink-0 place-items-center rounded-full border-2 border-moonstone-500/50 bg-moonstone-600/30">
-                <FaDownload className="h-8 w-8 -translate-y-0.5 text-moonstone-600" aria-hidden />
+              <div className="grid size-16 shrink-0 place-items-center rounded-full border-2 border-moonstone-500/50 bg-moonstone-400/30">
+                <FaDownload className="h-8 w-8 -translate-y-0.5 text-moonstone-400" aria-hidden />
               </div>
 
               <div className="flex-1">
@@ -362,7 +362,7 @@ export default async function Home(): Promise<React.ReactElement> {
 
       {/* Contact Footer */}
       <footer className="mx-auto mb-6 w-fit max-w-[calc(100vw-2rem)] sm:mb-8">
-        <div className="flex flex-col items-center gap-1 rounded-xl border border-seasalt-400/40 bg-seasalt-800/70 p-4 shadow-lg backdrop-blur-md sm:flex-row sm:gap-8 sm:px-6 sm:py-4">
+        <div className="flex flex-col items-center gap-1 rounded-xl border border-seasalt-200/40 bg-white/70 p-4 shadow-lg backdrop-blur-md sm:flex-row sm:gap-8 sm:px-6 sm:py-4">
           <a
             href={settings.identity.phoneTel}
             className="flex items-center gap-3 rounded-md px-4 py-2 text-base font-bold text-russian-violet transition-colors hover:text-coquelicot-500 sm:text-lg"
@@ -371,7 +371,7 @@ export default async function Home(): Promise<React.ReactElement> {
             <span>{settings.identity.phone}</span>
           </a>
 
-          <div className="hidden h-6 w-px bg-seasalt-400/50 sm:block" />
+          <div className="hidden h-6 w-px bg-seasalt-200/50 sm:block" />
 
           <a
             href={`mailto:${settings.identity.email}`}

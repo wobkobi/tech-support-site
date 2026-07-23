@@ -287,7 +287,7 @@ export function EventActionSheet({
                 type="button"
                 onClick={handleResendReview}
                 disabled={busy}
-                className="inline-flex h-11 items-center justify-center rounded-lg bg-moonstone-600/15 px-4 text-sm font-semibold text-moonstone-700 hover:bg-moonstone-600/25 disabled:opacity-50"
+                className="inline-flex h-11 items-center justify-center rounded-lg bg-moonstone-400/15 px-4 text-sm font-semibold text-moonstone-300 hover:bg-moonstone-400/25 disabled:opacity-50"
               >
                 Send review email
               </button>

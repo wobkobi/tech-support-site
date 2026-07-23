@@ -21,7 +21,7 @@ const INTEREST_OPTIONS = ["One-off job", "Monthly retainer", "Not sure yet"] as 
 const URGENCY_OPTIONS = ["This week", "This month", "Just exploring"] as const;
 
 const INPUT_CLASS = cn(
-  "rounded-md border border-seasalt-400/80 bg-seasalt px-4 py-3 text-base text-rich-black",
+  "rounded-md border border-seasalt-200/80 bg-seasalt px-4 py-3 text-base text-rich-black",
   "focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
 );
 
@@ -103,9 +103,9 @@ export function BusinessEnquiryForm(): React.ReactElement {
     return (
       <div
         role="status"
-        className="flex flex-col items-center gap-3 rounded-lg border border-moonstone-500/40 bg-moonstone-600/10 p-6 text-center"
+        className="flex flex-col items-center gap-3 rounded-lg border border-moonstone-500/40 bg-moonstone-400/10 p-6 text-center"
       >
-        <FaCircleCheck className="h-10 w-10 text-moonstone-600" aria-hidden />
+        <FaCircleCheck className="h-10 w-10 text-moonstone-400" aria-hidden />
         <p className="text-lg font-semibold text-rich-black sm:text-xl">Enquiry sent - thanks!</p>
         <p className="max-w-xl text-base text-rich-black/80 sm:text-lg">
           I'll come back to you within one business day, usually sooner. A confirmation is on its
@@ -150,7 +150,7 @@ export function BusinessEnquiryForm(): React.ReactElement {
               "rounded-lg border px-5 py-2.5 text-base font-medium whitespace-nowrap transition-colors",
               enquiryFor === "business"
                 ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
-                : "border-seasalt-400/60 bg-seasalt text-rich-black hover:border-russian-violet/40",
+                : "border-seasalt-200/60 bg-seasalt text-rich-black hover:border-russian-violet/40",
             )}
           >
             A business
@@ -163,7 +163,7 @@ export function BusinessEnquiryForm(): React.ReactElement {
               "rounded-lg border px-5 py-2.5 text-base font-medium whitespace-nowrap transition-colors",
               enquiryFor === "personal"
                 ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
-                : "border-seasalt-400/60 bg-seasalt text-rich-black hover:border-russian-violet/40",
+                : "border-seasalt-200/60 bg-seasalt text-rich-black hover:border-russian-violet/40",
             )}
           >
             Me personally
@@ -221,7 +221,7 @@ export function BusinessEnquiryForm(): React.ReactElement {
             required
             errorMessages={{ invalid: "Please enter a valid email address." }}
             className={cn(
-              "border border-seasalt-400/80 bg-seasalt px-4 py-3 text-base text-rich-black",
+              "border border-seasalt-200/80 bg-seasalt px-4 py-3 text-base text-rich-black",
               "focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30",
             )}
           />
@@ -237,7 +237,7 @@ export function BusinessEnquiryForm(): React.ReactElement {
             onChange={setPhone}
             errorMessages={{ invalid: "Please enter a valid phone number." }}
             className={cn(
-              "border border-seasalt-400/80 bg-seasalt px-4 py-3 text-base text-rich-black",
+              "border border-seasalt-200/80 bg-seasalt px-4 py-3 text-base text-rich-black",
               "focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30",
             )}
           />
@@ -302,7 +302,7 @@ export function BusinessEnquiryForm(): React.ReactElement {
       </div>
 
       {error && (
-        <p role="alert" className="text-base font-medium text-coquelicot-600">
+        <p role="alert" className="text-base font-medium text-coquelicot-400">
           {error}
         </p>
       )}

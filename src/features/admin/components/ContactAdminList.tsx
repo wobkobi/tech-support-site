@@ -254,7 +254,7 @@ function ContactCard({
             </div>
           );
         })}
-        {edit.error && <p className="text-xs font-medium text-coquelicot-600">{edit.error}</p>}
+        {edit.error && <p className="text-xs font-medium text-coquelicot-400">{edit.error}</p>}
         <div className="flex gap-2">
           <button
             onClick={edit.save}
@@ -354,7 +354,7 @@ function ContactCard({
               </button>
               <button
                 onClick={onRequestDelete}
-                className="rounded px-1.5 py-0.5 text-xs font-medium text-slate-400 transition-colors hover:text-coquelicot-600"
+                className="rounded px-1.5 py-0.5 text-xs font-medium text-slate-400 transition-colors hover:text-coquelicot-400"
               >
                 Delete
               </button>
@@ -363,13 +363,13 @@ function ContactCard({
         </div>
       </div>
       {isConfirmingDelete && (
-        <div className="bg-coquelicot-50 mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-coquelicot-200 px-3 py-2 text-xs">
-          <span className="font-medium text-coquelicot-700">Delete {c.name}?</span>
+        <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-coquelicot-800 bg-coquelicot-50 px-3 py-2 text-xs">
+          <span className="font-medium text-coquelicot-300">Delete {c.name}?</span>
           <span className="text-slate-500">Linked reviews are kept.</span>
           <button
             onClick={onConfirmDelete}
             disabled={isDeleting}
-            className="ml-auto rounded bg-coquelicot-600 px-2 py-0.5 font-semibold text-white transition-colors hover:bg-coquelicot-700 disabled:opacity-50"
+            className="ml-auto rounded bg-coquelicot-400 px-2 py-0.5 font-semibold text-white transition-colors hover:bg-coquelicot-300 disabled:opacity-50"
           >
             {isDeleting ? "Deleting…" : "Delete"}
           </button>
@@ -385,7 +385,7 @@ function ContactCard({
       {c.email ? (
         <a
           href={`mailto:${c.email}`}
-          className="text-sm break-all text-moonstone-600 transition-colors hover:text-moonstone-700"
+          className="text-sm break-all text-moonstone-400 transition-colors hover:text-moonstone-300"
         >
           {c.email}
         </a>
@@ -435,7 +435,7 @@ function ContactCard({
                         href={`/review?token=${rv.customerRef}`}
                         target="_blank"
                         rel="noreferrer"
-                        className="shrink-0 text-xs font-medium text-moonstone-600 transition-colors hover:text-moonstone-700"
+                        className="shrink-0 text-xs font-medium text-moonstone-400 transition-colors hover:text-moonstone-300"
                       >
                         Review link ↗
                       </a>
@@ -890,7 +890,7 @@ export function ContactAdminList({
         <button
           type="button"
           onClick={() => void exportContacts()}
-          className="shrink-0 text-xs font-medium text-moonstone-600 underline underline-offset-2 hover:text-moonstone-700"
+          className="shrink-0 text-xs font-medium text-moonstone-400 underline underline-offset-2 hover:text-moonstone-300"
         >
           Export CSV
         </button>
@@ -964,7 +964,7 @@ export function ContactAdminList({
         <div className="flex flex-col gap-3">
           <h3 className="flex items-center gap-2 text-xs font-semibold tracking-wide text-slate-700 uppercase">
             New
-            <span className="rounded-full bg-moonstone-600/15 px-2 py-0.5 text-[10px] font-semibold text-moonstone-600">
+            <span className="rounded-full bg-moonstone-400/15 px-2 py-0.5 text-[10px] font-semibold text-moonstone-400">
               {newContacts.length}
             </span>
           </h3>

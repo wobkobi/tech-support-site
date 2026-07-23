@@ -458,7 +458,7 @@ export function NavBar(): React.ReactElement | null {
       >
         <div
           className={cn(
-            "flex h-20 w-full flex-nowrap items-center justify-between rounded-2xl border border-seasalt-400/40 bg-seasalt-800/90 px-5 shadow-lg backdrop-blur-lg transition-[border-color,box-shadow] duration-300",
+            "flex h-20 w-full flex-nowrap items-center justify-between rounded-2xl border border-seasalt-200/40 bg-white/90 px-5 shadow-lg backdrop-blur-lg transition-[border-color,box-shadow] duration-300",
             isScrolled && "border-opacity-70 shadow-2xl",
           )}
         >
@@ -468,7 +468,7 @@ export function NavBar(): React.ReactElement | null {
           >
             <Image
               src="/source/logo.svg"
-              // Decorative: the adjacent "To The Point Tech" text already names the
+              // Decorative: the adjacent "To the Point Tech" text already names the
               // link, so an alt here would just add "Logo" noise for screen readers.
               alt=""
               width={40}
@@ -478,7 +478,7 @@ export function NavBar(): React.ReactElement | null {
               className="h-10 w-10 shrink-0 select-none"
             />
             <span className="text-lg font-bold whitespace-nowrap text-russian-violet sm:text-xl">
-              To The Point Tech
+              To the Point Tech
             </span>
           </Link>
 
@@ -493,8 +493,8 @@ export function NavBar(): React.ReactElement | null {
                   className={cn(
                     "shrink-0 rounded-lg px-4 py-2.5 text-lg font-semibold whitespace-nowrap transition-all duration-200 select-none xl:text-xl",
                     active
-                      ? "bg-moonstone-600/20 text-russian-violet shadow-sm"
-                      : "text-rich-black hover:scale-105 hover:bg-moonstone-600/15 hover:text-russian-violet hover:shadow-md",
+                      ? "bg-moonstone-400/20 text-russian-violet shadow-sm"
+                      : "text-rich-black hover:scale-105 hover:bg-moonstone-400/15 hover:text-russian-violet hover:shadow-md",
                   )}
                   aria-current={active ? "page" : undefined}
                 >
@@ -527,7 +527,7 @@ export function NavBar(): React.ReactElement | null {
 
             <button
               onClick={toggleMobileMenu}
-              className="flex h-11 w-11 items-center justify-center rounded-lg bg-seasalt-900/20 transition-all hover:bg-seasalt-900/30 lg:hidden"
+              className="flex h-11 w-11 items-center justify-center rounded-lg bg-white/20 transition-all hover:bg-white/30 lg:hidden"
               aria-label="Toggle mobile menu"
               aria-expanded={mobileMenuOpen}
               aria-controls="mobile-nav"
@@ -571,7 +571,7 @@ export function NavBar(): React.ReactElement | null {
       <nav
         ref={mobileDrawerRef}
         className={cn(
-          "overscroll-behavior-contain fixed right-4 z-40 max-h-[calc(100dvh-8rem)] max-w-[min(calc(100vw-2rem),18rem)] overflow-y-auto rounded-2xl border border-seasalt-400/40 bg-seasalt-800/95 shadow-2xl backdrop-blur-xl lg:hidden",
+          "overscroll-behavior-contain fixed right-4 z-40 max-h-[calc(100dvh-8rem)] max-w-[min(calc(100vw-2rem),18rem)] overflow-y-auto rounded-2xl border border-seasalt-200/40 bg-white/95 shadow-2xl backdrop-blur-xl lg:hidden",
           // `.app-mobile-drawer` (globals.css) owns top + translate transition.
           "app-mobile-drawer",
           mobileMenuOpen ? "translate-x-0" : "translate-x-full",
@@ -597,8 +597,8 @@ export function NavBar(): React.ReactElement | null {
                 className={cn(
                   "rounded-lg px-4 py-3 text-base font-semibold transition-all duration-200 select-none",
                   active
-                    ? "bg-moonstone-600/20 text-russian-violet shadow-sm"
-                    : "text-rich-black hover:scale-[1.02] hover:bg-moonstone-600/15 hover:text-russian-violet hover:shadow-md",
+                    ? "bg-moonstone-400/20 text-russian-violet shadow-sm"
+                    : "text-rich-black hover:scale-[1.02] hover:bg-moonstone-400/15 hover:text-russian-violet hover:shadow-md",
                 )}
                 aria-current={active ? "page" : undefined}
                 onClick={closeMobileMenu}
@@ -608,7 +608,7 @@ export function NavBar(): React.ReactElement | null {
             );
           })}
 
-          <div className="mt-4 flex flex-col gap-2 border-t border-seasalt-400/40 pt-4">
+          <div className="mt-4 flex flex-col gap-2 border-t border-seasalt-200/40 pt-4">
             <Button
               href="/booking"
               variant="primary"

@@ -91,16 +91,16 @@ export default async function PosterPage({
         {/* Inner column fills available height so footer can pin to bottom */}
         <div className="flex min-h-0 flex-1 flex-col justify-between gap-6">
           {/* Main frosted card - content-sized */}
-          <div className="rounded-4xl border-[3px] border-seasalt-400/40 bg-seasalt-800/60 p-6 shadow-xl backdrop-blur-xl">
+          <div className="rounded-4xl border-[3px] border-seasalt-200/40 bg-white/60 p-6 shadow-xl backdrop-blur-xl">
             <div className="flex flex-col gap-6">
               {/* Logo (doubles as the document's top-level heading for a11y). */}
               <div className="grid place-items-center">
                 <h1 className="sr-only">
-                  To The Point Tech - Computer &amp; IT support in Auckland
+                  To the Point Tech - Computer &amp; IT support in Auckland
                 </h1>
                 <Image
                   src="/source/logo-full.svg"
-                  alt="To The Point Tech"
+                  alt="To the Point Tech"
                   width={1376}
                   height={313}
                   priority
@@ -118,7 +118,7 @@ export default async function PosterPage({
                     className="absolute inset-0 rounded-xl"
                     style={{ backgroundColor: "rgba(67, 188, 205, 0.15)" }}
                   />
-                  <FaCircleCheck className="relative z-10 h-11 w-11 text-moonstone-600" />
+                  <FaCircleCheck className="relative z-10 h-11 w-11 text-moonstone-400" />
                   <span className="relative z-10 text-[34px] font-semibold text-rich-black">
                     CS Graduate
                   </span>
@@ -132,7 +132,7 @@ export default async function PosterPage({
                     className="absolute inset-0 rounded-xl"
                     style={{ backgroundColor: "rgba(67, 188, 205, 0.15)" }}
                   />
-                  <FaLocationDot className="relative z-10 h-11 w-11 text-moonstone-600" />
+                  <FaLocationDot className="relative z-10 h-11 w-11 text-moonstone-400" />
                   <span className="relative z-10 text-[34px] font-semibold text-rich-black">
                     Proudly Local
                   </span>
@@ -146,7 +146,7 @@ export default async function PosterPage({
                     className="absolute inset-0 rounded-xl"
                     style={{ backgroundColor: "rgba(67, 188, 205, 0.15)" }}
                   />
-                  <FaClock className="relative z-10 h-11 w-11 text-moonstone-600" />
+                  <FaClock className="relative z-10 h-11 w-11 text-moonstone-400" />
                   <span className="relative z-10 text-[34px] font-semibold text-rich-black">
                     Same-Day Available
                   </span>
@@ -155,14 +155,14 @@ export default async function PosterPage({
 
               {/* Text boxes - now content-sized with gap preserved */}
               <section className="flex flex-col gap-5">
-                <div className="rounded-[18px] border-2 border-seasalt-400/60 bg-seasalt-800 p-4.5 shadow-sm">
+                <div className="rounded-[18px] border-2 border-seasalt-200/60 bg-white p-4.5 shadow-sm">
                   <h2 className="mb-1.5 text-[53px] font-bold text-russian-violet">About Me</h2>
                   <p className="text-[40px] leading-tight font-medium text-rich-black">
                     {aboutMeText}
                   </p>
                 </div>
 
-                <div className="rounded-[18px] border-2 border-seasalt-400/60 bg-seasalt-800 p-4.5 shadow-sm">
+                <div className="rounded-[18px] border-2 border-seasalt-200/60 bg-white p-4.5 shadow-sm">
                   <h2 className="mb-1.5 text-[53px] font-bold text-russian-violet">Services</h2>
                   <p className="text-[40px] leading-tight font-medium text-rich-black">
                     {servicesText}
@@ -180,10 +180,10 @@ export default async function PosterPage({
                   {supportItems.map(({ label, icon: Icon }) => (
                     <li
                       key={label}
-                      className="flex h-27 items-center gap-3 rounded-xl border-2 border-seasalt-400/60 bg-seasalt-800 px-4.5"
+                      className="flex h-27 items-center gap-3 rounded-xl border-2 border-seasalt-200/60 bg-white px-4.5"
                     >
-                      <span className="grid size-18 shrink-0 place-items-center rounded-xl border-2 border-moonstone-500/30 bg-moonstone-600/15">
-                        <Icon className="h-11 w-11 text-moonstone-600" aria-hidden />
+                      <span className="grid size-18 shrink-0 place-items-center rounded-xl border-2 border-moonstone-500/30 bg-moonstone-400/15">
+                        <Icon className="h-11 w-11 text-moonstone-400" aria-hidden />
                       </span>
 
                       <span className="text-left text-[40px] leading-tight font-semibold text-rich-black">
@@ -198,11 +198,11 @@ export default async function PosterPage({
 
           {/* Footer - content-sized */}
           <footer className="flex items-center justify-center">
-            <div className="rounded-3xl border-2 border-seasalt-400/40 bg-seasalt-800/70 p-10 shadow-xl backdrop-blur-md">
+            <div className="rounded-3xl border-2 border-seasalt-200/40 bg-white/70 p-10 shadow-xl backdrop-blur-md">
               <div className="flex items-center gap-11">
                 {/* QR Code */}
                 <div className="flex shrink-0 flex-col items-center gap-2">
-                  <div className="grid size-60 place-items-center rounded-[10px] border-2 border-seasalt-400/60 bg-white p-3 shadow-sm">
+                  <div className="grid size-60 place-items-center rounded-[10px] border-2 border-seasalt-200/60 bg-white p-3 shadow-sm">
                     <Image
                       src="/qr-booking.svg"
                       alt="Scan to book"

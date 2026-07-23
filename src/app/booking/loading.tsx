@@ -50,7 +50,7 @@ export default function BookingLoading(): React.ReactElement {
                     <Bone className="h-11" />
                   </div>
                 </div>
-                <hr className="border-seasalt-400/80" />
+                <hr className="border-seasalt-200/80" />
                 <Bone className="h-5 w-56" />
                 <Bone className="h-28" />
                 <Bone className="h-12 w-44" />

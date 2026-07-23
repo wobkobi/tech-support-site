@@ -134,7 +134,7 @@ export function LineItemsEditor({
             onClick={() => onChange(items.filter((_, i) => i !== idx))}
             disabled={disabled}
             aria-label={`Remove line ${idx + 1}`}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-admin-faint hover:bg-admin-bg hover:text-coquelicot-400 disabled:opacity-50"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-admin-faint hover:bg-admin-bg hover:text-coquelicot-600 disabled:opacity-50"
           >
             <FaXmark className="h-4 w-4" aria-hidden />
           </button>

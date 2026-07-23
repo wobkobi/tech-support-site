@@ -39,7 +39,7 @@ export function CopyLinkButton({ url }: CopyLinkButtonProps): React.ReactElement
       className={cn(
         "rounded-md px-2 py-1 text-xs font-semibold transition-colors",
         copied
-          ? "bg-moonstone-600/20 text-moonstone-600"
+          ? "bg-moonstone-400/20 text-moonstone-400"
           : "bg-russian-violet/10 text-russian-violet hover:bg-russian-violet/20",
       )}
     >

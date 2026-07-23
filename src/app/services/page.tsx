@@ -37,7 +37,7 @@ export const metadata: Metadata = {
     "On-site and remote tech support across Auckland: computer and laptop repair, Wi-Fi setup, virus removal, data recovery, smart TVs, printers, email, cloud backup and small business IT.",
   alternates: { canonical: "/services" },
   openGraph: {
-    title: "Tech Support Services - To The Point Tech",
+    title: "Tech Support Services - To the Point Tech",
     description:
       "Computer repair, Wi-Fi setup, data recovery, smart home, printers, email and more across Auckland.",
     url: "/services",
@@ -124,7 +124,7 @@ export default async function ServicesPage(): Promise<React.ReactElement> {
   const servicesJsonLd = {
     "@context": "https://schema.org",
     "@type": "ItemList",
-    name: "To The Point Tech - Services",
+    name: "To the Point Tech - Services",
     itemListElement: serviceAreas.map((area, idx) => ({
       "@type": "ListItem",
       position: idx + 1,
@@ -200,11 +200,11 @@ export default async function ServicesPage(): Promise<React.ReactElement> {
               {serviceAreas.map((area) => (
                 <div
                   key={area.label}
-                  className="rounded-lg border border-seasalt-400/60 bg-seasalt-800 p-3 shadow-sm transition-all hover:shadow-md"
+                  className="rounded-lg border border-seasalt-200/60 bg-white p-3 shadow-sm transition-all hover:shadow-md"
                 >
                   <div className="mb-2 flex items-center gap-2">
-                    <span className="grid size-10 shrink-0 place-items-center rounded-lg border border-moonstone-500/40 bg-moonstone-600/20">
-                      <span className="text-2xl text-moonstone-600" aria-hidden>
+                    <span className="grid size-10 shrink-0 place-items-center rounded-lg border border-moonstone-500/40 bg-moonstone-400/20">
+                      <span className="text-2xl text-moonstone-400" aria-hidden>
                         {area.icon}
                       </span>
                     </span>
@@ -215,7 +215,7 @@ export default async function ServicesPage(): Promise<React.ReactElement> {
                   <ul className="space-y-1 text-base text-rich-black/80 sm:text-lg">
                     {area.examples.map((example) => (
                       <li key={example} className="flex gap-2">
-                        <span className="mt-0.5 text-moonstone-600">•</span>
+                        <span className="mt-0.5 text-moonstone-400">•</span>
                         <span>{example}</span>
                       </li>
                     ))}
@@ -248,27 +248,27 @@ export default async function ServicesPage(): Promise<React.ReactElement> {
 
               <ul className="space-y-2 text-base text-rich-black/90 sm:text-lg">
                 <li className="flex gap-2">
-                  <span className="mt-1 text-moonstone-600">•</span>
+                  <span className="mt-1 text-moonstone-400">•</span>
                   <span>Setting up a new laptop, phone, or tablet with all your accounts</span>
                 </li>
                 <li className="flex gap-2">
-                  <span className="mt-1 text-moonstone-600">•</span>
+                  <span className="mt-1 text-moonstone-400">•</span>
                   <span>Fixing Wi-Fi dead spots or unreliable connections</span>
                 </li>
                 <li className="flex gap-2">
-                  <span className="mt-1 text-moonstone-600">•</span>
+                  <span className="mt-1 text-moonstone-400">•</span>
                   <span>Organising and backing up photos to the cloud</span>
                 </li>
                 <li className="flex gap-2">
-                  <span className="mt-1 text-moonstone-600">•</span>
+                  <span className="mt-1 text-moonstone-400">•</span>
                   <span>Helping parents or grandparents get comfortable with devices</span>
                 </li>
                 <li className="flex gap-2">
-                  <span className="mt-1 text-moonstone-600">•</span>
+                  <span className="mt-1 text-moonstone-400">•</span>
                   <span>Sorting out email and account login issues</span>
                 </li>
                 <li className="flex gap-2">
-                  <span className="mt-1 text-moonstone-600">•</span>
+                  <span className="mt-1 text-moonstone-400">•</span>
                   <span>Removing unwanted software, scams, or malware</span>
                 </li>
               </ul>
@@ -291,23 +291,23 @@ export default async function ServicesPage(): Promise<React.ReactElement> {
 
               <ul className="space-y-2 text-base text-rich-black/90 sm:text-lg">
                 <li className="flex gap-2">
-                  <span className="mt-1 text-moonstone-600">•</span>
+                  <span className="mt-1 text-moonstone-400">•</span>
                   <span>Setting up workstations, email, and shared files</span>
                 </li>
                 <li className="flex gap-2">
-                  <span className="mt-1 text-moonstone-600">•</span>
+                  <span className="mt-1 text-moonstone-400">•</span>
                   <span>Basic network and Wi-Fi improvements</span>
                 </li>
                 <li className="flex gap-2">
-                  <span className="mt-1 text-moonstone-600">•</span>
+                  <span className="mt-1 text-moonstone-400">•</span>
                   <span>Backup and security checks</span>
                 </li>
                 <li className="flex gap-2">
-                  <span className="mt-1 text-moonstone-600">•</span>
+                  <span className="mt-1 text-moonstone-400">•</span>
                   <span>New staff device setup</span>
                 </li>
                 <li className="flex gap-2">
-                  <span className="mt-1 text-moonstone-600">•</span>
+                  <span className="mt-1 text-moonstone-400">•</span>
                   <span>One-off projects like office moves</span>
                 </li>
               </ul>

@@ -102,7 +102,7 @@ export default async function AdminPriceEstimatesPage({
             className={cn(
               "rounded-full border px-3 py-1 text-xs font-semibold transition-colors select-none",
               includeDev
-                ? "border-coquelicot-500/40 bg-coquelicot-500/10 text-coquelicot-400 hover:bg-coquelicot-500/20"
+                ? "border-coquelicot-500/40 bg-coquelicot-500/10 text-coquelicot-600 hover:bg-coquelicot-500/20"
                 : "border-admin-border bg-admin-surface text-admin-muted hover:bg-admin-bg",
             )}
           >

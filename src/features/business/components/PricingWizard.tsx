@@ -23,7 +23,7 @@ import type React from "react";
 import { useEffect, useState } from "react";
 
 const SOFT_CARD =
-  "border-seasalt-400/80 bg-seasalt-900/60 rounded-xl border p-3 text-base sm:p-4 sm:text-lg";
+  "border-seasalt-200/80 bg-white/60 rounded-xl border p-3 text-base sm:p-4 sm:text-lg";
 
 type Step = "issue" | "meeting" | "address" | "results";
 type MeetingMode = "on-site" | "remote";
@@ -451,7 +451,7 @@ export function PricingWizard({
               className={cn(
                 "h-2 flex-1 rounded-full transition-colors",
                 i < stepIndex
-                  ? "bg-moonstone-600"
+                  ? "bg-moonstone-400"
                   : i === stepIndex
                     ? "bg-russian-violet"
                     : "bg-slate-200",
@@ -603,7 +603,7 @@ export function PricingWizard({
               All prices in NZD. No GST.
             </p>
             {aiConfidence === "low" && (
-              <p className="mt-3 text-sm font-medium text-coquelicot-600">
+              <p className="mt-3 text-sm font-medium text-coquelicot-400">
                 Your description was brief, so this is a wide ballpark - I'll pin it down once I see
                 it.
               </p>

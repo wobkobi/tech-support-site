@@ -442,7 +442,7 @@ export function ExpensesView({ onMigrated }: ExpensesViewProps): React.ReactElem
             <span className="text-sm text-admin-text-secondary">Receipt held</span>
           </label>
         </div>
-        {formError && <p className="mt-2 text-xs text-coquelicot-400">{formError}</p>}
+        {formError && <p className="mt-2 text-xs text-coquelicot-600">{formError}</p>}
         <div className="mt-4 flex items-center gap-3">
           <AdminButton type="submit" busy={saving}>
             {editingId ? "Save changes" : "Add expense"}
@@ -606,7 +606,7 @@ export function ExpensesView({ onMigrated }: ExpensesViewProps): React.ReactElem
                   </button>
                   <button
                     onClick={() => setConfirmDeleteId(e.id)}
-                    className="inline-flex h-8 items-center text-coquelicot-400 hover:text-coquelicot-500"
+                    className="inline-flex h-8 items-center text-coquelicot-600 hover:text-coquelicot-500"
                   >
                     Delete
                   </button>
@@ -722,7 +722,7 @@ export function ExpensesView({ onMigrated }: ExpensesViewProps): React.ReactElem
                       </button>
                       <button
                         onClick={() => setConfirmDeleteId(e.id)}
-                        className="text-xs text-coquelicot-400 hover:text-coquelicot-500"
+                        className="text-xs text-coquelicot-600 hover:text-coquelicot-500"
                       >
                         Delete
                       </button>

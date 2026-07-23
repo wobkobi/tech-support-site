@@ -289,7 +289,7 @@ export default async function EditBookingPage({
             <section className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}>
               {/* Only worth saying when a limit is actually configured. */}
               {(changesLeft !== null || reschedule.cutoffHours > 0) && (
-                <p className="mb-4 rounded-lg border border-mustard-400 bg-mustard-900 px-4 py-3 text-sm text-rich-black/80 sm:text-base">
+                <p className="mb-4 rounded-lg border border-mustard-400 bg-mustard-50 px-4 py-3 text-sm text-rich-black/80 sm:text-base">
                   {changesLeft !== null && (
                     <>
                       You can change this booking{" "}

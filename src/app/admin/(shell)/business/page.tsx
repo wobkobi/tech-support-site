@@ -349,7 +349,7 @@ export default async function BusinessPage({
             >
               {tab.label}
               {tab.current && !active && (
-                <span className="ml-2 rounded-full bg-moonstone-600/15 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-moonstone-600 uppercase">
+                <span className="ml-2 rounded-full bg-moonstone-400/15 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-moonstone-400 uppercase">
                   Current
                 </span>
               )}

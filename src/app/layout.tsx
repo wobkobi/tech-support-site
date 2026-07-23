@@ -38,28 +38,28 @@ const legacyRedirectScript = `(function(){try{var allow=false;try{if(window.loca
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "To The Point Tech - Computer & IT Support in Auckland",
-    template: "%s | To The Point Tech",
+    default: "To the Point Tech - Computer & IT Support in Auckland",
+    template: "%s | To the Point Tech",
   },
   description:
     "Friendly computer and IT support across Auckland. On-site and remote help with PCs, Macs, Wi-Fi, phones, printers and more. Same-day, evening and weekend appointments. No jargon, no upselling, transparent pricing.",
-  applicationName: "To The Point Tech",
+  applicationName: "To the Point Tech",
   authors: [{ name: "Harrison Raynes" }],
   creator: "Harrison Raynes",
-  publisher: "To The Point Tech",
+  publisher: "To the Point Tech",
   category: "Technology",
   openGraph: {
     type: "website",
     locale: "en_NZ",
-    siteName: "To The Point Tech",
-    title: "To The Point Tech - Computer & IT Support in Auckland",
+    siteName: "To the Point Tech",
+    title: "To the Point Tech - Computer & IT Support in Auckland",
     description:
       "Friendly computer and IT support across Auckland. On-site and remote help, transparent pricing, no jargon.",
     // og:image is served route-wide by the file-based src/app/opengraph-image.jpg.
   },
   twitter: {
     card: "summary_large_image",
-    title: "To The Point Tech - Computer & IT Support in Auckland",
+    title: "To the Point Tech - Computer & IT Support in Auckland",
     description:
       "Friendly computer and IT support across Auckland. On-site and remote help, transparent pricing, no jargon.",
     images: ["/og-1200x630.jpg"],
@@ -116,8 +116,8 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 5,
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f6f7f8" }, // seasalt-500
-    { media: "(prefers-color-scheme: dark)", color: "#001514" }, // rich-black-500
+    { media: "(prefers-color-scheme: light)", color: "#f6f7f8" }, // seasalt-50
+    { media: "(prefers-color-scheme: dark)", color: "#001514" }, // rich-black-950
   ],
   colorScheme: "light",
 };
@@ -169,9 +169,9 @@ export default async function RootLayout({
     "@context": "https://schema.org",
     "@type": ["LocalBusiness", "ProfessionalService"],
     "@id": `${siteUrl}#business`,
-    name: "To The Point Tech",
-    legalName: "To The Point Tech",
-    alternateName: ["To The Point Tech Auckland", "To The Point IT Support"],
+    name: "To the Point Tech",
+    legalName: "To the Point Tech",
+    alternateName: ["To the Point Tech Auckland", "To the Point IT Support"],
     url: siteUrl,
     image: `${siteUrl}/og-1200x630.jpg`,
     logo: `${siteUrl}/assets/logo-mark-512.png`,
@@ -317,9 +317,9 @@ export default async function RootLayout({
     "@type": "WebSite",
     "@id": `${siteUrl}#website`,
     url: siteUrl,
-    name: "To The Point Tech",
+    name: "To the Point Tech",
     // Brand variants people actually type; feeds Google's site-name display.
-    alternateName: ["To The Point", "To The Point Tech Auckland"],
+    alternateName: ["To the Point", "To the Point Tech Auckland"],
     publisher: { "@id": `${siteUrl}#business` },
     inLanguage: "en-NZ",
   };

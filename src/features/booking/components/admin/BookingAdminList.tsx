@@ -341,7 +341,7 @@ export function BookingAdminList({
                               })
                             }
                             disabled={isBusy}
-                            className="rounded-lg bg-moonstone-600/15 px-2.5 py-1.5 text-xs font-medium text-moonstone-700 transition-colors hover:bg-moonstone-600/25 disabled:opacity-50"
+                            className="rounded-lg bg-moonstone-400/15 px-2.5 py-1.5 text-xs font-medium text-moonstone-300 transition-colors hover:bg-moonstone-400/25 disabled:opacity-50"
                           >
                             {b.reviewSentAt ? "Resend review" : "Send review"}
                           </button>

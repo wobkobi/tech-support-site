@@ -55,7 +55,7 @@ export default function HomeLoading(): React.ReactElement {
               {Array.from({ length: 12 }).map((_, i) => (
                 <li
                   key={i}
-                  className="flex items-center gap-3 rounded-xl border border-seasalt-400/60 bg-seasalt-800 p-3 shadow-sm"
+                  className="flex items-center gap-3 rounded-xl border border-seasalt-200/60 bg-white p-3 shadow-sm"
                 >
                   <Bone className="size-12 shrink-0 rounded-lg sm:size-14" />
                   <Bone className="h-5 flex-1" />

@@ -15,10 +15,10 @@ import type React from "react";
 export const metadata: Metadata = {
   title: "Privacy Policy",
   description:
-    "How To The Point Tech collects, uses and protects your information, the analytics and advertising tools we use, and your rights under the NZ Privacy Act 2020.",
+    "How To the Point Tech collects, uses and protects your information, the analytics and advertising tools we use, and your rights under the NZ Privacy Act 2020.",
   alternates: { canonical: "/privacy" },
   openGraph: {
-    title: "Privacy Policy - To The Point Tech",
+    title: "Privacy Policy - To the Point Tech",
     description: "What we collect, how we use it, and your privacy choices.",
     url: "/privacy",
   },
@@ -30,7 +30,7 @@ const LAST_UPDATED = "2 July 2026";
 const H2 = "mb-3 text-xl font-bold text-russian-violet sm:text-2xl";
 const P = "text-base text-rich-black/90 sm:text-lg";
 const LI = "flex gap-3 text-base text-rich-black/90 sm:text-lg";
-const DOT = "mt-1 shrink-0 text-lg text-moonstone-600";
+const DOT = "mt-1 shrink-0 text-lg text-moonstone-400";
 const LINK = "font-semibold text-russian-violet underline hover:text-coquelicot-500";
 
 /**
@@ -55,7 +55,7 @@ export default function PrivacyPage(): React.ReactElement {
             </h1>
             <p className="mb-4 text-sm text-rich-black/60">Last updated: {LAST_UPDATED}</p>
             <p className={P}>
-              To The Point Tech ("we", "us", "our") provides computer and IT support across
+              To the Point Tech ("we", "us", "our") provides computer and IT support across
               Auckland. We respect your privacy and only collect what we need to help you. This
               policy explains what information we collect, how we use it, who we share it with, and
               the choices you have. If you have any questions, email{" "}

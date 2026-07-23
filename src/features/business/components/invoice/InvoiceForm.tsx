@@ -267,7 +267,7 @@ export function InvoiceForm({
       </div>
 
       {error && (
-        <p className="rounded-lg border border-coquelicot-800 bg-coquelicot-900 px-4 py-3 text-sm text-coquelicot-200">
+        <p className="rounded-lg border border-coquelicot-200 bg-coquelicot-100 px-4 py-3 text-sm text-coquelicot-800">
           {error}
         </p>
       )}

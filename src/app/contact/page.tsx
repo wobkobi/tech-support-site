@@ -17,7 +17,7 @@ export const metadata: Metadata = {
     "Call 021 297 1237 or email harrison@tothepoint.co.nz for friendly tech support across Auckland. Same-day, evening and weekend appointments available.",
   alternates: { canonical: "/contact" },
   openGraph: {
-    title: "Contact - To The Point Tech",
+    title: "Contact - To the Point Tech",
     description: "Reach out by phone or email for tech help across Auckland.",
     url: "/contact",
   },
@@ -86,9 +86,9 @@ export default function ContactPage(): React.ReactElement {
             className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}
           >
             <div className="flex items-start gap-4">
-              <div className="grid size-12 shrink-0 place-items-center rounded-lg border border-moonstone-500/30 bg-moonstone-600/10 sm:size-14">
+              <div className="grid size-12 shrink-0 place-items-center rounded-lg border border-moonstone-500/30 bg-moonstone-400/10 sm:size-14">
                 <FaMapLocationDot
-                  className="h-6 w-6 text-moonstone-600 sm:h-7 sm:w-7"
+                  className="h-6 w-6 text-moonstone-400 sm:h-7 sm:w-7"
                   aria-hidden
                 />
               </div>
@@ -127,19 +127,19 @@ export default function ContactPage(): React.ReactElement {
 
             <ul className="space-y-2.5 text-base text-rich-black sm:text-lg">
               <li className="flex gap-3">
-                <span className="mt-1 text-lg text-moonstone-600">•</span>
+                <span className="mt-1 text-lg text-moonstone-400">•</span>
                 <span>What's happening or what you want to achieve</span>
               </li>
               <li className="flex gap-3">
-                <span className="mt-1 text-lg text-moonstone-600">•</span>
+                <span className="mt-1 text-lg text-moonstone-400">•</span>
                 <span>Which devices are involved (e.g., laptop, phone, printer)</span>
               </li>
               <li className="flex gap-3">
-                <span className="mt-1 text-lg text-moonstone-600">•</span>
+                <span className="mt-1 text-lg text-moonstone-400">•</span>
                 <span>Whether it's for home or business</span>
               </li>
               <li className="flex gap-3">
-                <span className="mt-1 text-lg text-moonstone-600">•</span>
+                <span className="mt-1 text-lg text-moonstone-400">•</span>
                 <span>Your availability (mornings, evenings, weekends)</span>
               </li>
             </ul>

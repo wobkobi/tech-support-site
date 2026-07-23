@@ -414,7 +414,7 @@ export default async function AdminPage(): Promise<React.ReactElement> {
           <span
             className={cn(
               "font-bold",
-              pendingCount > 0 ? "text-coquelicot-400" : "text-russian-violet",
+              pendingCount > 0 ? "text-coquelicot-600" : "text-russian-violet",
             )}
           >
             {pendingCount}
@@ -423,13 +423,13 @@ export default async function AdminPage(): Promise<React.ReactElement> {
         </p>
         {overdueInvoices.length > 0 && (
           <p className="text-sm text-admin-text-secondary">
-            <span className="font-bold text-coquelicot-400">{overdueInvoices.length}</span> overdue
+            <span className="font-bold text-coquelicot-600">{overdueInvoices.length}</span> overdue
             invoice{overdueInvoices.length === 1 ? "" : "s"}
           </p>
         )}
         {heldCount > 0 && (
           <p className="text-sm text-admin-text-secondary">
-            <span className="font-bold text-coquelicot-400">{heldCount}</span> held booking
+            <span className="font-bold text-coquelicot-600">{heldCount}</span> held booking
             {heldCount === 1 ? "" : "s"} to action
           </p>
         )}
@@ -567,7 +567,7 @@ export default async function AdminPage(): Promise<React.ReactElement> {
                   <span
                     className={cn(
                       "mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold",
-                      e.kind === "booking" && "bg-moonstone-600/15 text-moonstone-600",
+                      e.kind === "booking" && "bg-moonstone-400/15 text-moonstone-400",
                       e.kind === "review" && "bg-yellow-500/15 text-yellow-600",
                       e.kind === "contact" && "bg-admin-border text-admin-muted",
                       e.kind === "invoice" && "bg-russian-violet/15 text-russian-violet",
@@ -608,7 +608,7 @@ export default async function AdminPage(): Promise<React.ReactElement> {
                 className={cn(
                   "text-xs",
                   calendarLastRefreshMs === null
-                    ? "font-medium text-coquelicot-400"
+                    ? "font-medium text-coquelicot-600"
                     : calendarLastRefreshMs > 30 * 60 * 1000
                       ? "text-yellow-600"
                       : "text-admin-muted",

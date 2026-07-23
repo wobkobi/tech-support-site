@@ -36,7 +36,7 @@ export default function ReviewsLoading(): React.ReactElement {
               {Array.from({ length: 6 }).map((_, i) => (
                 <li
                   key={i}
-                  className="flex flex-col rounded-lg border-2 border-seasalt-400/60 bg-seasalt-800/80 p-4 sm:p-5"
+                  className="flex flex-col rounded-lg border-2 border-seasalt-200/60 bg-white/80 p-4 sm:p-5"
                 >
                   <Bone className="mb-2 h-5 w-full" />
                   <Bone className="mb-2 h-5 w-full" />

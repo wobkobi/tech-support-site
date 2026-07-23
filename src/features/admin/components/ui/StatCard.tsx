@@ -28,11 +28,11 @@ function valueToneClass(tone: StatTone): string {
     case "warning":
       return "text-amber-600";
     case "critical":
-      return "text-coquelicot-400";
+      return "text-coquelicot-600";
     case "violet":
       return "text-russian-violet";
     case "info":
-      return "text-moonstone-600";
+      return "text-moonstone-400";
   }
 }
 

@@ -14,12 +14,12 @@ import Link from "next/link";
 import type React from "react";
 
 export const metadata: Metadata = {
-  title: "Reviews - What Auckland Clients Say About To The Point Tech",
+  title: "Reviews - What Auckland Clients Say About To the Point Tech",
   description:
-    "Real reviews from Auckland clients who have used To The Point Tech for computer repair, Wi-Fi setup, virus removal, smart home, and small-business IT support.",
+    "Real reviews from Auckland clients who have used To the Point Tech for computer repair, Wi-Fi setup, virus removal, smart home, and small-business IT support.",
   alternates: { canonical: "/reviews" },
   openGraph: {
-    title: "Reviews - To The Point Tech",
+    title: "Reviews - To the Point Tech",
     description: "Feedback from clients across Auckland.",
     url: "/reviews",
   },
@@ -30,7 +30,7 @@ export const metadata: Metadata = {
 export const revalidate = 86400;
 
 const linkStyle =
-  "text-coquelicot-500 hover:text-coquelicot-600 underline-offset-4 hover:underline";
+  "text-coquelicot-500 hover:text-coquelicot-400 underline-offset-4 hover:underline";
 
 /**
  * Reviews page component.

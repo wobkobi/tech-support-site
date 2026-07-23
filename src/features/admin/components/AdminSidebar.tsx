@@ -249,7 +249,7 @@ export function AdminSidebar(): React.ReactElement {
         <div className="flex items-start justify-between border-b border-white/10 px-5 py-5">
           <div>
             <p className="text-xs font-semibold tracking-widest text-white/40 uppercase">Admin</p>
-            <p className="mt-0.5 text-sm font-bold text-white">To The Point</p>
+            <p className="mt-0.5 text-sm font-bold text-white">To the Point</p>
           </div>
           {/* Close button - only rendered below lg. */}
           <button

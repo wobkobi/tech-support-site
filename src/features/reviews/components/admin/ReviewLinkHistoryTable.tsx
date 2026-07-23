@@ -205,7 +205,7 @@ export function ReviewLinkHistoryTable({
                 className={cn(
                   "rounded-full px-2 py-0.5 text-[10px] font-medium",
                   entry.source === "Auto"
-                    ? "bg-moonstone-600/15 text-moonstone-600"
+                    ? "bg-moonstone-400/15 text-moonstone-400"
                     : entry.source === "Manual SMS"
                       ? "bg-coquelicot-500/10 text-coquelicot-500"
                       : entry.source === "Legacy"
@@ -287,7 +287,7 @@ export function ReviewLinkHistoryTable({
                           <p
                             className={cn(
                               "text-xs",
-                              phoneValid ? "text-slate-400" : "text-coquelicot-400",
+                              phoneValid ? "text-slate-400" : "text-coquelicot-600",
                             )}
                           >
                             {phoneValid
@@ -300,7 +300,7 @@ export function ReviewLinkHistoryTable({
                             type="button"
                             disabled={saving || (!!editPhoneInput && !phoneValid)}
                             onClick={() => handleSave(entry)}
-                            className="rounded-lg bg-moonstone-600 px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-moonstone-700 disabled:opacity-50"
+                            className="rounded-lg bg-moonstone-400 px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-moonstone-300 disabled:opacity-50"
                           >
                             {saving ? "Saving…" : "Save"}
                           </button>
