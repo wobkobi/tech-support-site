@@ -55,7 +55,7 @@ export async function generateMetadata(): Promise<Metadata> {
     description: `Transparent tech support pricing in Auckland. ${rateBlurb} No hidden fees, no upselling. On-site and remote rates available.`,
     alternates: { canonical: "/pricing" },
     openGraph: {
-      title: "Pricing - To The Point Tech",
+      title: "Pricing - To the Point Tech",
       description: `Simple, transparent rates. ${rateBlurb}`,
       url: "/pricing",
     },
@@ -63,7 +63,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 const linkStyle =
-  "text-coquelicot-500 hover:text-coquelicot-600 underline-offset-4 hover:underline";
+  "text-coquelicot-500 hover:text-coquelicot-400 underline-offset-4 hover:underline";
 
 /**
  * Renders `**…**` segments from pricing-policy copy as `<strong>` spans.
@@ -78,7 +78,7 @@ function renderEmphasised(text: string): React.ReactNode[] {
 }
 
 const ACCORDION_DETAILS =
-  "group rounded-xl border border-seasalt-400/60 bg-seasalt-900/40 p-0 open:bg-white open:shadow-sm";
+  "group rounded-xl border border-seasalt-200/60 bg-white/40 p-0 open:bg-white open:shadow-sm";
 const ACCORDION_SUMMARY = cn(
   "flex cursor-pointer items-center justify-between gap-3 rounded-xl px-5 py-4 text-base font-semibold text-russian-violet sm:text-lg",
   "marker:hidden hover:bg-white/60",
@@ -132,7 +132,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
 
             {promo ? (
               <>
-                <div className="rounded-lg border border-mustard-400 bg-mustard-900 p-5">
+                <div className="rounded-lg border border-mustard-400 bg-mustard-50 p-5">
                   <p className="mb-1 text-lg text-rich-black/60 line-through sm:text-xl">
                     ${baseRate}/hr
                   </p>
@@ -145,18 +145,18 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                   </p>
                 </div>
 
-                <div className="mt-4 rounded-lg bg-mustard-500 px-4 py-3 text-center text-russian-violet-500">
+                <div className="mt-4 rounded-lg bg-mustard-300 px-4 py-3 text-center text-russian-violet-900">
                   <p className="text-base font-bold sm:text-lg">
                     ⚡ Limited offer: {promo.title}
                     {promo.description ? ` - ${promo.description}` : ""}
                   </p>
-                  <p className="mt-1 text-base text-russian-violet-500 sm:text-lg">
+                  <p className="mt-1 text-base text-russian-violet-900 sm:text-lg">
                     Until {formatDateShort(promo.endAt)}.
                   </p>
                 </div>
               </>
             ) : (
-              <div className="rounded-lg border border-seasalt-400/60 bg-seasalt-900/40 p-5">
+              <div className="rounded-lg border border-seasalt-200/60 bg-white/40 p-5">
                 <p className="mb-2 text-3xl font-bold text-russian-violet sm:text-4xl">
                   ${baseRate}/hr
                 </p>
@@ -171,28 +171,28 @@ export default async function PricingPage(): Promise<React.ReactElement> {
 
             <div className="mt-5 space-y-3">
               <p className="flex gap-3 text-base text-rich-black/90 sm:text-lg">
-                <FaCheck className="mt-1.5 h-4 w-4 shrink-0 text-moonstone-600" aria-hidden />
+                <FaCheck className="mt-1.5 h-4 w-4 shrink-0 text-moonstone-400" aria-hidden />
                 <span>
                   <strong>Quick calls and emails are free.</strong> A "remote session" is when I log
                   in and start working on your machine.
                 </span>
               </p>
               <p className="flex gap-3 text-base text-rich-black/90 sm:text-lg">
-                <FaCheck className="mt-1.5 h-4 w-4 shrink-0 text-moonstone-600" aria-hidden />
+                <FaCheck className="mt-1.5 h-4 w-4 shrink-0 text-moonstone-400" aria-hidden />
                 <span>
                   <strong>Most jobs take 1 to 2 hours.</strong> I'll give you a time estimate before
                   we start.
                 </span>
               </p>
               <p className="flex gap-3 text-base text-rich-black/90 sm:text-lg">
-                <FaCheck className="mt-1.5 h-4 w-4 shrink-0 text-moonstone-600" aria-hidden />
+                <FaCheck className="mt-1.5 h-4 w-4 shrink-0 text-moonstone-400" aria-hidden />
                 <span>
                   <strong>Not sure which rate applies?</strong> Just ask - I'll confirm before
                   starting.
                 </span>
               </p>
               <p className="flex gap-3 text-base text-rich-black/90 sm:text-lg">
-                <FaCheck className="mt-1.5 h-4 w-4 shrink-0 text-moonstone-600" aria-hidden />
+                <FaCheck className="mt-1.5 h-4 w-4 shrink-0 text-moonstone-400" aria-hidden />
                 <span>
                   <strong>Running a business?</strong> Business rates and monthly retainers are on
                   the{" "}
@@ -220,11 +220,11 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                 </h3>
                 <ul className="space-y-2.5 text-base text-rich-black sm:text-lg">
                   <li className="flex gap-3">
-                    <span className="mt-1 text-lg text-moonstone-600">•</span>
+                    <span className="mt-1 text-lg text-moonstone-400">•</span>
                     <span>Hourly rate (${baseRate}/hr)</span>
                   </li>
                   <li className="flex gap-3">
-                    <span className="mt-1 text-lg text-moonstone-600">•</span>
+                    <span className="mt-1 text-lg text-moonstone-400">•</span>
                     <span>
                       <strong>One round trip</strong> billed at{" "}
                       <strong>${pricing.travelRatePerHour}/hr</strong> (lower than the hourly rate),{" "}
@@ -232,7 +232,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                     </span>
                   </li>
                   <li className="flex gap-3">
-                    <span className="mt-1 text-lg text-moonstone-600">•</span>
+                    <span className="mt-1 text-lg text-moonstone-400">•</span>
                     <span>
                       Best for: Wi-Fi setup, printers, smart TVs, physical hardware, anything
                       needing hands-on work
@@ -247,15 +247,15 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                 </h3>
                 <ul className="space-y-2.5 text-base text-rich-black sm:text-lg">
                   <li className="flex gap-3">
-                    <span className="mt-1 text-lg text-moonstone-600">•</span>
+                    <span className="mt-1 text-lg text-moonstone-400">•</span>
                     <span>Discounted rate, no travel charge</span>
                   </li>
                   <li className="flex gap-3">
-                    <span className="mt-1 text-lg text-moonstone-600">•</span>
+                    <span className="mt-1 text-lg text-moonstone-400">•</span>
                     <span>No drive time means quicker turnaround</span>
                   </li>
                   <li className="flex gap-3">
-                    <span className="mt-1 text-lg text-moonstone-600">•</span>
+                    <span className="mt-1 text-lg text-moonstone-400">•</span>
                     <span>
                       Best for: account issues, software setup, email problems, quick fixes,
                       follow-up support
@@ -279,20 +279,20 @@ export default async function PricingPage(): Promise<React.ReactElement> {
 
             <ul className="mb-5 space-y-2.5 text-base text-rich-black sm:text-lg">
               <li className="flex gap-3">
-                <span className="mt-1 text-lg text-moonstone-600">•</span>
+                <span className="mt-1 text-lg text-moonstone-400">•</span>
                 <span>
                   <strong>No hidden fees.</strong> The price I quote is the price you pay.
                 </span>
               </li>
               <li className="flex gap-3">
-                <span className="mt-1 text-lg text-moonstone-600">•</span>
+                <span className="mt-1 text-lg text-moonstone-400">•</span>
                 <span>
                   <strong>No upselling.</strong> I don't sell hardware or earn commission on
                   products.
                 </span>
               </li>
               <li className="flex gap-3">
-                <span className="mt-1 text-lg text-moonstone-600">•</span>
+                <span className="mt-1 text-lg text-moonstone-400">•</span>
                 <span>
                   <strong>Clear communication.</strong> If a job is taking longer than expected,
                   I'll let you know before continuing.

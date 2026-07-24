@@ -41,7 +41,7 @@ export function SiteFooter(): React.ReactElement | null {
 
   return (
     <footer className="mx-auto mt-8 mb-6 w-full max-w-[min(100vw-2rem,clamp(90rem,75vw,140rem))] px-4">
-      <div className="flex flex-col items-center gap-4 rounded-2xl border border-seasalt-400/40 bg-seasalt-800/70 p-6 shadow-lg backdrop-blur-md sm:p-8">
+      <div className="flex flex-col items-center gap-4 rounded-2xl border border-seasalt-200/40 bg-white/70 p-6 shadow-lg backdrop-blur-md sm:p-8">
         <nav
           aria-label="Footer"
           className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2"
@@ -57,7 +57,7 @@ export function SiteFooter(): React.ReactElement | null {
           ))}
         </nav>
         <p className="text-center text-sm text-rich-black/70 sm:text-base">
-          {`© ${year} To The Point Tech - friendly computer & IT support across Auckland.`}
+          {`© ${year} To the Point Tech - friendly computer & IT support across Auckland.`}
         </p>
       </div>
     </footer>

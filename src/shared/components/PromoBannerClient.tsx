@@ -119,7 +119,7 @@ export function PromoBannerClient({ promo }: Props): React.ReactElement {
       className={cn(
         "fixed inset-x-0 top-0 z-60",
         // Matches the mustard strap on /pricing so both promo surfaces look the same.
-        "bg-mustard-500 text-russian-violet-500",
+        "bg-mustard-300 text-russian-violet-900",
 
         // Right padding leaves room for the absolute-positioned dismiss button.
         "px-4 py-2.5 pr-12 text-center text-base font-semibold sm:px-12 sm:text-lg",
@@ -134,7 +134,7 @@ export function PromoBannerClient({ promo }: Props): React.ReactElement {
         className="block hover:underline focus:outline-none focus-visible:underline"
       >
         <FaBolt
-          className="mr-2 inline-block h-4 w-4 text-russian-violet-500 sm:h-5 sm:w-5"
+          className="mr-2 inline-block h-4 w-4 text-russian-violet-900 sm:h-5 sm:w-5"
           aria-hidden="true"
         />
         <span className="font-bold">Limited offer:</span> {summariseForBanner(promo)}
@@ -151,11 +151,11 @@ export function PromoBannerClient({ promo }: Props): React.ReactElement {
           // Keep the 32px pill visual but extend the tap target to 44px (older
           // audience, touch) via a transparent inset pseudo-element.
           "before:absolute before:-inset-1.5 before:content-['']",
-          "bg-russian-violet-500/10 text-russian-violet-500",
-          "ring-1 ring-russian-violet-500/20",
-          "hover:bg-russian-violet-500 hover:text-mustard-500 hover:ring-russian-violet-500",
+          "bg-russian-violet-900/10 text-russian-violet-900",
+          "ring-1 ring-russian-violet-900/20",
+          "hover:bg-russian-violet-900 hover:text-mustard-300 hover:ring-russian-violet-900",
           "hover:scale-110 hover:rotate-90 active:scale-95",
-          "focus:outline-none focus-visible:ring-2 focus-visible:ring-russian-violet-500/60",
+          "focus:outline-none focus-visible:ring-2 focus-visible:ring-russian-violet-900/60",
           "transition-all duration-200 ease-out",
         )}
       >

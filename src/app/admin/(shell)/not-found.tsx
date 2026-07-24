@@ -23,7 +23,7 @@ export default function AdminNotFound(): React.ReactElement {
         </p>
         <Link
           href="/admin"
-          className="mt-6 inline-block rounded-lg bg-russian-violet px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+          className="mt-6 inline-block rounded-lg bg-russian-violet px-4 py-2 text-sm font-medium text-white transition-opacity select-none hover:opacity-90"
         >
           Back to dashboard
         </Link>

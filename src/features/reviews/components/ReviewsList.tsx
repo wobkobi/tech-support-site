@@ -53,7 +53,7 @@ export function ReviewsList({ reviews }: { reviews: PublicReview[] }): React.Rea
                 key={r.id}
                 id={`review-${r.id}`}
                 style={{ order }}
-                className="flex flex-col rounded-lg border-2 border-seasalt-400/60 bg-seasalt-800/80 p-4 sm:p-5"
+                className="flex flex-col rounded-lg border-2 border-seasalt-200/60 bg-white/80 p-4 sm:p-5"
               >
                 <p className="text-base text-rich-black sm:text-lg">{r.text}</p>
                 <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 pt-3">

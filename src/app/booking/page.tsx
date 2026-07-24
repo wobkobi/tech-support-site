@@ -34,7 +34,7 @@ export const metadata: Metadata = {
     "Book an on-site or remote tech support appointment in Auckland. Same-day, evening and weekend slots available. Pick a 1- or 2-hour slot and get an instant calendar invite.",
   alternates: { canonical: "/booking" },
   openGraph: {
-    title: "Book an Appointment - To The Point Tech",
+    title: "Book an Appointment - To the Point Tech",
     description: "Same-day, evening and weekend tech support appointments across Auckland.",
     url: "/booking",
   },
@@ -228,9 +228,9 @@ async function getAvailableDays(): Promise<{
 }
 
 const STEP_ICON =
-  "border-moonstone-500/40 bg-moonstone-600/20 grid size-9 shrink-0 place-items-center rounded-lg border";
+  "border-moonstone-500/40 bg-moonstone-400/20 grid size-9 shrink-0 place-items-center rounded-lg border";
 
-const SKELETON_BLOCK = "bg-seasalt-900/40 rounded-lg";
+const SKELETON_BLOCK = "bg-white/40 rounded-lg";
 
 /**
  * Async island that fetches slot data inside the {@link Suspense} boundary. Renders
@@ -264,7 +264,7 @@ async function BookingFormIsland(): Promise<React.ReactElement> {
     return (
       <div
         role="status"
-        className="flex flex-col gap-2 rounded-lg border-2 border-mustard-500/60 bg-mustard-900/40 p-5 text-rich-black"
+        className="flex flex-col gap-2 rounded-lg border-2 border-mustard-300/60 bg-mustard-50/40 p-5 text-rich-black"
       >
         <p className="text-base font-semibold">Online booking is paused</p>
         <p className="text-sm sm:text-base">{closedMessage}</p>
@@ -275,7 +275,7 @@ async function BookingFormIsland(): Promise<React.ReactElement> {
     return (
       <div
         role="alert"
-        className="bg-coquelicot-50 flex flex-col gap-3 rounded-lg border-2 border-coquelicot-500/60 p-5 text-rich-black"
+        className="flex flex-col gap-3 rounded-lg border-2 border-coquelicot-500/60 bg-coquelicot-50 p-5 text-rich-black"
       >
         <p className="text-base font-semibold sm:text-lg">Availability isn't loading right now.</p>
         <p className="text-base sm:text-lg">
@@ -287,7 +287,7 @@ async function BookingFormIsland(): Promise<React.ReactElement> {
   return (
     <div className="flex flex-col gap-5">
       {sameDayClosed && (
-        <div className="rounded-lg border border-moonstone-500/40 bg-moonstone-600/10 p-4 text-rich-black">
+        <div className="rounded-lg border border-moonstone-500/40 bg-moonstone-400/10 p-4 text-rich-black">
           <p className="text-base">
             Same-day bookings are closed for today{sameDayDetail}. The earliest available time is
             tomorrow.
@@ -355,7 +355,7 @@ function BookingFormSkeleton(): React.ReactElement {
         </div>
       </div>
 
-      <hr className="border-seasalt-400/80" />
+      <hr className="border-seasalt-200/80" />
 
       {/* Your details */}
       <div className="flex flex-col gap-6">
@@ -371,7 +371,7 @@ function BookingFormSkeleton(): React.ReactElement {
         </div>
       </div>
 
-      <hr className="border-seasalt-400/80" />
+      <hr className="border-seasalt-200/80" />
 
       {/* Notes */}
       <div className="flex flex-col gap-2">
@@ -450,7 +450,7 @@ export default function BookingPage(): React.ReactElement {
                 <ol className="space-y-5">
                   <li className="flex gap-3">
                     <span className={STEP_ICON}>
-                      <FaClock className="text-base text-moonstone-600" aria-hidden />
+                      <FaClock className="text-base text-moonstone-400" aria-hidden />
                     </span>
                     <div>
                       <p className="text-base font-semibold text-rich-black">Choose length</p>
@@ -459,7 +459,7 @@ export default function BookingPage(): React.ReactElement {
                   </li>
                   <li className="flex gap-3">
                     <span className={STEP_ICON}>
-                      <FaCalendarCheck className="text-base text-moonstone-600" aria-hidden />
+                      <FaCalendarCheck className="text-base text-moonstone-400" aria-hidden />
                     </span>
                     <div>
                       <p className="text-base font-semibold text-rich-black">Pick a time</p>
@@ -468,7 +468,7 @@ export default function BookingPage(): React.ReactElement {
                   </li>
                   <li className="flex gap-3">
                     <span className={STEP_ICON}>
-                      <FaListCheck className="text-base text-moonstone-600" aria-hidden />
+                      <FaListCheck className="text-base text-moonstone-400" aria-hidden />
                     </span>
                     <div>
                       <p className="text-base font-semibold text-rich-black">Describe the issue</p>
@@ -477,7 +477,7 @@ export default function BookingPage(): React.ReactElement {
                   </li>
                   <li className="flex gap-3">
                     <span className={STEP_ICON}>
-                      <FaEnvelopeOpenText className="text-base text-moonstone-600" aria-hidden />
+                      <FaEnvelopeOpenText className="text-base text-moonstone-400" aria-hidden />
                     </span>
                     <div>
                       <p className="text-base font-semibold text-rich-black">Get confirmed</p>

@@ -915,7 +915,7 @@ export default function BookingForm({
                   "rounded-lg border p-4 text-left transition-colors",
                   duration === opt.value
                     ? "border-russian-violet bg-russian-violet/10"
-                    : "border-seasalt-400/60 bg-seasalt hover:border-russian-violet/40",
+                    : "border-seasalt-200/60 bg-seasalt hover:border-russian-violet/40",
                 )}
               >
                 <div className="flex items-start justify-between">
@@ -954,7 +954,7 @@ export default function BookingForm({
                     {weekdays.map((day) => (
                       <div key={day.dateKey} className="relative">
                         {(day.isToday || day.isTomorrow) && day.hasAnySlots && (
-                          <span className="absolute -top-5 right-0 left-0 text-center text-[10px] font-bold tracking-wide text-coquelicot-600 uppercase">
+                          <span className="absolute -top-5 right-0 left-0 text-center text-[10px] font-bold tracking-wide text-coquelicot-400 uppercase">
                             {day.isToday ? "Today" : "Tomorrow"}
                           </span>
                         )}
@@ -969,8 +969,8 @@ export default function BookingForm({
                             selectedDay?.dateKey === day.dateKey
                               ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
                               : day.hasAnySlots
-                                ? "border-seasalt-400/60 bg-seasalt text-rich-black hover:border-russian-violet/40"
-                                : "border-seasalt-400/40 bg-seasalt-900/20 text-rich-black/60",
+                                ? "border-seasalt-200/60 bg-seasalt text-rich-black hover:border-russian-violet/40"
+                                : "border-seasalt-200/40 bg-white/20 text-rich-black/60",
                             day.isToday &&
                               day.hasAnySlots &&
                               "ring-2 ring-coquelicot-500/50 ring-offset-1",
@@ -993,7 +993,7 @@ export default function BookingForm({
                     {weekends.map((day) => (
                       <div key={day.dateKey} className="relative">
                         {(day.isToday || day.isTomorrow) && day.hasAnySlots && (
-                          <span className="absolute -top-5 right-0 left-0 text-center text-[10px] font-bold tracking-wide text-coquelicot-600 uppercase">
+                          <span className="absolute -top-5 right-0 left-0 text-center text-[10px] font-bold tracking-wide text-coquelicot-400 uppercase">
                             {day.isToday ? "Today" : "Tomorrow"}
                           </span>
                         )}
@@ -1008,8 +1008,8 @@ export default function BookingForm({
                             selectedDay?.dateKey === day.dateKey
                               ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
                               : day.hasAnySlots
-                                ? "border-seasalt-400/60 bg-seasalt text-rich-black hover:border-russian-violet/40"
-                                : "border-seasalt-400/40 bg-seasalt-900/20 text-rich-black/60",
+                                ? "border-seasalt-200/60 bg-seasalt text-rich-black hover:border-russian-violet/40"
+                                : "border-seasalt-200/40 bg-white/20 text-rich-black/60",
                             day.isToday &&
                               day.hasAnySlots &&
                               "ring-2 ring-coquelicot-500/50 ring-offset-1",
@@ -1041,7 +1041,7 @@ export default function BookingForm({
             {selectedDay.timeWindows.every((w) =>
               duration === "short" ? !w.availableShort : !w.availableLong,
             ) ? (
-              <div className="rounded-lg border border-seasalt-400/80 bg-seasalt-900/30 p-4">
+              <div className="rounded-lg border border-seasalt-200/80 bg-white/30 p-4">
                 <p className="text-base text-rich-black/70">
                   Sorry, no {duration === "short" ? "1-hour" : "2-hour"} slots available on this
                   day.
@@ -1075,8 +1075,8 @@ export default function BookingForm({
                           isSelected
                             ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
                             : available
-                              ? "border-seasalt-400/60 bg-seasalt text-rich-black hover:border-russian-violet/40"
-                              : "border-seasalt-400/40 bg-seasalt-900/30 text-rich-black/60",
+                              ? "border-seasalt-200/60 bg-seasalt text-rich-black hover:border-russian-violet/40"
+                              : "border-seasalt-200/40 bg-white/30 text-rich-black/60",
                         )}
                       >
                         {window.label}
@@ -1111,8 +1111,8 @@ export default function BookingForm({
                                 selectedMinute === minute
                                   ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
                                   : available
-                                    ? "border-seasalt-400/60 bg-seasalt text-rich-black hover:border-russian-violet/40"
-                                    : "border-seasalt-400/40 bg-seasalt-900/30 text-rich-black/60",
+                                    ? "border-seasalt-200/60 bg-seasalt text-rich-black hover:border-russian-violet/40"
+                                    : "border-seasalt-200/40 bg-white/30 text-rich-black/60",
                               )}
                             >
                               {subSlotLabel(activeWindow.startHour, minute)}
@@ -1129,7 +1129,7 @@ export default function BookingForm({
       </fieldset>
 
       {/* Divider */}
-      <hr className="border-seasalt-400/80" />
+      <hr className="border-seasalt-200/80" />
 
       {/* ── Section 2: Your details ── */}
       <fieldset className="flex flex-col gap-6">
@@ -1166,13 +1166,13 @@ export default function BookingForm({
               aria-invalid={!!fieldErrors.name || undefined}
               aria-describedby={fieldErrors.name ? "booking-name-error" : undefined}
               className={cn(
-                "rounded-md border border-seasalt-400/80 bg-seasalt px-4 py-3 text-base text-rich-black",
+                "rounded-md border border-seasalt-200/80 bg-seasalt px-4 py-3 text-base text-rich-black",
                 "focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
                 fieldErrors.name && "border-coquelicot-500/60",
               )}
             />
             {fieldErrors.name && (
-              <p id="booking-name-error" className="text-sm text-coquelicot-600">
+              <p id="booking-name-error" className="text-sm text-coquelicot-400">
                 {fieldErrors.name}
               </p>
             )}
@@ -1199,7 +1199,7 @@ export default function BookingForm({
               maxLength={BOOKING_FIELD_LIMITS.email}
               errorMessages={{ invalid: "Please enter a valid email address." }}
               className={cn(
-                "border border-seasalt-400/80 bg-seasalt px-4 py-3 text-base text-rich-black",
+                "border border-seasalt-200/80 bg-seasalt px-4 py-3 text-base text-rich-black",
                 "focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30",
               )}
             />
@@ -1255,7 +1255,7 @@ export default function BookingForm({
             maxLength={BOOKING_FIELD_LIMITS.phone}
             errorMessages={{ invalid: "Please enter a valid phone number." }}
             className={cn(
-              "border border-seasalt-400/80 bg-seasalt px-4 py-3 text-base text-rich-black",
+              "border border-seasalt-200/80 bg-seasalt px-4 py-3 text-base text-rich-black",
               "focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30",
               "sm:max-w-sm",
             )}
@@ -1281,7 +1281,7 @@ export default function BookingForm({
                 "rounded-lg border px-5 py-2.5 text-base font-medium whitespace-nowrap transition-colors",
                 meetingType === "in-person"
                   ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
-                  : "border-seasalt-400/60 bg-seasalt text-rich-black hover:border-russian-violet/40",
+                  : "border-seasalt-200/60 bg-seasalt text-rich-black hover:border-russian-violet/40",
               )}
             >
               In-person
@@ -1294,7 +1294,7 @@ export default function BookingForm({
                 "rounded-lg border px-5 py-2.5 text-base font-medium whitespace-nowrap transition-colors",
                 meetingType === "remote"
                   ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
-                  : "border-seasalt-400/60 bg-seasalt text-rich-black hover:border-russian-violet/40",
+                  : "border-seasalt-200/60 bg-seasalt text-rich-black hover:border-russian-violet/40",
               )}
             >
               Remote
@@ -1366,7 +1366,7 @@ export default function BookingForm({
                       aria-describedby={fieldErrors.address ? "booking-address-error" : undefined}
                     />
                     {fieldErrors.address && (
-                      <p id="booking-address-error" className="text-sm text-coquelicot-600">
+                      <p id="booking-address-error" className="text-sm text-coquelicot-400">
                         {fieldErrors.address}
                       </p>
                     )}
@@ -1430,7 +1430,7 @@ export default function BookingForm({
                         maxLength={8}
                         aria-describedby="booking-unit-hint"
                         className={cn(
-                          "w-full rounded-md border border-seasalt-400/80 bg-seasalt px-4 py-3 text-base text-rich-black",
+                          "w-full rounded-md border border-seasalt-200/80 bg-seasalt px-4 py-3 text-base text-rich-black",
                           "focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
                         )}
                       />
@@ -1495,7 +1495,7 @@ export default function BookingForm({
       </fieldset>
 
       {/* Divider */}
-      <hr className="border-seasalt-400/80" />
+      <hr className="border-seasalt-200/80" />
 
       {/* ── Section 3: Describe the issue ── */}
       <fieldset className="flex flex-col gap-6">
@@ -1546,7 +1546,7 @@ export default function BookingForm({
             aria-invalid={!!fieldErrors.notes || undefined}
             aria-describedby={fieldErrors.notes ? "booking-notes-error" : "booking-notes-counter"}
             className={cn(
-              "rounded-md border border-seasalt-400/80 bg-seasalt px-4 py-3 text-base text-rich-black",
+              "rounded-md border border-seasalt-200/80 bg-seasalt px-4 py-3 text-base text-rich-black",
               "focus:border-russian-violet focus:ring-1 focus:ring-russian-violet/30 focus:outline-none",
               fieldErrors.notes && "border-coquelicot-500/60",
             )}
@@ -1557,7 +1557,7 @@ export default function BookingForm({
             className="flex items-center justify-between gap-3 text-sm"
           >
             <span
-              className={cn(pasteTrimmed ? "text-coquelicot-600" : "text-rich-black/60")}
+              className={cn(pasteTrimmed ? "text-coquelicot-400" : "text-rich-black/60")}
               aria-live="polite"
             >
               {pasteTrimmed
@@ -1590,7 +1590,7 @@ export default function BookingForm({
                 className={cn(
                   "tabular-nums",
                   notes.length >= BOOKING_FIELD_LIMITS.notes - NOTES_WARN_GAP
-                    ? "font-medium text-coquelicot-600"
+                    ? "font-medium text-coquelicot-400"
                     : "text-rich-black/60",
                 )}
               >
@@ -1599,7 +1599,7 @@ export default function BookingForm({
             </span>
           </div>
           {fieldErrors.notes && (
-            <p id="booking-notes-error" className="text-sm text-coquelicot-600">
+            <p id="booking-notes-error" className="text-sm text-coquelicot-400">
               {fieldErrors.notes}
             </p>
           )}
@@ -1664,7 +1664,7 @@ export default function BookingForm({
                 )}
               </div>
             )}
-            {quoteError && <p className="text-sm text-coquelicot-600">{quoteError}</p>}
+            {quoteError && <p className="text-sm text-coquelicot-400">{quoteError}</p>}
           </div>
         )}
       </fieldset>
@@ -1685,7 +1685,7 @@ export default function BookingForm({
         return (
           <section
             aria-label="Your appointment so far"
-            className="flex flex-col gap-2 rounded-lg border border-moonstone-500/30 bg-moonstone-600/5 p-4"
+            className="flex flex-col gap-2 rounded-lg border border-moonstone-500/30 bg-moonstone-400/5 p-4"
           >
             <div className="flex items-start justify-between gap-3">
               <h3 className="text-base font-bold text-russian-violet sm:text-lg">
@@ -1785,11 +1785,11 @@ export default function BookingForm({
           <div
             role="alert"
             className={cn(
-              "bg-coquelicot-50 rounded-md border border-coquelicot-500/40 p-4",
+              "rounded-md border border-coquelicot-500/40 bg-coquelicot-50 p-4",
               "flex flex-col gap-2",
             )}
           >
-            <p className="text-base font-medium text-coquelicot-700">
+            <p className="text-base font-medium text-coquelicot-300">
               That time slot was just taken by another customer.
             </p>
             <p className="text-sm text-rich-black/70">
@@ -1846,7 +1846,7 @@ export default function BookingForm({
           </div>
         )}
         {error && (
-          <p className="text-base font-medium text-coquelicot-600" role="alert">
+          <p className="text-base font-medium text-coquelicot-400" role="alert">
             {error}
           </p>
         )}
@@ -1857,7 +1857,7 @@ export default function BookingForm({
       <div
         className={cn(
           "sticky bottom-0 -mx-5 flex flex-wrap items-center gap-4 border-t",
-          "border-seasalt-400/80 bg-seasalt/90 px-5 py-3 backdrop-blur-md",
+          "border-seasalt-200/80 bg-seasalt/90 px-5 py-3 backdrop-blur-md",
           "sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none",
         )}
       >
@@ -1879,7 +1879,7 @@ export default function BookingForm({
         {Object.keys(fieldErrors).length > 0 && (
           <a
             href="#booking-duration"
-            className="text-sm font-medium text-coquelicot-600 underline sm:hidden"
+            className="text-sm font-medium text-coquelicot-400 underline sm:hidden"
           >
             {Object.keys(fieldErrors).length} issue
             {Object.keys(fieldErrors).length === 1 ? "" : "s"} - tap to review

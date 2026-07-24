@@ -414,7 +414,7 @@ export async function sendCustomerBookingConfirmation(
   const intro =
     kind === "rescheduled"
       ? "Your appointment has been rescheduled. The Google Calendar invite has been updated to match."
-      : "Thanks for choosing To The Point Tech - I'm looking forward to helping you out.";
+      : "Thanks for choosing To the Point Tech - I'm looking forward to helping you out.";
   const subject =
     kind === "rescheduled" ? `🔄 Appointment updated - ${start}` : `Booking confirmed - ${start}`;
   const previousLine =
@@ -530,7 +530,7 @@ export async function sendBookingReminderEmail(booking: BookingNotificationData)
 <body style="font-family:system-ui,sans-serif;background:#f6f7f8;margin:0;padding:24px">
   <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
     <h2 style="margin:0 0 12px;color:#0c0a3e;font-size:20px">Hi ${safeFirstName}, just a reminder</h2>
-    <p style="margin:0 0 20px;color:#444;line-height:1.6">Your appointment with To The Point Tech is coming up tomorrow.</p>
+    <p style="margin:0 0 20px;color:#444;line-height:1.6">Your appointment with To the Point Tech is coming up tomorrow.</p>
 
     <p style="margin:0 0 8px;color:#888;font-size:13px;text-transform:uppercase;letter-spacing:.05em;font-weight:600">When</p>
     <p style="margin:0 0 4px;font-size:16px;font-weight:600;color:#0c0a3e">${start}</p>
@@ -782,7 +782,7 @@ export async function sendPastClientReviewRequest(booking: ReviewRequestData): P
       from,
       replyTo: process.env.ADMIN_EMAIL,
       to: booking.email,
-      subject: `Hi ${firstName}, it's Harrison from To The Point Tech`,
+      subject: `Hi ${firstName}, it's Harrison from To the Point Tech`,
       html,
     });
     return true;
@@ -1348,7 +1348,7 @@ export async function sendBusinessEnquiryAck(enquiry: BusinessEnquiryData): Prom
       from,
       replyTo: process.env.ADMIN_EMAIL,
       to: enquiry.email,
-      subject: "Thanks for your enquiry - To The Point Tech",
+      subject: "Thanks for your enquiry - To the Point Tech",
       html,
     });
   } catch (error) {

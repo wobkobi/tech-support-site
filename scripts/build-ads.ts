@@ -106,7 +106,7 @@ const AD_SPECS: AdSpec[] = [
 const NAVY = PALETTE.russianViolet500; // headline + support
 const SEASALT = PALETTE.seasalt500;
 const MOON = PALETTE.moonstone500; // #43bccd - check badge + backdrop scrim tint
-const MOON_ICON = "#2d9cab"; // moonstone-400 - readable check stroke
+const MOON_ICON = "#2b93a1"; // moonstone-600 - readable check stroke
 
 // Moonstone circle-badge tick for the 9:16 check list (matches the site).
 const ICON_CHECK = `<svg viewBox="0 0 24 24" fill="none"><path d="M20 6 9 17l-5-5" stroke="${MOON_ICON}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
@@ -130,8 +130,8 @@ const STYLES = `
   .bg { position: absolute; inset: 0; background: url("__BG__") center/cover; filter: blur(24px) brightness(1.06) saturate(1.1); transform: scale(1.12); }
   .bg::after { content: ""; position: absolute; inset: 0; background: linear-gradient(160deg, ${SEASALT}4d, ${MOON}1a 65%, ${SEASALT}26); }
 
-  /* Frosted seasalt card - matches the site's FrostedSection: bg-seasalt-800/60
-     + seasalt-400/40 border + backdrop-blur. Sized to content, centred. */
+  /* Frosted seasalt card - matches the site's FrostedSection: bg-white/60
+     + seasalt-200/40 border + backdrop-blur. Sized to content, centred. */
   .card { position: absolute; left: 60px; right: 60px; top: 50%; transform: translateY(-50%); overflow: hidden; background: rgba(252,252,252,.6); border: 2px solid rgba(191,198,205,.4); box-shadow: 0 30px 80px rgba(12,10,62,.22); backdrop-filter: blur(14px); display: flex; flex-direction: column; align-items: center; text-align: center; }
 
   h1 { color: ${NAVY}; font-weight: 800; line-height: 1.08; letter-spacing: -0.5px; }

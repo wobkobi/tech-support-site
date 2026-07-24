@@ -151,7 +151,7 @@ export default async function ReviewPage({
                 <p className="text-base text-rich-black/80">
                   {alreadyReviewed
                     ? `Hi ${prefillName}! You can update your review any time using this link.`
-                    : `Hi ${prefillName}! Thanks for choosing To The Point Tech. I'd love to hear about your experience.`}
+                    : `Hi ${prefillName}! Thanks for choosing To the Point Tech. I'd love to hear about your experience.`}
                 </p>
               </section>
 

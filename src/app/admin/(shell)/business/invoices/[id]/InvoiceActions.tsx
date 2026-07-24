@@ -722,7 +722,7 @@ export function InvoiceActions({
       >
         {loading && <p className="py-6 text-center text-sm text-admin-muted">Loading preview...</p>}
         {error && !loading && (
-          <p className="rounded-lg border border-coquelicot-800 bg-coquelicot-900 px-4 py-3 text-sm text-coquelicot-200">
+          <p className="rounded-lg border border-coquelicot-200 bg-coquelicot-100 px-4 py-3 text-sm text-coquelicot-800">
             {error}
           </p>
         )}
@@ -862,7 +862,7 @@ export function InvoiceActions({
         }
       >
         {error && (
-          <p className="mb-4 rounded-lg border border-coquelicot-800 bg-coquelicot-900 px-4 py-3 text-sm text-coquelicot-200">
+          <p className="mb-4 rounded-lg border border-coquelicot-200 bg-coquelicot-100 px-4 py-3 text-sm text-coquelicot-800">
             {error}
           </p>
         )}

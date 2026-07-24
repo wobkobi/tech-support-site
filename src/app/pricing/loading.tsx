@@ -54,7 +54,7 @@ export default function PricingLoading(): React.ReactElement {
             <div className="space-y-3">
               {Array.from({ length: 7 }).map((_, i) => (
                 <div
-                  className="flex items-center justify-between gap-3 rounded-xl border border-seasalt-400/80 bg-seasalt-900/60 p-3 sm:p-4"
+                  className="flex items-center justify-between gap-3 rounded-xl border border-seasalt-200/80 bg-white/60 p-3 sm:p-4"
                   key={i}
                 >
                   <Bone className="h-5 w-40" />

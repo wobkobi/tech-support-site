@@ -29,7 +29,7 @@ export const metadata: Metadata = {
     "Common questions about tech support in Auckland: service areas, remote support, pricing, devices supported, booking, cancellations and what happens if I can't fix it.",
   alternates: { canonical: "/faq" },
   openGraph: {
-    title: "FAQ - To The Point Tech",
+    title: "FAQ - To the Point Tech",
     description: "Common questions about tech support, service areas, pricing and remote help.",
     url: "/faq",
   },
@@ -47,7 +47,7 @@ interface FaqItem {
 }
 
 const linkStyle =
-  "text-coquelicot-500 hover:text-coquelicot-600 underline-offset-4 hover:underline";
+  "text-coquelicot-500 hover:text-coquelicot-400 underline-offset-4 hover:underline";
 
 /**
  * Strips `**…**` markers for JSON-LD plain-text contexts.
@@ -423,7 +423,7 @@ export default async function FaqPage(): Promise<React.ReactElement> {
                         >
                           <span>{item.question}</span>
                           <span
-                            className="shrink-0 text-lg text-moonstone-600 transition-transform duration-200 group-open:rotate-180"
+                            className="shrink-0 text-lg text-moonstone-400 transition-transform duration-200 group-open:rotate-180"
                             aria-hidden
                           >
                             ▾

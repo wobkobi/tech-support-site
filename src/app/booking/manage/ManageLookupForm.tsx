@@ -100,7 +100,7 @@ export function ManageLookupForm({ phone, phoneTel }: ManageLookupFormProps): Re
           value={email}
           onChange={(ev) => setEmail(ev.target.value)}
           placeholder="you@example.com"
-          className="w-full rounded-lg border border-seasalt-400 bg-white px-4 py-3 text-base focus:border-russian-violet focus:ring-2 focus:ring-russian-violet/30 focus:outline-none sm:text-lg"
+          className="w-full rounded-lg border border-seasalt-200 bg-white px-4 py-3 text-base focus:border-russian-violet focus:ring-2 focus:ring-russian-violet/30 focus:outline-none sm:text-lg"
         />
         <p className="mt-1 text-sm text-rich-black/60 sm:text-base">
           Use the same address you booked with.

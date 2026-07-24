@@ -41,6 +41,8 @@ interface RawRun {
   parseMins?: number;
   durations: number[];
   first: unknown;
+  /** Set when the case could not complete; reported as a hard fail, no checks run. */
+  error?: string;
 }
 
 /**
@@ -154,7 +156,7 @@ async function collectRaw(
   url: string,
   adminSecret: string,
   runs: number,
-): Promise<{ ctx: LiveContext; raw: RawRun[] }> {
+): Promise<{ ctx: LiveContext; raw: RawRun[]; aborted: boolean }> {
   const { loadLiveContext } = await import("./context");
   const { callEstimate, callParseJob } = await import("./client");
   const { PARSE_CASES, ESTIMATE_CASES, CROSS_ROUTE_CASES } = await import("./cases");
@@ -180,62 +182,108 @@ async function collectRaw(
     process.stdout.write(`\r\x1b[2K  [${done}/${total}] ${id}`);
   };
 
+  // One errored case must not discard the run's completed paid calls: record
+  // it and carry on. Three consecutive errors mean the upstream API is down
+  // (dead key, exhausted quota) - abort then, keeping everything collected.
+  const MAX_CONSECUTIVE_ERRORS = 3;
+  let consecutiveErrors = 0;
+  let aborted = false;
+
+  /**
+   * Runs one case's collector, recording an error entry instead of throwing.
+   * @param id - Case id.
+   * @param kind - Case kind for the raw error entry.
+   * @param fn - Collector that pushes the case's raw entry on success.
+   */
+  const tryCase = async (
+    id: string,
+    kind: RawRun["kind"],
+    fn: () => Promise<void>,
+  ): Promise<void> => {
+    try {
+      await fn();
+      consecutiveErrors = 0;
+    } catch (err) {
+      consecutiveErrors++;
+      const message = (err instanceof Error ? err.message : String(err)).split("\n")[0];
+      raw.push({ id, kind, durations: [], first: null, error: message });
+      process.stdout.write(`\r\x1b[2K  \x1b[31m✗\x1b[0m ${id} errored - continuing\n`);
+      if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) aborted = true;
+    }
+  };
+
   // Single-task estimate probes generated from live benchmarks.
   for (const b of ctx.benchmarks) {
+    if (aborted) break;
     const id = `est-${b.label}`;
     tick(id);
-    const { durations, first } = await runCase(runs, async () => {
-      const r = await callEstimate(url, adminSecret, `Just ${b.label.toLowerCase()}, nothing else`);
-      return { value: r.estimatedMins, result: r };
+    await tryCase(id, "estimate-single", async () => {
+      const { durations, first } = await runCase(runs, async () => {
+        const r = await callEstimate(
+          url,
+          adminSecret,
+          `Just ${b.label.toLowerCase()}, nothing else`,
+        );
+        return { value: r.estimatedMins, result: r };
+      });
+      raw.push({ id, kind: "estimate-single", benchmarkLabel: b.label, durations, first });
     });
-    raw.push({ id, kind: "estimate-single", benchmarkLabel: b.label, durations, first });
   }
 
   // Authored estimate cases (report-only drift + reproducibility).
   for (const c of ESTIMATE_CASES) {
+    if (aborted) break;
     tick(c.id);
-    const { durations, first } = await runCase(runs, async () => {
-      const r = await callEstimate(url, adminSecret, c.description);
-      return { value: r.estimatedMins, result: r };
+    await tryCase(c.id, "estimate-multi", async () => {
+      const { durations, first } = await runCase(runs, async () => {
+        const r = await callEstimate(url, adminSecret, c.description);
+        return { value: r.estimatedMins, result: r };
+      });
+      raw.push({ id: c.id, kind: "estimate-multi", durations, first });
     });
-    raw.push({ id: c.id, kind: "estimate-multi", durations, first });
   }
 
   // Parse cases (canonical stated-time assertion, or report-only for "info").
   for (const c of PARSE_CASES) {
+    if (aborted) break;
     tick(c.id);
-    const { durations, first } = await runCase(runs, async () => {
-      const r = await callParseJob(url, adminSecret, c.input);
-      return { value: r.durationMins ?? -1, result: r };
-    });
-    raw.push({
-      id: c.id,
-      kind: "parse",
-      input: c.input,
-      expectMode: c.expectMode ?? "exact",
-      durations,
-      first,
+    await tryCase(c.id, "parse", async () => {
+      const { durations, first } = await runCase(runs, async () => {
+        const r = await callParseJob(url, adminSecret, c.input);
+        return { value: r.durationMins ?? -1, result: r };
+      });
+      raw.push({
+        id: c.id,
+        kind: "parse",
+        input: c.input,
+        expectMode: c.expectMode ?? "exact",
+        durations,
+        first,
+      });
     });
   }
 
   // Cross-route: same job to BOTH routes (once each) so the report can compare
   // the public benchmark estimate against the admin stated-time duration.
   for (const c of CROSS_ROUTE_CASES) {
+    if (aborted) break;
     tick(c.id);
-    const est = await callEstimate(url, adminSecret, c.input);
-    const job = await callParseJob(url, adminSecret, c.input);
-    raw.push({
-      id: c.id,
-      kind: "cross-route",
-      input: c.input,
-      durations: [est.estimatedMins],
-      parseMins: job.durationMins ?? -1,
-      first: est,
+    await tryCase(c.id, "cross-route", async () => {
+      const est = await callEstimate(url, adminSecret, c.input);
+      const job = await callParseJob(url, adminSecret, c.input);
+      raw.push({
+        id: c.id,
+        kind: "cross-route",
+        input: c.input,
+        durations: [est.estimatedMins],
+        parseMins: job.durationMins ?? -1,
+        first: est,
+      });
     });
   }
 
   process.stdout.write("\r\x1b[2K"); // clear the progress line before the report
-  return { ctx, raw };
+  return { ctx, raw, aborted };
 }
 
 /**
@@ -251,6 +299,18 @@ function evaluate(ctx: LiveContext, raw: RawRun[]): CheckResult[] {
   const inc = ctx.incrementMins;
 
   for (const r of raw) {
+    // Errored case: surface as a hard fail so it can't pass silently, then
+    // skip the family checks (there are no durations to evaluate).
+    if (r.error) {
+      out.push({
+        id: r.id,
+        family: "context",
+        label: `${r.kind} ${r.id}`,
+        status: "fail",
+        detail: `case errored: ${r.error}`,
+      });
+      continue;
+    }
     const first = r.durations[0];
 
     // Family 1: single-task estimate must reflect the live benchmark.
@@ -405,7 +465,7 @@ function printReport(checks: CheckResult[]): void {
       process.exit(0);
     }
     const started = new Date().toISOString();
-    const { ctx, raw } = await collectRaw(url, adminSecret, runs);
+    const { ctx, raw, aborted } = await collectRaw(url, adminSecret, runs);
     const checks = evaluate(ctx, raw);
     printReport(checks);
 
@@ -422,8 +482,16 @@ function printReport(checks: CheckResult[]): void {
     // spread is surfaced as a warning, not a build failure.
     const contextFailed = checks.filter((c) => c.status === "fail" && c.family === "context");
     const reproFailed = checks.filter((c) => c.status === "fail" && c.family === "reproducibility");
-    const calls = raw.length * runs;
-    console.log(`\n${raw.length} cases, ${calls} paid calls. Artifact: ${artifact}`);
+    const completed = raw.filter((r) => !r.error);
+    const calls = completed.length * runs;
+    console.log(
+      `\n${completed.length}/${raw.length} cases completed, ~${calls} paid calls. Artifact: ${artifact}`,
+    );
+    if (aborted) {
+      console.log(
+        `\n\x1b[33m⚠ run aborted early after repeated consecutive case errors (${raw.filter((r) => r.error).length} errored total) - upstream API likely rate-limited or out of quota. Completed cases are reported above and saved in the artifact.\x1b[0m`,
+      );
+    }
     if (reproFailed.length > 0) {
       console.log(
         `\n\x1b[33m⚠ ${reproFailed.length} reproducibility warning(s) - same input varied across runs (model non-determinism, not a gate).\x1b[0m`,

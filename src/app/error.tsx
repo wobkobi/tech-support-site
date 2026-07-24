@@ -92,7 +92,7 @@ export default function Error({
                 <summary className="cursor-pointer font-semibold hover:text-russian-violet">
                   Technical details (for the curious)
                 </summary>
-                <pre className="mt-3 max-w-full overflow-auto rounded-lg border border-seasalt-400/60 bg-seasalt-900/60 p-4 text-left text-base">
+                <pre className="mt-3 max-w-full overflow-auto rounded-lg border border-seasalt-200/60 bg-white/60 p-4 text-left text-base">
                   {String(error?.stack || error)}
                 </pre>
               </details>

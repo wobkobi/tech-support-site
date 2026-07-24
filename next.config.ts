@@ -40,7 +40,6 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   // Drop the X-Powered-By: Next.js header so responses don't advertise the framework/version.
   poweredByHeader: false,
-  output: "standalone",
   typescript: { ignoreBuildErrors: false },
 
   // Expose GOOGLE_MAPS_API_KEY to both server and client without the NEXT_PUBLIC_ prefix.

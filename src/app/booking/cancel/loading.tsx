@@ -10,7 +10,7 @@ import { Bone } from "@/shared/components/Skeleton";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
 
-const CARD = "border-seasalt-400/60 bg-seasalt-800 rounded-xl border p-5 shadow-sm sm:p-6";
+const CARD = "border-seasalt-200/60 bg-white rounded-xl border p-5 shadow-sm sm:p-6";
 
 /**
  * Booking cancel route-loading skeleton.
@@ -35,7 +35,7 @@ export default function BookingCancelLoading(): React.ReactElement {
 
       {/* Frosted container */}
       <div className="mx-auto my-5 w-full max-w-[min(100vw-2rem,56rem)] sm:my-10">
-        <div className="rounded-2xl border border-seasalt-400/40 bg-seasalt-800/60 p-5 shadow-lg backdrop-blur-xl sm:p-10">
+        <div className="rounded-2xl border border-seasalt-200/40 bg-white/60 p-5 shadow-lg backdrop-blur-xl sm:p-10">
           <section
             className={cn(CARD)}
             role="status"

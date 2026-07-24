@@ -23,5 +23,5 @@ interface BoneProps {
  * @returns Skeleton bone element.
  */
 export function Bone({ className }: BoneProps): React.ReactElement {
-  return <div className={cn("animate-pulse rounded-lg bg-seasalt-400/50", className)} />;
+  return <div className={cn("animate-pulse rounded-lg bg-seasalt-200/50", className)} />;
 }

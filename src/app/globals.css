@@ -8,77 +8,97 @@
     var(--font-exo), ui-sans-serif, system-ui, -apple-system, SegoeUI, Roboto, "NotoSans", Arial,
     "AppleColorEmoji", "SegoeUIEmoji";
 
+  /* Scales run light > dark (Tailwind convention: 50 lightest, 950 darkest).
+     Unsuffixed aliases point at each family's brand anchor step, which is not
+     always 500: rich-black > 950, seasalt > 50, russian-violet > 900,
+     mustard > 300; coquelicot and moonstone anchor at 500.
+     Anchor steps carry the exact brand hexes; the other steps come from a
+     generated ramp, so an anchor may sit slightly off the ramp's curve -
+     do not "smooth" it back to the generated value. */
+
   /* rich-black */
   --color-rich-black: #001514;
-  --color-rich-black-100: #000404;
-  --color-rich-black-200: #000808;
-  --color-rich-black-300: #000c0c;
-  --color-rich-black-400: #001010;
-  --color-rich-black-500: #001514;
-  --color-rich-black-600: #007670;
-  --color-rich-black-700: #00d8cd;
-  --color-rich-black-800: #3bfff5;
-  --color-rich-black-900: #9dfffa;
+  --color-rich-black-50: #e5fffe;
+  --color-rich-black-100: #ccfffc;
+  --color-rich-black-200: #99fffa;
+  --color-rich-black-300: #66fff7;
+  --color-rich-black-400: #33fff5;
+  --color-rich-black-500: #00fff2;
+  --color-rich-black-600: #00ccc2;
+  --color-rich-black-700: #009991;
+  --color-rich-black-800: #006661;
+  --color-rich-black-900: #003330;
+  --color-rich-black-950: #001514;
 
   /* seasalt */
   --color-seasalt: #f6f7f8;
-  --color-seasalt-100: #2c3137;
-  --color-seasalt-200: #57636f;
-  --color-seasalt-300: #8894a1;
-  --color-seasalt-400: #bfc6cd;
-  --color-seasalt-500: #f6f7f8;
-  --color-seasalt-600: #f8f9fa;
-  --color-seasalt-700: #fafafb;
-  --color-seasalt-800: #fcfcfc;
-  --color-seasalt-900: #fdfdfe;
+  --color-seasalt-50: #f6f7f8;
+  --color-seasalt-100: #e2e6e9;
+  --color-seasalt-200: #c6ccd2;
+  --color-seasalt-300: #a9b3bc;
+  --color-seasalt-400: #8d99a5;
+  --color-seasalt-500: #707f8f;
+  --color-seasalt-600: #5a6672;
+  --color-seasalt-700: #434c56;
+  --color-seasalt-800: #2d3339;
+  --color-seasalt-900: #16191d;
+  --color-seasalt-950: #101214;
 
   /* coquelicot */
   --color-coquelicot: #f34213;
-  --color-coquelicot-100: #310d03;
-  --color-coquelicot-200: #631905;
-  --color-coquelicot-300: #942608;
-  --color-coquelicot-400: #c6330a;
+  --color-coquelicot-50: #feece7;
+  --color-coquelicot-100: #fcd8cf;
+  --color-coquelicot-200: #fab29e;
+  --color-coquelicot-300: #f78b6e;
+  --color-coquelicot-400: #f5653d;
   --color-coquelicot-500: #f34213;
-  --color-coquelicot-600: #f56841;
-  --color-coquelicot-700: #f88e71;
-  --color-coquelicot-800: #fab4a0;
-  --color-coquelicot-900: #fdd9d0;
+  --color-coquelicot-600: #c2320a;
+  --color-coquelicot-700: #912508;
+  --color-coquelicot-800: #611905;
+  --color-coquelicot-900: #300c03;
+  --color-coquelicot-950: #220902;
 
   /* russian-violet */
   --color-russian-violet: #0c0a3e;
-  --color-russian-violet-100: #02020c;
-  --color-russian-violet-200: #050419;
-  --color-russian-violet-300: #070625;
-  --color-russian-violet-400: #090831;
-  --color-russian-violet-500: #0c0a3e;
-  --color-russian-violet-600: #1a1689;
-  --color-russian-violet-700: #2823d4;
-  --color-russian-violet-800: #6c68e6;
-  --color-russian-violet-900: #b6b4f3;
+  --color-russian-violet-50: #eae9fb;
+  --color-russian-violet-100: #d4d3f8;
+  --color-russian-violet-200: #aaa7f1;
+  --color-russian-violet-300: #7f7bea;
+  --color-russian-violet-400: #5450e2;
+  --color-russian-violet-500: #2a24db;
+  --color-russian-violet-600: #211daf;
+  --color-russian-violet-700: #191584;
+  --color-russian-violet-800: #110e58;
+  --color-russian-violet-900: #0c0a3e;
+  --color-russian-violet-950: #06051f;
 
   /* mustard */
   --color-mustard: #fed766;
-  --color-mustard-100: #473500;
-  --color-mustard-200: #8e6b01;
-  --color-mustard-300: #d5a001;
-  --color-mustard-400: #fec620;
-  --color-mustard-500: #fed766;
-  --color-mustard-600: #fee085;
-  --color-mustard-700: #ffe8a4;
-  --color-mustard-800: #fff0c2;
-  --color-mustard-900: #fff7e1;
+  --color-mustard-50: #fff9e6;
+  --color-mustard-100: #fff2cc;
+  --color-mustard-200: #fee59a;
+  --color-mustard-300: #fed766;
+  --color-mustard-400: #fecb34;
+  --color-mustard-500: #febf01;
+  --color-mustard-600: #cb9801;
+  --color-mustard-700: #987201;
+  --color-mustard-800: #654c01;
+  --color-mustard-900: #332600;
+  --color-mustard-950: #241b00;
 
   /* moonstone */
   --color-moonstone: #43bccd;
-  --color-moonstone-100: #0b272b;
-  --color-moonstone-200: #174e55;
-  --color-moonstone-300: #227580;
-  --color-moonstone-400: #2d9cab;
+  --color-moonstone-50: #ebf8fa;
+  --color-moonstone-100: #d7f1f4;
+  --color-moonstone-200: #aee3ea;
+  --color-moonstone-300: #86d5df;
+  --color-moonstone-400: #5ec6d4;
   --color-moonstone-500: #43bccd;
-  --color-moonstone-600: #68cad7;
-  --color-moonstone-700: #8dd7e1;
-  --color-moonstone-800: #b3e4eb;
-  --color-moonstone-900: #d9f2f5;
+  --color-moonstone-600: #2b93a1;
+  --color-moonstone-700: #206f79;
+  --color-moonstone-800: #154a51;
+  --color-moonstone-900: #0b2528;
+  --color-moonstone-950: #071a1c;
 
   /* admin neutrals - Polaris-like back-office chrome. Maps the slate values
      hardcoded across admin pages so upgraded surfaces read from tokens; the
@@ -122,30 +142,36 @@ body {
 }
 
 /* ============================================
-   Text Selection Fix (Tailwind v4 override)
+   Text Selection Defaults
+   --------------------------------------------
+   Inside `@layer base` so Tailwind `select-*` utilities (which live in the
+   later `utilities` layer) can override per element. Unlayered rules would
+   silently defeat every `select-none`/`select-text` class in the codebase.
    ============================================ */
+@layer base {
+  /* Normalise selection behaviour across browsers */
+  * {
+    -webkit-user-select: auto;
+    user-select: auto;
+  }
 
-/* Reset Tailwind v4's default user-select: none on interactive elements */
-* {
-  -webkit-user-select: auto;
-  user-select: auto;
-}
+  /* Keep buttons and form controls non-selectable (expected UX). Anchors
+     styled as buttons opt in with the `select-none` utility instead. */
+  button,
+  [role="button"],
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"] {
+    -webkit-user-select: none;
+    user-select: none;
+  }
 
-/* Keep buttons and form controls non-selectable (expected UX) */
-button,
-[role="button"],
-input[type="button"],
-input[type="submit"],
-input[type="reset"] {
-  -webkit-user-select: none;
-  user-select: none;
-}
-
-/* Inputs/textareas should allow selection of their content */
-input,
-textarea {
-  -webkit-user-select: text;
-  user-select: text;
+  /* Inputs/textareas should allow selection of their content */
+  input,
+  textarea {
+    -webkit-user-select: text;
+    user-select: text;
+  }
 }
 
 /* Hide the up/down spinner buttons on number inputs site-wide. They use a

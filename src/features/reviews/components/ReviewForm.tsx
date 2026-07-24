@@ -231,7 +231,7 @@ export default function ReviewFormProtected({
     <form onSubmit={handleSubmit} aria-busy={loading} className="space-y-4">
       {/* Personal-link banner: reassures without the "Verified" jargon. */}
       {isVerified && (
-        <div className="flex items-center gap-2 rounded-lg border border-moonstone-500/50 bg-moonstone-600/10 p-3 text-base text-moonstone-600">
+        <div className="flex items-center gap-2 rounded-lg border border-moonstone-500/50 bg-moonstone-400/10 p-3 text-base text-moonstone-400">
           <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
             <path
               fillRule="evenodd"
@@ -240,7 +240,7 @@ export default function ReviewFormProtected({
             />
           </svg>
           <span className="font-semibold">Your personal review link</span>
-          <span className="text-moonstone-600/80">
+          <span className="text-moonstone-400/80">
             • tied to your appointment, no sign-in needed
           </span>
         </div>
@@ -290,7 +290,7 @@ export default function ReviewFormProtected({
       )}
 
       {/* Identity */}
-      <div className="space-y-4 rounded-xl border border-seasalt-400/80 bg-seasalt-900/60 p-4">
+      <div className="space-y-4 rounded-xl border border-seasalt-200/80 bg-white/60 p-4">
         {/* Name display options */}
         <div>
           <p className="mb-2 text-base font-semibold text-rich-black">How do you want to appear?</p>
@@ -306,7 +306,7 @@ export default function ReviewFormProtected({
                   "rounded-lg border px-4 py-1.5 text-base font-medium whitespace-nowrap transition-colors",
                   nameDisplay === opt.value
                     ? "border-russian-violet bg-russian-violet/10 text-russian-violet"
-                    : "border-seasalt-400/60 bg-seasalt text-rich-black hover:border-russian-violet/40",
+                    : "border-seasalt-200/60 bg-seasalt text-rich-black hover:border-russian-violet/40",
                 )}
               >
                 {opt.label}
@@ -345,7 +345,7 @@ export default function ReviewFormProtected({
                 type="text"
                 autoComplete="given-name"
                 className={cn(
-                  "border-seasalt-400/60 bg-seasalt text-rich-black focus:ring-moonstone-500/50",
+                  "border-seasalt-200/60 bg-seasalt text-rich-black focus:ring-moonstone-500/50",
                   "w-full rounded-md border px-3 py-2 outline-none focus:ring-2",
                   errors.firstName && "border-coquelicot-500/60",
                 )}
@@ -376,7 +376,7 @@ export default function ReviewFormProtected({
                 type="text"
                 autoComplete="family-name"
                 className={cn(
-                  "border-seasalt-400/60 bg-seasalt text-rich-black focus:ring-moonstone-500/50",
+                  "border-seasalt-200/60 bg-seasalt text-rich-black focus:ring-moonstone-500/50",
                   "w-full rounded-md border px-3 py-2 outline-none focus:ring-2",
                 )}
                 value={lastName}
@@ -390,7 +390,7 @@ export default function ReviewFormProtected({
       </div>
 
       {/* Optional contact details */}
-      <div className="space-y-3 rounded-xl border border-seasalt-400/80 bg-seasalt-900/60 p-4">
+      <div className="space-y-3 rounded-xl border border-seasalt-200/80 bg-white/60 p-4">
         <div>
           <p className="text-base font-semibold text-rich-black">
             Stay in touch <span className="font-normal text-rich-black/40">(optional)</span>
@@ -412,7 +412,7 @@ export default function ReviewFormProtected({
               disabled={loading}
               errorMessages={{ invalid: "Doesn't look right - check the number." }}
               className={cn(
-                "border-seasalt-400/60 bg-seasalt text-rich-black focus:ring-moonstone-500/50",
+                "border-seasalt-200/60 bg-seasalt text-rich-black focus:ring-moonstone-500/50",
                 "border px-3 py-2 focus:ring-2",
               )}
             />
@@ -429,7 +429,7 @@ export default function ReviewFormProtected({
               placeholder="you@example.com"
               disabled={loading}
               className={cn(
-                "border-seasalt-400/60 bg-seasalt text-rich-black focus:ring-moonstone-500/50",
+                "border-seasalt-200/60 bg-seasalt text-rich-black focus:ring-moonstone-500/50",
                 "border px-3 py-2 focus:ring-2",
               )}
             />
@@ -438,7 +438,7 @@ export default function ReviewFormProtected({
       </div>
 
       {/* Review */}
-      <div className="rounded-xl border border-seasalt-400/80 bg-seasalt-900/60 p-4">
+      <div className="rounded-xl border border-seasalt-200/80 bg-white/60 p-4">
         <div className="flex items-baseline justify-between gap-3">
           <label htmlFor={textId} className="block text-base font-semibold text-rich-black">
             Review <span className="text-coquelicot-500">*</span>
@@ -468,7 +468,7 @@ export default function ReviewFormProtected({
           autoComplete="off"
           placeholder={`Share your experience (at least ${textMin} characters)...`}
           className={cn(
-            "border-seasalt-400/60 bg-seasalt text-rich-black focus:ring-moonstone-500/50",
+            "border-seasalt-200/60 bg-seasalt text-rich-black focus:ring-moonstone-500/50",
             "mt-1 min-h-35 w-full rounded-md border px-3 py-2 outline-none focus:ring-2",
             errors.text && "border-coquelicot-500/60",
           )}

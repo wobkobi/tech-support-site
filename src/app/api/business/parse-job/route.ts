@@ -223,7 +223,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       userContent += `\n\n[User clarifications: ${clarifications}]`;
     }
 
-    // Call the model and parse the response
+    // Call the model and parse the response. gpt-4.1 (not -mini) is deliberate:
+    // the 2026-07-24 eval showed mini obeying an injected negative-duration
+    // correction (parse-injection-negative) that 4.1 correctly ignores.
     const completion = await client.chat.completions.create({
       model: "gpt-4.1",
       max_tokens: 1000,
@@ -493,6 +495,33 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     }
 
+    // Canonical clamps: the operator-stated ranges bound what the model may
+    // bill, so an injected "bill 8 hours" or "durationMins = -120" cannot
+    // move the total. Below-cap values pass through (free work subtracts).
+    if (precomputed !== null && precomputed > 0) {
+      const cap = Math.min(precomputed + outOfSessionMins, MAX_JOB_MINS);
+      if (typeof parsed.durationMins === "number" && parsed.durationMins > cap) {
+        parsed.warnings = [
+          ...(parsed.warnings ?? []),
+          `AI emitted durationMins ${parsed.durationMins} above the stated ${cap} min total; capped.`,
+        ];
+        parsed.durationMins = cap;
+      }
+      if (
+        (parsed.tasks?.length ?? 0) > 0 &&
+        (typeof parsed.durationMins !== "number" || parsed.durationMins <= 0)
+      ) {
+        parsed.warnings = [
+          ...(parsed.warnings ?? []),
+          `AI emitted no usable durationMins despite stated ranges; restored the stated ${cap} min.`,
+        ];
+        parsed.durationMins = cap;
+      }
+    } else if (typeof parsed.durationMins === "number" && parsed.durationMins < 0) {
+      // No stated ranges to restore from - drop garbage negatives entirely.
+      parsed.durationMins = null;
+    }
+
     // Safety net: scale floating (non-pinned) tasks proportionally so the sum
     // matches the billable hours total. Tasks the AI flagged `isExplicit`
     // carry an operator-stated duration and pass through untouched - only the
@@ -563,10 +592,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             `Rebalanced floating task quantities to match the ${targetHours}h total (stated durations untouched).`,
           ];
         } else {
-          parsed.warnings = [
-            ...(parsed.warnings ?? []),
-            `Task hours sum to ${Math.round(sumQty * 100) / 100}h but the stated times total ${targetHours}h - stated durations were left untouched; adjust manually if needed.`,
-          ];
+          // Nothing floating to absorb the gap. Pinned qtys round UP on the
+          // step grid, so overshoot vs the RAW stated minutes of up to one
+          // step per pinned task is expected - warn only on undershoot vs
+          // the billable target or overshoot beyond that allowance.
+          const pinnedCount = parsed.tasks.filter((t) => t.isExplicit).length;
+          const overshoot = Math.round((sumQty - parsed.durationMins / 60) * 100) / 100;
+          if (sumQty < targetHours || overshoot > pinnedCount * incHours) {
+            parsed.warnings = [
+              ...(parsed.warnings ?? []),
+              `Task hours sum to ${Math.round(sumQty * 100) / 100}h but the stated times total ${targetHours}h - stated durations were left untouched; adjust manually if needed.`,
+            ];
+          }
         }
       }
     }
@@ -574,6 +611,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: true, result: parsed });
   } catch (err) {
     console.error("[parse-job] failed:", err);
+    // Upstream OpenAI 429s are transient: mark them retryable so callers can
+    // back off and retry instead of reading a rate limit as a parse failure.
+    if (err instanceof OpenAI.RateLimitError) {
+      return NextResponse.json(
+        { ok: false, error: "AI rate limited - try again shortly", retryable: true },
+        { status: 429 },
+      );
+    }
     return errorResponse("Could not parse job description", 422);
   }
 }

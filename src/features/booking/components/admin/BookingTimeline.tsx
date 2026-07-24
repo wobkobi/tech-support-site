@@ -70,7 +70,7 @@ function dotClass(tone: StepTone): string {
     case "success":
       return "bg-emerald-500";
     case "critical":
-      return "bg-coquelicot-400";
+      return "bg-coquelicot-600";
     case "violet":
       return "bg-russian-violet";
   }

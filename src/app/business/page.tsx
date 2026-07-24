@@ -35,7 +35,7 @@ export const metadata: Metadata = {
     "On-call IT support for Auckland small businesses: workstation and email setup, network fixes, backups, staff device onboarding and office moves. Ad-hoc callouts or a simple monthly retainer - no lock-in.",
   alternates: { canonical: "/business" },
   openGraph: {
-    title: "Business IT Support - To The Point Tech",
+    title: "Business IT Support - To the Point Tech",
     description:
       "Your on-call IT person, without hiring one. Ad-hoc help and monthly retainers for Auckland small businesses.",
     url: "/business",
@@ -265,11 +265,11 @@ export default async function BusinessPage(): Promise<React.ReactElement> {
               {businessServices.map((area) => (
                 <div
                   key={area.label}
-                  className="rounded-lg border border-seasalt-400/60 bg-seasalt-800 p-3 shadow-sm transition-all hover:shadow-md"
+                  className="rounded-lg border border-seasalt-200/60 bg-white p-3 shadow-sm transition-all hover:shadow-md"
                 >
                   <div className="mb-2 flex items-center gap-2">
-                    <span className="grid size-10 shrink-0 place-items-center rounded-lg border border-moonstone-500/40 bg-moonstone-600/20">
-                      <span className="text-2xl text-moonstone-600" aria-hidden>
+                    <span className="grid size-10 shrink-0 place-items-center rounded-lg border border-moonstone-500/40 bg-moonstone-400/20">
+                      <span className="text-2xl text-moonstone-400" aria-hidden>
                         {area.icon}
                       </span>
                     </span>
@@ -280,7 +280,7 @@ export default async function BusinessPage(): Promise<React.ReactElement> {
                   <ul className="space-y-1 text-base text-rich-black/80 sm:text-lg">
                     {area.examples.map((example) => (
                       <li key={example} className="flex gap-2">
-                        <span className="mt-0.5 text-moonstone-600">•</span>
+                        <span className="mt-0.5 text-moonstone-400">•</span>
                         <span>{example}</span>
                       </li>
                     ))}
@@ -310,17 +310,17 @@ export default async function BusinessPage(): Promise<React.ReactElement> {
 
             <ul className="space-y-2 text-base text-rich-black/90 sm:text-lg">
               <li className="flex gap-2">
-                <span className="mt-1 text-moonstone-600">•</span>
+                <span className="mt-1 text-moonstone-400">•</span>
                 <span>
                   Travel billed at ${pricing.travelRatePerHour}/hr for one round trip per visit
                 </span>
               </li>
               <li className="flex gap-2">
-                <span className="mt-1 text-moonstone-600">•</span>
+                <span className="mt-1 text-moonstone-400">•</span>
                 <span>Quick phone questions are usually free</span>
               </li>
               <li className="flex gap-2">
-                <span className="mt-1 text-moonstone-600">•</span>
+                <span className="mt-1 text-moonstone-400">•</span>
                 <span>Itemised invoice after every job</span>
               </li>
             </ul>
@@ -347,7 +347,7 @@ export default async function BusinessPage(): Promise<React.ReactElement> {
               {retainerTiers.map((tier) => (
                 <div
                   key={tier.name}
-                  className="flex flex-col rounded-lg border border-seasalt-400/60 bg-seasalt-800 p-4 shadow-sm transition-all hover:shadow-md"
+                  className="flex flex-col rounded-lg border border-seasalt-200/60 bg-white p-4 shadow-sm transition-all hover:shadow-md"
                 >
                   <h3 className="text-lg font-semibold text-rich-black sm:text-xl">{tier.name}</h3>
                   <p className="mb-1 text-lg font-bold text-russian-violet sm:text-xl">
@@ -357,7 +357,7 @@ export default async function BusinessPage(): Promise<React.ReactElement> {
                   <ul className="mb-4 flex-1 space-y-1 text-base text-rich-black/80 sm:text-lg">
                     {tier.inclusions.map((inc) => (
                       <li key={inc} className="flex gap-2">
-                        <span className="mt-0.5 text-moonstone-600">•</span>
+                        <span className="mt-0.5 text-moonstone-400">•</span>
                         <span>{inc}</span>
                       </li>
                     ))}
@@ -382,7 +382,7 @@ export default async function BusinessPage(): Promise<React.ReactElement> {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               {howItWorks.map((item) => (
                 <div key={item.step} className="flex gap-3">
-                  <span className="grid size-10 shrink-0 place-items-center rounded-full border border-moonstone-500/40 bg-moonstone-600/20 text-lg font-bold text-moonstone-600">
+                  <span className="grid size-10 shrink-0 place-items-center rounded-full border border-moonstone-500/40 bg-moonstone-400/20 text-lg font-bold text-moonstone-400">
                     {item.step}
                   </span>
                   <div>

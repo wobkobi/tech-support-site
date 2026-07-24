@@ -38,7 +38,7 @@ interface ContactEvent {
 }
 
 const KIND_BADGE: Record<EventKind, { letter: string; className: string }> = {
-  booking: { letter: "B", className: "bg-moonstone-600/15 text-moonstone-600" },
+  booking: { letter: "B", className: "bg-moonstone-400/15 text-moonstone-400" },
   invoice: { letter: "I", className: "bg-russian-violet/15 text-russian-violet" },
   payment: { letter: "$", className: "bg-emerald-500/15 text-emerald-600" },
   review: { letter: "R", className: "bg-yellow-500/15 text-yellow-600" },

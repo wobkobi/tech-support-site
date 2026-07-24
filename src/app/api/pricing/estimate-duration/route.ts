@@ -289,6 +289,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: true, result });
   } catch (err) {
     console.error("[estimate-duration] failed:", err);
+    // Upstream OpenAI 429s are transient: mark them retryable so callers can
+    // back off and retry instead of reading a rate limit as an estimate failure.
+    if (err instanceof OpenAI.RateLimitError) {
+      return NextResponse.json(
+        { ok: false, error: "AI rate limited - try again shortly", retryable: true },
+        { status: 429 },
+      );
+    }
     return errorResponse("Could not estimate duration", 422);
   }
 }

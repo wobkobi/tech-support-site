@@ -187,6 +187,18 @@ export function hourlyTaskMinutes(tasks: TaskLine[]): number {
   return tasks.filter((t) => t.baseRateId != null).reduce((sum, t) => sum + t.qty * 60, 0);
 }
 
+/**
+ * Overshoot allowance for operator-stated tasks: each explicit task's stated
+ * duration rounds UP to the {@link TASK_QTY_SNAP_MIN} grid, so pinned tasks
+ * can exceed the raw window by one step apiece. Overshoot within this
+ * allowance is rounding, not an over-estimate to rebalance or warn on.
+ * @param tasks - Task lines to assess.
+ * @returns Allowance in minutes (explicit hourly task count * snap step).
+ */
+export function explicitRoundingAllowanceMins(tasks: TaskLine[]): number {
+  return tasks.filter((t) => t.baseRateId != null && t.isExplicit).length * TASK_QTY_SNAP_MIN;
+}
+
 /** Minimum minutes a task can shrink to before it's dropped as descriptive noise. */
 const MIN_TASK_MINUTES = 5;
 // Rounding granularity for AI-parsed task qty after rebalancing. Matches the
@@ -201,7 +213,9 @@ const SHORT_TASK_MINUTES = 15;
  * Collapses task lines so their total hourly minutes fit the listed job window.
  * Pinned tasks (isShort or isExplicit) keep their parser-emitted qty - short
  * tasks at {@link SHORT_TASK_MINUTES}, explicit tasks at whatever the operator
- * stated. The remaining floating tasks scale proportionally to fill what's
+ * stated, with a one-snap-step-per-task overshoot allowance (see
+ * {@link explicitRoundingAllowanceMins}) before an explicit task is dropped
+ * for not fitting. The remaining floating tasks scale proportionally to fill what's
  * left of the window, so an over-long primary task absorbs more of the
  * correction than a correctly-sized one. Floating tasks that would scale
  * below {@link MIN_TASK_MINUTES} are dropped, then the rest rescale. Snaps
@@ -236,11 +250,15 @@ export function collapseToWindow(
     dropped++;
   }
 
-  // Explicit-but-not-short tasks keep their parser-emitted qty. Drop them
-  // (newest first) only if the remaining window can't accommodate them.
+  // Explicit-but-not-short tasks keep their parser-emitted qty. Stated
+  // durations round UP to the snap grid, so tolerate one step of overshoot
+  // per explicit task; drop (newest first) only genuine overflow beyond that.
   const explicit: TaskLine[] = hourlyIn.filter((t) => t.isExplicit && !t.isShort);
   const shortMin = short.length * SHORT_TASK_MINUTES;
-  while (explicit.length > 0 && shortMin + sumTaskMinutes(explicit) > windowMin) {
+  while (
+    explicit.length > 0 &&
+    shortMin + sumTaskMinutes(explicit) > windowMin + explicit.length * TASK_QTY_SNAP_MIN
+  ) {
     explicit.pop();
     dropped++;
   }
@@ -250,10 +268,13 @@ export function collapseToWindow(
   const remainingMin = windowMin - pinnedMin;
 
   if (floating.length === 0) {
+    // Nothing floating: pinned tasks stand as-is, so only report a rescale
+    // when something was actually dropped - otherwise the caller would toast
+    // "Rebalanced tasks" over an untouched list.
     return {
       tasks: parkHourRemainder([...short, ...explicit, ...flat], windowMin),
       dropped,
-      rescaled: true,
+      rescaled: dropped > 0,
     };
   }
 

@@ -62,7 +62,7 @@ function toastToneClass(tone: ToastTone): string {
     case "warning":
       return "border-amber-200 bg-amber-50 text-amber-900";
     case "error":
-      return "border-coquelicot-800 bg-coquelicot-900 text-coquelicot-200";
+      return "border-coquelicot-200 bg-coquelicot-100 text-coquelicot-800";
   }
 }
 

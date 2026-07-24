@@ -53,11 +53,12 @@ export type AdminButtonProps = AdminButtonAsLink | AdminButtonAsButton;
 function variantClasses(variant: AdminButtonVariant): string {
   switch (variant) {
     case "primary":
-      return "bg-russian-violet text-white hover:bg-russian-violet-600";
+      return "bg-russian-violet text-white hover:bg-russian-violet-800";
     case "secondary":
       return "border border-admin-border-strong bg-admin-surface text-admin-text hover:bg-admin-bg";
     case "danger":
-      return "bg-coquelicot-400 text-white hover:bg-coquelicot-500";
+      // Hover darkens: white on coquelicot-500 fails AA (~3.5:1) at this size.
+      return "bg-coquelicot-600 text-white hover:bg-coquelicot-700";
     case "ghost":
       return "text-admin-text-secondary hover:bg-admin-bg";
   }
@@ -105,7 +106,8 @@ export function AdminButton(props: AdminButtonProps): React.ReactElement {
   const ariaLabel = props["aria-label"];
 
   const base = cn(
-    "inline-flex items-center justify-center rounded-lg font-semibold whitespace-nowrap",
+    // select-none keeps link-rendered buttons unselectable like native ones.
+    "inline-flex items-center justify-center rounded-lg font-semibold whitespace-nowrap select-none",
     "transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-russian-violet",
     variantClasses(variant),
     sizeClasses(size),

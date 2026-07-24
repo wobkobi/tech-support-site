@@ -38,7 +38,7 @@ export default function ServicesLoading(): React.ReactElement {
               {Array.from({ length: 12 }).map((_, i) => (
                 <div
                   key={i}
-                  className="rounded-lg border border-seasalt-400/60 bg-seasalt-800 p-3 shadow-sm"
+                  className="rounded-lg border border-seasalt-200/60 bg-white p-3 shadow-sm"
                 >
                   <div className="mb-2 flex items-center gap-2">
                     <Bone className="size-10 shrink-0 rounded-lg" />

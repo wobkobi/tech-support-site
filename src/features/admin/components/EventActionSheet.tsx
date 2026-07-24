@@ -209,7 +209,7 @@ export function EventActionSheet({
         <div className="flex flex-col gap-2">
           <a
             href={`/admin/bookings/${booking.id}`}
-            className="inline-flex h-11 items-center justify-center rounded-lg bg-russian-violet/10 px-4 text-sm font-semibold text-russian-violet hover:bg-russian-violet/20"
+            className="inline-flex h-11 items-center justify-center rounded-lg bg-russian-violet/10 px-4 text-sm font-semibold text-russian-violet select-none hover:bg-russian-violet/20"
           >
             View details
           </a>
@@ -265,7 +265,7 @@ export function EventActionSheet({
                   href={`/booking/edit?token=${booking.cancelToken}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex h-11 items-center justify-center rounded-lg bg-russian-violet/10 px-4 text-sm font-semibold text-russian-violet hover:bg-russian-violet/20"
+                  className="inline-flex h-11 items-center justify-center rounded-lg bg-russian-violet/10 px-4 text-sm font-semibold text-russian-violet select-none hover:bg-russian-violet/20"
                 >
                   Reschedule
                 </a>
@@ -279,7 +279,7 @@ export function EventActionSheet({
                   times, client, and address pre-filled - see calculator/page.tsx. */}
               <a
                 href={`/admin/business/calculator?eventId=${encodeURIComponent(event.id)}`}
-                className="inline-flex h-11 items-center justify-center rounded-lg bg-russian-violet/10 px-4 text-sm font-semibold text-russian-violet hover:bg-russian-violet/20"
+                className="inline-flex h-11 items-center justify-center rounded-lg bg-russian-violet/10 px-4 text-sm font-semibold text-russian-violet select-none hover:bg-russian-violet/20"
               >
                 Bill in calculator
               </a>
@@ -287,7 +287,7 @@ export function EventActionSheet({
                 type="button"
                 onClick={handleResendReview}
                 disabled={busy}
-                className="inline-flex h-11 items-center justify-center rounded-lg bg-moonstone-600/15 px-4 text-sm font-semibold text-moonstone-700 hover:bg-moonstone-600/25 disabled:opacity-50"
+                className="inline-flex h-11 items-center justify-center rounded-lg bg-moonstone-400/15 px-4 text-sm font-semibold text-moonstone-300 hover:bg-moonstone-400/25 disabled:opacity-50"
               >
                 Send review email
               </button>

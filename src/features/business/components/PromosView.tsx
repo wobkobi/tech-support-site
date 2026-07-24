@@ -508,7 +508,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
                           </button>
                           <button
                             onClick={() => setConfirmDelete(p)}
-                            className="text-coquelicot-500 hover:text-coquelicot-600"
+                            className="text-coquelicot-500 hover:text-coquelicot-400"
                           >
                             Delete
                           </button>

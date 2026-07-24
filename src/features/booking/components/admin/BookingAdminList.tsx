@@ -341,14 +341,14 @@ export function BookingAdminList({
                               })
                             }
                             disabled={isBusy}
-                            className="rounded-lg bg-moonstone-600/15 px-2.5 py-1.5 text-xs font-medium text-moonstone-700 transition-colors hover:bg-moonstone-600/25 disabled:opacity-50"
+                            className="rounded-lg bg-moonstone-400/15 px-2.5 py-1.5 text-xs font-medium text-moonstone-300 transition-colors hover:bg-moonstone-400/25 disabled:opacity-50"
                           >
                             {b.reviewSentAt ? "Resend review" : "Send review"}
                           </button>
                         )}
                         <Link
                           href={`/admin/bookings/${b.id}`}
-                          className="rounded-lg bg-russian-violet/10 px-2.5 py-1.5 text-xs font-medium text-russian-violet transition-colors hover:bg-russian-violet/20"
+                          className="rounded-lg bg-russian-violet/10 px-2.5 py-1.5 text-xs font-medium text-russian-violet transition-colors select-none hover:bg-russian-violet/20"
                         >
                           View
                         </Link>

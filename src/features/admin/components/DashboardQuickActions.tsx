@@ -123,7 +123,7 @@ export function DashboardQuickActions({
           <h2 className="text-sm font-semibold text-slate-700">
             Complete events
             {bookings.length > 0 && (
-              <span className="ml-2 rounded-full bg-coquelicot-500/15 px-2 py-0.5 text-xs font-semibold text-coquelicot-400">
+              <span className="ml-2 rounded-full bg-coquelicot-500/15 px-2 py-0.5 text-xs font-semibold text-coquelicot-600">
                 {bookings.length}
               </span>
             )}
@@ -149,10 +149,10 @@ export function DashboardQuickActions({
                       {formatDateShort(b.startAt)}
                       {b.email ? ` · ${b.email}` : " · no email"}
                     </p>
-                    {err && <p className="text-xs text-coquelicot-400">{err}</p>}
+                    {err && <p className="text-xs text-coquelicot-600">{err}</p>}
                   </div>
                   {isDone ? (
-                    <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-moonstone-600">
+                    <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-moonstone-400">
                       Done
                       <FaCheck className="h-3 w-3" aria-hidden />
                     </span>

@@ -325,7 +325,7 @@ export default async function InvoiceViewPage({
           <div className="mb-8 flex items-start justify-between gap-4">
             <Image
               src="/source/logo-wordmark.svg"
-              alt="To The Point Tech"
+              alt="To the Point Tech"
               width={2000}
               height={674}
               className="h-12 w-auto sm:h-20"

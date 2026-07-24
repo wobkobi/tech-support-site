@@ -292,7 +292,7 @@ function parseLegacyInvoiceText(text: string): ParsedInvoiceData {
   }
 
   // Fourth: collect consecutive name-words directly after "Bill To", stopping at the first
-  // non-name token. "To" (from "To The Point") acts as the natural stop in these PDFs.
+  // non-name token. "To" (from "To the Point") acts as the natural stop in these PDFs.
   if (!clientName && billToPos >= 0) {
     const afterBillTo = text.slice(billToPos).replace(/^bill\s+to\s+/i, "");
     const tokens = afterBillTo.split(/\s+/);

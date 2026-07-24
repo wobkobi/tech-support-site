@@ -179,7 +179,7 @@ export function SendReviewLinkForm({
       } else if (data.reviewUrl) {
         const firstName = name.trim().split(" ")[0];
         setSmsText(
-          `Hi ${firstName}, it's Harrison from To The Point Tech. Thanks for letting me help you out! A quick review would be greatly appreciated - it really helps: ${data.reviewUrl}`,
+          `Hi ${firstName}, it's Harrison from To the Point Tech. Thanks for letting me help you out! A quick review would be greatly appreciated - it really helps: ${data.reviewUrl}`,
         );
         clearFields();
       }
@@ -356,7 +356,7 @@ export function SendReviewLinkForm({
               <button
                 type="submit"
                 disabled={loading}
-                className="self-start rounded-lg bg-moonstone-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-moonstone-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="self-start rounded-lg bg-moonstone-400 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-moonstone-300 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {loading ? "Loading preview..." : "Preview email"}
               </button>
@@ -417,7 +417,7 @@ export function SendReviewLinkForm({
                 <p
                   className={cn(
                     "-mt-1 text-xs",
-                    phoneValid ? "text-slate-400" : "text-coquelicot-400",
+                    phoneValid ? "text-slate-400" : "text-coquelicot-600",
                   )}
                 >
                   {phoneValid ? `Stored as: ${phoneE164}` : "Invalid phone number"}
@@ -426,7 +426,7 @@ export function SendReviewLinkForm({
               <button
                 type="submit"
                 disabled={loading || (!!phoneInput && !phoneValid)}
-                className="self-start rounded-lg bg-moonstone-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-moonstone-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="self-start rounded-lg bg-moonstone-400 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-moonstone-300 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {loading ? "Generating..." : "Generate text"}
               </button>
@@ -454,7 +454,7 @@ export function SendReviewLinkForm({
               <button
                 type="button"
                 onClick={handleCopy}
-                className="rounded-lg bg-moonstone-600 px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-moonstone-700"
+                className="rounded-lg bg-moonstone-400 px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-moonstone-300"
               >
                 {copied ? "Copied!" : "Copy message"}
               </button>

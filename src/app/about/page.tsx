@@ -19,7 +19,7 @@ export const metadata: Metadata = {
     "Computer science graduate based in Auckland. I help households and small businesses across Auckland with friendly, jargon-free tech support.",
   alternates: { canonical: "/about" },
   openGraph: {
-    title: "About - To The Point Tech",
+    title: "About - To the Point Tech",
     description: "Local computer and IT support across Auckland.",
     url: "/about",
     type: "profile",
@@ -27,7 +27,7 @@ export const metadata: Metadata = {
 };
 
 const linkStyle =
-  "text-coquelicot-500 hover:text-coquelicot-600 underline-offset-4 hover:underline";
+  "text-coquelicot-500 hover:text-coquelicot-400 underline-offset-4 hover:underline";
 
 /**
  * About page component.
@@ -68,7 +68,7 @@ export default function AboutPage(): React.ReactElement {
               id="about-hero-heading"
               className="mb-4 text-2xl font-extrabold text-russian-violet sm:text-3xl md:text-4xl"
             >
-              About To The Point Tech
+              About To the Point Tech
             </h1>
 
             <p className="mb-4 text-base text-rich-black sm:text-lg">
@@ -96,28 +96,28 @@ export default function AboutPage(): React.ReactElement {
 
             <ul className="mb-4 space-y-2.5 text-base text-rich-black sm:text-lg">
               <li className="flex gap-3">
-                <span className="mt-1 text-lg text-moonstone-600">•</span>
+                <span className="mt-1 text-lg text-moonstone-400">•</span>
                 <span>
                   <strong>Listen first.</strong> I start with a quick chat to understand what's
                   happening and what you want to achieve.
                 </span>
               </li>
               <li className="flex gap-3">
-                <span className="mt-1 text-lg text-moonstone-600">•</span>
+                <span className="mt-1 text-lg text-moonstone-400">•</span>
                 <span>
                   <strong>Explain before acting.</strong> You'll know what I'm planning to do and
                   roughly how long it should take before I touch anything.
                 </span>
               </li>
               <li className="flex gap-3">
-                <span className="mt-1 text-lg text-moonstone-600">•</span>
+                <span className="mt-1 text-lg text-moonstone-400">•</span>
                 <span>
                   <strong>Work transparently.</strong> I make changes in small steps so you can see
                   what's happening and ask questions.
                 </span>
               </li>
               <li className="flex gap-3">
-                <span className="mt-1 text-lg text-moonstone-600">•</span>
+                <span className="mt-1 text-lg text-moonstone-400">•</span>
                 <span>
                   <strong>Leave clear notes.</strong> After every visit, you get a simple summary of
                   what changed and any tips for next time.
@@ -150,15 +150,15 @@ export default function AboutPage(): React.ReactElement {
 
             <ul className="mb-4 space-y-2.5 text-base text-rich-black sm:text-lg">
               <li className="flex gap-3">
-                <span className="mt-1 text-lg text-moonstone-600">•</span>
+                <span className="mt-1 text-lg text-moonstone-400">•</span>
                 <span>Home users wanting reliable Wi-Fi, secure accounts, and proper backups.</span>
               </li>
               <li className="flex gap-3">
-                <span className="mt-1 text-lg text-moonstone-600">•</span>
+                <span className="mt-1 text-lg text-moonstone-400">•</span>
                 <span>Families helping parents or grandparents get comfortable with devices.</span>
               </li>
               <li className="flex gap-3">
-                <span className="mt-1 text-lg text-moonstone-600">•</span>
+                <span className="mt-1 text-lg text-moonstone-400">•</span>
                 <span>
                   Sole traders and small teams who need occasional IT help, or ongoing cover with a
                   simple monthly retainer.

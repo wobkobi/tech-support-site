@@ -28,11 +28,11 @@ function valueToneClass(tone: StatTone): string {
     case "warning":
       return "text-amber-600";
     case "critical":
-      return "text-coquelicot-400";
+      return "text-coquelicot-600";
     case "violet":
       return "text-russian-violet";
     case "info":
-      return "text-moonstone-600";
+      return "text-moonstone-400";
   }
 }
 
@@ -83,8 +83,10 @@ export function StatCard({
     active ? "border-russian-violet ring-1 ring-russian-violet" : "border-admin-border",
     className,
   );
+  // select-none unifies the link and button forms: clickable cards act as
+  // controls, so neither should offer text selection (the static div still does).
   const interactive =
-    "transition-shadow hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-russian-violet";
+    "select-none transition-shadow hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-russian-violet";
   const content = (
     <>
       <p className={cn("text-xl font-extrabold", valueToneClass(tone))}>{value}</p>

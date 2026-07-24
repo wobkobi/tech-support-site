@@ -187,7 +187,7 @@ async function ensureSyncIdSetup(spreadsheetId: string, tabName: string): Promis
                   startColumnIndex: SYNC_ID_COLUMN_INDEX,
                   endColumnIndex: SYNC_ID_COLUMN_INDEX + 1,
                 },
-                description: "Sync ID column - managed by To The Point app",
+                description: "Sync ID column - managed by To the Point app",
                 // Warning-only so owner-authed row deletes and updates are never
                 // blocked; strict protection would 403 deleteDimension calls.
                 warningOnly: true,

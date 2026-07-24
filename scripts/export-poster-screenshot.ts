@@ -54,7 +54,7 @@ interface PageConfig {
  * 1 = 300 DPI (captures 1748 × 2480 px as-is).
  * 2 = 600 DPI effective (3496 × 4960 px screenshot).
  */
-const DEVICE_SCALE_FACTOR = 1 as const;
+const DEVICE_SCALE_FACTOR = 2 as const;
 
 /** Configuration for digital variant (A5, no bleed). */
 const A5_DIGITAL_CONFIG: PageConfig = {
@@ -286,7 +286,10 @@ async function exportPoster(options: ExportOptions): Promise<string[]> {
 
   const browser = await puppeteer.launch({
     headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    // force-color-profile pins rendering to sRGB so captured hexes match the
+    // stylesheet exactly regardless of the host machine's monitor profile
+    // (wide-gamut displays otherwise skew the screenshot's colour values).
+    args: ["--no-sandbox", "--disable-setuid-sandbox", "--force-color-profile=srgb"],
   });
 
   const generatedFiles: string[] = [];

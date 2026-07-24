@@ -140,7 +140,7 @@ export function NumberField({
           }}
           className={cn(
             "w-32 rounded-lg border px-3 py-2.5 text-base focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-            error ? "border-coquelicot-400" : "border-admin-border-strong",
+            error ? "border-coquelicot-600" : "border-admin-border-strong",
           )}
         />
         {meta.unit && <span className="text-sm text-admin-muted">{meta.unit}</span>}
@@ -199,7 +199,7 @@ export function TextField({
   const [revealed, setRevealed] = useState(false);
   const inputClass = cn(
     "w-full rounded-lg border px-3 py-2.5 text-base focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
-    error ? "border-coquelicot-400" : "border-admin-border-strong",
+    error ? "border-coquelicot-600" : "border-admin-border-strong",
   );
   return (
     <FieldShell id={id} meta={meta} error={error} customised={customised}>
