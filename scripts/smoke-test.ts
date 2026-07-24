@@ -261,50 +261,25 @@ function runBuild(): void {
 }
 
 /**
- * Copies static assets and native modules into the standalone output directory.
- * Next.js standalone only bundles server JS - static files, public assets, and
- * platform-specific native binaries (e.g. sharp) must be copied manually.
- */
-function copyStandaloneAssets(): void {
-  console.log("  Copying static assets into standalone…");
-
-  // Built JS/CSS chunks and fonts
-  fs.cpSync(path.join(".next", "static"), path.join(".next", "standalone", ".next", "static"), {
-    recursive: true,
-    force: true,
-  });
-
-  // Public folder (images, manifests, favicons, etc.)
-  fs.cpSync("public", path.join(".next", "standalone", "public"), {
-    recursive: true,
-    force: true,
-  });
-
-  // Sharp and its platform-specific binary are not auto-traced by Next.js
-  for (const pkg of ["sharp", "@img"]) {
-    const src = path.join("node_modules", pkg);
-    const dst = path.join(".next", "standalone", "node_modules", pkg);
-    if (fs.existsSync(src)) {
-      fs.cpSync(src, dst, { recursive: true, force: true });
-    }
-  }
-
-  console.log("  ✓ Assets copied\n");
-}
-
-/**
- * Spawns the production server on the given port and returns the child process.
- * Uses the standalone server when output: "standalone" is configured.
+ * Spawns the production server (`next start`) on the given port and returns
+ * the child process. Serves .next/ and public/ directly, so no asset copying
+ * is needed.
  * @param port - Port to listen on.
  * @returns Spawned child process.
  */
 function startServer(port: number): ChildProcess {
   console.log(`▶ Starting server on port ${port}…`);
-  return spawn("node", [".next/standalone/server.js"], {
-    stdio: "pipe",
-    shell: false,
-    env: { ...process.env, PORT: String(port), HOSTNAME: "localhost" },
-  });
+  // Invoke the Next.js bin through the current Node executable so the spawn
+  // works without a shell on Windows and Unix alike.
+  return spawn(
+    process.execPath,
+    [path.join("node_modules", "next", "dist", "bin", "next"), "start", "-p", String(port)],
+    {
+      stdio: "pipe",
+      shell: false,
+      env: { ...process.env, HOSTNAME: "localhost" },
+    },
+  );
 }
 
 /**
@@ -550,9 +525,7 @@ function printTable(results: PageResult[]): void {
     if (remote) {
       console.log(`▶ Remote target: ${baseUrl}\n`);
     } else {
-      // Build and prepare the standalone output
       if (!skipBuild) runBuild();
-      copyStandaloneAssets();
 
       // Start the server and wait for readiness
       server = startServer(port);
