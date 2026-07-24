@@ -42,7 +42,7 @@ function statusHint(status: number): string {
     case 401:
       return "Unauthorised - ADMIN_SECRET in .env.local does not match the ADMIN_SECRET on the running dev server.";
     case 429:
-      return "Rate limited - the dev-only bypass is not active. The server must run in dev (NODE_ENV is not 'production') with the same ADMIN_SECRET the harness sends.";
+      return "Rate limited - if the body says retryable, the upstream OpenAI limit persisted through every backoff retry; otherwise the dev-only bypass is not active (the server must run in dev with the same ADMIN_SECRET the harness sends).";
     case 422:
       return "The route rejected the request (its own validation or parse error). Check the description / input.";
     case 500:
@@ -52,40 +52,62 @@ function statusHint(status: number): string {
   }
 }
 
+/** Max retries after an upstream (retryable) 429 before the case gives up. */
+const RATE_LIMIT_RETRIES = 5;
+/** First backoff wait; doubles after each subsequent rate-limited attempt. */
+const RATE_LIMIT_BASE_DELAY_MS = 5_000;
+
 /**
  * POSTs JSON and throws a diagnostic Error on a network failure, any non-ok
- * response, or an `{ ok: false }` body. The thrown message names the route,
- * the status, and a hint for what to check - it is meant to be printed to the
- * operator verbatim, without a stack trace.
+ * response, or an `{ ok: false }` body. An upstream OpenAI rate limit (429
+ * with `retryable: true`) is retried with exponential backoff first, so one
+ * throttled call doesn't abort a paid multi-case run. The thrown message
+ * names the route, the status, and a hint for what to check - it is meant to
+ * be printed to the operator verbatim, without a stack trace.
  * @param url - Absolute route URL.
  * @param body - JSON request body.
  * @param adminSecret - Value sent as the `x-admin-secret` header.
  * @returns Parsed JSON typed as T.
  */
 async function postJson<T>(url: string, body: unknown, adminSecret: string): Promise<T> {
-  let res: Response;
-  try {
-    res = await fetch(url, {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-admin-secret": adminSecret },
-      body: JSON.stringify(body),
-    });
-  } catch (cause) {
-    // fetch rejects only on a network-level failure (server down, bad host,
-    // socket reset) - turn that into a clear "is the server up?" message.
-    const reason = cause instanceof Error ? cause.message : String(cause);
-    throw new Error(
-      `Could not reach the dev server at ${url} (${reason}). Is \`npm run dev\` running and serving that URL? Pass --url=<addr> if it is on another port.`,
-    );
+  for (let attempt = 0; ; attempt++) {
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-admin-secret": adminSecret },
+        body: JSON.stringify(body),
+      });
+    } catch (cause) {
+      // fetch rejects only on a network-level failure (server down, bad host,
+      // socket reset) - turn that into a clear "is the server up?" message.
+      const reason = cause instanceof Error ? cause.message : String(cause);
+      throw new Error(
+        `Could not reach the dev server at ${url} (${reason}). Is \`npm run dev\` running and serving that URL? Pass --url=<addr> if it is on another port.`,
+      );
+    }
+    const json = (await res.json().catch(() => null)) as {
+      ok?: boolean;
+      retryable?: boolean;
+    } | null;
+    // Upstream OpenAI rate limit: hold off and retry, doubling the wait after
+    // each subsequent failure (5s > 10s > 20s > 40s > 80s).
+    if (res.status === 429 && json?.retryable === true && attempt < RATE_LIMIT_RETRIES) {
+      const delayMs = RATE_LIMIT_BASE_DELAY_MS * 2 ** attempt;
+      console.log(
+        `    AI rate limited - waiting ${delayMs / 1000}s (retry ${attempt + 1}/${RATE_LIMIT_RETRIES})`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      continue;
+    }
+    if (!res.ok || json?.ok === false || json === null) {
+      const bodyText = json === null ? "(no JSON body)" : JSON.stringify(json);
+      throw new Error(
+        `${url} returned HTTP ${res.status}. ${statusHint(res.status)}\n  Response body: ${bodyText}`,
+      );
+    }
+    return json as T;
   }
-  const json = (await res.json().catch(() => null)) as { ok?: boolean } | null;
-  if (!res.ok || json?.ok === false || json === null) {
-    const bodyText = json === null ? "(no JSON body)" : JSON.stringify(json);
-    throw new Error(
-      `${url} returned HTTP ${res.status}. ${statusHint(res.status)}\n  Response body: ${bodyText}`,
-    );
-  }
-  return json as T;
 }
 
 /**

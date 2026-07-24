@@ -27,6 +27,7 @@ import {
   composeDescription,
   effectiveHourlyRate,
   enforceMinBillable,
+  explicitRoundingAllowanceMins,
   hourlyTaskMinutes,
   jobToLineItems,
   timeDiffMins,
@@ -475,6 +476,8 @@ export function CalculatorView({
   // Rate confirm dialogs (replacing window.confirm on reset / delete-rate).
   const [confirmResetOpen, setConfirmResetOpen] = useState(false);
   const [confirmDeleteRateId, setConfirmDeleteRateId] = useState<string | null>(null);
+  // Full-clear confirm: clearing also deletes the saved draft, so it can't be undone.
+  const [confirmClearOpen, setConfirmClearOpen] = useState(false);
 
   // "Bill a calendar event" picker: lazily fetched on first open so a normal
   // calculator load costs nothing. Choosing an event pushes ?eventId= and the
@@ -1128,17 +1131,24 @@ export function CalculatorView({
   }
 
   /**
-   * Resets every persisted form field back to its mount-time default and
-   * drops the saved draft. Single source of truth for "start fresh".
+   * Resets every form field - persisted and session-only - back to a blank
+   * calculator and drops the saved draft. Single source of truth for "start
+   * fresh": also rewinds the job date to today, un-skips the promo, resets the
+   * cancel-policy inputs, and clears any error banners. When billing a
+   * calendar event, navigates off `?eventId=` so the keyed view remounts
+   * without the prefill.
    */
   function resetFormState(): void {
     const now = nowTime();
+    setJobDate(todayNZDate());
+    setSkipPromo(false);
     setTimeRanges([{ startTime: now, endTime: addHour(now) }]);
     setFollowUpMins(0);
     setTravelEntries([]);
     setJobAddress("");
     setTasks([]);
     setParts([]);
+    setShowParts(false);
     setNotes("");
     setClientName("");
     setClientEmail("");
@@ -1149,12 +1159,28 @@ export function CalculatorView({
     setAiInput("");
     // Non-persisted parse-session results, but still part of "starting fresh".
     setParseResult(null);
+    setParseError(null);
     setHasParsed(false);
     setClarifyQuestions([]);
     setClarifyAnswers({});
     setDraftRestoredAt(null);
+    // Cancel mode and its policy inputs go back to their mount defaults.
     setCancelMode(false);
+    setCancelReason("late-cancellation");
+    setCancelMeetingType("in-person");
+    setCancelBookingTime("09:00");
+    setCancelledAtDate("");
+    setCancelledAtTime("09:00");
+    setIncludeCancelTravel(true);
+    setStashedTravel([]);
+    // Stale save errors would otherwise sit above the buttons on a blank form.
+    setIncomeError(null);
+    setSaveInvoiceError(null);
     clearDraft();
+    // Billing a booked job: the prefill is a server prop keyed by eventId, so
+    // state resets alone can't remove the banner - drop the query param and
+    // let the remount start truly blank.
+    if (eventPrefill) router.replace("/admin/business/calculator");
   }
 
   /**
@@ -1820,6 +1846,19 @@ export function CalculatorView({
         onCancel={() => setConfirmDeleteRateId(null)}
       />
 
+      <ConfirmDialog
+        open={confirmClearOpen}
+        title="Clear the whole form?"
+        body="Wipes the job date, times, tasks, parts, travel, client details, and the description, and deletes the saved draft. This can't be undone."
+        confirmLabel="Clear everything"
+        tone="danger"
+        onConfirm={() => {
+          setConfirmClearOpen(false);
+          resetFormState();
+        }}
+        onCancel={() => setConfirmClearOpen(false)}
+      />
+
       {/* Job date - drives the public-holiday + promo lookup for this job. */}
       <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
         <label htmlFor="job-date" className="text-sm font-semibold text-slate-700">
@@ -2346,10 +2385,10 @@ export function CalculatorView({
               {savingIncome ? "Saving..." : "Save as income entry"}
             </button>
             <button
-              onClick={resetFormState}
+              onClick={() => setConfirmClearOpen(true)}
               className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-500 hover:bg-slate-50"
             >
-              Clear
+              Clear everything
             </button>
           </div>
 
@@ -2432,6 +2471,11 @@ function TaskTimeWarning({
   }
 
   if (windowMin <= 0) return null;
+  // Explicit durations round UP to the snap grid, so their sum can top the
+  // raw window by one step per pinned task without being an over-estimate.
+  // Suppress that expected overshoot - Fix never rescales pinned tasks.
+  const overshoot = taskMin - windowMin;
+  if (overshoot > 0 && overshoot <= explicitRoundingAllowanceMins(tasks)) return null;
   // Tolerance: qty rounds to 2 dp (= 0.6-min granularity), so a 3-task split
   // can drift up to ~1.5 min from windowMin while still being "correct" after
   // collapseToWindow has snapped each row to a 5-min boundary. Without this
