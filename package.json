@@ -110,7 +110,7 @@
     "esbuild": false,
     "prisma": true,
     "puppeteer": true,
-    "simple-git-hooks": false,
+    "simple-git-hooks": true,
     "unrs-resolver": true
   }
 }
