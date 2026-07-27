@@ -13,7 +13,10 @@
  * Remote (--url) auth: reads ADMIN_SECRET (must match the DEPLOYED environment's
  * value) for admin pages and VERCEL_AUTOMATION_BYPASS_SECRET for the Deployment
  * Protection wall. Both are sent ONLY to the deployment origin via request
- * interception, never to third-party hosts (maps, fonts, the Meta pixel).
+ * interception, never to third-party hosts (maps, fonts, the Meta pixel). The
+ * bypass is additionally primed as a session cookie before any page is measured
+ * (see primeBypassCookie), since headers alone leave redirected sub-resources
+ * looping through SSO.
  *
  * Exit codes:
  *   0  all pages loaded without errors
@@ -324,6 +327,46 @@ function isSameOrigin(requestUrl: string, origin: string): boolean {
 }
 
 /**
+ * Establishes the Vercel Deployment Protection bypass cookie for the whole
+ * browser session.
+ *
+ * The per-request headers attached in {@link checkPage} cover requests the
+ * interceptor sees as same-origin, but that is not every request the browser
+ * makes. A same-origin request that 302s out to the Vercel SSO host returns as
+ * a cross-origin request, which is deliberately left unauthenticated so the
+ * admin secret cannot leak; SSO then bounces it back to the deployment origin
+ * and the chain repeats until Chrome aborts with ERR_TOO_MANY_REDIRECTS. That
+ * shows up as a sub-resource failure on a page whose document loaded fine.
+ *
+ * Hitting the origin once with the bypass supplied as query parameters plus
+ * `x-vercel-set-bypass-cookie` sets the `_vercel_jwt` cookie, which then rides
+ * every subsequent request in the session no matter how it was initiated.
+ * @param browser - Puppeteer browser instance.
+ * @param remote - Remote-deployment auth context.
+ */
+async function primeBypassCookie(browser: Browser, remote: RemoteAuth): Promise<void> {
+  if (!remote.bypassSecret) return;
+
+  const primeUrl =
+    `${remote.baseUrl}/?x-vercel-protection-bypass=${encodeURIComponent(remote.bypassSecret)}` +
+    `&x-vercel-set-bypass-cookie=true`;
+
+  const page = await browser.newPage();
+  try {
+    await page.goto(primeUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
+    const cookies = await browser.cookies();
+    const primed = cookies.some((c) => c.name === "_vercel_jwt");
+    console.log(
+      primed
+        ? "  Deployment Protection bypass cookie set.\n"
+        : "  (no bypass cookie returned - Deployment Protection may be off)\n",
+    );
+  } finally {
+    await page.close();
+  }
+}
+
+/**
  * Visits a page with Puppeteer, collecting timing metrics and console errors.
  * @param browser - Puppeteer browser instance.
  * @param baseUrl - Server base URL.
@@ -400,7 +443,9 @@ async function checkPage(
       if (IGNORE_404_URLS.some((s) => text.includes(s) || locUrl.includes(s))) return;
       if (IGNORE_CONSOLE_GLOBAL.some((s) => text.includes(s) || locUrl.includes(s))) return;
       if (spec.ignoreErrors?.some((s) => text.includes(s) || locUrl.includes(s)) ?? false) return;
-      errors.push(`[console] ${text}`);
+      // Include the resource URL: "Failed to load resource" on its own names no
+      // culprit, which makes sub-resource failures undiagnosable from CI logs.
+      errors.push(locUrl ? `[console] ${text} (${locUrl})` : `[console] ${text}`);
     });
 
     await page.goto(url, { waitUntil: "networkidle2", timeout: 30_000 });
@@ -543,6 +588,11 @@ function printTable(results: PageResult[]): void {
       headless: true,
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
     });
+
+    // Clear the Deployment Protection wall for the whole session before any
+    // page is measured; per-request headers alone leave redirected sub-resources
+    // looping through SSO.
+    if (remote) await primeBypassCookie(browser, remote);
 
     // Auto-discover every page.tsx under src/app; route groups stripped,
     // dynamic segments skipped, admin routes split out. New pages get tested
