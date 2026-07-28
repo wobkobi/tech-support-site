@@ -13,10 +13,10 @@ import {
   buildAvailableDays,
   parseBookingNotes,
   type BookableDay,
-  type ExistingBooking,
   type JobDuration,
   type TimeOfDay,
 } from "@/features/booking/lib/booking";
+import { loadBlockingBookings } from "@/features/booking/lib/existing-bookings.server";
 import { fetchAllCalendarEvents } from "@/features/calendar/lib/google-calendar";
 import { Button } from "@/shared/components/Button";
 import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
@@ -61,15 +61,8 @@ async function getAvailableDays(excludeBookingId: string): Promise<BookableDay[]
   const { config } = await getAvailabilityConfig();
   const maxDate = new Date(now.getTime() + config.maxAdvanceDays * 24 * 60 * 60 * 1000);
 
-  const [existingBookings, cachedEvents] = await Promise.all([
-    prisma.booking.findMany({
-      where: {
-        id: { not: excludeBookingId },
-        status: { in: ["held", "confirmed"] },
-        endAt: { gte: now },
-      },
-      select: { id: true, startAt: true, endAt: true, bufferBeforeMin: true, bufferAfterMin: true },
-    }),
+  const [existing, cachedEvents] = await Promise.all([
+    loadBlockingBookings(now, { excludeId: excludeBookingId }),
     prisma.calendarEventCache.findMany({
       where: { expiresAt: { gt: now }, endAt: { gte: now } },
       select: { eventId: true, startAt: true, endAt: true },
@@ -92,14 +85,6 @@ async function getAvailableDays(excludeBookingId: string): Promise<BookableDay[]
       calendarEvents = [];
     }
   }
-
-  const existing: ExistingBooking[] = existingBookings.map((b) => ({
-    id: b.id,
-    startAt: b.startAt,
-    endAt: b.endAt,
-    bufferBeforeMin: b.bufferBeforeMin,
-    bufferAfterMin: b.bufferAfterMin,
-  }));
 
   return buildAvailableDays(existing, calendarEvents, now, config).days;
 }

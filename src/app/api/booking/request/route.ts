@@ -10,11 +10,11 @@ import {
   splitUnitFromAddress,
   validateBookingPayloadFields,
   validateBookingRequest,
-  type ExistingBooking,
   type JobDuration,
   type StartMinute,
   type TimeOfDay,
 } from "@/features/booking/lib/booking";
+import { loadBlockingBookings } from "@/features/booking/lib/existing-bookings.server";
 import { lookupPublicHoliday } from "@/features/business/lib/pricing-policy.server";
 import { getActivePromo } from "@/features/business/lib/promos";
 import { lookupDriveRoundTrip } from "@/features/business/lib/travel-distance";
@@ -151,28 +151,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
     const maxDate = new Date(now.getTime() + config.maxAdvanceDays * 24 * 60 * 60 * 1000);
 
-    // Only held/confirmed bookings that have not ended yet can conflict.
-    const existingBookings = await prisma.booking.findMany({
-      where: {
-        status: { in: ["held", "confirmed"] },
-        endAt: { gte: now },
-      },
-      select: {
-        id: true,
-        startAt: true,
-        endAt: true,
-        bufferBeforeMin: true,
-        bufferAfterMin: true,
-      },
-    });
-
-    const existingForValidation: ExistingBooking[] = existingBookings.map((b) => ({
-      id: b.id,
-      startAt: b.startAt,
-      endAt: b.endAt,
-      bufferBeforeMin: b.bufferBeforeMin,
-      bufferAfterMin: b.bufferAfterMin,
-    }));
+    const existingForValidation = await loadBlockingBookings(now);
 
     // Fail closed: the live calendar read is authoritative for real events, so
     // if it errors we cannot rule out a collision - refuse the booking rather
