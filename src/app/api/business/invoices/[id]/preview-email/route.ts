@@ -57,10 +57,13 @@ export async function POST(
     siteUrl,
   });
 
-  // includeReviewOverride wins when set (so unchecking the box updates the
-  // preview to drop the review line). Default is whatever eligibility says.
+  // Unchecking the box drops the review line from the preview, but ticking it
+  // cannot force one on: the send route ignores an explicit true when
+  // eligibility says no, so the preview has to apply the same `&& canSend`
+  // guard or it renders a link the real email would strip.
   // Quotes never carry a review ask, matching the send route.
-  const includeReview = !invoice.isQuote && (includeReviewOverride ?? eligibility.canSend);
+  const includeReview =
+    !invoice.isQuote && (includeReviewOverride ?? eligibility.canSend) && eligibility.canSend;
   const reviewUrl =
     includeReview && "reviewUrl" in eligibility ? (eligibility.reviewUrl ?? null) : null;
 
