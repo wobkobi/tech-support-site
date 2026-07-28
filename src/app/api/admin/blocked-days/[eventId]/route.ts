@@ -149,6 +149,6 @@ export async function DELETE(
       return NextResponse.json({ ok: true, action: "already-gone" });
     }
     console.error("[admin/blocked-days/[eventId]] Unblock failed:", err);
-    return NextResponse.json({ ok: false, error: "Failed to unblock the day." }, { status: 500 });
+    return errorResponse("Failed to unblock the day.", 500);
   }
 }

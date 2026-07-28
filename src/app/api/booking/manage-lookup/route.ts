@@ -7,6 +7,7 @@
  */
 
 import { sendBookingManageLinksEmail } from "@/features/reviews/lib/email";
+import { errorResponse } from "@/shared/lib/api-response";
 import { prisma } from "@/shared/lib/prisma";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 import { NextRequest, NextResponse } from "next/server";
@@ -33,7 +34,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // A malformed address is the one case worth reporting - it's the user's own
   // typo, and saying so leaks nothing about who has booked.
   if (!email || !email.includes("@") || email.length > 200) {
-    return NextResponse.json({ ok: false, error: "Enter a valid email address." }, { status: 400 });
+    return errorResponse("Enter a valid email address.", 400);
   }
 
   try {
