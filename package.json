@@ -1,6 +1,6 @@
 {
   "name": "tech-support-site",
-  "version": "4.7.20",
+  "version": "4.7.21",
   "private": true,
   "type": "module",
   "scripts": {
@@ -84,7 +84,7 @@
     "jsdom": "^30.0.0",
     "lint-staged": "^17.2.0",
     "png-to-ico": "^3.0.2",
-    "postcss": "^8.5.23",
+    "postcss": "^8.5.24",
     "prettier": "^3.9.6",
     "prettier-plugin-organize-imports": "^4.3.0",
     "prettier-plugin-packagejson": "^3.0.2",

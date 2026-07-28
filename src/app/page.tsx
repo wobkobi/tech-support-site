@@ -141,8 +141,8 @@ export default async function Home(): Promise<React.ReactElement> {
             </h1>
 
             <p className="mx-auto mb-8 max-w-7xl text-lg font-medium text-rich-black sm:text-xl md:text-2xl">
-              Friendly tech help across Auckland. Clear explanations, no jargon, and solutions that
-              actually work.
+              Tech help across Auckland. I fix the problem, explain what went wrong in plain
+              English, and don't leave until it actually works.
             </p>
 
             <div className="flex flex-wrap items-center justify-center gap-4">
@@ -181,7 +181,7 @@ export default async function Home(): Promise<React.ReactElement> {
                 Computer Science Graduate
               </h3>
               <p className="text-base text-rich-black/80 sm:text-lg">
-                University-trained with real-world experience
+                A computer science degree behind the advice, plus years of hands-on experience
               </p>
             </div>
 
@@ -198,7 +198,7 @@ export default async function Home(): Promise<React.ReactElement> {
                 Proudly Local
               </h3>
               <p className="text-base text-rich-black/80 sm:text-lg">
-                Auckland born and raised, on-site across the city
+                Auckland born and raised, and I come to you anywhere in the city
               </p>
             </div>
 
@@ -215,7 +215,7 @@ export default async function Home(): Promise<React.ReactElement> {
                 No Upselling
               </h3>
               <p className="text-base text-rich-black/80 sm:text-lg">
-                Honest advice, fair pricing, clear communication
+                If you don't need something, I'll say so - you won't be sold anything extra
               </p>
             </div>
           </section>
@@ -267,8 +267,8 @@ export default async function Home(): Promise<React.ReactElement> {
               Run a small business?
             </h2>
             <p className="mx-auto mb-4 max-w-2xl text-base text-rich-black/90 sm:text-lg">
-              Ad-hoc IT help when things break, or a monthly retainer for ongoing cover - no
-              lock-in.
+              Call me out when something breaks, or put me on a monthly retainer so it's covered
+              either way. No lock-in, and you can switch between the two whenever it suits.
             </p>
             <Button href="/business" variant="tertiary" size="md">
               Business IT support
@@ -281,12 +281,12 @@ export default async function Home(): Promise<React.ReactElement> {
               <h2 className="mb-4 text-2xl font-bold text-russian-violet sm:text-3xl">About Me</h2>
               <p className="mb-4 text-base text-rich-black sm:text-lg">
                 Hi, I'm Harrison, a computer science graduate based in Auckland. I started To The
-                Point Tech to give locals a reliable, friendly person to call when technology acts
-                up.
+                Point Tech because when something breaks, people want someone who turns up and sorts
+                it out properly.
               </p>
               <p className="text-base text-rich-black/90 sm:text-lg">
-                I focus on practical fixes and clear explanations, leaving with your problems
-                solved.
+                That's what I do. I'll explain what went wrong, what I did about it, and whether
+                it's worth spending money on - including when it isn't.
               </p>
             </article>
 
