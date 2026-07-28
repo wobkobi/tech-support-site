@@ -5,7 +5,8 @@
  * Turns a 6s FCP into a near-instant render by streaming the shell first.
  */
 
-import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
+import { CARD } from "@/shared/components/PageLayout";
+import { PageLoadingShell } from "@/shared/components/PageLoadingShell";
 import { Bone } from "@/shared/components/Skeleton";
 import { cn } from "@/shared/lib/cn";
 
@@ -15,26 +16,22 @@ import { cn } from "@/shared/lib/cn";
  */
 export default function ReviewLoading(): React.ReactElement {
   return (
-    <PageShell>
-      <FrostedSection maxWidth="56rem">
-        <div className="flex flex-col gap-4 sm:gap-5">
-          {/* Heading card skeleton */}
-          <section className={cn(CARD)}>
-            <Bone className="mb-3 h-9 w-72 sm:w-96" />
-            <Bone className="h-5 w-64 opacity-70 sm:w-80" />
-          </section>
+    <PageLoadingShell label="review page" maxWidth="56rem" compact>
+      {/* Heading card skeleton */}
+      <section className={cn(CARD)}>
+        <Bone className="mb-3 h-9 w-72 sm:w-96" />
+        <Bone className="h-5 w-64 opacity-70 sm:w-80" />
+      </section>
 
-          {/* Form card skeleton */}
-          <section className={cn(CARD)}>
-            <div className="space-y-4">
-              <Bone className="h-10 w-full" />
-              <Bone className="h-10 w-full" />
-              <Bone className="h-28 w-full" />
-              <Bone className="h-10 w-32 rounded-xl" />
-            </div>
-          </section>
+      {/* Form card skeleton */}
+      <section className={cn(CARD)}>
+        <div className="space-y-4">
+          <Bone className="h-10 w-full" />
+          <Bone className="h-10 w-full" />
+          <Bone className="h-28 w-full" />
+          <Bone className="h-10 w-32 rounded-xl" />
         </div>
-      </FrostedSection>
-    </PageShell>
+      </section>
+    </PageLoadingShell>
   );
 }
