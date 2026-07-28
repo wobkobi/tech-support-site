@@ -26,14 +26,14 @@ jobs:
 
     steps:
       - name: Checkout at the deployed commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           # Discovered routes + package.json version must match the deployed
           # build, so check out the exact SHA Vercel deployed.
           ref: ${{ github.event.deployment.sha }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: "npm"
@@ -44,7 +44,7 @@ jobs:
         run: npm ci --ignore-scripts
 
       - name: Cache Puppeteer Chromium
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/puppeteer
           key: puppeteer-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
