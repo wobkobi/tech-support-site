@@ -71,6 +71,46 @@ async function buildEmailSignature(siteUrl: string): Promise<string> {
     </div>`;
 }
 
+/**
+ * Wraps body HTML in the notification email shell (560px card, soft shadow,
+ * system font stack) used by the owner/customer notices.
+ * @param bodyHtml - Inner HTML for the card.
+ * @returns A complete HTML document.
+ */
+function renderNotificationEmail(bodyHtml: string): string {
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="font-family:system-ui,sans-serif;background:#f6f7f8;margin:0;padding:24px">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
+${bodyHtml}
+  </div>
+</body>
+</html>`;
+}
+
+/**
+ * Wraps body HTML in the document email shell (600px card, no shadow, Apple /
+ * Segoe font stack) used by the invoice, quote and void emails.
+ * Kept separate from {@link renderNotificationEmail} rather than parameterised:
+ * the two differ in width, shadow, font stack and padding, so a single shell
+ * with flags would misrepresent them as one design.
+ * @param bodyHtml - Inner HTML for the card.
+ * @returns A complete HTML document.
+ */
+function renderDocumentEmail(bodyHtml: string): string {
+  return `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8" /></head>
+<body style="margin:0;padding:24px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0c0a3e;background:#f6f7f8">
+  <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:12px;padding:24px">
+${bodyHtml}
+  </div>
+</body>
+</html>`;
+}
+
 // Lazy singleton so module import never throws when RESEND_API_KEY is unset.
 let _resend: Resend | null = null;
 /**
@@ -138,12 +178,7 @@ export async function sendOwnerReviewNotification(review: ReviewNotificationData
   const safeDisplayName = escapeHtml(displayName);
   const safeReviewText = escapeHtml(review.text).replace(/\n/g, "<br>");
 
-  const html = `
-<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="font-family:system-ui,sans-serif;background:#f6f7f8;margin:0;padding:24px">
-  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
+  const html = renderNotificationEmail(`
     <h2 style="margin:0 0 8px;color:#0c0a3e;font-size:20px">New review submitted</h2>
     <p style="margin:0 0 20px;color:#555;font-size:14px">${badge}</p>
 
@@ -157,9 +192,7 @@ export async function sendOwnerReviewNotification(review: ReviewNotificationData
         ? `<a href="${adminUrl}" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:600;font-size:14px">✅ Review &amp; Approve</a>`
         : `<p style="margin-top:12px;margin-bottom:0;color:#555;font-size:14px">This review has been verified.</p>`
     }
-  </div>
-</body>
-</html>`;
+`);
 
   try {
     await getResend().emails.send({
@@ -325,12 +358,7 @@ export async function sendOwnerBookingNotification(
       : "";
 
   // Render the email body
-  const html = `
-<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="font-family:system-ui,sans-serif;background:#f6f7f8;margin:0;padding:24px">
-  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
+  const html = renderNotificationEmail(`
     <h2 style="margin:0 0 4px;color:#0c0a3e;font-size:20px">${heading}</h2>
     <p style="margin:0 0 4px;color:#555;font-size:14px">${start}</p>
     ${previousLine}
@@ -343,9 +371,7 @@ export async function sendOwnerBookingNotification(
     </div>
 
     ${ownerMapHtml(booking)}
-  </div>
-</body>
-</html>`;
+`);
 
   // Send via Resend
   try {
@@ -427,12 +453,7 @@ export async function sendCustomerBookingConfirmation(
     : "";
 
   // Render the email body
-  const html = `
-<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="font-family:system-ui,sans-serif;background:#f6f7f8;margin:0;padding:24px">
-  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
+  const html = renderNotificationEmail(`
     <h2 style="margin:0 0 12px;color:#0c0a3e;font-size:20px">${heading}</h2>
     <p style="margin:0 0 20px;color:#444;line-height:1.6">${intro}</p>
 
@@ -462,9 +483,7 @@ export async function sendCustomerBookingConfirmation(
     <p style="margin:28px 0 6px;color:#888;font-size:13px;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Cancellation policy</p>
     <p style="margin:0;color:#444;font-size:13px;line-height:1.6">${renderEmphasisedHtml(cancellationText)}</p>
 ${await buildEmailSignature(siteUrl)}
-  </div>
-</body>
-</html>`;
+`);
 
   // Send via Resend
   try {
@@ -523,12 +542,7 @@ export async function sendBookingReminderEmail(booking: BookingNotificationData)
 
   // Render the email body. The "tomorrow" wording assumes comms.reminderLeadHours
   // stays near 24h; revisit this copy if that lead time moves far from a day.
-  const html = `
-<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="font-family:system-ui,sans-serif;background:#f6f7f8;margin:0;padding:24px">
-  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
+  const html = renderNotificationEmail(`
     <h2 style="margin:0 0 12px;color:#0c0a3e;font-size:20px">Hi ${safeFirstName}, just a reminder</h2>
     <p style="margin:0 0 20px;color:#444;line-height:1.6">Your appointment with To the Point Tech is coming up tomorrow.</p>
 
@@ -557,9 +571,7 @@ export async function sendBookingReminderEmail(booking: BookingNotificationData)
     <p style="margin:28px 0 6px;color:#888;font-size:13px;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Cancellation policy</p>
     <p style="margin:0;color:#444;font-size:13px;line-height:1.6">${renderEmphasisedHtml(cancellationText)}</p>
 ${await buildEmailSignature(siteUrl)}
-  </div>
-</body>
-</html>`;
+`);
 
   // Send via Resend
   try {
@@ -622,20 +634,13 @@ export async function sendBookingManageLinksEmail(
     .join("");
 
   const plural = bookings.length === 1 ? "appointment" : "appointments";
-  const html = `
-<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="font-family:system-ui,sans-serif;background:#f6f7f8;margin:0;padding:24px">
-  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
+  const html = renderNotificationEmail(`
     <h2 style="margin:0 0 12px;color:#0c0a3e;font-size:20px">Your upcoming ${plural}</h2>
     <p style="margin:0 0 20px;color:#444;line-height:1.6">Here are the links to change or cancel. If you didn't ask for this email you can safely ignore it.</p>
     ${rows}
     <p style="margin:20px 0 0;color:#444;font-size:14px;line-height:1.6">Prefer to talk it through? Just reply to this email.</p>
 ${await buildEmailSignature(siteUrl)}
-  </div>
-</body>
-</html>`;
+`);
 
   try {
     await getResend().emails.send({
@@ -689,12 +694,7 @@ export async function sendCustomerReviewRequest(booking: ReviewRequestData): Pro
   const firstName = booking.name.split(" ")[0];
   const safeFirstName = escapeHtml(firstName);
 
-  const html = `
-<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="font-family:system-ui,sans-serif;background:#f6f7f8;margin:0;padding:24px">
-  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
+  const html = renderNotificationEmail(`
     <h2 style="margin:0 0 12px;color:#0c0a3e;font-size:20px">Hi ${safeFirstName}, how did everything go?</h2>
     <p style="margin:0 0 12px;color:#444;line-height:1.6">It was great meeting you - I hope I managed to get everything sorted and left you feeling a bit less frustrated with technology!</p>
     <p style="margin:0 0 12px;color:#444;line-height:1.6">If you have a spare moment, I'd love to hear how it went. A quick review makes a real difference for a small local business like mine, and helps other people find reliable tech support when they need it.</p>
@@ -703,9 +703,7 @@ export async function sendCustomerReviewRequest(booking: ReviewRequestData): Pro
 
     <p style="margin:28px 0 20px;color:#444;font-size:14px;line-height:1.6">Thanks again for choosing ${identity.company} Tech. If you ever need a hand with anything else, don't hesitate to get in touch.</p>
 ${await buildEmailSignature(siteUrl)}
-  </div>
-</body>
-</html>`;
+`);
 
   try {
     await getResend().emails.send({
@@ -884,11 +882,7 @@ export async function buildInvoiceEmail({
   const subject = isQuote
     ? `Your quote from ${identity.company} Tech (${invoice.number})`
     : `Your invoice from ${identity.company} Tech (${invoice.number})`;
-  const html = `<!doctype html>
-<html lang="en">
-<head><meta charset="utf-8" /></head>
-<body style="margin:0;padding:24px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0c0a3e;background:#f6f7f8">
-  <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:12px;padding:24px">
+  const html = renderDocumentEmail(`
     <h1 style="margin:0 0 16px;font-size:20px;font-weight:700;color:#0c0a3e">Hi ${safeGreeting},</h1>
 
     <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#333;white-space:pre-wrap">${safeBody}</p>
@@ -908,9 +902,7 @@ export async function buildInvoiceEmail({
     ${reviewLine}
 
     ${await buildEmailSignature(siteUrl)}
-  </div>
-</body>
-</html>`;
+`);
 
   return { subject, html };
 }
@@ -1026,11 +1018,7 @@ export async function sendInvoiceReminderEmail({
       : "If you've already paid in the last day or two, please ignore this - bank transfers can cross over.";
 
   const subject = `Friendly reminder - invoice ${invoice.number} (${totalLabel})`;
-  const html = `<!doctype html>
-<html lang="en">
-<head><meta charset="utf-8" /></head>
-<body style="margin:0;padding:24px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0c0a3e;background:#f6f7f8">
-  <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:12px;padding:24px">
+  const html = renderDocumentEmail(`
     <h1 style="margin:0 0 16px;font-size:20px;font-weight:700;color:#0c0a3e">Hi ${greeting},</h1>
 
     <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#333">Just a friendly nudge - invoice ${safeNumber} was due on ${dueDate} and hasn't come through yet. A copy is attached.</p>
@@ -1051,9 +1039,7 @@ export async function sendInvoiceReminderEmail({
     <p style="margin:0;font-size:14px;color:#333">${closing}</p>
 
     ${await buildEmailSignature(siteUrl)}
-  </div>
-</body>
-</html>`;
+`);
 
   try {
     await getResend().emails.send({
@@ -1112,11 +1098,7 @@ export async function buildVoidEmail({
   const totalLabel = escapeHtml(formatNZD(invoice.total));
 
   const subject = `Invoice ${invoice.number} - voided`;
-  const html = `<!doctype html>
-<html lang="en">
-<head><meta charset="utf-8" /></head>
-<body style="margin:0;padding:24px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0c0a3e;background:#f6f7f8">
-  <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:12px;padding:24px">
+  const html = renderDocumentEmail(`
     <h1 style="margin:0 0 16px;font-size:20px;font-weight:700;color:#0c0a3e">Hi ${safeGreeting},</h1>
 
     <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#333;white-space:pre-wrap">${safeBody}</p>
@@ -1130,9 +1112,7 @@ export async function buildVoidEmail({
     <p style="margin:0;font-size:14px;color:#333">Any questions, just reply.</p>
 
     ${await buildEmailSignature(siteUrl)}
-  </div>
-</body>
-</html>`;
+`);
 
   return { subject, html };
 }
@@ -1262,12 +1242,7 @@ export async function sendBusinessEnquiryNotification(enquiry: BusinessEnquiryDa
     ? `<p style="margin:0 0 12px;font-size:14px;color:#444"><a href="tel:${escapeHtml(enquiry.phone)}" style="color:#43bccd">${escapeHtml(enquiry.phone)}</a></p>`
     : "";
 
-  const html = `
-<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="font-family:system-ui,sans-serif;background:#f6f7f8;margin:0;padding:24px">
-  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
+  const html = renderNotificationEmail(`
     <h2 style="margin:0 0 4px;color:#0c0a3e;font-size:20px">New business enquiry</h2>
     ${metaLine ? `<p style="margin:0 0 16px;color:#555;font-size:14px">${metaLine}</p>` : ""}
 
@@ -1280,9 +1255,7 @@ export async function sendBusinessEnquiryNotification(enquiry: BusinessEnquiryDa
       <p style="margin:0 0 4px;font-size:14px;color:#888">What they need</p>
       <p style="margin:0;font-size:14px;color:#444;line-height:1.6">${needsHtml}</p>
     </div>
-  </div>
-</body>
-</html>`;
+`);
 
   try {
     await getResend().emails.send({
@@ -1323,12 +1296,7 @@ export async function sendBusinessEnquiryAck(enquiry: BusinessEnquiryData): Prom
   const aboutTarget = enquiry.company ? ` for ${escapeHtml(enquiry.company)}` : "";
   const signature = await buildEmailSignature(siteUrl);
 
-  const html = `
-<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="font-family:system-ui,sans-serif;background:#f6f7f8;margin:0;padding:24px">
-  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
+  const html = renderNotificationEmail(`
     <h2 style="margin:0 0 16px;color:#0c0a3e;font-size:20px">Thanks for getting in touch</h2>
     <p style="margin:0 0 12px;color:#222;font-size:15px;line-height:1.6">Hi ${safeFirstName},</p>
     <p style="margin:0 0 12px;color:#222;font-size:15px;line-height:1.6">
@@ -1339,9 +1307,7 @@ export async function sendBusinessEnquiryAck(enquiry: BusinessEnquiryData): Prom
       If it's urgent, feel free to ring me directly.
     </p>
     ${signature}
-  </div>
-</body>
-</html>`;
+`);
 
   try {
     await getResend().emails.send({
