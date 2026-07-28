@@ -13,10 +13,10 @@ import {
   buildAvailableDays,
   parseBookingNotes,
   type BookableDay,
-  type ExistingBooking,
   type JobDuration,
   type TimeOfDay,
 } from "@/features/booking/lib/booking";
+import { loadBlockingBookings } from "@/features/booking/lib/existing-bookings.server";
 import { fetchAllCalendarEvents } from "@/features/calendar/lib/google-calendar";
 import { Button } from "@/shared/components/Button";
 import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
@@ -24,6 +24,7 @@ import { getIdentity } from "@/shared/lib/business-identity.server";
 import { cn } from "@/shared/lib/cn";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
+import { nzDateKey } from "@/shared/lib/timezone-utils";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type React from "react";
@@ -35,20 +36,6 @@ export const metadata: Metadata = {
   title: "Edit booking",
   robots: { index: false, follow: false },
 };
-
-/**
- * Derive NZ dateKey (YYYY-MM-DD) from a UTC Date.
- * @param date - UTC date object.
- * @returns NZ local date string.
- */
-function getNZDateKey(date: Date): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Pacific/Auckland",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
-}
 
 /**
  * Derive NZ local hour (24h) from a UTC Date.
@@ -74,15 +61,8 @@ async function getAvailableDays(excludeBookingId: string): Promise<BookableDay[]
   const { config } = await getAvailabilityConfig();
   const maxDate = new Date(now.getTime() + config.maxAdvanceDays * 24 * 60 * 60 * 1000);
 
-  const [existingBookings, cachedEvents] = await Promise.all([
-    prisma.booking.findMany({
-      where: {
-        id: { not: excludeBookingId },
-        status: { in: ["held", "confirmed"] },
-        endAt: { gte: now },
-      },
-      select: { id: true, startAt: true, endAt: true, bufferBeforeMin: true, bufferAfterMin: true },
-    }),
+  const [existing, cachedEvents] = await Promise.all([
+    loadBlockingBookings(now, { excludeId: excludeBookingId }),
     prisma.calendarEventCache.findMany({
       where: { expiresAt: { gt: now }, endAt: { gte: now } },
       select: { eventId: true, startAt: true, endAt: true },
@@ -105,14 +85,6 @@ async function getAvailableDays(excludeBookingId: string): Promise<BookableDay[]
       calendarEvents = [];
     }
   }
-
-  const existing: ExistingBooking[] = existingBookings.map((b) => ({
-    id: b.id,
-    startAt: b.startAt,
-    endAt: b.endAt,
-    bufferBeforeMin: b.bufferBeforeMin,
-    bufferAfterMin: b.bufferAfterMin,
-  }));
 
   return buildAvailableDays(existing, calendarEvents, now, config).days;
 }
@@ -171,7 +143,7 @@ export default async function EditBookingPage({
   const durationMinutes = (booking.endAt.getTime() - booking.startAt.getTime()) / 60000;
   const duration: JobDuration = durationMinutes <= 60 ? "short" : "long";
 
-  const dateKey = getNZDateKey(booking.startAt);
+  const dateKey = nzDateKey(booking.startAt);
   const nzHour = getNZHour(booking.startAt);
   const matchedSlot = TIME_OF_DAY_OPTIONS.find((t) => t.startHour === nzHour);
   const timeOfDay: TimeOfDay = matchedSlot?.value ?? "10am";

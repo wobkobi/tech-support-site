@@ -38,10 +38,7 @@ export async function PATCH(
     const review = await prisma.review.findUnique({ where: { id } });
     if (!review) {
       console.error("[PATCH] Not found: returning 404");
-      return new NextResponse(JSON.stringify({ error: "Review not found." }), {
-        status: 404,
-        headers: { "Content-Type": "application/json" },
-      });
+      return errorResponse("Review not found.", 404);
     }
     // Authorised when the supplied ref matches the review's stored ref, OR when
     // it is one of the linked contact's tokens (primary or merge-inherited alt)
@@ -60,10 +57,7 @@ export async function PATCH(
     }
     if (!directMatch && !contactTokenMatch) {
       console.error("[PATCH] Unauthorized: returning 403");
-      return new NextResponse(JSON.stringify({ error: "Unauthorized." }), {
-        status: 403,
-        headers: { "Content-Type": "application/json" },
-      });
+      return errorResponse("Unauthorized.", 403);
     }
 
     // Update review, reset status to pending

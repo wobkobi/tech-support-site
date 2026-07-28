@@ -13,8 +13,8 @@ import {
   NumberField,
   TextField,
 } from "@/features/admin/components/settings/SettingsFields";
+import { SettingsFooter } from "@/features/admin/components/settings/SettingsFooter";
 import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
-import { SettingsSaveBar } from "@/features/admin/components/settings/SettingsSaveBar";
 import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import { IDENTITY_FIELD_META } from "@/shared/lib/settings/field-meta";
@@ -49,7 +49,7 @@ function SectionHeading({ children }: { children: React.ReactNode }): React.Reac
  */
 export function IdentityTab({ initial, defaults }: Props): React.ReactElement {
   const form = useSettingsForm("identity", initial, defaults);
-  const { draft, setDraft, dirty, saving, fieldErrors, blocks, savedAt } = form;
+  const { draft, setDraft, fieldErrors } = form;
   const m = IDENTITY_FIELD_META;
 
   /**
@@ -257,25 +257,7 @@ export function IdentityTab({ initial, defaults }: Props): React.ReactElement {
         </FieldShell>
       </div>
 
-      {/* Guardrail blocks */}
-      {blocks.length > 0 && (
-        <div className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4">
-          <p className="text-sm font-semibold text-red-700">Can&apos;t save yet:</p>
-          <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-red-700">
-            {blocks.map((b) => (
-              <li key={b}>{b}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      <SettingsSaveBar
-        dirty={dirty}
-        saving={saving}
-        savedAt={savedAt}
-        onSave={() => void form.save()}
-        onReset={form.resetToDefault}
-      />
+      <SettingsFooter form={form} />
 
       <SettingsHistory group="identity" onRestore={(v: IdentitySettings) => setDraft(v)} />
     </div>

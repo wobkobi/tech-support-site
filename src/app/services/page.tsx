@@ -180,8 +180,8 @@ export default async function ServicesPage(): Promise<React.ReactElement> {
             </p>
 
             <p className="text-base text-rich-black/90 sm:text-lg">
-              Every job includes clear explanations, and I can leave notes so you know what changed
-              and how to handle things next time.
+              I'll explain what I'm doing as I go, and I can leave you notes on what changed so you
+              know how to handle it next time.
             </p>
           </section>
 

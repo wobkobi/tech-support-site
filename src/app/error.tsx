@@ -5,12 +5,10 @@
 
 "use client";
 
-import { Button } from "@/shared/components/Button";
-import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
-import { cn } from "@/shared/lib/cn";
+import { ErrorPageShell } from "@/shared/components/ErrorPageShell";
 import type React from "react";
-import { useEffect, useState } from "react";
-import { FaArrowRotateRight, FaHouse } from "react-icons/fa6";
+import { useState } from "react";
+import { FaHouse } from "react-icons/fa6";
 
 const MESSAGES = [
   "Something broke. Which is ironic, given that fixing broken things is literally my job.",
@@ -41,65 +39,25 @@ export default function Error({
   error: Error;
   reset: () => void;
 }): React.ReactElement {
-  const msg = (error?.message || "").trim().slice(0, 300) || "An unexpected error occurred.";
   const [quip] = useState(() => MESSAGES[Math.floor(Math.random() * MESSAGES.length)]);
   // Client-render exceptions aren't redacted by Next, so their message/stack
   // are only shown in development; production logs them to the console instead.
   const showDetails = process.env.NODE_ENV !== "production";
 
-  useEffect(() => {
-    console.error("[error boundary]:", error);
-  }, [error]);
-
   return (
-    <PageShell>
-      <FrostedSection maxWidth="56rem">
-        <div className="flex flex-col gap-6 sm:gap-8">
-          <section className={cn(CARD, "text-center")}>
-            <div className="mb-4 text-7xl font-extrabold text-coquelicot-500 sm:text-8xl">
-              Oops!
-            </div>
-
-            <h1 className="mb-4 text-3xl font-extrabold text-russian-violet sm:text-4xl md:text-5xl">
-              The website has encountered an error
-            </h1>
-
-            <p className="mb-6 text-base text-rich-black sm:text-lg md:text-xl">{quip}</p>
-
-            {showDetails && (
-              <p
-                className="mb-6 text-sm wrap-break-word text-rich-black/70 italic sm:text-base"
-                role="status"
-                aria-live="polite"
-              >
-                {msg}
-              </p>
-            )}
-
-            <div className="flex flex-wrap items-center justify-center gap-3">
-              <Button type="button" onClick={reset} variant="primary">
-                <FaArrowRotateRight className="h-5 w-5" aria-hidden />
-                Try again
-              </Button>
-              <Button href="/" variant="ghost">
-                <FaHouse className="h-5 w-5" aria-hidden />
-                Go home
-              </Button>
-            </div>
-
-            {showDetails && (
-              <details className="mt-6 text-base text-rich-black/80">
-                <summary className="cursor-pointer font-semibold hover:text-russian-violet">
-                  Technical details (for the curious)
-                </summary>
-                <pre className="mt-3 max-w-full overflow-auto rounded-lg border border-seasalt-200/60 bg-white/60 p-4 text-left text-base">
-                  {String(error?.stack || error)}
-                </pre>
-              </details>
-            )}
-          </section>
-        </div>
-      </FrostedSection>
-    </PageShell>
+    <ErrorPageShell
+      title="The website has encountered an error"
+      body={quip}
+      error={error}
+      onReset={reset}
+      secondary={{
+        href: "/",
+        label: "Go home",
+        icon: <FaHouse className="h-5 w-5" aria-hidden />,
+      }}
+      showMessage={showDetails}
+      detailsSummary={showDetails ? "Technical details (for the curious)" : undefined}
+      logPrefix="[error boundary]:"
+    />
   );
 }

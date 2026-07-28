@@ -7,15 +7,11 @@
  * 8am NZ time via cron-job.org.
  */
 
-import { advanceNextDue, calcGstFromInclusive } from "@/features/business/lib/business";
-import {
-  appendRowWithSyncId,
-  buildExpenseCells,
-  resolveSheetIdForDate,
-} from "@/features/business/lib/sheets-sync";
+import { recordSubscriptionPayment } from "@/features/business/lib/subscription-recording";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isCronAuthorized } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
+import { nzTodayKey } from "@/shared/lib/timezone-utils";
 import { NextRequest, NextResponse } from "next/server";
 
 // Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
@@ -35,13 +31,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   // nextDue is stored as UTC midnight (admin form + advanceNextDue), so UTC
   // midnight of today's NZ date is the correct ceiling for `nextDue <=`.
-  const nzDateStr = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Pacific/Auckland",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
-  const todayNZ = new Date(nzDateStr + "T00:00:00.000Z");
+  const todayNZ = new Date(`${nzTodayKey()}T00:00:00.000Z`);
 
   // Find subscriptions due today
   const due = await prisma.subscription.findMany({
@@ -55,60 +45,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   for (const sub of due) {
     try {
-      // Compute GST split and next due date
-      const rate = sub.gstRate;
-      const inclNum = sub.amountIncl;
-      const gstAmount = calcGstFromInclusive(inclNum, rate);
-      const amountExcl = Math.round((inclNum - gstAmount) * 100) / 100;
-      const nextDue = advanceNextDue(sub.nextDue, sub.frequency);
-
-      // CAS on nextDue makes concurrent runs idempotent. Post-CAS errors leave
-      // admin to re-record manually - safer than risking a duplicate.
-      const claim = await prisma.subscription.updateMany({
-        where: { id: sub.id, nextDue: sub.nextDue },
-        data: { nextDue },
-      });
-      if (claim.count === 0) {
+      const { claimed } = await recordSubscriptionPayment(sub, todayNZ);
+      if (!claimed) {
         skipped.push(sub.id);
         continue;
       }
-
-      // Record the expense entry
-      const expense = await prisma.expenseEntry.create({
-        data: {
-          // Use the NZ calendar date (UTC midnight), not the raw UTC "now":
-          // the cron runs at 8am NZ when UTC is still the previous day, which
-          // would land the expense a day early.
-          date: todayNZ,
-          supplier: sub.supplier,
-          description: sub.description,
-          category: sub.category,
-          amountIncl: inclNum,
-          gstAmount,
-          amountExcl,
-          method: sub.method,
-          receipt: false,
-          notes: sub.notes,
-        },
-      });
-
-      // Append to the per-FY Expenses sheet with a Sync ID so the row joins
-      // the two-way sync. Failures leave sheetRowKey null; the sync cron
-      // self-heals those by appending later.
-      try {
-        const spreadsheetId = await resolveSheetIdForDate(todayNZ);
-        if (spreadsheetId) {
-          const sheetRowKey = await appendRowWithSyncId(
-            spreadsheetId,
-            "Expenses",
-            buildExpenseCells(expense),
-          );
-          await prisma.expenseEntry.update({ where: { id: expense.id }, data: { sheetRowKey } });
-        }
-      } catch (sheetErr) {
-        console.error(`[cron/record-subscriptions] Sheet append failed for ${sub.id}:`, sheetErr);
-      }
-
       recorded.push(sub.id);
     } catch (err) {
       console.error(`[cron/record-subscriptions] Failed to record ${sub.id}:`, err);

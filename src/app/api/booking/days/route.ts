@@ -4,12 +4,8 @@
  */
 
 import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
-import {
-  BOOKING_CONFIG,
-  buildAvailableDays,
-  type ExistingBooking,
-} from "@/features/booking/lib/booking";
-import { prisma } from "@/shared/lib/prisma";
+import { BOOKING_CONFIG, buildAvailableDays } from "@/features/booking/lib/booking";
+import { loadBlockingBookings } from "@/features/booking/lib/existing-bookings.server";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -76,28 +72,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     const maxDate = new Date(now.getTime() + (config.maxAdvanceDays + 1) * 24 * 60 * 60 * 1000);
 
-    // Get existing bookings from database
-    const existingBookings = await prisma.booking.findMany({
-      where: {
-        status: { in: ["held", "confirmed"] },
-        endAt: { gte: now }, // Only future bookings matter
-      },
-      select: {
-        id: true,
-        startAt: true,
-        endAt: true,
-        bufferBeforeMin: true,
-        bufferAfterMin: true,
-      },
-    });
-
-    const existingForSlots: ExistingBooking[] = existingBookings.map((b) => ({
-      id: b.id,
-      startAt: b.startAt,
-      endAt: b.endAt,
-      bufferBeforeMin: b.bufferBeforeMin,
-      bufferAfterMin: b.bufferAfterMin,
-    }));
+    const existingForSlots = await loadBlockingBookings(now);
 
     console.log(`[booking/days] Found ${existingForSlots.length} database bookings`);
 

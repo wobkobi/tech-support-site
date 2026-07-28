@@ -9,6 +9,7 @@
  */
 
 import { syncInvoicePdfToDrive } from "@/features/business/lib/invoice-drive-sync";
+import { parseInvoiceEmailOverrides } from "@/features/business/lib/invoice-email-request";
 import { generateInvoicePdf, serializeInvoice } from "@/features/business/lib/invoice-pdf";
 import { sendVoidNotification } from "@/features/reviews/lib/email";
 import { errorResponse } from "@/shared/lib/api-response";
@@ -46,14 +47,7 @@ export async function POST(
   }
 
   // Parse optional overrides
-  const body = (await request.json().catch(() => ({}))) as {
-    sendNotification?: unknown;
-    greetingName?: unknown;
-    customBody?: unknown;
-  };
-  const sendNotification = body.sendNotification === true;
-  const greetingName = typeof body.greetingName === "string" ? body.greetingName : undefined;
-  const customBody = typeof body.customBody === "string" ? body.customBody : undefined;
+  const { greetingName, customBody, sendNotification } = await parseInvoiceEmailOverrides(request);
 
   // Idempotent for already-voided invoices: skip the status flip + voidedAt
   // stamp and just (re)send the notification + (re)sync Drive. Useful when

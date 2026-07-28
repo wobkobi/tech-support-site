@@ -73,13 +73,14 @@ export default function AboutPage(): React.ReactElement {
 
             <p className="mb-4 text-base text-rich-black sm:text-lg">
               I'm Harrison Raynes, a computer science graduate based in Auckland. I started To The
-              Point Tech because I saw how many people struggle with everyday technology problems
-              but don't have anyone reliable to call.
+              Point Tech because plenty of people have a computer problem and no one straightforward
+              to call about it.
             </p>
 
             <p className="text-base text-rich-black/80 sm:text-lg">
-              My focus is on practical fixes and clear explanations. I want to leave your tech in a
-              better state than I found it, and make sure you understand what changed and why.
+              I come to you and fix it on the spot where I can. You'll know what went wrong and what
+              I changed, in words that actually mean something, so next time it happens you might
+              not need to call me at all.
             </p>
           </section>
 

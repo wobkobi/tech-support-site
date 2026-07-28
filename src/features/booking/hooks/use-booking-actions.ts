@@ -11,6 +11,7 @@
  */
 
 import { useToast } from "@/features/admin/components/ui/Toast";
+import { apiFetch } from "@/shared/lib/api-client";
 import { useCallback, useMemo } from "react";
 
 /** Outcome of a booking mutation. */
@@ -46,19 +47,6 @@ export interface UseBookingActions {
   resendReview: (id: string, alreadySent?: boolean) => Promise<BookingActionResult>;
 }
 
-const JSON_HEADERS = { "Content-Type": "application/json" };
-
-/**
- * Reads an `{ error }` body, falling back when the response isn't JSON.
- * @param res - The failed response.
- * @param fallback - Message to use when no error field is present.
- * @returns The error message.
- */
-async function readError(res: Response, fallback: string): Promise<string> {
-  const data = (await res.json().catch(() => ({}))) as { error?: string };
-  return data.error ?? fallback;
-}
-
 /**
  * Booking mutation wrappers with built-in toasts. Consumed by the bookings list,
  * the booking detail page, and the schedule action sheet.
@@ -69,25 +57,16 @@ export function useBookingActions(): UseBookingActions {
 
   const patchBooking = useCallback<UseBookingActions["patchBooking"]>(
     async (id, body, successMsg) => {
-      try {
-        const res = await fetch(`/api/admin/bookings/${id}`, {
-          method: "PATCH",
-          headers: JSON_HEADERS,
-          body: JSON.stringify(body),
-        });
-        if (!res.ok) {
-          const error = await readError(res, "Action failed.");
-          toast(error, { tone: "error" });
-          return { ok: false, error };
-        }
-        const data = (await res.json().catch(() => ({}))) as { reviewSent?: boolean };
-        if (successMsg) toast(successMsg, { tone: "success" });
-        return { ok: true, reviewSent: data.reviewSent };
-      } catch {
-        const error = "Network error - try again.";
-        toast(error, { tone: "error" });
-        return { ok: false, error };
+      const res = await apiFetch<{ reviewSent?: boolean }>(`/api/admin/bookings/${id}`, {
+        method: "PATCH",
+        json: body,
+      });
+      if (!res.ok) {
+        toast(res.error, { tone: "error" });
+        return { ok: false, error: res.error };
       }
+      if (successMsg) toast(successMsg, { tone: "success" });
+      return { ok: true, reviewSent: res.data.reviewSent };
     },
     [toast],
   );
@@ -125,40 +104,26 @@ export function useBookingActions(): UseBookingActions {
 
   const deleteBooking = useCallback<UseBookingActions["deleteBooking"]>(
     async (id) => {
-      try {
-        const res = await fetch(`/api/admin/bookings/${id}`, { method: "DELETE" });
-        if (!res.ok) {
-          const error = await readError(res, "Delete failed.");
-          toast(error, { tone: "error" });
-          return { ok: false, error };
-        }
-        toast("Booking deleted.", { tone: "success" });
-        return { ok: true };
-      } catch {
-        const error = "Network error - try again.";
-        toast(error, { tone: "error" });
-        return { ok: false, error };
+      const res = await apiFetch(`/api/admin/bookings/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        toast(res.error, { tone: "error" });
+        return { ok: false, error: res.error };
       }
+      toast("Booking deleted.", { tone: "success" });
+      return { ok: true };
     },
     [toast],
   );
 
   const resendReview = useCallback<UseBookingActions["resendReview"]>(
     async (id, alreadySent) => {
-      try {
-        const res = await fetch(`/api/admin/bookings/${id}/resend-review`, { method: "POST" });
-        if (!res.ok) {
-          const error = await readError(res, "Failed to send.");
-          toast(error, { tone: "error" });
-          return { ok: false, error };
-        }
-        toast(alreadySent ? "Review email re-sent." : "Review email sent.", { tone: "success" });
-        return { ok: true };
-      } catch {
-        const error = "Network error - try again.";
-        toast(error, { tone: "error" });
-        return { ok: false, error };
+      const res = await apiFetch(`/api/admin/bookings/${id}/resend-review`, { method: "POST" });
+      if (!res.ok) {
+        toast(res.error, { tone: "error" });
+        return { ok: false, error: res.error };
       }
+      toast(alreadySent ? "Review email re-sent." : "Review email sent.", { tone: "success" });
+      return { ok: true };
     },
     [toast],
   );

@@ -9,11 +9,11 @@ import {
   splitUnitFromAddress,
   validateBookingPayloadFields,
   validateBookingRequest,
-  type ExistingBooking,
   type JobDuration,
   type StartMinute,
   type TimeOfDay,
 } from "@/features/booking/lib/booking";
+import { loadBlockingBookings } from "@/features/booking/lib/existing-bookings.server";
 import { lookupDriveRoundTrip } from "@/features/business/lib/travel-distance";
 import {
   createBookingEvent,
@@ -151,29 +151,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const { config } = await getAvailabilityConfig();
     const maxDate = new Date(now.getTime() + config.maxAdvanceDays * 24 * 60 * 60 * 1000);
 
-    // Get existing bookings, excluding the one being edited
-    const existingBookings = await prisma.booking.findMany({
-      where: {
-        id: { not: booking.id },
-        status: { in: ["held", "confirmed"] },
-        endAt: { gte: now },
-      },
-      select: {
-        id: true,
-        startAt: true,
-        endAt: true,
-        bufferBeforeMin: true,
-        bufferAfterMin: true,
-      },
-    });
-
-    const existingForValidation: ExistingBooking[] = existingBookings.map((b) => ({
-      id: b.id,
-      startAt: b.startAt,
-      endAt: b.endAt,
-      bufferBeforeMin: b.bufferBeforeMin,
-      bufferAfterMin: b.bufferAfterMin,
-    }));
+    // Excluding the one being edited, so it can keep its own slot.
+    const existingForValidation = await loadBlockingBookings(now, { excludeId: booking.id });
 
     // Fetch calendar events, excluding the current booking's event
     let calendarEvents: Array<{ id: string; start: string; end: string }> = [];

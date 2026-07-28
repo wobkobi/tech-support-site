@@ -58,21 +58,12 @@ function emptyForm(): FormState {
 }
 
 /**
- * Today's date as a YYYY-MM-DD string in NZ time. Overdue/due-today are calendar
- * comparisons for a NZ operator, so UTC would lag by up to 13 hours.
- * @returns NZ-local ISO date string.
- */
-function nzTodayISO(): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Pacific/Auckland" }).format(new Date());
-}
-
-/**
  * Returns true if the subscription's next due date is in the past.
  * @param nextDue - ISO date string of next due date.
  * @returns Whether the subscription is overdue.
  */
 function isOverdue(nextDue: string): boolean {
-  return new Date(nextDue) < new Date(nzTodayISO());
+  return new Date(nextDue) < new Date(todayISO());
 }
 
 /**
@@ -81,7 +72,7 @@ function isOverdue(nextDue: string): boolean {
  * @returns Whether the subscription is due today.
  */
 function isDueToday(nextDue: string): boolean {
-  return nextDue.startsWith(nzTodayISO());
+  return nextDue.startsWith(todayISO());
 }
 
 /**
@@ -186,12 +177,12 @@ export function SubscriptionsView({ reloadKey = 0 }: { reloadKey?: number }): Re
     try {
       const res = await fetch(`/api/business/subscriptions/${sub.id}/record`, {
         method: "POST",
-        headers: {},
       });
       const data = (await res.json()) as {
         ok: boolean;
         nextDue?: string;
         sheetSyncWarning?: boolean;
+        error?: string;
       };
       if (res.ok && data.ok) {
         const msg = data.sheetSyncWarning
@@ -200,7 +191,10 @@ export function SubscriptionsView({ reloadKey = 0 }: { reloadKey?: number }): Re
         toast(msg, { tone: data.sheetSyncWarning ? "warning" : "success" });
         await load();
       } else {
-        toast("Record failed.", { tone: "error" });
+        // A 409 means the period was already claimed (cron got there first, or a
+        // double click), so show the server's wording rather than "failed".
+        toast(data.error ?? "Record failed.", { tone: "error" });
+        if (res.status === 409) await load();
       }
     } finally {
       setRecording(null);
@@ -230,7 +224,6 @@ export function SubscriptionsView({ reloadKey = 0 }: { reloadKey?: number }): Re
     try {
       await fetch(`/api/business/subscriptions/${sub.id}`, {
         method: "DELETE",
-        headers: {},
       });
       toast("Deleted.", { tone: "success" });
       await load();

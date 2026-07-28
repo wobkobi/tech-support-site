@@ -10,11 +10,12 @@
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
+import { ADMIN_CONTROL_CLS, ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { formatNZD, todayISO } from "@/features/business/lib/business";
 import { INCOME_METHODS } from "@/features/business/lib/constants";
-import { listFinancialYears } from "@/features/business/lib/financial-year";
+import { fyKeyOf, listFinancialYears } from "@/features/business/lib/financial-year";
 import type { IncomeEntry } from "@/features/business/types/business";
 import { Field } from "@/shared/components/Field";
 import { formatDateShort } from "@/shared/lib/date-format";
@@ -26,10 +27,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 type SortKey = "date" | "customer" | "amount";
 /** Sort direction. */
 type SortDir = "asc" | "desc";
-
-const INPUT_CLS =
-  "w-full rounded-lg border border-admin-border-strong bg-admin-surface px-3 py-2 text-sm text-admin-text focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-russian-violet";
-const CONTROL_CLS = `h-9 ${INPUT_CLS}`;
 
 /**
  * Client component for recording, filtering, and displaying income entries.
@@ -242,7 +239,7 @@ export function IncomeView(): React.ReactElement {
               required
               value={form.date}
               onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))}
-              className={INPUT_CLS}
+              className={ADMIN_INPUT_CLS}
             />
           </Field>
           <Field label="Customer" htmlFor="inc-customer" required>
@@ -252,7 +249,7 @@ export function IncomeView(): React.ReactElement {
               required
               value={form.customer}
               onChange={(e) => setForm((p) => ({ ...p, customer: e.target.value }))}
-              className={INPUT_CLS}
+              className={ADMIN_INPUT_CLS}
             />
           </Field>
           <Field label="Description" htmlFor="inc-description" required>
@@ -262,7 +259,7 @@ export function IncomeView(): React.ReactElement {
               required
               value={form.description}
               onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
-              className={INPUT_CLS}
+              className={ADMIN_INPUT_CLS}
             />
           </Field>
           <Field label="Amount (NZD)" htmlFor="inc-amount" required>
@@ -274,7 +271,7 @@ export function IncomeView(): React.ReactElement {
               step="0.01"
               value={form.amount}
               onChange={(e) => setForm((p) => ({ ...p, amount: e.target.value }))}
-              className={INPUT_CLS}
+              className={ADMIN_INPUT_CLS}
             />
           </Field>
           <Field label="Payment method" htmlFor="inc-method">
@@ -282,7 +279,7 @@ export function IncomeView(): React.ReactElement {
               id="inc-method"
               value={form.method}
               onChange={(e) => setForm((p) => ({ ...p, method: e.target.value }))}
-              className={INPUT_CLS}
+              className={ADMIN_INPUT_CLS}
             >
               {INCOME_METHODS.map((m) => (
                 <option key={m}>{m}</option>
@@ -295,7 +292,7 @@ export function IncomeView(): React.ReactElement {
               type="text"
               value={form.notes}
               onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
-              className={INPUT_CLS}
+              className={ADMIN_INPUT_CLS}
             />
           </Field>
         </div>
@@ -321,12 +318,16 @@ export function IncomeView(): React.ReactElement {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Customer or description"
-            className={CONTROL_CLS}
+            className={ADMIN_CONTROL_CLS}
           />
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-xs font-medium text-admin-muted">Financial year</span>
-          <select value={fyKey} onChange={(e) => setFyKey(e.target.value)} className={CONTROL_CLS}>
+          <select
+            value={fyKey}
+            onChange={(e) => setFyKey(e.target.value)}
+            className={ADMIN_CONTROL_CLS}
+          >
             <option value="all">All years</option>
             {financialYears.map((f) => (
               <option key={f.label} value={fyKeyOf(f.label)}>
@@ -340,7 +341,7 @@ export function IncomeView(): React.ReactElement {
           <select
             value={methodFilter}
             onChange={(e) => setMethodFilter(e.target.value)}
-            className={CONTROL_CLS}
+            className={ADMIN_CONTROL_CLS}
           >
             <option value="all">All methods</option>
             {methodOptions.map((m) => (
@@ -356,7 +357,7 @@ export function IncomeView(): React.ReactElement {
             type="date"
             value={fromDate}
             onChange={(e) => setFromDate(e.target.value)}
-            className={CONTROL_CLS}
+            className={ADMIN_CONTROL_CLS}
           />
         </label>
         <label className="flex flex-col gap-1">
@@ -365,7 +366,7 @@ export function IncomeView(): React.ReactElement {
             type="date"
             value={toDate}
             onChange={(e) => setToDate(e.target.value)}
-            className={CONTROL_CLS}
+            className={ADMIN_CONTROL_CLS}
           />
         </label>
         {anyFilterActive && (
@@ -553,13 +554,4 @@ export function IncomeView(): React.ReactElement {
       />
     </div>
   );
-}
-
-/**
- * Extracts the `YYYY-YY` key from a financial-year label ("FY 2025-26").
- * @param label - The FY label.
- * @returns The key, or the label unchanged when it doesn't match.
- */
-function fyKeyOf(label: string): string {
-  return label.match(/(\d{4}-\d{2})/)?.[1] ?? label;
 }

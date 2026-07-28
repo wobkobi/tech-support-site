@@ -5,12 +5,8 @@
  * server-side from the GST-inclusive amount and rate.
  */
 
+import { recordExpense } from "@/features/business/lib/expense-recording";
 import { GST_RATE } from "@/features/business/lib/pricing-policy";
-import {
-  appendRowWithSyncId,
-  buildExpenseCells,
-  resolveSheetIdForDate,
-} from "@/features/business/lib/sheets-sync";
 import { parseAmount, parseRate } from "@/features/business/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
@@ -62,41 +58,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return errorResponse("Invalid GST rate", 400);
   }
 
-  const gstAmount = Math.round(((inclNum * rate) / (1 + rate)) * 100) / 100;
-  const amountExcl = Math.round((inclNum - gstAmount) * 100) / 100;
-
-  const entry = await prisma.expenseEntry.create({
-    data: {
-      date: new Date(date),
-      supplier,
-      description,
-      category,
-      amountIncl: inclNum,
-      gstAmount,
-      amountExcl,
-      method,
-      receipt: receipt ?? false,
-      notes: notes ?? null,
-    },
+  const { entry, sheetRowKey, sheetSyncWarning } = await recordExpense({
+    date: new Date(date),
+    supplier,
+    description,
+    category,
+    amountIncl: inclNum,
+    gstRate: rate,
+    method,
+    receipt,
+    notes,
   });
 
-  // Append to the per-FY Expenses sheet. Synchronous so the row is written
-  // before the response; failures are logged and swallowed - the sync cron
-  // self-heals entries left without a sheetRowKey.
-  let sheetRowKey: string | null = null;
-  try {
-    const spreadsheetId = await resolveSheetIdForDate(entry.date);
-    if (!spreadsheetId) {
-      console.warn(
-        `[expenses] No sheet found for ${entry.date.toISOString()} - cron self-heal will append later`,
-      );
-    } else {
-      sheetRowKey = await appendRowWithSyncId(spreadsheetId, "Expenses", buildExpenseCells(entry));
-      await prisma.expenseEntry.update({ where: { id: entry.id }, data: { sheetRowKey } });
-    }
-  } catch (err) {
-    console.error(`[expenses] Failed to append to sheet for entry ${entry.id}:`, err);
-  }
-
-  return NextResponse.json({ ok: true, entry: { ...entry, sheetRowKey } }, { status: 201 });
+  return NextResponse.json(
+    { ok: true, entry: { ...entry, sheetRowKey }, sheetSyncWarning },
+    { status: 201 },
+  );
 }

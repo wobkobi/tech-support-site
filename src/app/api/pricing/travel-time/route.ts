@@ -11,7 +11,7 @@ import { lookupDriveRoundTrip } from "@/features/business/lib/travel-distance";
 import { errorResponse, okResponse } from "@/shared/lib/api-response";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 import { getSettings } from "@/shared/lib/settings/get-settings";
-import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
+import { getPacificAucklandOffset, nzDateParts } from "@/shared/lib/timezone-utils";
 import { NextRequest, NextResponse } from "next/server";
 
 // Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
@@ -37,10 +37,7 @@ function parseIsoField(value: unknown): Date | undefined {
  * @returns A UTC Date for that NZ-local moment.
  */
 function representativeDepartureTime(hour: number, now: Date = new Date()): Date {
-  const [y, m, d] = now
-    .toLocaleDateString("en-CA", { timeZone: "Pacific/Auckland" })
-    .split("-")
-    .map(Number);
+  const [y, m, d] = nzDateParts(now);
 
   // Weekday maths on a UTC-midnight cursor built from the NZ calendar date, so
   // the day-of-week is the NZ one rather than the server's.

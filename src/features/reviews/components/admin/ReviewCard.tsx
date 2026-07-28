@@ -93,7 +93,7 @@ export function ReviewCard({
   async function remove(): Promise<void> {
     setLoading("delete");
     try {
-      const res = await fetch(`/api/admin/reviews/${row.id}`, { method: "DELETE", headers: {} });
+      const res = await fetch(`/api/admin/reviews/${row.id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Request failed");
       onDelete();
     } catch {

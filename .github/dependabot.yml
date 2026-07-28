@@ -9,3 +9,11 @@ updates:
     directory: "/" # Location of package manifests
     schedule:
       interval: "daily"
+
+  # Keeps the `uses:` tags in .github/workflows current. Without this, pinned
+  # actions silently fall behind and the runner warns about their declared
+  # Node runtime (node20 actions forced onto node24).
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"

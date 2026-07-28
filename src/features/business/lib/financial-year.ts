@@ -137,3 +137,14 @@ export function aggregateByFinancialYear(
     };
   });
 }
+
+/**
+ * Extracts the `YYYY-YY` key from a financial-year label ("FY 2025-26").
+ * The ledger filters store the key, while {@link FinancialYear} carries the
+ * display label, so the two need converting at the boundary.
+ * @param label - The FY label.
+ * @returns The key, or the label unchanged when it doesn't match.
+ */
+export function fyKeyOf(label: string): string {
+  return label.match(/(\d{4}-\d{2})/)?.[1] ?? label;
+}

@@ -103,7 +103,8 @@ export default function ContactPage(): React.ReactElement {
                   On-site visits across Auckland.
                 </p>
                 <p className="text-base text-rich-black/80 sm:text-lg">
-                  Remote support available for software and account issues. No travel needed.
+                  A lot of software and account problems I can sort out remotely, so there's no
+                  travel to pay for.
                 </p>
               </div>
             </div>

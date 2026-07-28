@@ -128,9 +128,7 @@ export function ManualBookingModal({
      */
     async function loadContacts(): Promise<void> {
       try {
-        const res = await fetch("/api/admin/contacts", {
-          headers: {},
-        });
+        const res = await fetch("/api/admin/contacts", {});
         if (!res.ok) return;
         const data = (await res.json()) as { ok?: boolean; contacts?: ContactSuggestion[] };
         if (data.ok && data.contacts) setContacts(data.contacts);

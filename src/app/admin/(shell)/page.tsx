@@ -17,7 +17,7 @@ import { cn } from "@/shared/lib/cn";
 import { formatDateShort, formatDateTimeShort } from "@/shared/lib/date-format";
 import { toE164NZ } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
-import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
+import { nzDateParts, nzMidnightUtc } from "@/shared/lib/timezone-utils";
 import type { Metadata } from "next";
 import Link from "next/link";
 import type React from "react";
@@ -79,21 +79,6 @@ function Panel({
 }
 
 /**
- * NZ (Pacific/Auckland) midnight for a calendar date, returned as the equivalent
- * UTC instant. Vercel runs the server in UTC, so building day/month boundaries
- * from local Date parts would land on UTC midnight (12-13h off NZ) and miscount
- * "today"/"this month". Handles NZDT/NZST via {@link getPacificAucklandOffset}.
- * @param year - Full year.
- * @param month - Month 1-12.
- * @param day - Day of month (overflow wraps, e.g. day 32 > next month).
- * @returns UTC Date at NZ midnight of that date.
- */
-function nzMidnightUtc(year: number, month: number, day: number): Date {
-  const offset = getPacificAucklandOffset(year, month, day);
-  return new Date(Date.UTC(year, month - 1, day, -offset, 0, 0));
-}
-
-/**
  * Admin dashboard page showing stat cards and live data panels.
  * @returns Dashboard page element.
  */
@@ -104,10 +89,7 @@ export default async function AdminPage(): Promise<React.ReactElement> {
   // Build "today"/"this month" boundaries on NZ midnight, not the server's UTC
   // midnight (Vercel runs in UTC, 12-13h behind NZ), so counts match the
   // operator's calendar day rather than sliding a booking into the wrong day.
-  const [nzYear, nzMonth, nzDay] = now
-    .toLocaleDateString("en-CA", { timeZone: "Pacific/Auckland" })
-    .split("-")
-    .map(Number);
+  const [nzYear, nzMonth, nzDay] = nzDateParts(now);
   const todayStart = nzMidnightUtc(nzYear, nzMonth, nzDay);
   const todayEnd = nzMidnightUtc(nzYear, nzMonth, nzDay + 1);
   const monthStart = nzMidnightUtc(nzYear, nzMonth, 1);

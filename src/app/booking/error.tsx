@@ -6,12 +6,9 @@
 
 "use client";
 
-import { Button } from "@/shared/components/Button";
-import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
-import { cn } from "@/shared/lib/cn";
+import { ErrorPageShell } from "@/shared/components/ErrorPageShell";
 import type React from "react";
-import { useEffect } from "react";
-import { FaArrowRotateRight, FaCalendarDays } from "react-icons/fa6";
+import { FaCalendarDays } from "react-icons/fa6";
 
 /**
  * Error boundary UI for the booking segment.
@@ -27,43 +24,25 @@ export default function BookingError({
   error: Error;
   reset: () => void;
 }): React.ReactElement {
-  // Log the raw error for debugging rather than showing it to the customer -
-  // client-render exceptions carry library internals/URLs that aren't redacted.
-  useEffect(() => {
-    console.error("[booking] error boundary:", error);
-  }, [error]);
-
   return (
-    <PageShell>
-      <FrostedSection maxWidth="56rem">
-        <div className="flex flex-col gap-6 sm:gap-8">
-          <section className={cn(CARD, "text-center")}>
-            <div className="mb-4 text-7xl font-extrabold text-coquelicot-500 sm:text-8xl">
-              Oops!
-            </div>
-
-            <h1 className="mb-4 text-3xl font-extrabold text-russian-violet sm:text-4xl md:text-5xl">
-              Something went wrong with the booking page
-            </h1>
-
-            <p className="mb-6 text-base text-rich-black sm:text-lg md:text-xl">
-              Nothing has been booked yet, so you haven&apos;t lost anything. Give it another go, or
-              get in touch and I&apos;ll sort it out.
-            </p>
-
-            <div className="flex flex-wrap items-center justify-center gap-3">
-              <Button type="button" onClick={reset} variant="primary">
-                <FaArrowRotateRight className="h-5 w-5" aria-hidden />
-                Try again
-              </Button>
-              <Button href="/contact" variant="ghost">
-                <FaCalendarDays className="h-5 w-5" aria-hidden />
-                Contact me
-              </Button>
-            </div>
-          </section>
-        </div>
-      </FrostedSection>
-    </PageShell>
+    <ErrorPageShell
+      title="Something went wrong with the booking page"
+      body={
+        <>
+          Nothing has been booked yet, so you haven&apos;t lost anything. Give it another go, or get
+          in touch and I&apos;ll sort it out.
+        </>
+      }
+      error={error}
+      onReset={reset}
+      secondary={{
+        href: "/contact",
+        label: "Contact me",
+        icon: <FaCalendarDays className="h-5 w-5" aria-hidden />,
+      }}
+      // Log the raw error rather than showing it to the customer - client-render
+      // exceptions carry library internals/URLs that aren't redacted.
+      logPrefix="[booking] error boundary:"
+    />
   );
 }

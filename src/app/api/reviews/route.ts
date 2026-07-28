@@ -4,13 +4,13 @@
  */
 
 import { sendOwnerReviewNotification } from "@/features/reviews/lib/email";
+import { revalidateReviewPaths } from "@/features/reviews/lib/revalidate";
 import { reviewTextError } from "@/features/reviews/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";
 import { normaliseContactPhone } from "@/shared/lib/normalise-phone";
 import { prisma as prismaClient } from "@/shared/lib/prisma";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 import { getSettings } from "@/shared/lib/settings/get-settings";
-import { revalidatePath, revalidateTag } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
@@ -227,11 +227,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       },
     });
 
-    // Trigger on-demand revalidation of review surfaces. An auto-approved review
-    // should also appear on the home page (tag-cached), so bust that tag too.
-    revalidatePath("/reviews");
-    revalidatePath("/review");
-    if (status === "approved") revalidateTag("reviews", {});
+    // Trigger on-demand revalidation of every review surface. The home-page
+    // marquee is one of them, so this has to go through the shared helper - the
+    // inline version this replaced omitted "/" and left the marquee stale.
+    revalidateReviewPaths();
 
     // Notify the owner - fire-and-forget, never blocks the response
     void sendOwnerReviewNotification(review);

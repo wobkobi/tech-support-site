@@ -44,7 +44,6 @@ export function ContactsAdminView({
     try {
       const res = await fetch("/api/admin/contacts/sync", {
         method: "POST",
-        headers: {},
       });
       const data = (await res.json()) as {
         ok: boolean;

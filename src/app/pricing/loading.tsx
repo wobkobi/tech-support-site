@@ -5,7 +5,8 @@
  * next-steps and estimate cards. Shown while the live pricing policy loads.
  */
 
-import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
+import { CARD } from "@/shared/components/PageLayout";
+import { PageLoadingShell } from "@/shared/components/PageLoadingShell";
 import { Bone } from "@/shared/components/Skeleton";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
@@ -16,68 +17,57 @@ import type React from "react";
  */
 export default function PricingLoading(): React.ReactElement {
   return (
-    <PageShell>
-      <FrostedSection>
-        <div
-          className="flex flex-col gap-6 sm:gap-8"
-          role="status"
-          aria-live="polite"
-          aria-label="Loading pricing page"
-        >
-          {/* Heading card */}
-          <section className={cn(CARD)}>
-            <Bone className="mb-4 h-9 w-72 sm:h-10" />
-            <Bone className="h-6 w-full max-w-xl" />
-          </section>
+    <PageLoadingShell label="pricing page">
+      {/* Heading card */}
+      <section className={cn(CARD)}>
+        <Bone className="mb-4 h-9 w-72 sm:h-10" />
+        <Bone className="h-6 w-full max-w-xl" />
+      </section>
 
-          {/* Rate card */}
-          <section className={cn(CARD)}>
-            <Bone className="mb-4 h-7 w-48" />
-            <div className="flex flex-wrap items-end gap-3">
-              <Bone className="h-12 w-28" />
-              <Bone className="h-6 w-40" />
-            </div>
-          </section>
-
-          {/* No surprises + accordion details */}
-          <section className={cn(CARD)}>
-            <Bone className="mb-4 h-7 w-44" />
-            <div className="mb-5 flex flex-col gap-3">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="flex gap-3">
-                  <Bone className="mt-1 size-4 shrink-0 rounded-full" />
-                  <Bone className="h-5 max-w-lg flex-1" />
-                </div>
-              ))}
-            </div>
-            <Bone className="mb-3 h-6 w-36" />
-            <div className="space-y-3">
-              {Array.from({ length: 7 }).map((_, i) => (
-                <div
-                  className="flex items-center justify-between gap-3 rounded-xl border border-seasalt-200/80 bg-white/60 p-3 sm:p-4"
-                  key={i}
-                >
-                  <Bone className="h-5 w-40" />
-                  <Bone className="size-4 shrink-0 rounded-full" />
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* Next steps */}
-          <section className={cn(CARD)}>
-            <Bone className="h-6 w-full max-w-lg" />
-          </section>
-
-          {/* Estimate */}
-          <section className={cn(CARD)}>
-            <Bone className="mb-2 h-7 w-56" />
-            <Bone className="h-5 w-full max-w-md" />
-          </section>
-
-          <span className="sr-only">Loading pricing page...</span>
+      {/* Rate card */}
+      <section className={cn(CARD)}>
+        <Bone className="mb-4 h-7 w-48" />
+        <div className="flex flex-wrap items-end gap-3">
+          <Bone className="h-12 w-28" />
+          <Bone className="h-6 w-40" />
         </div>
-      </FrostedSection>
-    </PageShell>
+      </section>
+
+      {/* No surprises + accordion details */}
+      <section className={cn(CARD)}>
+        <Bone className="mb-4 h-7 w-44" />
+        <div className="mb-5 flex flex-col gap-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="flex gap-3">
+              <Bone className="mt-1 size-4 shrink-0 rounded-full" />
+              <Bone className="h-5 max-w-lg flex-1" />
+            </div>
+          ))}
+        </div>
+        <Bone className="mb-3 h-6 w-36" />
+        <div className="space-y-3">
+          {Array.from({ length: 7 }).map((_, i) => (
+            <div
+              className="flex items-center justify-between gap-3 rounded-xl border border-seasalt-200/80 bg-white/60 p-3 sm:p-4"
+              key={i}
+            >
+              <Bone className="h-5 w-40" />
+              <Bone className="size-4 shrink-0 rounded-full" />
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Next steps */}
+      <section className={cn(CARD)}>
+        <Bone className="h-6 w-full max-w-lg" />
+      </section>
+
+      {/* Estimate */}
+      <section className={cn(CARD)}>
+        <Bone className="mb-2 h-7 w-56" />
+        <Bone className="h-5 w-full max-w-md" />
+      </section>
+    </PageLoadingShell>
   );
 }

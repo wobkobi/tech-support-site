@@ -125,10 +125,13 @@ export default async function PricingPage(): Promise<React.ReactElement> {
           </section>
 
           <section
-            aria-label="Rates"
+            aria-label="Home rates"
             className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-100")}
           >
-            <h2 className="mb-3 text-xl font-bold text-russian-violet sm:text-2xl">Rates</h2>
+            {/* Qualified rather than just "Rates": an unqualified heading reads as
+                universal, so a business visitor takes the home rate as theirs and
+                never reaches the business page. */}
+            <h2 className="mb-3 text-xl font-bold text-russian-violet sm:text-2xl">Home rates</h2>
 
             {promo ? (
               <>
@@ -169,6 +172,20 @@ export default async function PricingPage(): Promise<React.ReactElement> {
 
             <GetEstimateButton />
 
+            {/* Sits with the rate rather than in the caveat list below: a business
+                visitor forms their price impression here, and a fourth checkmark
+                among the home-job caveats reads as fine print they can skip. */}
+            <div className="mt-5 rounded-lg border border-moonstone-400/40 bg-moonstone-400/5 p-4">
+              <p className="text-base text-rich-black/90 sm:text-lg">
+                <strong>Running a business?</strong> Check out the business rates and monthly
+                retainers on the{" "}
+                <Link href="/business" className={linkStyle}>
+                  business page
+                </Link>
+                .
+              </p>
+            </div>
+
             <div className="mt-5 space-y-3">
               <p className="flex gap-3 text-base text-rich-black/90 sm:text-lg">
                 <FaCheck className="mt-1.5 h-4 w-4 shrink-0 text-moonstone-400" aria-hidden />
@@ -189,17 +206,6 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                 <span>
                   <strong>Not sure which rate applies?</strong> Just ask - I'll confirm before
                   starting.
-                </span>
-              </p>
-              <p className="flex gap-3 text-base text-rich-black/90 sm:text-lg">
-                <FaCheck className="mt-1.5 h-4 w-4 shrink-0 text-moonstone-400" aria-hidden />
-                <span>
-                  <strong>Running a business?</strong> Business rates and monthly retainers are on
-                  the{" "}
-                  <Link href="/business" className={linkStyle}>
-                    business page
-                  </Link>
-                  .
                 </span>
               </p>
             </div>

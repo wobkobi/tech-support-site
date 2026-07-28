@@ -14,8 +14,8 @@ import {
   NumberField,
   ToggleField,
 } from "@/features/admin/components/settings/SettingsFields";
+import { SettingsFooter } from "@/features/admin/components/settings/SettingsFooter";
 import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
-import { SettingsSaveBar } from "@/features/admin/components/settings/SettingsSaveBar";
 import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
 import { hourLabel } from "@/features/booking/lib/booking";
 import { cn } from "@/shared/lib/cn";
@@ -95,7 +95,7 @@ function HourSelect({ value, onChange, from, to, close }: HourSelectProps): Reac
  */
 export function AvailabilityTab({ initial, defaults }: Props): React.ReactElement {
   const form = useSettingsForm("availability", initial, defaults);
-  const { draft, setDraft, dirty, saving, fieldErrors, blocks, warns, savedAt } = form;
+  const { draft, setDraft, fieldErrors } = form;
   const m = AVAILABILITY_FIELD_META;
 
   /**
@@ -512,47 +512,9 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
         </button>
       </div>
 
-      {/* Guardrail blocks */}
-      {blocks.length > 0 && (
-        <div className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4">
-          <p className="text-sm font-semibold text-red-700">Can&apos;t save yet:</p>
-          <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-red-700">
-            {blocks.map((b) => (
-              <li key={b}>{b}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
       <AvailabilityPreview config={draft} />
 
-      {/* Guardrail warnings */}
-      {warns.length > 0 && (
-        <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4">
-          <p className="text-sm font-semibold text-amber-800">Heads up:</p>
-          <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-amber-800">
-            {warns.map((w) => (
-              <li key={w}>{w}</li>
-            ))}
-          </ul>
-          <button
-            type="button"
-            onClick={() => void form.save(true)}
-            disabled={saving}
-            className="mt-3 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
-          >
-            Save anyway
-          </button>
-        </div>
-      )}
-
-      <SettingsSaveBar
-        dirty={dirty}
-        saving={saving}
-        savedAt={savedAt}
-        onSave={() => void form.save()}
-        onReset={form.resetToDefault}
-      />
+      <SettingsFooter form={form} />
 
       <SettingsHistory group="availability" onRestore={(v: AvailabilitySettings) => setDraft(v)} />
     </div>

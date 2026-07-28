@@ -7,6 +7,7 @@
  * the sync cron reconciles any drift.
  */
 
+import { splitGstInclusive } from "@/features/business/lib/business";
 import { GST_RATE } from "@/features/business/lib/pricing-policy";
 import {
   appendRowWithSyncId,
@@ -62,8 +63,7 @@ export async function PUT(
     return errorResponse("Expense entry not found", 404);
   }
 
-  const gstAmount = Math.round(((inclNum * rate) / (1 + rate)) * 100) / 100;
-  const amountExcl = Math.round((inclNum - gstAmount) * 100) / 100;
+  const { gstAmount, amountExcl } = splitGstInclusive(inclNum, rate);
 
   const updated = await prisma.expenseEntry.update({
     where: { id },

@@ -11,7 +11,7 @@
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { useToast } from "@/features/admin/components/ui/Toast";
-import { formatNZD } from "@/features/business/lib/business";
+import { formatNZD, todayISO } from "@/features/business/lib/business";
 import { INCOME_METHODS } from "@/features/business/lib/constants";
 import type React from "react";
 import { useState } from "react";
@@ -38,14 +38,6 @@ interface PaymentDialogProps {
   onClose: (recorded: boolean) => void;
 }
 
-/**
- * Today's date as a yyyy-mm-dd string in the local (NZ) timezone.
- * @returns The date string.
- */
-function localToday(): string {
-  return new Date().toLocaleDateString("en-CA");
-}
-
 const INPUT_CLS =
   "w-full rounded-lg border border-admin-border-strong px-3 py-2 text-sm text-admin-text focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-russian-violet";
 
@@ -66,7 +58,7 @@ export function PaymentDialog({
 }: PaymentDialogProps): React.ReactElement {
   const { toast } = useToast();
   const alreadyPaid = invoice.status === "PAID";
-  const [date, setDate] = useState(localToday());
+  const [date, setDate] = useState(todayISO());
   const [method, setMethod] = useState<string>(INCOME_METHODS[0]);
   const [reference, setReference] = useState("");
   // Default ON, but OFF when already PAID - a legacy backfill must not create a

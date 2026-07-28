@@ -12,6 +12,7 @@
  */
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
 import { Modal } from "@/features/admin/components/ui/Modal";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { advanceNextDue, formatNZD } from "@/features/business/lib/business";
@@ -31,9 +32,6 @@ interface MigrateToSubscriptionDialogProps {
   /** Close handler; `migrated` is true when a subscription was created. */
   onClose: (migrated: boolean) => void;
 }
-
-const INPUT_CLS =
-  "w-full rounded-lg border border-admin-border-strong bg-admin-surface px-3 py-2 text-sm text-admin-text focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-russian-violet";
 
 /** Known cadences in days, matched to a frequency label. */
 const CADENCES: { days: number; frequency: string }[] = [
@@ -189,7 +187,7 @@ export function MigrateToSubscriptionDialog({
           <select
             value={frequency}
             onChange={(e) => changeFrequency(e.target.value)}
-            className={INPUT_CLS}
+            className={ADMIN_INPUT_CLS}
           >
             {VALID_FREQUENCIES.map((f) => (
               <option key={f} value={f}>
@@ -208,7 +206,7 @@ export function MigrateToSubscriptionDialog({
               setNextDue(e.target.value);
               setNextDueEdited(true);
             }}
-            className={INPUT_CLS}
+            className={ADMIN_INPUT_CLS}
           />
         </label>
 

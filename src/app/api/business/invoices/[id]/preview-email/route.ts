@@ -7,6 +7,11 @@
  */
 
 import { getInvoiceReviewEligibility } from "@/features/business/lib/contact-review-token";
+import {
+  parseInvoiceEmailOverrides,
+  resolveReviewInclusion,
+  toInvoiceEmailPayload,
+} from "@/features/business/lib/invoice-email-request";
 import { buildInvoiceEmail } from "@/features/reviews/lib/email";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
@@ -40,15 +45,11 @@ export async function POST(
   // Optional operator overrides: greetingName targets a person inside a
   // company invoice, customBody replaces the intro paragraph, includeReview
   // forces the review link on/off (defaults to the eligibility check).
-  const body = (await request.json().catch(() => ({}))) as {
-    greetingName?: unknown;
-    customBody?: unknown;
-    includeReview?: unknown;
-  };
-  const greetingName = typeof body.greetingName === "string" ? body.greetingName : undefined;
-  const customBody = typeof body.customBody === "string" ? body.customBody : undefined;
-  const includeReviewOverride =
-    typeof body.includeReview === "boolean" ? body.includeReview : undefined;
+  const {
+    greetingName,
+    customBody,
+    includeReview: includeReviewOverride,
+  } = await parseInvoiceEmailOverrides(request);
 
   const siteUrl = getSiteUrl();
   const eligibility = await getInvoiceReviewEligibility({
@@ -57,25 +58,12 @@ export async function POST(
     siteUrl,
   });
 
-  // includeReviewOverride wins when set (so unchecking the box updates the
-  // preview to drop the review line). Default is whatever eligibility says.
-  // Quotes never carry a review ask, matching the send route.
-  const includeReview = !invoice.isQuote && (includeReviewOverride ?? eligibility.canSend);
-  const reviewUrl =
-    includeReview && "reviewUrl" in eligibility ? (eligibility.reviewUrl ?? null) : null;
+  // Only the URL is needed here: the client re-derives the checkbox state from
+  // `eligibility` in the response.
+  const { reviewUrl } = resolveReviewInclusion(invoice, eligibility, includeReviewOverride);
 
   const { subject, html } = await buildInvoiceEmail({
-    invoice: {
-      number: invoice.number,
-      clientName: invoice.clientName,
-      clientEmail: invoice.clientEmail,
-      issueDate: invoice.issueDate,
-      dueDate: invoice.dueDate,
-      total: invoice.total,
-      driveWebUrl: invoice.driveWebUrl,
-      isQuote: invoice.isQuote,
-      quoteValidUntil: invoice.quoteValidUntil,
-    },
+    invoice: toInvoiceEmailPayload(invoice),
     reviewUrl,
     greetingName,
     customBody,

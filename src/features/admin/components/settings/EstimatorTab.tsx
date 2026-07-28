@@ -10,8 +10,8 @@
 import { BenchmarkListField } from "@/features/admin/components/settings/BenchmarkListField";
 import { EstimatorPreview } from "@/features/admin/components/settings/EstimatorPreview";
 import { NumberField } from "@/features/admin/components/settings/SettingsFields";
+import { SettingsFooter } from "@/features/admin/components/settings/SettingsFooter";
 import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
-import { SettingsSaveBar } from "@/features/admin/components/settings/SettingsSaveBar";
 import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
 import { ESTIMATOR_FIELD_META } from "@/shared/lib/settings/field-meta";
 import type { EstimatorSettings } from "@/shared/lib/settings/types";
@@ -31,7 +31,7 @@ interface Props {
  */
 export function EstimatorTab({ initial, defaults }: Props): React.ReactElement {
   const form = useSettingsForm("estimator", initial, defaults);
-  const { draft, setDraft, dirty, saving, fieldErrors, blocks, warns, savedAt } = form;
+  const { draft, setDraft, fieldErrors } = form;
   const m = ESTIMATOR_FIELD_META;
 
   /**
@@ -193,45 +193,7 @@ export function EstimatorTab({ initial, defaults }: Props): React.ReactElement {
 
       <EstimatorPreview estimator={draft} />
 
-      {/* Guardrail blocks - save was refused. */}
-      {blocks.length > 0 && (
-        <div className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4">
-          <p className="text-sm font-semibold text-red-700">Can&apos;t save yet:</p>
-          <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-red-700">
-            {blocks.map((b) => (
-              <li key={b}>{b}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* Guardrail warnings - allowed, but confirm. */}
-      {warns.length > 0 && (
-        <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4">
-          <p className="text-sm font-semibold text-amber-800">Heads up:</p>
-          <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-amber-800">
-            {warns.map((w) => (
-              <li key={w}>{w}</li>
-            ))}
-          </ul>
-          <button
-            type="button"
-            onClick={() => void form.save(true)}
-            disabled={saving}
-            className="mt-3 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
-          >
-            Save anyway
-          </button>
-        </div>
-      )}
-
-      <SettingsSaveBar
-        dirty={dirty}
-        saving={saving}
-        savedAt={savedAt}
-        onSave={() => void form.save()}
-        onReset={form.resetToDefault}
-      />
+      <SettingsFooter form={form} />
 
       <SettingsHistory group="estimator" onRestore={(v: EstimatorSettings) => setDraft(v)} />
     </div>
