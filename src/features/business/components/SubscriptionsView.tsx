@@ -182,6 +182,7 @@ export function SubscriptionsView({ reloadKey = 0 }: { reloadKey?: number }): Re
         ok: boolean;
         nextDue?: string;
         sheetSyncWarning?: boolean;
+        error?: string;
       };
       if (res.ok && data.ok) {
         const msg = data.sheetSyncWarning
@@ -190,7 +191,10 @@ export function SubscriptionsView({ reloadKey = 0 }: { reloadKey?: number }): Re
         toast(msg, { tone: data.sheetSyncWarning ? "warning" : "success" });
         await load();
       } else {
-        toast("Record failed.", { tone: "error" });
+        // A 409 means the period was already claimed (cron got there first, or a
+        // double click), so show the server's wording rather than "failed".
+        toast(data.error ?? "Record failed.", { tone: "error" });
+        if (res.status === 409) await load();
       }
     } finally {
       setRecording(null);
