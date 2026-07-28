@@ -9,6 +9,7 @@
 import { BlockDayButton } from "@/features/admin/components/BlockDayButton";
 import { EventActionSheet } from "@/features/admin/components/EventActionSheet";
 import { ManualBookingModal } from "@/features/admin/components/ManualBookingModal";
+import { useOptimisticDayBlocks } from "@/features/admin/hooks/use-optimistic-day-blocks";
 import {
   KIND_BAR_BG,
   KIND_STYLES,
@@ -24,7 +25,7 @@ import { isPastEditWindow, nzDayEndMs } from "@/shared/lib/edit-window";
 import { addDaysToDateKey, getPacificAucklandOffset, nzDateKey } from "@/shared/lib/timezone-utils";
 import { useRouter } from "next/navigation";
 import type React from "react";
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { FaCalendarDay, FaChevronLeft, FaChevronRight, FaRegCalendar } from "react-icons/fa6";
 
 /**
@@ -94,18 +95,12 @@ export function DayAgendaView({
   // Day selection and sheet state
   const [selectedDayKey, setSelectedDayKey] = useState(initialDayKey);
   const [modalStartAt, setModalStartAt] = useState<string | null>(null);
-  // Days with a block/unblock request in flight - a Set so several can run at
-  // once (each button disables only its own day, not the whole schedule).
-  const [pendingDays, setPendingDays] = useState<Set<string>>(() => new Set());
+  const { pendingDays, optimisticBlock, setPending, applyOptimisticBlock, debouncedRefresh } =
+    useOptimisticDayBlocks(events);
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
   const [actionSheetEvent, setActionSheetEvent] = useState<WeekEvent | null>(null);
   // Stable "now" for the past-event lock (avoids an impure call during render).
   const [renderedAt] = useState(() => Date.now());
-  // Optimistic block/unblock overrides per day (dateKey > blocked?), applied
-  // on click so the UI flips instantly - Google lags a write and the 30s cache
-  // can serve a stale read, so a plain refetch lags. Kept until the server
-  // refetch catches up; a failed request reverts it.
-  const [optimisticBlock, setOptimisticBlock] = useState<Map<string, boolean>>(() => new Map());
   // useTransition keeps the current view interactive while the next week
   // is being fetched, so crossing the week boundary doesn't blank the UI.
   const [isPending, startTransition] = useTransition();
@@ -200,66 +195,6 @@ export function DayAgendaView({
   const isToday = selectedDayKey === todayKey;
   const hasBookings = timedEvents.some((e) => e.kind === "booking");
   const bookingCount = timedEvents.filter((e) => e.kind === "booking").length;
-
-  /**
-   * Records the optimistic busy state for a just-clicked day so the UI flips
-   * before the server round-trip; the refetch reconciles (or the button reverts).
-   * @param dayKey - The toggled day (NZ YYYY-MM-DD).
-   * @param blocked - The new state (true = now blocked, false = now free).
-   */
-  function applyOptimisticBlock(dayKey: string, blocked: boolean): void {
-    setOptimisticBlock((prev) => new Map(prev).set(dayKey, blocked));
-  }
-
-  /**
-   * Adds/removes a day from the in-flight set as its request starts/finishes.
-   * @param dayKey - The day whose request changed state.
-   * @param pending - True when starting, false when finished.
-   */
-  function setPending(dayKey: string, pending: boolean): void {
-    setPendingDays((prev) => {
-      const next = new Set(prev);
-      if (pending) next.add(dayKey);
-      else next.delete(dayKey);
-      return next;
-    });
-  }
-
-  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  /**
-   * Coalesces schedule refetches into ONE after rapid changes settle. Blocking
-   * several days fires one refresh, not one per click: each block busts the 30s
-   * cache, so N immediate refreshes would each re-hit Google and back the server
-   * up (locking out further clicks). The optimistic UI covers the 1.2s interim.
-   */
-  function debouncedRefresh(): void {
-    if (refreshTimer.current) clearTimeout(refreshTimer.current);
-    refreshTimer.current = setTimeout(() => router.refresh(), 1200);
-  }
-
-  // Reconcile optimistic overrides against fresh server data: an override only
-  // bridges click > next refresh, so drop overrides for days no longer in
-  // flight (a lost/merged block falls back to its real state). Pending lives
-  // in a ref so reconciliation fires on server data only, not when a request settles.
-  const pendingRef = useRef(pendingDays);
-  useEffect(() => {
-    pendingRef.current = pendingDays;
-  }, [pendingDays]);
-  useEffect(() => {
-    setOptimisticBlock((prev) => {
-      if (prev.size === 0) return prev;
-      let changed = false;
-      const next = new Map(prev);
-      for (const day of prev.keys()) {
-        if (!pendingRef.current.has(day)) {
-          next.delete(day);
-          changed = true;
-        }
-      }
-      return changed ? next : prev;
-    });
-  }, [events]);
 
   // 7-day strip data: the Monday-to-Sunday week containing the selected day,
   // with a booking count per day. Booking count drives the dot indicators
