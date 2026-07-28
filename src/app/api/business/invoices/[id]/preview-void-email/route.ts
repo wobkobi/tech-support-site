@@ -5,6 +5,7 @@
  * applying optional operator overrides (greetingName, customBody).
  */
 
+import { parseInvoiceEmailOverrides } from "@/features/business/lib/invoice-email-request";
 import { buildVoidEmail } from "@/features/reviews/lib/email";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
@@ -34,12 +35,7 @@ export async function POST(
     return errorResponse("Invoice not found", 404);
   }
 
-  const body = (await request.json().catch(() => ({}))) as {
-    greetingName?: unknown;
-    customBody?: unknown;
-  };
-  const greetingName = typeof body.greetingName === "string" ? body.greetingName : undefined;
-  const customBody = typeof body.customBody === "string" ? body.customBody : undefined;
+  const { greetingName, customBody } = await parseInvoiceEmailOverrides(request);
 
   const { subject, html } = await buildVoidEmail({
     invoice: {

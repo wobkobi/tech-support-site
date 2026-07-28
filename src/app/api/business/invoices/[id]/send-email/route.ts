@@ -8,6 +8,11 @@
 
 import { getInvoiceReviewEligibility } from "@/features/business/lib/contact-review-token";
 import { syncInvoicePdfToDrive } from "@/features/business/lib/invoice-drive-sync";
+import {
+  parseInvoiceEmailOverrides,
+  resolveReviewInclusion,
+  toInvoiceEmailPayload,
+} from "@/features/business/lib/invoice-email-request";
 import { generateInvoicePdf, serializeInvoice } from "@/features/business/lib/invoice-pdf";
 import { sendInvoiceEmail } from "@/features/reviews/lib/email";
 import { errorResponse } from "@/shared/lib/api-response";
@@ -54,15 +59,11 @@ export async function POST(
   // Optional operator overrides (match the preview): greetingName targets a
   // person inside a company invoice, customBody replaces the intro paragraph,
   // includeReview forces the review link on/off (defaults to eligibility).
-  const body = (await request.json().catch(() => ({}))) as {
-    greetingName?: unknown;
-    customBody?: unknown;
-    includeReview?: unknown;
-  };
-  const greetingName = typeof body.greetingName === "string" ? body.greetingName : undefined;
-  const customBody = typeof body.customBody === "string" ? body.customBody : undefined;
-  const includeReviewOverride =
-    typeof body.includeReview === "boolean" ? body.includeReview : undefined;
+  const {
+    greetingName,
+    customBody,
+    includeReview: includeReviewOverride,
+  } = await parseInvoiceEmailOverrides(request);
 
   // Check review-link eligibility
   const siteUrl = getSiteUrl();
@@ -72,14 +73,11 @@ export async function POST(
     siteUrl,
   });
 
-  // Server-side gate: if the customer is in cooldown or already reviewed, an
-  // explicit `includeReview: true` from a stale client is ignored - the UI
-  // blocks the checkbox but client state is not trusted. Quotes never carry a
-  // review ask - the job hasn't happened yet.
-  const includeReview =
-    !invoice.isQuote && (includeReviewOverride ?? eligibility.canSend) && eligibility.canSend;
-  const reviewUrl =
-    includeReview && "reviewUrl" in eligibility ? (eligibility.reviewUrl ?? null) : null;
+  const { includeReview, reviewUrl } = resolveReviewInclusion(
+    invoice,
+    eligibility,
+    includeReviewOverride,
+  );
 
   // Generate the invoice PDF
   let pdfBytes: Buffer;
@@ -92,17 +90,7 @@ export async function POST(
 
   // Send the email
   const ok = await sendInvoiceEmail({
-    invoice: {
-      number: invoice.number,
-      clientName: invoice.clientName,
-      clientEmail: invoice.clientEmail,
-      issueDate: invoice.issueDate,
-      dueDate: invoice.dueDate,
-      total: invoice.total,
-      driveWebUrl: invoice.driveWebUrl,
-      isQuote: invoice.isQuote,
-      quoteValidUntil: invoice.quoteValidUntil,
-    },
+    invoice: toInvoiceEmailPayload(invoice),
     pdfBytes,
     reviewUrl,
     greetingName,
