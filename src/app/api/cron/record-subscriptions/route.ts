@@ -7,7 +7,7 @@
  * 8am NZ time via cron-job.org.
  */
 
-import { advanceNextDue, calcGstFromInclusive } from "@/features/business/lib/business";
+import { advanceNextDue, splitGstInclusive } from "@/features/business/lib/business";
 import {
   appendRowWithSyncId,
   buildExpenseCells,
@@ -16,6 +16,7 @@ import {
 import { errorResponse } from "@/shared/lib/api-response";
 import { isCronAuthorized } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
+import { nzTodayKey } from "@/shared/lib/timezone-utils";
 import { NextRequest, NextResponse } from "next/server";
 
 // Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
@@ -35,13 +36,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   // nextDue is stored as UTC midnight (admin form + advanceNextDue), so UTC
   // midnight of today's NZ date is the correct ceiling for `nextDue <=`.
-  const nzDateStr = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Pacific/Auckland",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
-  const todayNZ = new Date(nzDateStr + "T00:00:00.000Z");
+  const todayNZ = new Date(`${nzTodayKey()}T00:00:00.000Z`);
 
   // Find subscriptions due today
   const due = await prisma.subscription.findMany({
@@ -58,8 +53,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       // Compute GST split and next due date
       const rate = sub.gstRate;
       const inclNum = sub.amountIncl;
-      const gstAmount = calcGstFromInclusive(inclNum, rate);
-      const amountExcl = Math.round((inclNum - gstAmount) * 100) / 100;
+      const { gstAmount, amountExcl } = splitGstInclusive(inclNum, rate);
       const nextDue = advanceNextDue(sub.nextDue, sub.frequency);
 
       // CAS on nextDue makes concurrent runs idempotent. Post-CAS errors leave

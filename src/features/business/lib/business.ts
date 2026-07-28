@@ -18,6 +18,7 @@ import type {
   TravelEntry,
 } from "@/features/business/types/business";
 import { formatDateSlash } from "@/shared/lib/date-format";
+import { nzTodayKey } from "@/shared/lib/timezone-utils";
 
 /**
  * Minimum travel cost (NZD) below which a calculated travel charge is
@@ -46,7 +47,7 @@ export function formatNZD(amount: number): string {
  * @returns ISO date string for today in NZ.
  */
 export function todayISO(): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Pacific/Auckland" }).format(new Date());
+  return nzTodayKey();
 }
 
 /**
@@ -57,6 +58,22 @@ export function todayISO(): string {
  */
 export function calcGstFromInclusive(amountIncl: number, gstRate: number): number {
   return Math.round(((amountIncl * gstRate) / (1 + gstRate)) * 100) / 100;
+}
+
+/**
+ * Splits a GST-inclusive amount into its GST component and GST-exclusive base.
+ * Both ledger writers and the subscription recorders need the pair, and deriving
+ * `amountExcl` separately is where the two drifted apart.
+ * @param amountIncl - Amount including GST.
+ * @param gstRate - GST rate as a decimal (e.g. 0.15).
+ * @returns GST component and exclusive base, each rounded to 2 decimal places.
+ */
+export function splitGstInclusive(
+  amountIncl: number,
+  gstRate: number,
+): { gstAmount: number; amountExcl: number } {
+  const gstAmount = calcGstFromInclusive(amountIncl, gstRate);
+  return { gstAmount, amountExcl: Math.round((amountIncl - gstAmount) * 100) / 100 };
 }
 
 /**

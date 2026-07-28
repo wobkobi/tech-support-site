@@ -15,13 +15,14 @@ import {
   OPTIMISTIC_BUSY_PREFIX,
   formatHour,
   formatTimeRange,
+  mondayOf,
   optimisticBusyEvent,
   type WeekEvent,
   type WeekViewKind,
 } from "@/features/admin/lib/schedule-types";
 import { cn } from "@/shared/lib/cn";
 import { isPastEditWindow, nzDayEndMs } from "@/shared/lib/edit-window";
-import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
+import { getPacificAucklandOffset, nzDateKey } from "@/shared/lib/timezone-utils";
 import { useRouter } from "next/navigation";
 import type React from "react";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
@@ -138,7 +139,7 @@ export function WeekView({
   // the buffer around a week that falls outside the current 21-day window.
   const [isPending, startTransition] = useTransition();
 
-  const todayNzKey = useMemo(() => formatNzDateKey(new Date()), []);
+  const todayNzKey = useMemo(() => nzDateKey(new Date()), []);
   // Stable "now" for the past-event lock (hides block buttons on old days).
   const [renderedAt] = useState(() => Date.now());
 
@@ -150,7 +151,7 @@ export function WeekView({
     const id = setInterval(() => setNowMs(Date.now()), 60_000);
     return () => clearInterval(id);
   }, []);
-  const nowKey = formatNzDateKey(new Date(nowMs));
+  const nowKey = nzDateKey(new Date(nowMs));
   const nowOffsetMin = minuteOfDay(new Date(nowMs).toISOString());
 
   // Prev/Next/Today Monday keys derived from current state for the nav
@@ -158,9 +159,9 @@ export function WeekView({
   const { prevWeekKey, nextWeekKey, todayWeekKey } = useMemo(() => {
     const ws = new Date(weekStartIso);
     return {
-      prevWeekKey: formatNzDateKey(new Date(ws.getTime() - 7 * 86_400_000)),
-      nextWeekKey: formatNzDateKey(new Date(ws.getTime() + 7 * 86_400_000)),
-      todayWeekKey: computeMondayNzKey(new Date()),
+      prevWeekKey: nzDateKey(new Date(ws.getTime() - 7 * 86_400_000)),
+      nextWeekKey: nzDateKey(new Date(ws.getTime() + 7 * 86_400_000)),
+      todayWeekKey: mondayOf(nzDateKey(new Date())),
     };
   }, [weekStartIso]);
 
@@ -205,7 +206,7 @@ export function WeekView({
     for (let i = 0; i < 7; i++) {
       const date = new Date(weekStart.getTime() + i * 86_400_000);
       arr.push({
-        key: formatNzDateKey(date),
+        key: nzDateKey(date),
         date,
         label: new Intl.DateTimeFormat("en-NZ", { timeZone: NZ_TZ, weekday: "short" }).format(date),
         subLabel: new Intl.DateTimeFormat("en-NZ", {
@@ -223,8 +224,8 @@ export function WeekView({
         // appear in every day bucket they overlap. Google's all-day end is
         // exclusive (next NZ midnight), so the YYYY-MM-DD comparison is
         // start-inclusive, end-exclusive.
-        const startKey = formatNzDateKey(new Date(ev.startAt));
-        const endKey = formatNzDateKey(new Date(ev.endAt));
+        const startKey = nzDateKey(new Date(ev.startAt));
+        const endKey = nzDateKey(new Date(ev.endAt));
         for (const day of arr) {
           if (day.key < startKey || day.key >= endKey) continue;
           // Drop a Busy block from a day the operator just unblocked (optimistic).
@@ -232,7 +233,7 @@ export function WeekView({
           day.allDayEvents.push(ev);
         }
       } else {
-        const key = formatNzDateKey(new Date(ev.startAt));
+        const key = nzDateKey(new Date(ev.startAt));
         const bucket = arr.find((d) => d.key === key);
         if (bucket) bucket.timedEvents.push(ev);
       }
@@ -664,37 +665,4 @@ function minuteOfDay(iso: string): number {
   const hour = Number(parts.find((p) => p.type === "hour")?.value ?? "0");
   const minute = Number(parts.find((p) => p.type === "minute")?.value ?? "0");
   return (hour - DAY_START_HOUR) * 60 + minute;
-}
-
-/**
- * Formats a Date as a NZ-local YYYY-MM-DD key for bucketing events by day.
- * @param date - Date to format.
- * @returns Date key in YYYY-MM-DD form.
- */
-function formatNzDateKey(date: Date): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: NZ_TZ,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
-}
-
-/**
- * Returns the YYYY-MM-DD key for the Monday of the NZ week containing the
- * given date - the "today" jump target for the week nav. Pure UTC date-part
- * math so DST + offset edges can't shift the result.
- * @param date - Reference date.
- * @returns Monday-of-week date key.
- */
-function computeMondayNzKey(date: Date): string {
-  const nzKey = formatNzDateKey(date);
-  const [y, m, d] = nzKey.split("-").map(Number);
-  const utc = new Date(Date.UTC(y, m - 1, d));
-  const back = (utc.getUTCDay() + 6) % 7;
-  const monday = new Date(Date.UTC(y, m - 1, d - back));
-  const my = monday.getUTCFullYear();
-  const mm = String(monday.getUTCMonth() + 1).padStart(2, "0");
-  const md = String(monday.getUTCDate()).padStart(2, "0");
-  return `${my}-${mm}-${md}`;
 }

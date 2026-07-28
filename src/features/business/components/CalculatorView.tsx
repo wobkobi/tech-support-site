@@ -58,7 +58,7 @@ import type {
 } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
 import type { IdentitySettings } from "@/shared/lib/settings/types";
-import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
+import { getPacificAucklandOffset, nzDateParts } from "@/shared/lib/timezone-utils";
 import { useRouter } from "next/navigation";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -117,13 +117,7 @@ function jobStartIsoFromTime(hhmm: string, anchorDate?: string): string | null {
   if (!/^\d{1,2}:\d{2}$/.test(hhmm)) return null;
   const [h, m] = hhmm.split(":").map(Number);
   if (h < 0 || h > 23 || m < 0 || m > 59) return null;
-  const nzDateStr = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Pacific/Auckland",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
-  const [y, mo, d] = nzDateStr.split("-").map(Number);
+  const [y, mo, d] = nzDateParts(new Date());
   // Weekday of a Y-M-D is timezone-independent when computed in UTC.
   const todayDow = new Date(Date.UTC(y, mo - 1, d)).getUTCDay();
   let daysAhead = 0;
@@ -292,14 +286,6 @@ function emptyTask(rates: RateConfig[]): TaskLine {
     action: null,
     details: null,
   };
-}
-
-/**
- * Today's date as an NZ-local YYYY-MM-DD string - the calculator's job-date default.
- * @returns ISO date string in Pacific/Auckland.
- */
-function todayNZDate(): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Pacific/Auckland" }).format(new Date());
 }
 
 interface CalculatorViewProps {
@@ -545,7 +531,7 @@ export function CalculatorView({
 
   // Job date drives the holiday + promo lookup so a past job is priced by what
   // applied THEN, not today. Persisted in the draft; defaults to today (NZ).
-  const [jobDate, setJobDate] = useState<string>(() => eventPrefill?.jobDate ?? todayNZDate());
+  const [jobDate, setJobDate] = useState<string>(() => eventPrefill?.jobDate ?? todayISO());
   // Holiday context for the selected date: name (for the UI) + the live labour
   // uplift fraction (0 when the date isn't a public holiday).
   const [holiday, setHoliday] = useState<{ name: string | null; uplift: number }>({
@@ -613,7 +599,7 @@ export function CalculatorView({
          hydration mismatch this effect replaces */
       setDraftRestoredAt(draft.savedAt ?? null);
       setAiInput(draft.aiInput ?? "");
-      setJobDate(draft.jobDate ?? todayNZDate());
+      setJobDate(draft.jobDate ?? todayISO());
       setTimeRanges(draft.timeRanges ?? [{ startTime: "", endTime: "" }]);
       setFollowUpMins(draft.followUpMins ?? 0);
       setTravelEntries(draft.travelEntries ?? []);
@@ -1140,7 +1126,7 @@ export function CalculatorView({
    */
   function resetFormState(): void {
     const now = nowTime();
-    setJobDate(todayNZDate());
+    setJobDate(todayISO());
     setSkipPromo(false);
     setTimeRanges([{ startTime: now, endTime: addHour(now) }]);
     setFollowUpMins(0);
@@ -1868,7 +1854,7 @@ export function CalculatorView({
           id="job-date"
           type="date"
           value={jobDate}
-          onChange={(e) => setJobDate(e.target.value || todayNZDate())}
+          onChange={(e) => setJobDate(e.target.value || todayISO())}
           className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
         />
         <span className="text-xs text-slate-500">

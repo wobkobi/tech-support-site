@@ -14,7 +14,7 @@ import { StatCard } from "@/features/admin/components/ui/StatCard";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { formatNZD, todayISO } from "@/features/business/lib/business";
 import { INCOME_METHODS } from "@/features/business/lib/constants";
-import { listFinancialYears } from "@/features/business/lib/financial-year";
+import { fyKeyOf, listFinancialYears } from "@/features/business/lib/financial-year";
 import type { IncomeEntry } from "@/features/business/types/business";
 import { Field } from "@/shared/components/Field";
 import { formatDateShort } from "@/shared/lib/date-format";
@@ -553,13 +553,4 @@ export function IncomeView(): React.ReactElement {
       />
     </div>
   );
-}
-
-/**
- * Extracts the `YYYY-YY` key from a financial-year label ("FY 2025-26").
- * @param label - The FY label.
- * @returns The key, or the label unchanged when it doesn't match.
- */
-function fyKeyOf(label: string): string {
-  return label.match(/(\d{4}-\d{2})/)?.[1] ?? label;
 }

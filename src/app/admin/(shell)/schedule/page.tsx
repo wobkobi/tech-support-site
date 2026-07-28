@@ -11,12 +11,13 @@ import { ScheduleFindTimes } from "@/features/admin/components/ScheduleFindTimes
 import { WeekView } from "@/features/admin/components/WeekView";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { mondayOf, type WeekEvent, type WeekViewKind } from "@/features/admin/lib/schedule-types";
-import { addDays, resolveWeekStart, toNZDateKey } from "@/features/admin/lib/week";
+import { addDays, resolveWeekStart } from "@/features/admin/lib/week";
 import { lookupPublicHolidaysForKeys } from "@/features/business/lib/pricing-policy.server";
 import { getCachedScheduleEvents } from "@/features/calendar/lib/google-calendar";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
+import { nzDateKey } from "@/shared/lib/timezone-utils";
 import type { Metadata } from "next";
 import type React from "react";
 
@@ -222,7 +223,7 @@ export default async function AdminSchedulePage({
   // round-trip per buffered day).
   const bufferedDayKeys: string[] = [];
   for (let i = -BUFFER_DAYS_BEFORE; i < BUFFER_DAYS_AFTER; i++) {
-    bufferedDayKeys.push(toNZDateKey(addDays(weekStartDate, i)));
+    bufferedDayKeys.push(nzDateKey(addDays(weekStartDate, i)));
   }
   const holidaysByKey = await lookupPublicHolidaysForKeys(bufferedDayKeys).catch(
     () => new Map<string, { name: string; region: string }>(),
@@ -236,8 +237,8 @@ export default async function AdminSchedulePage({
   // middle of the buffer at index [BUFFER_DAYS_BEFORE, BUFFER_DAYS_BEFORE+7).
   const dayKeysInWeek = bufferedDayKeys.slice(BUFFER_DAYS_BEFORE, BUFFER_DAYS_BEFORE + 7);
 
-  const todayKey = toNZDateKey(now);
-  const weekStartKey = toNZDateKey(weekStartDate);
+  const todayKey = nzDateKey(now);
+  const weekStartKey = nzDateKey(weekStartDate);
   // Pick the user-requested day when valid (inside the visible week);
   // otherwise prefer today if it falls inside the buffer; otherwise fall
   // back to the current-week's first day.

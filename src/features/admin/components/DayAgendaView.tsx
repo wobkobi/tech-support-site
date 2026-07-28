@@ -21,7 +21,7 @@ import {
 } from "@/features/admin/lib/schedule-types";
 import { cn } from "@/shared/lib/cn";
 import { isPastEditWindow, nzDayEndMs } from "@/shared/lib/edit-window";
-import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
+import { addDaysToDateKey, getPacificAucklandOffset, nzDateKey } from "@/shared/lib/timezone-utils";
 import { useRouter } from "next/navigation";
 import type React from "react";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
@@ -38,22 +38,6 @@ function formatGap(minutes: number): string {
   if (h > 0 && m > 0) return `${h}h ${m}m free`;
   if (h > 0) return `${h}h free`;
   return `${m}m free`;
-}
-
-/**
- * NZ YYYY-MM-DD for a day offset from a starting NZ date key. Pure UTC math
- * to avoid DST + offset edges.
- * @param dayKey - Starting NZ date key.
- * @param delta - Days to add (negative for earlier days).
- * @returns Resulting NZ date key.
- */
-function shiftDayKey(dayKey: string, delta: number): string {
-  const [y, m, d] = dayKey.split("-").map(Number);
-  const shifted = new Date(Date.UTC(y, m - 1, d + delta));
-  const sy = shifted.getUTCFullYear();
-  const sm = String(shifted.getUTCMonth() + 1).padStart(2, "0");
-  const sd = String(shifted.getUTCDate()).padStart(2, "0");
-  return `${sy}-${sm}-${sd}`;
 }
 
 /** Minimum gap between consecutive bookings to render a "free" label. */
@@ -149,41 +133,13 @@ export function DayAgendaView({
       month: "long",
     });
     const yearFmt = new Intl.DateTimeFormat("en-NZ", { timeZone: NZ_TZ, year: "numeric" });
-    // ±1 day in NZ-local terms - compute by date-part math so DST + UTC noon
-    // edge cases don't shift the key by an extra day.
-    const midnightUtc = Date.UTC(yy, mm - 1, dd, 0, 0, 0);
-    const prevNz = new Intl.DateTimeFormat("en-CA", {
-      timeZone: NZ_TZ,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).format(new Date(midnightUtc - 86_400_000));
-    const nextNz = new Intl.DateTimeFormat("en-CA", {
-      timeZone: NZ_TZ,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).format(new Date(midnightUtc + 86_400_000));
     return {
       dayLabel: dayFmt.format(noonUtc),
       yearLabel: yearFmt.format(noonUtc),
-      prevDayKey: prevNz,
-      nextDayKey: nextNz,
+      prevDayKey: addDaysToDateKey(selectedDayKey, -1),
+      nextDayKey: addDaysToDateKey(selectedDayKey, 1),
     };
-  }, [yy, mm, dd, offset]);
-
-  // Day-key formatter shared across the per-day bucketing and the week-strip
-  // count below. Constructing once is cheaper than per-event.
-  const dayKeyFmt = useMemo(
-    () =>
-      new Intl.DateTimeFormat("en-CA", {
-        timeZone: NZ_TZ,
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      }),
-    [],
-  );
+  }, [yy, mm, dd, offset, selectedDayKey]);
 
   // Filter the week's events down to the selected day. All-day events are
   // start-inclusive / end-exclusive so multi-day Busy blocks show on each
@@ -194,11 +150,11 @@ export function DayAgendaView({
     const allDay: WeekEvent[] = [];
     for (const ev of events) {
       if (ev.isAllDay) {
-        const startKey = dayKeyFmt.format(new Date(ev.startAt));
-        const endKey = dayKeyFmt.format(new Date(ev.endAt));
+        const startKey = nzDateKey(new Date(ev.startAt));
+        const endKey = nzDateKey(new Date(ev.endAt));
         if (selectedDayKey >= startKey && selectedDayKey < endKey) allDay.push(ev);
       } else {
-        const key = dayKeyFmt.format(new Date(ev.startAt));
+        const key = nzDateKey(new Date(ev.startAt));
         if (key === selectedDayKey) timed.push(ev);
       }
     }
@@ -224,7 +180,7 @@ export function DayAgendaView({
     }
 
     return { agendaItems: items, timedEvents: timed, allDayEvents: allDay };
-  }, [events, selectedDayKey, dayKeyFmt]);
+  }, [events, selectedDayKey]);
 
   const holidayName = holidaysByDateKey[selectedDayKey] ?? null;
   // Optimistic override for a just-clicked day: true = blocked, false = free,
@@ -311,7 +267,7 @@ export function DayAgendaView({
   const weekDays = useMemo(() => {
     const mondayKey = mondayOf(selectedDayKey);
     return Array.from({ length: 7 }, (_, i) => {
-      const dayKey = shiftDayKey(mondayKey, i);
+      const dayKey = addDaysToDateKey(mondayKey, i);
       const [y, m, d] = dayKey.split("-").map(Number);
       const ofs = getPacificAucklandOffset(y, m, d);
       const noon = new Date(Date.UTC(y, m - 1, d, 12 - ofs, 0, 0));
@@ -327,11 +283,11 @@ export function DayAgendaView({
       let count = 0;
       for (const ev of events) {
         if (ev.kind !== "booking" || ev.isAllDay) continue;
-        if (dayKeyFmt.format(new Date(ev.startAt)) === dayKey) count++;
+        if (nzDateKey(new Date(ev.startAt)) === dayKey) count++;
       }
       return { key: dayKey, weekday, dayOfMonth, count };
     });
-  }, [selectedDayKey, events, dayKeyFmt]);
+  }, [selectedDayKey, events]);
 
   /**
    * Navigates to a new day. Stays client-side when the day is inside the

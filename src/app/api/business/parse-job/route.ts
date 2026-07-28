@@ -23,7 +23,7 @@ import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
-import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
+import { getPacificAucklandOffset, nzDateParts } from "@/shared/lib/timezone-utils";
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 
@@ -44,10 +44,7 @@ function nzTimeToDate(hhmm: string | null | undefined, anchorDate?: string): Dat
   if (!hhmm || !/^\d{1,2}:\d{2}$/.test(hhmm)) return undefined;
   const [h, m] = hhmm.split(":").map(Number);
   if (h > 23 || m > 59) return undefined;
-  const nzDateStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Pacific/Auckland" }).format(
-    new Date(),
-  );
-  const [y, mo, d] = nzDateStr.split("-").map(Number);
+  const [y, mo, d] = nzDateParts(new Date());
   // Weekday of a Y-M-D is timezone-independent when computed in UTC.
   const todayDow = new Date(Date.UTC(y, mo - 1, d)).getUTCDay();
   let daysAhead = 0;

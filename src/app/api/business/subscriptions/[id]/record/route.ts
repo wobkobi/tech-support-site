@@ -6,7 +6,7 @@
  * are non-fatal and surface as a sheetSyncWarning flag in the response.
  */
 
-import { advanceNextDue, calcGstFromInclusive } from "@/features/business/lib/business";
+import { advanceNextDue, splitGstInclusive } from "@/features/business/lib/business";
 import {
   appendRowWithSyncId,
   buildExpenseCells,
@@ -46,8 +46,7 @@ export async function POST(
   const today = new Date();
   const rate = sub.gstRate;
   const inclNum = sub.amountIncl;
-  const gstAmount = calcGstFromInclusive(inclNum, rate);
-  const amountExcl = Math.round((inclNum - gstAmount) * 100) / 100;
+  const { gstAmount, amountExcl } = splitGstInclusive(inclNum, rate);
 
   // 1. Create expense entry
   const expense = await prisma.expenseEntry.create({

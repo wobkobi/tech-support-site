@@ -24,6 +24,7 @@ import { getIdentity } from "@/shared/lib/business-identity.server";
 import { cn } from "@/shared/lib/cn";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
+import { nzDateKey } from "@/shared/lib/timezone-utils";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type React from "react";
@@ -35,20 +36,6 @@ export const metadata: Metadata = {
   title: "Edit booking",
   robots: { index: false, follow: false },
 };
-
-/**
- * Derive NZ dateKey (YYYY-MM-DD) from a UTC Date.
- * @param date - UTC date object.
- * @returns NZ local date string.
- */
-function getNZDateKey(date: Date): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Pacific/Auckland",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
-}
 
 /**
  * Derive NZ local hour (24h) from a UTC Date.
@@ -171,7 +158,7 @@ export default async function EditBookingPage({
   const durationMinutes = (booking.endAt.getTime() - booking.startAt.getTime()) / 60000;
   const duration: JobDuration = durationMinutes <= 60 ? "short" : "long";
 
-  const dateKey = getNZDateKey(booking.startAt);
+  const dateKey = nzDateKey(booking.startAt);
   const nzHour = getNZHour(booking.startAt);
   const matchedSlot = TIME_OF_DAY_OPTIONS.find((t) => t.startHour === nzHour);
   const timeOfDay: TimeOfDay = matchedSlot?.value ?? "10am";

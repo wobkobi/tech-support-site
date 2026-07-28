@@ -5,6 +5,7 @@
  * server-side from the GST-inclusive amount and rate.
  */
 
+import { splitGstInclusive } from "@/features/business/lib/business";
 import { GST_RATE } from "@/features/business/lib/pricing-policy";
 import {
   appendRowWithSyncId,
@@ -62,8 +63,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return errorResponse("Invalid GST rate", 400);
   }
 
-  const gstAmount = Math.round(((inclNum * rate) / (1 + rate)) * 100) / 100;
-  const amountExcl = Math.round((inclNum - gstAmount) * 100) / 100;
+  const { gstAmount, amountExcl } = splitGstInclusive(inclNum, rate);
 
   const entry = await prisma.expenseEntry.create({
     data: {
