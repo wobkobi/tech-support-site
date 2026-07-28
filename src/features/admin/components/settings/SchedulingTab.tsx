@@ -8,8 +8,8 @@
  */
 
 import { NumberField } from "@/features/admin/components/settings/SettingsFields";
+import { SettingsFooter } from "@/features/admin/components/settings/SettingsFooter";
 import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
-import { SettingsSaveBar } from "@/features/admin/components/settings/SettingsSaveBar";
 import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
 import { SCHEDULING_FIELD_META } from "@/shared/lib/settings/field-meta";
 import type { SchedulingSettings } from "@/shared/lib/settings/types";
@@ -29,7 +29,7 @@ interface Props {
  */
 export function SchedulingTab({ initial, defaults }: Props): React.ReactElement {
   const form = useSettingsForm("scheduling", initial, defaults);
-  const { draft, setDraft, dirty, saving, fieldErrors, blocks, savedAt } = form;
+  const { draft, setDraft, fieldErrors } = form;
   const m = SCHEDULING_FIELD_META;
 
   /**
@@ -108,25 +108,7 @@ export function SchedulingTab({ initial, defaults }: Props): React.ReactElement 
         />
       </div>
 
-      {/* Guardrail blocks */}
-      {blocks.length > 0 && (
-        <div className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4">
-          <p className="text-sm font-semibold text-red-700">Can&apos;t save yet:</p>
-          <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-red-700">
-            {blocks.map((b) => (
-              <li key={b}>{b}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      <SettingsSaveBar
-        dirty={dirty}
-        saving={saving}
-        savedAt={savedAt}
-        onSave={() => void form.save()}
-        onReset={form.resetToDefault}
-      />
+      <SettingsFooter form={form} />
 
       <SettingsHistory group="scheduling" onRestore={(v: SchedulingSettings) => setDraft(v)} />
     </div>

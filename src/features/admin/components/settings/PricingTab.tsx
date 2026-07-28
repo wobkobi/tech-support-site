@@ -9,8 +9,8 @@
 
 import { PricingPreview } from "@/features/admin/components/settings/PricingPreview";
 import { NumberField, ToggleField } from "@/features/admin/components/settings/SettingsFields";
+import { SettingsFooter } from "@/features/admin/components/settings/SettingsFooter";
 import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
-import { SettingsSaveBar } from "@/features/admin/components/settings/SettingsSaveBar";
 import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { PRICING_FIELD_META } from "@/shared/lib/settings/field-meta";
@@ -32,7 +32,7 @@ interface Props {
  */
 export function PricingTab({ initial, defaults }: Props): React.ReactElement {
   const form = useSettingsForm("pricing", initial, defaults);
-  const { draft, setDraft, baseline, dirty, saving, fieldErrors, blocks, warns, savedAt } = form;
+  const { draft, setDraft, baseline, fieldErrors } = form;
   const m = PRICING_FIELD_META;
   const [confirmGst, setConfirmGst] = useState(false);
 
@@ -267,45 +267,7 @@ export function PricingTab({ initial, defaults }: Props): React.ReactElement {
 
       <PricingPreview config={draft} />
 
-      {/* Guardrail blocks - save was refused. */}
-      {blocks.length > 0 && (
-        <div className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4">
-          <p className="text-sm font-semibold text-red-700">Can&apos;t save yet:</p>
-          <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-red-700">
-            {blocks.map((b) => (
-              <li key={b}>{b}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* Guardrail warnings - allowed, but confirm. */}
-      {warns.length > 0 && (
-        <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4">
-          <p className="text-sm font-semibold text-amber-800">Heads up:</p>
-          <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-amber-800">
-            {warns.map((w) => (
-              <li key={w}>{w}</li>
-            ))}
-          </ul>
-          <button
-            type="button"
-            onClick={() => void form.save(true)}
-            disabled={saving}
-            className="mt-3 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
-          >
-            Save anyway
-          </button>
-        </div>
-      )}
-
-      <SettingsSaveBar
-        dirty={dirty}
-        saving={saving}
-        savedAt={savedAt}
-        onSave={() => void form.save()}
-        onReset={form.resetToDefault}
-      />
+      <SettingsFooter form={form} />
 
       <SettingsHistory group="pricing" onRestore={(v: PricingSettings) => setDraft(v)} />
 
