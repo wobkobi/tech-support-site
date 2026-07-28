@@ -18,7 +18,7 @@ const CARD = "border-seasalt-200/60 bg-white rounded-xl border p-5 shadow-sm sm:
  */
 export default function BookingCancelLoading(): React.ReactElement {
   return (
-    <main className="relative min-h-dvh overflow-hidden">
+    <main id="main" className="relative min-h-dvh overflow-hidden">
       {/* Backdrop */}
       <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
         <picture>
