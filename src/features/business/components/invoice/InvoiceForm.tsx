@@ -10,6 +10,7 @@
  */
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
+import { ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
 import { validateEmail } from "@/features/booking/lib/booking";
 import { LineItemsEditor } from "@/features/business/components/invoice/LineItemsEditor";
 import { calcInvoiceTotals, formatNZD, isValidLineItem } from "@/features/business/lib/business";
@@ -57,8 +58,6 @@ interface InvoiceFormProps {
   onChange?: (data: InvoiceFormData) => void;
 }
 
-const INPUT_CLS =
-  "w-full rounded-lg border border-admin-border-strong bg-admin-surface px-3 py-2 text-sm text-admin-text focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-russian-violet";
 const LABEL_CLS = "mb-1 block text-xs font-semibold text-admin-muted uppercase";
 
 /**
@@ -171,7 +170,7 @@ export function InvoiceForm({
             value={form.clientName}
             onChange={(e) => update({ clientName: e.target.value })}
             disabled={busy}
-            className={INPUT_CLS}
+            className={ADMIN_INPUT_CLS}
           />
         </label>
         <label>
@@ -181,7 +180,7 @@ export function InvoiceForm({
             value={form.clientEmail}
             onChange={(e) => update({ clientEmail: e.target.value })}
             disabled={busy}
-            className={INPUT_CLS}
+            className={ADMIN_INPUT_CLS}
           />
         </label>
         <label>
@@ -198,7 +197,7 @@ export function InvoiceForm({
               })
             }
             disabled={busy}
-            className={INPUT_CLS}
+            className={ADMIN_INPUT_CLS}
           />
         </label>
         <label>
@@ -208,7 +207,7 @@ export function InvoiceForm({
             value={form.dueDate}
             onChange={(e) => update({ dueDate: e.target.value })}
             disabled={busy}
-            className={INPUT_CLS}
+            className={ADMIN_INPUT_CLS}
           />
         </label>
       </div>
@@ -230,7 +229,7 @@ export function InvoiceForm({
           onChange={(e) => update({ notes: e.target.value })}
           disabled={busy}
           placeholder="Optional note shown on the invoice."
-          className={cn(INPUT_CLS, "resize-y")}
+          className={cn(ADMIN_INPUT_CLS, "resize-y")}
         />
       </label>
 

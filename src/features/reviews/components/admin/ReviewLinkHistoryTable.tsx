@@ -108,7 +108,6 @@ export function ReviewLinkHistoryTable({
     try {
       const res = await fetch(`/api/admin/contacts/${entry.id}/clear-review-link`, {
         method: "POST",
-        headers: {},
       });
       const data = (await res.json()) as { ok?: boolean; error?: string };
       if (!res.ok) throw new Error(data.error ?? "Request failed");

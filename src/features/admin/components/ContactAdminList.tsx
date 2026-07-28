@@ -605,9 +605,7 @@ export function ContactAdminList({
    */
   async function exportContacts(): Promise<void> {
     try {
-      const res = await fetch("/api/admin/contacts/export", {
-        headers: {},
-      });
+      const res = await fetch("/api/admin/contacts/export", {});
       if (!res.ok) {
         console.error("[ContactAdminList] Export failed:", res.status);
         return;
@@ -637,7 +635,6 @@ export function ContactAdminList({
     try {
       const res = await fetch(`/api/admin/contacts/${id}/sync-google`, {
         method: "POST",
-        headers: {},
       });
       const data = (await res.json()) as { ok: boolean; error?: string };
       if (data.ok) {
@@ -733,7 +730,7 @@ export function ContactAdminList({
   async function deleteContact(id: string): Promise<void> {
     setDeletingId(id);
     try {
-      const res = await fetch(`/api/admin/contacts/${id}`, { method: "DELETE", headers: {} });
+      const res = await fetch(`/api/admin/contacts/${id}`, { method: "DELETE" });
       const data = (await res.json()) as { ok: boolean };
       if (data.ok) {
         setContacts((prev) => prev.filter((c) => c.id !== id));

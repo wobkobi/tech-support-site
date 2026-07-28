@@ -24,7 +24,6 @@ export function RecalculateButton(): React.ReactElement {
     try {
       const res = await fetch("/api/admin/travel/recalculate", {
         method: "POST",
-        headers: {},
       });
       const data = (await res.json()) as { ok: boolean; cachedCount?: number; error?: string };
       if (data.ok) {

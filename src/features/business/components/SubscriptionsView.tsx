@@ -177,7 +177,6 @@ export function SubscriptionsView({ reloadKey = 0 }: { reloadKey?: number }): Re
     try {
       const res = await fetch(`/api/business/subscriptions/${sub.id}/record`, {
         method: "POST",
-        headers: {},
       });
       const data = (await res.json()) as {
         ok: boolean;
@@ -221,7 +220,6 @@ export function SubscriptionsView({ reloadKey = 0 }: { reloadKey?: number }): Re
     try {
       await fetch(`/api/business/subscriptions/${sub.id}`, {
         method: "DELETE",
-        headers: {},
       });
       toast("Deleted.", { tone: "success" });
       await load();

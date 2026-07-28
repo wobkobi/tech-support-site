@@ -10,6 +10,7 @@
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
+import { ADMIN_CONTROL_CLS, ADMIN_INPUT_CLS } from "@/features/admin/components/ui/field-classes";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { BreakdownModal, type BreakdownData } from "@/features/business/components/BreakdownModal";
@@ -34,9 +35,6 @@ interface ExpensesViewProps {
   onMigrated?: () => void;
 }
 
-const INPUT_CLS =
-  "w-full rounded-lg border border-admin-border-strong bg-admin-surface px-3 py-2 text-sm text-admin-text focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-russian-violet";
-const CONTROL_CLS = `h-9 ${INPUT_CLS}`;
 // An expense can only migrate to a subscription once its supplier+description has
 // repeated MORE THAN twice - one coincidental pair isn't a confirmed pattern.
 const MIGRATE_MIN_MATCHES = 3;
@@ -338,7 +336,7 @@ export function ExpensesView({ onMigrated }: ExpensesViewProps): React.ReactElem
               required
               value={form.date}
               onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))}
-              className={INPUT_CLS}
+              className={ADMIN_INPUT_CLS}
             />
           </Field>
           <Field label="Supplier" htmlFor="exp-supplier" required>
@@ -348,7 +346,7 @@ export function ExpensesView({ onMigrated }: ExpensesViewProps): React.ReactElem
               required
               value={form.supplier}
               onChange={(e) => setForm((p) => ({ ...p, supplier: e.target.value }))}
-              className={INPUT_CLS}
+              className={ADMIN_INPUT_CLS}
             />
           </Field>
           <Field label="Description" htmlFor="exp-description" required>
@@ -358,7 +356,7 @@ export function ExpensesView({ onMigrated }: ExpensesViewProps): React.ReactElem
               required
               value={form.description}
               onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
-              className={INPUT_CLS}
+              className={ADMIN_INPUT_CLS}
             />
           </Field>
           <Field label="Category" htmlFor="exp-category">
@@ -366,7 +364,7 @@ export function ExpensesView({ onMigrated }: ExpensesViewProps): React.ReactElem
               id="exp-category"
               value={form.category}
               onChange={(e) => setForm((p) => ({ ...p, category: e.target.value }))}
-              className={INPUT_CLS}
+              className={ADMIN_INPUT_CLS}
             >
               {EXPENSE_CATEGORIES.map((c) => (
                 <option key={c}>{c}</option>
@@ -382,7 +380,7 @@ export function ExpensesView({ onMigrated }: ExpensesViewProps): React.ReactElem
               step="0.01"
               value={form.amountIncl}
               onChange={(e) => setForm((p) => ({ ...p, amountIncl: e.target.value }))}
-              className={INPUT_CLS}
+              className={ADMIN_INPUT_CLS}
             />
           </Field>
           <Field label="GST rate" htmlFor="exp-gst">
@@ -390,7 +388,7 @@ export function ExpensesView({ onMigrated }: ExpensesViewProps): React.ReactElem
               id="exp-gst"
               value={form.gstRate}
               onChange={(e) => setForm((p) => ({ ...p, gstRate: e.target.value }))}
-              className={INPUT_CLS}
+              className={ADMIN_INPUT_CLS}
             >
               <option value="0.15">15%</option>
               <option value="0">0% (no GST)</option>
@@ -406,7 +404,7 @@ export function ExpensesView({ onMigrated }: ExpensesViewProps): React.ReactElem
               id="exp-method"
               value={form.method}
               onChange={(e) => setForm((p) => ({ ...p, method: e.target.value }))}
-              className={INPUT_CLS}
+              className={ADMIN_INPUT_CLS}
             >
               {PAYMENT_METHODS.map((m) => (
                 <option key={m}>{m}</option>
@@ -419,7 +417,7 @@ export function ExpensesView({ onMigrated }: ExpensesViewProps): React.ReactElem
               type="text"
               value={form.notes}
               onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
-              className={INPUT_CLS}
+              className={ADMIN_INPUT_CLS}
             />
           </Field>
           <label className="flex items-center gap-2">
@@ -455,12 +453,16 @@ export function ExpensesView({ onMigrated }: ExpensesViewProps): React.ReactElem
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Supplier or description"
-            className={CONTROL_CLS}
+            className={ADMIN_CONTROL_CLS}
           />
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-xs font-medium text-admin-muted">Financial year</span>
-          <select value={fyKey} onChange={(e) => setFyKey(e.target.value)} className={CONTROL_CLS}>
+          <select
+            value={fyKey}
+            onChange={(e) => setFyKey(e.target.value)}
+            className={ADMIN_CONTROL_CLS}
+          >
             <option value="all">All years</option>
             {financialYears.map((f) => (
               <option key={f.label} value={fyKeyOf(f.label)}>
@@ -474,7 +476,7 @@ export function ExpensesView({ onMigrated }: ExpensesViewProps): React.ReactElem
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
-            className={CONTROL_CLS}
+            className={ADMIN_CONTROL_CLS}
           >
             <option value="all">All categories</option>
             {categoryOptions.map((c) => (
@@ -489,7 +491,7 @@ export function ExpensesView({ onMigrated }: ExpensesViewProps): React.ReactElem
           <select
             value={methodFilter}
             onChange={(e) => setMethodFilter(e.target.value)}
-            className={CONTROL_CLS}
+            className={ADMIN_CONTROL_CLS}
           >
             <option value="all">All methods</option>
             {methodOptions.map((m) => (
@@ -505,7 +507,7 @@ export function ExpensesView({ onMigrated }: ExpensesViewProps): React.ReactElem
             type="date"
             value={fromDate}
             onChange={(e) => setFromDate(e.target.value)}
-            className={CONTROL_CLS}
+            className={ADMIN_CONTROL_CLS}
           />
         </label>
         <label className="flex flex-col gap-1">
@@ -514,7 +516,7 @@ export function ExpensesView({ onMigrated }: ExpensesViewProps): React.ReactElem
             type="date"
             value={toDate}
             onChange={(e) => setToDate(e.target.value)}
-            className={CONTROL_CLS}
+            className={ADMIN_CONTROL_CLS}
           />
         </label>
         <label className="flex h-9 items-center gap-2 text-sm text-admin-text-secondary">

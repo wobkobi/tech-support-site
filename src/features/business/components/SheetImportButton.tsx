@@ -49,9 +49,7 @@ export function SheetImportButton(): React.ReactElement {
     setDone(null);
     setError(null);
     try {
-      const res = await fetch("/api/business/sheets/import", {
-        headers: {},
-      });
+      const res = await fetch("/api/business/sheets/import");
       if (!res.ok) throw new Error("Sheet read failed");
       const data = (await res.json()) as ImportResult;
       setPreview(data);
@@ -69,7 +67,6 @@ export function SheetImportButton(): React.ReactElement {
     try {
       const res = await fetch("/api/business/sheets/import", {
         method: "POST",
-        headers: {},
       });
       if (!res.ok) throw new Error("Import failed");
       const data = (await res.json()) as ImportResult;

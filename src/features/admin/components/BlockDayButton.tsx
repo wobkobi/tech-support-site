@@ -126,7 +126,7 @@ export function BlockDayButton({
           ? // Pass the clicked day so a multi-day block is trimmed/split, not wiped.
             fetch(
               `/api/admin/blocked-days/${encodeURIComponent(busyEventId!)}?date=${encodeURIComponent(dateKey)}`,
-              { method: "DELETE", headers: {} },
+              { method: "DELETE" },
             )
           : fetch("/api/admin/blocked-days", {
               method: "POST",
