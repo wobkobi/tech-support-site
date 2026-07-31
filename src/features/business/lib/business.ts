@@ -41,6 +41,18 @@ export function formatNZD(amount: number): string {
 }
 
 /**
+ * Formats a minute count as a compact "Xh Ym" string for admin display.
+ * @param mins - Minutes (non-negative integer).
+ * @returns "45 min" / "1h" / "1h 30m".
+ */
+export function formatMins(mins: number): string {
+  if (mins < 60) return `${mins} min`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m === 0 ? `${h}h` : `${h}h ${m}m`;
+}
+
+/**
  * Returns today's date as a YYYY-MM-DD string in NZ (Pacific/Auckland) time.
  * The ledger/invoice forms that default to "today" run for a NZ operator, and
  * UTC would show yesterday every NZ morning.

@@ -14,7 +14,8 @@ import { StatusPill, type StatusTone } from "@/features/admin/components/ui/Stat
 import { BookingActions } from "@/features/booking/components/admin/BookingActions";
 import { BookingInfoCard } from "@/features/booking/components/admin/BookingInfoCard";
 import { BookingTimeline } from "@/features/booking/components/admin/BookingTimeline";
-import { formatNZD } from "@/features/business/lib/business";
+import { formatMins, formatNZD } from "@/features/business/lib/business";
+import { formatQuotedRange } from "@/features/business/lib/estimate-range";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { formatDateShort, formatDateTimeShort } from "@/shared/lib/date-format";
 import { prisma } from "@/shared/lib/prisma";
@@ -138,6 +139,7 @@ export default async function BookingDetailPage({
   // Which price-snapshot fields exist decides whether to show the card.
   const hasPriceSnapshot =
     booking.quotedLowAtBooking != null ||
+    booking.quotedDescriptionAtBooking != null ||
     booking.baseRateAtBooking != null ||
     booking.travelMinsAtBooking != null ||
     booking.promoTitleAtBooking != null ||
@@ -193,8 +195,11 @@ export default async function BookingDetailPage({
               <dl className="space-y-1.5 text-sm">
                 {booking.quotedLowAtBooking != null && booking.quotedHighAtBooking != null && (
                   <InfoRow label="Quoted">
-                    {formatNZD(booking.quotedLowAtBooking)} -{" "}
-                    {formatNZD(booking.quotedHighAtBooking)}
+                    {formatQuotedRange(
+                      booking.quotedLowAtBooking,
+                      booking.quotedHighAtBooking,
+                      booking.quotedTravelAtBooking,
+                    )}
                   </InfoRow>
                 )}
                 {promoSummary && <InfoRow label="Promo">{promoSummary}</InfoRow>}
@@ -221,6 +226,37 @@ export default async function BookingDetailPage({
                 )}
                 {booking.publicHolidayName && (
                   <InfoRow label="Public holiday">{booking.publicHolidayName}</InfoRow>
+                )}
+                {booking.quotedDescriptionAtBooking && (
+                  <div className="mt-3 border-t border-admin-border pt-3">
+                    <span className="text-admin-muted">They asked</span>
+                    <p className="mt-1 whitespace-pre-wrap text-admin-text italic">
+                      &ldquo;{booking.quotedDescriptionAtBooking}&rdquo;
+                    </p>
+                  </div>
+                )}
+                {booking.quotedMinsAtBooking != null && (
+                  <div className="mt-2">
+                    <span className="text-admin-muted">AI read it as</span>
+                    <p className="mt-1 text-admin-text">
+                      {formatMins(booking.quotedMinsAtBooking)}
+                      {booking.quotedCategoryAtBooking
+                        ? ` · ${booking.quotedCategoryAtBooking}`
+                        : ""}
+                    </p>
+                    {booking.quotedTasksAtBooking.length > 0 && (
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {booking.quotedTasksAtBooking.map((task, i) => (
+                          <span
+                            key={`quoted-task-${i}`}
+                            className="rounded-md bg-admin-bg px-2 py-0.5 text-xs text-admin-muted"
+                          >
+                            {task.label}: {formatMins(task.mins)}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 )}
               </dl>
             </Card>

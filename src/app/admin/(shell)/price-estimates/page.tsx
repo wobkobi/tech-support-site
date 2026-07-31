@@ -9,6 +9,7 @@ import { Card } from "@/features/admin/components/ui/Card";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";
+import { formatMins } from "@/features/business/lib/business";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { cn } from "@/shared/lib/cn";
 import { formatDateTimeShort } from "@/shared/lib/date-format";
@@ -24,18 +25,6 @@ export const metadata: Metadata = {
   title: "Price estimates - Admin",
   robots: { index: false, follow: false },
 };
-
-/**
- * Formats a minute count as a compact "Xh Ym" string.
- * @param mins - Minutes (non-negative integer).
- * @returns "45 min" / "1h" / "1h 30m".
- */
-function formatMins(mins: number): string {
-  if (mins < 60) return `${mins} min`;
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  return m === 0 ? `${h}h` : `${h}h ${m}m`;
-}
 
 /**
  * Admin audit page for the public price estimator. Lists the last 500 logs
