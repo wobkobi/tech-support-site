@@ -280,7 +280,7 @@ export default async function Home(): Promise<React.ReactElement> {
             <article className={cn(CARD, "animate-slide-up animate-fill-both animate-delay-300")}>
               <h2 className="mb-4 text-2xl font-bold text-russian-violet sm:text-3xl">About Me</h2>
               <p className="mb-4 text-base text-rich-black sm:text-lg">
-                Hi, I'm Harrison, a computer science graduate based in Auckland. I started To The
+                Hi, I'm Harrison, a computer science graduate based in Auckland. I started To the
                 Point Tech because when something breaks, people want someone who turns up and sorts
                 it out properly.
               </p>
