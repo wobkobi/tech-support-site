@@ -1,8 +1,9 @@
 // src/features/business/lib/business.ts
 /**
- * @description Core business calculation helpers - NZD/date formatting, GST
- * extraction, billable-minute and hourly-rate maths, job-to-line-item building,
- * and invoice totals. Shared by the calculator, invoice, and ledger views.
+ * @description Core business calculation and display helpers - NZD/date
+ * formatting, GST extraction, billable-minute and hourly-rate maths,
+ * job-to-line-item building, invoice totals, and admin minute-count display.
+ * Shared by the calculator, invoice, ledger, and admin booking views.
  */
 import {
   BILLING_INCREMENT_MINS,

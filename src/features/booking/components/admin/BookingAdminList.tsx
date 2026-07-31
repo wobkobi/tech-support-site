@@ -13,6 +13,7 @@ import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
 import { StatusPill, type StatusTone } from "@/features/admin/components/ui/StatusPill";
 import { useBookingActions } from "@/features/booking/hooks/use-booking-actions";
+import { formatQuotedRange } from "@/features/business/lib/estimate-range";
 import { cn } from "@/shared/lib/cn";
 import { formatDateTimeShort } from "@/shared/lib/date-format";
 import Link from "next/link";
@@ -35,6 +36,8 @@ export interface AdminBookingRow {
   /** Public quote the customer saw before booking (snapshot); null when they didn't get one. */
   quotedLow: number | null;
   quotedHigh: number | null;
+  /** Round-trip travel slice of the quoted total, in dollars; null when unknown/not travel. */
+  quotedTravel: number | null;
 }
 
 type StatusFilter = "all" | "held" | "confirmed" | "cancelled" | "completed";
@@ -313,7 +316,7 @@ export function BookingAdminList({
                     </td>
                     <td className="px-3 py-3 align-top whitespace-nowrap text-slate-600">
                       {b.quotedLow != null && b.quotedHigh != null ? (
-                        `$${b.quotedLow} - $${b.quotedHigh}`
+                        formatQuotedRange(b.quotedLow, b.quotedHigh, b.quotedTravel)
                       ) : (
                         <span className="text-slate-300">-</span>
                       )}

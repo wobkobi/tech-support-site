@@ -1,9 +1,11 @@
 // src/features/business/lib/estimate-range.ts
 /**
- * @description Shared, client-safe price-range math for the public estimator.
- * Turns a point time estimate + hourly rate into a customer-facing low/high
- * band whose width scales with the AI's confidence. Used by both the pricing
- * page wizard and the inline booking-form estimate so the two never drift.
+ * @description Shared, client-safe price-range math and display formatting for
+ * the public estimator. Turns a point time estimate + hourly rate into a
+ * customer-facing low/high band whose width scales with the AI's confidence,
+ * and formats that band (and quoted-booking snapshots of it) for display. Used
+ * by the pricing page wizard, the inline booking-form estimate, and the admin
+ * booking views so they never drift.
  */
 
 import type { EstimateConfidence, EstimatorRange } from "@/shared/lib/settings/types";

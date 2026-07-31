@@ -218,9 +218,9 @@ export default async function BookingDetailPage({
                 )}
                 {booking.travelMinsAtBooking != null && (
                   <InfoRow label="Travel time">
-                    {booking.travelMinsAtBooking} min there
+                    {formatMins(booking.travelMinsAtBooking)} there
                     {booking.travelMinsBackAtBooking != null
-                      ? ` · ${booking.travelMinsBackAtBooking} min back`
+                      ? ` · ${formatMins(booking.travelMinsBackAtBooking)} back`
                       : ""}
                   </InfoRow>
                 )}
