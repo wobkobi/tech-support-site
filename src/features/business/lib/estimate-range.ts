@@ -72,3 +72,22 @@ export function priceRangeFor(
   const high = Math.max(Math.ceil((cost * band.highFactor) / 5) * 5, low + range.minSpread);
   return { low, high };
 }
+
+/**
+ * Formats a public quote for display, splitting labour from travel when a
+ * travel slice was quoted. `low`/`high` are the all-in totals the estimator
+ * showed the customer, so the labour figures are derived by subtracting
+ * `travel`. A null travel (rows logged before travel was broken out) or a zero
+ * one (remote jobs) falls back to the combined range. Whole dollars throughout
+ * - the estimator only ever produces whole-dollar bands.
+ * @param low - All-in low end of the quoted band, in dollars.
+ * @param high - All-in high end of the quoted band, in dollars.
+ * @param travel - Round-trip travel slice of the total, or null when unknown.
+ * @returns A display string such as "$25 - $55 + $30 travel" or "$55 - $85".
+ */
+export function formatQuotedRange(low: number, high: number, travel: number | null): string {
+  if (travel && travel > 0) {
+    return `$${low - travel} - $${high - travel} + $${travel} travel`;
+  }
+  return `$${low} - $${high}`;
+}

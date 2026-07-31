@@ -15,6 +15,7 @@ import {
   type TimeOfDay,
 } from "@/features/booking/lib/booking";
 import { loadBlockingBookings } from "@/features/booking/lib/existing-bookings.server";
+import { formatQuotedRange } from "@/features/business/lib/estimate-range";
 import { lookupPublicHoliday } from "@/features/business/lib/pricing-policy.server";
 import { getActivePromo } from "@/features/business/lib/promos";
 import { lookupDriveRoundTrip } from "@/features/business/lib/travel-distance";
@@ -244,16 +245,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       bookingNotes += `Address: ${canonicalAddress}\n`;
     }
     if (quotedLowAtBooking !== null && quotedHighAtBooking !== null) {
-      // priceLow/priceHigh are the all-in total; subtract the travel slice to
-      // show labour + travel separately (matching the estimate card). Older
-      // logs have no travelCharge - fall back to the combined range.
-      if (quotedTravelAtBooking && quotedTravelAtBooking > 0) {
-        const labourLow = quotedLowAtBooking - quotedTravelAtBooking;
-        const labourHigh = quotedHighAtBooking - quotedTravelAtBooking;
-        bookingNotes += `Quoted: $${labourLow} - $${labourHigh} + $${quotedTravelAtBooking} travel\n`;
-      } else {
-        bookingNotes += `Quoted: $${quotedLowAtBooking} - $${quotedHighAtBooking}\n`;
-      }
+      // Same helper the admin price-snapshot card uses, so the notes line and
+      // the card can never disagree on the labour/travel split.
+      bookingNotes += `Quoted: ${formatQuotedRange(quotedLowAtBooking, quotedHighAtBooking, quotedTravelAtBooking)}\n`;
     }
 
     // Create calendar event
