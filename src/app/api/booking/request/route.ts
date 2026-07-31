@@ -38,7 +38,7 @@ import { prisma } from "@/shared/lib/prisma";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
-import { Prisma } from "@prisma/client";
+import { Prisma, type AiEstimateCategory, type EstimateTask } from "@prisma/client";
 import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -214,12 +214,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Snapshot the public quote the customer saw (carried from /pricing or the
     // inline booking estimate). Fetched before the notes/calendar are built so
     // the quoted range appears in both. Best effort; the id is validated loosely
-    // and the low/high are copied so they survive the estimate-log retention
-    // purge. The stored priceLow/priceHigh are the all-in total (labour + travel).
+    // and the range, travel slice, typed description and AI reading are all
+    // copied so they survive the estimate-log retention purge. The stored
+    // priceLow/priceHigh are the all-in total (labour + travel).
     let priceEstimateIdAtBooking: string | null = null;
     let quotedLowAtBooking: number | null = null;
     let quotedHighAtBooking: number | null = null;
     let quotedTravelAtBooking: number | null = null;
+    let quotedDescriptionAtBooking: string | null = null;
+    let quotedMinsAtBooking: number | null = null;
+    let quotedCategoryAtBooking: AiEstimateCategory | null = null;
+    let quotedTasksAtBooking: EstimateTask[] = [];
     if (estimateId && /^[a-f0-9]{24}$/i.test(estimateId)) {
       const est = await prisma.priceEstimateLog
         .findUnique({ where: { id: estimateId } })
@@ -229,6 +234,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         quotedLowAtBooking = est.priceLow;
         quotedHighAtBooking = est.priceHigh;
         quotedTravelAtBooking = est.travelCharge;
+        quotedDescriptionAtBooking = est.description;
+        quotedMinsAtBooking = est.aiEstimatedMins;
+        quotedCategoryAtBooking = est.aiCategory;
+        quotedTasksAtBooking = est.aiTasks;
       }
     }
 
@@ -362,10 +371,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           promoFlatHourlyRateAtBooking: activePromo?.flatHourlyRate ?? null,
           promoPercentDiscountAtBooking: activePromo?.percentDiscount ?? null,
           publicHolidayName,
-          // Snapshot of the public quote the customer saw before booking.
+          // Snapshot of the public quote the customer saw before booking, plus
+          // what they typed to get it and how the AI read it.
           priceEstimateIdAtBooking,
           quotedLowAtBooking,
           quotedHighAtBooking,
+          quotedTravelAtBooking,
+          quotedDescriptionAtBooking,
+          quotedMinsAtBooking,
+          quotedCategoryAtBooking,
+          quotedTasksAtBooking,
         },
       });
 
