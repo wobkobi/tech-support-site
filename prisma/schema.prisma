@@ -173,11 +173,24 @@ model Booking {
 
   // Public price-estimate snapshot - the quote the customer saw (on /pricing or
   // the inline booking estimate) before booking, so the operator can compare it
-  // to the final job. The estimate row may be purged after retention; the
-  // low/high are snapshotted here so they survive on the booking.
+  // to the final job. The estimate row is purged 30 days after it is written,
+  // so everything worth keeping is copied onto the booking here; the id is kept
+  // only to tie the two together while the log still exists.
   priceEstimateIdAtBooking String? @db.ObjectId
   quotedLowAtBooking       Int?
   quotedHighAtBooking      Int?
+  // Round-trip travel slice of the quoted total, so the admin card shows the
+  // same labour + travel split as the booking notes. Null on rows written
+  // before travel was broken out, 0 on remote bookings.
+  quotedTravelAtBooking    Int?
+
+  // What the customer typed into the estimator and how the AI read it, so the
+  // reasoning behind a quoted range outlives the estimate log. Category and
+  // task shape are the same ones PriceEstimateLog stores.
+  quotedDescriptionAtBooking String?
+  quotedMinsAtBooking        Int?
+  quotedCategoryAtBooking    AiEstimateCategory?
+  quotedTasksAtBooking       EstimateTask[]
 
   // Cancellation state stamped by /api/booking/cancel (customer path) and
   // the admin booking cancel UI (operator + cancel-for-customer paths).

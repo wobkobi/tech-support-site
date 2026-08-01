@@ -50,6 +50,7 @@ export default async function AdminBookingsPage(): Promise<React.ReactElement> {
       noShow: true,
       quotedLowAtBooking: true,
       quotedHighAtBooking: true,
+      quotedTravelAtBooking: true,
     },
   });
 
@@ -68,6 +69,7 @@ export default async function AdminBookingsPage(): Promise<React.ReactElement> {
     noShow: b.noShow,
     quotedLow: b.quotedLowAtBooking ?? null,
     quotedHigh: b.quotedHighAtBooking ?? null,
+    quotedTravel: b.quotedTravelAtBooking ?? null,
   }));
 
   return (

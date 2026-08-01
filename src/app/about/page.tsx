@@ -72,7 +72,7 @@ export default function AboutPage(): React.ReactElement {
             </h1>
 
             <p className="mb-4 text-base text-rich-black sm:text-lg">
-              I'm Harrison Raynes, a computer science graduate based in Auckland. I started To The
+              I'm Harrison Raynes, a computer science graduate based in Auckland. I started To the
               Point Tech because plenty of people have a computer problem and no one straightforward
               to call about it.
             </p>

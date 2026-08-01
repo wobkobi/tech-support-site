@@ -15,6 +15,7 @@ import {
   type TimeOfDay,
 } from "@/features/booking/lib/booking";
 import { loadBlockingBookings } from "@/features/booking/lib/existing-bookings.server";
+import { formatQuotedRange } from "@/features/business/lib/estimate-range";
 import { lookupPublicHoliday } from "@/features/business/lib/pricing-policy.server";
 import { getActivePromo } from "@/features/business/lib/promos";
 import { lookupDriveRoundTrip } from "@/features/business/lib/travel-distance";
@@ -37,7 +38,7 @@ import { prisma } from "@/shared/lib/prisma";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
-import { Prisma } from "@prisma/client";
+import { Prisma, type AiEstimateCategory, type EstimateTask } from "@prisma/client";
 import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -213,12 +214,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Snapshot the public quote the customer saw (carried from /pricing or the
     // inline booking estimate). Fetched before the notes/calendar are built so
     // the quoted range appears in both. Best effort; the id is validated loosely
-    // and the low/high are copied so they survive the estimate-log retention
-    // purge. The stored priceLow/priceHigh are the all-in total (labour + travel).
+    // and the range, travel slice, typed description and AI reading are all
+    // copied so they survive the estimate-log retention purge. The stored
+    // priceLow/priceHigh are the all-in total (labour + travel).
     let priceEstimateIdAtBooking: string | null = null;
     let quotedLowAtBooking: number | null = null;
     let quotedHighAtBooking: number | null = null;
     let quotedTravelAtBooking: number | null = null;
+    let quotedDescriptionAtBooking: string | null = null;
+    let quotedMinsAtBooking: number | null = null;
+    let quotedCategoryAtBooking: AiEstimateCategory | null = null;
+    let quotedTasksAtBooking: EstimateTask[] = [];
     if (estimateId && /^[a-f0-9]{24}$/i.test(estimateId)) {
       const est = await prisma.priceEstimateLog
         .findUnique({ where: { id: estimateId } })
@@ -228,6 +234,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         quotedLowAtBooking = est.priceLow;
         quotedHighAtBooking = est.priceHigh;
         quotedTravelAtBooking = est.travelCharge;
+        quotedDescriptionAtBooking = est.description;
+        quotedMinsAtBooking = est.aiEstimatedMins;
+        quotedCategoryAtBooking = est.aiCategory;
+        quotedTasksAtBooking = est.aiTasks;
       }
     }
 
@@ -244,16 +254,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       bookingNotes += `Address: ${canonicalAddress}\n`;
     }
     if (quotedLowAtBooking !== null && quotedHighAtBooking !== null) {
-      // priceLow/priceHigh are the all-in total; subtract the travel slice to
-      // show labour + travel separately (matching the estimate card). Older
-      // logs have no travelCharge - fall back to the combined range.
-      if (quotedTravelAtBooking && quotedTravelAtBooking > 0) {
-        const labourLow = quotedLowAtBooking - quotedTravelAtBooking;
-        const labourHigh = quotedHighAtBooking - quotedTravelAtBooking;
-        bookingNotes += `Quoted: $${labourLow} - $${labourHigh} + $${quotedTravelAtBooking} travel\n`;
-      } else {
-        bookingNotes += `Quoted: $${quotedLowAtBooking} - $${quotedHighAtBooking}\n`;
-      }
+      // Same helper the admin price-snapshot card uses, so the notes line and
+      // the card can never disagree on the labour/travel split.
+      bookingNotes += `Quoted: ${formatQuotedRange(quotedLowAtBooking, quotedHighAtBooking, quotedTravelAtBooking)}\n`;
     }
 
     // Create calendar event
@@ -368,10 +371,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           promoFlatHourlyRateAtBooking: activePromo?.flatHourlyRate ?? null,
           promoPercentDiscountAtBooking: activePromo?.percentDiscount ?? null,
           publicHolidayName,
-          // Snapshot of the public quote the customer saw before booking.
+          // Snapshot of the public quote the customer saw before booking, plus
+          // what they typed to get it and how the AI read it.
           priceEstimateIdAtBooking,
           quotedLowAtBooking,
           quotedHighAtBooking,
+          quotedTravelAtBooking,
+          quotedDescriptionAtBooking,
+          quotedMinsAtBooking,
+          quotedCategoryAtBooking,
+          quotedTasksAtBooking,
         },
       });
 

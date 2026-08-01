@@ -1,8 +1,9 @@
 // src/features/business/lib/business.ts
 /**
- * @description Core business calculation helpers - NZD/date formatting, GST
- * extraction, billable-minute and hourly-rate maths, job-to-line-item building,
- * and invoice totals. Shared by the calculator, invoice, and ledger views.
+ * @description Core business calculation and display helpers - NZD/date
+ * formatting, GST extraction, billable-minute and hourly-rate maths,
+ * job-to-line-item building, invoice totals, and admin minute-count display.
+ * Shared by the calculator, invoice, ledger, and admin booking views.
  */
 import {
   BILLING_INCREMENT_MINS,
@@ -38,6 +39,18 @@ export function formatNZD(amount: number): string {
     .toFixed(2)
     .replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   return `${sign}$${body}`;
+}
+
+/**
+ * Formats a minute count as a compact "Xh Ym" string for admin display.
+ * @param mins - Minutes (non-negative integer).
+ * @returns "45 min" / "1h" / "1h 30m".
+ */
+export function formatMins(mins: number): string {
+  if (mins < 60) return `${mins} min`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m === 0 ? `${h}h` : `${h}h ${m}m`;
 }
 
 /**
