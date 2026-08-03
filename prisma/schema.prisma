@@ -268,6 +268,15 @@ model Contact {
   // and the Google sync stores the union tail (Google keeps the full list).
   altPhones       String[]  @default([])
   address         String?
+  // Address review state, set at import time when the geocoder could not
+  // confidently resolve the stored address. A non-empty candidate list means it
+  // matched several Auckland places and the operator picks one; an empty list
+  // means nothing precise matched and the operator types the address. Only ever
+  // written inside a call that already stamps lastSyncedAt and updatedAt to the
+  // same instant - a standalone write bumps updatedAt past lastSyncedAt,
+  // re-dirties the row, and re-pushes it on every sync run.
+  addressUnverified Boolean  @default(false)
+  addressCandidates String[] @default([])
   googleContactId String? // Google People API resource name (e.g. "people/c1234567890")
   // Stable per-contact review URL token. Lazy-filled by ensureContactReviewToken
   // so the same review link appears on every invoice the customer receives.

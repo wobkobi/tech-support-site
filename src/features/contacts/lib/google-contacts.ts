@@ -8,7 +8,7 @@
  */
 
 import { getOAuth2Client } from "@/features/calendar/lib/google-calendar";
-import { normaliseAddress } from "@/shared/lib/normalise-address";
+import { resolveAddress } from "@/shared/lib/normalise-address";
 import { isNZMobileKey, normaliseContactPhone, toE164NZ } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
 import { google } from "googleapis";
@@ -22,6 +22,33 @@ import { splitName } from "./split-name";
 function getPeopleClient(): ReturnType<typeof google.people> {
   const auth = getOAuth2Client();
   return google.people({ version: "v1", auth });
+}
+
+/**
+ * Maps a geocoder resolution onto the Contact address columns. A confident
+ * match stores the canonical form and clears the review flags; an ambiguous or
+ * unmatched address stores the raw text and raises them. A failed lookup
+ * returns the raw text with no flag keys at all, so a Geocoding outage cannot
+ * mark a whole sync pass for review or clear a flag that is still valid.
+ * @param raw - Address text as it arrived from Google.
+ * @returns Address columns to spread into a Contact create or update.
+ */
+async function addressFields(raw: string): Promise<{
+  address: string;
+  addressUnverified?: boolean;
+  addressCandidates?: string[];
+}> {
+  const resolution = await resolveAddress(raw);
+  switch (resolution.status) {
+    case "resolved":
+      return { address: resolution.address, addressUnverified: false, addressCandidates: [] };
+    case "ambiguous":
+      return { address: raw, addressUnverified: true, addressCandidates: resolution.candidates };
+    case "unresolved":
+      return { address: raw, addressUnverified: true, addressCandidates: [] };
+    case "skipped":
+      return { address: raw };
+  }
 }
 
 /**
@@ -242,9 +269,9 @@ export async function importFromGoogleContacts(): Promise<number> {
               if (r.phone) updates.phone = r.phone;
               // Canonicalise hand-typed Google addresses, but only when the
               // value actually changed - keeps Geocoding calls near zero on
-              // repeat imports.
+              // repeat imports. Flags ride along in the same stamped update.
               if (r.address && r.address !== existing.address) {
-                updates.address = (await normaliseAddress(r.address)) ?? r.address;
+                Object.assign(updates, await addressFields(r.address));
               }
               await prisma.contact.update({
                 where: { id: existing.id },
@@ -253,12 +280,19 @@ export async function importFromGoogleContacts(): Promise<number> {
             } else {
               // Same-instant stamp as the update branch above.
               const stampedAt = new Date();
+              const addressData = r.address
+                ? await addressFields(r.address)
+                : { address: null as string | null };
               const created = await prisma.contact.create({
                 data: {
                   name: r.name ?? r.email,
                   email: r.email,
                   phone: r.phone,
-                  address: r.address ? ((await normaliseAddress(r.address)) ?? r.address) : null,
+                  ...addressData,
+                  // Explicit null: an omitted optional field has no key in
+                  // MongoDB, and `where: { deletedAt: null }` doesn't match a
+                  // missing key - the imported contact would be invisible.
+                  deletedAt: null,
                   googleContactId: r.resourceName,
                   lastSyncedAt: stampedAt,
                   updatedAt: stampedAt,
@@ -314,7 +348,7 @@ export async function importFromGoogleContacts(): Promise<number> {
               }
               // Same changed-only address canonicalisation as the email branch.
               if (r.address && r.address !== existing.address) {
-                updates.address = (await normaliseAddress(r.address)) ?? r.address;
+                Object.assign(updates, await addressFields(r.address));
               }
               await prisma.contact.update({
                 where: { id: existing.id },
@@ -323,12 +357,17 @@ export async function importFromGoogleContacts(): Promise<number> {
             } else {
               // Same-instant stamp as the update branch above.
               const stampedAt = new Date();
+              const addressData = r.address
+                ? await addressFields(r.address)
+                : { address: null as string | null };
               const created = await prisma.contact.create({
                 data: {
                   name: r.name ?? r.phone,
                   email: null,
                   phone: r.phone,
-                  address: r.address ? ((await normaliseAddress(r.address)) ?? r.address) : null,
+                  ...addressData,
+                  // Explicit null - see the note in the email-matched branch.
+                  deletedAt: null,
                   googleContactId: r.resourceName,
                   lastSyncedAt: stampedAt,
                   updatedAt: stampedAt,
@@ -615,8 +654,9 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
     if (nameAction === "pull" && googleName) siteUpdate.name = googleName;
     if (emailAction === "pull" && googleEmail) siteUpdate.email = googleEmail;
     if (addressAction === "pull" && googleAddress) {
-      // Canonicalise the hand-typed Google address before it lands on the site.
-      siteUpdate.address = (await normaliseAddress(googleAddress)) ?? googleAddress;
+      // Canonicalise the hand-typed Google address before it lands on the site,
+      // flagging it for review when it doesn't resolve to one confident match.
+      Object.assign(siteUpdate, await addressFields(googleAddress));
     }
     // Keep the site's phone as the first phone in the merged list so the rest
     // of the app (which reads Contact.phone as the primary) sees the primary

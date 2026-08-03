@@ -22,6 +22,10 @@ export interface ContactSeed {
   email?: string | null;
   phone?: string | null;
   address?: string | null;
+  /** True when `address` could not be confidently geocoded and needs review. */
+  addressUnverified?: boolean;
+  /** Auckland candidates offered to the operator; empty when nothing matched. */
+  addressCandidates?: string[];
   googleContactId?: string | null;
 }
 
@@ -61,6 +65,13 @@ export async function findOrCreateContactByEmail(
       email: normalisedEmail,
       phone: seed.phone ?? null,
       address: seed.address ?? null,
+      addressUnverified: seed.addressUnverified ?? false,
+      addressCandidates: seed.addressCandidates ?? [],
+      // Explicit null, not omitted: MongoDB stores no key for an omitted
+      // optional field, and `where: { deletedAt: null }` - the filter every
+      // reader uses - does not match a document where the key is absent. Omit
+      // it and the new contact is invisible to the list, sync, and matchers.
+      deletedAt: null,
       googleContactId: seed.googleContactId ?? null,
     },
   });
@@ -94,6 +105,10 @@ export async function findOrCreateContactByPhone(
       email: seed.email ?? null,
       phone: normalisedPhone,
       address: seed.address ?? null,
+      addressUnverified: seed.addressUnverified ?? false,
+      addressCandidates: seed.addressCandidates ?? [],
+      // Explicit null - see the note in findOrCreateContactByEmail.
+      deletedAt: null,
       googleContactId: seed.googleContactId ?? null,
     },
   });
