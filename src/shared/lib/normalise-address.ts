@@ -9,24 +9,46 @@ const PRECISE_TYPES = new Set(["street_address", "premise", "subpremise"]);
 const PRECISE_LOCATION_TYPES = new Set(["ROOFTOP", "RANGE_INTERPOLATED"]);
 
 /**
+ * Outcome of one Geocoding attempt. `ok: false` means the lookup never ran or
+ * failed (blank input, missing key, HTTP or network error, non-OK API status),
+ * which is deliberately distinct from a call that succeeded and matched
+ * nothing - that is `ok: true` with an empty list. Callers that flag addresses
+ * for review depend on the distinction: treating an outage as "no such
+ * address" would flag every contact in a sync pass.
+ */
+type GeocodeOutcome = { ok: true; candidates: string[] } | { ok: false };
+
+/**
+ * How a free-text address resolved against the geocoder.
+ * - `resolved` - exactly one confident candidate, safe to store
+ * - `ambiguous` - two or more, so the operator has to choose
+ * - `unresolved` - the lookup ran and matched nothing precise in Auckland
+ * - `skipped` - the lookup never ran or failed, so nothing can be concluded
+ */
+export type AddressResolution =
+  | { status: "resolved"; address: string }
+  | { status: "ambiguous"; candidates: string[] }
+  | { status: "unresolved" }
+  | { status: "skipped" };
+
+/**
  * Geocodes a free-text address (Auckland, NZ constrained) and returns every
- * confident, precise NZ candidate in Google's formatted form, deduped. Empty
- * on blank input, missing key, failure, or nothing precise in NZ - so callers
- * can tell "not found" (0), "unambiguous" (1), and "ambiguous" (>1) apart. A
+ * confident, precise NZ candidate in Google's formatted form, deduped. A
  * leading unit like "2/15" is preserved when Google drops it. Never throws.
  * @param raw - Free-text address to geocode.
- * @returns Confident candidate addresses; empty when none resolve.
+ * @returns The candidates on a successful call, or `{ ok: false }` when the
+ *   lookup could not be made or failed.
  */
-export async function geocodeAddressCandidates(raw: string | null | undefined): Promise<string[]> {
+async function geocode(raw: string | null | undefined): Promise<GeocodeOutcome> {
   const trimmed = raw?.trim();
-  if (!trimmed) return [];
+  if (!trimmed) return { ok: false };
 
   // Server-only key (no referrer restriction) is preferred; falls back to the
   // client key when running in dev without the split.
   const apiKey = process.env.GOOGLE_MAPS_SERVER_KEY ?? process.env.GOOGLE_MAPS_API_KEY;
   if (!apiKey) {
     console.warn("[normalise-address] No GOOGLE_MAPS_SERVER_KEY or GOOGLE_MAPS_API_KEY set.");
-    return [];
+    return { ok: false };
   }
 
   const url = new URL("https://maps.googleapis.com/maps/api/geocode/json");
@@ -42,7 +64,7 @@ export async function geocodeAddressCandidates(raw: string | null | undefined): 
     const res = await fetch(url.toString(), { signal: AbortSignal.timeout(8000) });
     if (!res.ok) {
       console.error(`[normalise-address] Geocoding API HTTP error: ${res.status}`);
-      return [];
+      return { ok: false };
     }
 
     const data = (await res.json()) as {
@@ -56,14 +78,17 @@ export async function geocodeAddressCandidates(raw: string | null | undefined): 
         address_components?: Array<{ short_name?: string; types?: string[] }>;
       }>;
     };
-    if (data.status !== "OK" || data.results.length === 0) {
-      if (data.status !== "ZERO_RESULTS") {
-        console.warn(
-          `[normalise-address] Geocoding API status: ${data.status}` +
-            (data.error_message ? ` - ${data.error_message}` : ""),
-        );
-      }
-      return [];
+
+    // ZERO_RESULTS is a successful lookup that matched nothing - a real answer
+    // about the address. Any other non-OK status is a fault on Google's side
+    // and must not be read as one.
+    if (data.status === "ZERO_RESULTS") return { ok: true, candidates: [] };
+    if (data.status !== "OK") {
+      console.warn(
+        `[normalise-address] Geocoding API status: ${data.status}` +
+          (data.error_message ? ` - ${data.error_message}` : ""),
+      );
+      return { ok: false };
     }
 
     // Preserve a leading "unit/number" prefix (e.g. "2/15 Foo St") when the
@@ -95,11 +120,42 @@ export async function geocodeAddressCandidates(raw: string | null | undefined): 
       if (!candidates.includes(withUnit)) candidates.push(withUnit);
     }
 
-    return candidates;
+    return { ok: true, candidates };
   } catch (err) {
     console.error("[normalise-address] Geocoding lookup failed:", err);
-    return [];
+    return { ok: false };
   }
+}
+
+/**
+ * Geocodes a free-text address and returns every confident, precise NZ
+ * candidate in Google's formatted form, deduped. Empty on blank input, missing
+ * key, failure, or nothing precise in NZ - so callers can tell "not found" (0),
+ * "unambiguous" (1), and "ambiguous" (>1) apart. Never throws.
+ * @param raw - Free-text address to geocode.
+ * @returns Confident candidate addresses; empty when none resolve.
+ */
+export async function geocodeAddressCandidates(raw: string | null | undefined): Promise<string[]> {
+  const outcome = await geocode(raw);
+  return outcome.ok ? outcome.candidates : [];
+}
+
+/**
+ * Resolves a free-text address, reporting why it did not produce a canonical
+ * value so callers can flag it for operator review. Use this over
+ * {@link normaliseAddress} when the difference between "matched nothing" and
+ * "the lookup failed" matters. Never throws.
+ * @param raw - Free-text address to resolve.
+ * @returns The resolution status and, where relevant, the address or candidates.
+ */
+export async function resolveAddress(raw: string | null | undefined): Promise<AddressResolution> {
+  const outcome = await geocode(raw);
+  if (!outcome.ok) return { status: "skipped" };
+
+  const [only] = outcome.candidates;
+  if (outcome.candidates.length === 1 && only) return { status: "resolved", address: only };
+  if (outcome.candidates.length > 1) return { status: "ambiguous", candidates: outcome.candidates };
+  return { status: "unresolved" };
 }
 
 /**
@@ -111,6 +167,6 @@ export async function geocodeAddressCandidates(raw: string | null | undefined): 
  * @returns Canonical formatted address, or null when no single confident match exists.
  */
 export async function normaliseAddress(raw: string | null | undefined): Promise<string | null> {
-  const candidates = await geocodeAddressCandidates(raw);
-  return candidates.length === 1 ? candidates[0] : null;
+  const resolution = await resolveAddress(raw);
+  return resolution.status === "resolved" ? resolution.address : null;
 }
