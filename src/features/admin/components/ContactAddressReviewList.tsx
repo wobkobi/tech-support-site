@@ -4,7 +4,7 @@
  * @description Review queue for imported contact addresses the geocoder could
  * not confidently resolve. Each card offers the Auckland candidates as
  * one-click picks plus a free-text box checked through
- * /api/booking/verify-address, and saves through PATCH
+ * /api/admin/contacts/verify-address, and saves through PATCH
  * /api/admin/contacts/[id]. A saved or dismissed row drops out of the list.
  */
 
@@ -82,7 +82,7 @@ function AddressReviewCard({ row, onDone }: AddressReviewCardProps): React.React
     setChecking(true);
     setChecked(null);
     try {
-      const res = await fetch("/api/booking/verify-address", {
+      const res = await fetch("/api/admin/contacts/verify-address", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ address: typed.trim() }),
