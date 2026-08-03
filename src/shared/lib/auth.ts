@@ -8,7 +8,7 @@
 import { ADMIN_SESSION_COOKIE, verifySessionCookieValue } from "@/shared/lib/admin-session";
 import { getClientIp } from "@/shared/lib/rate-limit";
 import { timingSafeEqual } from "crypto";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { NextRequest } from "next/server";
 
@@ -93,10 +93,11 @@ export async function isAdminRequest(req: NextRequest): Promise<boolean> {
 }
 
 /**
- * Server-component / server-action gate. Reads the admin session cookie via
- * `next/headers` and redirects to `/admin/login?next=...` when missing or
- * invalid. Defence-in-depth alongside the proxy guard - keeps individual
- * pages safe even if the proxy matcher misses something.
+ * Server-component / server-action gate. Accepts the signed session cookie
+ * (browser path) or the X-Admin-Secret header (scripts), matching
+ * {@link isAdminRequest}, and redirects to `/admin/login?next=...` when neither
+ * is valid. Defence-in-depth alongside the proxy guard - keeps individual pages
+ * safe even if the proxy matcher misses something.
  * @param redirectPath - Path to land back on after login (defaults to `/admin`).
  */
 export async function requireAdminAuth(redirectPath = "/admin"): Promise<void> {
@@ -104,6 +105,23 @@ export async function requireAdminAuth(redirectPath = "/admin"): Promise<void> {
   const value = store.get(ADMIN_SESSION_COOKIE)?.value ?? null;
   const ok = await verifySessionCookieValue(value);
   if (ok) return;
+
+  // Same X-Admin-Secret path isAdminRequest accepts, so a script can fetch an
+  // admin page instead of getting a login redirect whose HTML still carries the
+  // intended page's metadata - a blank-looking render that reads as a bug.
+  // Browsers can't set the header on a navigation, so the cookie remains the
+  // only browser-facing path. Failures are rate-limited per IP exactly as on
+  // the API side, because this puts secret guessing in front of pages too.
+  const headerStore = await headers();
+  const ip =
+    headerStore.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    headerStore.get("x-real-ip")?.trim() ||
+    "unknown";
+  if (!isOverAuthFailLimit(ip)) {
+    if (isValidAdminToken(headerStore.get("x-admin-secret"))) return;
+    recordAuthFail(ip);
+  }
+
   redirect(`/admin/login?next=${encodeURIComponent(redirectPath)}`);
 }
 
