@@ -9,6 +9,7 @@ import {
 } from "@/features/contacts/lib/google-contacts";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
+import { resolveAddress } from "@/shared/lib/normalise-address";
 import { isValidPhone, normalisePhone, toE164NZ } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
@@ -18,6 +19,11 @@ interface ContactPatchBody {
   email?: string;
   phone?: string;
   address?: string;
+  /**
+   * Clears the address review flags. Sent with an `address` when the operator
+   * picks or types a value, and on its own to dismiss a row unchanged.
+   */
+  addressReviewed?: boolean;
   /** Retainer tier label, or null/"" to clear the retainer arrangement. */
   retainerTier?: string | null;
   retainerPrice?: number | null;
@@ -119,11 +125,22 @@ export async function PATCH(
     return errorResponse("Invalid retainerSince date.", 400);
   }
 
-  const updateData: Record<string, string | number | Date | null> = {};
+  const updateData: Record<string, string | number | boolean | Date | string[] | null> = {};
   if (body.name !== undefined) updateData.name = body.name.trim();
   if (body.email !== undefined) updateData.email = body.email.trim().toLowerCase() || null;
   if (body.phone !== undefined) updateData.phone = toE164NZ(body.phone) || null;
-  if (body.address !== undefined) updateData.address = body.address.trim() || null;
+  // Canonicalise before storing so an address typed here matches the shape the
+  // import and booking paths produce. An ambiguous or failed lookup keeps the
+  // typed text - the operator has already made the call by typing it.
+  if (body.address !== undefined) {
+    const typed = body.address.trim() || null;
+    const resolution = typed ? await resolveAddress(typed) : null;
+    updateData.address = resolution?.status === "resolved" ? resolution.address : typed;
+  }
+  if (body.addressReviewed) {
+    updateData.addressUnverified = false;
+    updateData.addressCandidates = [];
+  }
   if (body.retainerTier !== undefined) updateData.retainerTier = body.retainerTier?.trim() || null;
   if (body.retainerPrice !== undefined) updateData.retainerPrice = body.retainerPrice;
   if (body.retainerHours !== undefined) updateData.retainerHours = body.retainerHours;
