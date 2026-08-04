@@ -1,6 +1,6 @@
 {
   "name": "tech-support-site",
-  "version": "4.9.0",
+  "version": "4.9.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -16,8 +16,7 @@
     "eval:ai": "dotenv -e .env.local -- tsx scripts/eval-ai/index.ts",
     "format": "prettier --write \"**/*.{js,ts,jsx,tsx,mjs,css,html,md,json,yml,yaml}\"",
     "postinstall": "prisma generate",
-    "lint": "eslint \"{src,scripts}/**/*.{js,ts,jsx,tsx}\"",
-    "lint:fix": "eslint --fix \"{src,scripts}/**/*.{js,ts,jsx,tsx}\"",
+    "lint": "eslint --fix \"{src,scripts}/**/*.{js,ts,jsx,tsx}\"",
     "prepare": "simple-git-hooks",
     "settings:seed": "dotenv -e .env.local -- tsx scripts/seed-settings.ts",
     "smoke": "dotenv -e .env.local -- tsx scripts/smoke-test.ts",
@@ -103,15 +102,5 @@
   "engines": {
     "node": "24.x",
     "npm": ">=10.0.0"
-  },
-  "allowScripts": {
-    "@prisma/client": true,
-    "@prisma/engines": true,
-    "canvas": true,
-    "esbuild": false,
-    "prisma": true,
-    "puppeteer": true,
-    "simple-git-hooks": true,
-    "unrs-resolver": true
   }
 }

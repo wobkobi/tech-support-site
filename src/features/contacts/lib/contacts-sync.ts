@@ -11,6 +11,7 @@ import {
   backfillContactsFromBookings,
   matchReviewsToContacts,
   mergeDuplicateEmailContacts,
+  mergeDuplicateGoogleContacts,
   mergePhoneOnlyContacts,
   normaliseSoftDeleteField,
 } from "./maintenance";
@@ -46,8 +47,12 @@ export async function runContactsSync({
 }: { full?: boolean } = {}): Promise<ContactsSyncResult> {
   // 1. Clean up locally so duplicates never propagate to Google. Normalise the
   // deletedAt field first - a contact missing it is invisible to every
-  // `deletedAt: null` reader (MongoDB isSet gotcha).
+  // `deletedAt: null` reader (MongoDB isSet gotcha), including the merge passes
+  // below. The merges then run strongest key first: a shared Google resource
+  // name is proof of a duplicate, a shared email is near-proof, and a shared
+  // mobile is the weakest of the three.
   await normaliseSoftDeleteField();
+  await mergeDuplicateGoogleContacts();
   await mergeDuplicateEmailContacts();
   await mergePhoneOnlyContacts();
   await backfillContactsFromBookings();

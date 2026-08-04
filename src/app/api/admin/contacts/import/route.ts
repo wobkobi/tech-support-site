@@ -4,6 +4,7 @@
  */
 
 import { importFromGoogleContacts } from "@/features/contacts/lib/google-contacts";
+import { normaliseSoftDeleteField } from "@/features/contacts/lib/maintenance";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
@@ -24,6 +25,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   try {
+    // A contact missing the deletedAt key is invisible to every
+    // `deletedAt: null` reader, including the index the import matches against -
+    // importing over that state re-creates every Google contact as a duplicate.
+    // The cron path normalises first for the same reason.
+    await normaliseSoftDeleteField();
     const importedCount = await importFromGoogleContacts();
     return NextResponse.json({ ok: true, importedCount });
   } catch (error) {
