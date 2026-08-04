@@ -13,6 +13,7 @@ import {
 import { sendPastClientReviewRequest } from "@/features/reviews/lib/email";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
+import { getIdentity } from "@/shared/lib/business-identity.server";
 import { isValidPhone, toE164NZ } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
 import { getSiteUrl } from "@/shared/lib/site-url";
@@ -29,7 +30,9 @@ export const maxDuration = 60;
  * onto their Contact row. Authenticated via X-Admin-Secret header.
  * @param request - The incoming request.
  * @returns JSON with reviewUrl (and `existing: true` when the same link was
- * already issued earlier).
+ * already issued earlier). The SMS path also returns the ready-to-send
+ * `smsText`, composed here so the operator's name and business name come from
+ * the live identity settings rather than being hardcoded in the admin form.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
@@ -111,7 +114,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       if (!contact.reviewToken) {
         await prisma.contact.update({ where: { id: contact.id }, data: { reviewToken } });
       }
-      return NextResponse.json({ ok: true, reviewUrl, copyOnly: true });
+      const identity = await getIdentity();
+      const smsText =
+        `Hi ${name.trim().split(" ")[0]}, it's ${identity.name.split(" ")[0]} from ` +
+        `${identity.company} Tech. Thanks for letting me help you out! A quick review ` +
+        `would be greatly appreciated - it really helps: ${reviewUrl}`;
+      return NextResponse.json({ ok: true, reviewUrl, smsText, copyOnly: true });
     }
 
     // Email path: send first, then stamp the send-state only on a successful
