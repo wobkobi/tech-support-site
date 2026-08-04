@@ -70,7 +70,7 @@ export function ParseConfidenceBanner({
         </button>
       </div>
       {warnings.length > 0 && (
-        <ul className={cn("mt-2 space-y-0.5 pl-5 text-xs", text)}>
+        <ul className={cn("mt-2 space-y-1 pl-5 text-sm", text)}>
           {warnings.map((w, i) => (
             <li key={i} className="list-disc">
               {w}

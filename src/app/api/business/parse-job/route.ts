@@ -7,7 +7,7 @@
  */
 
 import { composeDescription, effectiveHourlyRate } from "@/features/business/lib/business";
-import { clampBillableMins, MAX_JOB_MINS } from "@/features/business/lib/pricing-policy";
+import { clampBillableMins } from "@/features/business/lib/pricing-policy";
 import {
   buildParseJobContext,
   buildParseJobPrompt,
@@ -198,8 +198,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       {
         minBillableMins: settings.pricing.minBillableMins,
         incrementMins: settings.pricing.billingIncrementMins,
+        shortTaskMins: settings.pricing.shortTaskMins,
       },
     );
+    // Live ceiling on one job's billable time; clamps the model's minutes below.
+    const maxJobMins = settings.pricing.maxJobMins;
 
     // Parse the stated time ranges once - reused below to attach parsed.ranges.
     const extractedRanges = extractRanges(input);
@@ -463,7 +466,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       typeof parsed.outOfSessionMins === "number" &&
       Number.isFinite(parsed.outOfSessionMins) &&
       parsed.outOfSessionMins > 0
-        ? Math.min(Math.round(parsed.outOfSessionMins), MAX_JOB_MINS)
+        ? Math.min(Math.round(parsed.outOfSessionMins), maxJobMins)
         : 0;
     parsed.outOfSessionMins = outOfSessionMins;
 
@@ -496,7 +499,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // bill, so an injected "bill 8 hours" or "durationMins = -120" cannot
     // move the total. Below-cap values pass through (free work subtracts).
     if (precomputed !== null && precomputed > 0) {
-      const cap = Math.min(precomputed + outOfSessionMins, MAX_JOB_MINS);
+      const cap = Math.min(precomputed + outOfSessionMins, maxJobMins);
       if (typeof parsed.durationMins === "number" && parsed.durationMins > cap) {
         parsed.warnings = [
           ...(parsed.warnings ?? []),
@@ -519,11 +522,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       parsed.durationMins = null;
     }
 
-    // Safety net: scale floating (non-pinned) tasks proportionally so the sum
-    // matches the billable hours total. Tasks the AI flagged `isExplicit`
-    // carry an operator-stated duration and pass through untouched - only the
-    // floating set absorbs the gap. When every task is pinned, fall back to
-    // scaling every task equally so the sum still hits the target.
+    // Safety net: fit the task quantities to the billable total. Two sets are
+    // pinned and never scaled - `isExplicit` (an operator-stated duration is
+    // exact) and `isShort` (a quick one-shot task cannot absorb a share of a
+    // long session just because time is left over). Only the floating set
+    // moves, and it lands on the billing-increment grid: a bare proportional
+    // multiplier produces quantities like 0.85h (51 min) off a 5-min grid,
+    // which read on the invoice as times nobody worked.
     if (
       parsed.tasks?.length > 0 &&
       typeof parsed.durationMins === "number" &&
@@ -532,73 +537,97 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       // Match the calculator's billable rule exactly (round to the live billing
       // increment, floor at the minimum) so the safety net, AI, and invoice agree
       // on the target. incHours is one increment expressed in hours.
-      const incHours = settings.pricing.billingIncrementMins / 60;
-      const targetHours =
-        Math.round(
-          (clampBillableMins(
-            parsed.durationMins,
-            settings.pricing.minBillableMins,
-            settings.pricing.billingIncrementMins,
-          ) /
-            60) *
-            100,
-        ) / 100;
+      const incMins = settings.pricing.billingIncrementMins;
+      const incHours = incMins / 60;
+      const targetMins = clampBillableMins(
+        parsed.durationMins,
+        settings.pricing.minBillableMins,
+        incMins,
+      );
+      const targetHours = Math.round((targetMins / 60) * 100) / 100;
       const sumQty = parsed.tasks.reduce((s, t) => s + (t.qty || 0), 0);
       const diff = Math.round((targetHours - sumQty) * 100) / 100;
       if (sumQty > 0 && Math.abs(diff) >= incHours) {
-        const pinnedSum = parsed.tasks
-          .filter((t) => t.isExplicit)
-          .reduce((s, t) => s + (t.qty || 0), 0);
-        const floatingTargets = targetHours - pinnedSum;
-        const floatingSum = sumQty - pinnedSum;
-        // Operator-stated durations are EXACT - pinned tasks are never scaled
-        // or drift-parked. When nothing is floating (every task pinned), the
-        // sum simply stands and the mismatch surfaces as a warning for the
-        // operator instead of silently moving stated times.
-        const canScaleFloating = floatingSum > 0 && floatingTargets > 0;
+        /**
+         * Whether a task's quantity is fixed and must not be scaled - an
+         * operator-stated duration, or a quick one-shot task.
+         * @param t - Task to classify.
+         * @param t.isExplicit - Set when the operator stated this task's duration.
+         * @param t.isShort - Set when the task is a quick one-shot job.
+         * @returns True when the task is pinned.
+         */
+        const isPinned = (t: { isExplicit?: boolean; isShort?: boolean }): boolean =>
+          !!t.isExplicit || !!t.isShort;
+        /**
+         * A task's minutes read back onto the increment grid. qty is hours at
+         * 2 dp, which cannot hold every step exactly (10 min = 0.1667h emitted
+         * as 0.17h = 10.2 min), so reconciling against the raw qty leaks a
+         * fraction of a minute per task into the drift park below.
+         * @param qty - Task quantity in decimal hours.
+         * @returns Minutes rounded to the nearest increment.
+         */
+        const gridMins = (qty: number): number => Math.round(((qty || 0) * 60) / incMins) * incMins;
+        const pinnedMins = parsed.tasks.filter(isPinned).reduce((s, t) => s + gridMins(t.qty), 0);
+        const floatingIdx = parsed.tasks.map((t, i) => ({ t, i })).filter(({ t }) => !isPinned(t));
+        const floatingSumMins = floatingIdx.reduce((s, { t }) => s + gridMins(t.qty), 0);
+        const floatingTargetMins = targetMins - pinnedMins;
+        // Every floating task keeps at least one increment, so the floating set
+        // needs that much room before it can be fitted at all.
+        const canScaleFloating =
+          floatingSumMins > 0 && floatingTargetMins >= floatingIdx.length * incMins;
         if (canScaleFloating) {
-          const multiplier = floatingTargets / floatingSum;
-          parsed.tasks = parsed.tasks.map((t) => {
-            if (t.isExplicit) return t;
-            return {
-              ...t,
-              qty: Math.max(incHours, Math.round(t.qty * multiplier * 100) / 100),
-            };
+          // Proportional share, floored onto the increment grid with one
+          // increment as the minimum, then the whole-increment remainder goes
+          // to the largest shares first. Mirrors the prompt's subBase +
+          // subLeftover distribution so the model and the server apportion
+          // the same way.
+          const multiplier = floatingTargetMins / floatingSumMins;
+          const shares = floatingIdx.map(({ t, i }) => {
+            const rawMins = gridMins(t.qty) * multiplier;
+            return { i, rawMins, mins: Math.max(incMins, Math.floor(rawMins / incMins) * incMins) };
           });
-          // Park any rounding remainder on the largest floating task so the
-          // sum lands exactly on targetHours.
+          let leftover = floatingTargetMins - shares.reduce((s, x) => s + x.mins, 0);
+          for (const share of [...shares].sort((a, b) => b.rawMins - a.rawMins)) {
+            if (leftover < incMins) break;
+            share.mins += incMins;
+            leftover -= incMins;
+          }
+          for (const { i, mins } of shares) {
+            parsed.tasks[i] = { ...parsed.tasks[i], qty: Math.round((mins / 60) * 100) / 100 };
+          }
+          // qty is hours at 2 dp, which cannot represent every increment exactly
+          // (10 min = 0.1667h > 0.17h). Park that sub-increment remainder on the
+          // largest floating task so the line totals still sum to the window.
           const adjustedSum = parsed.tasks.reduce((s, t) => s + t.qty, 0);
           const drift = Math.round((targetHours - adjustedSum) * 100) / 100;
-          if (drift !== 0) {
-            const driftable = parsed.tasks
-              .map((t, i) => ({ t, i }))
-              .filter(({ t }) => !t.isExplicit);
-            if (driftable.length > 0) {
-              const largest = driftable.reduce((max, cur) => (cur.t.qty > max.t.qty ? cur : max));
-              parsed.tasks[largest.i] = {
-                ...parsed.tasks[largest.i],
-                qty: Math.max(
-                  incHours,
-                  Math.round((parsed.tasks[largest.i].qty + drift) * 100) / 100,
-                ),
-              };
-            }
+          if (drift !== 0 && shares.length > 0) {
+            const largest = shares.reduce((max, cur) => (cur.mins > max.mins ? cur : max));
+            parsed.tasks[largest.i] = {
+              ...parsed.tasks[largest.i],
+              qty: Math.max(
+                incHours,
+                Math.round((parsed.tasks[largest.i].qty + drift) * 100) / 100,
+              ),
+            };
           }
           parsed.warnings = [
             ...(parsed.warnings ?? []),
-            `Rebalanced floating task quantities to match the ${targetHours}h total (stated durations untouched).`,
+            `Rebalanced floating task quantities to match the ${targetHours}h total (stated and quick-task durations untouched).`,
           ];
         } else {
-          // Nothing floating to absorb the gap. Pinned qtys round UP on the
+          // No floating task can absorb the gap - every task is pinned, or the
+          // pinned set already fills the window. Pinned qtys round UP on the
           // step grid, so overshoot vs the RAW stated minutes of up to one
-          // step per pinned task is expected - warn only on undershoot vs
-          // the billable target or overshoot beyond that allowance.
-          const pinnedCount = parsed.tasks.filter((t) => t.isExplicit).length;
+          // step per pinned task is expected. Warn on undershoot vs the
+          // billable target or overshoot beyond that allowance: a residual
+          // nothing can plausibly absorb usually means the window itself is
+          // wrong (a break, or overlapping ranges), not under-estimated tasks.
+          const pinnedCount = parsed.tasks.filter(isPinned).length;
           const overshoot = Math.round((sumQty - parsed.durationMins / 60) * 100) / 100;
           if (sumQty < targetHours || overshoot > pinnedCount * incHours) {
             parsed.warnings = [
               ...(parsed.warnings ?? []),
-              `Task hours sum to ${Math.round(sumQty * 100) / 100}h but the stated times total ${targetHours}h - stated durations were left untouched; adjust manually if needed.`,
+              `Task hours sum to ${Math.round(sumQty * 100) / 100}h but the stated times total ${targetHours}h - stated and quick-task durations were left untouched. Check the session window for a break or an overlapping range.`,
             ];
           }
         }

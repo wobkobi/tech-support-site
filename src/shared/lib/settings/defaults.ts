@@ -57,11 +57,15 @@ export const DEFAULT_SETTINGS: Settings = {
     ],
   },
 
-  // Source: pricing-policy.ts + MIN_TRAVEL_CHARGE in business.ts.
+  // Source: pricing-policy.ts + MIN_TRAVEL_CHARGE and the task-timing fallbacks
+  // (shortTaskMins / minTaskMins) in business.ts.
   pricing: {
     gstRegistered: false,
     minBillableMins: 15,
     billingIncrementMins: 5,
+    shortTaskMins: 15,
+    minTaskMins: 5,
+    maxJobMins: 480,
     publicHolidayUplift: 0.25,
     minTravelCharge: 10,
     travelRatePerHour: 40,

@@ -103,6 +103,17 @@ export interface PricingSettings {
   minBillableMins: number;
   /** Round-to-nearest billable step (minutes); shared with the AI parser snap. */
   billingIncrementMins: number;
+  /**
+   * Minutes a quick, one-shot task is billed at - the AI parser's SHORT set
+   * (a "quick" hint, a stated duration at/below the minimum, or an inherently
+   * one-shot action like a password reset). Caps trivial work so it can't take
+   * an even share of a long session.
+   */
+  shortTaskMins: number;
+  /** Minutes a task can shrink to before it's dropped from the invoice as descriptive noise. */
+  minTaskMins: number;
+  /** Hard ceiling on one job's billable time (minutes); clamps AI-parsed durations. */
+  maxJobMins: number;
   /** Public-holiday labour surcharge, fraction (0.25 = +25%). 0 = no surcharge. */
   publicHolidayUplift: number;
   /** Minimum travel charge floor (NZD). 0 = no floor. */

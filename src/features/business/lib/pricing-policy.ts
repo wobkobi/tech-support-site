@@ -28,7 +28,7 @@ export const GST_RATE = 0.15;
  */
 export const GST_REGISTERED = false;
 
-/** Minimum charge once any billable work happens; 15 is a multiple of BILLING_INCREMENT_MINS so the floor + round don't double-snap. */
+/** Minimum a WHOLE job bills once any billable work happens - never a per-task floor (see `enforceMinBillable`); 15 is a multiple of BILLING_INCREMENT_MINS so the floor + round don't double-snap. */
 export const MIN_BILLABLE_MINS = 15;
 
 /** Round-to-nearest step for billable time; mirrors {@link billableMins} in business.ts. */
@@ -297,9 +297,6 @@ export function isWithinTravelWindow(
   return msUntil < travelChargeHours * 60 * 60 * 1000;
 }
 
-/** Hard ceiling for a single job's billable minutes (8h). Shared by both AI routes. */
-export const MAX_JOB_MINS = 8 * 60;
-
 /**
  * Snaps to the nearest billing increment, applies the minimum-billable floor,
  * then optionally caps at a ceiling. A zero/negative raw value floors to the
@@ -308,7 +305,7 @@ export const MAX_JOB_MINS = 8 * 60;
  * @param rawMins - Raw duration in minutes (may be 0 or negative).
  * @param minBillableMins - Minimum billable floor (live setting; defaults to the const).
  * @param incrementMins - Rounding increment (live setting; defaults to the const).
- * @param ceilingMins - Optional hard cap (e.g. {@link MAX_JOB_MINS}); omit for no ceiling.
+ * @param ceilingMins - Optional hard cap (pass the live `maxJobMins`); omit for no ceiling.
  * @returns Billable minutes after snap, floor, and optional ceiling.
  */
 export function clampBillableMins(
@@ -470,7 +467,7 @@ export function minimumsCopy(
   billingIncrementMins: number = BILLING_INCREMENT_MINS,
 ): string {
   return (
-    `**${minBillableMins} minutes minimum** on anything billable, then ` +
+    `**${minBillableMins} minutes minimum** per job, then ` +
     `**${billingIncrementMins}-minute increments** after that. ` +
     `Quick calls and emails stay **free** - a "remote session" is when I log in ` +
     `and start working on your machine.`
@@ -515,6 +512,9 @@ export interface Policy {
   TRAVEL_RATE_PER_HOUR: number;
   MIN_BILLABLE_MINS: number;
   BILLING_INCREMENT_MINS: number;
+  SHORT_TASK_MINS: number;
+  MIN_TASK_MINS: number;
+  MAX_JOB_MINS: number;
   PUBLIC_HOLIDAY_UPLIFT: number;
   UNSUCCESSFUL_WORK_FACTOR: number;
   WORKMANSHIP_WINDOW_DAYS: number;

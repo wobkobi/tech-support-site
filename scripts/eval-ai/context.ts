@@ -15,6 +15,7 @@ export interface LiveContext {
   benchmarks: { label: string; mins: number }[];
   minBillableMins: number;
   incrementMins: number;
+  maxJobMins: number;
   rates: {
     id: string;
     label: string;
@@ -62,6 +63,7 @@ export async function loadLiveContext(): Promise<LiveContext> {
     benchmarks: settings.estimator.benchmarks,
     minBillableMins: settings.pricing.minBillableMins,
     incrementMins: settings.pricing.billingIncrementMins,
+    maxJobMins: settings.pricing.maxJobMins,
     rates: rates.map((r) => ({
       id: r.id,
       label: r.label,

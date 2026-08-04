@@ -154,6 +154,12 @@ function validatePricing(p: PricingSettings): FieldError[] {
     errors.push({ field: "minBillableMins", message: "Must be 0 or more minutes (0 = no floor)." });
   if (!inRange(p.billingIncrementMins, 1, 60))
     errors.push({ field: "billingIncrementMins", message: "Must be 1-60 minutes." });
+  if (!inRange(p.shortTaskMins, 1, 240))
+    errors.push({ field: "shortTaskMins", message: "Must be 1-240 minutes." });
+  if (!inRange(p.minTaskMins, 1, 240))
+    errors.push({ field: "minTaskMins", message: "Must be 1-240 minutes." });
+  if (!inRange(p.maxJobMins, 60, 1440))
+    errors.push({ field: "maxJobMins", message: "Must be 60-1440 minutes (1-24 hours)." });
   if (!inRange(p.publicHolidayUplift, 0, 5))
     errors.push({ field: "publicHolidayUplift", message: "Must be a fraction 0-5 (0 = off)." });
   if (!nonNeg(p.minTravelCharge))

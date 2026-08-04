@@ -924,7 +924,7 @@ export function CalculatorView({
       // long tasks absorb more of the correction; tasks scaling below the
       // minimum drop), then floor the whole job to the minimum billable time
       // so a sub-minimum job bills - and displays - at the floor.
-      const collapsed = collapseToWindow(parsedTasks, parsedWindowMin);
+      const collapsed = collapseToWindow(parsedTasks, parsedWindowMin, pricing.taskTiming);
       setTasks(enforceMinBillable(collapsed.tasks, pricing.minBillableMins));
       if (collapsed.rescaled || collapsed.dropped > 0) {
         const parts: string[] = ["Rebalanced tasks"];
@@ -942,6 +942,7 @@ export function CalculatorView({
       pricing.travelRatePerHour,
       pricing.minTravelCharge,
       pricing.minBillableMins,
+      pricing.taskTiming,
       eventPrefill,
       toast,
     ],
@@ -2230,8 +2231,9 @@ export function CalculatorView({
                 tasks={tasks}
                 windowMin={durationMins}
                 minBillableMins={pricing.minBillableMins}
+                snapMins={pricing.taskTiming?.snapMins}
                 onFix={() => {
-                  const collapsed = collapseToWindow(tasks, durationMins);
+                  const collapsed = collapseToWindow(tasks, durationMins, pricing.taskTiming);
                   setTasks(enforceMinBillable(collapsed.tasks, pricing.minBillableMins));
                 }}
               />
@@ -2408,6 +2410,8 @@ interface TaskTimeWarningProps {
   tasks: TaskLine[];
   windowMin: number;
   minBillableMins: number;
+  /** Live billing increment; sizes the pinned-task overshoot allowance. */
+  snapMins?: number;
   onFix: () => void;
 }
 
@@ -2420,6 +2424,7 @@ interface TaskTimeWarningProps {
  * @param props.tasks - Current task lines (hourly + flat).
  * @param props.windowMin - Job window in minutes (`durationMins`).
  * @param props.minBillableMins - Minimum billable labour minutes; below this the floor banner shows.
+ * @param props.snapMins - Live billing increment sizing the pinned-task overshoot allowance.
  * @param props.onFix - Handler that collapses tasks to the window and floors to the minimum.
  * @returns Warning element, or null when totals already match.
  */
@@ -2427,6 +2432,7 @@ function TaskTimeWarning({
   tasks,
   windowMin,
   minBillableMins,
+  snapMins,
   onFix,
 }: TaskTimeWarningProps): React.ReactElement | null {
   const taskMin = hourlyTaskMinutes(tasks);
@@ -2461,10 +2467,10 @@ function TaskTimeWarning({
   // raw window by one step per pinned task without being an over-estimate.
   // Suppress that expected overshoot - Fix never rescales pinned tasks.
   const overshoot = taskMin - windowMin;
-  if (overshoot > 0 && overshoot <= explicitRoundingAllowanceMins(tasks)) return null;
+  if (overshoot > 0 && overshoot <= explicitRoundingAllowanceMins(tasks, snapMins)) return null;
   // Tolerance: qty rounds to 2 dp (= 0.6-min granularity), so a 3-task split
   // can drift up to ~1.5 min from windowMin while still being "correct" after
-  // collapseToWindow has snapped each row to a 5-min boundary. Without this
+  // collapseToWindow has snapped each row to the increment. Without this
   // the banner shows "Tasks total 215 min - listed window is 215 min" because
   // the underlying float is 214.8 vs 215.
   if (Math.abs(taskMin - windowMin) < 2) return null;

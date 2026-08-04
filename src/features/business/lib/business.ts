@@ -219,75 +219,126 @@ export function hourlyTaskMinutes(tasks: TaskLine[]): number {
 
 /**
  * Overshoot allowance for operator-stated tasks: each explicit task's stated
- * duration rounds UP to the {@link TASK_QTY_SNAP_MIN} grid, so pinned tasks
- * can exceed the raw window by one step apiece. Overshoot within this
- * allowance is rounding, not an over-estimate to rebalance or warn on.
+ * duration rounds UP to the snap grid, so pinned tasks can exceed the raw
+ * window by one step apiece. Overshoot within this allowance is rounding, not
+ * an over-estimate to rebalance or warn on.
  * @param tasks - Task lines to assess.
+ * @param snapMins - Live billing increment in minutes; defaults to the code fallback.
  * @returns Allowance in minutes (explicit hourly task count * snap step).
  */
-export function explicitRoundingAllowanceMins(tasks: TaskLine[]): number {
-  return tasks.filter((t) => t.baseRateId != null && t.isExplicit).length * TASK_QTY_SNAP_MIN;
+export function explicitRoundingAllowanceMins(
+  tasks: TaskLine[],
+  snapMins: number = TASK_TIMING_FALLBACK.snapMins,
+): number {
+  return tasks.filter((t) => t.baseRateId != null && t.isExplicit).length * snapMins;
 }
 
-/** Minimum minutes a task can shrink to before it's dropped as descriptive noise. */
-const MIN_TASK_MINUTES = 5;
-// Rounding granularity for AI-parsed task qty after rebalancing. Matches the
-// pricing billing increment's default (5) but stays an independent literal: it
-// is an internal AI-parse detail, and referencing BILLING_INCREMENT_MINS here
-// would re-introduce a circular-import TDZ with the pricing-policy module.
-const TASK_QTY_SNAP_MIN = 5;
-/** Minutes every isShort task is pinned to. Matches the AI's 0.25h SHORT-set assignment. */
-const SHORT_TASK_MINUTES = 15;
+/**
+ * Live task-timing values threaded in from pricing settings. Every consumer
+ * reads the operator's settings; {@link TASK_TIMING_FALLBACK} is the in-code
+ * default only, so editing Settings changes the apportionment everywhere.
+ */
+export interface TaskTimingConfig {
+  /** Rounding granularity for task qty; the live `billingIncrementMins`. */
+  snapMins: number;
+  /** Minutes an `isShort` task is pinned to; the live `shortTaskMins`. */
+  shortTaskMins: number;
+  /** Minutes a floating task can shrink to before it's dropped; the live `minTaskMins`. */
+  minTaskMins: number;
+}
+
+/**
+ * Fallbacks matching the settings defaults. Literals rather than reads of
+ * BILLING_INCREMENT_MINS et al: importing those here re-introduces a
+ * circular-import TDZ with the pricing-policy module.
+ */
+export const TASK_TIMING_FALLBACK: TaskTimingConfig = {
+  snapMins: 5,
+  shortTaskMins: 15,
+  minTaskMins: 5,
+};
 
 /**
  * Collapses task lines so their total hourly minutes fit the listed job window.
  * Pinned tasks (isShort or isExplicit) keep their parser-emitted qty - short
- * tasks at {@link SHORT_TASK_MINUTES}, explicit tasks at whatever the operator
+ * tasks at the live `shortTaskMins`, explicit tasks at whatever the operator
  * stated, with a one-snap-step-per-task overshoot allowance (see
  * {@link explicitRoundingAllowanceMins}) before an explicit task is dropped
  * for not fitting. The remaining floating tasks scale proportionally to fill what's
  * left of the window, so an over-long primary task absorbs more of the
  * correction than a correctly-sized one. Floating tasks that would scale
- * below {@link MIN_TASK_MINUTES} are dropped, then the rest rescale. Snaps
- * qty to 5-min increments and parks any rounding remainder on the largest
- * floating survivor so totals match exactly. Flat-rate tasks pass through.
+ * below the live `minTaskMins` are dropped, then the rest rescale. Snaps
+ * qty to the live billing increment and parks any rounding remainder on the
+ * largest floating survivor so totals match exactly. Flat-rate tasks pass through.
  * @param tasks - Task lines to collapse.
  * @param windowMin - Target window in minutes (`durationMins`).
+ * @param timing - Live task-timing settings; defaults to {@link TASK_TIMING_FALLBACK}.
  * @returns Adjusted task list, count of dropped tasks, and whether any qty was rescaled.
  */
 export function collapseToWindow(
   tasks: TaskLine[],
   windowMin: number,
+  timing: TaskTimingConfig = TASK_TIMING_FALLBACK,
 ): { tasks: TaskLine[]; dropped: number; rescaled: boolean } {
   if (windowMin <= 0) return { tasks, dropped: 0, rescaled: false };
   const hourlyIn = tasks.filter((t) => t.baseRateId != null);
   const flat = tasks.filter((t) => t.baseRateId == null);
   if (hourlyIn.length === 0) return { tasks, dropped: 0, rescaled: false };
 
+  // The classification below splits tasks into short / explicit / floating
+  // groups, so the surviving lines have to be put back into the order the
+  // operator listed them - otherwise a quick task leads the invoice and the
+  // session's main work sinks to the bottom. Every derived clone carries its
+  // source position via {@link derive}.
+  const orderOf = new Map<TaskLine, number>();
+  tasks.forEach((t, i) => orderOf.set(t, i));
+  /**
+   * {@link withMinutes} that carries the source task's input position onto the
+   * clone, so {@link inInputOrder} can still place it.
+   * @param task - Source task line.
+   * @param mins - New duration in minutes.
+   * @returns Updated task line, registered at the source task's position.
+   */
+  const derive = (task: TaskLine, mins: number): TaskLine => {
+    const next = withMinutes(task, mins);
+    orderOf.set(next, orderOf.get(task) ?? 0);
+    return next;
+  };
+  /**
+   * Restores input order across the classification groups.
+   * @param list - Surviving task lines in group order.
+   * @returns The same lines ordered as the operator listed them.
+   */
+  const inInputOrder = (list: TaskLine[]): TaskLine[] =>
+    [...list].sort((a, b) => (orderOf.get(a) ?? 0) - (orderOf.get(b) ?? 0));
+
   // Already fits; just park 2 dp qty drift (see {@link parkHourRemainder}). No
   // rescale toast since only qty representation moves.
   if (sumTaskMinutes(hourlyIn) <= windowMin) {
-    return { tasks: parkHourRemainder(tasks, windowMin), dropped: 0, rescaled: false };
+    return { tasks: parkHourRemainder(tasks, windowMin, timing), dropped: 0, rescaled: false };
   }
 
-  // Pin short tasks at 15 min each; drop any that don't fit the window.
+  // Pin short tasks at the operator's quick-task time; drop any that don't fit.
+  // isExplicit wins over isShort: a stated duration is the operator's own
+  // measurement, so it keeps its qty rather than being rewritten to the
+  // quick-task time (the parser emits the flags exclusive, this is the guard).
   const short: TaskLine[] = hourlyIn
-    .filter((t) => t.isShort)
-    .map((t) => withMinutes(t, SHORT_TASK_MINUTES));
+    .filter((t) => t.isShort && !t.isExplicit)
+    .map((t) => derive(t, timing.shortTaskMins));
   let dropped = 0;
-  while (short.length * SHORT_TASK_MINUTES > windowMin) {
+  while (short.length * timing.shortTaskMins > windowMin) {
     short.pop();
     dropped++;
   }
 
-  // Explicit-but-not-short tasks keep their parser-emitted qty. Stated
-  // durations round UP to the snap grid, so tolerate one step of overshoot
-  // per explicit task; drop (newest first) only genuine overflow beyond that.
-  const explicit: TaskLine[] = hourlyIn.filter((t) => t.isExplicit && !t.isShort);
-  const shortMin = short.length * SHORT_TASK_MINUTES;
+  // Explicit tasks keep their parser-emitted qty. Stated durations round UP to
+  // the snap grid, so tolerate one step of overshoot per explicit task; drop
+  // (newest first) only genuine overflow beyond that.
+  const explicit: TaskLine[] = hourlyIn.filter((t) => t.isExplicit);
+  const shortMin = short.length * timing.shortTaskMins;
   while (
     explicit.length > 0 &&
-    shortMin + sumTaskMinutes(explicit) > windowMin + explicit.length * TASK_QTY_SNAP_MIN
+    shortMin + sumTaskMinutes(explicit) > windowMin + explicit.length * timing.snapMins
   ) {
     explicit.pop();
     dropped++;
@@ -302,7 +353,7 @@ export function collapseToWindow(
     // when something was actually dropped - otherwise the caller would toast
     // "Rebalanced tasks" over an untouched list.
     return {
-      tasks: parkHourRemainder([...short, ...explicit, ...flat], windowMin),
+      tasks: parkHourRemainder(inInputOrder([...short, ...explicit, ...flat]), windowMin, timing),
       dropped,
       rescaled: dropped > 0,
     };
@@ -312,22 +363,23 @@ export function collapseToWindow(
     // Pinned tasks already cover the whole window; drop every floating one.
     dropped += floating.length;
     return {
-      tasks: parkHourRemainder([...short, ...explicit, ...flat], windowMin),
+      tasks: parkHourRemainder(inInputOrder([...short, ...explicit, ...flat]), windowMin, timing),
       dropped,
       rescaled: true,
     };
   }
 
   // Scale floating tasks proportionally to fill remainingMin; drop tasks that
-  // would land below MIN_TASK_MINUTES and rescale until everything fits.
+  // would land below the operator's smallest-task time and rescale until
+  // everything fits.
   while (floating.length > 0) {
     const sum = sumTaskMinutes(floating);
     if (sum <= remainingMin) break;
     const multiplier = remainingMin / sum;
     const scaled = floating.map((t) => ({ task: t, scaledMin: t.qty * 60 * multiplier }));
-    const tooSmall = scaled.filter((s) => s.scaledMin < MIN_TASK_MINUTES);
+    const tooSmall = scaled.filter((s) => s.scaledMin < timing.minTaskMins);
     if (tooSmall.length === 0) {
-      floating = scaled.map((s) => withMinutes(s.task, snapMinutes(s.scaledMin)));
+      floating = scaled.map((s) => derive(s.task, snapMinutes(s.scaledMin, timing.snapMins)));
       break;
     }
     scaled.sort((a, b) => a.scaledMin - b.scaledMin);
@@ -345,13 +397,17 @@ export function collapseToWindow(
       for (let i = 1; i < floating.length; i++) {
         if (floating[i].qty > floating[biggestIdx].qty) biggestIdx = i;
       }
-      const adjustedMin = Math.max(MIN_TASK_MINUTES, floating[biggestIdx].qty * 60 + error);
-      floating[biggestIdx] = withMinutes(floating[biggestIdx], adjustedMin);
+      const adjustedMin = Math.max(timing.minTaskMins, floating[biggestIdx].qty * 60 + error);
+      floating[biggestIdx] = derive(floating[biggestIdx], adjustedMin);
     }
   }
 
   return {
-    tasks: parkHourRemainder([...short, ...explicit, ...floating, ...flat], windowMin),
+    tasks: parkHourRemainder(
+      inInputOrder([...short, ...explicit, ...floating, ...flat]),
+      windowMin,
+      timing,
+    ),
     dropped,
     rescaled: true,
   };
@@ -362,29 +418,37 @@ export function collapseToWindow(
  * billed window. Invoice lines bill `qty * unitPrice`, and `qty` is hours at
  * 2 dp - an even split (1h / 3 > 0.33h x 3 = 0.99h) under-bills by a cent of
  * time apiece ($64.35 instead of $65 at $65/hr). Only fires when the
- * minute-level totals already fill the window (within one
- * {@link TASK_QTY_SNAP_MIN}), so a genuine under-estimate isn't inflated.
+ * minute-level totals already fill the window (within one snap step), so a
+ * genuine under-estimate isn't inflated.
  * @param tasks - Task lines (`qty` in decimal hours); flat-rate lines pass through.
  * @param windowMin - Billed window in minutes (`durationMins`).
+ * @param timing - Live task-timing settings; defaults to {@link TASK_TIMING_FALLBACK}.
  * @returns Task list with the remainder parked, or the input unchanged.
  */
-function parkHourRemainder(tasks: TaskLine[], windowMin: number): TaskLine[] {
+function parkHourRemainder(
+  tasks: TaskLine[],
+  windowMin: number,
+  timing: TaskTimingConfig = TASK_TIMING_FALLBACK,
+): TaskLine[] {
   if (windowMin <= 0) return tasks;
   const hourly = tasks.filter((t) => t.baseRateId != null);
   if (hourly.length === 0) return tasks;
-  if (sumTaskMinutes(hourly) < windowMin - TASK_QTY_SNAP_MIN) return tasks;
+  if (sumTaskMinutes(hourly) < windowMin - timing.snapMins) return tasks;
   const targetHours = Math.round((windowMin / 60) * 100) / 100;
   const sumQty = Math.round(hourly.reduce((s, t) => s + t.qty, 0) * 100) / 100;
   const diff = Math.round((targetHours - sumQty) * 100) / 100;
   if (diff === 0) return tasks;
-  // Operator-stated durations are exact: park the drift on the largest
+  // Stated and quick-task durations are exact: park the drift on the largest
   // FLOATING task only. When every hourly task is pinned, leave the
-  // cent-level drift in place rather than move a stated time.
-  const floating = hourly.filter((t) => !t.isExplicit);
+  // cent-level drift in place rather than move a pinned time.
+  const floating = hourly.filter((t) => !t.isExplicit && !t.isShort);
   if (floating.length === 0) return tasks;
   let biggest = floating[0];
   for (const t of floating) if (t.qty > biggest.qty) biggest = t;
-  const adjustedQty = Math.max(MIN_TASK_MINUTES / 60, Math.round((biggest.qty + diff) * 100) / 100);
+  const adjustedQty = Math.max(
+    timing.minTaskMins / 60,
+    Math.round((biggest.qty + diff) * 100) / 100,
+  );
   return tasks.map((t) =>
     t === biggest
       ? { ...t, qty: adjustedQty, lineTotal: Math.round(adjustedQty * t.unitPrice * 100) / 100 }
@@ -395,10 +459,11 @@ function parkHourRemainder(tasks: TaskLine[], windowMin: number): TaskLine[] {
 /**
  * Rounds a minute value to the nearest task-qty snap step.
  * @param mins - Raw minutes.
- * @returns Minutes rounded to the nearest {@link TASK_QTY_SNAP_MIN}.
+ * @param snapMins - Live billing increment in minutes; defaults to the code fallback.
+ * @returns Minutes rounded to the nearest snap step.
  */
-function snapMinutes(mins: number): number {
-  return Math.round(mins / TASK_QTY_SNAP_MIN) * TASK_QTY_SNAP_MIN;
+function snapMinutes(mins: number, snapMins: number = TASK_TIMING_FALLBACK.snapMins): number {
+  return Math.round(mins / snapMins) * snapMins;
 }
 
 /**
@@ -488,8 +553,8 @@ export function effectiveHourlyRate(
  * Enforces the whole-job minimum-billable floor. When the hourly task lines
  * carry some time but sum below minBillableMins, grows the most significant
  * line so the billed labour is at least the minimum - the largest floating
- * (non operator-stated) task, or the largest hourly task when every line is
- * pinned. A job with no hourly time stays at 0 so the floor never invents a
+ * (neither operator-stated nor quick) task, or the largest hourly task when
+ * every line is pinned. A job with no hourly time stays at 0 so the floor never invents a
  * charge on an empty or parts-only job. Applied by both {@link calcJobTotal}
  * and {@link jobToLineItems} so the on-screen total and the issued invoice
  * agree, mirroring the {@link MIN_TRAVEL_CHARGE} floor.
@@ -506,8 +571,8 @@ export function enforceMinBillable(
   const totalMin = sumTaskMinutes(hourly);
   if (totalMin <= 0 || totalMin >= minBillableMins) return tasks;
   // Land the deficit on the most significant line: the largest floating task,
-  // falling back to the largest hourly task when the operator pinned them all.
-  const floating = hourly.filter((t) => !t.isExplicit);
+  // falling back to the largest hourly task when every line is pinned.
+  const floating = hourly.filter((t) => !t.isExplicit && !t.isShort);
   const pool = floating.length > 0 ? floating : hourly;
   let biggest = pool[0];
   for (const t of pool) if (t.qty > biggest.qty) biggest = t;
@@ -612,6 +677,13 @@ export interface JobPricing {
   holidayUplift?: number;
   /** Fraction charged for an unsuccessful visit (e.g. 0.5 = half); defaults to 0.5. */
   unsuccessfulFactor?: number;
+  /**
+   * Live task-timing settings for {@link collapseToWindow} and
+   * {@link explicitRoundingAllowanceMins}. Not a {@link calcJobTotal} input -
+   * it rides along so the calculator's apportionment reads the same settings
+   * bundle as the totals. Falls back to {@link TASK_TIMING_FALLBACK}.
+   */
+  taskTiming?: TaskTimingConfig;
 }
 
 /**
