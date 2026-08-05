@@ -499,11 +499,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // bill, so an injected "bill 8 hours" or "durationMins = -120" cannot
     // move the total. Below-cap values pass through (free work subtracts).
     if (precomputed !== null && precomputed > 0) {
-      const cap = Math.min(precomputed + outOfSessionMins, maxJobMins);
+      const statedTotal = precomputed + outOfSessionMins;
+      const cap = Math.min(statedTotal, maxJobMins);
       if (typeof parsed.durationMins === "number" && parsed.durationMins > cap) {
+        // Name the constraint that actually bound. A long-but-real session
+        // ("12pm-12am") is cut by the longest-billable-day ceiling, not by the
+        // model over-reading the ranges - blaming the model there sends the
+        // operator hunting for a parse error that never happened.
         parsed.warnings = [
           ...(parsed.warnings ?? []),
-          `AI emitted durationMins ${parsed.durationMins} above the stated ${cap} min total; capped.`,
+          cap < statedTotal
+            ? `Session states ${statedTotal} min, over the ${maxJobMins} min longest-billable-day ceiling; capped to ${cap}. Raise it in Settings > Pricing if a job this long really bills in full.`
+            : `AI emitted durationMins ${parsed.durationMins} above the stated ${cap} min total; capped.`,
         ];
         parsed.durationMins = cap;
       }
@@ -624,7 +631,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           // wrong (a break, or overlapping ranges), not under-estimated tasks.
           const pinnedCount = parsed.tasks.filter(isPinned).length;
           const overshoot = Math.round((sumQty - parsed.durationMins / 60) * 100) / 100;
-          if (sumQty < targetHours || overshoot > pinnedCount * incHours) {
+          // A job under the minimum billable time always has tasks summing below
+          // the floored target - enforceMinBillable tops the invoice up on its
+          // own, so that gap is the floor doing its job, not a window problem.
+          const flooredByMinimum = parsed.durationMins < settings.pricing.minBillableMins;
+          if ((sumQty < targetHours && !flooredByMinimum) || overshoot > pinnedCount * incHours) {
             parsed.warnings = [
               ...(parsed.warnings ?? []),
               `Task hours sum to ${Math.round(sumQty * 100) / 100}h but the stated times total ${targetHours}h - stated and quick-task durations were left untouched. Check the session window for a break or an overlapping range.`,

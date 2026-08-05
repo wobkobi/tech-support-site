@@ -363,12 +363,33 @@ function evaluate(ctx: LiveContext, raw: RawRun[]): CheckResult[] {
               : `durationMins=${first} (canonical ${canonical})`,
         });
       } else {
+        // Two things the raw canonical does not account for. The route caps
+        // durationMins at the longest-billable-day ceiling, so a 12h or 19h
+        // stated session legitimately comes back capped (the cross-route check
+        // below already reads ctx.maxJobMins for the same reason). And the
+        // collector stores an absent durationMins as -1 to keep `durations` a
+        // number[], so a canonical of null - "these ranges state no duration" -
+        // must be compared against that sentinel, not against null itself.
+        // No minimum or increment is applied: durationMins is worked minutes,
+        // and the billing floor lands on task qty instead.
+        const expected = canonical === null ? -1 : Math.min(canonical, ctx.maxJobMins);
+        /**
+         * Renders a measured duration for the report, spelling out the -1
+         * sentinel the collector uses for an absent durationMins.
+         * @param v - Minutes, or -1 when the route reported no duration.
+         * @returns Human-readable value for the check detail.
+         */
+        const show = (v: number): string => (v === -1 ? "no duration" : String(v));
         out.push({
           id: r.id,
           family: "context",
           label: `parse durationMins ${r.id}`,
-          status: first === canonical ? "pass" : "fail",
-          detail: `got ${first}, expected exactly ${canonical}`,
+          status: first === expected ? "pass" : "fail",
+          detail: `got ${show(first)}, expected exactly ${show(expected)}${
+            canonical !== null && expected !== canonical
+              ? ` (canonical ${canonical}, capped at the ${ctx.maxJobMins} min ceiling)`
+              : ""
+          }`,
         });
       }
     }
