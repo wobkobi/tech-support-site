@@ -23,9 +23,15 @@ export function parseBookingNotes(raw: string | null): {
 } {
   if (!raw) return { userNotes: "", meetingType: "", address: "", phone: "" };
 
-  const metaSeparatorIdx = raw.indexOf("\n\n[");
-  const userNotes = metaSeparatorIdx >= 0 ? raw.slice(0, metaSeparatorIdx).trim() : raw.trim();
-  const meta = metaSeparatorIdx >= 0 ? raw.slice(metaSeparatorIdx) : "";
+  // A metadata-only blob - an operator-entered booking where the customer typed
+  // nothing - opens straight onto the "[...]" block, so there is no "\n\n["
+  // separator to find. Without the startsWith check the whole internal block
+  // (admin marker, meeting type, street address) falls through as `userNotes`
+  // and gets shown back to the customer under "What you told me".
+  const trimmed = raw.trim();
+  const metaSeparatorIdx = trimmed.startsWith("[") ? 0 : trimmed.indexOf("\n\n[");
+  const userNotes = metaSeparatorIdx === -1 ? trimmed : trimmed.slice(0, metaSeparatorIdx).trim();
+  const meta = metaSeparatorIdx === -1 ? "" : trimmed.slice(metaSeparatorIdx);
 
   const meetingTypeLine = meta.match(/Meeting type:\s*(.+)/i)?.[1]?.trim() ?? "";
   const meetingType: "in-person" | "remote" | "" = meetingTypeLine
@@ -71,7 +77,7 @@ export function buildAppointmentDescription(input: {
     isRemote
       ? `Remote session with ${company} - no visit required.`
       : `${company} is coming to you.`,
-    userNotes ? `\nWhat you told us:\n${userNotes}` : "",
+    userNotes ? `\nWhat you told me:\n${userNotes}` : "",
     `\nNeed to change or cancel?\nReschedule: ${manageUrl}\nCancel: ${cancelUrl}`,
     `\nQuestions? ${phone} or ${email}`,
   ]
