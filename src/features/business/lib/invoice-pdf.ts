@@ -4,7 +4,7 @@
  * Tailwind palette so the PDF reads as the same document as the on-screen
  * InvoicePreviewPanel; keep the two layouts in sync.
  */
-import { formatNZD } from "@/features/business/lib/business";
+import { formatNZD, lineItemQtyLabel } from "@/features/business/lib/business";
 import { isInvoiceOverdue } from "@/features/business/lib/invoice-status";
 import type { Invoice } from "@/features/business/types/business";
 import { getIdentity } from "@/shared/lib/business-identity.server";
@@ -413,7 +413,7 @@ function drawLineItemsTable(ctx: PdfCtx, invoice: Invoice, y: number): number {
       });
     });
 
-    const qtyStr = String(item.qty);
+    const qtyStr = lineItemQtyLabel(item);
     ctx.page.drawText(qtyStr, {
       x: COL.price - ctx.font.widthOfTextAtSize(qtyStr, CELL_SIZE) - 4,
       y: firstBaselineY,

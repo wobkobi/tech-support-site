@@ -836,15 +836,18 @@ export function CalculatorView({
         // rateConfigId to null so the promo math classifies it correctly even
         // if the AI emitted a stray ID.
         const isHourly = t.baseRateId != null;
-        // Round AI-emitted quantities to 2 dp so a fractional-hour estimate
-        // can't put a long float on the line.
-        const qty = Math.round(t.qty * 100) / 100;
+        // The route snaps hourly tasks onto the billing grid and returns whole
+        // minutes; carry those as the billed unit with qty unrounded, so the
+        // line quantities still sum to the session. Flat rows keep a 2 dp count.
+        const minutes = isHourly ? (t.minutes ?? Math.round(t.qty * 60)) : undefined;
+        const qty = minutes != null ? minutes / 60 : Math.round(t.qty * 100) / 100;
         return {
           rateConfigId: isHourly ? null : (t.rateConfigId ?? null),
           baseRateId: t.baseRateId ?? null,
           modifierIds: t.modifierIds ?? [],
           description,
           qty,
+          ...(minutes != null && { minutes }),
           unitPrice: t.unitPrice,
           lineTotal: Math.round(qty * t.unitPrice * 100) / 100,
           device,
@@ -1015,9 +1018,21 @@ export function CalculatorView({
     setTasks((prev) => {
       const t = [...prev];
       const item = { ...t[idx], [field]: val };
-      // Quantities round to 2 dp so hand-typed hour fractions (1.333333...)
-      // can't leave long floats on the line or the invoice.
-      if (field === "qty") item.qty = Math.round(Number(val) * 100) / 100;
+      // Minutes are the billed unit on hourly rows, so a hand-edited qty has to
+      // rewrite them or the stale value would keep winning downstream. The task
+      // row edits hrs + mins, so the incoming qty is already a whole number of
+      // minutes; snap it and carry qty unrounded so the column stays exact.
+      if (field === "qty") {
+        const mins = Math.round(Number(val) * 60);
+        if (item.baseRateId != null) {
+          item.minutes = mins;
+          item.qty = mins / 60;
+        } else {
+          // Flat rows (Travel etc.) count units, not time.
+          item.minutes = undefined;
+          item.qty = Math.round(Number(val) * 100) / 100;
+        }
+      }
       if (field === "rateConfigId") {
         const rate = rates.find((r) => r.id === val);
         if (rate) {

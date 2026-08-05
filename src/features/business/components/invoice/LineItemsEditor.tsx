@@ -70,7 +70,18 @@ export function LineItemsEditor({
       items.map((item, i) => {
         if (i !== idx) return item;
         const merged = { ...item, ...patch };
-        return { ...merged, lineTotal: deriveLineTotal(merged.qty, merged.unitPrice) };
+        // This editor works in decimal quantities. A hand-typed qty on a row
+        // that carried billed minutes has to rewrite them, or the stale minutes
+        // would keep printing the old h:mm while the total moved.
+        const minutes =
+          patch.qty !== undefined && merged.minutes != null
+            ? Math.round(merged.qty * 60)
+            : merged.minutes;
+        return {
+          ...merged,
+          ...(minutes != null && { minutes }),
+          lineTotal: deriveLineTotal(merged.qty, merged.unitPrice),
+        };
       }),
     );
   }

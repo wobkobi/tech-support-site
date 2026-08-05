@@ -552,6 +552,23 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         incMins,
       );
       const targetHours = Math.round((targetMins / 60) * 100) / 100;
+      // Minutes are the billed unit. Snap every task onto the grid up front and
+      // carry qty as those minutes in hours, unrounded - the model emits qty at
+      // 2 dp, which cannot hold a 5-minute step (10 min arrives as 0.17h =
+      // 10.2 min), and that fraction is what stopped a 140-minute job ever
+      // billing 140.
+      /**
+       * A model-emitted quantity read back as whole minutes on the billing grid,
+       * floored at one increment so no task lands at zero.
+       * @param qty - Task quantity in decimal hours, as the model emitted it.
+       * @returns Billed minutes, a multiple of the billing increment.
+       */
+      const snapTaskMins = (qty: number): number =>
+        Math.max(incMins, Math.round(((qty || 0) * 60) / incMins) * incMins);
+      parsed.tasks = parsed.tasks.map((t) => {
+        const mins = snapTaskMins(t.qty);
+        return { ...t, minutes: mins, qty: mins / 60 };
+      });
       const sumQty = parsed.tasks.reduce((s, t) => s + (t.qty || 0), 0);
       const diff = Math.round((targetHours - sumQty) * 100) / 100;
       if (sumQty > 0 && Math.abs(diff) >= incHours) {
@@ -565,18 +582,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
          */
         const isPinned = (t: { isExplicit?: boolean; isShort?: boolean }): boolean =>
           !!t.isExplicit || !!t.isShort;
-        /**
-         * A task's minutes read back onto the increment grid. qty is hours at
-         * 2 dp, which cannot hold every step exactly (10 min = 0.1667h emitted
-         * as 0.17h = 10.2 min), so reconciling against the raw qty leaks a
-         * fraction of a minute per task into the drift park below.
-         * @param qty - Task quantity in decimal hours.
-         * @returns Minutes rounded to the nearest increment.
-         */
-        const gridMins = (qty: number): number => Math.round(((qty || 0) * 60) / incMins) * incMins;
-        const pinnedMins = parsed.tasks.filter(isPinned).reduce((s, t) => s + gridMins(t.qty), 0);
+        const pinnedMins = parsed.tasks.filter(isPinned).reduce((s, t) => s + (t.minutes ?? 0), 0);
         const floatingIdx = parsed.tasks.map((t, i) => ({ t, i })).filter(({ t }) => !isPinned(t));
-        const floatingSumMins = floatingIdx.reduce((s, { t }) => s + gridMins(t.qty), 0);
+        const floatingSumMins = floatingIdx.reduce((s, { t }) => s + (t.minutes ?? 0), 0);
         const floatingTargetMins = targetMins - pinnedMins;
         // Every floating task keeps at least one increment, so the floating set
         // needs that much room before it can be fitted at all.
@@ -590,7 +598,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           // the same way.
           const multiplier = floatingTargetMins / floatingSumMins;
           const shares = floatingIdx.map(({ t, i }) => {
-            const rawMins = gridMins(t.qty) * multiplier;
+            const rawMins = (t.minutes ?? 0) * multiplier;
             return { i, rawMins, mins: Math.max(incMins, Math.floor(rawMins / incMins) * incMins) };
           });
           let leftover = floatingTargetMins - shares.reduce((s, x) => s + x.mins, 0);
@@ -599,23 +607,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             share.mins += incMins;
             leftover -= incMins;
           }
-          for (const { i, mins } of shares) {
-            parsed.tasks[i] = { ...parsed.tasks[i], qty: Math.round((mins / 60) * 100) / 100 };
+          // Any sub-increment leftover goes to the largest share, so the minutes
+          // land exactly on the window rather than a step short of it.
+          if (leftover > 0 && shares.length > 0) {
+            shares.reduce((max, cur) => (cur.mins > max.mins ? cur : max)).mins += leftover;
           }
-          // qty is hours at 2 dp, which cannot represent every increment exactly
-          // (10 min = 0.1667h > 0.17h). Park that sub-increment remainder on the
-          // largest floating task so the line totals still sum to the window.
-          const adjustedSum = parsed.tasks.reduce((s, t) => s + t.qty, 0);
-          const drift = Math.round((targetHours - adjustedSum) * 100) / 100;
-          if (drift !== 0 && shares.length > 0) {
-            const largest = shares.reduce((max, cur) => (cur.mins > max.mins ? cur : max));
-            parsed.tasks[largest.i] = {
-              ...parsed.tasks[largest.i],
-              qty: Math.max(
-                incHours,
-                Math.round((parsed.tasks[largest.i].qty + drift) * 100) / 100,
-              ),
-            };
+          for (const { i, mins } of shares) {
+            parsed.tasks[i] = { ...parsed.tasks[i], minutes: mins, qty: mins / 60 };
           }
           parsed.warnings = [
             ...(parsed.warnings ?? []),

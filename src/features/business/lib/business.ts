@@ -312,10 +312,10 @@ export function collapseToWindow(
   const inInputOrder = (list: TaskLine[]): TaskLine[] =>
     [...list].sort((a, b) => (orderOf.get(a) ?? 0) - (orderOf.get(b) ?? 0));
 
-  // Already fits; just park 2 dp qty drift (see {@link parkHourRemainder}). No
-  // rescale toast since only qty representation moves.
+  // Already fits - nothing to collapse, and minutes are exact so there is no
+  // rounding drift left to park.
   if (sumTaskMinutes(hourlyIn) <= windowMin) {
-    return { tasks: parkHourRemainder(tasks, windowMin, timing), dropped: 0, rescaled: false };
+    return { tasks, dropped: 0, rescaled: false };
   }
 
   // Pin short tasks at the operator's quick-task time; drop any that don't fit.
@@ -353,7 +353,7 @@ export function collapseToWindow(
     // when something was actually dropped - otherwise the caller would toast
     // "Rebalanced tasks" over an untouched list.
     return {
-      tasks: parkHourRemainder(inInputOrder([...short, ...explicit, ...flat]), windowMin, timing),
+      tasks: inInputOrder([...short, ...explicit, ...flat]),
       dropped,
       rescaled: dropped > 0,
     };
@@ -363,7 +363,7 @@ export function collapseToWindow(
     // Pinned tasks already cover the whole window; drop every floating one.
     dropped += floating.length;
     return {
-      tasks: parkHourRemainder(inInputOrder([...short, ...explicit, ...flat]), windowMin, timing),
+      tasks: inInputOrder([...short, ...explicit, ...flat]),
       dropped,
       rescaled: true,
     };
@@ -403,57 +403,10 @@ export function collapseToWindow(
   }
 
   return {
-    tasks: parkHourRemainder(
-      inInputOrder([...short, ...explicit, ...floating, ...flat]),
-      windowMin,
-      timing,
-    ),
+    tasks: inInputOrder([...short, ...explicit, ...floating, ...flat]),
     dropped,
     rescaled: true,
   };
-}
-
-/**
- * Nudges the largest hourly task's `qty` so the line quantities sum back to the
- * billed window. Invoice lines bill `qty * unitPrice`, and `qty` is hours at
- * 2 dp - an even split (1h / 3 > 0.33h x 3 = 0.99h) under-bills by a cent of
- * time apiece ($64.35 instead of $65 at $65/hr). Only fires when the
- * minute-level totals already fill the window (within one snap step), so a
- * genuine under-estimate isn't inflated.
- * @param tasks - Task lines (`qty` in decimal hours); flat-rate lines pass through.
- * @param windowMin - Billed window in minutes (`durationMins`).
- * @param timing - Live task-timing settings; defaults to {@link TASK_TIMING_FALLBACK}.
- * @returns Task list with the remainder parked, or the input unchanged.
- */
-function parkHourRemainder(
-  tasks: TaskLine[],
-  windowMin: number,
-  timing: TaskTimingConfig = TASK_TIMING_FALLBACK,
-): TaskLine[] {
-  if (windowMin <= 0) return tasks;
-  const hourly = tasks.filter((t) => t.baseRateId != null);
-  if (hourly.length === 0) return tasks;
-  if (sumTaskMinutes(hourly) < windowMin - timing.snapMins) return tasks;
-  const targetHours = Math.round((windowMin / 60) * 100) / 100;
-  const sumQty = Math.round(hourly.reduce((s, t) => s + t.qty, 0) * 100) / 100;
-  const diff = Math.round((targetHours - sumQty) * 100) / 100;
-  if (diff === 0) return tasks;
-  // Stated and quick-task durations are exact: park the drift on the largest
-  // FLOATING task only. When every hourly task is pinned, leave the
-  // cent-level drift in place rather than move a pinned time.
-  const floating = hourly.filter((t) => !t.isExplicit && !t.isShort);
-  if (floating.length === 0) return tasks;
-  let biggest = floating[0];
-  for (const t of floating) if (t.qty > biggest.qty) biggest = t;
-  const adjustedQty = Math.max(
-    timing.minTaskMins / 60,
-    Math.round((biggest.qty + diff) * 100) / 100,
-  );
-  return tasks.map((t) =>
-    t === biggest
-      ? { ...t, qty: adjustedQty, lineTotal: Math.round(adjustedQty * t.unitPrice * 100) / 100 }
-      : t,
-  );
 }
 
 /**
@@ -467,29 +420,72 @@ function snapMinutes(mins: number, snapMins: number = TASK_TIMING_FALLBACK.snapM
 }
 
 /**
- * Total minutes across the given task lines (`qty` is decimal hours).
+ * A task's billed minutes. Prefers the authoritative `minutes`, falling back to
+ * the decimal-hour `qty` for rows that predate it (manual flat lines, legacy
+ * drafts).
+ * @param task - Task line.
+ * @returns Billed minutes.
+ */
+export function taskMinutes(task: TaskLine): number {
+  return task.minutes ?? task.qty * 60;
+}
+
+/**
+ * Total minutes across the given task lines.
  * @param arr - Task lines.
  * @returns Sum of minute durations.
  */
 function sumTaskMinutes(arr: TaskLine[]): number {
-  return arr.reduce((s, t) => s + t.qty * 60, 0);
+  return arr.reduce((s, t) => s + taskMinutes(t), 0);
 }
 
 /**
- * Returns a clone of `task` with `qty` set to `mins / 60` (rounded to 2 dp so
- * snapped minute totals never produce ugly `2.3333…` qty values) and
- * `lineTotal` recomputed against the existing unit price.
+ * Returns a clone of `task` billed for `mins` whole minutes.
+ *
+ * `minutes` is the authoritative figure; `qty` is it in hours, deliberately
+ * NOT rounded to 2 dp. Two decimals cannot represent a 5-minute grid - only
+ * 15/30/45/60 land exactly - so rounding here is what used to make a 140-minute
+ * job bill 139.8 or 140.4 and never 140. Carrying full precision keeps
+ * `qty * unitPrice` exact everywhere it is summed.
  * @param task - Source task line.
- * @param mins - New duration in minutes.
+ * @param mins - New duration in minutes; rounded to a whole minute.
  * @returns Updated task line.
  */
 function withMinutes(task: TaskLine, mins: number): TaskLine {
-  const qty = Math.round((mins / 60) * 100) / 100;
+  const minutes = Math.round(mins);
+  const qty = minutes / 60;
   return {
     ...task,
+    minutes,
     qty,
     lineTotal: Math.round(qty * task.unitPrice * 100) / 100,
   };
+}
+
+/**
+ * Formats billed time for an invoice's quantity column as h:mm ("2:20", "0:45").
+ * Chosen over decimal hours because the column then visibly sums to the session
+ * length, and over a bare minute count because nothing invites a reader to
+ * multiply it by the hourly rate.
+ * @param mins - Billed minutes.
+ * @returns h:mm string.
+ */
+export function formatBilledTime(mins: number): string {
+  const whole = Math.max(0, Math.round(mins));
+  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
+}
+
+/**
+ * Quantity column text for one invoice line: h:mm for hourly labour, the plain
+ * count for flat rows (travel, parts, a surcharge) and for invoices issued
+ * before minutes were recorded.
+ * @param item - Invoice line item.
+ * @param item.qty - Decimal quantity (hours on labour rows, a count on flat rows).
+ * @param item.minutes - Billed minutes; present only on hourly labour rows.
+ * @returns Text for the Qty cell.
+ */
+export function lineItemQtyLabel(item: { qty: number; minutes?: number }): string {
+  return item.minutes == null ? String(item.qty) : formatBilledTime(item.minutes);
 }
 
 /**
@@ -610,6 +606,9 @@ export function jobToLineItems(
       qty: task.qty,
       unitPrice: task.unitPrice,
       lineTotal,
+      // Carry the billed minutes onto hourly rows so the invoice renders h:mm
+      // and the column sums to the session; flat rows keep a plain count.
+      ...(task.minutes != null && isHourlyTask(task) && { minutes: task.minutes }),
     });
     if (isHourlyTask(task)) labourTotal += lineTotal;
   }

@@ -26,6 +26,14 @@ export interface LineItem {
   qty: number;
   unitPrice: number;
   lineTotal: number;
+  /**
+   * Whole billed minutes, authoritative for hourly labour lines: `qty` is those
+   * minutes in hours and cannot hold a 5-minute grid exactly (10 min = 0.1667h),
+   * so renderers show this as h:mm and money is derived from it. Absent on
+   * flat rows (travel, parts, surcharges) and on invoices issued before the
+   * switch, which keep rendering their decimal `qty`.
+   */
+  minutes?: number;
 }
 
 export type InvoiceStatus = "DRAFT" | "SENT" | "PAID" | "VOIDED";
@@ -127,9 +135,12 @@ export interface TaskLine {
   /** For hourly tasks - applied modifier RateConfig IDs (each with hourlyDelta set). Effective $/hr = base + sum(deltas). */
   modifierIds?: string[];
   description: string;
+  /** Decimal hours, derived from {@link TaskLine.minutes} on hourly tasks. Carried unrounded so `qty * unitPrice` stays exact. */
   qty: number;
   unitPrice: number;
   lineTotal: number;
+  /** Whole billed minutes - the authoritative duration on hourly tasks; flat-rate rows leave it unset. */
+  minutes?: number;
   /** Device tag picked by the operator or returned by the AI. */
   device?: string | null;
   /** Action tag picked by the operator or returned by the AI. */
@@ -232,7 +243,10 @@ interface ParsedTaskLine {
   /** Resolved modifier rate IDs (set by the server from modifierLabels emitted by the AI). */
   modifierIds?: string[];
   description: string;
+  /** Decimal hours; the server rewrites it from {@link ParsedTaskLine.minutes} once the grid snap has run. */
   qty: number;
+  /** Whole billed minutes on the billing-increment grid, set by the server after parsing. */
+  minutes?: number;
   unitPrice: number;
   /** Free-text device tag from the AI (e.g. "Laptop", "Phone", "Email account"). */
   device?: string | null;

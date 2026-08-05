@@ -11,7 +11,7 @@ import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { StatusPill } from "@/features/admin/components/ui/StatusPill";
 import { InvoiceStatusBadge } from "@/features/business/components/invoice/InvoiceStatusBadge";
 import { InvoiceTimeline } from "@/features/business/components/invoice/InvoiceTimeline";
-import { formatNZD } from "@/features/business/lib/business";
+import { formatNZD, lineItemQtyLabel } from "@/features/business/lib/business";
 import { isInvoiceOverdue } from "@/features/business/lib/invoice-status";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { getIdentity } from "@/shared/lib/business-identity.server";
@@ -410,7 +410,7 @@ export default async function InvoiceViewPage({
                     {item.description}
                   </td>
                   <td className="px-2 py-2 text-right align-top text-slate-700 sm:px-3">
-                    {item.qty}
+                    {lineItemQtyLabel(item)}
                   </td>
                   <td className="px-2 py-2 text-right align-top whitespace-nowrap text-slate-700 sm:px-3">
                     {formatNZD(item.unitPrice)}

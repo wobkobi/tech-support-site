@@ -6,7 +6,7 @@
  * Pure presentational; memoised.
  */
 
-import { calcInvoiceTotals, formatNZD } from "@/features/business/lib/business";
+import { calcInvoiceTotals, formatNZD, lineItemQtyLabel } from "@/features/business/lib/business";
 import type { LineItem } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
@@ -170,7 +170,7 @@ function InvoicePreviewPanelImpl({
                     )}
                   </td>
                   <td className="px-1 py-2 text-right align-top text-slate-700 sm:px-2">
-                    {item.qty}
+                    {lineItemQtyLabel(item)}
                   </td>
                   <td className="px-1 py-2 text-right align-top whitespace-nowrap text-slate-700 sm:px-2">
                     {formatNZD(item.unitPrice)}
