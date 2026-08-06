@@ -1,6 +1,6 @@
 {
   "name": "tech-support-site",
-  "version": "4.12.0",
+  "version": "4.13.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -52,7 +52,7 @@
     "@vercel/speed-insights": "^2.0.0",
     "clsx": "^2.1.1",
     "date-holidays": "^3.34.1",
-    "googleapis": "^174.0.0",
+    "googleapis": "^174.0.1",
     "next": "^16.3.0",
     "openai": "^7.4.0",
     "pdf-lib": "^1.17.1",
@@ -90,12 +90,12 @@
     "prettier-plugin-packagejson": "^3.0.2",
     "prettier-plugin-tailwindcss": "^0.8.1",
     "prisma": "6.19.3",
-    "puppeteer": "^25.4.0",
+    "puppeteer": "^25.5.0",
     "qr-code-styling": "^1.9.2",
     "sharp": "^0.35.3",
     "simple-git-hooks": "^2.13.1",
     "tailwindcss": "^4.3.3",
-    "tsx": "^4.23.5",
+    "tsx": "^4.23.8",
     "typescript": "6.0.3",
     "typescript-eslint": "^8.66.0"
   },

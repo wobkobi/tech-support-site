@@ -3,10 +3,16 @@
  * @description Cron that sends a 24h-out email reminder for confirmed bookings.
  *
  * Window: bookings starting in 13-25 hours from now, not previously emailed.
- * Idempotent via Booking.emailReminderSentAt. Called every 15 minutes via
- * cron-job.org. Lower bound = CANCELLATION.freeNoticeHours + 1 so reminders
- * always land while the customer can still cancel free - reading the $30
- * fee in a reminder would read as a bait-and-switch.
+ * Idempotent via Booking.emailReminderSentAt. Lower bound =
+ * CANCELLATION.freeNoticeHours + 1 so reminders always land while the customer
+ * can still cancel free - reading the $30 fee in a reminder would read as a
+ * bait-and-switch.
+ *
+ * Called every 30 minutes via cron-job.org, and must not be slowed past that.
+ * Unlike the other jobs this selects a bounded window rather than unbounded
+ * catch-up work, so a booking the cron steps over is never revisited. The
+ * settings validator only guarantees `reminderLeadHours > freeNoticeHours + 1`,
+ * which on whole-hour inputs allows a window just 1 hour wide.
  */
 
 import { combineUnitAndAddress } from "@/features/booking/lib/booking";
