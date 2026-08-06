@@ -160,25 +160,69 @@ function renderEmphasisedHtml(text: string): string {
  * @param siteUrl - Canonical site URL for the logo link and footer.
  * @returns HTML string for the signature.
  */
+/**
+ * Placeholder values the signature block can interpolate, each already safe to
+ * drop into HTML. The contactable ones come back as anchors so a phone number or
+ * address stays tappable wherever the operator chooses to place it.
+ * @param identity - Live identity settings.
+ * @param siteUrl - Absolute site URL.
+ * @returns Map from placeholder name to ready-to-insert HTML.
+ */
+function signaturePlaceholders(
+  identity: Awaited<ReturnType<typeof getIdentity>>,
+  siteUrl: string,
+): Record<string, string> {
+  return {
+    name: escapeHtml(identity.name),
+    company: escapeHtml(brandName(identity)),
+    location: escapeHtml(identity.location),
+    phone: `<a href="${identity.phoneTel}" style="color:#555;text-decoration:none">${escapeHtml(identity.phone)}</a>`,
+    email: `<a href="mailto:${identity.email}" style="color:#43bccd;text-decoration:none">${escapeHtml(identity.email)}</a>`,
+    website: `<a href="${siteUrl}" style="color:#43bccd;text-decoration:none">${escapeHtml(siteUrl.replace(/^https?:\/\//, ""))}</a>`,
+  };
+}
+
+/**
+ * Signature block: the logo, then the operator's own lines from
+ * `identity.emailSignature`. Escaping runs before placeholder substitution, so
+ * the anchors those placeholders expand to survive while anything the operator
+ * types stays inert text. An unknown `{token}` is left visible rather than
+ * dropped, so a typo shows up in the email instead of silently blanking a line.
+ * @param siteUrl - Absolute site URL used for the logo and website links.
+ * @returns HTML fragment appended to the end of an email body.
+ */
 async function buildEmailSignature(siteUrl: string): Promise<string> {
   const identity = await getIdentity();
+  const placeholders = signaturePlaceholders(identity, siteUrl);
+
+  const lines = identity.emailSignature
+    .split("\n")
+    .map((line) => {
+      if (!line.trim()) return `<div style="height:8px"></div>`;
+      const html = renderEmphasisedHtml(line)
+        .replace(/\{(\w+)\}/g, (whole, key: string) => placeholders[key] ?? whole)
+        // renderEmphasisedHtml is shared with body copy, so the brand colour for
+        // bold is applied here rather than baked into that helper.
+        .replace(/<strong>/g, '<strong style="color:#0c0a3e">');
+      return `<p style="margin:0 0 3px;font-size:13px;color:#555">${html}</p>`;
+    })
+    .join("");
+
   return `
-    <div style="margin:32px 0 0;padding-top:24px;border-top:1px solid #e8e8e8">
-      <a href="${siteUrl}" style="display:inline-block;margin-bottom:12px">
-        <img src="${siteUrl}/assets/email-signature-400x135.png" alt="${escapeHtml(brandName(identity))}" width="200" style="display:block;border:0;height:auto" />
+    <div style="margin:24px 0 0;padding-top:16px;border-top:1px solid #e8e8e8">
+      <a href="${siteUrl}" style="display:inline-block;margin-bottom:8px">
+        <img src="${siteUrl}/assets/email-signature-280x95.png" alt="${escapeHtml(brandName(identity))}" width="140" style="display:block;border:0;height:auto" />
       </a>
-      <p style="margin:0 0 2px;font-size:14px;font-weight:600;color:#0c0a3e">${identity.name}</p>
-      <p style="margin:0 0 10px;font-size:13px;color:#666">Owner &amp; Technician</p>
-      <p style="margin:0 0 4px;font-size:13px;color:#555">📞 <a href="${identity.phoneTel}" style="color:#555;text-decoration:none">${identity.phone}</a></p>
-      <p style="margin:0 0 4px;font-size:13px;color:#555">✉️ <a href="mailto:${identity.email}" style="color:#43bccd;text-decoration:none">${identity.email}</a></p>
-      <p style="margin:0 0 4px;font-size:13px;color:#555">🌐 <a href="${siteUrl}" style="color:#43bccd;text-decoration:none">${siteUrl.replace(/^https?:\/\//, "")}</a></p>
-      <p style="margin:0;font-size:12px;color:#999">${identity.location}</p>
+      ${lines}
     </div>`;
 }
 
 /**
  * Wraps body HTML in the notification email shell (560px card, soft shadow,
- * system font stack) used by the owner/customer notices.
+ * system font stack) used by the owner/customer notices. Pins the document to a
+ * light colour scheme: the signature logo is a transparent PNG whose chip mark
+ * is deep navy, so a client that auto-inverts the card to dark would leave the
+ * mark all but invisible against it.
  * @param bodyHtml - Inner HTML for the card.
  * @returns A complete HTML document.
  */
@@ -186,7 +230,7 @@ function renderNotificationEmail(bodyHtml: string): string {
   return `
 <!DOCTYPE html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light"></head>
 <body style="font-family:system-ui,sans-serif;background:#f6f7f8;margin:0;padding:24px">
   <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
 ${bodyHtml}
@@ -207,7 +251,7 @@ ${bodyHtml}
 function renderDocumentEmail(bodyHtml: string): string {
   return `<!doctype html>
 <html lang="en">
-<head><meta charset="utf-8" /></head>
+<head><meta charset="utf-8" /><meta name="color-scheme" content="light" /><meta name="supported-color-schemes" content="light" /></head>
 <body style="margin:0;padding:24px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0c0a3e;background:#f6f7f8">
   <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:12px;padding:24px">
 ${bodyHtml}
@@ -849,7 +893,7 @@ export async function buildPastClientReviewEmailHtml(
   return `
 <!DOCTYPE html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light"></head>
 <body style="font-family:system-ui,sans-serif;background:#f6f7f8;margin:0;padding:24px">
   <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
     <h2 style="margin:0 0 12px;color:#0c0a3e;font-size:20px">Hi ${safeFirstName},</h2>

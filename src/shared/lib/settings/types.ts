@@ -155,6 +155,13 @@ export interface IdentitySettings {
   homeRegion: string;
   /** Advertised service-area radius in km (drives the SEO GeoCircle). */
   serviceRadiusKm: number;
+  /**
+   * Text block under the logo in every outgoing email, one line per row. Carries
+   * `{name}` / `{company}` / `{phone}` / `{email}` / `{website}` / `{location}`
+   * placeholders so the details stay sourced from the fields above rather than
+   * being retyped here, and `**bold**` for emphasis. Blank rows become spacing.
+   */
+  emailSignature: string;
 }
 
 /** One task-duration benchmark: a short label and its standalone minutes. */

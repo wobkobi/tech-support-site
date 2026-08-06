@@ -270,6 +270,13 @@ export const IDENTITY_FIELD_META: Record<string, FieldMeta> = {
     title: "Served suburbs",
     description: "Suburbs you cover, listed in the site's map data for local SEO.",
   },
+  emailSignature: {
+    title: "Email signature",
+    description:
+      "Lines under the logo on every email you send. Use {name}, {company}, {phone}, {email}, " +
+      "{website} and {location} to pull the details above in, so changing one there updates every " +
+      "email. Wrap text in **stars** for bold, and leave a row blank for a gap.",
+  },
 };
 
 /** Field metadata for the tax-planner group, keyed by dotted path. */

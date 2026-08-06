@@ -238,11 +238,39 @@ export interface AdditionalAsset {
   type: "logo-on-bg" | "logo-only" | "mark-only" | "mark-on-bg" | "bg-only";
   /** Output file format. */
   format: "png" | "jpg";
+  /**
+   * Solid fill painted behind the art instead of leaving it transparent, with
+   * `plateRadius` rounding the corners. For assets that land on a background
+   * this file cannot control - a mail client in dark mode, say - where the
+   * deep-navy mark on a dark backdrop reads as nothing.
+   */
+  plate?: string;
+  /** Corner radius in pixels for {@link AdditionalAsset.plate}. Ignored without it. */
+  plateRadius?: number;
 }
 
+// public/assets/email-signature-400x135.png is deliberately absent from this
+// list and must not be deleted. Emails already delivered hotlink it and fetch it
+// when the recipient opens them, so the file has to keep resolving even though
+// nothing generates it any more. build:icons only writes, never prunes, so an
+// orphan here is stable.
 export const ADDITIONAL_ASSETS: AdditionalAsset[] = [
-  // Email signature logo (full wordmark, transparent)
-  { name: "email-signature-400x135", width: 400, height: 135, type: "logo-only", format: "png" },
+  // Email signature logo, used both inside the app's emails and pasted into a
+  // mail client's own signature setting. Carries its own white plate: the app's
+  // cards are white so it is invisible there, but a client in dark mode would
+  // otherwise leave the deep-navy mark unreadable. 280px because a mail client
+  // renders a pasted signature at natural width, and anything wider than an
+  // iPhone compose viewport gets a horizontal scrollbar; that is also exactly 2x
+  // the 140px the templates display it at.
+  {
+    name: "email-signature-280x95",
+    width: 280,
+    height: 95,
+    type: "logo-only",
+    format: "png",
+    plate: "#ffffff",
+    plateRadius: 10,
+  },
   // Invoice/document header
   { name: "document-header-800x270", width: 800, height: 270, type: "logo-only", format: "png" },
   // Business card back (print-ready)

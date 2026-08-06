@@ -181,6 +181,9 @@ export const DEFAULT_SETTINGS: Settings = {
     bankAccount: process.env.NEXT_PUBLIC_BUSINESS_BANK_ACCOUNT ?? BANK_ACCOUNT_PLACEHOLDER,
     homeRegion: "Auckland",
     serviceRadiusKm: 25,
+    // Placeholders rather than literal details, so editing the phone or email
+    // above moves every email without anyone remembering to edit this too.
+    emailSignature: "**{name}** · Owner / Technician\n{phone} · {email}\n{website} · {location}",
   },
 
   // Source: DEFAULT_TAX_RATES in tax-planner.ts (sheet still overrides per-FY).

@@ -1,6 +1,6 @@
 {
   "name": "tech-support-site",
-  "version": "4.13.0",
+  "version": "4.14.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -11,6 +11,7 @@
     "build:poster": "npx tsx scripts/export-poster-screenshot.ts",
     "calibrate": "dotenv -e .env.local -- tsx scripts/calibrate-benchmarks.ts",
     "check:addresses": "tsx scripts/check-address-resolution.ts",
+    "check:emails": "dotenv -e .env.local -- tsx --conditions=react-server scripts/check-email-render.ts",
     "db:push": "prisma db push",
     "dev": "next dev --turbopack",
     "eval:ai": "dotenv -e .env.local -- tsx scripts/eval-ai/index.ts",
@@ -92,10 +93,11 @@
     "prisma": "6.19.3",
     "puppeteer": "^25.5.0",
     "qr-code-styling": "^1.9.2",
+    "server-only": "^0.0.1",
     "sharp": "^0.35.3",
     "simple-git-hooks": "^2.13.1",
     "tailwindcss": "^4.3.3",
-    "tsx": "^4.23.8",
+    "tsx": "^4.23.9",
     "typescript": "6.0.3",
     "typescript-eslint": "^8.66.0"
   },

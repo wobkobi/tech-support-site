@@ -128,12 +128,12 @@ export function IdentityTab({ initial, defaults }: Props): React.ReactElement {
       <SectionHeading>Base address (travel origin + map)</SectionHeading>
       <div className="divide-y divide-admin-border">
         <FieldShell
-          id="addrLine"
+          id="baseAddress.line"
           meta={m["baseAddress.line"]}
           customised={draft.baseAddress.line !== defaults.baseAddress.line}
         >
           <AddressAutocomplete
-            id="addrLine"
+            id="baseAddress.line"
             value={draft.baseAddress.line}
             fetchDetails
             aria-label="Base address"
@@ -152,21 +152,21 @@ export function IdentityTab({ initial, defaults }: Props): React.ReactElement {
           />
         </FieldShell>
         <TextField
-          id="addrLocality"
+          id="baseAddress.locality"
           meta={m["baseAddress.locality"]}
           value={draft.baseAddress.locality}
           customised={draft.baseAddress.locality !== defaults.baseAddress.locality}
           onChange={(v) => setAddr({ locality: v })}
         />
         <TextField
-          id="addrPostcode"
+          id="baseAddress.postcode"
           meta={m["baseAddress.postcode"]}
           value={draft.baseAddress.postcode}
           customised={draft.baseAddress.postcode !== defaults.baseAddress.postcode}
           onChange={(v) => setAddr({ postcode: v })}
         />
         <NumberField
-          id="addrLat"
+          id="baseAddress.lat"
           meta={m["baseAddress.lat"]}
           value={draft.baseAddress.lat}
           nullable
@@ -174,7 +174,7 @@ export function IdentityTab({ initial, defaults }: Props): React.ReactElement {
           onChange={(v) => setAddr({ lat: v })}
         />
         <NumberField
-          id="addrLng"
+          id="baseAddress.lng"
           meta={m["baseAddress.lng"]}
           value={draft.baseAddress.lng}
           nullable
@@ -253,6 +253,26 @@ export function IdentityTab({ initial, defaults }: Props): React.ReactElement {
             placeholder="One suburb per line"
             onChange={(e) => set({ servedSuburbs: e.target.value.split("\n") })}
             className="w-full rounded-lg border border-admin-border-strong px-3 py-2 text-base focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+          />
+        </FieldShell>
+      </div>
+
+      <SectionHeading>Email signature</SectionHeading>
+      <div className="divide-y divide-admin-border">
+        <FieldShell
+          id="emailSignature"
+          meta={m.emailSignature}
+          error={fieldErrors.emailSignature}
+          customised={draft.emailSignature !== defaults.emailSignature}
+        >
+          <textarea
+            id="emailSignature"
+            value={draft.emailSignature}
+            rows={5}
+            spellCheck={false}
+            placeholder={"**{name}** · Owner / Technician\n{phone} · {email}"}
+            onChange={(e) => set({ emailSignature: e.target.value })}
+            className="w-full rounded-lg border border-admin-border-strong px-3 py-2 font-mono text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
           />
         </FieldShell>
       </div>
