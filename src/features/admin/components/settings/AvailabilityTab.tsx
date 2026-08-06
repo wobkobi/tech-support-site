@@ -12,6 +12,7 @@ import { AvailabilityPreview } from "@/features/admin/components/settings/Availa
 import {
   FieldShell,
   NumberField,
+  SettingsTabBody,
   ToggleField,
 } from "@/features/admin/components/settings/SettingsFields";
 import { SettingsFooter } from "@/features/admin/components/settings/SettingsFooter";
@@ -172,7 +173,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
     });
 
   return (
-    <div>
+    <SettingsTabBody changed={form.changedPaths}>
       {/* Master switch + paused message */}
       <div className="divide-y divide-admin-border">
         <ToggleField
@@ -523,6 +524,6 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
       <SettingsFooter form={form} />
 
       <SettingsHistory group="availability" onRestore={(v: AvailabilitySettings) => setDraft(v)} />
-    </div>
+    </SettingsTabBody>
   );
 }

@@ -10,7 +10,37 @@
 import { cn } from "@/shared/lib/cn";
 import type { FieldMeta } from "@/shared/lib/settings/field-meta";
 import type React from "react";
-import { useState } from "react";
+import { createContext, useContext, useState } from "react";
+
+/**
+ * Dotted paths edited since the last save, supplied by {@link SettingsTabBody}.
+ * Null when no provider is present, in which case rows simply show no unsaved
+ * marker rather than breaking.
+ */
+const ChangedPathsContext = createContext<Set<string> | null>(null);
+
+/**
+ * Root element for a settings tab, publishing which fields are unsaved so each
+ * row can mark itself. Supplied once per tab instead of threaded through every
+ * field, which is why it works off the field id rather than a prop.
+ * @param props - Component props.
+ * @param props.changed - Dotted paths edited since the last save.
+ * @param props.children - Tab contents.
+ * @returns The tab's root element.
+ */
+export function SettingsTabBody({
+  changed,
+  children,
+}: {
+  changed: Set<string>;
+  children: React.ReactNode;
+}): React.ReactElement {
+  return (
+    <ChangedPathsContext.Provider value={changed}>
+      <div>{children}</div>
+    </ChangedPathsContext.Provider>
+  );
+}
 
 interface FieldShellProps {
   id: string;
@@ -39,18 +69,30 @@ export function FieldShell({
   customised,
   children,
 }: FieldShellProps): React.ReactElement {
+  const unsaved = useContext(ChangedPathsContext)?.has(id) ?? false;
   return (
     <div className="py-4">
       <label htmlFor={id} className="flex items-baseline justify-between gap-3">
         <span className="text-sm font-semibold text-russian-violet">
           {meta.title}
-          {customised && (
+          {/* One slot, escalating: what you are about to save outranks what you
+              changed at some point in the past, so only the louder one shows. */}
+          {unsaved ? (
             <span
               className="ml-2 align-middle text-xs font-normal text-amber-600"
-              title="Changed from the default"
+              title="Changed since the last save"
             >
-              edited
+              unsaved
             </span>
+          ) : (
+            customised && (
+              <span
+                className="ml-2 align-middle text-xs font-normal text-admin-faint"
+                title="Differs from the shipped default"
+              >
+                edited
+              </span>
+            )
           )}
         </span>
       </label>

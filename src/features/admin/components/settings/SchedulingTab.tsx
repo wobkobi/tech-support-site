@@ -7,7 +7,7 @@
  * - the defaults are sensible and most operators never need to touch these.
  */
 
-import { NumberField } from "@/features/admin/components/settings/SettingsFields";
+import { NumberField, SettingsTabBody } from "@/features/admin/components/settings/SettingsFields";
 import { SettingsFooter } from "@/features/admin/components/settings/SettingsFooter";
 import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
 import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
@@ -40,7 +40,7 @@ export function SchedulingTab({ initial, defaults }: Props): React.ReactElement 
   const set = (patch: Partial<SchedulingSettings>): void => setDraft((p) => ({ ...p, ...patch }));
 
   return (
-    <div>
+    <SettingsTabBody changed={form.changedPaths}>
       <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
         <p className="text-sm text-amber-800">
           Advanced. These tune the calendar travel-block engine. The defaults work well - only
@@ -111,6 +111,6 @@ export function SchedulingTab({ initial, defaults }: Props): React.ReactElement 
       <SettingsFooter form={form} />
 
       <SettingsHistory group="scheduling" onRestore={(v: SchedulingSettings) => setDraft(v)} />
-    </div>
+    </SettingsTabBody>
   );
 }

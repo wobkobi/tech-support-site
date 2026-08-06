@@ -11,6 +11,7 @@
 import {
   FieldShell,
   NumberField,
+  SettingsTabBody,
   TextField,
 } from "@/features/admin/components/settings/SettingsFields";
 import { SettingsFooter } from "@/features/admin/components/settings/SettingsFooter";
@@ -68,7 +69,7 @@ export function IdentityTab({ initial, defaults }: Props): React.ReactElement {
     setDraft((p) => ({ ...p, baseAddress: { ...p.baseAddress, ...patch } }));
 
   return (
-    <div>
+    <SettingsTabBody changed={form.changedPaths}>
       <SectionHeading>Contact</SectionHeading>
       <div className="divide-y divide-admin-border">
         <TextField
@@ -280,6 +281,6 @@ export function IdentityTab({ initial, defaults }: Props): React.ReactElement {
       <SettingsFooter form={form} />
 
       <SettingsHistory group="identity" onRestore={(v: IdentitySettings) => setDraft(v)} />
-    </div>
+    </SettingsTabBody>
   );
 }

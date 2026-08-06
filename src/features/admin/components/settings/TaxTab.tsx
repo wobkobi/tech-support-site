@@ -7,7 +7,7 @@
  * still takes precedence over these.
  */
 
-import { NumberField } from "@/features/admin/components/settings/SettingsFields";
+import { NumberField, SettingsTabBody } from "@/features/admin/components/settings/SettingsFields";
 import { SettingsFooter } from "@/features/admin/components/settings/SettingsFooter";
 import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
 import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
@@ -40,7 +40,7 @@ export function TaxTab({ initial, defaults }: Props): React.ReactElement {
   const set = (patch: Partial<TaxSettings>): void => setDraft((p) => ({ ...p, ...patch }));
 
   return (
-    <div>
+    <SettingsTabBody changed={form.changedPaths}>
       <p className="mb-4 text-sm text-admin-muted">
         Enter each rate as a percentage. If a per-FY workbook fills the matching rate cell, that
         value is used for that year and these act as the fallback.
@@ -82,6 +82,6 @@ export function TaxTab({ initial, defaults }: Props): React.ReactElement {
       <SettingsFooter form={form} />
 
       <SettingsHistory group="tax" onRestore={(v: TaxSettings) => setDraft(v)} />
-    </div>
+    </SettingsTabBody>
   );
 }

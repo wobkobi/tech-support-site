@@ -8,7 +8,11 @@
  */
 
 import { PricingPreview } from "@/features/admin/components/settings/PricingPreview";
-import { NumberField, ToggleField } from "@/features/admin/components/settings/SettingsFields";
+import {
+  NumberField,
+  SettingsTabBody,
+  ToggleField,
+} from "@/features/admin/components/settings/SettingsFields";
 import { SettingsFooter } from "@/features/admin/components/settings/SettingsFooter";
 import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
 import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
@@ -55,7 +59,7 @@ export function PricingTab({ initial, defaults }: Props): React.ReactElement {
   };
 
   return (
-    <div>
+    <SettingsTabBody changed={form.changedPaths}>
       <div className="divide-y divide-admin-border">
         <ToggleField
           id="gstRegistered"
@@ -315,6 +319,6 @@ export function PricingTab({ initial, defaults }: Props): React.ReactElement {
           setTop({ gstRegistered: baseline.gstRegistered });
         }}
       />
-    </div>
+    </SettingsTabBody>
   );
 }
