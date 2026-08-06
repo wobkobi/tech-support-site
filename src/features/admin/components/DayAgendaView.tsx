@@ -25,7 +25,7 @@ import { isPastEditWindow, nzDayEndMs } from "@/shared/lib/edit-window";
 import { addDaysToDateKey, getPacificAucklandOffset, nzDateKey } from "@/shared/lib/timezone-utils";
 import { useRouter } from "next/navigation";
 import type React from "react";
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { FaCalendarDay, FaChevronLeft, FaChevronRight, FaRegCalendar } from "react-icons/fa6";
 
 /**
@@ -101,6 +101,14 @@ export function DayAgendaView({
   const [actionSheetEvent, setActionSheetEvent] = useState<WeekEvent | null>(null);
   // Stable "now" for the past-event lock (avoids an impure call during render).
   const [renderedAt] = useState(() => Date.now());
+  // Separate ticking clock for the current-time marker. Kept apart from
+  // renderedAt deliberately: that one must stay frozen or the past-edit lock
+  // would shift under the operator mid-session.
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
   // useTransition keeps the current view interactive while the next week
   // is being fetched, so crossing the week boundary doesn't blank the UI.
   const [isPending, startTransition] = useTransition();
@@ -161,7 +169,10 @@ export function DayAgendaView({
     // booking>booking gaps get a label - the operator's free-slot view
     // shouldn't be confused by travel or personal events that already imply
     // unavailability.
-    type AgendaItem = { type: "event"; ev: WeekEvent } | { type: "gap"; minutes: number };
+    type AgendaItem =
+      | { type: "event"; ev: WeekEvent }
+      | { type: "gap"; minutes: number }
+      | { type: "now"; atMs: number };
     const items: AgendaItem[] = [];
     for (let i = 0; i < timed.length; i++) {
       const cur = timed[i];
@@ -174,8 +185,21 @@ export function DayAgendaView({
       if (gapMin >= MIN_GAP_MINUTES) items.push({ type: "gap", minutes: gapMin });
     }
 
+    // Mark where the day has got to, before the first event still to come. An
+    // event already under way starts before now, so the marker lands after its
+    // card rather than splitting it. Skipped on an empty day, where a lone line
+    // with nothing either side says less than the "no events" message does.
+    if (timed.length > 0 && selectedDayKey === nzDateKey(new Date(nowMs))) {
+      const next = items.findIndex(
+        (it) => it.type === "event" && new Date(it.ev.startAt).getTime() > nowMs,
+      );
+      const marker: AgendaItem = { type: "now", atMs: nowMs };
+      if (next === -1) items.push(marker);
+      else items.splice(next, 0, marker);
+    }
+
     return { agendaItems: items, timedEvents: timed, allDayEvents: allDay };
-  }, [events, selectedDayKey]);
+  }, [events, selectedDayKey, nowMs]);
 
   const holidayName = holidaysByDateKey[selectedDayKey] ?? null;
   // Optimistic override for a just-clicked day: true = blocked, false = free,
@@ -597,6 +621,24 @@ export function DayAgendaView({
           </p>
         ) : (
           agendaItems.map((item, idx) => {
+            if (item.type === "now") {
+              return (
+                <div
+                  key="now"
+                  className="flex items-center gap-2 px-2 text-[11px] font-semibold tracking-wide uppercase"
+                >
+                  <span className="h-0.5 flex-1 rounded-full bg-red-500" />
+                  <span className="rounded-full bg-red-500 px-2 py-0.5 text-white">
+                    {new Intl.DateTimeFormat("en-NZ", {
+                      timeZone: NZ_TZ,
+                      hour: "numeric",
+                      minute: "2-digit",
+                    }).format(new Date(item.atMs))}
+                  </span>
+                  <span className="h-0.5 flex-1 rounded-full bg-red-500" />
+                </div>
+              );
+            }
             if (item.type === "gap") {
               return (
                 <div
