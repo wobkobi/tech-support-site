@@ -47,7 +47,16 @@ const sent: Sent[] = [];
 const realFetch = globalThis.fetch;
 globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-  if (!url.includes("resend.com")) return realFetch(input, init);
+  // Match on the host, not a substring: "resend.com" appearing anywhere in a
+  // path would otherwise stub an unrelated request and let the run pass on a
+  // send that never happened.
+  let host = "";
+  try {
+    host = new URL(url).hostname.toLowerCase();
+  } catch {
+    // Relative or malformed URL - never the Resend transport.
+  }
+  if (host !== "resend.com" && !host.endsWith(".resend.com")) return realFetch(input, init);
   const body = JSON.parse(String(init?.body ?? "{}")) as Partial<Sent>;
   sent.push({ subject: body.subject ?? "", html: body.html ?? "", text: body.text ?? "" });
   return new Response(JSON.stringify({ id: "fixture-message-id" }), {
