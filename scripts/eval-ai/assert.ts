@@ -5,7 +5,7 @@
 // mirroring their code. Independent correctness is anchored by the hardcoded
 // canonical constants in the self-test (see index.ts).
 
-import { clampBillableMins, MAX_JOB_MINS } from "@/features/business/lib/pricing-policy";
+import { clampBillableMins } from "@/features/business/lib/pricing-policy";
 
 /** Grouping for a reported check. */
 type CheckFamily = "context" | "reproducibility" | "drift" | "cross-route";
@@ -26,14 +26,14 @@ export interface CheckResult {
  * @param benchmarkMins - Standalone benchmark minutes for the task.
  * @param minBillableMins - Live minimum billable floor.
  * @param incrementMins - Live rounding increment.
- * @param ceilingMins - Hard ceiling (defaults to the shared 8h cap).
+ * @param ceilingMins - Live hard ceiling on one job's billable minutes.
  * @returns Expected estimatedMins the route would return.
  */
 export function expectedEstimateMins(
   benchmarkMins: number,
   minBillableMins: number,
   incrementMins: number,
-  ceilingMins = MAX_JOB_MINS,
+  ceilingMins: number,
 ): number {
   return clampBillableMins(benchmarkMins, minBillableMins, incrementMins, ceilingMins);
 }

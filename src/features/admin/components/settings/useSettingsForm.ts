@@ -19,12 +19,41 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
  */
 export const SettingsAllContext = createContext<Settings | null>(null);
 
+/**
+ * Collects the dotted paths at which two settings values differ. Recurses only
+ * into plain objects; an array or primitive that differs reports as its own
+ * path rather than being walked, so a list editor reads as one changed field.
+ * @param next - The draft value.
+ * @param prev - The value to compare against.
+ * @param prefix - Path accumulated so far (empty at the root).
+ * @returns Dotted paths that differ.
+ */
+function diffPaths(next: unknown, prev: unknown, prefix = ""): string[] {
+  if (Object.is(next, prev)) return [];
+  const walkable =
+    !!next &&
+    !!prev &&
+    typeof next === "object" &&
+    typeof prev === "object" &&
+    !Array.isArray(next) &&
+    !Array.isArray(prev);
+  if (!walkable) return prefix ? [prefix] : [];
+
+  const a = next as Record<string, unknown>;
+  const b = prev as Record<string, unknown>;
+  return [...new Set([...Object.keys(a), ...Object.keys(b)])].flatMap((key) =>
+    diffPaths(a[key], b[key], prefix ? `${prefix}.${key}` : key),
+  );
+}
+
 export interface SettingsFormApi<G extends SettingsGroup> {
   draft: Settings[G];
   setDraft: React.Dispatch<React.SetStateAction<Settings[G]>>;
   /** Last-saved value (advances on each successful save). The revert target. */
   baseline: Settings[G];
   dirty: boolean;
+  /** Dotted paths edited since the last save, keyed to match field ids. */
+  changedPaths: Set<string>;
   saving: boolean;
   /** Field path > message for inline errors. */
   fieldErrors: Record<string, string>;
@@ -88,6 +117,13 @@ export function useSettingsForm<G extends SettingsGroup>(
   );
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(baseline);
+
+  // Dotted paths of the fields edited since the last save, keyed the same way
+  // field ids are, so a field row can recognise itself without every call site
+  // threading a prop. Arrays and other non-plain values report as one path
+  // (`morningGuards`, `servedSuburbs`) rather than per index, matching the
+  // single anchor those composite editors render.
+  const changedPaths = useMemo(() => new Set(diffPaths(draft, baseline)), [draft, baseline]);
 
   // Warn before a full-page unload (reload / close / external nav) with unsaved
   // edits. This does not cover in-app settings tab switches: SettingsView renders
@@ -159,6 +195,7 @@ export function useSettingsForm<G extends SettingsGroup>(
     setDraft,
     baseline,
     dirty,
+    changedPaths,
     saving,
     fieldErrors,
     blocks,

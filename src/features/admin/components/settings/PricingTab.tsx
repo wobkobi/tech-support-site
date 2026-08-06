@@ -8,7 +8,11 @@
  */
 
 import { PricingPreview } from "@/features/admin/components/settings/PricingPreview";
-import { NumberField, ToggleField } from "@/features/admin/components/settings/SettingsFields";
+import {
+  NumberField,
+  SettingsTabBody,
+  ToggleField,
+} from "@/features/admin/components/settings/SettingsFields";
 import { SettingsFooter } from "@/features/admin/components/settings/SettingsFooter";
 import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
 import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
@@ -55,7 +59,7 @@ export function PricingTab({ initial, defaults }: Props): React.ReactElement {
   };
 
   return (
-    <div>
+    <SettingsTabBody changed={form.changedPaths}>
       <div className="divide-y divide-admin-border">
         <ToggleField
           id="gstRegistered"
@@ -82,6 +86,37 @@ export function PricingTab({ initial, defaults }: Props): React.ReactElement {
           error={fieldErrors.billingIncrementMins}
           customised={draft.billingIncrementMins !== defaults.billingIncrementMins}
           onChange={(v) => setTop({ billingIncrementMins: v ?? 1 })}
+        />
+        <NumberField
+          id="shortTaskMins"
+          meta={m.shortTaskMins}
+          value={draft.shortTaskMins}
+          min={1}
+          max={240}
+          error={fieldErrors.shortTaskMins}
+          customised={draft.shortTaskMins !== defaults.shortTaskMins}
+          onChange={(v) => setTop({ shortTaskMins: v ?? 1 })}
+        />
+        <NumberField
+          id="minTaskMins"
+          meta={m.minTaskMins}
+          value={draft.minTaskMins}
+          min={1}
+          max={240}
+          error={fieldErrors.minTaskMins}
+          customised={draft.minTaskMins !== defaults.minTaskMins}
+          onChange={(v) => setTop({ minTaskMins: v ?? 1 })}
+        />
+        <NumberField
+          id="maxJobMins"
+          meta={m.maxJobMins}
+          value={draft.maxJobMins}
+          min={60}
+          max={1440}
+          step={30}
+          error={fieldErrors.maxJobMins}
+          customised={draft.maxJobMins !== defaults.maxJobMins}
+          onChange={(v) => setTop({ maxJobMins: v ?? 60 })}
         />
         <NumberField
           id="publicHolidayUplift"
@@ -284,6 +319,6 @@ export function PricingTab({ initial, defaults }: Props): React.ReactElement {
           setTop({ gstRegistered: baseline.gstRegistered });
         }}
       />
-    </div>
+    </SettingsTabBody>
   );
 }

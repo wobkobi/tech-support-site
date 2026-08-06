@@ -9,7 +9,7 @@
 
 import { BenchmarkListField } from "@/features/admin/components/settings/BenchmarkListField";
 import { EstimatorPreview } from "@/features/admin/components/settings/EstimatorPreview";
-import { NumberField } from "@/features/admin/components/settings/SettingsFields";
+import { NumberField, SettingsTabBody } from "@/features/admin/components/settings/SettingsFields";
 import { SettingsFooter } from "@/features/admin/components/settings/SettingsFooter";
 import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
 import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
@@ -52,12 +52,16 @@ export function EstimatorTab({ initial, defaults }: Props): React.ReactElement {
     }));
 
   return (
-    <div>
-      <BenchmarkListField
-        benchmarks={draft.benchmarks}
-        fieldErrors={fieldErrors}
-        onChange={(benchmarks) => setDraft((p) => ({ ...p, benchmarks }))}
-      />
+    <SettingsTabBody changed={form.changedPaths}>
+      {/* id matches the `benchmarks` field-meta key so search can scroll here;
+          the list has no single input to carry it. */}
+      <div id="benchmarks" tabIndex={-1}>
+        <BenchmarkListField
+          benchmarks={draft.benchmarks}
+          fieldErrors={fieldErrors}
+          onChange={(benchmarks) => setDraft((p) => ({ ...p, benchmarks }))}
+        />
+      </div>
 
       {/* Price range width - the confidence-scaled band the public estimator shows. */}
       <div className="mt-8">
@@ -196,6 +200,6 @@ export function EstimatorTab({ initial, defaults }: Props): React.ReactElement {
       <SettingsFooter form={form} />
 
       <SettingsHistory group="estimator" onRestore={(v: EstimatorSettings) => setDraft(v)} />
-    </div>
+    </SettingsTabBody>
   );
 }

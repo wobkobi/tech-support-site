@@ -138,9 +138,10 @@ export async function lookupDriveRoundTrip(
 ): Promise<DriveRoundTripResult> {
   // Travel origin is the unified business base address (defaults to HOME_ADDRESS env).
   const origin = (await getIdentity()).baseAddress.line || process.env.HOME_ADDRESS;
-  // Server-only key (no referrer restriction) preferred; falls back to the
-  // client key when the split env isn't set up.
-  const apiKey = process.env.GOOGLE_MAPS_SERVER_KEY ?? process.env.GOOGLE_MAPS_API_KEY;
+  // Server-only key, no fallback to GOOGLE_MAPS_API_KEY: next.config.ts
+  // publishes that one to the browser, so falling back would spend a publicly
+  // readable key on server-side quota.
+  const apiKey = process.env.GOOGLE_MAPS_SERVER_KEY;
   if (!origin || !apiKey) return { status: "misconfig" };
 
   const trimmed = destination.trim().slice(0, 100);

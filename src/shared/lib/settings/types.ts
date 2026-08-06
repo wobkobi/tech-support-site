@@ -103,6 +103,17 @@ export interface PricingSettings {
   minBillableMins: number;
   /** Round-to-nearest billable step (minutes); shared with the AI parser snap. */
   billingIncrementMins: number;
+  /**
+   * Minutes a quick, one-shot task is billed at - the AI parser's SHORT set
+   * (a "quick" hint, a stated duration at/below the minimum, or an inherently
+   * one-shot action like a password reset). Caps trivial work so it can't take
+   * an even share of a long session.
+   */
+  shortTaskMins: number;
+  /** Minutes a task can shrink to before it's dropped from the invoice as descriptive noise. */
+  minTaskMins: number;
+  /** Hard ceiling on one job's billable time (minutes); clamps AI-parsed durations. */
+  maxJobMins: number;
   /** Public-holiday labour surcharge, fraction (0.25 = +25%). 0 = no surcharge. */
   publicHolidayUplift: number;
   /** Minimum travel charge floor (NZD). 0 = no floor. */
@@ -144,6 +155,13 @@ export interface IdentitySettings {
   homeRegion: string;
   /** Advertised service-area radius in km (drives the SEO GeoCircle). */
   serviceRadiusKm: number;
+  /**
+   * Text block under the logo in every outgoing email, one line per row. Carries
+   * `{name}` / `{company}` / `{phone}` / `{email}` / `{website}` / `{location}`
+   * placeholders so the details stay sourced from the fields above rather than
+   * being retyped here, and `**bold**` for emphasis. Blank rows become spacing.
+   */
+  emailSignature: string;
 }
 
 /** One task-duration benchmark: a short label and its standalone minutes. */

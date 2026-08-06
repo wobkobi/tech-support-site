@@ -6,7 +6,11 @@
  * the shared settings form hook.
  */
 
-import { NumberField, ToggleField } from "@/features/admin/components/settings/SettingsFields";
+import {
+  NumberField,
+  SettingsTabBody,
+  ToggleField,
+} from "@/features/admin/components/settings/SettingsFields";
 import { SettingsFooter } from "@/features/admin/components/settings/SettingsFooter";
 import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
 import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
@@ -57,7 +61,7 @@ export function CommsTab({ initial, defaults }: Props): React.ReactElement {
   };
 
   return (
-    <div>
+    <SettingsTabBody changed={form.changedPaths}>
       <h3 className="text-xs font-bold tracking-wide text-russian-violet uppercase">
         Which emails send
       </h3>
@@ -183,6 +187,6 @@ export function CommsTab({ initial, defaults }: Props): React.ReactElement {
           });
         }}
       />
-    </div>
+    </SettingsTabBody>
   );
 }

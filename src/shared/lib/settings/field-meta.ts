@@ -270,6 +270,13 @@ export const IDENTITY_FIELD_META: Record<string, FieldMeta> = {
     title: "Served suburbs",
     description: "Suburbs you cover, listed in the site's map data for local SEO.",
   },
+  emailSignature: {
+    title: "Email signature",
+    description:
+      "Lines under the logo on every email you send. Use {name}, {company}, {phone}, {email}, " +
+      "{website} and {location} to pull the details above in, so changing one there updates every " +
+      "email. Wrap text in **stars** for bold, and leave a row blank for a gap.",
+  },
 };
 
 /** Field metadata for the tax-planner group, keyed by dotted path. */
@@ -346,7 +353,8 @@ export const PRICING_FIELD_META: Record<string, FieldMeta> = {
   },
   minBillableMins: {
     title: "Minimum billable time",
-    description: "The smallest amount of time any billable work is charged at.",
+    description:
+      "The least a whole job can bill, however short the visit. It floors the job total, not each line - a 5-minute task inside a longer visit still bills 5 minutes.",
     unit: "minutes",
     off: "Set 0 for no minimum - bill the exact time worked.",
   },
@@ -354,6 +362,24 @@ export const PRICING_FIELD_META: Record<string, FieldMeta> = {
     title: "Billing increment",
     description:
       "Billable time is rounded to the nearest step of this size. Shared with the job calculator.",
+    unit: "minutes",
+  },
+  shortTaskMins: {
+    title: "Quick-task time",
+    description:
+      "What a one-off quick job is billed at - a password reset, showing someone how to eject a USB stick. Stops small favours taking an even share of a long visit; the rest of the time goes to the work that actually filled it.",
+    unit: "minutes",
+  },
+  minTaskMins: {
+    title: "Smallest task time",
+    description:
+      "Any task that shrinks below this is dropped from the invoice rather than billed as a near-zero line.",
+    unit: "minutes",
+  },
+  maxJobMins: {
+    title: "Longest billable day",
+    description:
+      "Ceiling on the time a single job can bill. Catches a mistyped time range before it reaches an invoice.",
     unit: "minutes",
   },
   publicHolidayUplift: {

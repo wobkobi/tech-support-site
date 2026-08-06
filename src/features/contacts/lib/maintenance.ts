@@ -1,7 +1,9 @@
 // src/features/contacts/lib/maintenance.ts
 // Single source of truth for contact maintenance: backfilling contacts from
-// bookings, merging phone-only duplicates, linking reviews to contacts, and
-// surfacing field conflicts for the admin to resolve. The sync-contacts cron,
+// bookings, merging duplicates (by Google link, then email, then mobile),
+// linking reviews to contacts, and surfacing field conflicts for the admin to
+// resolve. Every merge pass folds through one helper so they cannot drift apart
+// in what they preserve off the deleted row. The sync-contacts cron,
 // the standalone admin routes, and the contacts admin page (enrich only) call
 // these - keeping the logic here is what stops the paths from drifting apart.
 // Every reader excludes soft-deleted contacts (deletedAt != null).
@@ -53,31 +55,186 @@ export async function normaliseSoftDeleteField(): Promise<number> {
   return res.count;
 }
 
+/** Every field {@link foldContactInto} reads, shared by all three merge passes. */
+const MERGE_SELECT = {
+  id: true,
+  email: true,
+  altEmails: true,
+  phone: true,
+  altPhones: true,
+  address: true,
+  googleContactId: true,
+  reviewToken: true,
+  altReviewTokens: true,
+  createdAt: true,
+} as const;
+
+/** The Contact fields {@link foldContactInto} needs from both rows. */
+interface MergeableContact {
+  id: string;
+  email: string | null;
+  altEmails: string[];
+  phone: string | null;
+  altPhones: string[];
+  address: string | null;
+  googleContactId: string | null;
+  reviewToken: string | null;
+  altReviewTokens: string[];
+}
+
+/**
+ * Folds `dup` into `keeper` and hard-deletes it: the keeper's blank fields are
+ * filled from the dup, and the phone, email and review-token sets are unioned so
+ * nothing only the dup knew becomes unmatchable. Reassign-then-delete must be
+ * atomic - a delete without the review reassignment orphans the dup's reviews
+ * onto a now-missing contactId, since Review.contactId is a bare ObjectId, not a
+ * relation, so nothing cleans it up.
+ *
+ * Google is never touched: dupes typically share the keeper's googleContactId,
+ * so a remote delete would remove the real contact. `keeper` is mutated to match
+ * what was written, so folding a third row into the same keeper sees the
+ * post-merge state instead of a stale copy.
+ * @param keeper - The row that survives; updated in place to reflect the merge.
+ * @param dup - The row being merged away.
+ * @returns Whether the merge committed.
+ */
+async function foldContactInto(keeper: MergeableContact, dup: MergeableContact): Promise<boolean> {
+  const fill: Record<string, unknown> = {};
+  if (!keeper.phone && dup.phone) fill.phone = dup.phone;
+  if (!keeper.address && dup.address) fill.address = dup.address;
+  if (!keeper.reviewToken && dup.reviewToken) fill.reviewToken = dup.reviewToken;
+  // A phone-only keeper adopts the dup's email rather than throwing it away.
+  // The email pass can't reach this line - it buckets on a shared email, so both
+  // rows have one - but the Google-link and mobile passes can.
+  if (!keeper.email && dup.email) fill.email = dup.email.toLowerCase();
+
+  // Fold the dup's numbers into altPhones so the second number stays
+  // matchable locally (Google keeps the full union either way).
+  const keeperPrimary =
+    normaliseContactPhone(fill.phone as string | undefined) ?? normaliseContactPhone(keeper.phone);
+  const altSet = new Set(keeper.altPhones);
+  for (const p of [dup.phone, ...dup.altPhones]) {
+    const key = normaliseContactPhone(p);
+    if (key && key !== keeperPrimary) altSet.add(key);
+  }
+  if (altSet.size !== keeper.altPhones.length) fill.altPhones = { set: [...altSet] };
+
+  // Fold the dup's emails into the keeper so any address only the dup knew stays
+  // matchable (the shared primary is excluded; all lowercased).
+  const keeperPrimaryEmail =
+    ((fill.email as string | undefined) ?? keeper.email)?.toLowerCase() ?? null;
+  const seenEmail = new Set<string>();
+  const mergedAltEmails: string[] = [];
+  for (const e of [...keeper.altEmails, dup.email, ...dup.altEmails]) {
+    const lower = e?.toLowerCase();
+    if (!lower || lower === keeperPrimaryEmail || seenEmail.has(lower)) continue;
+    seenEmail.add(lower);
+    mergedAltEmails.push(lower);
+  }
+  // Compare contents, not just length: this list is rebuilt from scratch, so a
+  // keeper alt dropped for equalling the primary can be replaced one-for-one by
+  // one of the dup's and leave the count unchanged.
+  const keeperAlts = keeper.altEmails.map((e) => e.toLowerCase());
+  if (
+    mergedAltEmails.length !== keeperAlts.length ||
+    mergedAltEmails.some((e, i) => e !== keeperAlts[i])
+  ) {
+    fill.altEmails = { set: mergedAltEmails };
+  }
+  // Adopt the dup's Google link when the keeper has none, so a dup-only
+  // googleContactId isn't forgotten when the row is hard-deleted below.
+  if (!keeper.googleContactId && dup.googleContactId) {
+    fill.googleContactId = dup.googleContactId;
+  }
+  // Fold the dup's review tokens too, so links already sent under the dup
+  // keep resolving to the keeper.
+  const keeperToken = (fill.reviewToken as string | undefined) ?? keeper.reviewToken ?? null;
+  const tokenSet = new Set(keeper.altReviewTokens);
+  for (const t of [dup.reviewToken, ...dup.altReviewTokens]) {
+    if (t && t !== keeperToken) tokenSet.add(t);
+  }
+  if (tokenSet.size !== keeper.altReviewTokens.length) {
+    fill.altReviewTokens = { set: [...tokenSet] };
+  }
+
+  try {
+    await prisma.$transaction([
+      prisma.review.updateMany({
+        where: { contactId: dup.id },
+        data: { contactId: keeper.id },
+      }),
+      ...(Object.keys(fill).length > 0
+        ? [prisma.contact.update({ where: { id: keeper.id }, data: fill })]
+        : []),
+      prisma.contact.delete({ where: { id: dup.id } }),
+    ]);
+  } catch (err) {
+    console.error(`[contacts/maintenance] merge of ${dup.id} into ${keeper.id} failed:`, err);
+    return false;
+  }
+
+  if (fill.phone) keeper.phone = fill.phone as string;
+  if (fill.address) keeper.address = fill.address as string;
+  if (fill.reviewToken) keeper.reviewToken = fill.reviewToken as string;
+  if (fill.email) keeper.email = fill.email as string;
+  if (fill.googleContactId) keeper.googleContactId = fill.googleContactId as string;
+  if (fill.altPhones) keeper.altPhones = [...altSet];
+  if (fill.altEmails) keeper.altEmails = mergedAltEmails;
+  if (fill.altReviewTokens) keeper.altReviewTokens = [...tokenSet];
+  return true;
+}
+
+/**
+ * Merges live contacts that share the same googleContactId into one. A Google
+ * person can only be one contact, so a shared resource name is the strongest
+ * duplicate signal available - stronger than email or phone, which drift in case
+ * and formatting. The oldest row is kept and the rest are folded into it.
+ *
+ * This is the pass that clears up an import which ran while the existing rows
+ * were unmatchable and re-created every Google contact as a second row.
+ * @returns The number of duplicate contacts merged away.
+ */
+export async function mergeDuplicateGoogleContacts(): Promise<number> {
+  const contacts = await prisma.contact.findMany({
+    where: { deletedAt: null, googleContactId: { not: null } },
+    select: MERGE_SELECT,
+    orderBy: { createdAt: "asc" },
+  });
+
+  const byGoogleId = new Map<string, typeof contacts>();
+  for (const c of contacts) {
+    const key = c.googleContactId!;
+    byGoogleId.set(key, [...(byGoogleId.get(key) ?? []), c]);
+  }
+
+  let merged = 0;
+  for (const rows of byGoogleId.values()) {
+    if (rows.length < 2) continue;
+    // Oldest first (orderBy above): the original row is the keeper.
+    const [keeper, ...dupes] = rows;
+    for (const dup of dupes) {
+      if (await foldContactInto(keeper, dup)) merged++;
+    }
+  }
+  if (merged > 0) {
+    console.warn(`[contacts/maintenance] merged ${merged} contact(s) sharing a Google link`);
+  }
+  return merged;
+}
+
 /**
  * Merges live contacts that share the same (case-insensitive) email into one:
  * the oldest row is kept (it carries the original reviewToken and history),
  * dupes' reviews are reassigned to it, its blank fields are filled from the
- * dupes, and the dupes are hard-deleted. Guards against import artefacts -
- * e.g. a sync that ran while contacts were invisible re-created every Google
- * contact as a duplicate. Google is never touched here: dupes typically share
- * the keeper's googleContactId, so a remote delete would remove the real one.
+ * dupes, and the dupes are hard-deleted. Catches the pairs the Google-link pass
+ * can't - two rows for one person that were never linked to the same Google
+ * contact, or to Google at all.
  * @returns The number of duplicate contacts merged away.
  */
 export async function mergeDuplicateEmailContacts(): Promise<number> {
   const contacts = await prisma.contact.findMany({
     where: { deletedAt: null, email: { not: null } },
-    select: {
-      id: true,
-      email: true,
-      altEmails: true,
-      phone: true,
-      altPhones: true,
-      address: true,
-      googleContactId: true,
-      reviewToken: true,
-      altReviewTokens: true,
-      createdAt: true,
-    },
+    select: MERGE_SELECT,
     orderBy: { createdAt: "asc" },
   });
 
@@ -93,65 +250,7 @@ export async function mergeDuplicateEmailContacts(): Promise<number> {
     // Oldest first (orderBy above): the original row is the keeper.
     const [keeper, ...dupes] = rows;
     for (const dup of dupes) {
-      const fill: Record<string, unknown> = {};
-      if (!keeper.phone && dup.phone) fill.phone = dup.phone;
-      if (!keeper.address && dup.address) fill.address = dup.address;
-      if (!keeper.reviewToken && dup.reviewToken) fill.reviewToken = dup.reviewToken;
-      // Fold the dup's numbers into altPhones so the second number stays
-      // matchable locally (Google keeps the full union either way).
-      const keeperPrimary =
-        normaliseContactPhone(fill.phone as string | undefined) ??
-        normaliseContactPhone(keeper.phone);
-      const altSet = new Set(keeper.altPhones);
-      for (const p of [dup.phone, ...dup.altPhones]) {
-        const key = normaliseContactPhone(p);
-        if (key && key !== keeperPrimary) altSet.add(key);
-      }
-      if (altSet.size !== keeper.altPhones.length) fill.altPhones = { set: [...altSet] };
-      // Fold the dup's alternate emails into the keeper so any address only the
-      // dup knew stays matchable (the shared primary is excluded; all lowercased).
-      const keeperPrimaryEmail = keeper.email?.toLowerCase() ?? null;
-      const seenEmail = new Set<string>();
-      const mergedAltEmails: string[] = [];
-      for (const e of [...keeper.altEmails, ...dup.altEmails]) {
-        const lower = e.toLowerCase();
-        if (lower === keeperPrimaryEmail || seenEmail.has(lower)) continue;
-        seenEmail.add(lower);
-        mergedAltEmails.push(lower);
-      }
-      if (mergedAltEmails.length !== keeper.altEmails.length) {
-        fill.altEmails = { set: mergedAltEmails };
-      }
-      // Adopt the dup's Google link when the keeper has none, so a dup-only
-      // googleContactId isn't forgotten when the row is hard-deleted below.
-      if (!keeper.googleContactId && dup.googleContactId) {
-        fill.googleContactId = dup.googleContactId;
-      }
-      // Fold the dup's review tokens too, so links already sent under the dup
-      // keep resolving to the keeper.
-      const keeperToken = (fill.reviewToken as string | undefined) ?? keeper.reviewToken ?? null;
-      const tokenSet = new Set(keeper.altReviewTokens);
-      for (const t of [dup.reviewToken, ...dup.altReviewTokens]) {
-        if (t && t !== keeperToken) tokenSet.add(t);
-      }
-      if (tokenSet.size !== keeper.altReviewTokens.length) {
-        fill.altReviewTokens = { set: [...tokenSet] };
-      }
-      try {
-        await prisma.$transaction([
-          prisma.review.updateMany({
-            where: { contactId: dup.id },
-            data: { contactId: keeper.id },
-          }),
-          ...(Object.keys(fill).length > 0
-            ? [prisma.contact.update({ where: { id: keeper.id }, data: fill })]
-            : []),
-          prisma.contact.delete({ where: { id: dup.id } }),
-        ]);
-        merged++;
-      } catch (err) {
-        console.error(`[contacts/maintenance] email-dup merge failed for ${dup.id}:`, err);
-      }
+      if (await foldContactInto(keeper, dup)) merged++;
     }
   }
   if (merged > 0) {
@@ -161,20 +260,22 @@ export async function mergeDuplicateEmailContacts(): Promise<number> {
 }
 
 /**
- * Merges phone-only contacts into their email-bearing counterpart when both
- * share the same normalised phone: migrates the phone-only contact's reviews
- * onto the email contact, then deletes the phone-only row. Runs before backfill
- * so the post-merge contact set is accurate.
+ * Merges contacts that share a normalised mobile number into one. An
+ * email-bearing row is always the keeper and any phone-only rows fold into it;
+ * where every row in the bucket is phone-only the oldest one wins, which is what
+ * collapses the pairs left behind by an import that couldn't match its own rows.
+ * Runs before backfill so the post-merge contact set is accurate.
  * @returns The set of contact ids that were merged away (deleted).
  */
 export async function mergePhoneOnlyContacts(): Promise<Set<string>> {
   const contacts = await prisma.contact.findMany({
     where: { deletedAt: null },
-    select: { id: true, email: true, phone: true, altPhones: true, name: true },
+    select: MERGE_SELECT,
+    orderBy: { createdAt: "asc" },
   });
 
   // Bucket by normalised phone (primary + alts): one email-bearing "keeper" +
-  // any phone-only dups.
+  // any phone-only rows, oldest first.
   const phoneBuckets = new Map<
     string,
     { withEmail: (typeof contacts)[number] | null; phoneOnly: (typeof contacts)[number][] }
@@ -194,24 +295,16 @@ export async function mergePhoneOnlyContacts(): Promise<Set<string>> {
 
   const deletedIds = new Set<string>();
   for (const { withEmail, phoneOnly } of phoneBuckets.values()) {
-    if (!withEmail || phoneOnly.length === 0) continue;
-    for (const dup of phoneOnly) {
-      // Reassign-then-delete must be atomic: a hard delete without the review
-      // reassignment would orphan the phone-only contact's reviews onto a
-      // now-missing contactId (Review.contactId is a bare ObjectId, not a
-      // relation, so nothing cleans it up).
-      try {
-        await prisma.$transaction([
-          prisma.review.updateMany({
-            where: { contactId: dup.id },
-            data: { contactId: withEmail.id },
-          }),
-          prisma.contact.delete({ where: { id: dup.id } }),
-        ]);
-        deletedIds.add(dup.id);
-      } catch (err) {
-        console.error(`[contacts/maintenance] phone-only merge failed for ${dup.id}:`, err);
-      }
+    // With no email-bearing row the oldest phone-only row is the keeper - two
+    // phone-only rows on one mobile are the same person either way.
+    const keeper = withEmail ?? phoneOnly[0];
+    const dupes = withEmail ? phoneOnly : phoneOnly.slice(1);
+    if (!keeper || dupes.length === 0) continue;
+    for (const dup of dupes) {
+      // A person reachable on two mobiles sits in two buckets; skip the pair
+      // once either side has already been merged away by an earlier bucket.
+      if (deletedIds.has(keeper.id) || deletedIds.has(dup.id)) continue;
+      if (await foldContactInto(keeper, dup)) deletedIds.add(dup.id);
     }
   }
   return deletedIds;

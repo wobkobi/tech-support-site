@@ -836,15 +836,18 @@ export function CalculatorView({
         // rateConfigId to null so the promo math classifies it correctly even
         // if the AI emitted a stray ID.
         const isHourly = t.baseRateId != null;
-        // Round AI-emitted quantities to 2 dp so a fractional-hour estimate
-        // can't put a long float on the line.
-        const qty = Math.round(t.qty * 100) / 100;
+        // The route snaps hourly tasks onto the billing grid and returns whole
+        // minutes; carry those as the billed unit with qty unrounded, so the
+        // line quantities still sum to the session. Flat rows keep a 2 dp count.
+        const minutes = isHourly ? (t.minutes ?? Math.round(t.qty * 60)) : undefined;
+        const qty = minutes != null ? minutes / 60 : Math.round(t.qty * 100) / 100;
         return {
           rateConfigId: isHourly ? null : (t.rateConfigId ?? null),
           baseRateId: t.baseRateId ?? null,
           modifierIds: t.modifierIds ?? [],
           description,
           qty,
+          ...(minutes != null && { minutes }),
           unitPrice: t.unitPrice,
           lineTotal: Math.round(qty * t.unitPrice * 100) / 100,
           device,
@@ -924,7 +927,7 @@ export function CalculatorView({
       // long tasks absorb more of the correction; tasks scaling below the
       // minimum drop), then floor the whole job to the minimum billable time
       // so a sub-minimum job bills - and displays - at the floor.
-      const collapsed = collapseToWindow(parsedTasks, parsedWindowMin);
+      const collapsed = collapseToWindow(parsedTasks, parsedWindowMin, pricing.taskTiming);
       setTasks(enforceMinBillable(collapsed.tasks, pricing.minBillableMins));
       if (collapsed.rescaled || collapsed.dropped > 0) {
         const parts: string[] = ["Rebalanced tasks"];
@@ -942,6 +945,7 @@ export function CalculatorView({
       pricing.travelRatePerHour,
       pricing.minTravelCharge,
       pricing.minBillableMins,
+      pricing.taskTiming,
       eventPrefill,
       toast,
     ],
@@ -1014,9 +1018,21 @@ export function CalculatorView({
     setTasks((prev) => {
       const t = [...prev];
       const item = { ...t[idx], [field]: val };
-      // Quantities round to 2 dp so hand-typed hour fractions (1.333333...)
-      // can't leave long floats on the line or the invoice.
-      if (field === "qty") item.qty = Math.round(Number(val) * 100) / 100;
+      // Minutes are the billed unit on hourly rows, so a hand-edited qty has to
+      // rewrite them or the stale value would keep winning downstream. The task
+      // row edits hrs + mins, so the incoming qty is already a whole number of
+      // minutes; snap it and carry qty unrounded so the column stays exact.
+      if (field === "qty") {
+        const mins = Math.round(Number(val) * 60);
+        if (item.baseRateId != null) {
+          item.minutes = mins;
+          item.qty = mins / 60;
+        } else {
+          // Flat rows (Travel etc.) count units, not time.
+          item.minutes = undefined;
+          item.qty = Math.round(Number(val) * 100) / 100;
+        }
+      }
       if (field === "rateConfigId") {
         const rate = rates.find((r) => r.id === val);
         if (rate) {
@@ -2230,8 +2246,9 @@ export function CalculatorView({
                 tasks={tasks}
                 windowMin={durationMins}
                 minBillableMins={pricing.minBillableMins}
+                snapMins={pricing.taskTiming?.snapMins}
                 onFix={() => {
-                  const collapsed = collapseToWindow(tasks, durationMins);
+                  const collapsed = collapseToWindow(tasks, durationMins, pricing.taskTiming);
                   setTasks(enforceMinBillable(collapsed.tasks, pricing.minBillableMins));
                 }}
               />
@@ -2408,6 +2425,8 @@ interface TaskTimeWarningProps {
   tasks: TaskLine[];
   windowMin: number;
   minBillableMins: number;
+  /** Live billing increment; sizes the pinned-task overshoot allowance. */
+  snapMins?: number;
   onFix: () => void;
 }
 
@@ -2420,6 +2439,7 @@ interface TaskTimeWarningProps {
  * @param props.tasks - Current task lines (hourly + flat).
  * @param props.windowMin - Job window in minutes (`durationMins`).
  * @param props.minBillableMins - Minimum billable labour minutes; below this the floor banner shows.
+ * @param props.snapMins - Live billing increment sizing the pinned-task overshoot allowance.
  * @param props.onFix - Handler that collapses tasks to the window and floors to the minimum.
  * @returns Warning element, or null when totals already match.
  */
@@ -2427,6 +2447,7 @@ function TaskTimeWarning({
   tasks,
   windowMin,
   minBillableMins,
+  snapMins,
   onFix,
 }: TaskTimeWarningProps): React.ReactElement | null {
   const taskMin = hourlyTaskMinutes(tasks);
@@ -2461,10 +2482,10 @@ function TaskTimeWarning({
   // raw window by one step per pinned task without being an over-estimate.
   // Suppress that expected overshoot - Fix never rescales pinned tasks.
   const overshoot = taskMin - windowMin;
-  if (overshoot > 0 && overshoot <= explicitRoundingAllowanceMins(tasks)) return null;
+  if (overshoot > 0 && overshoot <= explicitRoundingAllowanceMins(tasks, snapMins)) return null;
   // Tolerance: qty rounds to 2 dp (= 0.6-min granularity), so a 3-task split
   // can drift up to ~1.5 min from windowMin while still being "correct" after
-  // collapseToWindow has snapped each row to a 5-min boundary. Without this
+  // collapseToWindow has snapped each row to the increment. Without this
   // the banner shows "Tasks total 215 min - listed window is 215 min" because
   // the underlying float is 214.8 vs 215.
   if (Math.abs(taskMin - windowMin) < 2) return null;

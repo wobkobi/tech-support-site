@@ -154,6 +154,11 @@ export default async function CalculatorPage({
     travelRatePerHour: policy.TRAVEL_RATE_PER_HOUR,
     minBillableMins: policy.MIN_BILLABLE_MINS,
     unsuccessfulFactor: policy.UNSUCCESSFUL_WORK_FACTOR,
+    taskTiming: {
+      snapMins: policy.BILLING_INCREMENT_MINS,
+      shortTaskMins: policy.SHORT_TASK_MINS,
+      minTaskMins: policy.MIN_TASK_MINS,
+    },
   };
 
   // Flatten Dates to the ISO strings the client types expect (matches what

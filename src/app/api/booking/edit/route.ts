@@ -5,6 +5,7 @@
 
 import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
 import {
+  buildAppointmentDescription,
   parseHourLabel,
   splitUnitFromAddress,
   validateBookingPayloadFields,
@@ -27,12 +28,14 @@ import {
   sendOwnerBookingNotification,
 } from "@/features/reviews/lib/email";
 import { errorResponse } from "@/shared/lib/api-response";
+import { getIdentity } from "@/shared/lib/business-identity.server";
 import { normaliseAddress } from "@/shared/lib/normalise-address";
 import { normaliseName } from "@/shared/lib/normalise-name";
 import { validatePhone } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 import { getSettings } from "@/shared/lib/settings/get-settings";
+import { getSiteUrl } from "@/shared/lib/site-url";
 import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 import { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
@@ -211,6 +214,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       bookingNotes += `Phone: ${phoneE164}\n`;
     }
 
+    // Internal blob above; the customer is an attendee on the replacement event,
+    // so the invite gets the customer-facing description rather than the raw
+    // metadata (which now also carries their phone number).
+    const identity = await getIdentity();
+    const siteUrl = getSiteUrl();
+    const calendarDescription = buildAppointmentDescription({
+      company: identity.company,
+      phone: identity.phone,
+      email: identity.email,
+      isRemote: meetingType === "remote",
+      userNotes: notes.trim(),
+      manageUrl: `${siteUrl}/booking/edit?token=${encodeURIComponent(booking.cancelToken)}`,
+      cancelUrl: `${siteUrl}/booking/cancel?token=${encodeURIComponent(booking.cancelToken)}`,
+    });
+
     // Replace the calendar event: delete the old one, then create at the new time.
     if (booking.calendarEventId) {
       try {
@@ -226,7 +244,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       const summary = `Tech Support: ${cleanName} - ${cleanDurationLabel}`;
       const calendarResult = await createBookingEvent({
         summary,
-        description: bookingNotes,
+        description: calendarDescription,
         startAt,
         endAt,
         timeZone: config.timeZone,

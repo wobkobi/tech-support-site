@@ -6,6 +6,10 @@
  * {@link ContactConflictsView} so the operator can pick the winning value.
  */
 import {
+  ContactAddressReviewList,
+  type AddressReviewRow,
+} from "@/features/admin/components/ContactAddressReviewList";
+import {
   ContactConflictsView,
   type ConflictRow,
 } from "@/features/admin/components/ContactConflictsView";
@@ -30,11 +34,35 @@ export const metadata: Metadata = {
 export default async function AdminContactConflictsPage(): Promise<React.ReactElement> {
   await requireAdminAuth();
 
-  const conflicts = await prisma.contactConflict.findMany({
-    where: { resolvedAt: null },
-    orderBy: { createdAt: "desc" },
-    take: 200,
-  });
+  const [conflicts, flagged] = await Promise.all([
+    prisma.contactConflict.findMany({
+      where: { resolvedAt: null },
+      orderBy: { createdAt: "desc" },
+      take: 200,
+    }),
+    prisma.contact.findMany({
+      where: { addressUnverified: true, deletedAt: null },
+      orderBy: { updatedAt: "desc" },
+      take: 200,
+      select: { id: true, name: true, email: true, address: true, addressCandidates: true },
+    }),
+  ]);
+
+  // A flagged row always has an address (the flag is only ever set alongside
+  // one), but the column is nullable so narrow it rather than asserting.
+  const addressRows: AddressReviewRow[] = flagged.flatMap((c) =>
+    c.address
+      ? [
+          {
+            contactId: c.id,
+            contactName: c.name,
+            contactEmail: c.email,
+            address: c.address,
+            candidates: c.addressCandidates,
+          },
+        ]
+      : [],
+  );
 
   const contactIds = Array.from(new Set(conflicts.map((c) => c.contactId)));
   const contacts =
@@ -62,9 +90,12 @@ export default async function AdminContactConflictsPage(): Promise<React.ReactEl
       <PageHeader
         breadcrumbs={[{ label: "Contacts", href: "/admin/contacts" }, { label: "Conflicts" }]}
         title="Contact conflicts"
-        description="Fields where the site and Google Contacts both changed since the last sync. Pick which value wins - it's written to both sides and the conflict is closed."
+        description="Anything the Google Contacts sync couldn't decide on its own - fields that changed on both sides, and imported addresses that didn't resolve."
       />
-      <ContactConflictsView initial={rows} />
+      <div className="flex flex-col gap-6">
+        <ContactAddressReviewList initial={addressRows} />
+        <ContactConflictsView initial={rows} />
+      </div>
     </>
   );
 }

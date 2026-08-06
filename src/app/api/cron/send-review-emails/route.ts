@@ -1,7 +1,10 @@
 // src/app/api/cron/send-review-emails/route.ts
 /**
- * @description Cron job that sends review request emails 30 minutes after appointments.
- * Called externally via cron-job.org every 15 minutes.
+ * @description Cron job that sends review request emails once a booking has been
+ * finished for the configured delay. Called externally via cron-job.org hourly.
+ * The query is unbounded catch-up work ("ended long enough ago and not yet
+ * emailed"), so the cadence only shifts when a mail goes out, never whether it
+ * does - safe to slow further if function CPU ever needs trimming again.
  */
 
 import { sendCustomerReviewRequest } from "@/features/reviews/lib/email";
@@ -16,8 +19,8 @@ export const maxDuration = 60;
 
 /**
  * GET /api/cron/send-review-emails
- * Finds completed appointments from 30 minutes ago and sends review requests.
- * Designed to be called every 15 minutes via cron-job.org.
+ * Finds completed appointments past the configured delay and sends review requests.
+ * Designed to be called hourly via cron-job.org.
  * @param request - The incoming cron request
  * @returns JSON response with results
  */

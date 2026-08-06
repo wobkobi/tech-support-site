@@ -37,8 +37,11 @@ export function PricingPreview({ config }: Props): React.ReactElement {
 
   lines.push(
     config.minBillableMins > 0
-      ? `Work is billed in ${config.billingIncrementMins}-min steps, minimum ${config.minBillableMins} min.`
+      ? `Work is billed in ${config.billingIncrementMins}-min steps, with a ${config.minBillableMins} min minimum per job.`
       : `Work is billed in ${config.billingIncrementMins}-min steps, no minimum.`,
+  );
+  lines.push(
+    `A quick one-off job bills ${config.shortTaskMins} min, so it can't take an even share of a long visit.`,
   );
 
   if (config.publicHolidayUplift > 0) {

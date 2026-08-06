@@ -480,10 +480,11 @@ export async function fetchAllCalendarEvents(
 /**
  * Cached wrapper around {@link fetchAllCalendarEvents} for the admin schedule page.
  * 30-second TTL with revalidation on booking/blocked-day mutations via
- * {@link SCHEDULE_CALENDAR_TAG}. Paired with the schedule's client-side auto-poll
- * (the ScheduleAutoRefresh component) so externally-made calendar changes surface
- * within ~30s; the operator's own edits still bust the cache immediately. Takes
- * ISO strings (not Date objects) so the cache key is deterministically serialisable.
+ * {@link SCHEDULE_CALENDAR_TAG}. Also backs the schedule's client-side auto-poll
+ * (the ScheduleAutoRefresh component), which reads this cache once a minute to
+ * fingerprint the window, so externally-made calendar changes surface within
+ * ~60s; the operator's own edits still bust the cache immediately. Takes ISO
+ * strings (not Date objects) so the cache key is deterministically serialisable.
  * @param startIso - ISO 8601 start of range.
  * @param endIso - ISO 8601 end of range.
  * @returns Cached array of calendar events.

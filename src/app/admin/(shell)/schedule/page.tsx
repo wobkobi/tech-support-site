@@ -10,6 +10,7 @@ import { ScheduleAutoRefresh } from "@/features/admin/components/ScheduleAutoRef
 import { ScheduleFindTimes } from "@/features/admin/components/ScheduleFindTimes";
 import { WeekView } from "@/features/admin/components/WeekView";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
+import { scheduleEventsToken } from "@/features/admin/lib/schedule-token";
 import { mondayOf, type WeekEvent, type WeekViewKind } from "@/features/admin/lib/schedule-types";
 import { addDays, resolveWeekStart } from "@/features/admin/lib/week";
 import { lookupPublicHolidaysForKeys } from "@/features/business/lib/pricing-policy.server";
@@ -69,6 +70,11 @@ export default async function AdminSchedulePage({
   // buffer.
   const bufferStartDate = addDays(weekStartDate, -BUFFER_DAYS_BEFORE);
   const bufferEndDate = addDays(weekStartDate, BUFFER_DAYS_AFTER);
+  // Hoisted so the event fetch and the auto-refresh poll share byte-identical
+  // bounds - they key the same cache entry, and a mismatch would have the poll
+  // comparing tokens from two different windows, so it would refresh every tick.
+  const bufferStartIso = bufferStartDate.toISOString();
+  const bufferEndIso = bufferEndDate.toISOString();
 
   const bookingCalId = process.env.BOOKING_CALENDAR_ID ?? "";
   const carCalId = process.env.CAR_CALENDAR_ID ?? process.env.WORK_CALENDAR_ID ?? "";
@@ -79,9 +85,7 @@ export default async function AdminSchedulePage({
   // side. Travel blocks queried separately because synthetic cache entries
   // don't carry their parent context.
   const [rawEvents, travelBlocks] = await Promise.all([
-    getCachedScheduleEvents(bufferStartDate.toISOString(), bufferEndDate.toISOString()).catch(
-      () => [],
-    ),
+    getCachedScheduleEvents(bufferStartIso, bufferEndIso).catch(() => []),
     prisma.travelBlock.findMany({
       where: {
         eventStartAt: { lt: bufferEndDate },
@@ -251,8 +255,12 @@ export default async function AdminSchedulePage({
 
   return (
     <>
-      {/* Silent 30s poll so externally-made calendar changes surface on their own. */}
-      <ScheduleAutoRefresh />
+      {/* Silent poll so externally-made calendar changes surface on their own. */}
+      <ScheduleAutoRefresh
+        fromIso={bufferStartIso}
+        toIso={bufferEndIso}
+        token={scheduleEventsToken(rawEvents)}
+      />
       <PageHeader title="Schedule" />
       {/* Next-open-times bar - shared across the mobile agenda + desktop grid. */}
       <ScheduleFindTimes />

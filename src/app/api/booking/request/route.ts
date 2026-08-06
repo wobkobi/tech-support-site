@@ -5,6 +5,7 @@
 
 import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
 import {
+  buildAppointmentDescription,
   combineUnitAndAddress,
   parseHourLabel,
   splitUnitFromAddress,
@@ -31,12 +32,14 @@ import {
   sendOwnerBookingNotification,
 } from "@/features/reviews/lib/email";
 import { errorResponse } from "@/shared/lib/api-response";
+import { getIdentity } from "@/shared/lib/business-identity.server";
 import { normaliseAddress } from "@/shared/lib/normalise-address";
 import { normaliseName } from "@/shared/lib/normalise-name";
 import { validatePhone } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 import { getSettings } from "@/shared/lib/settings/get-settings";
+import { getSiteUrl } from "@/shared/lib/site-url";
 import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 import { Prisma, type AiEstimateCategory, type EstimateTask } from "@prisma/client";
 import { randomUUID } from "crypto";
@@ -259,6 +262,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       bookingNotes += `Quoted: ${formatQuotedRange(quotedLowAtBooking, quotedHighAtBooking, quotedTravelAtBooking)}\n`;
     }
 
+    // The notes blob above is the internal record (time label, meeting type,
+    // address, quoted range) that parseBookingNotes reads back. The customer is
+    // an attendee on the calendar event, so the invite gets the customer-facing
+    // description instead - it must never carry the quoted price or the metadata.
+    const identity = await getIdentity();
+    const siteUrl = getSiteUrl();
+    const calendarDescription = buildAppointmentDescription({
+      company: identity.company,
+      phone: identity.phone,
+      email: identity.email,
+      isRemote: meetingType === "remote",
+      userNotes: notes.trim(),
+      manageUrl: `${siteUrl}/booking/edit?token=${encodeURIComponent(cancelToken)}`,
+      cancelUrl: `${siteUrl}/booking/cancel?token=${encodeURIComponent(cancelToken)}`,
+    });
+
     // Create calendar event
     let calendarEventId: string | null = null;
     try {
@@ -266,7 +285,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       const summary = `Tech Support: ${cleanName} - ${cleanDurationLabel}`;
       const calendarResult = await createBookingEvent({
         summary,
-        description: bookingNotes,
+        description: calendarDescription,
         startAt,
         endAt,
         timeZone: config.timeZone,

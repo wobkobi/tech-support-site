@@ -68,13 +68,12 @@ export async function calculateTravelMinutes(
   departureTime: Date,
   options?: { useArrivalTime?: boolean; mode?: TransportMode },
 ): Promise<number | null> {
-  // Server-only key (no referrer restriction) is preferred for Distance Matrix
-  // calls; falls back to the client key when running in dev without the split.
-  const apiKey = process.env.GOOGLE_MAPS_SERVER_KEY ?? process.env.GOOGLE_MAPS_API_KEY;
+  // Server-only key, no fallback to GOOGLE_MAPS_API_KEY: next.config.ts
+  // publishes that one to the browser, so falling back would spend a publicly
+  // readable key on Distance Matrix quota.
+  const apiKey = process.env.GOOGLE_MAPS_SERVER_KEY;
   if (!apiKey) {
-    console.warn(
-      "[travel-time] No GOOGLE_MAPS_SERVER_KEY or GOOGLE_MAPS_API_KEY set - skipping travel time calculation",
-    );
+    console.warn("[travel-time] No GOOGLE_MAPS_SERVER_KEY set - skipping travel time calculation");
     return null;
   }
   // apiKey is a string past the guard, but TS won't carry that narrowing into the

@@ -8,6 +8,7 @@
 import {
   BOOKING_CONFIG,
   BOOKING_FIELD_LIMITS,
+  buildAppointmentDescription,
   combineUnitAndAddress,
   validateEmail,
 } from "@/features/booking/lib/booking";
@@ -22,9 +23,11 @@ import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
 import { sendCustomerBookingConfirmation } from "@/features/reviews/lib/email";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
+import { getIdentity } from "@/shared/lib/business-identity.server";
 import { validatePhone } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
+import { getSiteUrl } from "@/shared/lib/site-url";
 import { Prisma } from "@prisma/client";
 import { randomUUID } from "crypto";
 import { revalidateTag } from "next/cache";
@@ -159,11 +162,26 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const cancelToken = randomUUID();
   const reviewToken = randomUUID();
 
-  // Build booking notes
+  // Internal notes blob: the operator's record, parsed back by
+  // parseBookingNotes. Never sent to the customer - the calendar invite gets the
+  // customer-facing description built below, since the client is an attendee and
+  // would otherwise read the admin marker and the raw metadata.
   let bookingNotes = notes ? `${notes}\n\n` : "";
   bookingNotes += `[Manual entry by admin - ${durationMinutes} min]\n`;
   bookingNotes += `Meeting type: ${address ? "In-person" : "Remote"}\n`;
   if (address) bookingNotes += `Address: ${address}\n`;
+
+  const identity = await getIdentity();
+  const siteUrl = getSiteUrl();
+  const calendarDescription = buildAppointmentDescription({
+    company: identity.company,
+    phone: identity.phone,
+    email: identity.email,
+    isRemote: !address,
+    userNotes: notes?.trim() ?? "",
+    manageUrl: `${siteUrl}/booking/edit?token=${encodeURIComponent(cancelToken)}`,
+    cancelUrl: `${siteUrl}/booking/cancel?token=${encodeURIComponent(cancelToken)}`,
+  });
 
   // Create the calendar event
   let calendarEventId: string | null = null;
@@ -171,7 +189,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const summary = `Tech Support: ${name} - ${durationMinutes === 60 ? "1 hour" : "2 hours"}`;
     const result = await createBookingEvent({
       summary,
-      description: bookingNotes,
+      description: calendarDescription,
       startAt,
       endAt,
       timeZone: BOOKING_CONFIG.timeZone,

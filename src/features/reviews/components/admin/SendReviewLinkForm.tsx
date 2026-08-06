@@ -170,17 +170,17 @@ export function SendReviewLinkForm({
         ok?: boolean;
         error?: string;
         reviewUrl?: string;
+        smsText?: string;
         existing?: boolean;
       };
       if (!res.ok) throw new Error(data.error ?? "Request failed");
 
       if (data.existing && data.reviewUrl) {
         setExistingUrl(data.reviewUrl);
-      } else if (data.reviewUrl) {
-        const firstName = name.trim().split(" ")[0];
-        setSmsText(
-          `Hi ${firstName}, it's Harrison from To the Point Tech. Thanks for letting me help you out! A quick review would be greatly appreciated - it really helps: ${data.reviewUrl}`,
-        );
+      } else if (data.smsText) {
+        // Composed server-side so the operator + business name come from the
+        // live identity settings.
+        setSmsText(data.smsText);
         clearFields();
       }
     } catch (err) {

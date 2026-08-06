@@ -33,6 +33,111 @@ function escapeHtml(value: string): string {
     .replace(/'/g, "&#39;");
 }
 
+// Bare http(s) URL inside ALREADY-ESCAPED text. `&amp;` stays part of the match
+// because it is a real query separator the operator typed; any other entity
+// ends it, since &quot; / &#39; / &lt; / &gt; came from quotes or brackets
+// AROUND the link rather than from the link itself. Only http(s) matches, so
+// javascript: and data: URLs can never become anchors. Case-insensitive because
+// a phone keyboard will autocapitalise "Https://" at the start of a line.
+const ESCAPED_URL_RE = /https?:\/\/(?:&amp;|[^\s&])+/gi;
+
+/** Sentence punctuation that belongs to the prose, not to a trailing URL. */
+const URL_TRAILING_PUNCT_RE = /[.,;:!?]+$/;
+
+/**
+ * Occurrences of a single character, for the bracket-balance trim below.
+ * @param haystack - String to scan.
+ * @param char - Character to count.
+ * @returns Number of occurrences.
+ */
+function countChar(haystack: string, char: string): number {
+  return haystack.split(char).length - 1;
+}
+
+/**
+ * Turns bare http(s) URLs in already-escaped text into anchors, so a link the
+ * operator types into a message box is clickable in the email rather than inert
+ * text.
+ *
+ * MUST run AFTER {@link escapeHtml}, never before: the input has no live markup
+ * left, so the anchors this adds are the only tags in the result and a pasted
+ * `<a href>` still renders as visible text. Escaped `&amp;` passes through into
+ * the href unchanged, which is what an HTML attribute expects.
+ * @param escaped - Text that has already been through {@link escapeHtml}.
+ * @returns The same text with bare URLs wrapped in anchors.
+ */
+function linkifyEscaped(escaped: string): string {
+  return escaped.replace(ESCAPED_URL_RE, (match) => {
+    // Trim what reads as prose: "see https://x.co/a." and "(https://x.co/a)"
+    // should link the URL alone. Brackets only come off when unbalanced, so a
+    // URL that legitimately contains "(...)" survives intact.
+    let url = match.replace(URL_TRAILING_PUNCT_RE, "");
+    while (
+      (url.endsWith(")") && countChar(url, ")") > countChar(url, "(")) ||
+      (url.endsWith("]") && countChar(url, "]") > countChar(url, "["))
+    ) {
+      url = url.slice(0, -1).replace(URL_TRAILING_PUNCT_RE, "");
+    }
+    // Nothing left past the scheme - leave the text alone rather than emit an
+    // anchor pointing at "https://".
+    if (!/^https?:\/\/\S/i.test(url)) return match;
+    return `<a href="${url}" style="color:#43bccd">${url}</a>${match.slice(url.length)}`;
+  });
+}
+
+/**
+ * Customer-facing brand name: the identity company plus the " Tech" suffix the
+ * signature, subjects, and bodies all share. Centralised so renaming the
+ * business in Settings moves every email at once, and so the suffix lives in
+ * one place rather than being spelled out at each use.
+ * @param identity - Live business identity (only `company` is read).
+ * @param identity.company - Trading name from the identity settings.
+ * @returns Brand name for customer-facing copy.
+ */
+function brandName(identity: { company: string }): string {
+  return `${identity.company} Tech`;
+}
+
+/**
+ * Plain-text fallback derived from the rendered HTML, so every email ships a
+ * text/plain part alongside the HTML one: clients that refuse HTML still show
+ * something readable, and an HTML-only message is a mild spam-filter signal.
+ * Anchors keep their destination as "label (url)", since a text reader cannot
+ * follow a link it cannot see.
+ * @param html - Rendered email HTML.
+ * @returns Plain-text equivalent.
+ */
+function htmlToText(html: string): string {
+  return (
+    html
+      .replace(/<head[\s\S]*?<\/head>/gi, "")
+      .replace(/<style[\s\S]*?<\/style>/gi, "")
+      .replace(/<a\b[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi, (_match, href, label) => {
+        const text = String(label)
+          .replace(/<[^>]+>/g, "")
+          .trim();
+        return text && text !== href ? `${text} (${href})` : String(href);
+      })
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/(?:p|div|h1|h2|h3|tr|li)>/gi, "\n\n")
+      .replace(/<[^>]+>/g, "")
+      // Reverse escapeHtml. &amp; comes LAST so an escaped "&amp;lt;" does not
+      // decode twice into a live "<".
+      .replace(/&nbsp;/g, " ")
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&amp;/g, "&")
+      // The HTML templates are indented for readability; that indentation would
+      // otherwise show up as ragged leading whitespace on every text line.
+      .replace(/^[ \t]+/gm, "")
+      .replace(/[ \t]+\n/g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim()
+  );
+}
+
 /**
  * Renders a pricing-policy `**…**` copy string as email-safe HTML. Non-marker
  * segments are HTML-escaped as cheap insurance against future user input.
@@ -55,25 +160,69 @@ function renderEmphasisedHtml(text: string): string {
  * @param siteUrl - Canonical site URL for the logo link and footer.
  * @returns HTML string for the signature.
  */
+/**
+ * Placeholder values the signature block can interpolate, each already safe to
+ * drop into HTML. The contactable ones come back as anchors so a phone number or
+ * address stays tappable wherever the operator chooses to place it.
+ * @param identity - Live identity settings.
+ * @param siteUrl - Absolute site URL.
+ * @returns Map from placeholder name to ready-to-insert HTML.
+ */
+function signaturePlaceholders(
+  identity: Awaited<ReturnType<typeof getIdentity>>,
+  siteUrl: string,
+): Record<string, string> {
+  return {
+    name: escapeHtml(identity.name),
+    company: escapeHtml(brandName(identity)),
+    location: escapeHtml(identity.location),
+    phone: `<a href="${identity.phoneTel}" style="color:#555;text-decoration:none">${escapeHtml(identity.phone)}</a>`,
+    email: `<a href="mailto:${identity.email}" style="color:#43bccd;text-decoration:none">${escapeHtml(identity.email)}</a>`,
+    website: `<a href="${siteUrl}" style="color:#43bccd;text-decoration:none">${escapeHtml(siteUrl.replace(/^https?:\/\//, ""))}</a>`,
+  };
+}
+
+/**
+ * Signature block: the logo, then the operator's own lines from
+ * `identity.emailSignature`. Escaping runs before placeholder substitution, so
+ * the anchors those placeholders expand to survive while anything the operator
+ * types stays inert text. An unknown `{token}` is left visible rather than
+ * dropped, so a typo shows up in the email instead of silently blanking a line.
+ * @param siteUrl - Absolute site URL used for the logo and website links.
+ * @returns HTML fragment appended to the end of an email body.
+ */
 async function buildEmailSignature(siteUrl: string): Promise<string> {
   const identity = await getIdentity();
+  const placeholders = signaturePlaceholders(identity, siteUrl);
+
+  const lines = identity.emailSignature
+    .split("\n")
+    .map((line) => {
+      if (!line.trim()) return `<div style="height:8px"></div>`;
+      const html = renderEmphasisedHtml(line)
+        .replace(/\{(\w+)\}/g, (whole, key: string) => placeholders[key] ?? whole)
+        // renderEmphasisedHtml is shared with body copy, so the brand colour for
+        // bold is applied here rather than baked into that helper.
+        .replace(/<strong>/g, '<strong style="color:#0c0a3e">');
+      return `<p style="margin:0 0 3px;font-size:13px;color:#555">${html}</p>`;
+    })
+    .join("");
+
   return `
-    <div style="margin:32px 0 0;padding-top:24px;border-top:1px solid #e8e8e8">
-      <a href="${siteUrl}" style="display:inline-block;margin-bottom:12px">
-        <img src="${siteUrl}/assets/email-signature-400x135.png" alt="${identity.company} Tech" width="200" style="display:block;border:0;height:auto" />
+    <div style="margin:24px 0 0;padding-top:16px;border-top:1px solid #e8e8e8">
+      <a href="${siteUrl}" style="display:inline-block;margin-bottom:8px">
+        <img src="${siteUrl}/assets/email-signature-280x95.png" alt="${escapeHtml(brandName(identity))}" width="140" style="display:block;border:0;height:auto" />
       </a>
-      <p style="margin:0 0 2px;font-size:14px;font-weight:600;color:#0c0a3e">${identity.name}</p>
-      <p style="margin:0 0 10px;font-size:13px;color:#666">Owner &amp; Technician</p>
-      <p style="margin:0 0 4px;font-size:13px;color:#555">📞 <a href="${identity.phoneTel}" style="color:#555;text-decoration:none">${identity.phone}</a></p>
-      <p style="margin:0 0 4px;font-size:13px;color:#555">✉️ <a href="mailto:${identity.email}" style="color:#43bccd;text-decoration:none">${identity.email}</a></p>
-      <p style="margin:0 0 4px;font-size:13px;color:#555">🌐 <a href="${siteUrl}" style="color:#43bccd;text-decoration:none">${siteUrl.replace(/^https?:\/\//, "")}</a></p>
-      <p style="margin:0;font-size:12px;color:#999">${identity.location}</p>
+      ${lines}
     </div>`;
 }
 
 /**
  * Wraps body HTML in the notification email shell (560px card, soft shadow,
- * system font stack) used by the owner/customer notices.
+ * system font stack) used by the owner/customer notices. Pins the document to a
+ * light colour scheme: the signature logo is a transparent PNG whose chip mark
+ * is deep navy, so a client that auto-inverts the card to dark would leave the
+ * mark all but invisible against it.
  * @param bodyHtml - Inner HTML for the card.
  * @returns A complete HTML document.
  */
@@ -81,7 +230,7 @@ function renderNotificationEmail(bodyHtml: string): string {
   return `
 <!DOCTYPE html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light"></head>
 <body style="font-family:system-ui,sans-serif;background:#f6f7f8;margin:0;padding:24px">
   <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
 ${bodyHtml}
@@ -102,7 +251,7 @@ ${bodyHtml}
 function renderDocumentEmail(bodyHtml: string): string {
   return `<!doctype html>
 <html lang="en">
-<head><meta charset="utf-8" /></head>
+<head><meta charset="utf-8" /><meta name="color-scheme" content="light" /><meta name="supported-color-schemes" content="light" /></head>
 <body style="margin:0;padding:24px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0c0a3e;background:#f6f7f8">
   <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:12px;padding:24px">
 ${bodyHtml}
@@ -201,6 +350,7 @@ export async function sendOwnerReviewNotification(review: ReviewNotificationData
       to: adminEmail,
       subject: `New review - ${displayName} (${review.verified ? "verified" : "pending"})`,
       html,
+      text: htmlToText(html),
     });
   } catch (error) {
     console.error("[email] Failed to send owner review notification:", error);
@@ -382,6 +532,7 @@ export async function sendOwnerBookingNotification(
       to: adminEmail,
       subject,
       html,
+      text: htmlToText(html),
     });
   } catch (error) {
     console.error("[email] Failed to send owner booking notification:", error);
@@ -437,10 +588,11 @@ export async function sendCustomerBookingConfirmation(
     kind === "rescheduled"
       ? `🔄 Appointment updated, ${safeFirstName}!`
       : `Booking confirmed, ${safeFirstName}!`;
+  const identity = await getIdentity();
   const intro =
     kind === "rescheduled"
       ? "Your appointment has been rescheduled. The Google Calendar invite has been updated to match."
-      : "Thanks for choosing To the Point Tech - I'm looking forward to helping you out.";
+      : `Thanks for choosing ${escapeHtml(brandName(identity))} - I'm looking forward to helping you out.`;
   const subject =
     kind === "rescheduled" ? `🔄 Appointment updated - ${start}` : `Booking confirmed - ${start}`;
   const previousLine =
@@ -493,6 +645,7 @@ ${await buildEmailSignature(siteUrl)}
       to: booking.email,
       subject,
       html,
+      text: htmlToText(html),
       attachments,
     });
   } catch (error) {
@@ -535,6 +688,7 @@ export async function sendBookingReminderEmail(booking: BookingNotificationData)
         ? `<p style="margin:0 0 20px;color:#444;font-size:14px">📍 ${escapeHtml(onSite)}</p>`
         : "";
   const cancellationText = await liveCancellationCopy(booking);
+  const identity = await getIdentity();
   const promoLine = booking.promoTitleAtBooking
     ? `<div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;padding:12px 16px;margin-bottom:16px"><p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#0c0a3e">🏷 Rate locked in: ${escapeHtml(booking.promoTitleAtBooking)}</p><p style="margin:0;font-size:13px;color:#444;line-height:1.5">This rate applies to your appointment even if the offer ends before your visit.</p></div>`
     : "";
@@ -544,7 +698,7 @@ export async function sendBookingReminderEmail(booking: BookingNotificationData)
   // stays near 24h; revisit this copy if that lead time moves far from a day.
   const html = renderNotificationEmail(`
     <h2 style="margin:0 0 12px;color:#0c0a3e;font-size:20px">Hi ${safeFirstName}, just a reminder</h2>
-    <p style="margin:0 0 20px;color:#444;line-height:1.6">Your appointment with To the Point Tech is coming up tomorrow.</p>
+    <p style="margin:0 0 20px;color:#444;line-height:1.6">Your appointment with ${escapeHtml(brandName(identity))} is coming up tomorrow.</p>
 
     <p style="margin:0 0 8px;color:#888;font-size:13px;text-transform:uppercase;letter-spacing:.05em;font-weight:600">When</p>
     <p style="margin:0 0 4px;font-size:16px;font-weight:600;color:#0c0a3e">${start}</p>
@@ -581,6 +735,7 @@ ${await buildEmailSignature(siteUrl)}
       to: booking.email,
       subject: `Reminder: appointment tomorrow - ${start}`,
       html,
+      text: htmlToText(html),
       attachments,
     });
     return true;
@@ -649,6 +804,7 @@ ${await buildEmailSignature(siteUrl)}
       to,
       subject: `Your upcoming ${plural}`,
       html,
+      text: htmlToText(html),
     });
     return true;
   } catch (error) {
@@ -701,7 +857,7 @@ export async function sendCustomerReviewRequest(booking: ReviewRequestData): Pro
     <p style="margin:0 0 24px;color:#444;line-height:1.6">It only takes a minute, and honest feedback is always welcome.</p>
     <a href="${reviewUrl}" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:15px">Leave a review</a>
 
-    <p style="margin:28px 0 20px;color:#444;font-size:14px;line-height:1.6">Thanks again for choosing ${identity.company} Tech. If you ever need a hand with anything else, don't hesitate to get in touch.</p>
+    <p style="margin:28px 0 20px;color:#444;font-size:14px;line-height:1.6">Thanks again for choosing ${escapeHtml(brandName(identity))}. If you ever need a hand with anything else, don't hesitate to get in touch.</p>
 ${await buildEmailSignature(siteUrl)}
 `);
 
@@ -712,6 +868,7 @@ ${await buildEmailSignature(siteUrl)}
       to: booking.email,
       subject: `Thanks for having me, ${firstName} - how did everything go?`,
       html,
+      text: htmlToText(html),
     });
     return true;
   } catch (error) {
@@ -736,11 +893,11 @@ export async function buildPastClientReviewEmailHtml(
   return `
 <!DOCTYPE html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light"></head>
 <body style="font-family:system-ui,sans-serif;background:#f6f7f8;margin:0;padding:24px">
   <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
     <h2 style="margin:0 0 12px;color:#0c0a3e;font-size:20px">Hi ${safeFirstName},</h2>
-    <p style="margin:0 0 12px;color:#444;line-height:1.6">It's ${identity.name.split(" ")[0]} from ${identity.company} Tech - thanks again for letting me help you out!</p>
+    <p style="margin:0 0 12px;color:#444;line-height:1.6">It's ${escapeHtml(identity.name.split(" ")[0])} from ${escapeHtml(brandName(identity))} - thanks again for letting me help you out!</p>
     <p style="margin:0 0 12px;color:#444;line-height:1.6">If you have a spare moment, a quick review would mean a lot - it really helps other people find reliable local tech support.</p>
     <p style="margin:0 0 24px;color:#444;line-height:1.6">No pressure at all, but if you're happy to, I'd really appreciate it.</p>
     <a href="${reviewUrl}" style="display:inline-block;background:#43bccd;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:15px">Leave a review</a>
@@ -773,6 +930,7 @@ export async function sendPastClientReviewRequest(booking: ReviewRequestData): P
 
   const reviewUrl = `${siteUrl}/review?token=${encodeURIComponent(booking.reviewToken)}`;
   const firstName = booking.name.split(" ")[0];
+  const identity = await getIdentity();
   const html = await buildPastClientReviewEmailHtml(firstName, reviewUrl);
 
   try {
@@ -780,8 +938,9 @@ export async function sendPastClientReviewRequest(booking: ReviewRequestData): P
       from,
       replyTo: process.env.ADMIN_EMAIL,
       to: booking.email,
-      subject: `Hi ${firstName}, it's Harrison from To the Point Tech`,
+      subject: `Hi ${firstName}, it's ${identity.name.split(" ")[0]} from ${brandName(identity)}`,
       html,
+      text: htmlToText(html),
     });
     return true;
   } catch (error) {
@@ -840,8 +999,8 @@ export async function buildInvoiceEmail({
   const defaultBody = isQuote ? DEFAULT_QUOTE_EMAIL_BODY : DEFAULT_INVOICE_EMAIL_BODY;
   const bodyText = (customBody ?? defaultBody).trim();
   // pre-wrap preserves line breaks the operator typed; escape first so the
-  // body can never inject markup.
-  const safeBody = escapeHtml(bodyText || defaultBody);
+  // body can never inject markup, then linkify so a typed URL is clickable.
+  const safeBody = linkifyEscaped(escapeHtml(bodyText || defaultBody));
   // Greeting: caller-supplied override wins; otherwise fall back to the first
   // word of clientName. The Send modal lets the operator type the right name
   // per send, so there's no auto-detection of company vs person here.
@@ -880,8 +1039,8 @@ export async function buildInvoiceEmail({
   // Append " Tech" to match the signature and body brand name, so the subject
   // and the rest of the same email show one consistent business name.
   const subject = isQuote
-    ? `Your quote from ${identity.company} Tech (${invoice.number})`
-    : `Your invoice from ${identity.company} Tech (${invoice.number})`;
+    ? `Your quote from ${brandName(identity)} (${invoice.number})`
+    : `Your invoice from ${brandName(identity)} (${invoice.number})`;
   const html = renderDocumentEmail(`
     <h1 style="margin:0 0 16px;font-size:20px;font-weight:700;color:#0c0a3e">Hi ${safeGreeting},</h1>
 
@@ -958,6 +1117,7 @@ export async function sendInvoiceEmail({
       to: invoice.clientEmail,
       subject,
       html,
+      text: htmlToText(html),
       attachments: [
         {
           filename: `${invoice.isQuote ? "Quote" : "Invoice"} ${invoice.number}.pdf`,
@@ -1048,6 +1208,7 @@ export async function sendInvoiceReminderEmail({
       to: invoice.clientEmail,
       subject,
       html,
+      text: htmlToText(html),
       attachments: [
         {
           filename: `Invoice ${invoice.number}.pdf`,
@@ -1088,7 +1249,7 @@ export async function buildVoidEmail({
 }> {
   const siteUrl = getSiteUrl();
   const bodyText = (customBody ?? DEFAULT_VOID_EMAIL_BODY).trim();
-  const safeBody = escapeHtml(bodyText || DEFAULT_VOID_EMAIL_BODY);
+  const safeBody = linkifyEscaped(escapeHtml(bodyText || DEFAULT_VOID_EMAIL_BODY));
   const trimmedOverride = greetingName?.trim();
   const greetingTarget =
     trimmedOverride || (invoice.clientName.split(" ")[0] || invoice.clientName).trim();
@@ -1166,6 +1327,7 @@ export async function sendVoidNotification({
       to: invoice.clientEmail,
       subject,
       html,
+      text: htmlToText(html),
       attachments: [
         {
           filename: `Invoice ${invoice.number} VOIDED.pdf`,
@@ -1267,6 +1429,7 @@ export async function sendBusinessEnquiryNotification(enquiry: BusinessEnquiryDa
         ? `Business enquiry - ${enquiry.company} (${enquiry.name})`
         : `Business enquiry - ${enquiry.name} (personal)`,
       html,
+      text: htmlToText(html),
     });
   } catch (error) {
     console.error("[email] Failed to send business enquiry notification:", error);
@@ -1295,6 +1458,7 @@ export async function sendBusinessEnquiryAck(enquiry: BusinessEnquiryData): Prom
   // Personal enquiries thank the person directly rather than a company.
   const aboutTarget = enquiry.company ? ` for ${escapeHtml(enquiry.company)}` : "";
   const signature = await buildEmailSignature(siteUrl);
+  const identity = await getIdentity();
 
   const html = renderNotificationEmail(`
     <h2 style="margin:0 0 16px;color:#0c0a3e;font-size:20px">Thanks for getting in touch</h2>
@@ -1314,8 +1478,9 @@ export async function sendBusinessEnquiryAck(enquiry: BusinessEnquiryData): Prom
       from,
       replyTo: process.env.ADMIN_EMAIL,
       to: enquiry.email,
-      subject: "Thanks for your enquiry - To the Point Tech",
+      subject: `Thanks for your enquiry - ${brandName(identity)}`,
       html,
+      text: htmlToText(html),
     });
   } catch (error) {
     console.error("[email] Failed to send business enquiry ack:", error);

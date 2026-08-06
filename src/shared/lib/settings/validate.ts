@@ -154,6 +154,12 @@ function validatePricing(p: PricingSettings): FieldError[] {
     errors.push({ field: "minBillableMins", message: "Must be 0 or more minutes (0 = no floor)." });
   if (!inRange(p.billingIncrementMins, 1, 60))
     errors.push({ field: "billingIncrementMins", message: "Must be 1-60 minutes." });
+  if (!inRange(p.shortTaskMins, 1, 240))
+    errors.push({ field: "shortTaskMins", message: "Must be 1-240 minutes." });
+  if (!inRange(p.minTaskMins, 1, 240))
+    errors.push({ field: "minTaskMins", message: "Must be 1-240 minutes." });
+  if (!inRange(p.maxJobMins, 60, 1440))
+    errors.push({ field: "maxJobMins", message: "Must be 60-1440 minutes (1-24 hours)." });
   if (!inRange(p.publicHolidayUplift, 0, 5))
     errors.push({ field: "publicHolidayUplift", message: "Must be a fraction 0-5 (0 = off)." });
   if (!nonNeg(p.minTravelCharge))
@@ -336,6 +342,12 @@ function validateReviews(r: ReviewsSettings): FieldError[] {
 }
 
 /**
+ * Placeholders the email signature accepts. Kept in step with
+ * `signaturePlaceholders` in the email layer, which is what actually expands them.
+ */
+const SIGNATURE_PLACEHOLDERS = ["name", "company", "phone", "email", "website", "location"];
+
+/**
  * Validates the business identity group's shape + bounds.
  * @param i - Proposed identity settings.
  * @returns List of field errors (empty when valid).
@@ -350,6 +362,18 @@ function validateIdentity(i: IdentitySettings): FieldError[] {
     errors.push({ field: "paymentTermsDays", message: "Must be 0 or more days." });
   if (!inRange(i.serviceRadiusKm, 1, 500))
     errors.push({ field: "serviceRadiusKm", message: "Service radius must be 1-500 km." });
+  if (!i.emailSignature.trim())
+    errors.push({ field: "emailSignature", message: "Email signature cannot be empty." });
+  // A misspelt placeholder renders as literal "{pone}" in a customer's inbox,
+  // which no test would catch, so reject it at the point it is typed.
+  const unknownPlaceholders = [...i.emailSignature.matchAll(/\{(\w+)\}/g)]
+    .map((m) => m[1])
+    .filter((key) => !SIGNATURE_PLACEHOLDERS.includes(key));
+  if (unknownPlaceholders.length > 0)
+    errors.push({
+      field: "emailSignature",
+      message: `Unknown placeholder${unknownPlaceholders.length > 1 ? "s" : ""}: ${[...new Set(unknownPlaceholders)].map((k) => `{${k}}`).join(", ")}. Available: ${SIGNATURE_PLACEHOLDERS.map((k) => `{${k}}`).join(", ")}.`,
+    });
   if (i.baseAddress.lat !== null && !inRange(i.baseAddress.lat, -90, 90))
     errors.push({ field: "baseAddress.lat", message: "Latitude must be -90 to 90." });
   if (i.baseAddress.lng !== null && !inRange(i.baseAddress.lng, -180, 180))

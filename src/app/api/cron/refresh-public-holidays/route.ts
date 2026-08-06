@@ -43,10 +43,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return errorResponse("Unauthorized", 401);
   }
 
-  const apiKey = process.env.GOOGLE_MAPS_SERVER_KEY ?? process.env.GOOGLE_MAPS_API_KEY;
+  // Server-only key, no fallback to GOOGLE_MAPS_API_KEY: next.config.ts
+  // publishes that one to the browser, so falling back would spend a publicly
+  // readable key on server-side quota.
+  const apiKey = process.env.GOOGLE_MAPS_SERVER_KEY;
   if (!apiKey) {
     return NextResponse.json(
-      { ok: false, error: "Missing GOOGLE_MAPS_SERVER_KEY / GOOGLE_MAPS_API_KEY" },
+      { ok: false, error: "Missing GOOGLE_MAPS_SERVER_KEY" },
       { status: 503 },
     );
   }

@@ -6,7 +6,11 @@
  * review-request cooldown. Saves through the shared settings form hook.
  */
 
-import { NumberField, ToggleField } from "@/features/admin/components/settings/SettingsFields";
+import {
+  NumberField,
+  SettingsTabBody,
+  ToggleField,
+} from "@/features/admin/components/settings/SettingsFields";
 import { SettingsFooter } from "@/features/admin/components/settings/SettingsFooter";
 import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
 import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
@@ -39,7 +43,7 @@ export function ReviewsTab({ initial, defaults }: Props): React.ReactElement {
   const set = (patch: Partial<ReviewsSettings>): void => setDraft((p) => ({ ...p, ...patch }));
 
   return (
-    <div>
+    <SettingsTabBody changed={form.changedPaths}>
       <div className="divide-y divide-admin-border">
         <NumberField
           id="homepageFeaturedCount"
@@ -72,6 +76,6 @@ export function ReviewsTab({ initial, defaults }: Props): React.ReactElement {
       <SettingsFooter form={form} />
 
       <SettingsHistory group="reviews" onRestore={(v: ReviewsSettings) => setDraft(v)} />
-    </div>
+    </SettingsTabBody>
   );
 }

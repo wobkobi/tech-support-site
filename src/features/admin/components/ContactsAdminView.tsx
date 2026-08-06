@@ -33,6 +33,8 @@ export function ContactsAdminView({
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
   const [syncConfirmPending, setSyncConfirmPending] = useState(false);
+  const [checkingAddresses, setCheckingAddresses] = useState(false);
+  const [addressResult, setAddressResult] = useState<string | null>(null);
 
   const syncedCount = contacts.filter((c) => !!c.googleContactId).length;
   const unsyncedCount = contacts.filter((c) => !c.googleContactId).length;
@@ -63,6 +65,30 @@ export function ContactsAdminView({
       setSyncResult("Network error - try again.");
     } finally {
       setSyncing(false);
+    }
+  }, [router]);
+
+  const runAddressCheck = useCallback(async () => {
+    setCheckingAddresses(true);
+    setAddressResult(null);
+    try {
+      const res = await fetch("/api/admin/contacts/check-addresses", { method: "POST" });
+      const data = (await res.json()) as {
+        ok: boolean;
+        checked?: number;
+        flagged?: number;
+        error?: string;
+      };
+      if (data.ok) {
+        setAddressResult(`Checked ${data.checked ?? 0} - ${data.flagged ?? 0} need a look.`);
+        router.refresh();
+      } else {
+        setAddressResult(`Error: ${data.error ?? "unknown"}`);
+      }
+    } catch {
+      setAddressResult("Network error - try again.");
+    } finally {
+      setCheckingAddresses(false);
     }
   }, [router]);
 
@@ -248,6 +274,27 @@ export function ContactsAdminView({
           )}
 
           {syncResult && <p className="mt-3 text-xs text-slate-500">{syncResult}</p>}
+        </div>
+
+        <div className="mt-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <p className="text-sm font-semibold text-slate-700">Address check</p>
+          <p className="mt-0.5 text-xs text-slate-400">
+            Re-checks every stored address and flags the ones that don&apos;t match a single
+            Auckland address. Takes a while - one lookup per contact.
+          </p>
+          <button
+            onClick={() => void runAddressCheck()}
+            disabled={checkingAddresses}
+            className={cn(
+              "mt-3 rounded-lg px-4 py-2 text-sm font-semibold transition-colors",
+              checkingAddresses
+                ? "cursor-not-allowed bg-slate-100 text-slate-400"
+                : "bg-russian-violet text-white hover:bg-russian-violet/90",
+            )}
+          >
+            {checkingAddresses ? "Checking…" : "Check all addresses"}
+          </button>
+          {addressResult && <p className="mt-3 text-xs text-slate-500">{addressResult}</p>}
         </div>
       </div>
       {/* end right column */}

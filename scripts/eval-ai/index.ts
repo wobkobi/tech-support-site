@@ -10,7 +10,7 @@
 //   npm run eval:ai -- --url=http://localhost:3001
 //   npm run eval:ai -- --runs=3           # repeat each case 3x for reproducibility
 
-import { clampBillableMins, MAX_JOB_MINS } from "@/features/business/lib/pricing-policy";
+import { clampBillableMins } from "@/features/business/lib/pricing-policy";
 import { calcSessionMins } from "@/features/business/lib/time-parse";
 import {
   type CheckResult,
@@ -51,9 +51,15 @@ interface RawRun {
  */
 function runSelfTest(): number {
   const cases: SelfCase[] = [
-    { name: "estimate snaps to benchmark", got: expectedEstimateMins(45, 30, 15), want: 45 },
-    { name: "estimate floors to min-billable", got: expectedEstimateMins(10, 30, 15), want: 30 },
-    { name: "estimate caps at ceiling", got: expectedEstimateMins(500, 30, 15), want: 480 },
+    // 480 is the self-test's own canonical ceiling, hardcoded like the rest of
+    // these expectations - the live value now comes from settings.maxJobMins.
+    { name: "estimate snaps to benchmark", got: expectedEstimateMins(45, 30, 15, 480), want: 45 },
+    {
+      name: "estimate floors to min-billable",
+      got: expectedEstimateMins(10, 30, 15, 480),
+      want: 30,
+    },
+    { name: "estimate caps at ceiling", got: expectedEstimateMins(500, 30, 15, 480), want: 480 },
     { name: "tolerance is >=1 increment", got: estimateTolerance(45, 15), want: 15 },
     { name: "within tolerance true", got: withinTolerance(88, 90, 15), want: true },
     { name: "within tolerance false", got: withinTolerance(70, 90, 15), want: false },
@@ -317,7 +323,7 @@ function evaluate(ctx: LiveContext, raw: RawRun[]): CheckResult[] {
     if (r.kind === "estimate-single") {
       const bench = ctx.benchmarks.find((b) => b.label === r.benchmarkLabel);
       if (bench) {
-        const expected = expectedEstimateMins(bench.mins, ctx.minBillableMins, inc);
+        const expected = expectedEstimateMins(bench.mins, ctx.minBillableMins, inc, ctx.maxJobMins);
         const tol = estimateTolerance(expected, inc);
         const ok = withinTolerance(first, expected, tol);
         out.push({
@@ -357,12 +363,33 @@ function evaluate(ctx: LiveContext, raw: RawRun[]): CheckResult[] {
               : `durationMins=${first} (canonical ${canonical})`,
         });
       } else {
+        // Two things the raw canonical does not account for. The route caps
+        // durationMins at the longest-billable-day ceiling, so a 12h or 19h
+        // stated session legitimately comes back capped (the cross-route check
+        // below already reads ctx.maxJobMins for the same reason). And the
+        // collector stores an absent durationMins as -1 to keep `durations` a
+        // number[], so a canonical of null - "these ranges state no duration" -
+        // must be compared against that sentinel, not against null itself.
+        // No minimum or increment is applied: durationMins is worked minutes,
+        // and the billing floor lands on task qty instead.
+        const expected = canonical === null ? -1 : Math.min(canonical, ctx.maxJobMins);
+        /**
+         * Renders a measured duration for the report, spelling out the -1
+         * sentinel the collector uses for an absent durationMins.
+         * @param v - Minutes, or -1 when the route reported no duration.
+         * @returns Human-readable value for the check detail.
+         */
+        const show = (v: number): string => (v === -1 ? "no duration" : String(v));
         out.push({
           id: r.id,
           family: "context",
           label: `parse durationMins ${r.id}`,
-          status: first === canonical ? "pass" : "fail",
-          detail: `got ${first}, expected exactly ${canonical}`,
+          status: first === expected ? "pass" : "fail",
+          detail: `got ${show(first)}, expected exactly ${show(expected)}${
+            canonical !== null && expected !== canonical
+              ? ` (canonical ${canonical}, capped at the ${ctx.maxJobMins} min ceiling)`
+              : ""
+          }`,
         });
       }
     }
@@ -374,7 +401,7 @@ function evaluate(ctx: LiveContext, raw: RawRun[]): CheckResult[] {
       const stated =
         canonical === null
           ? null
-          : clampBillableMins(canonical, ctx.minBillableMins, inc, MAX_JOB_MINS);
+          : clampBillableMins(canonical, ctx.minBillableMins, inc, ctx.maxJobMins);
       const estMins = r.durations[0];
       const parseMins = r.parseMins ?? -1;
       out.push({
@@ -460,7 +487,9 @@ function printReport(checks: CheckResult[]): void {
       console.log(
         `benchmarks: ${ctx.benchmarks.length}, rates: ${ctx.rates.length}, templates: ${ctx.templates.length}`,
       );
-      console.log(`minBillable: ${ctx.minBillableMins}m, increment: ${ctx.incrementMins}m`);
+      console.log(
+        `minBillable: ${ctx.minBillableMins}m, increment: ${ctx.incrementMins}m, maxJob: ${ctx.maxJobMins}m`,
+      );
       for (const b of ctx.benchmarks) console.log(`  - ${b.label}: ${b.mins}m`);
       process.exit(0);
     }

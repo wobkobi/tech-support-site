@@ -257,28 +257,34 @@ export async function buildAdditionalAssets(): Promise<void> {
   const logoMarkBuffer = await fs.readFile(LOGO_MARK);
   const logoFullBuffer = await fs.readFile(LOGO_FULL);
 
-  for (const { name, width, height, type, format } of ADDITIONAL_ASSETS) {
+  for (const { name, width, height, type, format, plate, plateRadius } of ADDITIONAL_ASSETS) {
     let output: Sharp;
 
     if (type === "logo-only") {
-      // Full wordmark on transparent background
+      // Full wordmark, transparent unless the spec asks for a plate. A plate
+      // needs more inset than the bleed-to-edge transparent version, or the
+      // wordmark runs into the corner radius.
+      const inset = plate ? 0.86 : 0.95;
       const logo = await sharp(logoFullBuffer)
         .resize({
-          width: Math.round(width * 0.95),
-          height: Math.round(height * 0.95),
+          width: Math.round(width * inset),
+          height: Math.round(height * inset),
           fit: "inside",
         })
         .png()
         .toBuffer();
 
-      output = sharp({
-        create: {
-          width,
-          height,
-          channels: 4,
-          background: { r: 0, g: 0, b: 0, alpha: 0 },
-        },
-      }).composite([{ input: logo, gravity: "centre" }]);
+      const base = plate
+        ? sharp(
+            Buffer.from(
+              `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><rect width="${width}" height="${height}" rx="${plateRadius ?? 0}" fill="${plate}"/></svg>`,
+            ),
+          )
+        : sharp({
+            create: { width, height, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+          });
+
+      output = base.composite([{ input: logo, gravity: "centre" }]);
     } else if (type === "mark-only") {
       // Square logo mark on transparent background
       const logo = await sharp(logoMarkBuffer)

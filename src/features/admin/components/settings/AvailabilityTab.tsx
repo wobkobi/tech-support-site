@@ -12,6 +12,7 @@ import { AvailabilityPreview } from "@/features/admin/components/settings/Availa
 import {
   FieldShell,
   NumberField,
+  SettingsTabBody,
   ToggleField,
 } from "@/features/admin/components/settings/SettingsFields";
 import { SettingsFooter } from "@/features/admin/components/settings/SettingsFooter";
@@ -172,7 +173,7 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
     });
 
   return (
-    <div>
+    <SettingsTabBody changed={form.changedPaths}>
       {/* Master switch + paused message */}
       <div className="divide-y divide-admin-border">
         <ToggleField
@@ -406,8 +407,14 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
         />
       </div>
 
-      {/* Morning guards - protect early slots once the night-before arrives. */}
-      <h3 className="mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase">
+      {/* Morning guards - protect early slots once the night-before arrives.
+          id matches the `morningGuards` field-meta key so search can scroll
+          here; the repeating rows have no single input to carry it. */}
+      <h3
+        id="morningGuards"
+        tabIndex={-1}
+        className="mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase"
+      >
         Morning guards
       </h3>
       <p className="mt-1 text-sm text-admin-muted">
@@ -517,6 +524,6 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
       <SettingsFooter form={form} />
 
       <SettingsHistory group="availability" onRestore={(v: AvailabilitySettings) => setDraft(v)} />
-    </div>
+    </SettingsTabBody>
   );
 }

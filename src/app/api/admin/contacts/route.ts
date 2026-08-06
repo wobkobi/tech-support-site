@@ -7,7 +7,7 @@ import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-crea
 import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
-import { normaliseAddress } from "@/shared/lib/normalise-address";
+import { resolveAddress } from "@/shared/lib/normalise-address";
 import { toE164NZ } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
@@ -72,16 +72,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const phoneE164 = body.phone ? toE164NZ(body.phone) || null : null;
 
   // Google-canonicalise a typed address (unambiguous matches only - see
-  // normaliseAddress), keeping the typed value when there's no single confident
-  // match, so contacts saved here match the shape the booking routes store.
-  const address = body.address?.trim()
-    ? ((await normaliseAddress(body.address.trim())) ?? body.address.trim())
-    : null;
+  // resolveAddress), keeping the typed value when there's no single confident
+  // match and flagging it so it shows in the address review queue.
+  const rawAddress = body.address?.trim() || null;
+  const resolution = rawAddress ? await resolveAddress(rawAddress) : null;
+  const address = resolution?.status === "resolved" ? resolution.address : rawAddress;
+  const addressUnverified =
+    resolution?.status === "ambiguous" || resolution?.status === "unresolved";
+  const addressCandidates = resolution?.status === "ambiguous" ? resolution.candidates : [];
 
   const { contact, created } = await findOrCreateContactByEmail(email, {
     name: body.name.trim(),
     phone: phoneE164,
     address,
+    addressUnverified,
+    addressCandidates,
     googleContactId: body.googleContactId?.trim() || null,
   });
 
