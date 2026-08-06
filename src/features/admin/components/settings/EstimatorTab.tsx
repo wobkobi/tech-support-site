@@ -53,11 +53,15 @@ export function EstimatorTab({ initial, defaults }: Props): React.ReactElement {
 
   return (
     <div>
-      <BenchmarkListField
-        benchmarks={draft.benchmarks}
-        fieldErrors={fieldErrors}
-        onChange={(benchmarks) => setDraft((p) => ({ ...p, benchmarks }))}
-      />
+      {/* id matches the `benchmarks` field-meta key so search can scroll here;
+          the list has no single input to carry it. */}
+      <div id="benchmarks" tabIndex={-1}>
+        <BenchmarkListField
+          benchmarks={draft.benchmarks}
+          fieldErrors={fieldErrors}
+          onChange={(benchmarks) => setDraft((p) => ({ ...p, benchmarks }))}
+        />
+      </div>
 
       {/* Price range width - the confidence-scaled band the public estimator shows. */}
       <div className="mt-8">

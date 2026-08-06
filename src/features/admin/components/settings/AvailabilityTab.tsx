@@ -406,8 +406,14 @@ export function AvailabilityTab({ initial, defaults }: Props): React.ReactElemen
         />
       </div>
 
-      {/* Morning guards - protect early slots once the night-before arrives. */}
-      <h3 className="mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase">
+      {/* Morning guards - protect early slots once the night-before arrives.
+          id matches the `morningGuards` field-meta key so search can scroll
+          here; the repeating rows have no single input to carry it. */}
+      <h3
+        id="morningGuards"
+        tabIndex={-1}
+        className="mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase"
+      >
         Morning guards
       </h3>
       <p className="mt-1 text-sm text-admin-muted">
