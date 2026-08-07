@@ -18,7 +18,7 @@ import {
 } from "@/features/business/lib/invoice-numbering";
 import { generateInvoicePdf, serializeInvoice } from "@/features/business/lib/invoice-pdf";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
-import { parseAmount } from "@/features/business/lib/validation";
+import { parseAmount, parseObjectId } from "@/features/business/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { getIdentity } from "@/shared/lib/business-identity.server";
@@ -181,10 +181,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           unsuccessful: unsuccessful === true,
           unsuccessfulDiscount: unsuccessfulDiscountValue > 0 ? unsuccessfulDiscountValue : null,
           notes: notes ?? null,
-          contactId: contactId ?? null,
-          // ObjectId shape enforced here (Prisma throws on malformed ids at read
-          // time otherwise); calendarEventId is a free-form Google id.
-          bookingId: bookingId && /^[a-f0-9]{24}$/i.test(bookingId) ? bookingId : null,
+          // ObjectId shape enforced on both ids (Prisma throws on a malformed
+          // id, which would 500 the create; it also throws at read time
+          // otherwise); calendarEventId is a free-form Google id.
+          contactId: parseObjectId(contactId),
+          bookingId: parseObjectId(bookingId),
           calendarEventId:
             typeof calendarEventId === "string" && calendarEventId ? calendarEventId : null,
         },

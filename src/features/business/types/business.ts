@@ -31,9 +31,11 @@ export interface LineItem {
    * minutes in hours and cannot hold a 5-minute grid exactly (10 min = 0.1667h),
    * so renderers show this as h:mm and money is derived from it. Absent on
    * flat rows (travel, parts, surcharges) and on invoices issued before the
-   * switch, which keep rendering their decimal `qty`.
+   * switch, which keep rendering their decimal `qty`. Null as well as undefined
+   * because Prisma reads a missing optional composite field back as null;
+   * readers must treat the two the same.
    */
-  minutes?: number;
+  minutes?: number | null;
 }
 
 export type InvoiceStatus = "DRAFT" | "SENT" | "PAID" | "VOIDED";
