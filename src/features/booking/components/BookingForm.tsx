@@ -18,6 +18,7 @@ import {
   type TimeOfDay,
 } from "@/features/booking/lib/booking";
 import { fetchQuickEstimate } from "@/features/business/lib/quick-estimate";
+import { parseObjectId } from "@/features/business/lib/validation";
 import { Button } from "@/shared/components/Button";
 import { EmailInput } from "@/shared/components/EmailInput";
 import { PhoneInput } from "@/shared/components/PhoneInput";
@@ -156,7 +157,7 @@ export default function BookingForm({
   // (?estimate=<id>, 24-hex) and replaced if they run the inline estimate below.
   const estimateParam = useSearchParams().get("estimate");
   const [estimateId, setEstimateId] = useState<string | undefined>(
-    estimateParam && /^[a-f0-9]{24}$/i.test(estimateParam) ? estimateParam : undefined,
+    parseObjectId(estimateParam) ?? undefined,
   );
   // Inline "get a rough estimate" state (new bookings only).
   const [estimating, setEstimating] = useState(false);

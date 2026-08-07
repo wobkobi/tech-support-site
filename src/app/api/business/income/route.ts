@@ -7,7 +7,7 @@
  */
 
 import { recordIncome } from "@/features/business/lib/income-recording";
-import { parseAmount } from "@/features/business/lib/validation";
+import { parseAmount, parseDate } from "@/features/business/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
@@ -52,8 +52,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return errorResponse("Invalid amount", 400);
   }
 
+  const entryDate = parseDate(date);
+  if (entryDate === null) {
+    return errorResponse("Invalid date", 400);
+  }
+
   const { entry, sheetRowKey } = await recordIncome({
-    date: new Date(date),
+    date: entryDate,
     customer,
     description,
     amount: safeAmount,

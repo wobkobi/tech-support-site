@@ -13,7 +13,7 @@ import {
   resolveSheetIdForDate,
   updateRowBySyncId,
 } from "@/features/business/lib/sheets-sync";
-import { parseAmount } from "@/features/business/lib/validation";
+import { parseAmount, parseDate } from "@/features/business/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
@@ -49,12 +49,16 @@ export async function PUT(
     return errorResponse("Invalid amount", 400);
   }
 
+  const entryDate = parseDate(date);
+  if (entryDate === null) {
+    return errorResponse("Invalid date", 400);
+  }
+
   const existing = await prisma.incomeEntry.findUnique({ where: { id } });
   if (!existing) {
     return errorResponse("Income entry not found", 404);
   }
 
-  const entryDate = new Date(date);
   const updated = await prisma.incomeEntry.update({
     where: { id },
     data: {

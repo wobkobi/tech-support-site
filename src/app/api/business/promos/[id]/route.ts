@@ -7,6 +7,7 @@
  */
 
 import { ACTIVE_PROMO_TAG } from "@/features/business/lib/promos";
+import { parseDate } from "@/features/business/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
@@ -48,8 +49,14 @@ export async function PATCH(
   // in a state POST would reject - both discount fields set, percentDiscount out of
   // range, or endAt before startAt - which then flows straight into public pricing
   // ("500% off", $0/hr).
-  const startAt = body.startAt !== undefined ? new Date(body.startAt) : existing.startAt;
-  const endAt = body.endAt !== undefined ? new Date(body.endAt) : existing.endAt;
+  // Parse rather than trusting `!== undefined`: a cleared date input sends "",
+  // which becomes an Invalid Date that compares false against everything, so it
+  // would slide past the start-before-end check into Prisma and 500 the update.
+  const startAt = body.startAt !== undefined ? parseDate(body.startAt) : existing.startAt;
+  const endAt = body.endAt !== undefined ? parseDate(body.endAt) : existing.endAt;
+  if (!startAt || !endAt) {
+    return errorResponse("startAt and endAt must be valid dates", 400);
+  }
   const flatHourlyRate =
     body.flatHourlyRate !== undefined ? body.flatHourlyRate : existing.flatHourlyRate;
   const percentDiscount =

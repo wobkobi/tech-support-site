@@ -7,6 +7,7 @@
  */
 
 import { generateInvoicePdf } from "@/features/business/lib/invoice-pdf";
+import { parseDate } from "@/features/business/lib/validation";
 import type { Invoice, LineItem } from "@/features/business/types/business";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
@@ -48,6 +49,13 @@ export async function POST(request: NextRequest): Promise<Response> {
   if (!body.number || !body.clientName) {
     return errorResponse("number and clientName are required", 400);
   }
+  // serializeInvoice calls toISOString on both dates, which throws a RangeError
+  // on an Invalid Date - the shape a cleared date input on the edit form sends.
+  const issueDate = parseDate(body.issueDate);
+  const dueDate = parseDate(body.dueDate);
+  if (!issueDate || !dueDate) {
+    return errorResponse("Enter a valid issue date and due date", 400);
+  }
 
   // Build the minimum Invoice shape generateInvoicePdf needs. Status is
   // forced to DRAFT so the watermark stays off for in-progress previews.
@@ -56,8 +64,8 @@ export async function POST(request: NextRequest): Promise<Response> {
     number: body.number,
     clientName: body.clientName,
     clientEmail: body.clientEmail,
-    issueDate: new Date(body.issueDate),
-    dueDate: new Date(body.dueDate),
+    issueDate,
+    dueDate,
     lineItems: body.lineItems,
     gst: body.gstAmount > 0,
     subtotal: body.subtotal,

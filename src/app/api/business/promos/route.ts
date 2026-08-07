@@ -7,6 +7,7 @@
  */
 
 import { ACTIVE_PROMO_TAG } from "@/features/business/lib/promos";
+import { parseDate } from "@/features/business/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
@@ -31,7 +32,13 @@ interface PromoBody {
 function validatePromo(body: PromoBody): string | null {
   if (!body.title || typeof body.title !== "string") return "title is required";
   if (!body.startAt || !body.endAt) return "startAt and endAt are required";
-  if (new Date(body.startAt) >= new Date(body.endAt)) {
+  // Parse before comparing: an unparseable date compares false against
+  // everything, so `start >= end` would pass it through to Prisma, which
+  // rejects an Invalid Date and 500s the create.
+  const startAt = parseDate(body.startAt);
+  const endAt = parseDate(body.endAt);
+  if (!startAt || !endAt) return "startAt and endAt must be valid dates";
+  if (startAt >= endAt) {
     return "startAt must be before endAt";
   }
   const hasFlat = typeof body.flatHourlyRate === "number" && body.flatHourlyRate > 0;
@@ -75,8 +82,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     data: {
       title: body.title!,
       description: body.description ?? null,
-      startAt: new Date(body.startAt!),
-      endAt: new Date(body.endAt!),
+      startAt: parseDate(body.startAt)!,
+      endAt: parseDate(body.endAt)!,
       flatHourlyRate: body.flatHourlyRate ?? null,
       percentDiscount: body.percentDiscount ?? null,
       isActive: body.isActive ?? true,

@@ -16,7 +16,7 @@ import {
   resolveSheetIdForDate,
   updateRowBySyncId,
 } from "@/features/business/lib/sheets-sync";
-import { parseAmount, parseRate } from "@/features/business/lib/validation";
+import { parseAmount, parseDate, parseRate } from "@/features/business/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
@@ -58,6 +58,11 @@ export async function PUT(
     return errorResponse("Invalid GST rate", 400);
   }
 
+  const entryDate = parseDate(date);
+  if (entryDate === null) {
+    return errorResponse("Invalid date", 400);
+  }
+
   const existing = await prisma.expenseEntry.findUnique({ where: { id } });
   if (!existing) {
     return errorResponse("Expense entry not found", 404);
@@ -68,7 +73,7 @@ export async function PUT(
   const updated = await prisma.expenseEntry.update({
     where: { id },
     data: {
-      date: new Date(date),
+      date: entryDate,
       supplier,
       description,
       category,

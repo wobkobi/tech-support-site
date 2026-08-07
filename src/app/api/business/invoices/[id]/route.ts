@@ -14,7 +14,7 @@ import { parseDate, parseObjectId } from "@/features/business/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
-import type { InvoiceStatus } from "@prisma/client";
+import { InvoiceStatus } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 
 // Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
@@ -60,18 +60,16 @@ function statusDataFor(
   return data;
 }
 
-/** Every valid {@link InvoiceStatus}, guarding both PATCH branches before the cast. */
-const INVOICE_STATUSES: readonly string[] = ["DRAFT", "SENT", "PAID", "VOIDED"];
-
 /**
  * Narrows an untrusted status from a request body. Prisma rejects an unknown
  * enum value outright, so casting without this check turns a bad status into a
- * 500 rather than a 400.
+ * 500 rather than a 400. Reads the accepted values off the generated enum, so
+ * a status added to the schema is covered without editing a second list.
  * @param value - Raw status from a request body.
- * @returns True when the value is one of the four invoice statuses.
+ * @returns True when the value is one of the invoice statuses.
  */
 function isInvoiceStatus(value: unknown): value is InvoiceStatus {
-  return typeof value === "string" && INVOICE_STATUSES.includes(value);
+  return typeof value === "string" && Object.values(InvoiceStatus).includes(value as InvoiceStatus);
 }
 
 /**
