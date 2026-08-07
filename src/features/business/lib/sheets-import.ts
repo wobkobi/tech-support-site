@@ -16,6 +16,7 @@ import {
   buildExpenseCells,
   resolveSheetIdForDate,
 } from "@/features/business/lib/sheets-sync";
+import { parseObjectId } from "@/features/business/lib/validation";
 import { prisma } from "@/shared/lib/prisma";
 import type { ExpenseEntry, IncomeEntry } from "@prisma/client";
 import { randomUUID } from "crypto";
@@ -202,9 +203,6 @@ function expenseDiffers(db: ExpenseEntry, data: ExpenseRowData): boolean {
   );
 }
 
-/** 24-hex Mongo ObjectId shape - guards live findUnique({ id }) against legacy UUID Sync IDs. */
-const OBJECT_ID_RE = /^[a-f0-9]{24}$/i;
-
 /**
  * Whether two money amounts differ by at least a cent. Both are rounded to
  * cents first so float representation drift and the GST percent integer
@@ -332,7 +330,7 @@ async function importFromSheet(
           // before creating a DUPLICATE - a deterministic Sync ID equals the
           // entry's Mongo id, so a hit means "already recorded - just link it".
           // Gate on the ObjectId shape; a legacy UUID would throw on findUnique.
-          const idLink = OBJECT_ID_RE.test(syncId)
+          const idLink = parseObjectId(syncId)
             ? await prisma.incomeEntry.findUnique({ where: { id: syncId } })
             : null;
           if (idLink) {
@@ -471,7 +469,7 @@ async function importFromSheet(
         } else {
           // Live id-fallback link before creating a duplicate - see the income
           // loop above for the full rationale.
-          const idLink = OBJECT_ID_RE.test(syncId)
+          const idLink = parseObjectId(syncId)
             ? await prisma.expenseEntry.findUnique({ where: { id: syncId } })
             : null;
           if (idLink) {

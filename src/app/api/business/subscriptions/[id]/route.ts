@@ -6,7 +6,7 @@
  */
 
 import { VALID_FREQUENCIES } from "@/features/business/lib/constants";
-import { parseAmount, parseRate } from "@/features/business/lib/validation";
+import { parseAmount, parseDate, parseRate } from "@/features/business/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
@@ -69,7 +69,8 @@ export async function PATCH(
 
   // Reject an unparseable nextDue before it reaches Prisma as an Invalid Date
   // (which would surface as a 500 rather than a clean 400).
-  if (nextDue !== undefined && Number.isNaN(new Date(nextDue).getTime())) {
+  const nextDueValue = nextDue !== undefined ? parseDate(nextDue) : undefined;
+  if (nextDueValue === null) {
     return errorResponse("Invalid nextDue date", 400);
   }
 
@@ -84,7 +85,7 @@ export async function PATCH(
         ...(safeRate !== undefined && { gstRate: safeRate }),
         ...(method !== undefined && { method }),
         ...(frequency !== undefined && { frequency }),
-        ...(nextDue !== undefined && { nextDue: new Date(nextDue) }),
+        ...(nextDueValue && { nextDue: nextDueValue }),
         ...(isActive !== undefined && { isActive }),
         ...(notes !== undefined && { notes }),
       },

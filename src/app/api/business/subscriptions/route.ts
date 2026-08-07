@@ -6,7 +6,7 @@
  */
 
 import { VALID_FREQUENCIES } from "@/features/business/lib/constants";
-import { parseAmount, parseRate } from "@/features/business/lib/validation";
+import { parseAmount, parseDate, parseRate } from "@/features/business/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
@@ -69,6 +69,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return errorResponse("Invalid GST rate", 400);
   }
 
+  const nextDueValue = parseDate(nextDue);
+  if (nextDueValue === null) {
+    return errorResponse("Invalid nextDue date", 400);
+  }
+
   const subscription = await prisma.subscription.create({
     data: {
       description,
@@ -78,7 +83,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       gstRate: safeRate,
       method: method ?? "Business Account",
       frequency,
-      nextDue: new Date(nextDue),
+      nextDue: nextDueValue,
       isActive: true,
       notes: notes ?? null,
     },

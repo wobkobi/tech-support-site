@@ -20,6 +20,7 @@ import { formatQuotedRange } from "@/features/business/lib/estimate-range";
 import { lookupPublicHoliday } from "@/features/business/lib/pricing-policy.server";
 import { getActivePromo } from "@/features/business/lib/promos";
 import { lookupDriveRoundTrip } from "@/features/business/lib/travel-distance";
+import { parseObjectId } from "@/features/business/lib/validation";
 import {
   createBookingEvent,
   deleteBookingEvent,
@@ -228,7 +229,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     let quotedMinsAtBooking: number | null = null;
     let quotedCategoryAtBooking: AiEstimateCategory | null = null;
     let quotedTasksAtBooking: EstimateTask[] = [];
-    if (estimateId && /^[a-f0-9]{24}$/i.test(estimateId)) {
+    if (parseObjectId(estimateId)) {
       const est = await prisma.priceEstimateLog
         .findUnique({ where: { id: estimateId } })
         .catch(() => null);

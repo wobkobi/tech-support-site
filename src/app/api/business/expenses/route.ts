@@ -7,7 +7,7 @@
 
 import { recordExpense } from "@/features/business/lib/expense-recording";
 import { GST_RATE } from "@/features/business/lib/pricing-policy";
-import { parseAmount, parseRate } from "@/features/business/lib/validation";
+import { parseAmount, parseDate, parseRate } from "@/features/business/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
@@ -58,8 +58,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return errorResponse("Invalid GST rate", 400);
   }
 
+  const entryDate = parseDate(date);
+  if (entryDate === null) {
+    return errorResponse("Invalid date", 400);
+  }
+
   const { entry, sheetRowKey, sheetSyncWarning } = await recordExpense({
-    date: new Date(date),
+    date: entryDate,
     supplier,
     description,
     category,
