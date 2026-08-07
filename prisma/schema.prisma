@@ -451,6 +451,14 @@ type LineItem {
   qty         Float
   unitPrice   Float
   lineTotal   Float
+  // Whole billed minutes, authoritative on hourly labour rows: `qty` is those
+  // minutes in hours and can't hold a 5-minute grid exactly (10 min = 0.1667h),
+  // so renderers show this as h:mm. Must stay in step with the optional
+  // `minutes` on the app-side LineItem type - Prisma rejects a composite field
+  // it doesn't declare, which 500s the whole create. Float, not Int, so a
+  // fractional value can't turn into that same rejection. Unset on flat rows
+  // (travel, parts, surcharges) and on invoices issued before the switch.
+  minutes     Float?
 }
 
 model Invoice {

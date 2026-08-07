@@ -118,16 +118,26 @@ export function calcInvoiceTotals(
 }
 
 /**
+ * Every key a persisted line item may carry. Must match the Prisma `LineItem`
+ * composite type exactly: Prisma rejects a composite field it doesn't declare,
+ * and an unguarded extra key turns that into a 500 on invoice create/update.
+ * Rejecting here fails loudly as a 400 instead, and surfaces the mismatch in
+ * local dev rather than in production.
+ */
+const LINE_ITEM_FIELDS = new Set(["description", "qty", "unitPrice", "lineTotal", "minutes"]);
+
+/**
  * Validates one untrusted line-item payload before it reaches
  * {@link calcInvoiceTotals} or the database. Rejects non-object items, blank
- * descriptions, and non-finite numerics (which would otherwise yield NaN totals
- * or a malformed persisted invoice).
+ * descriptions, non-finite numerics (which would otherwise yield NaN totals or a
+ * malformed persisted invoice), and any key outside {@link LINE_ITEM_FIELDS}.
  * @param item - Candidate line item from a request body.
- * @returns True when the item has a non-empty description and finite qty, unit price, and line total.
+ * @returns True when the item carries only known fields, a non-empty description, finite qty, unit price and line total, and minutes either absent or finite.
  */
 export function isValidLineItem(item: unknown): item is LineItem {
   if (!item || typeof item !== "object") return false;
-  const { description, qty, unitPrice, lineTotal } = item as Record<string, unknown>;
+  if (!Object.keys(item).every((key) => LINE_ITEM_FIELDS.has(key))) return false;
+  const { description, qty, unitPrice, lineTotal, minutes } = item as Record<string, unknown>;
   return (
     typeof description === "string" &&
     description.trim().length > 0 &&
@@ -136,7 +146,8 @@ export function isValidLineItem(item: unknown): item is LineItem {
     typeof unitPrice === "number" &&
     Number.isFinite(unitPrice) &&
     typeof lineTotal === "number" &&
-    Number.isFinite(lineTotal)
+    Number.isFinite(lineTotal) &&
+    (minutes == null || (typeof minutes === "number" && Number.isFinite(minutes)))
   );
 }
 
@@ -481,10 +492,10 @@ export function formatBilledTime(mins: number): string {
  * before minutes were recorded.
  * @param item - Invoice line item.
  * @param item.qty - Decimal quantity (hours on labour rows, a count on flat rows).
- * @param item.minutes - Billed minutes; present only on hourly labour rows.
+ * @param item.minutes - Billed minutes; present only on hourly labour rows. Null on rows Prisma read back without the field.
  * @returns Text for the Qty cell.
  */
-export function lineItemQtyLabel(item: { qty: number; minutes?: number }): string {
+export function lineItemQtyLabel(item: { qty: number; minutes?: number | null }): string {
   return item.minutes == null ? String(item.qty) : formatBilledTime(item.minutes);
 }
 

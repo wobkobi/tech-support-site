@@ -10,6 +10,7 @@
 import { calcInvoiceTotals, isValidLineItem } from "@/features/business/lib/business";
 import { syncInvoicePdfToDriveById } from "@/features/business/lib/invoice-drive-sync";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
+import { parseDate, parseObjectId } from "@/features/business/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
@@ -57,6 +58,20 @@ function statusDataFor(
     data.paymentReference = null;
   }
   return data;
+}
+
+/** Every valid {@link InvoiceStatus}, guarding both PATCH branches before the cast. */
+const INVOICE_STATUSES: readonly string[] = ["DRAFT", "SENT", "PAID", "VOIDED"];
+
+/**
+ * Narrows an untrusted status from a request body. Prisma rejects an unknown
+ * enum value outright, so casting without this check turns a bad status into a
+ * 500 rather than a 400.
+ * @param value - Raw status from a request body.
+ * @returns True when the value is one of the four invoice statuses.
+ */
+function isInvoiceStatus(value: unknown): value is InvoiceStatus {
+  return typeof value === "string" && INVOICE_STATUSES.includes(value);
 }
 
 /**
@@ -173,8 +188,17 @@ export async function PATCH(
     ) {
       return errorResponse("Invalid line item", 400);
     }
+    // A cleared <input type="date"> submits "", not undefined, so it reaches
+    // this branch. Parse both dates up front: an unparseable one has to 400
+    // here, because Prisma rejects an Invalid Date and would 500 the update.
+    const issueDateValue = issueDate !== undefined ? parseDate(issueDate) : undefined;
+    const dueDateValue = dueDate !== undefined ? parseDate(dueDate) : undefined;
+    if (issueDateValue === null || dueDateValue === null) {
+      return errorResponse("Enter a valid issue date and due date", 400);
+    }
     if (status !== undefined) {
-      const err = validateTransition(current.status, status as InvoiceStatus);
+      if (!isInvoiceStatus(status)) return errorResponse("Invalid status", 400);
+      const err = validateTransition(current.status, status);
       if (err) return errorResponse(err, 409);
     }
     // GST mode is driven by the live pricing settings (gstRegistered); the
@@ -190,14 +214,14 @@ export async function PATCH(
       preservedDiscount,
       GST_REGISTERED,
     );
-    const statusPatch = status !== undefined ? statusDataFor(status as InvoiceStatus, current) : {};
+    const statusPatch = isInvoiceStatus(status) ? statusDataFor(status, current) : {};
     const invoice = await prisma.invoice.update({
       where: { id },
       data: {
         ...(clientName !== undefined && { clientName }),
         ...(clientEmail !== undefined && { clientEmail }),
-        ...(issueDate !== undefined && { issueDate: new Date(issueDate) }),
-        ...(dueDate !== undefined && { dueDate: new Date(dueDate) }),
+        ...(issueDateValue && { issueDate: issueDateValue }),
+        ...(dueDateValue && { dueDate: dueDateValue }),
         ...(lineItems !== undefined && {
           lineItems,
           subtotal,
@@ -218,10 +242,7 @@ export async function PATCH(
   // contact after the invoice is created. Handle it before the status branch so
   // a contactId-only PATCH is not rejected as an invalid status.
   if (body.contactId !== undefined && body.status === undefined) {
-    const contactId =
-      typeof body.contactId === "string" && /^[a-f0-9]{24}$/i.test(body.contactId)
-        ? body.contactId
-        : null;
+    const contactId = parseObjectId(body.contactId);
     const invoice = await prisma.invoice.update({ where: { id }, data: { contactId } });
     return NextResponse.json({ ok: true, invoice });
   }
@@ -230,7 +251,7 @@ export async function PATCH(
   // trigger the void notification flow (that lives at /void); statusDataFor
   // stamps/clears voidedAt so the detail page label stays in sync.
   const { status } = body;
-  if (!["DRAFT", "SENT", "PAID", "VOIDED"].includes(status)) {
+  if (!isInvoiceStatus(status)) {
     return errorResponse("Invalid status", 400);
   }
   // Quotes can't be marked PAID - conversion is the only path to a payable
@@ -238,13 +259,13 @@ export async function PATCH(
   if (current.isQuote && status === "PAID") {
     return errorResponse("Convert the quote to an invoice before recording payment.", 409);
   }
-  const transitionErr = validateTransition(current.status, status as InvoiceStatus);
+  const transitionErr = validateTransition(current.status, status);
   if (transitionErr) {
     return errorResponse(transitionErr, 409);
   }
   const invoice = await prisma.invoice.update({
     where: { id },
-    data: statusDataFor(status as InvoiceStatus, current),
+    data: statusDataFor(status, current),
   });
   // Status changes (Mark as paid, etc.) should be reflected in the Drive archive copy.
   await syncInvoicePdfToDriveById(id, "[invoice-patch]");
