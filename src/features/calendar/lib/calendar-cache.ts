@@ -208,6 +208,8 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
   // Also process jobs finished within the last few days so their travel bars stay
   // on the schedule for the record (they'd otherwise be cleaned once the job passed).
   // Past legs are priced at a near-future proxy inside calculateTravelMinutes.
+  // Doubles as the TravelBlock retention cutoff: once an event drops out of this
+  // window nothing refreshes its block, so the sweep at the end removes it.
   const TRAVEL_RETENTION_DAYS = 7;
   const travelWindowStart = new Date(now.getTime() - TRAVEL_RETENTION_DAYS * 24 * 60 * 60 * 1000);
   const scheduling = settings.scheduling;
@@ -856,7 +858,8 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
     // ends. Its block is the historical record of the reserved travel - the
     // schedule's past days still render it, and the operator's end-of-event
     // time corrections must not churn it. Only blocks whose event vanished
-    // while still upcoming (cancelled or deleted) are cleaned up.
+    // while still upcoming (cancelled or deleted) are cleaned up here; the
+    // frozen ones age out in the retention sweep below.
     if (block.eventEndAt < now) continue;
 
     const staleIds = [block.beforeEventId, block.afterEventId].filter(
@@ -877,6 +880,46 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
       console.log(`[refreshCalendarCache] Removed stale travel block for: ${block.sourceEventId}`);
     } catch (err) {
       console.error("[refreshCalendarCache] Failed to delete TravelBlock record:", err);
+    }
+  }
+
+  // Retention sweep: a finished job's block is frozen while the cron still fetches
+  // its event, but once the event falls out of the travel window nothing refreshes
+  // it again, so keeping it only grows the table and clutters the admin list. Its
+  // synthetic cache entries are normally long expired; delete them by id anyway so
+  // a block that outlived its 30-min TTL can't strand orphans.
+  const agedOutBlocks = await prisma.travelBlock.findMany({
+    where: { eventEndAt: { lt: travelWindowStart } },
+    select: { id: true, beforeEventId: true, afterEventId: true },
+  });
+
+  if (agedOutBlocks.length > 0) {
+    const agedOutCacheIds = agedOutBlocks
+      .flatMap((b) => [b.beforeEventId, b.afterEventId])
+      .filter((id): id is string => id !== null);
+
+    if (agedOutCacheIds.length > 0) {
+      try {
+        await prisma.calendarEventCache.deleteMany({
+          where: { eventId: { in: agedOutCacheIds } },
+        });
+      } catch (err) {
+        console.error(
+          "[refreshCalendarCache] Failed to delete aged-out travel cache entries:",
+          err,
+        );
+      }
+    }
+
+    try {
+      const purged = await prisma.travelBlock.deleteMany({
+        where: { id: { in: agedOutBlocks.map((b) => b.id) } },
+      });
+      console.log(
+        `[refreshCalendarCache] Purged ${purged.count} travel blocks older than ${TRAVEL_RETENTION_DAYS} days`,
+      );
+    } catch (err) {
+      console.error("[refreshCalendarCache] Failed to purge aged-out TravelBlocks:", err);
     }
   }
 
