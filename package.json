@@ -25,7 +25,7 @@
     "typecheck": "tsc --noEmit"
   },
   "simple-git-hooks": {
-    "pre-commit": "npm install --package-lock-only --allow-remote=all && git add package-lock.json package.json && npx lint-staged && npm run typecheck && npm run check:addresses",
+    "pre-commit": "npm update --package-lock-only --allow-remote=all && npm install --package-lock-only --allow-remote=all && git add package-lock.json package.json && npx lint-staged && npm run typecheck && npm run check:addresses",
     "pre-push": "npm run lint && npm run build && npm run smoke -- --skip-build"
   },
   "lint-staged": {
