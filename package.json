@@ -17,7 +17,7 @@
     "eval:ai": "dotenv -e .env.local -- tsx scripts/eval-ai/index.ts",
     "format": "prettier --write \"**/*.{js,ts,jsx,tsx,mjs,css,html,md,json,yml,yaml}\"",
     "postinstall": "prisma generate",
-    "lint": "eslint --fix \"{src,scripts}/**/*.{js,ts,jsx,tsx}\"",
+    "lint": "eslint --fix --cache \"{src,scripts}/**/*.{js,ts,jsx,tsx}\"",
     "prepare": "simple-git-hooks",
     "settings:seed": "dotenv -e .env.local -- tsx scripts/seed-settings.ts",
     "smoke": "dotenv -e .env.local -- tsx scripts/smoke-test.ts",
@@ -25,7 +25,7 @@
     "typecheck": "tsc --noEmit"
   },
   "simple-git-hooks": {
-    "pre-commit": "npm update --package-lock-only --allow-remote=all && npm install --package-lock-only --allow-remote=all && git add package-lock.json package.json && npx lint-staged && npm run typecheck && npm run check:addresses",
+    "pre-commit": "if ! find node_modules/.npm-update-stamp -mmin -1440 2>/dev/null | grep -q .; then npm update --package-lock-only --allow-remote=all --no-audit --no-fund && touch node_modules/.npm-update-stamp; fi && npm install --package-lock-only --allow-remote=all --no-audit --no-fund && git add package-lock.json package.json && npx lint-staged && npm run typecheck && npm run check:addresses",
     "pre-push": "npm run lint && npm run build && npm run smoke -- --skip-build"
   },
   "lint-staged": {
