@@ -443,6 +443,21 @@ async function checkPage(
       if (IGNORE_404_URLS.some((s) => text.includes(s) || locUrl.includes(s))) return;
       if (IGNORE_CONSOLE_GLOBAL.some((s) => text.includes(s) || locUrl.includes(s))) return;
       if (spec.ignoreErrors?.some((s) => text.includes(s) || locUrl.includes(s)) ?? false) return;
+      // Deployment Protection bounces browser-initiated sub-resource fetches that
+      // carry neither the primed cookie nor the interception header. <link
+      // rel="manifest"> is the case that bites: the browser fetches it with
+      // credentials omitted (no crossorigin attribute), and being browser- rather
+      // than renderer-initiated it is not reliably interceptable, so the wall
+      // redirects it until Chrome gives up. Only reachable against a protected
+      // remote, so a genuine redirect loop still fails locally and on any public
+      // deployment.
+      if (
+        remote?.bypassSecret &&
+        text.includes("ERR_TOO_MANY_REDIRECTS") &&
+        isSameOrigin(locUrl, remote.origin)
+      ) {
+        return;
+      }
       // Include the resource URL: "Failed to load resource" on its own names no
       // culprit, which makes sub-resource failures undiagnosable from CI logs.
       errors.push(locUrl ? `[console] ${text} (${locUrl})` : `[console] ${text}`);

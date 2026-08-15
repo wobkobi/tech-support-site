@@ -1,3 +1,4 @@
 {
-  "buildCommand": "npm run db:push && npm run build"
+  "buildCommand": "npm run db:push && npm run build",
+  "regions": ["syd1"]
 }
