@@ -3,7 +3,7 @@
 /**
  * @description Shared booking mutation wrappers around the admin bookings API -
  * PATCH edits, mark-completed, cancel (operator / on-behalf), no-show, delete,
- * and resend-review - each bundled with success/error toasts. The bookings list,
+ * resend-review, and time edits - each bundled with success/error toasts. The bookings list,
  * the booking detail page, and the schedule's EventActionSheet all mutate
  * bookings through this hook so the endpoints, wording, and error handling live
  * in one place. Every wrapper resolves to a {@link BookingActionResult}; the
@@ -22,6 +22,16 @@ interface BookingActionResult {
   reviewSent?: boolean;
   /** Error message when {@link BookingActionResult.ok} is false. */
   error?: string;
+}
+
+/** Outcome of a time edit - {@link BookingActionResult} plus its own failure mode. */
+interface BookingTimesResult extends BookingActionResult {
+  /**
+   * Set when the new window overlaps another booking or calendar event. The
+   * caller is expected to show it and offer to save anyway; no toast is raised
+   * for this case, unlike every other failure.
+   */
+  conflict?: string;
 }
 
 /** Cancellation policy mode - operator (no fee) vs on-behalf (customer fee rules). */
@@ -45,6 +55,11 @@ export interface UseBookingActions {
   deleteBooking: (id: string) => Promise<BookingActionResult>;
   /** Sends (or re-sends) the review-request email; `alreadySent` tunes the toast. */
   resendReview: (id: string, alreadySent?: boolean) => Promise<BookingActionResult>;
+  /** Moves a booking's start/end; `force` saves through an overlap warning. */
+  updateBookingTimes: (
+    id: string,
+    times: { startAt: string; endAt: string; force?: boolean },
+  ) => Promise<BookingTimesResult>;
 }
 
 /**
@@ -128,6 +143,33 @@ export function useBookingActions(): UseBookingActions {
     [toast],
   );
 
+  const updateBookingTimes = useCallback<UseBookingActions["updateBookingTimes"]>(
+    async (id, times) => {
+      const res = await apiFetch<{ notified?: boolean; calendarWarning?: string }>(
+        `/api/admin/bookings/${id}`,
+        { method: "PATCH", json: times },
+      );
+      if (!res.ok) {
+        // 409 on an unforced save is the overlap warning, which belongs in the
+        // caller's confirm dialog rather than a toast that dismisses itself.
+        if (res.status === 409 && !times.force) {
+          return { ok: false, error: res.error, conflict: res.error };
+        }
+        toast(res.error, { tone: "error" });
+        return { ok: false, error: res.error };
+      }
+      toast(res.data.notified ? "Times updated - customer notified." : "Times updated.", {
+        tone: "success",
+      });
+      if (res.data.calendarWarning) {
+        // Held longer than the default: this one needs acting on in Google.
+        toast(res.data.calendarWarning, { tone: "warning", duration: 10_000 });
+      }
+      return { ok: true };
+    },
+    [toast],
+  );
+
   return useMemo(
     () => ({
       patchBooking,
@@ -136,7 +178,16 @@ export function useBookingActions(): UseBookingActions {
       markNoShow,
       deleteBooking,
       resendReview,
+      updateBookingTimes,
     }),
-    [patchBooking, completeBooking, cancelBooking, markNoShow, deleteBooking, resendReview],
+    [
+      patchBooking,
+      completeBooking,
+      cancelBooking,
+      markNoShow,
+      deleteBooking,
+      resendReview,
+      updateBookingTimes,
+    ],
   );
 }

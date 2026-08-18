@@ -15,6 +15,17 @@ const nzDateKeyFormat = new Intl.DateTimeFormat("en-CA", {
   day: "2-digit",
 });
 
+// Same deal, with the time parts a datetime-local input needs.
+const nzInputFormat = new Intl.DateTimeFormat("en-CA", {
+  timeZone: NZ_TZ,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
+
 /**
  * Formats an instant as its NZ (Pacific/Auckland) calendar date.
  * The server runs in UTC, so reading local Date parts would land 12-13 hours off
@@ -42,6 +53,35 @@ export function nzTodayKey(): string {
 export function nzDateParts(date: Date): [number, number, number] {
   const [y, m, d] = nzDateKey(date).split("-").map(Number);
   return [y, m, d];
+}
+
+/**
+ * Formats an instant as the NZ-local "YYYY-MM-DDTHH:mm" string an
+ * `<input type="datetime-local">` expects. The browser would render its own
+ * local time, which is only NZ time by luck, and the server runs in UTC.
+ * @param input - The instant to format.
+ * @returns NZ-local datetime string.
+ */
+export function toNzInputValue(input: Date | string): string {
+  const parts = nzInputFormat.formatToParts(typeof input === "string" ? new Date(input) : input);
+  const map = new Map(parts.map((p) => [p.type, p.value]));
+  return `${map.get("year")}-${map.get("month")}-${map.get("day")}T${map.get("hour")}:${map.get("minute")}`;
+}
+
+/**
+ * Parses a NZ-local "YYYY-MM-DDTHH:mm" datetime-local value back into a UTC
+ * Date, applying the NZDT/NZST offset in force on that calendar date.
+ * Callers must reject an empty input first - a cleared field has no parts to
+ * read and cannot be given a sensible instant.
+ * @param local - Input value from a datetime-local field, read as NZ time.
+ * @returns The equivalent UTC Date.
+ */
+export function fromNzInputValue(local: string): Date {
+  const [datePart, timePart] = local.split("T");
+  const [y, m, d] = datePart.split("-").map(Number);
+  const [hh, mm] = timePart.split(":").map(Number);
+  const offset = getPacificAucklandOffset(y, m, d);
+  return new Date(Date.UTC(y, m - 1, d, hh - offset, mm, 0));
 }
 
 /**

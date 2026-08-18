@@ -3,10 +3,10 @@
  * @description Detail page for a single booking - the Booking model is the app's
  * richest row (price/promo/rate snapshots, travel mins, cancellation metadata,
  * reminder/review stamps) and this surfaces it. Two-column on lg+: the editable
- * customer card + price snapshot on the left, a context rail (actions, timeline,
- * linked records) on the right. Batch 1 loads the booking; batch 2 runs the
- * linked-record lookups (contact / invoices / review) in parallel. Both are
- * Server-Timing instrumented.
+ * customer + times cards and the price snapshot on the left, a context rail
+ * (actions, timeline, linked records) on the right. Batch 1 loads the booking;
+ * batch 2 runs the linked-record lookups (contact / invoices / review) and the
+ * settings read in parallel. Both are Server-Timing instrumented.
  */
 import { Card, CardHeader } from "@/features/admin/components/ui/Card";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
@@ -14,12 +14,14 @@ import { StatusPill, type StatusTone } from "@/features/admin/components/ui/Stat
 import { BookingActions } from "@/features/booking/components/admin/BookingActions";
 import { BookingInfoCard } from "@/features/booking/components/admin/BookingInfoCard";
 import { BookingTimeline } from "@/features/booking/components/admin/BookingTimeline";
+import { BookingTimesCard } from "@/features/booking/components/admin/BookingTimesCard";
 import { formatMins, formatNZD } from "@/features/business/lib/business";
 import { formatQuotedRange } from "@/features/business/lib/estimate-range";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { formatDateShort, formatDateTimeShort } from "@/shared/lib/date-format";
 import { prisma } from "@/shared/lib/prisma";
 import { ServerTimer } from "@/shared/lib/server-timing";
+import { getSettings } from "@/shared/lib/settings/get-settings";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -100,7 +102,7 @@ export default async function BookingDetailPage({
   // Batch 2: linked records, all keyed on the booking so they run in parallel.
   // Contact matches the primary or any alt email (case-insensitive), skipping
   // soft-deleted rows - the same rule the booking>contact sync uses.
-  const [contact, invoices, review] = await timer.measure("batch2", () =>
+  const [contact, invoices, review, settings] = await timer.measure("batch2", () =>
     Promise.all([
       booking.email
         ? prisma.contact
@@ -129,6 +131,8 @@ export default async function BookingDetailPage({
           select: { id: true, status: true, verified: true, createdAt: true },
         })
         .catch(() => null),
+      // Only for the times card's lock, which mirrors the PATCH route's gate.
+      getSettings(),
     ]),
   );
   timer.log("booking-detail");
@@ -183,6 +187,16 @@ export default async function BookingDetailPage({
               email={booking.email}
               phone={booking.phone}
               notes={booking.notes}
+            />
+          </Card>
+
+          <Card>
+            <BookingTimesCard
+              id={booking.id}
+              startAt={booking.startAt.toISOString()}
+              endAt={booking.endAt.toISOString()}
+              status={booking.status}
+              lockHours={settings.scheduling.pastEditLockHours}
             />
           </Card>
 

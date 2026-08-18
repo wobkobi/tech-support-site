@@ -3,22 +3,44 @@
  * @description Admin API for editing and cancelling bookings by ID.
  */
 
+import { getAvailabilityConfig } from "@/features/booking/lib/availability-config.server";
+import { combineUnitAndAddress } from "@/features/booking/lib/booking";
+import { loadBlockingBookings } from "@/features/booking/lib/existing-bookings.server";
 import { createDraftCancellationInvoice } from "@/features/business/lib/cancellation-invoice";
 import { assessCancellation } from "@/features/business/lib/pricing-policy";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
-import { deleteBookingEvent, SCHEDULE_CALENDAR_TAG } from "@/features/calendar/lib/google-calendar";
-import { sendCustomerReviewRequest } from "@/features/reviews/lib/email";
+import { lookupDriveRoundTrip } from "@/features/business/lib/travel-distance";
+import {
+  deleteBookingEvent,
+  fetchAllCalendarEvents,
+  patchBookingEvent,
+  SCHEDULE_CALENDAR_TAG,
+} from "@/features/calendar/lib/google-calendar";
+import {
+  sendCustomerBookingConfirmation,
+  sendCustomerReviewRequest,
+  sendOwnerBookingNotification,
+} from "@/features/reviews/lib/email";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
+import { formatDateTimeShort } from "@/shared/lib/date-format";
 import { isPastEditWindow } from "@/shared/lib/edit-window";
 import { toE164NZ } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
+import { Prisma } from "@prisma/client";
 import { revalidateTag } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 
 // Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
 export const maxDuration = 60;
+
+/**
+ * Longest span a hand-typed time edit may produce. Not a policy limit - it's a
+ * typo guard, since getting the date wrong on one of the two fields yields a
+ * booking days long rather than an obviously bad value.
+ */
+const MAX_SPAN_HOURS = 12;
 
 interface PatchPayload {
   name?: string;
@@ -34,16 +56,75 @@ interface PatchPayload {
   cancelMode?: "operator" | "on-behalf";
   /** No-show: always charges callout + travel via the draft-invoice flow. */
   markNoShow?: boolean;
+  /** New start (ISO) for a time edit. Must be sent together with `endAt`. */
+  startAt?: string;
+  /** New end (ISO) for a time edit. Must be sent together with `startAt`. */
+  endAt?: string;
+  /** Save a future time change that overlaps something else anyway. */
+  force?: boolean;
+}
+
+/**
+ * Looks for anything already sitting in a proposed booking window: another live
+ * booking, or an event on any of the watched calendars.
+ *
+ * Raw overlap only - the booking engine's travel buffers are deliberately not
+ * applied here. An operator typing times by hand has already accounted for the
+ * drive, and a buffer-based check would flag nearly every deliberate
+ * back-to-back as a conflict.
+ * @param bookingId - The booking being moved, so it can't clash with itself.
+ * @param calendarEventId - Its own event, excluded for the same reason.
+ * @param startAt - Proposed start.
+ * @param endAt - Proposed end.
+ * @returns Description of the first clash found, or null when the window is clear.
+ */
+async function findScheduleConflict(
+  bookingId: string,
+  calendarEventId: string | null,
+  startAt: Date,
+  endAt: Date,
+): Promise<string | null> {
+  // loadBlockingBookings drops anything finishing before its cutoff, so passing
+  // the proposed start narrows it to the bookings that could actually overlap.
+  const [bookings, events] = await Promise.all([
+    loadBlockingBookings(startAt, { excludeId: bookingId }),
+    fetchAllCalendarEvents(startAt, endAt).catch((err: unknown) => {
+      // A calendar outage must not block the edit - fall through to "no clash".
+      console.error("[admin/bookings] Conflict check couldn't read the calendar:", err);
+      return [];
+    }),
+  ]);
+
+  const clash = bookings.find((b) => b.startAt < endAt && b.endAt > startAt);
+  if (clash) {
+    return `another booking (${formatDateTimeShort(clash.startAt)} - ${formatDateTimeShort(clash.endAt)})`;
+  }
+
+  const event = events.find(
+    (e) => e.id !== calendarEventId && new Date(e.start) < endAt && new Date(e.end) > startAt,
+  );
+  if (event) {
+    return `"${event.summary ?? "an untitled event"}" on your calendar`;
+  }
+
+  return null;
 }
 
 /**
  * PATCH /api/admin/bookings/[id]
  * Updates a booking's fields. Cancelling removes the calendar event and frees the slot.
+ *
+ * Sending `startAt` + `endAt` moves the booking, and what that means depends on
+ * where both the old and new times sit. Shifting a job that has already run to
+ * another past time is the operator recording what actually happened, and stays
+ * silent; anything else is a real reschedule (conflicts checked, travel
+ * re-snapshotted, both parties emailed). Either way the Google event is patched
+ * to match, so the row and the calendar never drift.
  * Requires X-Admin-Secret header.
  * @param request - Incoming request.
  * @param params - Route params.
  * @param params.params - Destructured route params containing booking id.
- * @returns JSON with ok flag or error.
+ * @returns JSON with ok flag or error; `notified` and `calendarWarning` on a time edit.
  */
 export async function PATCH(
   request: NextRequest,
@@ -65,14 +146,19 @@ export async function PATCH(
     return errorResponse("Booking not found.", 404);
   }
 
-  // Lock past events: refuse state changes (complete / cancel / no-show) on a
-  // booking that ended more than the configured window ago. Metadata-only edits
-  // (name/email/phone/notes/address corrections) are still allowed.
+  const now = new Date();
+
+  // Lock past events: refuse state changes (complete / cancel / no-show) and
+  // time edits on a booking that ended more than the configured window ago -
+  // both feed billing, so stale history shouldn't be rewritten by accident.
+  // Metadata-only edits (name/email/phone/notes/address corrections) are still
+  // allowed.
   const isStateChange = body.status !== undefined || body.markNoShow === true;
+  const isTimeChange = body.startAt !== undefined || body.endAt !== undefined;
   const { scheduling } = await getSettings();
   if (
-    isStateChange &&
-    isPastEditWindow(booking.endAt.getTime(), Date.now(), scheduling.pastEditLockHours)
+    (isStateChange || isTimeChange) &&
+    isPastEditWindow(booking.endAt.getTime(), now.getTime(), scheduling.pastEditLockHours)
   ) {
     return errorResponse(
       `Can't change a booking more than ${scheduling.pastEditLockHours}h after it ended.`,
@@ -100,6 +186,77 @@ export async function PATCH(
         ? `${currentNotes}\nAddress: ${newAddress}`
         : `Address: ${newAddress}`;
     }
+  }
+
+  // Time edit. Runs before the status branches so that cancelling in the same
+  // request still wins the activeSlotKey - a cancelled booking must release its
+  // slot, not move it.
+  let timeChange: { startAt: Date; endAt: Date; notify: boolean } | null = null;
+  if (isTimeChange) {
+    if (body.startAt === undefined || body.endAt === undefined) {
+      return errorResponse("Send both a start and a finish time.", 400);
+    }
+    const startAt = new Date(body.startAt);
+    const endAt = new Date(body.endAt);
+    if (Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime())) {
+      return errorResponse("Invalid start or finish time.", 400);
+    }
+    if (endAt <= startAt) {
+      return errorResponse("The finish time has to be after the start time.", 400);
+    }
+    if (endAt.getTime() - startAt.getTime() > MAX_SPAN_HOURS * 60 * 60 * 1000) {
+      return errorResponse(
+        `That's over ${MAX_SPAN_HOURS} hours long - check the date on both fields.`,
+        400,
+      );
+    }
+
+    // Staying silent needs BOTH times in the past - that is the only shape that
+    // is purely "record what actually happened". A booking still ahead is an
+    // ordinary reschedule, and one whose stored time has passed but is being
+    // moved into the future is a reschedule too (a stale row being corrected to
+    // a date the customer may not know about yet), so both notify.
+    const alreadyRun =
+      booking.startAt.getTime() <= now.getTime() && startAt.getTime() <= now.getTime();
+    const notify = !alreadyRun && booking.status !== "cancelled";
+
+    if (notify && !body.force) {
+      const conflict = await findScheduleConflict(id, booking.calendarEventId, startAt, endAt);
+      if (conflict) {
+        return errorResponse(`That overlaps ${conflict}.`, 409);
+      }
+    }
+
+    data.startAt = startAt;
+    data.endAt = endAt;
+    // Only a booking still holding its slot carries a live key; cancelled and
+    // completed rows keep `released:<id>` and must not reclaim one.
+    if (!booking.activeSlotKey?.startsWith("released:")) {
+      data.activeSlotKey = startAt.toISOString();
+    }
+
+    if (notify) {
+      // The replacement invite only supersedes the old one when its SEQUENCE
+      // rises, and the ICS sequence is built from rescheduleCount.
+      data.rescheduleCount = { increment: 1 };
+      // Re-snapshot both drive legs at the new times so a later cancellation
+      // bills the right travel. Deliberately not done on the past branch:
+      // travel is frozen once a job has run, and a fresh lookup against a
+      // historic departure time would only blank it.
+      if (booking.meetingType === "in_person" && booking.address) {
+        try {
+          const drive = await lookupDriveRoundTrip(booking.address, startAt, endAt);
+          if (drive.status === "ok") {
+            data.travelMinsAtBooking = drive.data.there.durationMins;
+            data.travelMinsBackAtBooking = drive.data.back.durationMins;
+          }
+        } catch (err) {
+          console.warn("[admin/bookings] travel-time snapshot failed:", err);
+        }
+      }
+    }
+
+    timeChange = { startAt, endAt, notify };
   }
 
   if (body.markNoShow && booking.status !== "cancelled") {
@@ -135,7 +292,6 @@ export async function PATCH(
         console.error("[admin/bookings] Failed to delete calendar event:", err);
       }
     }
-    const now = new Date();
     const onBehalf = body.cancelMode === "on-behalf";
     data.status = "cancelled";
     data.activeSlotKey = `released:${id}`;
@@ -159,8 +315,77 @@ export async function PATCH(
     data.status = "confirmed";
   }
 
-  // Apply the update
-  const updated = await prisma.booking.update({ where: { id }, data });
+  // Apply the update. activeSlotKey is unique, so a time edit onto a start
+  // another live booking already holds surfaces here as P2002 - and unlike an
+  // overlap it can't be forced through, since the constraint is the thing
+  // keeping two bookings off the same slot.
+  const updated = await prisma.booking.update({ where: { id }, data }).catch((error: unknown) => {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return null;
+    }
+    throw error;
+  });
+  if (!updated) {
+    return errorResponse("Another booking already starts at that time.", 409);
+  }
+
+  // Keep the Google event in step with the row. Best-effort by necessity - the
+  // booking is already written - but a silent failure would recreate the exact
+  // drift this exists to remove, so it comes back as a warning.
+  let calendarWarning: string | undefined;
+  if (timeChange && booking.calendarEventId) {
+    try {
+      const { config } = await getAvailabilityConfig();
+      await patchBookingEvent({
+        eventId: booking.calendarEventId,
+        startAt: timeChange.startAt,
+        endAt: timeChange.endAt,
+        timeZone: config.timeZone,
+        notifyAttendees: timeChange.notify,
+      });
+    } catch (err) {
+      console.error("[admin/bookings] Failed to move calendar event:", err);
+      calendarWarning = "Saved, but the calendar event didn't move - check Google Calendar.";
+    }
+  }
+
+  // Tell both parties about a genuine reschedule. Both helpers catch their own
+  // errors and never throw, so a Resend hiccup can't fail the edit.
+  if (timeChange?.notify) {
+    const emailAddress = combineUnitAndAddress(updated.unit ?? "", updated.address ?? "");
+    await Promise.all([
+      sendCustomerBookingConfirmation(
+        {
+          id: updated.id,
+          name: updated.name,
+          email: updated.email,
+          notes: updated.notes ?? "",
+          startAt: timeChange.startAt,
+          endAt: timeChange.endAt,
+          cancelToken: updated.cancelToken,
+          promoTitleAtBooking: updated.promoTitleAtBooking,
+          address: emailAddress,
+          meetingType: updated.meetingType,
+          rescheduleCount: updated.rescheduleCount,
+        },
+        { kind: "rescheduled", previousStartAt: booking.startAt },
+      ),
+      sendOwnerBookingNotification(
+        {
+          id: updated.id,
+          name: updated.name,
+          email: updated.email,
+          notes: updated.notes ?? "",
+          startAt: timeChange.startAt,
+          endAt: timeChange.endAt,
+          cancelToken: updated.cancelToken,
+          address: emailAddress,
+          meetingType: updated.meetingType,
+        },
+        { kind: "rescheduled", previousStartAt: booking.startAt },
+      ),
+    ]);
+  }
 
   // Same cancellation draft applies to on-behalf and no-show paths.
   if (
@@ -243,7 +468,12 @@ export async function PATCH(
   }
 
   revalidateTag(SCHEDULE_CALENDAR_TAG, {});
-  return NextResponse.json({ ok: true, reviewSent });
+  return NextResponse.json({
+    ok: true,
+    reviewSent,
+    ...(timeChange ? { notified: timeChange.notify } : {}),
+    ...(calendarWarning ? { calendarWarning } : {}),
+  });
 }
 
 /**

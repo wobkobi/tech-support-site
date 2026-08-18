@@ -19,12 +19,10 @@ import { Field } from "@/shared/components/Field";
 import { PhoneInput } from "@/shared/components/PhoneInput";
 import { cn } from "@/shared/lib/cn";
 import { formatNZPhone, validatePhone } from "@/shared/lib/normalise-phone";
-import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
+import { fromNzInputValue, toNzInputValue } from "@/shared/lib/timezone-utils";
 import { useRouter } from "next/navigation";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
-
-const NZ_TZ = "Pacific/Auckland";
 
 interface ContactSuggestion {
   id: string;
@@ -77,7 +75,7 @@ export function ManualBookingModal({
   const [estimateHint, setEstimateHint] = useState<string | null>(null);
   const lastEstimatedNotes = useRef("");
   const [sendConfirmation, setSendConfirmation] = useState(true);
-  const [startAtLocal, setStartAtLocal] = useState(() => toLocalInputValue(startAtIso));
+  const [startAtLocal, setStartAtLocal] = useState(() => toNzInputValue(startAtIso));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -167,7 +165,7 @@ export function ManualBookingModal({
 
     setSubmitting(true);
     try {
-      const startAt = fromLocalInputValue(startAtLocal);
+      const startAt = fromNzInputValue(startAtLocal);
       const res = await fetch("/api/admin/bookings", {
         method: "POST",
         headers: {
@@ -412,37 +410,3 @@ const textInputClasses = cn(
   "w-full rounded-md border border-admin-border-strong bg-admin-surface px-3 py-2 text-sm text-admin-text",
   "focus:border-russian-violet focus:ring-2 focus:ring-russian-violet/30 focus:outline-none",
 );
-
-/**
- * Converts a UTC ISO timestamp to a NZ-local "YYYY-MM-DDTHH:mm" string suitable
- * for an `<input type="datetime-local">` value.
- * @param iso - UTC ISO timestamp.
- * @returns NZ-local datetime string.
- */
-function toLocalInputValue(iso: string): string {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: NZ_TZ,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).formatToParts(new Date(iso));
-  const map = new Map(parts.map((p) => [p.type, p.value]));
-  return `${map.get("year")}-${map.get("month")}-${map.get("day")}T${map.get("hour")}:${map.get("minute")}`;
-}
-
-/**
- * Parses a NZ-local "YYYY-MM-DDTHH:mm" datetime-local input value back into a
- * UTC Date, applying the right NZDT/NZST offset for the chosen date.
- * @param local - Input value from a datetime-local field, interpreted as NZ time.
- * @returns UTC Date.
- */
-function fromLocalInputValue(local: string): Date {
-  const [datePart, timePart] = local.split("T");
-  const [y, m, d] = datePart.split("-").map(Number);
-  const [hh, mm] = timePart.split(":").map(Number);
-  const offset = getPacificAucklandOffset(y, m, d);
-  return new Date(Date.UTC(y, m - 1, d, hh - offset, mm, 0));
-}
