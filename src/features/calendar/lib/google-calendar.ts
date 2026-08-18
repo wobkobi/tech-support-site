@@ -153,6 +153,41 @@ export async function createBookingEvent(params: {
 }
 
 /**
+ * Moves an existing booking event to a new time window.
+ *
+ * Patches start/end only, so the event id, description, location and attendee
+ * all survive. The customer-facing edit flow deletes and recreates because it
+ * rewrites the whole event; doing that here would cancel and re-issue the
+ * invite every time a finish time is nudged by ten minutes.
+ * @param params - Patch parameters.
+ * @param params.eventId - Calendar event ID to move (Booking.calendarEventId).
+ * @param params.startAt - New start time (UTC).
+ * @param params.endAt - New end time (UTC).
+ * @param params.timeZone - Display timezone for the invite.
+ * @param params.notifyAttendees - Whether Google emails the attendee about the move.
+ * @returns Promise that resolves when patched.
+ */
+export async function patchBookingEvent(params: {
+  eventId: string;
+  startAt: Date;
+  endAt: Date;
+  timeZone: string;
+  notifyAttendees: boolean;
+}): Promise<void> {
+  const calendar = getCalendarClient();
+
+  await calendar.events.patch({
+    calendarId: getBookingCalendarId(),
+    eventId: params.eventId,
+    requestBody: {
+      start: { dateTime: params.startAt.toISOString(), timeZone: params.timeZone },
+      end: { dateTime: params.endAt.toISOString(), timeZone: params.timeZone },
+    },
+    sendUpdates: params.notifyAttendees ? "all" : "none",
+  });
+}
+
+/**
  * Deletes a calendar event
  * @param params - Delete parameters
  * @param params.eventId - Calendar event ID to delete
