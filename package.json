@@ -1,6 +1,6 @@
 {
   "name": "tech-support-site",
-  "version": "4.14.4",
+  "version": "4.15.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -19,6 +19,7 @@
     "postinstall": "prisma generate",
     "lint": "eslint --fix --cache \"{src,scripts}/**/*.{js,ts,jsx,tsx}\"",
     "prepare": "simple-git-hooks",
+    "reconcile:times": "dotenv -e .env.local -- tsx scripts/reconcile-booking-times.ts",
     "settings:seed": "dotenv -e .env.local -- tsx scripts/seed-settings.ts",
     "smoke": "dotenv -e .env.local -- tsx scripts/smoke-test.ts",
     "start": "next start",
@@ -52,8 +53,8 @@
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
     "clsx": "^2.1.1",
-    "date-holidays": "^3.34.1",
-    "googleapis": "^174.0.1",
+    "date-holidays": "^3.35.0",
+    "googleapis": "^175.0.0",
     "next": "^16.3.1",
     "openai": "^7.4.0",
     "pdf-lib": "^1.17.1",
