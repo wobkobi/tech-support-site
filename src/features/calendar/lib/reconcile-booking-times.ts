@@ -8,9 +8,14 @@
  * on working off a stale start. This walks the bookings that own an event,
  * compares the row against the live event, and reports or applies the
  * difference. The calendar wins: it is where the correction was made.
+ *
+ * It also carries the other half of that drift: an event deleted in Calendar
+ * because the job was called off, on a row nobody cancelled. Those get
+ * calendarEventMissingAt stamped so the reminder and review crons stop emailing
+ * about a job that isn't happening.
  */
 
-import { fetchBookingEvent } from "@/features/calendar/lib/google-calendar";
+import { lookupBookingEvent } from "@/features/calendar/lib/google-calendar";
 import { prisma } from "@/shared/lib/prisma";
 import { Prisma } from "@prisma/client";
 
@@ -33,22 +38,36 @@ export interface BookingTimeDrift {
   skipped?: string;
 }
 
+/** A booking whose calendar event has been deleted out from under it. */
+export interface BookingEventMissing {
+  bookingId: string;
+  /** Customer name, so a dry run reads without a second lookup. */
+  name: string;
+  /** When the row still thinks the job runs. */
+  startAt: Date;
+}
+
 /** Outcome of one reconcile pass. */
 export interface ReconcileResult {
   /** Bookings that owned an event and were compared. */
   checked: number;
-  /** Bookings whose event could not be read (deleted, all-day, API failure). */
+  /** Bookings whose event could not be read (all-day, or an API failure). */
   unreadable: number;
   /** Every disagreement found, applied or not. */
   drifted: BookingTimeDrift[];
+  /** Bookings whose event is gone from Calendar - the job was called off there. */
+  missing: BookingEventMissing[];
+  /** Bookings previously flagged as missing whose event reads back again. */
+  restored: number;
 }
 
 /**
- * Compares booking rows against their live calendar events.
+ * Compares booking rows against their live calendar events, correcting drifted
+ * times and flagging rows whose event has been deleted.
  * @param options - Pass options.
- * @param options.apply - Write the calendar's times back to the row. False only reports.
+ * @param options.apply - Write the calendar's times back to the row and stamp/clear the missing-event flag. False only reports.
  * @param options.sinceDays - How far back to look, in days (defaults to 60).
- * @returns What was checked and what disagreed.
+ * @returns What was checked, what disagreed, and whose event is gone.
  */
 export async function reconcileBookingTimes(options: {
   apply: boolean;
@@ -71,29 +90,67 @@ export async function reconcileBookingTimes(options: {
       endAt: true,
       calendarEventId: true,
       activeSlotKey: true,
+      calendarEventMissingAt: true,
     },
     orderBy: { startAt: "asc" },
   });
 
-  const result: ReconcileResult = { checked: 0, unreadable: 0, drifted: [] };
+  const result: ReconcileResult = {
+    checked: 0,
+    unreadable: 0,
+    drifted: [],
+    missing: [],
+    restored: 0,
+  };
 
   for (let i = 0; i < bookings.length; i += FETCH_CONCURRENCY) {
     const batch = bookings.slice(i, i + FETCH_CONCURRENCY);
-    const events = await Promise.all(
+    const lookups = await Promise.all(
       // The non-null assertion is safe: the query filtered on it.
-      batch.map((b) => fetchBookingEvent(b.calendarEventId!)),
+      batch.map((b) => lookupBookingEvent(b.calendarEventId!)),
     );
 
     for (const [index, booking] of batch.entries()) {
-      const event = events[index];
-      if (!event) {
+      const lookup = lookups[index];
+
+      // Event deleted in Calendar: flag the orphaned row so the email crons
+      // leave it alone, and leave its times as they are - there is nothing
+      // authoritative left to copy from.
+      if (lookup.state === "gone") {
+        result.missing.push({
+          bookingId: booking.id,
+          name: booking.name,
+          startAt: booking.startAt,
+        });
+        if (options.apply && !booking.calendarEventMissingAt) {
+          await prisma.booking.update({
+            where: { id: booking.id },
+            data: { calendarEventMissingAt: new Date() },
+          });
+        }
+        continue;
+      }
+
+      if (lookup.state === "unreadable") {
         result.unreadable++;
         continue;
       }
       result.checked++;
 
-      const startAt = new Date(event.start);
-      const endAt = new Date(event.end);
+      // The event reads back, so an earlier flag was a deletion since undone or
+      // a lookup that had been failing. Either way, let the emails resume.
+      if (booking.calendarEventMissingAt) {
+        result.restored++;
+        if (options.apply) {
+          await prisma.booking.update({
+            where: { id: booking.id },
+            data: { calendarEventMissingAt: null },
+          });
+        }
+      }
+
+      const startAt = new Date(lookup.event.start);
+      const endAt = new Date(lookup.event.end);
       if (
         startAt.getTime() === booking.startAt.getTime() &&
         endAt.getTime() === booking.endAt.getTime()

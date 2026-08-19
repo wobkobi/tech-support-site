@@ -1,7 +1,10 @@
 // src/app/api/cron/send-invoice-reminders/route.ts
 // Daily cron chasing overdue SENT invoices: up to the configured max nudges per
-// invoice at the comms-settings offsets, idempotent via reminderCount. See docs/CRON.md.
+// invoice at the comms-settings offsets, idempotent via reminderCount. An
+// invoice whose payment is already sitting in the income ledger is held back
+// rather than chased. See docs/CRON.md.
 
+import { findRecordedPayment } from "@/features/business/lib/invoice-payment-match";
 import { sendOverdueReminder } from "@/features/business/lib/invoice-reminders";
 import { NOT_A_QUOTE_FILTER } from "@/features/business/lib/invoice-status";
 import { errorResponse } from "@/shared/lib/api-response";
@@ -16,7 +19,7 @@ export const maxDuration = 60;
 /**
  * GET /api/cron/send-invoice-reminders
  * @param request - Incoming cron request.
- * @returns JSON `{ ok, sent, skipped, failed, errors }`.
+ * @returns JSON `{ ok, sent, skipped, paid, failed, errors }`.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!isCronAuthorized(request)) {
@@ -42,7 +45,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       orderBy: { dueDate: "asc" },
     });
 
-    const results = { sent: 0, skipped: 0, failed: 0, errors: [] as string[] };
+    const results = { sent: 0, skipped: 0, paid: 0, failed: 0, errors: [] as string[] };
 
     for (const inv of candidates) {
       const count = inv.reminderCount ?? 0;
@@ -62,6 +65,19 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         }
       }
 
+      // The money may already be in, entered straight into the Cashbook sheet
+      // rather than against the invoice. Chasing someone who has paid is worse
+      // than a nudge arriving late, so hold off and let the operator confirm -
+      // the invoice page shows the same match with a prompt to record it.
+      const payment = await findRecordedPayment(inv);
+      if (payment) {
+        results.paid++;
+        console.warn(
+          `[cron/send-invoice-reminders] ${inv.number} not chased: ${payment.strength} payment of ${payment.amount} on ${payment.date.toISOString()} - mark it paid`,
+        );
+        continue;
+      }
+
       const res = await sendOverdueReminder(inv);
       if (res.ok) {
         results.sent++;
@@ -75,7 +91,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
 
     console.log(
-      `[cron/send-invoice-reminders] done: ${results.sent} sent, ${results.skipped} skipped, ${results.failed} failed`,
+      `[cron/send-invoice-reminders] done: ${results.sent} sent, ${results.skipped} skipped, ${results.paid} already paid, ${results.failed} failed`,
     );
     return NextResponse.json({ ok: true, ...results });
   } catch (error) {

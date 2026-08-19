@@ -177,6 +177,21 @@ export default async function BookingDetailPage({
         description={`${formatDateTimeShort(booking.startAt)} - ${formatDateTimeShort(booking.endAt)}`}
       />
 
+      {/* The reconcile cron found no calendar event behind this row, so both
+          email crons are holding off. Sits above everything: it means a job the
+          site still thinks is on has been called off in Calendar. */}
+      {booking.calendarEventMissingAt && booking.status !== "cancelled" && (
+        <div className="mb-4 rounded-lg border border-coquelicot-200 bg-coquelicot-50 p-4 text-sm text-admin-text">
+          <p className="font-semibold text-coquelicot-700">This booking has no calendar event.</p>
+          <p className="mt-1">
+            The event was deleted in Google Calendar on{" "}
+            {formatDateTimeShort(booking.calendarEventMissingAt)}, but the booking is still{" "}
+            {booking.status}. Reminder and review emails are paused until it&apos;s sorted - cancel
+            the booking if the job isn&apos;t happening, or re-book it if it is.
+          </p>
+        </div>
+      )}
+
       <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start lg:gap-6">
         {/* Left: editable customer info + price snapshot. */}
         <div className="space-y-4">

@@ -48,9 +48,31 @@ if (result.drifted.length === 0) {
   );
 }
 
+if (result.missing.length > 0) {
+  console.log(
+    `\n${result.missing.length} booking(s) own an event Calendar no longer has - the job was called off there and the row was left behind:`,
+  );
+  for (const gone of result.missing) {
+    console.log(
+      `  ${gone.name}  (${gone.bookingId})  still booked ${formatDateTimeShort(gone.startAt)}`,
+    );
+  }
+  console.log(
+    apply
+      ? "  flagged - reminder and review emails are paused until each row is cancelled properly"
+      : "  re-run with --apply to pause their reminder and review emails",
+  );
+}
+
+if (result.restored > 0) {
+  console.log(
+    `\n${result.restored} previously flagged booking(s) read back again and were cleared.`,
+  );
+}
+
 if (result.unreadable > 0) {
   console.log(
-    `\n${result.unreadable} booking(s) had no readable event (deleted, all-day, or an API failure) and were left alone.`,
+    `\n${result.unreadable} booking(s) had no readable event (all-day, or an API failure) and were left alone.`,
   );
 }
 

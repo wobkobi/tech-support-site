@@ -131,6 +131,22 @@ export function unitMatchesStreetNumber(unit: string, rest: string): boolean {
   return !!m && m[1].toLowerCase() === u.toLowerCase();
 }
 
+/**
+ * Prisma where-fragment matching bookings whose calendar event is still there.
+ * Both email crons spread it in so neither chases a job that was called off in
+ * Calendar without the row being cancelled.
+ *
+ * MUST be this OR shape: on the Mongo connector a bare `calendarEventMissingAt:
+ * null` compiles to "exists AND is null" and silently skips every booking
+ * written before the field existed, which is all of them. Spread it inside an
+ * `AND` when the query already has an OR of its own.
+ */
+export const CALENDAR_EVENT_PRESENT_FILTER = {
+  // Plain mutable shape (no `as const`): Prisma's BookingWhereInput requires
+  // a mutable OR array.
+  OR: [{ calendarEventMissingAt: null }, { calendarEventMissingAt: { isSet: false } }],
+};
+
 export const BOOKING_CONFIG = {
   timeZone: "Pacific/Auckland",
   maxAdvanceDays: 14,

@@ -12,6 +12,7 @@ import { StatusPill } from "@/features/admin/components/ui/StatusPill";
 import { InvoiceStatusBadge } from "@/features/business/components/invoice/InvoiceStatusBadge";
 import { InvoiceTimeline } from "@/features/business/components/invoice/InvoiceTimeline";
 import { formatNZD, lineItemQtyLabel } from "@/features/business/lib/business";
+import { findRecordedPayment } from "@/features/business/lib/invoice-payment-match";
 import { isInvoiceOverdue } from "@/features/business/lib/invoice-status";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { getIdentity } from "@/shared/lib/business-identity.server";
@@ -284,8 +285,28 @@ export default async function InvoiceViewPage({
     total: incomeEntries.reduce((sum, e) => sum + e.amount, 0),
   };
 
+  // Money entered straight into the Cashbook sheet never reaches the invoice, so
+  // a SENT row can already be paid. Looked up only for SENT invoices, which is
+  // the one state where the answer changes what the operator should do.
+  const recordedPayment =
+    invoice.status === "SENT" && !invoice.isQuote ? await findRecordedPayment(invoice) : null;
+
   return (
     <div>
+      {recordedPayment && (
+        <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-admin-text">
+          <p className="font-semibold text-amber-800">This invoice looks like it has been paid.</p>
+          <p className="mt-1">
+            {recordedPayment.strength === "linked"
+              ? "A linked income entry exists, but the invoice is still marked SENT."
+              : "An income entry matches this invoice's customer and total, but nothing is recorded against the invoice."}{" "}
+            {formatNZD(recordedPayment.amount)} on {formatDateShort(recordedPayment.date)} via{" "}
+            {recordedPayment.method}. Reminders are paused until it&apos;s recorded - use Record
+            payment above, or ignore this if it&apos;s a different job.
+          </p>
+        </div>
+      )}
+
       <PageHeader
         breadcrumbs={[
           { label: "Invoices", href: "/admin/business/invoices" },

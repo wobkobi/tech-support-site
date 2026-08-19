@@ -297,6 +297,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           activeSlotKey: startAt.toISOString(),
           bufferAfterMin: config.bookingBufferAfterMin,
           rescheduleCount: { increment: 1 },
+          // Clear the reminder stamp so the 24h nudge fires again at the new
+          // time. The stamp is otherwise never cleared, so a booking moved after
+          // its reminder went out is never reminded again - the reschedule
+          // confirmation tells the customer the new time, but the day-before
+          // nudge is what stops no-shows. Gated on the start actually moving, so
+          // an edit that only touches notes or the address doesn't re-send a
+          // reminder the customer already has.
+          ...(startAt.getTime() !== booking.startAt.getTime() ? { emailReminderSentAt: null } : {}),
           phone: phoneE164,
           // Keep the structured snapshots in step with the edit so the
           // cancellation invoice reads the current address / meeting type /
