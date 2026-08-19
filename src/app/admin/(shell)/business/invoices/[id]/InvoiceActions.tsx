@@ -59,6 +59,10 @@ interface InvoiceActionsProps {
   isOverdue?: boolean;
   /** Reminders already sent (null reads as 0); shown in the confirm copy. */
   reminderCount?: number | null;
+  /** Last reminder stamp; passed to {@link PaymentDialog} to offer the apology. */
+  reminderLastSentAt?: string | null;
+  /** Apology stamp; passed to {@link PaymentDialog} so it can't be sent twice. */
+  apologySentAt?: string | null;
   /** True when the row is a quote - swaps email copy, hides payment actions, adds Convert. */
   isQuote?: boolean;
 }
@@ -88,6 +92,8 @@ const headers = { "Content-Type": "application/json" };
  * @param props.autoOpenSend - Open the send preview on mount when true.
  * @param props.isOverdue - Whether the invoice is SENT and past due.
  * @param props.reminderCount - Reminders already sent (null reads as 0).
+ * @param props.reminderLastSentAt - Last reminder stamp, passed to the payment dialog.
+ * @param props.apologySentAt - Apology stamp, passed to the payment dialog.
  * @param props.isQuote - Whether the row is a quote.
  * @returns Invoice actions element with its modals.
  */
@@ -106,6 +112,8 @@ export function InvoiceActions({
   autoOpenSend = false,
   isOverdue = false,
   reminderCount = null,
+  reminderLastSentAt = null,
+  apologySentAt = null,
   isQuote = false,
 }: InvoiceActionsProps): React.ReactElement {
   const router = useRouter();
@@ -682,6 +690,8 @@ export function InvoiceActions({
             clientName,
             status: currentStatus,
             paidAt,
+            reminderLastSentAt,
+            apologySentAt,
           }}
           hasLinkedIncome={linkedIncome.count > 0}
           onClose={(recorded) => {

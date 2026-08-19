@@ -1223,6 +1223,91 @@ export async function sendInvoiceReminderEmail({
   }
 }
 
+interface SendPaymentApologyEmailArgs {
+  invoice: InvoiceEmailData;
+  /** When the reminder that shouldn't have gone out was sent. */
+  reminderSentAt: Date;
+  /** When the payment actually landed - always earlier than the reminder. */
+  paidAt: Date;
+}
+
+/**
+ * Apologises for chasing an invoice the client had already paid, sent when the
+ * payment is finally recorded. Deliberately short and attachment-free - the
+ * client already has the invoice, and a receipt would bury the apology. Never
+ * throws.
+ * @param args - Send inputs.
+ * @param args.invoice - Invoice row fields needed for the body.
+ * @param args.reminderSentAt - When the wrongly-sent reminder went out.
+ * @param args.paidAt - When the payment actually landed.
+ * @returns True if Resend accepted the message, false on failure or misconfig.
+ */
+export async function sendPaymentApologyEmail({
+  invoice,
+  reminderSentAt,
+  paidAt,
+}: SendPaymentApologyEmailArgs): Promise<boolean> {
+  const from = process.env.EMAIL_FROM;
+  if (!from || !process.env.RESEND_API_KEY) {
+    console.warn(
+      `[email] Not configured (${missingEmailEnv("EMAIL_FROM", "RESEND_API_KEY")}) - skipping payment apology.`,
+    );
+    return false;
+  }
+  if (!invoice.clientEmail) {
+    console.warn(`[email] Invoice ${invoice.number} has no clientEmail - skipping apology.`);
+    return false;
+  }
+
+  const siteUrl = getSiteUrl();
+  const greeting = escapeHtml((invoice.clientName.split(" ")[0] || invoice.clientName).trim());
+  const safeNumber = escapeHtml(invoice.number);
+  const remindedOn = escapeHtml(formatDateShort(reminderSentAt));
+  const paidOn = escapeHtml(formatDateShort(paidAt));
+  const totalLabel = escapeHtml(formatNZD(invoice.total));
+
+  const subject = `Sorry - invoice ${invoice.number} was already paid`;
+  const html = renderDocumentEmail(`
+    <h1 style="margin:0 0 16px;font-size:20px;font-weight:700;color:#0c0a3e">Hi ${greeting},</h1>
+
+    <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#333">I sent you a reminder about invoice ${safeNumber} on ${remindedOn}, but your payment had already come through on ${paidOn}. That one's on me - I hadn't marked it off yet.</p>
+
+    <div style="margin:0 0 16px;padding:12px 16px;background:#f3f4f6;border-radius:8px;font-size:14px;color:#333">
+      <p style="margin:0 0 4px"><strong>Invoice:</strong> ${safeNumber}</p>
+      <p style="margin:0 0 4px"><strong>Amount:</strong> ${totalLabel}</p>
+      <p style="margin:0"><strong>Paid:</strong> ${paidOn}</p>
+    </div>
+
+    <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#333">Nothing is owed, and you can ignore the reminder. Sorry for the chase.</p>
+
+    <p style="margin:0;font-size:14px;color:#333">If anything doesn't look right, just reply.</p>
+
+    ${await buildEmailSignature(siteUrl)}
+`);
+
+  try {
+    // Resend SDK v3+ returns { data, error } instead of throwing on API-level
+    // failures, so check error explicitly - a rejected send must leave
+    // apologySentAt unstamped rather than reporting success.
+    const result = await getResend().emails.send({
+      from,
+      replyTo: process.env.ADMIN_EMAIL,
+      to: invoice.clientEmail,
+      subject,
+      html,
+      text: htmlToText(html),
+    });
+    if (result.error) {
+      console.error(`[email] Resend rejected apology for ${invoice.number}:`, result.error);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error(`[email] Failed to send apology for invoice ${invoice.number}:`, error);
+    return false;
+  }
+}
+
 interface BuildVoidEmailArgs {
   invoice: InvoiceEmailData;
   greetingName?: string;

@@ -2,10 +2,11 @@
 // src/features/business/components/invoice/PaymentDialog.tsx
 /**
  * @description Records a payment against an invoice via POST /pay. Collects the
- * date, method (INCOME_METHODS), an optional reference, and whether to write an
- * income-ledger entry. Shared by the invoices list and the invoice detail page.
- * Mount it fresh per payment (conditional render or key by invoice id) so the
- * form resets - it holds no reset effect.
+ * date, method (INCOME_METHODS), an optional reference, whether to write an
+ * income-ledger entry, and - when a reminder went out after the payment date -
+ * whether to apologise for the chase. Shared by the invoices list and the
+ * invoice detail page. Mount it fresh per payment (conditional render or key by
+ * invoice id) so the form resets - it holds no reset effect.
  */
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
@@ -13,6 +14,8 @@ import { Modal } from "@/features/admin/components/ui/Modal";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { formatNZD, todayISO } from "@/features/business/lib/business";
 import { INCOME_METHODS } from "@/features/business/lib/constants";
+import { reminderChasedPaidInvoice } from "@/features/business/lib/invoice-apology";
+import { formatDateShort } from "@/shared/lib/date-format";
 import type React from "react";
 import { useState } from "react";
 
@@ -24,6 +27,10 @@ interface PaymentDialogInvoice {
   clientName: string;
   status: string;
   paidAt?: string | null;
+  /** Most recent overdue reminder; a later date than the payment offers the apology. */
+  reminderLastSentAt?: string | null;
+  /** Apology already sent for this invoice; suppresses the offer. */
+  apologySentAt?: string | null;
 }
 
 /** Props for {@link PaymentDialog}. */
@@ -64,7 +71,20 @@ export function PaymentDialog({
   // Default ON, but OFF when already PAID - a legacy backfill must not create a
   // second ledger row for a payment that was entered by hand.
   const [createIncome, setCreateIncome] = useState(!alreadyPaid);
+  const [sendApology, setSendApology] = useState(true);
   const [busy, setBusy] = useState(false);
+
+  // Recomputed as the operator edits the date: backdating the payment past the
+  // last reminder is exactly what reveals the wrongly-sent chase. Suppressed on
+  // an already-PAID row, where this is a backfill rather than a fresh payment.
+  const wronglyChased =
+    !alreadyPaid &&
+    reminderChasedPaidInvoice({
+      reminderLastSentAt: invoice.reminderLastSentAt,
+      paidAt: date,
+      apologySentAt: invoice.apologySentAt,
+    });
+  const apologyRequested = wronglyChased && sendApology;
 
   /**
    * Submits the payment to the /pay route, toasts the result, and closes.
@@ -80,6 +100,7 @@ export function PaymentDialog({
           method,
           reference: reference.trim() || undefined,
           createIncome,
+          sendApology: apologyRequested,
         }),
       });
       const d = await res.json();
@@ -92,6 +113,10 @@ export function PaymentDialog({
         toast("Payment recorded, but the Cashbook sheet update didn't go through.", {
           tone: "warning",
         });
+      } else if (apologyRequested && !d.apologySent) {
+        toast("Payment recorded, but the apology email didn't go through.", { tone: "warning" });
+      } else if (d.apologySent) {
+        toast(`Payment recorded for ${invoice.number}, and an apology sent.`, { tone: "success" });
       } else {
         toast(`Payment recorded for ${invoice.number}.`, { tone: "success" });
       }
@@ -175,6 +200,25 @@ export function PaymentDialog({
             )}
           </span>
         </label>
+
+        {wronglyChased && invoice.reminderLastSentAt && (
+          <label className="flex items-start gap-2 rounded-lg border border-admin-border bg-admin-bg p-3">
+            <input
+              type="checkbox"
+              checked={sendApology}
+              onChange={(e) => setSendApology(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span>
+              <span className="font-medium text-admin-text">Apologise for the reminder</span>
+              <span className="mt-0.5 block text-sm text-admin-muted">
+                A reminder went out on {formatDateShort(invoice.reminderLastSentAt)}, after this
+                payment date. Emails {invoice.clientName} to say the invoice was already paid and
+                sorry for the chase.
+              </span>
+            </span>
+          </label>
+        )}
       </div>
     </Modal>
   );

@@ -175,6 +175,12 @@ export const COMMS_FIELD_META: Record<string, FieldMeta> = {
     unit: "reminders",
     off: "Set 0 to never send an automatic reminder.",
   },
+  invoiceApologyEnabled: {
+    title: "Apologise for a wrong reminder",
+    description:
+      "When a payment is recorded with a date earlier than the last reminder, offer to email the client an apology for chasing a bill they had already paid.",
+    off: "When off, the payment dialog never offers the apology.",
+  },
 };
 
 /** Field metadata for the reviews group, keyed by field name. */

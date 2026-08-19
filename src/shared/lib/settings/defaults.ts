@@ -205,6 +205,7 @@ export const DEFAULT_SETTINGS: Settings = {
     invoiceReminderFirstDays: 3,
     invoiceReminderSecondDays: 10,
     invoiceReminderMaxCount: 2,
+    invoiceApologyEnabled: true,
   },
 
   // Source: calendar-cache.ts travel-block heuristics + edit-window.ts + travel-time route.

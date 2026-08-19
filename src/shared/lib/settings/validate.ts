@@ -322,6 +322,8 @@ function validateComms(c: CommsSettings): FieldError[] {
     });
   if (!inRange(c.invoiceReminderMaxCount, 0, 10))
     errors.push({ field: "invoiceReminderMaxCount", message: "Must be 0-10 reminders." });
+  if (typeof c.invoiceApologyEnabled !== "boolean")
+    errors.push({ field: "invoiceApologyEnabled", message: "Must be on or off." });
   return errors;
 }
 

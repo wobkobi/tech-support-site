@@ -240,6 +240,8 @@ export interface CommsSettings {
   invoiceReminderSecondDays: number;
   /** Maximum number of automatic overdue reminders per invoice. */
   invoiceReminderMaxCount: number;
+  /** Master switch for the apology sent when a reminder chased an already-paid invoice. */
+  invoiceApologyEnabled: boolean;
 }
 
 export interface SchedulingSettings {

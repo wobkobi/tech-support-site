@@ -76,6 +76,8 @@ export interface Invoice {
   reminderLastSentAt?: string | null;
   /** How many overdue reminders have gone out; null reads as 0 (Mongo backfill rule). */
   reminderCount?: number | null;
+  /** When the apology for a wrongly-sent reminder was emailed; null = never. */
+  apologySentAt?: string | null;
   /** True when this row is a quote (Q- number, no payment until converted). Null reads as false. */
   isQuote?: boolean | null;
   /** ISO date the quote's pricing is honoured until; null = no stated expiry. */

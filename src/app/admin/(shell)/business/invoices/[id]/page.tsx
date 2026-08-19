@@ -140,6 +140,7 @@ async function InvoiceRail({
           voidedAt={invoice.voidedAt}
           reminderLastSentAt={invoice.reminderLastSentAt}
           reminderCount={invoice.reminderCount}
+          apologySentAt={invoice.apologySentAt}
         />
       </Card>
 
@@ -312,6 +313,8 @@ export default async function InvoiceViewPage({
             autoOpenSend={send === "1"}
             isOverdue={isInvoiceOverdue(invoice)}
             reminderCount={invoice.reminderCount}
+            reminderLastSentAt={invoice.reminderLastSentAt?.toISOString() ?? null}
+            apologySentAt={invoice.apologySentAt?.toISOString() ?? null}
             isQuote={invoice.isQuote === true}
           />
         }

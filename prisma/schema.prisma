@@ -512,6 +512,11 @@ model Invoice {
   // the Mongo no-backfill rule; readers treat null count as 0.
   reminderLastSentAt DateTime?
   reminderCount      Int?
+  // Stamped when the "sorry, you'd already paid" note goes out - a reminder
+  // chased a payment that had already landed because the invoice hadn't been
+  // marked off yet. Set only after Resend accepts, so a failed send stays
+  // retryable, and it doubles as the never-apologise-twice guard.
+  apologySentAt      DateTime?
   // Quote mode: true = this row is a QUOTE (Q- number, QUOTE watermark, no
   // payment/income until converted). Convert-to-invoice allocates a real
   // invoice number, clears the flag, and restamps issue/due dates. Nullable
