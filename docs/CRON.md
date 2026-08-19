@@ -1,0 +1,101 @@
+# Scheduled jobs (cron-job.org)
+
+The cron endpoints are triggered by an external scheduler instead of Vercel Cron (`vercel.json` has
+no cron block and the Vercel scheduler is not used). [cron-job.org](https://cron-job.org/) (free)
+calls the endpoints over HTTPS on a schedule. Every job is a plain `GET` route under
+`src/app/api/cron/`.
+
+## Prerequisites
+
+1. Deploy the app to Vercel and note the production URL.
+2. Set these environment variables in the Vercel project (Settings > Environment Variables), since
+   the functions read them at runtime:
+   - `MONGODB_URI` - the MongoDB connection string (all jobs); the schema datasource reads
+     `env("MONGODB_URI")`.
+   - `CRON_SECRET` - a long random string; cron-job.org sends it as the bearer token. Contains a `$`
+     locally, so in `.env.local` it must be single-quoted with the `$` escaped as `\$`
+     (dotenv-expand expands `$VAR` even inside single quotes).
+   - `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` / `GOOGLE_OAUTH_REDIRECT_URI` /
+     `GOOGLE_OAUTH_REFRESH_TOKEN` - Google OAuth for the calendar, sheets and contacts jobs.
+   - `BOOKING_CALENDAR_ID`, `CAR_CALENDAR_ID`, `WORK_CALENDAR_ID`, `PERSONAL_CALENDAR_ID`,
+     `HOME_ADDRESS` - calendar cache refresh.
+   - `GOOGLE_SHEET_ID`, `GOOGLE_BUSINESS_SHEETS_FOLDER_ID` - sheets sync and subscription recording.
+   - `RESEND_API_KEY`, `EMAIL_FROM`, `ADMIN_EMAIL` - review request, booking reminder and invoice
+     reminder emails.
+   - `GOOGLE_MAPS_SERVER_KEY` - public holidays refresh. No fallback to `GOOGLE_MAPS_API_KEY`:
+     next.config.ts publishes that one to the browser, so falling back would spend a publicly
+     readable key on server-side quota. The key's Google Cloud project must have the **Calendar
+     API** enabled and must not be API-restricted to Maps services only - the job reads the public
+     NZ holidays calendar, not a Maps endpoint.
+
+## Auth
+
+Every cron route checks `Authorization: Bearer <CRON_SECRET>` via `isCronAuthorized`
+(`src/shared/lib/auth.ts`); the old `x-vercel-cron` header path was removed in 1.49.4. In each
+cron-job.org job, add a request header:
+
+```
+Authorization: Bearer <CRON_SECRET>
+```
+
+(Use the same value as the `CRON_SECRET` env var in Vercel.)
+
+## Jobs
+
+All endpoints are **GET**. Create one cron-job.org job per row.
+
+| Job                    | URL path                            | Method | Schedule         | Purpose                                          |
+| ---------------------- | ----------------------------------- | ------ | ---------------- | ------------------------------------------------ |
+| Calendar cache refresh | `/api/cron/refresh-calendar-cache`  | GET    | every 30 minutes | Fetch Google Calendar events into the DB cache   |
+| Release holds          | `/api/cron/release-holds`           | GET    | every 15 minutes | Cancel expired booking holds                     |
+| Review emails          | `/api/cron/send-review-emails`      | GET    | hourly           | Send review requests after completed bookings    |
+| Booking reminders      | `/api/cron/send-booking-reminders`  | GET    | every 30 minutes | Email a 24h-out reminder for confirmed bookings  |
+| Invoice reminders      | `/api/cron/send-invoice-reminders`  | GET    | daily            | Chase overdue SENT invoices (max 2 nudges each)  |
+| Sheets sync            | `/api/cron/sync-sheets`             | GET    | hourly           | Reconcile Cashbook/Expenses sheets with MongoDB  |
+| Contacts sync          | `/api/cron/sync-contacts`           | GET    | every 3 hours    | Two-way incremental Google Contacts sync         |
+| Record subscriptions   | `/api/cron/record-subscriptions`    | GET    | daily 08:00 NZ   | Record due subscriptions as expenses + sheet row |
+| Purge price estimates  | `/api/cron/purge-price-estimates`   | GET    | daily            | Delete price estimate logs past retention        |
+| Public holidays        | `/api/cron/refresh-public-holidays` | GET    | monthly          | Refresh NZ public holidays (current + next year) |
+
+Full URL = the production URL + the path above. cron-job.org lets you pick a timezone per job -
+schedule Record subscriptions in `Pacific/Auckland` so it stays at 8am across DST changes.
+
+## Notes
+
+- Routes respond synchronously with `{ ok: true, ...counts }`. The two sync jobs return 503 on
+  failure so cron-job.org flags the run; the rest return 500 with an error message.
+- `sync-sheets` and `sync-contacts` set `maxDuration = 300` (many sequential Google API calls);
+  everything else runs with `maxDuration = 60`. A long sync run can outlive cron-job.org's 30 s
+  response window, so a cron-job.org "timeout" does not necessarily mean the run failed - check the
+  Vercel function logs for the actual outcome.
+- Overlapping or retried runs are safe by design: release-holds guards each update on status +
+  expiry, booking reminders stamp `emailReminderSentAt` only after Resend accepts the send, invoice
+  reminders stamp `reminderLastSentAt`/`reminderCount` the same way (max 2 per invoice, offsets live
+  in the comms settings), record-subscriptions advances `nextDue` with a CAS guard, and the holidays
+  refresh is a pure upsert.
+- Booking reminders send inside a window from `CANCELLATION.freeNoticeHours + 1` up to
+  `comms.reminderLeadHours` before the start, so the reminder always lands while the customer can
+  still cancel free.
+- Tunable values (retention days, reminder lead hours, notification toggles) are read live from
+  settings on every run; the review and reminder jobs no-op cleanly when their toggle is off.
+- Cadences are set against each job's query shape, not picked for freshness alone - every run costs
+  Vercel Fluid Active CPU, and the free tier only includes 4 CPU-hours a month. Catch-up jobs
+  (review emails, invoice reminders, purge, subscriptions) query "everything not yet done" with no
+  upper bound, so a slower cadence only delays them - it can never drop work. Booking reminders are
+  the exception: they select a bounded window (`freeNoticeHours + 1` to `reminderLeadHours` out), so
+  the cadence must stay shorter than the narrowest window the settings validator permits. That
+  validator enforces `reminderLeadHours > freeNoticeHours + 1`, which on whole-hour inputs bottoms
+  out at a 1-hour window - hence 30 minutes here, and why this job must not be moved to hourly.
+- Contacts sync runs local dedup/merge first, then pushes only the dirty set, then pulls Google's
+  changes. The manual full sync lives at `/api/admin/contacts/sync`.
+- Sheets sync treats the sheet as source of truth, joining rows on the hidden column-Z Sync ID, and
+  self-heals site entries whose sheet append failed.
+
+## Adding a new job
+
+1. Create `src/app/api/cron/<name>/route.ts` with a `GET` handler that checks `isCronAuthorized`
+   first and returns 401 otherwise.
+2. Set `maxDuration` to match the worst-case upstream latency.
+3. Make the work idempotent - a run can be retried or overlap the next one.
+4. Register the job on cron-job.org with the Bearer header and the intended cadence.
+5. Add a row to the table above.
