@@ -421,6 +421,13 @@ export const PRICING_FIELD_META: Record<string, FieldMeta> = {
     unit: "%",
     off: "Set 0 to charge nothing for an unsuccessful visit.",
   },
+  remoteNoFixFreeMins: {
+    title: "Remote no-fix grace period",
+    description:
+      "Minutes covered at no charge when a remote session ends with neither a fix nor an explanation of the cause. Time past this is billed at the unsuccessful-visit charge above.",
+    unit: "minutes",
+    off: "Set 0 to drop the grace period from the pricing and FAQ pages.",
+  },
   workmanshipWindowDays: {
     title: "Workmanship guarantee window",
     description:

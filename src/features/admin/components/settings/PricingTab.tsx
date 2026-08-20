@@ -160,6 +160,18 @@ export function PricingTab({ initial, defaults }: Props): React.ReactElement {
           onChange={(v) => setTop({ unsuccessfulWorkFactor: (v ?? 0) / 100 })}
         />
         <NumberField
+          id="remoteNoFixFreeMins"
+          meta={m.remoteNoFixFreeMins}
+          value={draft.remoteNoFixFreeMins}
+          min={0}
+          max={480}
+          step={5}
+          minutesHint
+          error={fieldErrors.remoteNoFixFreeMins}
+          customised={draft.remoteNoFixFreeMins !== defaults.remoteNoFixFreeMins}
+          onChange={(v) => setTop({ remoteNoFixFreeMins: v ?? 0 })}
+        />
+        <NumberField
           id="workmanshipWindowDays"
           meta={m.workmanshipWindowDays}
           value={draft.workmanshipWindowDays}

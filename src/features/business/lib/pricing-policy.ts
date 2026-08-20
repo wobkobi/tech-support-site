@@ -39,6 +39,7 @@ const PUBLIC_HOLIDAY_UPLIFT = 0.25;
 
 /** Fallback fraction charged for an unsuccessful visit (0.5 = half price). */
 const UNSUCCESSFUL_WORK_FACTOR = 0.5;
+const REMOTE_NO_FIX_FREE_MINS = 30;
 
 /** Fallback workmanship-guarantee window (days): fallout from a prior visit's changes is fixed free inside it. */
 const WORKMANSHIP_WINDOW_DAYS = 30;
@@ -346,6 +347,17 @@ function days(n: number): string {
 }
 
 /**
+ * Renders a minute count for customer-facing copy. The grace period is a
+ * setting, so whole-hour values are reachable and "60 minutes" reads worse to a
+ * client than "1 hour".
+ * @param n - Number of minutes.
+ * @returns e.g. "30 minutes", "1 hour", "90 minutes".
+ */
+function minutes(n: number): string {
+  return n % 60 === 0 ? hours(n / 60) : `${n} minute${n === 1 ? "" : "s"}`;
+}
+
+/**
  * Cancellation policy text (pricing accordion + booking emails + cancel page).
  * @param p - Cancellation policy (defaults to the module constant).
  * @param opts - Optional narrowing for a context that knows the meeting type.
@@ -385,23 +397,33 @@ export function cancellationCopy(
  * Fixed-or-discounted definition of the unsuccessful-visit rule: full rate
  * only when the problem is put right; an unfixed visit discounts the labour
  * even when it ends with a clear diagnosis (a no-fix, no-diagnosis remote
- * session is free). The charge phrase tracks the live factor so the copy
- * never disagrees with the bill.
+ * session opens with a free grace period). Both the charge phrase and the
+ * grace period track their live settings so the copy never disagrees with the
+ * bill; a grace of 0 drops that sentence rather than promising "0 minutes".
  * @param factor - Unsuccessful-visit charge fraction (defaults to the constant).
+ * @param freeMins - Minutes covered free on a no-fix remote session (defaults to the constant).
  * @returns Multi-paragraph copy describing the unsuccessful-visit rule.
  */
-export function unsuccessfulWorkCopy(factor: number = UNSUCCESSFUL_WORK_FACTOR): string {
+export function unsuccessfulWorkCopy(
+  factor: number = UNSUCCESSFUL_WORK_FACTOR,
+  freeMins: number = REMOTE_NO_FIX_FREE_MINS,
+): string {
   const chargePhrase =
     factor <= 0
       ? "**No charge**"
       : factor === 0.5
         ? "**Half price**"
         : `**${Math.round(factor * 100)}% of the agreed rate**`;
-  return (
-    "A visit bills at the agreed rate when the problem is **fixed** - the issue described no longer reproduces by the end of the visit. A partial fix counts as a fix.\n\n" +
-    `${chargePhrase} applies to the labour whenever I can't put the problem right - even when I leave you with a clear diagnosis of what's wrong and what to do next (for example, 'the drive is failing - here is the replacement to order'). Travel and any parts are charged as normal.\n\n` +
-    "A remote session where I can't fix the problem or explain the cause is **free**."
-  );
+  const paragraphs = [
+    "A visit bills at the agreed rate when the problem is **fixed** - the issue described no longer reproduces by the end of the visit. A partial fix counts as a fix.",
+    `${chargePhrase} applies to the labour whenever I can't put the problem right - even when I leave you with a clear diagnosis of what's wrong and what to do next (for example, 'the drive is failing - here is the replacement to order'). Travel and any parts are charged as normal.`,
+  ];
+  if (freeMins > 0) {
+    paragraphs.push(
+      `On a remote session where I can't fix the problem or explain the cause, I'll cover the first **${minutes(freeMins)}** at no charge.`,
+    );
+  }
+  return paragraphs.join("\n\n");
 }
 
 /**
@@ -517,6 +539,7 @@ export interface Policy {
   MAX_JOB_MINS: number;
   PUBLIC_HOLIDAY_UPLIFT: number;
   UNSUCCESSFUL_WORK_FACTOR: number;
+  REMOTE_NO_FIX_FREE_MINS: number;
   WORKMANSHIP_WINDOW_DAYS: number;
   CANCELLATION: CancellationPolicy;
 }

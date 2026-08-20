@@ -171,6 +171,11 @@ function validatePricing(p: PricingSettings): FieldError[] {
       field: "unsuccessfulWorkFactor",
       message: "Must be a fraction 0-1 (0.5 = half price, 0 = free).",
     });
+  if (!inRange(p.remoteNoFixFreeMins, 0, 480))
+    errors.push({
+      field: "remoteNoFixFreeMins",
+      message: "Must be 0-480 minutes (0 = no stated grace period).",
+    });
   if (!nonNeg(p.workmanshipWindowDays))
     errors.push({
       field: "workmanshipWindowDays",

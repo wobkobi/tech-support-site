@@ -82,7 +82,10 @@ export default async function FaqPage(): Promise<React.ReactElement> {
   ]);
   const paymentTermsDays = settings.identity.paymentTermsDays;
   const cancellationText = cancellationCopy(policy.CANCELLATION);
-  const unsuccessfulText = unsuccessfulWorkCopy(policy.UNSUCCESSFUL_WORK_FACTOR);
+  const unsuccessfulText = unsuccessfulWorkCopy(
+    policy.UNSUCCESSFUL_WORK_FACTOR,
+    policy.REMOTE_NO_FIX_FREE_MINS,
+  );
   const workmanshipText = workmanshipCopy(policy.WORKMANSHIP_WINDOW_DAYS);
   const partsText = partsCopy();
   const gstText = gstCopy(policy.GST_REGISTERED);
