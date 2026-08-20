@@ -196,7 +196,7 @@ export default async function FaqPage(): Promise<React.ReactElement> {
     {
       question: "What if the job takes longer than the estimate?",
       plainAnswer:
-        "You'll never be surprised by the bill. I confirm the expected cost before starting, and if the work is heading past it, I pause and check with you before carrying on - you decide whether to continue. A booked time slot isn't a hard cutoff either: if the job needs longer and the calendar allows, I stay until it's sorted. And if it genuinely needs a second visit, the extra trip's travel is on me.",
+        "You'll never be surprised by the bill. I confirm the expected cost before starting, and if the work is heading past it, I pause and check with you before carrying on - you decide whether to continue. A booked time isn't a hard cutoff either: if the job needs longer and the calendar allows, I stay until it's sorted. And if it genuinely needs a second visit, the extra trip's travel is on me.",
       answer: (
         <>
           <p>
@@ -205,7 +205,7 @@ export default async function FaqPage(): Promise<React.ReactElement> {
             carrying on - you decide whether to continue.
           </p>
           <p className="mt-2 text-rich-black/80">
-            A booked time slot isn't a hard cutoff either: if the job needs longer and the calendar
+            A booked time isn't a hard cutoff either: if the job needs longer and the calendar
             allows, I stay until it's sorted. And if it genuinely needs a second visit, the extra
             trip's travel is on me.
           </p>
@@ -237,7 +237,7 @@ export default async function FaqPage(): Promise<React.ReactElement> {
     {
       question: "How do I book an appointment?",
       plainAnswer:
-        "The fastest way is to book online via the booking page - it shows available days and times. You can also call or email if you'd rather chat first. For anything urgent, a phone call works best because I can usually slot you in sooner.",
+        "The fastest way is to book online via the booking page - it shows available days and times. You can also call or email if you'd rather chat first. For anything urgent, a phone call works best because I can usually fit you in sooner.",
       answer: (
         <>
           <p>
@@ -252,8 +252,7 @@ export default async function FaqPage(): Promise<React.ReactElement> {
             by phone or email if you'd rather chat through it first.
           </p>
           <p className="mt-2 text-rich-black/80">
-            For anything urgent, a phone call works best - I can usually slot you in sooner that
-            way.
+            For anything urgent, a phone call works best - I can usually fit you in sooner that way.
           </p>
         </>
       ),

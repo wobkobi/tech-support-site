@@ -87,7 +87,7 @@ export const AVAILABILITY_FIELD_META: Record<string, FieldMeta> = {
   },
   bufferMin: {
     title: "Calendar buffer",
-    description: "Gap kept clear around your existing calendar events when offering slots.",
+    description: "Gap kept clear around your existing calendar events when offering times.",
     unit: "minutes",
   },
   bookingBufferAfterMin: {
@@ -107,20 +107,20 @@ export const AVAILABILITY_FIELD_META: Record<string, FieldMeta> = {
   },
   maxJobsPerDay: {
     title: "Max jobs per day",
-    description: "Stop offering slots on a day once this many bookings already exist.",
+    description: "Stop offering times on a day once this many bookings already exist.",
     unit: "jobs",
     off: "Set 0 or leave blank for no daily limit.",
   },
   maxBillableHoursPerDay: {
     title: "Max hours per day",
-    description: "Stop offering slots on a day once this many booked hours already exist.",
+    description: "Stop offering times on a day once this many booked hours already exist.",
     unit: "hours",
     off: "Set 0 or leave blank for no daily limit.",
   },
   morningGuards: {
     title: "Morning guards",
     description:
-      "Protect early slots once the night-before arrives (e.g. from Friday evening, block Sat/Sun before noon). Slots stay bookable if reserved earlier in the week.",
+      "Protect early times once the night-before arrives (e.g. from Friday evening, block Sat/Sun before noon). Times stay bookable if reserved earlier in the week.",
   },
 };
 
@@ -351,7 +351,7 @@ export const SCHEDULING_FIELD_META: Record<string, FieldMeta> = {
   travelQuoteHour: {
     title: "Travel-quote time",
     description:
-      "When a customer hasn't picked a slot yet, drive time is quoted against this hour of the day (a realistic-traffic proxy rather than whenever they opened the page).",
+      "When a customer hasn't picked a time yet, drive time is quoted against this hour of the day (a realistic-traffic proxy rather than whenever they opened the page).",
     unit: "hour 0-23",
   },
 };
@@ -468,7 +468,7 @@ export const PRICING_FIELD_META: Record<string, FieldMeta> = {
   "cancellation.remoteFee": {
     title: "Remote cancellation fee",
     description:
-      "Flat fee for a remote session cancelled inside its window, or a remote no-show. No call-out tier and no travel - a remote cancel only costs you the slot.",
+      "Flat fee for a remote session cancelled inside its window, or a remote no-show. No call-out tier and no travel - a remote cancel only costs you the time.",
     unit: "$",
   },
   "cancellation.autoSendCancellationInvoice": {

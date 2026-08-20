@@ -31,7 +31,7 @@ import { FaCalendarCheck, FaClock, FaEnvelopeOpenText, FaListCheck } from "react
 export const metadata: Metadata = {
   title: "Book a Tech Support Appointment in Auckland",
   description:
-    "Book an on-site or remote tech support appointment in Auckland. Same-day, evening and weekend slots available. Pick a 1- or 2-hour slot and get an instant calendar invite.",
+    "Book an on-site or remote tech support appointment in Auckland. Same-day, evening and weekend appointments available. Pick a 1- or 2-hour appointment and get an instant calendar invite.",
   alternates: { canonical: "/booking" },
   openGraph: {
     title: "Book an Appointment - To the Point Tech",

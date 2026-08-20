@@ -477,7 +477,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           );
         }
         return NextResponse.json(
-          { ok: false, error: "This time slot is no longer available." },
+          { ok: false, error: "This time is no longer available." },
           { status: 409 },
         );
       }

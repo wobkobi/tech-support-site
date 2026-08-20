@@ -427,7 +427,7 @@ export function unsuccessfulWorkCopy(
   ];
   if (freeMins > 0) {
     paragraphs.push(
-      `If I leave without fixing the problem, the first **${minutes(freeMins)}** of the return visit are free, whether I'm back at your place or picking it up remotely. That's not the same as running out of time: if the job was going fine and the slot just ended, the next visit carries on at the normal rate.`,
+      `If I leave without fixing the problem, the first **${minutes(freeMins)}** of the return visit are free, whether I'm back at your place or picking it up remotely. That's different from simply running out of time: if the job was going fine and just needed longer, the next visit carries on at the normal rate.`,
     );
   }
   return paragraphs.join("\n\n");

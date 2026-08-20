@@ -143,7 +143,7 @@ export function JobDetailsSection({
                   type="button"
                   onClick={() => removeRange(index)}
                   disabled={!multi}
-                  aria-label={`Remove time slot ${index + 1}`}
+                  aria-label={`Remove time range ${index + 1}`}
                   className="rounded-lg border border-red-200 bg-white px-2 py-2 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-300 disabled:hover:bg-white"
                 >
                   ×
