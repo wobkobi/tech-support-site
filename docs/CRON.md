@@ -95,7 +95,8 @@ schedule Record subscriptions in `Pacific/Auckland` so it stays at 8am across DS
   until it is cancelled properly, and the flag clears itself if the event reads back. Only a 404 or
   an explicit `cancelled` status counts as gone, so a quota or auth blip never pauses mail. It uses
   a 7-day lookback, and the query has no upper bound, so every future booking is covered;
-  `npm run reconcile:times` is the same pass with the wider 60-day manual default.
+  `npm run reconcile:times:dry` and `npm run reconcile:times:apply` are the same pass by hand, with
+  the wider 60-day default.
 - It also re-arms send stamps that cannot belong to a booking's current times. `emailReminderSentAt`
   and `reviewSentAt` are one-way - nothing else in the codebase clears them - so a row that has been
   moved carries the marks of emails sent against its old date and is skipped by both jobs forever.
