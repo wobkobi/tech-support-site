@@ -39,7 +39,8 @@ const PUBLIC_HOLIDAY_UPLIFT = 0.25;
 
 /** Fallback fraction charged for an unsuccessful visit (0.5 = half price). */
 const UNSUCCESSFUL_WORK_FACTOR = 0.5;
-const REMOTE_NO_FIX_FREE_MINS = 30;
+/** Fallback grace period (minutes) covered free at the start of a visit returning to finish an unfixed job. */
+const NO_FIX_FREE_MINS = 30;
 
 /** Fallback workmanship-guarantee window (days): fallout from a prior visit's changes is fixed free inside it. */
 const WORKMANSHIP_WINDOW_DAYS = 30;
@@ -396,17 +397,23 @@ export function cancellationCopy(
 /**
  * Fixed-or-discounted definition of the unsuccessful-visit rule: full rate
  * only when the problem is put right; an unfixed visit discounts the labour
- * even when it ends with a clear diagnosis (a no-fix, no-diagnosis remote
- * session opens with a free grace period). Both the charge phrase and the
- * grace period track their live settings so the copy never disagrees with the
- * bill; a grace of 0 drops that sentence rather than promising "0 minutes".
+ * even when it ends with a clear diagnosis, and buys the customer a free
+ * opening stretch on the visit that comes back to finish it (on site or
+ * remote). Both the charge phrase and the grace period track their live
+ * settings so the copy never disagrees with the bill; a grace of 0 drops that
+ * sentence rather than promising "0 minutes".
+ *
+ * Which visits qualify is stated, not computed: no booking field records why a
+ * return was booked, so the difference between coming back to a job that
+ * failed and coming back to one that merely ran out of slot is the operator's
+ * call at invoicing time.
  * @param factor - Unsuccessful-visit charge fraction (defaults to the constant).
- * @param freeMins - Minutes covered free on a no-fix remote session (defaults to the constant).
+ * @param freeMins - Minutes covered free at the start of a return visit (defaults to the constant).
  * @returns Multi-paragraph copy describing the unsuccessful-visit rule.
  */
 export function unsuccessfulWorkCopy(
   factor: number = UNSUCCESSFUL_WORK_FACTOR,
-  freeMins: number = REMOTE_NO_FIX_FREE_MINS,
+  freeMins: number = NO_FIX_FREE_MINS,
 ): string {
   const chargePhrase =
     factor <= 0
@@ -420,7 +427,7 @@ export function unsuccessfulWorkCopy(
   ];
   if (freeMins > 0) {
     paragraphs.push(
-      `On a remote session where I can't fix the problem or explain the cause, I'll cover the first **${minutes(freeMins)}** at no charge.`,
+      `If I leave without fixing the problem, the first **${minutes(freeMins)}** of the return visit are free, whether I'm back at your place or picking it up remotely. That's not the same as running out of time: if the job was going fine and the slot just ended, the next visit carries on at the normal rate.`,
     );
   }
   return paragraphs.join("\n\n");
@@ -539,7 +546,7 @@ export interface Policy {
   MAX_JOB_MINS: number;
   PUBLIC_HOLIDAY_UPLIFT: number;
   UNSUCCESSFUL_WORK_FACTOR: number;
-  REMOTE_NO_FIX_FREE_MINS: number;
+  NO_FIX_FREE_MINS: number;
   WORKMANSHIP_WINDOW_DAYS: number;
   CANCELLATION: CancellationPolicy;
 }

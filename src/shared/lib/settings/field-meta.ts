@@ -421,10 +421,10 @@ export const PRICING_FIELD_META: Record<string, FieldMeta> = {
     unit: "%",
     off: "Set 0 to charge nothing for an unsuccessful visit.",
   },
-  remoteNoFixFreeMins: {
-    title: "Remote no-fix grace period",
+  noFixFreeMins: {
+    title: "No-fix grace period",
     description:
-      "Minutes covered at no charge when a remote session ends with neither a fix nor an explanation of the cause. Time past this is billed at the unsuccessful-visit charge above.",
+      "Minutes covered at no charge at the start of a return visit, when the previous one ended without a fix. On site or remote. A return booked only because the first ran out of time is a continuation, not a retry, so it bills from the first minute.",
     unit: "minutes",
     off: "Set 0 to drop the grace period from the pricing and FAQ pages.",
   },

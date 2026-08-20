@@ -84,7 +84,7 @@ export default async function FaqPage(): Promise<React.ReactElement> {
   const cancellationText = cancellationCopy(policy.CANCELLATION);
   const unsuccessfulText = unsuccessfulWorkCopy(
     policy.UNSUCCESSFUL_WORK_FACTOR,
-    policy.REMOTE_NO_FIX_FREE_MINS,
+    policy.NO_FIX_FREE_MINS,
   );
   const workmanshipText = workmanshipCopy(policy.WORKMANSHIP_WINDOW_DAYS);
   const partsText = partsCopy();

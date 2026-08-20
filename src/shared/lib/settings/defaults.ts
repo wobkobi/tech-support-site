@@ -70,7 +70,7 @@ export const DEFAULT_SETTINGS: Settings = {
     minTravelCharge: 10,
     travelRatePerHour: 40,
     unsuccessfulWorkFactor: 0.5,
-    remoteNoFixFreeMins: 30,
+    noFixFreeMins: 30,
     workmanshipWindowDays: 30,
     cancellation: {
       freeNoticeHours: 12,

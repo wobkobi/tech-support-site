@@ -122,8 +122,8 @@ export interface PricingSettings {
   travelRatePerHour: number;
   /** Fraction charged when a visit is unsuccessful (0.5 = half price, 0 = free). */
   unsuccessfulWorkFactor: number;
-  /** Minutes covered free at the start of a remote session that ends with no fix and no cause. 0 = no stated grace. */
-  remoteNoFixFreeMins: number;
+  /** Minutes covered free at the start of a return visit, when the previous one ended without a fix. 0 = no stated grace. */
+  noFixFreeMins: number;
   /** Days after a visit during which fallout from that visit's changes is fixed free. 0 = no stated guarantee. */
   workmanshipWindowDays: number;
   cancellation: CancellationSettings;

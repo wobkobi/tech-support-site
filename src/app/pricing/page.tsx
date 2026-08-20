@@ -402,10 +402,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                 </summary>
                 <div className={ACCORDION_BODY}>
                   {renderEmphasised(
-                    unsuccessfulWorkCopy(
-                      policy.UNSUCCESSFUL_WORK_FACTOR,
-                      policy.REMOTE_NO_FIX_FREE_MINS,
-                    ),
+                    unsuccessfulWorkCopy(policy.UNSUCCESSFUL_WORK_FACTOR, policy.NO_FIX_FREE_MINS),
                   )}
                 </div>
               </details>
