@@ -276,6 +276,12 @@ export const IDENTITY_FIELD_META: Record<string, FieldMeta> = {
     title: "Served suburbs",
     description: "Suburbs you cover, listed in the site's map data for local SEO.",
   },
+  publishedHours: {
+    title: "Published hours",
+    description:
+      "The hours Google and other search engines are told you are open. Does not change what the booking form offers, so you can advertise a tidy window and still take later bookings.",
+    off: "Off = publish each day's real bookable hours from the Availability tab.",
+  },
   emailSignature: {
     title: "Email signature",
     description:

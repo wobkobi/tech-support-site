@@ -9,7 +9,9 @@
  */
 
 import {
+  closeLabel,
   FieldShell,
+  HourSelect,
   NumberField,
   SettingsTabBody,
   TextField,
@@ -18,13 +20,22 @@ import { SettingsFooter } from "@/features/admin/components/settings/SettingsFoo
 import { SettingsHistory } from "@/features/admin/components/settings/SettingsHistory";
 import { useSettingsForm } from "@/features/admin/components/settings/useSettingsForm";
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
+import { hourLabel } from "@/features/booking/lib/booking";
+import { cn } from "@/shared/lib/cn";
 import { IDENTITY_FIELD_META } from "@/shared/lib/settings/field-meta";
-import type { BaseAddress, IdentitySettings } from "@/shared/lib/settings/types";
+import type {
+  BaseAddress,
+  IdentitySettings,
+  PublishedHours,
+  WeeklySchedule,
+} from "@/shared/lib/settings/types";
 import type React from "react";
 
 interface Props {
   initial: IdentitySettings;
   defaults: IdentitySettings;
+  /** The real bookable schedule, shown alongside the published-hours override. */
+  bookableSchedule: WeeklySchedule;
 }
 
 /**
@@ -46,9 +57,10 @@ function SectionHeading({ children }: { children: React.ReactNode }): React.Reac
  * @param props - Component props.
  * @param props.initial - Server-resolved current identity settings.
  * @param props.defaults - Code default identity settings.
+ * @param props.bookableSchedule - The real bookable weekly schedule.
  * @returns Identity tab element.
  */
-export function IdentityTab({ initial, defaults }: Props): React.ReactElement {
+export function IdentityTab({ initial, defaults, bookableSchedule }: Props): React.ReactElement {
   const form = useSettingsForm("identity", initial, defaults);
   const { draft, setDraft, fieldErrors } = form;
   const m = IDENTITY_FIELD_META;
@@ -67,6 +79,23 @@ export function IdentityTab({ initial, defaults }: Props): React.ReactElement {
    */
   const setAddr = (patch: Partial<BaseAddress>): void =>
     setDraft((p) => ({ ...p, baseAddress: { ...p.baseAddress, ...patch } }));
+
+  /**
+   * Patches the published-hours override; a no-op while the override is off.
+   * @param patch - Partial published-hours fields.
+   * @returns void
+   */
+  const setPublished = (patch: Partial<PublishedHours>): void =>
+    setDraft((p) =>
+      p.publishedHours ? { ...p, publishedHours: { ...p.publishedHours, ...patch } } : p,
+    );
+
+  // Widest window anyone can actually book, used to seed the override (so
+  // switching it on starts as a no-op) and to show what stays bookable.
+  const openDays = Object.values(bookableSchedule).filter((d) => d.enabled);
+  const bookableOpen = openDays.length > 0 ? Math.min(...openDays.map((d) => d.open)) : 10;
+  const bookableClose = openDays.length > 0 ? Math.max(...openDays.map((d) => d.close)) : 20;
+  const published = draft.publishedHours;
 
   return (
     <SettingsTabBody changed={form.changedPaths}>
@@ -255,6 +284,70 @@ export function IdentityTab({ initial, defaults }: Props): React.ReactElement {
             onChange={(e) => set({ servedSuburbs: e.target.value.split("\n") })}
             className="w-full rounded-lg border border-admin-border-strong px-3 py-2 text-base focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
           />
+        </FieldShell>
+      </div>
+
+      <SectionHeading>Published hours (SEO)</SectionHeading>
+      <div className="divide-y divide-admin-border">
+        <FieldShell
+          id="publishedHours"
+          meta={m.publishedHours}
+          error={fieldErrors["publishedHours.open"] ?? fieldErrors["publishedHours.close"]}
+          customised={published !== null}
+        >
+          <div className="flex flex-wrap items-center gap-2 text-sm text-admin-text-secondary">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={published !== null}
+              aria-label="Override published hours"
+              onClick={() =>
+                set({
+                  publishedHours: published ? null : { open: bookableOpen, close: bookableClose },
+                })
+              }
+              className={cn(
+                "relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors",
+                published ? "bg-russian-violet" : "bg-admin-border-strong",
+              )}
+            >
+              <span
+                className={cn(
+                  "inline-block h-5 w-5 rounded-full bg-admin-surface shadow transition-[translate]",
+                  published ? "translate-x-6" : "translate-x-1",
+                )}
+              />
+            </button>
+            {published ? (
+              <>
+                <span>Tell Google</span>
+                <HourSelect
+                  value={published.open}
+                  from={0}
+                  to={23}
+                  ariaLabel="Published opening time"
+                  onChange={(h) => setPublished({ open: h })}
+                />
+                <span>to</span>
+                <HourSelect
+                  value={published.close}
+                  from={1}
+                  to={24}
+                  close
+                  ariaLabel="Published closing time"
+                  onChange={(h) => setPublished({ close: h })}
+                />
+              </>
+            ) : (
+              <span>Off - your real bookable hours are published.</span>
+            )}
+          </div>
+          {published && (
+            <p className="mt-2 text-xs text-admin-muted">
+              Bookings still run {hourLabel(bookableOpen)} to {closeLabel(bookableClose)}, set on
+              the Availability tab. Only the advertised listing changes.
+            </p>
+          )}
         </FieldShell>
       </div>
 

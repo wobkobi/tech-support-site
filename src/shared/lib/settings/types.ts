@@ -138,6 +138,17 @@ export interface BaseAddress {
   lng: number | null;
 }
 
+/**
+ * The opening hours advertised to search engines, when they should differ from
+ * the bookable schedule. A single window applied to every enabled day.
+ */
+export interface PublishedHours {
+  /** Advertised opening hour, 0-23 NZ-local. */
+  open: number;
+  /** Advertised closing hour, 1-24 NZ-local. Must be greater than `open`. */
+  close: number;
+}
+
 export interface IdentitySettings {
   name: string;
   company: string;
@@ -155,6 +166,12 @@ export interface IdentitySettings {
   homeRegion: string;
   /** Advertised service-area radius in km (drives the SEO GeoCircle). */
   serviceRadiusKm: number;
+  /**
+   * Overrides the hours published in the site's schema.org data, so the listing
+   * Google shows can be narrower than the hours the booking form actually
+   * offers. null = publish each day's real bookable window.
+   */
+  publishedHours: PublishedHours | null;
   /**
    * Text block under the logo in every outgoing email, one line per row. Carries
    * `{name}` / `{company}` / `{phone}` / `{email}` / `{website}` / `{location}`

@@ -364,6 +364,18 @@ function validateIdentity(i: IdentitySettings): FieldError[] {
     errors.push({ field: "paymentTermsDays", message: "Must be 0 or more days." });
   if (!inRange(i.serviceRadiusKm, 1, 500))
     errors.push({ field: "serviceRadiusKm", message: "Service radius must be 1-500 km." });
+  if (i.publishedHours !== null) {
+    if (!inRange(i.publishedHours.open, 0, 23) || !inRange(i.publishedHours.close, 1, 24))
+      errors.push({
+        field: "publishedHours.open",
+        message: "Published hours must be within the day.",
+      });
+    else if (i.publishedHours.open >= i.publishedHours.close)
+      errors.push({
+        field: "publishedHours.close",
+        message: "Published closing time must be after the opening time.",
+      });
+  }
   if (!i.emailSignature.trim())
     errors.push({ field: "emailSignature", message: "Email signature cannot be empty." });
   // A misspelt placeholder renders as literal "{pone}" in a customer's inbox,
@@ -481,6 +493,26 @@ export function checkGuardrails(s: Settings): GuardrailIssue[] {
         level: "block",
         message: `${dayNames[day]}'s open hours are shorter than the shortest job (${shortestJob} min) plus its after-buffer, so nobody could book ${dayNames[day]}.`,
       });
+    }
+  }
+
+  // Published SEO hours are allowed to be narrower than the bookable schedule
+  // (that is the point of the override), but advertising a time no day can
+  // actually take sends customers to a booking form with no such slot.
+  if (identity.publishedHours) {
+    const open = [0, 1, 2, 3, 4, 5, 6]
+      .map((day) => a.schedule[day])
+      .filter((d): d is NonNullable<typeof d> => Boolean(d?.enabled));
+    if (open.length > 0) {
+      const earliestOpen = Math.min(...open.map((d) => d.open));
+      const latestClose = Math.max(...open.map((d) => d.close));
+      const { open: pubOpen, close: pubClose } = identity.publishedHours;
+      if (pubOpen < earliestOpen || pubClose > latestClose) {
+        issues.push({
+          level: "warn",
+          message: `Published hours (${pubOpen}:00-${pubClose}:00) advertise time outside every bookable day (${earliestOpen}:00-${latestClose}:00), so customers could ask for a slot the booking form never offers.`,
+        });
+      }
     }
   }
 
