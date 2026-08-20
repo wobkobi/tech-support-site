@@ -13,6 +13,11 @@
  * because the job was called off, on a row nobody cancelled. Those get
  * calendarEventMissingAt stamped so the reminder and review crons stop emailing
  * about a job that isn't happening.
+ *
+ * Correcting a time is not enough on its own. emailReminderSentAt and
+ * reviewSentAt are one-way stamps, so a row moved to a new date still carries
+ * the marks of emails sent against the old one, and both crons skip it forever.
+ * A correction clears the stamps its move invalidated.
  */
 
 import { lookupBookingEvent } from "@/features/calendar/lib/google-calendar";
@@ -25,6 +30,9 @@ const FETCH_CONCURRENCY = 10;
 /** Default lookback. Older bookings are history no reader still acts on. */
 const DEFAULT_SINCE_DAYS = 60;
 
+/** A send stamp cleared so the move's email can go out against the new times. */
+export type RearmedStamp = "reminder" | "review";
+
 /** One booking whose row and calendar event disagree. */
 export interface BookingTimeDrift {
   bookingId: string;
@@ -34,6 +42,8 @@ export interface BookingTimeDrift {
   from: { startAt: Date; endAt: Date };
   /** What the calendar event says. */
   to: { startAt: Date; endAt: Date };
+  /** Stamps cleared by the move; empty when the move re-arms nothing. */
+  rearmed: RearmedStamp[];
   /** Why the row was left alone, when it was. */
   skipped?: string;
 }
@@ -63,17 +73,19 @@ export interface ReconcileResult {
 
 /**
  * Compares booking rows against their live calendar events, correcting drifted
- * times and flagging rows whose event has been deleted.
+ * times, re-arming the send stamps a correction invalidates, and flagging rows
+ * whose event has been deleted.
  * @param options - Pass options.
- * @param options.apply - Write the calendar's times back to the row and stamp/clear the missing-event flag. False only reports.
+ * @param options.apply - Write the calendar's times back to the row, clear the re-armed stamps, and stamp/clear the missing-event flag. False only reports.
  * @param options.sinceDays - How far back to look, in days (defaults to 60).
- * @returns What was checked, what disagreed, and whose event is gone.
+ * @returns What was checked, what disagreed, what was re-armed, and whose event is gone.
  */
 export async function reconcileBookingTimes(options: {
   apply: boolean;
   sinceDays?: number;
 }): Promise<ReconcileResult> {
-  const since = new Date(Date.now() - (options.sinceDays ?? DEFAULT_SINCE_DAYS) * 86_400_000);
+  const now = new Date();
+  const since = new Date(now.getTime() - (options.sinceDays ?? DEFAULT_SINCE_DAYS) * 86_400_000);
 
   // Cancelled bookings are excluded: their event is already deleted, so there
   // is nothing to compare against and nothing that still reads their times.
@@ -91,6 +103,9 @@ export async function reconcileBookingTimes(options: {
       calendarEventId: true,
       activeSlotKey: true,
       calendarEventMissingAt: true,
+      emailReminderSentAt: true,
+      reviewSentAt: true,
+      reviewSubmittedAt: true,
     },
     orderBy: { startAt: "asc" },
   });
@@ -158,11 +173,30 @@ export async function reconcileBookingTimes(options: {
         continue;
       }
 
+      // Both send stamps are one-way - nothing else in the codebase clears
+      // them - so a booking corrected to a new time carries stamps describing a
+      // date it no longer has, and is skipped by both crons forever.
+      const rearmed: RearmedStamp[] = [];
+      // A moved start means the reminder that went out named the wrong day. Safe
+      // to re-arm unconditionally: the worst case is a second reminder carrying
+      // the corrected time, which is the one the customer needs.
+      if (booking.emailReminderSentAt && startAt.getTime() !== booking.startAt.getTime()) {
+        rearmed.push("reminder");
+      }
+      // The review request is only re-armed when the job is still ahead, which
+      // means the request already sent was asking about a visit that had not
+      // happened. A finish time corrected into the past is a real completed job,
+      // and a customer who has actually reviewed is never asked twice.
+      if (booking.reviewSentAt && !booking.reviewSubmittedAt && endAt > now) {
+        rearmed.push("review");
+      }
+
       const drift: BookingTimeDrift = {
         bookingId: booking.id,
         name: booking.name,
         from: { startAt: booking.startAt, endAt: booking.endAt },
         to: { startAt, endAt },
+        rearmed,
       };
 
       if (options.apply) {
@@ -176,6 +210,13 @@ export async function reconcileBookingTimes(options: {
               startAt,
               endAt,
               ...(movesSlot ? { activeSlotKey: startAt.toISOString() } : {}),
+              ...(rearmed.includes("reminder") ? { emailReminderSentAt: null } : {}),
+              // reviewSendFailedAt goes with it: it drives a one-shot retry that
+              // would otherwise fire the request straight back out, ahead of the
+              // job it is asking about.
+              ...(rearmed.includes("review")
+                ? { reviewSentAt: null, reviewSendFailedAt: null }
+                : {}),
             },
           });
         } catch (error) {
@@ -184,6 +225,8 @@ export async function reconcileBookingTimes(options: {
             // stale is the lesser evil - the alternative is two bookings
             // claiming one slot - but it needs a human, so it's reported.
             drift.skipped = "another booking already starts at that time";
+            // Nothing was written, so nothing was re-armed either.
+            drift.rearmed = [];
           } else {
             throw error;
           }

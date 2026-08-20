@@ -7,7 +7,9 @@
  * Runs ahead of the reminder and review crons on purpose: both decide when to
  * email from Booking.startAt/endAt, and both skip a booking flagged here, so a
  * time corrected in Calendar or a job called off there has to land in the row
- * first or the emails go out on stale state.
+ * first or the emails go out on stale state. A correction also clears the send
+ * stamps it invalidates, so the moved booking is emailed against its new times
+ * rather than being skipped on the strength of the old ones.
  */
 
 import { reconcileBookingTimes } from "@/features/calendar/lib/reconcile-booking-times";
@@ -42,8 +44,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     for (const drift of result.drifted) {
       console.log(
         `[cron/reconcile-booking-times] ${drift.bookingId} moved to ${drift.to.startAt.toISOString()}${
-          drift.skipped ? ` SKIPPED: ${drift.skipped}` : ""
-        }`,
+          drift.rearmed.length > 0 ? ` re-armed: ${drift.rearmed.join("+")}` : ""
+        }${drift.skipped ? ` SKIPPED: ${drift.skipped}` : ""}`,
       );
     }
     for (const gone of result.missing) {

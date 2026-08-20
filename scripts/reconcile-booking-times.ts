@@ -36,6 +36,12 @@ if (result.drifted.length === 0) {
     console.log(
       `  calendar: ${formatDateTimeShort(drift.to.startAt)} - ${formatDateTimeShort(drift.to.endAt)}`,
     );
+    if (drift.rearmed.length > 0) {
+      const labels = drift.rearmed
+        .map((s) => (s === "reminder" ? "24h reminder" : "review request"))
+        .join(" + ");
+      console.log(apply ? `  re-armed: ${labels}` : `  would re-arm: ${labels}`);
+    }
     if (drift.skipped) {
       console.log(`  SKIPPED: ${drift.skipped}`);
     } else if (apply) {

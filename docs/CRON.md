@@ -96,6 +96,14 @@ schedule Record subscriptions in `Pacific/Auckland` so it stays at 8am across DS
   an explicit `cancelled` status counts as gone, so a quota or auth blip never pauses mail. It uses
   a 7-day lookback, and the query has no upper bound, so every future booking is covered;
   `npm run reconcile:times` is the same pass with the wider 60-day manual default.
+- A correction also re-arms the send stamps it invalidates, since nothing else in the codebase
+  clears them and a row moved to a new date would otherwise carry the marks of emails sent against
+  the old one and be skipped by both jobs forever. `emailReminderSentAt` clears whenever the start
+  moves - the worst case is a second reminder carrying the corrected time, which is the one the
+  customer needs. `reviewSentAt` (and `reviewSendFailedAt`, which drives a one-shot retry) clears
+  only when the new finish is still in the future and the customer has not already reviewed: that is
+  exactly the case where the request already sent was asking about a visit that had not happened. A
+  finish corrected into the past is a real completed job and is left alone.
 - Invoice reminders hold off on an invoice whose payment is already in the income ledger. Money
   entered straight into the Cashbook sheet never reaches the invoice (only `POST /pay` links the
   two), so a paid invoice can still read as SENT. A linked entry is proof; an unlinked entry
