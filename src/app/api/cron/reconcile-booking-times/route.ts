@@ -7,9 +7,10 @@
  * Runs ahead of the reminder and review crons on purpose: both decide when to
  * email from Booking.startAt/endAt, and both skip a booking flagged here, so a
  * time corrected in Calendar or a job called off there has to land in the row
- * first or the emails go out on stale state. A correction also clears the send
- * stamps it invalidates, so the moved booking is emailed against its new times
- * rather than being skipped on the strength of the old ones.
+ * first or the emails go out on stale state. It also clears send stamps that
+ * cannot belong to a booking's current times, so a row that has been moved is
+ * emailed against the times it actually holds rather than skipped on the
+ * strength of the ones it used to.
  */
 
 import { reconcileBookingTimes } from "@/features/calendar/lib/reconcile-booking-times";
@@ -29,7 +30,7 @@ const CRON_SINCE_DAYS = 7;
 /**
  * GET /api/cron/reconcile-booking-times
  * @param request - Incoming cron request.
- * @returns JSON `{ ok, checked, corrected, missing, restored, unreadable }`.
+ * @returns JSON `{ ok, checked, corrected, rearmed, missing, restored, unreadable }`.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!isCronAuthorized(request)) {
@@ -44,8 +45,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     for (const drift of result.drifted) {
       console.log(
         `[cron/reconcile-booking-times] ${drift.bookingId} moved to ${drift.to.startAt.toISOString()}${
-          drift.rearmed.length > 0 ? ` re-armed: ${drift.rearmed.join("+")}` : ""
-        }${drift.skipped ? ` SKIPPED: ${drift.skipped}` : ""}`,
+          drift.skipped ? ` SKIPPED: ${drift.skipped}` : ""
+        }`,
+      );
+    }
+    for (const r of result.rearmed) {
+      console.log(
+        `[cron/reconcile-booking-times] ${r.bookingId} (${r.name}) re-armed: ${r.stamps.join("+")}`,
       );
     }
     for (const gone of result.missing) {
@@ -55,13 +61,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
 
     console.log(
-      `[cron/reconcile-booking-times] done: checked=${result.checked} corrected=${result.drifted.length} missing=${result.missing.length} restored=${result.restored} unreadable=${result.unreadable}`,
+      `[cron/reconcile-booking-times] done: checked=${result.checked} corrected=${result.drifted.length} rearmed=${result.rearmed.length} missing=${result.missing.length} restored=${result.restored} unreadable=${result.unreadable}`,
     );
 
     return NextResponse.json({
       ok: true,
       checked: result.checked,
       corrected: result.drifted.length,
+      rearmed: result.rearmed.length,
       missing: result.missing.length,
       restored: result.restored,
       unreadable: result.unreadable,

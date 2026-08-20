@@ -96,14 +96,18 @@ schedule Record subscriptions in `Pacific/Auckland` so it stays at 8am across DS
   an explicit `cancelled` status counts as gone, so a quota or auth blip never pauses mail. It uses
   a 7-day lookback, and the query has no upper bound, so every future booking is covered;
   `npm run reconcile:times` is the same pass with the wider 60-day manual default.
-- A correction also re-arms the send stamps it invalidates, since nothing else in the codebase
-  clears them and a row moved to a new date would otherwise carry the marks of emails sent against
-  the old one and be skipped by both jobs forever. `emailReminderSentAt` clears whenever the start
-  moves - the worst case is a second reminder carrying the corrected time, which is the one the
-  customer needs. `reviewSentAt` (and `reviewSendFailedAt`, which drives a one-shot retry) clears
-  only when the new finish is still in the future and the customer has not already reviewed: that is
-  exactly the case where the request already sent was asking about a visit that had not happened. A
-  finish corrected into the past is a real completed job and is left alone.
+- It also re-arms send stamps that cannot belong to a booking's current times. `emailReminderSentAt`
+  and `reviewSentAt` are one-way - nothing else in the codebase clears them - so a row that has been
+  moved carries the marks of emails sent against its old date and is skipped by both jobs forever.
+  The test is on the times themselves, not on whether this pass moved anything, because a row
+  corrected by an earlier run or by either edit route has matching times and stale stamps. A
+  reminder counts as stale when it predates the start by more than 168 hours, the widest lead the
+  settings validator allows, so it cannot have been sent for these times whatever the setting is;
+  that also keeps the check free of a settings read, which the CLI script could not do anyway. A
+  review request counts as stale when it predates a finish that is still in the future and the
+  customer has not reviewed, which is exactly the case where it was asking about a visit that had
+  not happened. `reviewSendFailedAt` clears with it, since its one-shot retry would fire the request
+  straight back out. A finish already in the past is a real completed job and is left alone.
 - Invoice reminders hold off on an invoice whose payment is already in the income ledger. Money
   entered straight into the Cashbook sheet never reaches the invoice (only `POST /pay` links the
   two), so a paid invoice can still read as SENT. A linked entry is proof; an unlinked entry

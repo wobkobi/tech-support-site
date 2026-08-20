@@ -36,12 +36,6 @@ if (result.drifted.length === 0) {
     console.log(
       `  calendar: ${formatDateTimeShort(drift.to.startAt)} - ${formatDateTimeShort(drift.to.endAt)}`,
     );
-    if (drift.rearmed.length > 0) {
-      const labels = drift.rearmed
-        .map((s) => (s === "reminder" ? "24h reminder" : "review request"))
-        .join(" + ");
-      console.log(apply ? `  re-armed: ${labels}` : `  would re-arm: ${labels}`);
-    }
     if (drift.skipped) {
       console.log(`  SKIPPED: ${drift.skipped}`);
     } else if (apply) {
@@ -51,6 +45,25 @@ if (result.drifted.length === 0) {
   }
   console.log(
     `${result.drifted.length} of ${result.checked} bookings drifted${apply ? " (see above for any skipped)" : " - re-run with --apply to correct them"}.`,
+  );
+}
+
+if (result.rearmed.length > 0) {
+  console.log(
+    `\n${result.rearmed.length} booking(s) carry send stamps from times they no longer have, so the email never fires again:`,
+  );
+  for (const r of result.rearmed) {
+    const labels = r.stamps
+      .map((s) => (s === "reminder" ? "24h reminder" : "review request"))
+      .join(" + ");
+    console.log(
+      `  ${r.name}  (${r.bookingId})  booked ${formatDateTimeShort(r.startAt)}  >  ${labels}`,
+    );
+  }
+  console.log(
+    apply
+      ? "  cleared - each will be emailed against its real times"
+      : "  re-run with --apply to clear them",
   );
 }
 

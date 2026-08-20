@@ -30,7 +30,16 @@ const FETCH_CONCURRENCY = 10;
 /** Default lookback. Older bookings are history no reader still acts on. */
 const DEFAULT_SINCE_DAYS = 60;
 
-/** A send stamp cleared so the move's email can go out against the new times. */
+/**
+ * Widest gap the settings validator allows between a reminder and the start it
+ * was sent for: `reminderLeadHours` is capped at 168. A stamp older than that
+ * relative to the current start cannot have been sent for these times, whatever
+ * the setting happens to be, so the check needs no settings read - which also
+ * keeps this callable from the CLI script, outside any Next request context.
+ */
+const MAX_REMINDER_LEAD_MS = 168 * 3_600_000;
+
+/** A send stamp cleared so its email can go out against the row's real times. */
 export type RearmedStamp = "reminder" | "review";
 
 /** One booking whose row and calendar event disagree. */
@@ -42,10 +51,19 @@ export interface BookingTimeDrift {
   from: { startAt: Date; endAt: Date };
   /** What the calendar event says. */
   to: { startAt: Date; endAt: Date };
-  /** Stamps cleared by the move; empty when the move re-arms nothing. */
-  rearmed: RearmedStamp[];
   /** Why the row was left alone, when it was. */
   skipped?: string;
+}
+
+/** A booking carrying send stamps that belong to times it no longer has. */
+export interface BookingStampRearm {
+  bookingId: string;
+  /** Customer name, so a dry run reads without a second lookup. */
+  name: string;
+  /** The start the row holds once this pass is done. */
+  startAt: Date;
+  /** Which stamps were cleared. */
+  stamps: RearmedStamp[];
 }
 
 /** A booking whose calendar event has been deleted out from under it. */
@@ -69,6 +87,64 @@ export interface ReconcileResult {
   missing: BookingEventMissing[];
   /** Bookings previously flagged as missing whose event reads back again. */
   restored: number;
+  /** Bookings whose stale send stamps were cleared, drifted or not. */
+  rearmed: BookingStampRearm[];
+}
+
+/**
+ * Send stamps on a booking that cannot belong to the times it is about to hold.
+ *
+ * Judged against the times themselves rather than against "did this pass move
+ * it", because a row corrected by an earlier run, or by either edit route, has
+ * matching times and stale stamps - and a drift-only check would never repair
+ * it. Both tests are one-directional and conservative: they only fire on a job
+ * that is still ahead, where an email already sent was necessarily about times
+ * the booking no longer has.
+ * @param booking - The row's current stamps.
+ * @param booking.emailReminderSentAt - When the 24h reminder went out.
+ * @param booking.reviewSentAt - When the review request went out.
+ * @param booking.reviewSubmittedAt - When the customer actually reviewed.
+ * @param startAt - The start the row holds after this pass.
+ * @param endAt - The finish the row holds after this pass.
+ * @param now - Reference instant.
+ * @returns The stamps worth clearing, in report order.
+ */
+function staleSendStamps(
+  booking: {
+    emailReminderSentAt: Date | null;
+    reviewSentAt: Date | null;
+    reviewSubmittedAt: Date | null;
+  },
+  startAt: Date,
+  endAt: Date,
+  now: Date,
+): RearmedStamp[] {
+  const stale: RearmedStamp[] = [];
+
+  // A legitimate reminder goes out inside the lead window before the start.
+  // One sent further back than the widest permitted window was sent for an
+  // earlier date, and the job it now names has not been reminded at all.
+  if (
+    booking.emailReminderSentAt &&
+    startAt > now &&
+    startAt.getTime() - booking.emailReminderSentAt.getTime() > MAX_REMINDER_LEAD_MS
+  ) {
+    stale.push("reminder");
+  }
+
+  // A review request that predates the finish was asking about a visit that had
+  // not happened. Never re-armed for a customer who has actually reviewed, and
+  // never for a finish already in the past, which is a real completed job.
+  if (
+    booking.reviewSentAt &&
+    !booking.reviewSubmittedAt &&
+    endAt > now &&
+    booking.reviewSentAt < endAt
+  ) {
+    stale.push("review");
+  }
+
+  return stale;
 }
 
 /**
@@ -116,6 +192,7 @@ export async function reconcileBookingTimes(options: {
     drifted: [],
     missing: [],
     restored: 0,
+    rearmed: [],
   };
 
   for (let i = 0; i < bookings.length; i += FETCH_CONCURRENCY) {
@@ -166,29 +243,39 @@ export async function reconcileBookingTimes(options: {
 
       const startAt = new Date(lookup.event.start);
       const endAt = new Date(lookup.event.end);
-      if (
-        startAt.getTime() === booking.startAt.getTime() &&
-        endAt.getTime() === booking.endAt.getTime()
-      ) {
-        continue;
-      }
 
-      // Both send stamps are one-way - nothing else in the codebase clears
-      // them - so a booking corrected to a new time carries stamps describing a
-      // date it no longer has, and is skipped by both crons forever.
-      const rearmed: RearmedStamp[] = [];
-      // A moved start means the reminder that went out named the wrong day. Safe
-      // to re-arm unconditionally: the worst case is a second reminder carrying
-      // the corrected time, which is the one the customer needs.
-      if (booking.emailReminderSentAt && startAt.getTime() !== booking.startAt.getTime()) {
-        rearmed.push("reminder");
-      }
-      // The review request is only re-armed when the job is still ahead, which
-      // means the request already sent was asking about a visit that had not
-      // happened. A finish time corrected into the past is a real completed job,
-      // and a customer who has actually reviewed is never asked twice.
-      if (booking.reviewSentAt && !booking.reviewSubmittedAt && endAt > now) {
-        rearmed.push("review");
+      // Both send stamps are one-way, so a booking whose times have changed
+      // carries stamps describing a date it no longer has and is skipped by both
+      // crons forever. Checked against the times themselves, not against whether
+      // this pass moved anything: a row corrected by an earlier run has matching
+      // times and stale stamps, and a drift-gated check would never reach it.
+      const stamps = staleSendStamps(booking, startAt, endAt, now);
+      const clearStamps = {
+        ...(stamps.includes("reminder") ? { emailReminderSentAt: null } : {}),
+        // reviewSendFailedAt goes with it: it drives a one-shot retry that would
+        // otherwise fire the request straight back out, ahead of the job it is
+        // asking about.
+        ...(stamps.includes("review") ? { reviewSentAt: null, reviewSendFailedAt: null } : {}),
+      };
+
+      const drifted =
+        startAt.getTime() !== booking.startAt.getTime() ||
+        endAt.getTime() !== booking.endAt.getTime();
+
+      // Times already agree, so the only thing left to repair is the stamps.
+      if (!drifted) {
+        if (stamps.length > 0) {
+          result.rearmed.push({
+            bookingId: booking.id,
+            name: booking.name,
+            startAt,
+            stamps,
+          });
+          if (options.apply) {
+            await prisma.booking.update({ where: { id: booking.id }, data: clearStamps });
+          }
+        }
+        continue;
       }
 
       const drift: BookingTimeDrift = {
@@ -196,9 +283,9 @@ export async function reconcileBookingTimes(options: {
         name: booking.name,
         from: { startAt: booking.startAt, endAt: booking.endAt },
         to: { startAt, endAt },
-        rearmed,
       };
 
+      let wrote = true;
       if (options.apply) {
         // Only a booking still holding its slot carries a live key; completed
         // rows keep `released:<id>` and must not reclaim one.
@@ -210,13 +297,7 @@ export async function reconcileBookingTimes(options: {
               startAt,
               endAt,
               ...(movesSlot ? { activeSlotKey: startAt.toISOString() } : {}),
-              ...(rearmed.includes("reminder") ? { emailReminderSentAt: null } : {}),
-              // reviewSendFailedAt goes with it: it drives a one-shot retry that
-              // would otherwise fire the request straight back out, ahead of the
-              // job it is asking about.
-              ...(rearmed.includes("review")
-                ? { reviewSentAt: null, reviewSendFailedAt: null }
-                : {}),
+              ...clearStamps,
             },
           });
         } catch (error) {
@@ -225,12 +306,17 @@ export async function reconcileBookingTimes(options: {
             // stale is the lesser evil - the alternative is two bookings
             // claiming one slot - but it needs a human, so it's reported.
             drift.skipped = "another booking already starts at that time";
-            // Nothing was written, so nothing was re-armed either.
-            drift.rearmed = [];
+            wrote = false;
           } else {
             throw error;
           }
         }
+      }
+
+      // Reported alongside the drift, but only when the write that carried the
+      // clears actually landed.
+      if (stamps.length > 0 && wrote) {
+        result.rearmed.push({ bookingId: booking.id, name: booking.name, startAt, stamps });
       }
 
       result.drifted.push(drift);
