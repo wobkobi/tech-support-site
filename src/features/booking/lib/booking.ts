@@ -648,14 +648,14 @@ export function validateBookingRequest(
 
   const startHour = parseHourLabel(timeOfDay);
   if (startHour === null) {
-    return { valid: false, error: "Invalid time" };
+    return { valid: false, error: "Invalid time slot" };
   }
 
   // startMinute arrives raw from the JSON body; only accept an offset the
   // operator actually offers so off-grid, fractional, or negative minutes
   // can't slip past the window check below or land on a phantom slot key.
   if (!Number.isInteger(startMinute) || !config.subSlotMinutes.includes(startMinute)) {
-    return { valid: false, error: "Invalid time" };
+    return { valid: false, error: "Invalid time slot" };
   }
 
   const durationMinutes = duration === "short" ? config.durations.short : config.durations.long;
@@ -678,7 +678,7 @@ export function validateBookingRequest(
   const slotEnd = new Date(slotStart.getTime() + durationMinutes * 60 * 1000);
 
   if (slotStart < now) {
-    return { valid: false, error: "This time is in the past" };
+    return { valid: false, error: "This time slot is in the past" };
   }
 
   // Server-side enforce the client's min-notice window so direct API calls
@@ -706,12 +706,12 @@ export function validateBookingRequest(
   ) {
     return {
       valid: false,
-      error: "That time isn't available - early times close ahead of the day",
+      error: "That time isn't available - early slots close ahead of the day",
     };
   }
 
   if (!isSlotFree(slotStart, slotEnd, existingBookings, calendarEvents, config.bufferMin)) {
-    return { valid: false, error: "This time is no longer available" };
+    return { valid: false, error: "This time slot is no longer available" };
   }
 
   // Enforce the operator's daily caps server-side too - the day grid applies

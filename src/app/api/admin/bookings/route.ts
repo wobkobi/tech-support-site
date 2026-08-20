@@ -131,7 +131,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   });
   if (conflictingBooking) {
     return NextResponse.json(
-      { ok: false, error: "Another booking already occupies this time." },
+      { ok: false, error: "Another booking already occupies this slot." },
       { status: 409 },
     );
   }
@@ -149,7 +149,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json(
         {
           ok: false,
-          error: `Calendar event "${overlap.summary ?? overlap.id}" overlaps this time.`,
+          error: `Calendar event "${overlap.summary ?? overlap.id}" overlaps this slot.`,
         },
         { status: 409 },
       );
@@ -273,7 +273,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       }
     }
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
-      return errorResponse("This time was just taken.", 409);
+      return errorResponse("This slot was just taken.", 409);
     }
     console.error("[admin/bookings] Booking insert failed:", err);
     return errorResponse("Failed to save booking.", 500);

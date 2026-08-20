@@ -91,7 +91,7 @@ function validateAvailability(a: AvailabilitySettings): FieldError[] {
       message: "Must be 0/blank (unlimited) or positive.",
     });
   if (!Array.isArray(a.subSlotMinutes) || a.subSlotMinutes.some((m) => !inRange(m, 0, 59)))
-    errors.push({ field: "subSlotMinutes", message: "Each start-time offset must be 0-59." });
+    errors.push({ field: "subSlotMinutes", message: "Each sub-slot offset must be 0-59." });
 
   if (!Array.isArray(a.morningGuards)) {
     errors.push({ field: "morningGuards", message: "Must be a list of guard rules." });
@@ -515,7 +515,7 @@ export function checkGuardrails(s: Settings): GuardrailIssue[] {
       if (pubOpen < earliestOpen || pubClose > latestClose) {
         issues.push({
           level: "warn",
-          message: `Published hours (${pubOpen}:00-${pubClose}:00) advertise time outside every bookable day (${earliestOpen}:00-${latestClose}:00), so customers could ask for a time the booking form never offers.`,
+          message: `Published hours (${pubOpen}:00-${pubClose}:00) advertise time outside every bookable day (${earliestOpen}:00-${latestClose}:00), so customers could ask for a slot the booking form never offers.`,
         });
       }
     }
