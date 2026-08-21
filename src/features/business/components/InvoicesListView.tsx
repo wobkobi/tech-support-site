@@ -673,6 +673,8 @@ export function InvoicesListView(): React.ReactElement {
             clientName: payTarget.clientName,
             status: payTarget.status,
             paidAt: payTarget.paidAt,
+            reminderLastSentAt: payTarget.reminderLastSentAt,
+            apologySentAt: payTarget.apologySentAt,
           }}
           onClose={(recorded) => {
             const id = payTarget.id;

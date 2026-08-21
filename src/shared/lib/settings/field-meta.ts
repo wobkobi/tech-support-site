@@ -175,6 +175,12 @@ export const COMMS_FIELD_META: Record<string, FieldMeta> = {
     unit: "reminders",
     off: "Set 0 to never send an automatic reminder.",
   },
+  invoiceApologyEnabled: {
+    title: "Apologise for a wrong reminder",
+    description:
+      "When a payment is recorded with a date earlier than the last reminder, offer to email the client an apology for chasing a bill they had already paid.",
+    off: "When off, the payment dialog never offers the apology.",
+  },
 };
 
 /** Field metadata for the reviews group, keyed by field name. */
@@ -269,6 +275,12 @@ export const IDENTITY_FIELD_META: Record<string, FieldMeta> = {
   servedSuburbs: {
     title: "Served suburbs",
     description: "Suburbs you cover, listed in the site's map data for local SEO.",
+  },
+  publishedHours: {
+    title: "Published hours",
+    description:
+      "The hours Google and other search engines are told you are open. Does not change what the booking form offers, so you can advertise a tidy window and still take later bookings.",
+    off: "Off = publish each day's real bookable hours from the Availability tab.",
   },
   emailSignature: {
     title: "Email signature",
@@ -408,6 +420,13 @@ export const PRICING_FIELD_META: Record<string, FieldMeta> = {
       "Fraction of the labour billed when the problem isn't put right by the end of the visit, diagnosis or not (50 = half price).",
     unit: "%",
     off: "Set 0 to charge nothing for an unsuccessful visit.",
+  },
+  noFixFreeMins: {
+    title: "No-fix grace period",
+    description:
+      "Minutes covered at no charge at the start of a return visit, when the previous one ended without a fix. On site or remote. A return booked only because the first ran out of time is a continuation, not a retry, so it bills from the first minute.",
+    unit: "minutes",
+    off: "Set 0 to drop the grace period from the pricing and FAQ pages.",
   },
   workmanshipWindowDays: {
     title: "Workmanship guarantee window",

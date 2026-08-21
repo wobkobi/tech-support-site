@@ -142,13 +142,17 @@ export default async function RootLayout({
   // schema.org telephone, derived from the editable tel: link (strip the scheme).
   const telephone = identity.phoneTel.replace(/^tel:/, "");
   const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  // Which days appear still tracks the real schedule; only the times are
+  // overridable, so the advertised listing can be narrower than the hours the
+  // booking form offers (evening slots stay bookable, just not advertised).
+  const published = identity.publishedHours;
   const openingHoursSpecification = [1, 2, 3, 4, 5, 6, 0]
     .filter((d) => availability.schedule[d]?.enabled)
     .map((d) => ({
       "@type": "OpeningHoursSpecification",
       dayOfWeek: dayNames[d],
-      opens: `${String(availability.schedule[d].open).padStart(2, "0")}:00`,
-      closes: `${String(availability.schedule[d].close).padStart(2, "0")}:00`,
+      opens: `${String(published?.open ?? availability.schedule[d].open).padStart(2, "0")}:00`,
+      closes: `${String(published?.close ?? availability.schedule[d].close).padStart(2, "0")}:00`,
     }));
   // Fall back to the default suburb list when the stored list is empty - an
   // identity row seeded before servedSuburbs existed stores [], which would

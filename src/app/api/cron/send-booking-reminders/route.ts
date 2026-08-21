@@ -15,7 +15,10 @@
  * which on whole-hour inputs allows a window just 1 hour wide.
  */
 
-import { combineUnitAndAddress } from "@/features/booking/lib/booking";
+import {
+  CALENDAR_EVENT_PRESENT_FILTER,
+  combineUnitAndAddress,
+} from "@/features/booking/lib/booking";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { sendBookingReminderEmail } from "@/features/reviews/lib/email";
 import { errorResponse } from "@/shared/lib/api-response";
@@ -57,7 +60,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       where: {
         status: "confirmed",
         startAt: { gt: fromTime, lte: upperTime },
-        OR: [{ emailReminderSentAt: null }, { emailReminderSentAt: { isSet: false } }],
+        // Two independent null-or-unset tests, so both live under AND - a second
+        // top-level OR would overwrite the first.
+        AND: [
+          { OR: [{ emailReminderSentAt: null }, { emailReminderSentAt: { isSet: false } }] },
+          CALENDAR_EVENT_PRESENT_FILTER,
+        ],
       },
       select: {
         id: true,

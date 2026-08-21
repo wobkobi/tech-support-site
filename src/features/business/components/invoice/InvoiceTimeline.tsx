@@ -1,9 +1,9 @@
 // src/features/business/components/invoice/InvoiceTimeline.tsx
 /**
  * @description Vertical lifecycle timeline for an invoice: Created > Sent >
- * Review link sent > Paid > Voided. Steps render only once reached; a reached
- * step with a null timestamp (legacy rows) degrades to a muted "date not
- * recorded" rather than vanishing. Server component.
+ * Review link sent > Reminder sent > Paid > Apology sent > Voided. Steps render
+ * only once reached; a reached step with a null timestamp (legacy rows) degrades
+ * to a muted "date not recorded" rather than vanishing. Server component.
  */
 
 import type { InvoiceStatus } from "@/features/business/types/business";
@@ -36,6 +36,8 @@ interface InvoiceTimelineProps {
   reminderLastSentAt?: Date | string | null;
   /** How many overdue reminders have gone out; null reads as 0. */
   reminderCount?: number | null;
+  /** When the apology for a wrongly-sent reminder went out; null = never. */
+  apologySentAt?: Date | string | null;
 }
 
 /** One rendered timeline step. */
@@ -79,6 +81,7 @@ function dotClass(tone: StepTone): string {
  * @param props.voidedAt - Void timestamp (nullable).
  * @param props.reminderLastSentAt - Most recent overdue-reminder timestamp (nullable).
  * @param props.reminderCount - Overdue reminders sent so far (null reads as 0).
+ * @param props.apologySentAt - Wrongly-chased apology timestamp (nullable).
  * @returns The timeline element.
  */
 export function InvoiceTimeline({
@@ -92,6 +95,7 @@ export function InvoiceTimeline({
   voidedAt,
   reminderLastSentAt,
   reminderCount,
+  apologySentAt,
 }: InvoiceTimelineProps): React.ReactElement {
   const steps: Step[] = [{ label: "Created", date: createdAt, tone: "neutral" }];
 
@@ -117,6 +121,12 @@ export function InvoiceTimeline({
   if (status === "PAID" || paidAt != null) {
     const detail = [paymentMethod, paymentReference].filter(Boolean).join(" · ") || null;
     steps.push({ label: "Paid", date: paidAt ?? null, detail, tone: "success" });
+  }
+
+  // Sent at pay time, so it sits after Paid: the reminder above it turned out to
+  // have chased money that had already arrived.
+  if (apologySentAt != null) {
+    steps.push({ label: "Apology sent", date: apologySentAt, tone: "info" });
   }
 
   if (status === "VOIDED" || voidedAt != null) {

@@ -7,6 +7,7 @@
  * Inputs are sized larger than the app default for the older admin audience.
  */
 
+import { hourLabel } from "@/features/booking/lib/booking";
 import { cn } from "@/shared/lib/cn";
 import type { FieldMeta } from "@/shared/lib/settings/field-meta";
 import type React from "react";
@@ -328,5 +329,63 @@ export function ToggleField({
         {value ? "On" : "Off"}
       </span>
     </FieldShell>
+  );
+}
+
+/**
+ * Labels an hour for a closing-time dropdown, where 24 means midnight.
+ * @param h - Hour 1-24.
+ * @returns Display label.
+ */
+export function closeLabel(h: number): string {
+  return h === 24 ? "12am" : hourLabel(h);
+}
+
+interface HourSelectProps {
+  value: number;
+  onChange: (h: number) => void;
+  /** Inclusive hour range for the options. */
+  from: number;
+  to: number;
+  /** Use the close-style label (24 = midnight). */
+  close?: boolean;
+  /** Accessible name, for selects rendered without an adjacent label. */
+  ariaLabel?: string;
+}
+
+/**
+ * Small hour dropdown used for open/close/break times.
+ * @param props - Component props.
+ * @param props.value - Selected hour.
+ * @param props.onChange - Called with the new hour.
+ * @param props.from - First selectable hour.
+ * @param props.to - Last selectable hour.
+ * @param props.close - Whether to label 24 as midnight.
+ * @param props.ariaLabel - Accessible name for the select.
+ * @returns Hour select element.
+ */
+export function HourSelect({
+  value,
+  onChange,
+  from,
+  to,
+  close,
+  ariaLabel,
+}: HourSelectProps): React.ReactElement {
+  const opts: number[] = [];
+  for (let h = from; h <= to; h++) opts.push(h);
+  return (
+    <select
+      value={value}
+      aria-label={ariaLabel}
+      onChange={(e) => onChange(Number(e.target.value))}
+      className="rounded-lg border border-admin-border-strong px-2 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
+    >
+      {opts.map((h) => (
+        <option key={h} value={h}>
+          {close ? closeLabel(h) : hourLabel(h)}
+        </option>
+      ))}
+    </select>
   );
 }

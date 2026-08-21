@@ -1,6 +1,6 @@
 {
   "name": "tech-support-site",
-  "version": "4.15.0",
+  "version": "4.18.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -19,7 +19,8 @@
     "postinstall": "prisma generate",
     "lint": "eslint --fix --cache \"{src,scripts}/**/*.{js,ts,jsx,tsx}\"",
     "prepare": "simple-git-hooks",
-    "reconcile:times": "dotenv -e .env.local -- tsx scripts/reconcile-booking-times.ts",
+    "reconcile:times:apply": "dotenv -e .env.local -- tsx scripts/reconcile-booking-times.ts --apply",
+    "reconcile:times:dry": "dotenv -e .env.local -- tsx scripts/reconcile-booking-times.ts",
     "settings:seed": "dotenv -e .env.local -- tsx scripts/seed-settings.ts",
     "smoke": "dotenv -e .env.local -- tsx scripts/smoke-test.ts",
     "start": "next start",

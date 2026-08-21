@@ -85,6 +85,7 @@ export const getPolicy = cache(async (): Promise<Policy> => {
     MAX_JOB_MINS: pricing.maxJobMins,
     PUBLIC_HOLIDAY_UPLIFT: pricing.publicHolidayUplift,
     UNSUCCESSFUL_WORK_FACTOR: pricing.unsuccessfulWorkFactor,
+    NO_FIX_FREE_MINS: pricing.noFixFreeMins,
     WORKMANSHIP_WINDOW_DAYS: pricing.workmanshipWindowDays,
     CANCELLATION: pricing.cancellation,
   };

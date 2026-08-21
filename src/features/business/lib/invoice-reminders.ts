@@ -1,8 +1,9 @@
 // src/features/business/lib/invoice-reminders.ts - overdue-reminder
-// send-and-stamp shared by the daily cron and the manual action.
+// send-and-stamp shared by the daily cron and the manual action, plus the
+// apology for a reminder that chased an already-paid invoice.
 
 import { generateInvoicePdf, serializeInvoice } from "@/features/business/lib/invoice-pdf";
-import { sendInvoiceReminderEmail } from "@/features/reviews/lib/email";
+import { sendInvoiceReminderEmail, sendPaymentApologyEmail } from "@/features/reviews/lib/email";
 import { prisma } from "@/shared/lib/prisma";
 import type { Invoice as PrismaInvoice } from "@prisma/client";
 
@@ -54,4 +55,38 @@ export async function sendOverdueReminder(invoice: PrismaInvoice): Promise<Remin
   });
 
   return { ok: true, reminderNumber };
+}
+
+/**
+ * Emails the "sorry, you'd already paid" note and stamps `apologySentAt` only
+ * once Resend accepts, so a transient failure leaves the invoice eligible for a
+ * later attempt instead of silently swallowing the apology. Callers gate on
+ * reminderChasedPaidInvoice (invoice-apology.ts) and the comms setting first.
+ * @param invoice - The invoice row that was wrongly chased.
+ * @param paidAt - The recorded payment date (earlier than the last reminder).
+ * @returns True when the apology was sent and stamped.
+ */
+export async function sendReminderApology(invoice: PrismaInvoice, paidAt: Date): Promise<boolean> {
+  if (!invoice.reminderLastSentAt) return false;
+
+  const accepted = await sendPaymentApologyEmail({
+    invoice: {
+      number: invoice.number,
+      clientName: invoice.clientName,
+      clientEmail: invoice.clientEmail,
+      issueDate: invoice.issueDate,
+      dueDate: invoice.dueDate,
+      total: invoice.total,
+    },
+    reminderSentAt: invoice.reminderLastSentAt,
+    paidAt,
+  });
+  if (!accepted) return false;
+
+  await prisma.invoice.update({
+    where: { id: invoice.id },
+    data: { apologySentAt: new Date() },
+  });
+
+  return true;
 }

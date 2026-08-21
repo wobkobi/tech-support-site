@@ -2,9 +2,17 @@
 // Reports (and optionally applies) the difference between each booking's stored
 // times and its live Google Calendar event. Reads the booking calendar and the
 // live database, so it costs Calendar quota and needs .env.local.
-// Run with: npm run reconcile:times          (dry run, writes nothing)
-//           npm run reconcile:times -- --apply
-//           npm run reconcile:times -- --days 120
+// Run with: npm run reconcile:times:dry      (writes nothing)
+//           npm run reconcile:times:apply    (writes)
+//
+// Two scripts rather than one plus a flag, because getting the flag through is
+// the failure everyone hits: PowerShell 5.1 strips a bare `--` before npm sees
+// it, npm then reads what follows as its own config, and the flag never reaches
+// this script. `npm run reconcile:times:dry -- --apply` therefore runs a DRY RUN
+// that reads exactly like a successful apply. Quote the separator for the flags
+// that have no script of their own:
+//           npm run reconcile:times:dry '--' --days 120
+// From bash (including the git hooks) the bare `--` is fine.
 
 import { reconcileBookingTimes } from "@/features/calendar/lib/reconcile-booking-times";
 import { formatDateTimeShort } from "@/shared/lib/date-format";
@@ -48,9 +56,50 @@ if (result.drifted.length === 0) {
   );
 }
 
+if (result.rearmed.length > 0) {
+  console.log(
+    `\n${result.rearmed.length} booking(s) carry send stamps from times they no longer have, so the email never fires again:`,
+  );
+  for (const r of result.rearmed) {
+    const labels = r.stamps
+      .map((s) => (s === "reminder" ? "24h reminder" : "review request"))
+      .join(" + ");
+    console.log(
+      `  ${r.name}  (${r.bookingId})  booked ${formatDateTimeShort(r.startAt)}  >  ${labels}`,
+    );
+  }
+  console.log(
+    apply
+      ? "  cleared - each will be emailed against its real times"
+      : "  re-run with --apply to clear them",
+  );
+}
+
+if (result.missing.length > 0) {
+  console.log(
+    `\n${result.missing.length} booking(s) own an event Calendar no longer has - the job was called off there and the row was left behind:`,
+  );
+  for (const gone of result.missing) {
+    console.log(
+      `  ${gone.name}  (${gone.bookingId})  still booked ${formatDateTimeShort(gone.startAt)}`,
+    );
+  }
+  console.log(
+    apply
+      ? "  flagged - reminder and review emails are paused until each row is cancelled properly"
+      : "  re-run with --apply to pause their reminder and review emails",
+  );
+}
+
+if (result.restored > 0) {
+  console.log(
+    `\n${result.restored} previously flagged booking(s) read back again and were cleared.`,
+  );
+}
+
 if (result.unreadable > 0) {
   console.log(
-    `\n${result.unreadable} booking(s) had no readable event (deleted, all-day, or an API failure) and were left alone.`,
+    `\n${result.unreadable} booking(s) had no readable event (all-day, or an API failure) and were left alone.`,
   );
 }
 

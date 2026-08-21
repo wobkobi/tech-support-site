@@ -130,6 +130,12 @@ model Booking {
 
   // Google Calendar event ID, used to delete the event on cancellation.
   calendarEventId String?
+  // Set by the reconcile cron when this row still owns an event id that Calendar
+  // no longer has: the job was called off there and the row was left behind.
+  // While it is set, the reminder and review crons skip the booking rather than
+  // email about a job that isn't happening, and the admin flags it for cleanup.
+  // Cleared as soon as the event reads back, so a restored event resumes mail.
+  calendarEventMissingAt DateTime?
 
   // Review email tracking.
   reviewSentAt      DateTime? // When the review request email was sent
@@ -512,6 +518,11 @@ model Invoice {
   // the Mongo no-backfill rule; readers treat null count as 0.
   reminderLastSentAt DateTime?
   reminderCount      Int?
+  // Stamped when the "sorry, you'd already paid" note goes out - a reminder
+  // chased a payment that had already landed because the invoice hadn't been
+  // marked off yet. Set only after Resend accepts, so a failed send stays
+  // retryable, and it doubles as the never-apologise-twice guard.
+  apologySentAt      DateTime?
   // Quote mode: true = this row is a QUOTE (Q- number, QUOTE watermark, no
   // payment/income until converted). Convert-to-invoice allocates a real
   // invoice number, clears the flag, and restamps issue/due dates. Nullable

@@ -122,6 +122,8 @@ export interface PricingSettings {
   travelRatePerHour: number;
   /** Fraction charged when a visit is unsuccessful (0.5 = half price, 0 = free). */
   unsuccessfulWorkFactor: number;
+  /** Minutes covered free at the start of a return visit, when the previous one ended without a fix. 0 = no stated grace. */
+  noFixFreeMins: number;
   /** Days after a visit during which fallout from that visit's changes is fixed free. 0 = no stated guarantee. */
   workmanshipWindowDays: number;
   cancellation: CancellationSettings;
@@ -136,6 +138,17 @@ export interface BaseAddress {
   postcode: string;
   lat: number | null;
   lng: number | null;
+}
+
+/**
+ * The opening hours advertised to search engines, when they should differ from
+ * the bookable schedule. A single window applied to every enabled day.
+ */
+export interface PublishedHours {
+  /** Advertised opening hour, 0-23 NZ-local. */
+  open: number;
+  /** Advertised closing hour, 1-24 NZ-local. Must be greater than `open`. */
+  close: number;
 }
 
 export interface IdentitySettings {
@@ -155,6 +168,12 @@ export interface IdentitySettings {
   homeRegion: string;
   /** Advertised service-area radius in km (drives the SEO GeoCircle). */
   serviceRadiusKm: number;
+  /**
+   * Overrides the hours published in the site's schema.org data, so the listing
+   * Google shows can be narrower than the hours the booking form actually
+   * offers. null = publish each day's real bookable window.
+   */
+  publishedHours: PublishedHours | null;
   /**
    * Text block under the logo in every outgoing email, one line per row. Carries
    * `{name}` / `{company}` / `{phone}` / `{email}` / `{website}` / `{location}`
@@ -240,6 +259,8 @@ export interface CommsSettings {
   invoiceReminderSecondDays: number;
   /** Maximum number of automatic overdue reminders per invoice. */
   invoiceReminderMaxCount: number;
+  /** Master switch for the apology sent when a reminder chased an already-paid invoice. */
+  invoiceApologyEnabled: boolean;
 }
 
 export interface SchedulingSettings {

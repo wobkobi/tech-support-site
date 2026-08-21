@@ -162,6 +162,13 @@ export function CommsTab({ initial, defaults }: Props): React.ReactElement {
           customised={draft.invoiceReminderMaxCount !== defaults.invoiceReminderMaxCount}
           onChange={(v) => set({ invoiceReminderMaxCount: v ?? 0 })}
         />
+        <ToggleField
+          id="invoiceApologyEnabled"
+          meta={m.invoiceApologyEnabled}
+          value={draft.invoiceApologyEnabled}
+          customised={draft.invoiceApologyEnabled !== defaults.invoiceApologyEnabled}
+          onChange={(v) => set({ invoiceApologyEnabled: v })}
+        />
       </div>
 
       <SettingsFooter form={form} />

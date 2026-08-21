@@ -2,14 +2,17 @@
 /**
  * @description Records a payment against an invoice: atomically claims the PAID
  * stamp (idempotent under double-clicks / retries), creates or updates the
- * linked income-ledger entry, and re-syncs the PAID-watermarked PDF to Drive.
- * The DB stamp is authoritative; the income + Drive steps are best-effort and
- * never roll back the payment.
+ * linked income-ledger entry, re-syncs the PAID-watermarked PDF to Drive, and
+ * apologises when an overdue reminder had chased a payment that already landed.
+ * The DB stamp is authoritative; the income, Drive and apology steps are
+ * best-effort and never roll back the payment.
  */
 
 import { INCOME_METHODS } from "@/features/business/lib/constants";
 import { recordIncome } from "@/features/business/lib/income-recording";
+import { reminderChasedPaidInvoice } from "@/features/business/lib/invoice-apology";
 import { syncInvoicePdfToDriveById } from "@/features/business/lib/invoice-drive-sync";
+import { sendReminderApology } from "@/features/business/lib/invoice-reminders";
 import {
   formatDateForSheet,
   resolveSheetIdForDate,
@@ -18,6 +21,7 @@ import {
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
+import { getSettings } from "@/shared/lib/settings/get-settings";
 import { NextRequest, NextResponse } from "next/server";
 
 // Raise the serverless ceiling so the awaited Drive re-upload can't 504.
@@ -25,14 +29,15 @@ export const maxDuration = 60;
 
 /**
  * POST /api/business/invoices/[id]/pay
- * Body: `{ paidAt?, method, reference?, createIncome? }`. `method` must be an
- * INCOME_METHODS value; `paidAt` defaults to now; `createIncome` defaults true
- * except on an already-PAID invoice (where a non-dialog caller must not silently
- * create a second ledger row).
+ * Body: `{ paidAt?, method, reference?, createIncome?, sendApology? }`. `method`
+ * must be an INCOME_METHODS value; `paidAt` defaults to now; `createIncome` and
+ * `sendApology` both default true except on an already-PAID invoice (where a
+ * non-dialog caller must not silently create a second ledger row or email about
+ * a long-settled bill).
  * @param request - Next.js request (admin-auth gated).
  * @param ctx - Route ctx with the invoice id.
  * @param ctx.params - Resolved Next.js dynamic route params.
- * @returns JSON `{ ok, invoice, incomeEntry, incomeAction, sheetWarning }` or an error.
+ * @returns JSON `{ ok, invoice, incomeEntry, incomeAction, sheetWarning, apologySent }` or an error.
  */
 export async function POST(
   request: NextRequest,
@@ -57,6 +62,7 @@ export async function POST(
     method?: unknown;
     reference?: unknown;
     createIncome?: unknown;
+    sendApology?: unknown;
   };
   const method = typeof body.method === "string" ? body.method : "";
   if (!(INCOME_METHODS as readonly string[]).includes(method)) {
@@ -71,6 +77,10 @@ export async function POST(
   // Defaults true, but false on an already-PAID invoice so a non-dialog caller
   // can't double-count a ledger row that was entered by hand.
   const createIncome = typeof body.createIncome === "boolean" ? body.createIncome : !alreadyPaid;
+  // Same default as createIncome, and for the same reason: backfilling paidAt
+  // onto a legacy PAID row must not email an apology for a bill that was
+  // settled - and acknowledged - months ago.
+  const sendApology = typeof body.sendApology === "boolean" ? body.sendApology : !alreadyPaid;
 
   // Atomic claim: stamp the payment only where paidAt is still empty. Covers a
   // fresh payment (status flips to PAID) and a backfill onto a legacy PAID row
@@ -94,6 +104,7 @@ export async function POST(
       invoice: current,
       incomeEntry: existing,
       incomeAction: "skipped",
+      apologySent: false,
     });
   }
 
@@ -164,6 +175,33 @@ export async function POST(
   // Re-sync the PAID-watermarked PDF to Drive (awaited; best-effort).
   await syncInvoicePdfToDriveById(id, "[invoice-pay]");
 
+  // Apologise when a reminder chased money that had already arrived. Re-checked
+  // here rather than trusted from the body, and best-effort like the Drive sync:
+  // a failed send leaves apologySentAt null (retryable) and never unwinds the
+  // recorded payment.
+  let apologySent = false;
+  if (
+    sendApology &&
+    reminderChasedPaidInvoice({
+      reminderLastSentAt: invoice.reminderLastSentAt,
+      paidAt,
+      apologySentAt: invoice.apologySentAt,
+    })
+  ) {
+    const { comms } = await getSettings();
+    if (comms.invoiceApologyEnabled) {
+      apologySent = await sendReminderApology(invoice, paidAt);
+      if (apologySent) console.log(`[invoice-pay] apology sent for ${invoice.number}`);
+    }
+  }
+
   const updated = await prisma.invoice.findUnique({ where: { id } });
-  return NextResponse.json({ ok: true, invoice: updated, incomeEntry, incomeAction, sheetWarning });
+  return NextResponse.json({
+    ok: true,
+    invoice: updated,
+    incomeEntry,
+    incomeAction,
+    sheetWarning,
+    apologySent,
+  });
 }

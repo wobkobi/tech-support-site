@@ -7,6 +7,7 @@
  * does - safe to slow further if function CPU ever needs trimming again.
  */
 
+import { CALENDAR_EVENT_PRESENT_FILTER } from "@/features/booking/lib/booking";
 import { sendCustomerReviewRequest } from "@/features/reviews/lib/email";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isCronAuthorized } from "@/shared/lib/auth";
@@ -42,18 +43,26 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     // Find confirmed/completed bookings that ended at least the configured
     // delay ago and have not had a review email yet.
     //
+    // A booking whose calendar event has been deleted is excluded: the job was
+    // called off in Calendar and nobody cancelled the row, so asking how it went
+    // would be asking about a visit that never happened.
+    //
     // MongoDB gotcha: documents written before reviewSentAt existed in the
     // schema have no `reviewSentAt` field at all (not even null). Prisma's
     // `reviewSentAt: null` filter only matches explicit nulls and skips
     // those documents. Using `isSet: false` on its own would skip the
-    // opposite case (field present and null). The OR covers both.
+    // opposite case (field present and null). The OR covers both - and two of
+    // them have to live under AND, since a second top-level OR would win.
     const bookingsToEmail = await prisma.booking.findMany({
       where: {
         endAt: {
           lte: delayAgo,
         },
         status: { in: ["confirmed", "completed"] },
-        OR: [{ reviewSentAt: null }, { reviewSentAt: { isSet: false } }],
+        AND: [
+          { OR: [{ reviewSentAt: null }, { reviewSentAt: { isSet: false } }] },
+          CALENDAR_EVENT_PRESENT_FILTER,
+        ],
       },
       select: {
         id: true,
@@ -179,7 +188,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     // attempt. The flag is cleared either way (cap of one retry) so a persistent
     // failure gives up rather than emailing forever.
     const failedBookings = await prisma.booking.findMany({
-      where: { reviewSendFailedAt: { not: null } },
+      // Same calendar guard as the main query: a booking flagged between the
+      // failed send and this pass must not be retried into a job that's off.
+      where: { reviewSendFailedAt: { not: null }, ...CALENDAR_EVENT_PRESENT_FILTER },
       select: { id: true, name: true, email: true, reviewToken: true },
     });
     let retried = 0;

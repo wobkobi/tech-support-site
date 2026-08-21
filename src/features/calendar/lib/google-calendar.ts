@@ -213,14 +213,38 @@ export interface BookingEventDetails {
   location: string | null;
 }
 
+/** Outcome of a single booking-event lookup. */
+export type BookingEventLookup =
+  /** The event is there and carries a real time window. */
+  | { state: "found"; event: BookingEventDetails }
+  /** Deleted or cancelled in Calendar - the job is off. */
+  | { state: "gone" }
+  /** All-day, or the API call failed: nothing can be concluded either way. */
+  | { state: "unreadable" };
+
 /**
- * Fetches one timed event from the booking calendar by id - live, not via the
- * schedule cache, so just-made time corrections are certain to be current.
- * Used by the calculator's "Bill in calculator" prefill.
- * @param eventId - Google Calendar event id (as stored on Booking.calendarEventId).
- * @returns Event details, or null when missing, cancelled, all-day, or on any API failure.
+ * True for a Google API error that means "no such event". googleapis surfaces
+ * the HTTP status differently depending on the transport layer that threw, so
+ * all three shapes are checked; anything else must not be read as a deletion.
+ * @param err - The thrown value.
+ * @returns Whether the error is a 404.
  */
-export async function fetchBookingEvent(eventId: string): Promise<BookingEventDetails | null> {
+function isEventNotFound(err: unknown): boolean {
+  if (typeof err !== "object" || err === null) return false;
+  const e = err as { code?: unknown; status?: unknown; response?: { status?: unknown } };
+  return e.code === 404 || e.status === 404 || e.response?.status === 404;
+}
+
+/**
+ * Reads one timed event from the booking calendar by id - live, not via the
+ * schedule cache, so just-made time corrections are certain to be current.
+ * Separates a deleted event from an unreadable one: only the former means the
+ * job is off, and pausing a customer's emails on a quota blip would be worse
+ * than sending them.
+ * @param eventId - Google Calendar event id (as stored on Booking.calendarEventId).
+ * @returns Which of the three states the event is in.
+ */
+export async function lookupBookingEvent(eventId: string): Promise<BookingEventLookup> {
   try {
     const calendar = getCalendarClient();
     const res = await calendar.events.get({
@@ -228,19 +252,37 @@ export async function fetchBookingEvent(eventId: string): Promise<BookingEventDe
       eventId,
     });
     const event = res.data;
-    if (!event || event.status === "cancelled") return null;
+    // A deleted event reads back as status "cancelled" for a while before
+    // Google drops the row entirely and starts answering 404.
+    if (!event || event.status === "cancelled") return { state: "gone" };
     // All-day events carry date (not dateTime) and have no billable time window.
-    if (!event.start?.dateTime || !event.end?.dateTime) return null;
+    if (!event.start?.dateTime || !event.end?.dateTime) return { state: "unreadable" };
     return {
-      start: event.start.dateTime,
-      end: event.end.dateTime,
-      summary: event.summary ?? null,
-      location: event.location ?? null,
+      state: "found",
+      event: {
+        start: event.start.dateTime,
+        end: event.end.dateTime,
+        summary: event.summary ?? null,
+        location: event.location ?? null,
+      },
     };
   } catch (err) {
-    console.warn("[calendar] fetchBookingEvent failed:", err);
-    return null;
+    if (isEventNotFound(err)) return { state: "gone" };
+    console.warn("[calendar] lookupBookingEvent failed:", err);
+    return { state: "unreadable" };
   }
+}
+
+/**
+ * Fetches one timed event from the booking calendar by id. Collapses
+ * {@link lookupBookingEvent} to "usable times or nothing" for callers that only
+ * need the window, such as the calculator's "Bill in calculator" prefill.
+ * @param eventId - Google Calendar event id (as stored on Booking.calendarEventId).
+ * @returns Event details, or null when missing, cancelled, all-day, or on any API failure.
+ */
+export async function fetchBookingEvent(eventId: string): Promise<BookingEventDetails | null> {
+  const lookup = await lookupBookingEvent(eventId);
+  return lookup.state === "found" ? lookup.event : null;
 }
 
 /**

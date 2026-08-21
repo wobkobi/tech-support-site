@@ -70,6 +70,7 @@ export const DEFAULT_SETTINGS: Settings = {
     minTravelCharge: 10,
     travelRatePerHour: 40,
     unsuccessfulWorkFactor: 0.5,
+    noFixFreeMins: 30,
     workmanshipWindowDays: 30,
     cancellation: {
       freeNoticeHours: 12,
@@ -181,6 +182,8 @@ export const DEFAULT_SETTINGS: Settings = {
     bankAccount: process.env.NEXT_PUBLIC_BUSINESS_BANK_ACCOUNT ?? BANK_ACCOUNT_PLACEHOLDER,
     homeRegion: "Auckland",
     serviceRadiusKm: 25,
+    // null = the SEO hours mirror each day's bookable window.
+    publishedHours: null,
     // Placeholders rather than literal details, so editing the phone or email
     // above moves every email without anyone remembering to edit this too.
     emailSignature: "**{name}** · Owner / Technician\n{phone} · {email}\n{website} · {location}",
@@ -205,6 +208,7 @@ export const DEFAULT_SETTINGS: Settings = {
     invoiceReminderFirstDays: 3,
     invoiceReminderSecondDays: 10,
     invoiceReminderMaxCount: 2,
+    invoiceApologyEnabled: true,
   },
 
   // Source: calendar-cache.ts travel-block heuristics + edit-window.ts + travel-time route.

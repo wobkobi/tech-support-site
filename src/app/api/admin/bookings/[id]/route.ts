@@ -234,6 +234,13 @@ export async function PATCH(
     if (!booking.activeSlotKey?.startsWith("released:")) {
       data.activeSlotKey = startAt.toISOString();
     }
+    // A moved start needs its 24h nudge again; the stamp is otherwise never
+    // cleared, so a booking reminded at the old time is never reminded at the
+    // new one. Gated on the start actually changing, so correcting only the
+    // finish time doesn't re-send a reminder the customer already has.
+    if (startAt.getTime() !== booking.startAt.getTime()) {
+      data.emailReminderSentAt = null;
+    }
 
     if (notify) {
       // The replacement invite only supersedes the old one when its SEQUENCE

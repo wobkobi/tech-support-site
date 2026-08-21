@@ -11,6 +11,7 @@
 import { AvailabilityPreview } from "@/features/admin/components/settings/AvailabilityPreview";
 import {
   FieldShell,
+  HourSelect,
   NumberField,
   SettingsTabBody,
   ToggleField,
@@ -39,53 +40,6 @@ const DAY_ORDER: { index: number; name: string }[] = [
   { index: 6, name: "Saturday" },
   { index: 0, name: "Sunday" },
 ];
-
-/**
- * Labels an hour for the close dropdown, where 24 means midnight (end of day).
- * @param h - Hour 1-24.
- * @returns Display label.
- */
-function closeLabel(h: number): string {
-  return h === 24 ? "12am" : hourLabel(h);
-}
-
-interface HourSelectProps {
-  value: number;
-  onChange: (h: number) => void;
-  /** Inclusive hour range for the options. */
-  from: number;
-  to: number;
-  /** Use the close-style label (24 = midnight). */
-  close?: boolean;
-}
-
-/**
- * Small hour dropdown used for open/close/break times.
- * @param props - Component props.
- * @param props.value - Selected hour.
- * @param props.onChange - Called with the new hour.
- * @param props.from - First selectable hour.
- * @param props.to - Last selectable hour.
- * @param props.close - Whether to label 24 as midnight.
- * @returns Hour select element.
- */
-function HourSelect({ value, onChange, from, to, close }: HourSelectProps): React.ReactElement {
-  const opts: number[] = [];
-  for (let h = from; h <= to; h++) opts.push(h);
-  return (
-    <select
-      value={value}
-      onChange={(e) => onChange(Number(e.target.value))}
-      className="rounded-lg border border-admin-border-strong px-2 py-2 text-sm focus:ring-2 focus:ring-russian-violet/30 focus:outline-none"
-    >
-      {opts.map((h) => (
-        <option key={h} value={h}>
-          {close ? closeLabel(h) : hourLabel(h)}
-        </option>
-      ))}
-    </select>
-  );
-}
 
 /**
  * Availability settings tab.

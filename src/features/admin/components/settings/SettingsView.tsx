@@ -238,7 +238,11 @@ export function SettingsView({
             ) : active === "estimator" ? (
               <EstimatorTab initial={estimator} defaults={estimatorDefaults} />
             ) : active === "identity" ? (
-              <IdentityTab initial={identity} defaults={identityDefaults} />
+              <IdentityTab
+                initial={identity}
+                defaults={identityDefaults}
+                bookableSchedule={availability.schedule}
+              />
             ) : active === "comms" ? (
               <CommsTab initial={comms} defaults={commsDefaults} />
             ) : active === "reviews" ? (

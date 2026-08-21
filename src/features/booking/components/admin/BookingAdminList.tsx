@@ -33,6 +33,8 @@ export interface AdminBookingRow {
   reviewSentAt: string | null;
   cancelledAt: string | null;
   noShow: boolean;
+  /** Set when the row's Google Calendar event is gone; null while it's there. */
+  calendarEventMissingAt: string | null;
   /** Public quote the customer saw before booking (snapshot); null when they didn't get one. */
   quotedLow: number | null;
   quotedHigh: number | null;
@@ -313,6 +315,16 @@ export function BookingAdminList({
                     </td>
                     <td className="px-3 py-3 align-top">
                       <StatusPill tone={STATUS_TONE[b.status]}>{b.status}</StatusPill>
+                      {/* Reminder and review emails are paused for this row - the
+                          calendar event behind it is gone. */}
+                      {b.calendarEventMissingAt && b.status !== "cancelled" && (
+                        <span
+                          className="mt-1 block text-xs font-medium text-coquelicot-700"
+                          title="The Google Calendar event was deleted. Reminder and review emails are paused until this booking is cancelled or re-booked."
+                        >
+                          no calendar event
+                        </span>
+                      )}
                     </td>
                     <td className="px-3 py-3 align-top whitespace-nowrap text-slate-600">
                       {b.quotedLow != null && b.quotedHigh != null ? (
