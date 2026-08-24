@@ -67,7 +67,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
-    "@next/bundle-analyzer": "^16.3.1",
+    "@next/bundle-analyzer": "^16.3.2",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/google.maps": "^3.65.5",
     "@types/jsdom": "^30.0.0",
