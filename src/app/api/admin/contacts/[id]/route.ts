@@ -10,6 +10,7 @@ import {
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { resolveAddress } from "@/shared/lib/normalise-address";
+import { normaliseEmail, normaliseEmailOrNull } from "@/shared/lib/normalise-email";
 import { isValidPhone, normalisePhone, toE164NZ } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
@@ -81,7 +82,7 @@ export async function PATCH(
     return errorResponse("Name is required.", 400);
   }
   if (body.email !== undefined) {
-    const trimmedEmail = body.email.trim().toLowerCase();
+    const trimmedEmail = normaliseEmail(body.email);
     if (trimmedEmail && !/^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/.test(trimmedEmail)) {
       return errorResponse("Please enter a valid email address.", 400);
     }
@@ -127,7 +128,7 @@ export async function PATCH(
 
   const updateData: Record<string, string | number | boolean | Date | string[] | null> = {};
   if (body.name !== undefined) updateData.name = body.name.trim();
-  if (body.email !== undefined) updateData.email = body.email.trim().toLowerCase() || null;
+  if (body.email !== undefined) updateData.email = normaliseEmailOrNull(body.email);
   if (body.phone !== undefined) updateData.phone = toE164NZ(body.phone) || null;
   // Canonicalise before storing so an address typed here matches the shape the
   // import and booking paths produce. An ambiguous or failed lookup keeps the

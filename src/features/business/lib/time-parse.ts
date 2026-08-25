@@ -114,6 +114,13 @@ export function extractRanges(input: string): ParsedTimeRange[] {
       const [, startRaw, startMerRaw, sep, endRaw, endMerRaw] = match;
       // Bare-space compact pairs are phone numbers or IDs, never a range.
       if (!/[-–—]|to/.test(sep) && (isCompact(startRaw) || isCompact(endRaw))) continue;
+      // A dashed date reads as a range if taken at face value: "2026-08-25"
+      // pairs 2026 with 08 as 20:26-08:00, an overnight shift of nearly 15
+      // hours. A third dash-joined number on either side means this is a date,
+      // not a time - no real range carries one.
+      const matchEnd = (match.index ?? 0) + match[0].length;
+      if (/^\s*[-–—]\s*\d/.test(line.slice(matchEnd))) continue;
+      if (/\d\s*[-–—]\s*$/.test(line.slice(0, match.index ?? 0))) continue;
       const startMer = (startMerRaw?.toLowerCase() ?? null) as Meridiem;
       const endMer = (endMerRaw?.toLowerCase() ?? null) as Meridiem;
       const start = parseTimeMins(startRaw, startMer ?? endMer);

@@ -31,7 +31,7 @@ interface SelfCase {
 /** Raw results for one case across N runs. */
 interface RawRun {
   id: string;
-  kind: "estimate-single" | "estimate-multi" | "parse" | "cross-route";
+  kind: "estimate-single" | "estimate-multi" | "parse" | "cross-route" | "travel";
   benchmarkLabel?: string;
   /** Raw input text (parse + cross-route) - the auditor re-derives the canonical duration from it. */
   input?: string;
@@ -39,6 +39,14 @@ interface RawRun {
   expectMode?: "exact" | "info";
   /** Cross-route cases: the parse-job durationMins for the same input. */
   parseMins?: number;
+  /** Travel cases: the decision the route returned, and what was expected. */
+  travel?: {
+    gotDestination: string | null;
+    gotNoTravelCharge: boolean | null;
+    wantDestination: string | null;
+    wantNoTravelCharge: boolean;
+    why: string;
+  };
   durations: number[];
   first: unknown;
   /** Set when the case could not complete; reported as a hard fail, no checks run. */
@@ -165,14 +173,18 @@ async function collectRaw(
 ): Promise<{ ctx: LiveContext; raw: RawRun[]; aborted: boolean }> {
   const { loadLiveContext } = await import("./context");
   const { callEstimate, callParseJob } = await import("./client");
-  const { PARSE_CASES, ESTIMATE_CASES, CROSS_ROUTE_CASES } = await import("./cases");
+  const { PARSE_CASES, ESTIMATE_CASES, CROSS_ROUTE_CASES, TRAVEL_CASES } = await import("./cases");
 
   process.stdout.write("Loading live context (settings, rates, templates)...\n");
   const ctx = await loadLiveContext();
   const raw: RawRun[] = [];
 
   const total =
-    ctx.benchmarks.length + ESTIMATE_CASES.length + PARSE_CASES.length + CROSS_ROUTE_CASES.length;
+    ctx.benchmarks.length +
+    ESTIMATE_CASES.length +
+    PARSE_CASES.length +
+    CROSS_ROUTE_CASES.length +
+    TRAVEL_CASES.length;
   console.log(
     `Running ${total} cases x ${runs} run(s) = ${total * runs} paid calls. This takes a few minutes.\n`,
   );
@@ -265,6 +277,30 @@ async function collectRaw(
         expectMode: c.expectMode ?? "exact",
         durations,
         first,
+      });
+    });
+  }
+
+  // Travel decisions. Run once each: the answer is a branch, not a measured
+  // number, so repeated runs would only re-walk the same branch.
+  for (const c of TRAVEL_CASES) {
+    if (aborted) break;
+    tick(c.id);
+    await tryCase(c.id, "travel", async () => {
+      const r = await callParseJob(url, adminSecret, c.input);
+      raw.push({
+        id: c.id,
+        kind: "travel",
+        input: c.input,
+        durations: [],
+        first: r,
+        travel: {
+          gotDestination: r.destination ?? null,
+          gotNoTravelCharge: r.noTravelCharge ?? null,
+          wantDestination: c.destination,
+          wantNoTravelCharge: c.noTravelCharge,
+          why: c.why,
+        },
       });
     });
   }
@@ -394,6 +430,31 @@ function evaluate(ctx: LiveContext, raw: RawRun[]): CheckResult[] {
       }
     }
 
+    // Travel: destination and noTravelCharge are one decision, so both are
+    // asserted together and a contradiction between them fails outright.
+    if (r.kind === "travel" && r.travel) {
+      const t = r.travel;
+      const dest = t.gotDestination;
+      const destOk =
+        t.wantDestination === null
+          ? dest === null
+          : typeof dest === "string" && dest.toLowerCase().includes(t.wantDestination);
+      const chargeOk = t.gotNoTravelCharge === t.wantNoTravelCharge;
+      // The invariant is independent of what this case expected: naming a
+      // destination and then refusing to charge it is always wrong.
+      const contradiction = dest !== null && t.gotNoTravelCharge === true;
+      const wantDest = t.wantDestination === null ? "null" : `containing "${t.wantDestination}"`;
+      out.push({
+        id: r.id,
+        family: "travel",
+        label: `travel ${r.id}`,
+        status: destOk && chargeOk && !contradiction ? "pass" : "fail",
+        detail: contradiction
+          ? `contradiction: named ${JSON.stringify(dest)} then set noTravelCharge true`
+          : `destination ${JSON.stringify(dest)} (want ${wantDest}), noTravelCharge ${t.gotNoTravelCharge} (want ${t.wantNoTravelCharge}) - ${t.why}`,
+      });
+    }
+
     // Cross-route (report-only): public benchmark estimate vs admin stated-time
     // duration for the same job, with the canonical stated total for reference.
     if (r.kind === "cross-route") {
@@ -436,13 +497,20 @@ function evaluate(ctx: LiveContext, raw: RawRun[]): CheckResult[] {
  * @param checks - Evaluated checks.
  */
 function printReport(checks: CheckResult[]): void {
-  const families: CheckResult["family"][] = ["context", "reproducibility", "drift", "cross-route"];
+  const families: CheckResult["family"][] = [
+    "context",
+    "travel",
+    "reproducibility",
+    "drift",
+    "cross-route",
+  ];
   const titles: Record<CheckResult["family"], string> = {
     context: "1. Each model uses ALL context",
-    reproducibility: "2. Reproducibility",
-    drift: "3. Public estimate vs benchmarks (report-only)",
+    travel: "2. Travel decisions (one round trip, or none)",
+    reproducibility: "3. Reproducibility",
+    drift: "4. Public estimate vs benchmarks (report-only)",
     "cross-route":
-      "4. Cross-route drift (report-only): public estimate vs admin stated-time duration",
+      "5. Cross-route drift (report-only): public estimate vs admin stated-time duration",
   };
   for (const fam of families) {
     const rows = checks.filter((c) => c.family === fam);
@@ -505,11 +573,15 @@ function printReport(checks: CheckResult[]): void {
     const artifact = path.join(dir, `run-${started.replace(/[:.]/g, "-")}.json`);
     fs.writeFileSync(artifact, JSON.stringify({ started, runs, checks, raw }, null, 2));
 
-    // Only the deterministic context asserts (stated-time exactness, min-billable
-    // floor, increment) gate the exit code. Reproducibility is a soft, reported
-    // signal - a hosted LLM is never bit-for-bit reproducible, so a run-to-run
-    // spread is surfaced as a warning, not a build failure.
-    const contextFailed = checks.filter((c) => c.status === "fail" && c.family === "context");
+    // The deterministic asserts gate the exit code: context (stated-time
+    // exactness, min-billable floor, increment) and travel (which single trip
+    // the job bills). Both are branch decisions with one right answer, not
+    // model taste. Reproducibility is a soft, reported signal - a hosted LLM is
+    // never bit-for-bit reproducible, so a run-to-run spread is surfaced as a
+    // warning, not a build failure.
+    const hardFailed = checks.filter(
+      (c) => c.status === "fail" && (c.family === "context" || c.family === "travel"),
+    );
     const reproFailed = checks.filter((c) => c.status === "fail" && c.family === "reproducibility");
     const completed = raw.filter((r) => !r.error);
     const calls = completed.length * runs;
@@ -527,11 +599,11 @@ function printReport(checks: CheckResult[]): void {
       );
     }
     console.log(
-      contextFailed.length === 0
-        ? `\n\x1b[32m✓ all hard (context) assertions passed\x1b[0m\n`
-        : `\n\x1b[31m✗ ${contextFailed.length} hard (context) assertion(s) failed\x1b[0m\n`,
+      hardFailed.length === 0
+        ? `\n\x1b[32m✓ all hard (context + travel) assertions passed\x1b[0m\n`
+        : `\n\x1b[31m✗ ${hardFailed.length} hard (context + travel) assertion(s) failed\x1b[0m\n`,
     );
-    process.exit(contextFailed.length === 0 ? 0 : 1);
+    process.exit(hardFailed.length === 0 ? 0 : 1);
   } catch (err) {
     // Print the diagnostic message the client built (route, status, hint) as a
     // single clean line - no stack trace - then exit non-zero. Catching here

@@ -15,6 +15,7 @@ import { ParseConfidenceBanner } from "@/features/business/components/ParseConfi
 import { TaxonomyManageModal } from "@/features/business/components/TaxonomyManageModal";
 import { CancelFeeSection } from "@/features/business/components/calculator/CancelFeeSection";
 import { ClientPickerSection } from "@/features/business/components/calculator/ClientPickerSection";
+import { EventPickerSection } from "@/features/business/components/calculator/EventPickerSection";
 import { JobDetailsSection } from "@/features/business/components/calculator/JobDetailsSection";
 import { PartsSection } from "@/features/business/components/calculator/PartsSection";
 import { RateConfigPanel } from "@/features/business/components/calculator/RateConfigPanel";
@@ -44,7 +45,9 @@ import {
   type CancelMeetingType,
 } from "@/features/business/lib/pricing-policy";
 import { summariseForBanner, type ActivePromo } from "@/features/business/lib/promos";
+import { extractRanges } from "@/features/business/lib/time-parse";
 import type {
+  EventPrefill,
   GoogleContact,
   JobCalculation,
   ParsedRange,
@@ -57,11 +60,12 @@ import type {
   TravelEntry,
 } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
+import { normaliseEmail } from "@/shared/lib/normalise-email";
 import type { IdentitySettings } from "@/shared/lib/settings/types";
 import { getPacificAucklandOffset, nzDateParts } from "@/shared/lib/timezone-utils";
 import { useRouter } from "next/navigation";
 import type React from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 /**
  * Returns the YYYY-MM-DD string for today + n days.
@@ -149,6 +153,18 @@ const DRAFT_KEY = "calculator-draft-v2";
  * is stashed here just before the push and consumed on the next mount.
  */
 const AI_INPUT_HANDOFF_KEY = "calculator-ai-input-handoff";
+
+/**
+ * Blank state for the rate panel's add/edit form. Shared by the mount default,
+ * the cancel-edit path, and the full clear so they cannot drift apart.
+ */
+const BLANK_RATE_FORM = {
+  label: "",
+  type: "hourly" as "flat" | "hourly" | "modifier" | "percent",
+  amount: "",
+  unit: "hour",
+  isDefault: false,
+};
 
 /**
  * Subset of CalculatorView state persisted across refreshes. Excludes
@@ -291,8 +307,11 @@ function emptyTask(rates: RateConfig[]): TaskLine {
 interface CalculatorViewProps {
   /** Live business identity, threaded into the invoice preview. */
   identity: IdentitySettings;
-  /** Live pricing (GST, min travel, travel $/hr from settings) for the job calculations. */
-  pricing: JobPricing & { travelRatePerHour: number };
+  /**
+   * Live pricing (GST, min travel, travel $/hr from settings) for the job
+   * calculations, plus the event picker's merge-suggestion window.
+   */
+  pricing: JobPricing & { travelRatePerHour: number; mergeSuggestGapMins: number };
   /**
    * Live cancellation policy driving cancel mode: the notice windows decide
    * whether a fee and the round trip apply, and callOutFee is the amount. Sits
@@ -309,39 +328,9 @@ interface CalculatorViewProps {
   eventPrefill: EventPrefill | null;
 }
 
-/**
- * Job prefill built server-side from a booking-calendar event (whose times
- * the operator corrects to actual on-site time) plus its Booking row. Wins
- * over any saved draft - billing a specific event is a fresh task.
- */
-export interface EventPrefill {
-  /** Google Calendar event id; stored on the saved invoice. */
-  calendarEventId: string;
-  /** Matching Booking row id, or null for manual calendar events. */
-  bookingId: string | null;
-  /** NZ-local YYYY-MM-DD of the event start. */
-  jobDate: string;
-  /** NZ-local HH:MM event start (actual on-site start). */
-  startTime: string;
-  /** NZ-local HH:MM event end (actual on-site end). */
-  endTime: string;
-  clientName: string;
-  clientEmail: string;
-  jobAddress: string;
-  /**
-   * How the booking was to be met. Cancel mode bills no round trip on a remote
-   * session. Null when no Booking row backs the event, in which case the
-   * calculator infers it from whether there is an address or a drive.
-   */
-  meetingType: CancelMeetingType | null;
-  /**
-   * Drive prediction made for the event's actual window, from the frozen
-   * TravelBlock (raw minutes, no scheduling buffer) or the booking snapshot.
-   * Null when neither exists - the operator looks up manually.
-   */
-  travelMinsThere: number | null;
-  travelMinsBack: number | null;
-}
+// The prefill shapes live in the shared business types so the event picker
+// can read them without importing back from this module.
+export type { EventPrefill, EventPrefillSlot } from "@/features/business/types/business";
 
 /**
  * Interactive job calculator that lets an admin build a job quote using AI parsing, time tracking,
@@ -384,8 +373,10 @@ export function CalculatorView({
   // one slot per detected HH:MM-HH:MM segment; operators can add/remove rows
   // via the Time card. No labels, dates, or per-slot travel - it's all flat.
   const [timeRanges, setTimeRanges] = useState<ParsedRange[]>(() => {
+    // One slot per merged event. The slot sum ignores the gaps between them,
+    // so billing two events an hour apart charges the two visits, not the wait.
     if (eventPrefill) {
-      return [{ startTime: eventPrefill.startTime, endTime: eventPrefill.endTime }];
+      return eventPrefill.slots.map((s) => ({ startTime: s.startTime, endTime: s.endTime }));
     }
     return [{ startTime: "", endTime: "" }];
   });
@@ -439,7 +430,10 @@ export function CalculatorView({
   const [stashedTravel, setStashedTravel] = useState<TravelEntry[]>([]);
   // Client details
   const [clientName, setClientName] = useState(() => eventPrefill?.clientName ?? "");
-  const [clientEmail, setClientEmail] = useState(() => eventPrefill?.clientEmail ?? "");
+  // Normalised on seed as well as on typing: a Booking row written before
+  // emails were normalised can still carry capitals, and the invoice preview
+  // must show exactly what gets saved.
+  const [clientEmail, setClientEmail] = useState(() => normaliseEmail(eventPrefill?.clientEmail));
   // Address-to state mirrors the InvoiceBuilder's segmented control so the
   // operator picks Name/Company/Custom once and the choice rides through to
   // the invoice without re-picking.
@@ -465,33 +459,37 @@ export function CalculatorView({
   // Full-clear confirm: clearing also deletes the saved draft, so it can't be undone.
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
 
-  // "Bill a calendar event" picker: lazily fetched on first open so a normal
-  // calculator load costs nothing. Choosing an event pushes ?eventId= and the
-  // server prefills times, client, address, and travel; the page keys this
-  // component by eventId, so that navigation MUST remount it - the prefill
-  // only lands through useState initialisers, never a prop update.
-  const [eventPickerOpen, setEventPickerOpen] = useState(false);
-  const [recentEvents, setRecentEvents] = useState<
-    { id: string; summary: string; start: string; end: string }[] | null
-  >(null);
-  const [loadingEvents, setLoadingEvents] = useState(false);
-
-  /** Opens the event picker, fetching the recent-events list on first open. */
-  async function handleOpenEventPicker(): Promise<void> {
-    setEventPickerOpen((open) => !open);
-    if (recentEvents !== null || loadingEvents) return;
-    setLoadingEvents(true);
+  /**
+   * Loads the calculator for a set of calendar events, keeping a part-typed
+   * description across the remount the navigation forces. The page keys this
+   * component by the id set, so choosing events MUST remount it - the prefill
+   * only lands through useState initialisers, never a prop update.
+   * @param eventIds - Google Calendar event ids to bill as one job.
+   */
+  function handleBillEvents(eventIds: string[]): void {
     try {
-      const res = await fetch("/api/admin/schedule/recent-events");
-      const d = (await res.json()) as {
-        ok?: boolean;
-        events?: { id: string; summary: string; start: string; end: string }[];
-      };
-      setRecentEvents(d.ok && d.events ? d.events : []);
+      if (aiInput.trim()) sessionStorage.setItem(AI_INPUT_HANDOFF_KEY, aiInput);
     } catch {
-      setRecentEvents([]);
+      // Storage unavailable; the description won't carry over.
     }
-    setLoadingEvents(false);
+    // Unticking the last event leaves nothing to bill: fall back to a blank
+    // calculator rather than an empty eventIds= that would resolve to null.
+    if (eventIds.length === 0) {
+      router.push("/admin/business/calculator");
+      return;
+    }
+    const query =
+      eventIds.length === 1
+        ? `eventId=${encodeURIComponent(eventIds[0])}`
+        : `eventIds=${encodeURIComponent(eventIds.join(","))}`;
+    router.push(`/admin/business/calculator?${query}`);
+  }
+
+  /** Puts the job date and time slots back to the billed events' own windows. */
+  function resetToEventTimes(): void {
+    if (!eventPrefill) return;
+    setJobDate(eventPrefill.jobDate);
+    setTimeRanges(eventPrefill.slots.map((s) => ({ startTime: s.startTime, endTime: s.endTime })));
   }
 
   // AI parse session
@@ -514,13 +512,7 @@ export function CalculatorView({
 
   // Rate management
   const [showRates, setShowRates] = useState(false);
-  const [rateForm, setRateForm] = useState({
-    label: "",
-    type: "hourly" as "flat" | "hourly" | "modifier" | "percent",
-    amount: "",
-    unit: "hour",
-    isDefault: false,
-  });
+  const [rateForm, setRateForm] = useState(BLANK_RATE_FORM);
   const [editingRateId, setEditingRateId] = useState<string | null>(null);
   const [resettingRates, setResettingRates] = useState(false);
 
@@ -608,7 +600,7 @@ export function CalculatorView({
       setParts(draft.parts ?? []);
       setNotes(draft.notes ?? "");
       setClientName(draft.clientName ?? "");
-      setClientEmail(draft.clientEmail ?? "");
+      setClientEmail(normaliseEmail(draft.clientEmail));
       setPickedContactName(draft.pickedContactName ?? null);
       setPickedContactCompany(draft.pickedContactCompany ?? null);
       setPickedContactGoogleId(draft.pickedContactGoogleId ?? null);
@@ -775,181 +767,187 @@ export function CalculatorView({
    * applies the $10 minimum so a 1-min drive still bills the published floor.
    * @param result - The parsed job response returned by the AI.
    */
-  const applyParseResult = useCallback(
-    (result: ParseJobResponse) => {
-      const includeTravelDefault = (result.travel?.durationMins ?? 0) > 0;
+  function applyParseResult(result: ParseJobResponse): void {
+    const includeTravelDefault = (result.travel?.durationMins ?? 0) > 0;
 
-      // Out-of-session work (a call after the visit) goes into the follow-up
-      // field; the parser includes it inside durationMins, so in-session slot
-      // time is durationMins minus this.
-      const outMins = Math.max(0, Math.round(result.outOfSessionMins ?? 0));
-      setFollowUpMins(outMins);
+    // Out-of-session work (a call after the visit) goes into the follow-up
+    // field; the parser includes it inside durationMins, so in-session slot
+    // time is durationMins minus this.
+    const outMins = Math.max(0, Math.round(result.outOfSessionMins ?? 0));
+    setFollowUpMins(outMins);
 
-      // Hydrate the time slots. Prefer the per-range list when the parser found
-      // segments; otherwise synthesise one slot from startTime/endTime, or as a
-      // last resort anchor the in-session duration to "now". The billable
-      // window is always slot time + follow-up.
-      let parsedWindowMin = outMins;
-      if (result.ranges && result.ranges.length > 0) {
-        setTimeRanges(result.ranges.map((r) => ({ startTime: r.startTime, endTime: r.endTime })));
-        parsedWindowMin += result.ranges.reduce(
-          (s, r) => s + timeDiffMins(r.startTime, r.endTime),
-          0,
-        );
-      } else if (result.startTime && result.endTime) {
-        setTimeRanges([{ startTime: result.startTime, endTime: result.endTime }]);
-        parsedWindowMin += timeDiffMins(result.startTime, result.endTime);
-      } else if (result.startTime) {
-        // Start stated but no end: close the slot at the event's end when billing
-        // a booked job, else at "now". Anchoring to now would end a past job at
-        // today's wall clock instead of inside its actual window.
-        const end = eventPrefill ? eventPrefill.endTime : nowTime();
-        setTimeRanges([{ startTime: result.startTime, endTime: end }]);
-        parsedWindowMin += timeDiffMins(result.startTime, end);
-      } else if (result.durationMins !== null) {
-        // Duration only ("was there about 2 hours"): anchor the slot to the
-        // event's start when billing a booked job, else to now-minus-duration.
-        const inSessionMins = Math.max(0, result.durationMins - outMins);
-        let startTime: string;
-        let endTime: string;
-        if (eventPrefill) {
-          startTime = eventPrefill.startTime;
-          endTime = addMinsToTime(eventPrefill.startTime, inSessionMins);
-        } else {
-          endTime = nowTime();
-          startTime = addMinsToTime(endTime, -inSessionMins);
-        }
-        setTimeRanges([{ startTime, endTime }]);
-        parsedWindowMin = outMins + inSessionMins;
-      }
-
-      // Hydrate task and part lines
-      const parsedTasks: TaskLine[] = result.tasks.map((t) => {
-        const device = t.device ?? null;
-        const action = t.action ?? null;
-        const details = t.details?.trim() ? t.details.trim() : null;
-        // Server already composes the description, but compose locally as a
-        // fallback so descriptions stay correct even if an older route shape
-        // sneaks through.
-        const description = composeDescription(device, action, details) || t.description || "";
-        // If baseRateId is set, this is an hourly task (new rate model) - force
-        // rateConfigId to null so the promo math classifies it correctly even
-        // if the AI emitted a stray ID.
-        const isHourly = t.baseRateId != null;
-        // The route snaps hourly tasks onto the billing grid and returns whole
-        // minutes; carry those as the billed unit with qty unrounded, so the
-        // line quantities still sum to the session. Flat rows keep a 2 dp count.
-        const minutes = isHourly ? (t.minutes ?? Math.round(t.qty * 60)) : undefined;
-        const qty = minutes != null ? minutes / 60 : Math.round(t.qty * 100) / 100;
-        return {
-          rateConfigId: isHourly ? null : (t.rateConfigId ?? null),
-          baseRateId: t.baseRateId ?? null,
-          modifierIds: t.modifierIds ?? [],
-          description,
-          qty,
-          ...(minutes != null && { minutes }),
-          unitPrice: t.unitPrice,
-          lineTotal: Math.round(qty * t.unitPrice * 100) / 100,
-          device,
-          action,
-          details,
-          isShort: t.isShort ?? false,
-          isExplicit: t.isExplicit ?? false,
-          // Per-line halving: an AI-flagged unresolved task bills half its
-          // labour via calcJobTotal; completed tasks in the same job are
-          // unaffected. The chip on the task row is the operator override.
-          unsuccessful: t.unsuccessful ?? false,
-        };
-      });
-      const parsedParts = result.parts.map((p) => ({ description: p.description, cost: p.cost }));
-
-      // Reparse semantics: the new parse result is the new truth for the auto
-      // travel entry AND the parsed out-of-pocket costs (parking, tolls).
-      // Operator-typed manual entries survive a reparse so they don't have to
-      // be re-typed after every AI tweak.
-      setJobAddress(result.destination ?? "");
-
-      // Parsed disbursements pass through at the stated cost; isParsedCost
-      // lets a reparse replace them while a manual address re-lookup (which
-      // only replaces the isAuto drive entry) leaves them alone.
-      const parsedCostEntries: TravelEntry[] = (result.travelCosts ?? []).map((c) => ({
-        label: c.label,
-        cost: Math.round(c.cost * 100) / 100,
-        isParsedCost: true,
-      }));
-
-      if (result.travel && includeTravelDefault) {
-        const cost = calcTravelCharge(
-          result.travel.durationMins,
-          result.travel.durationMinsBack,
-          pricing.travelRatePerHour,
-          pricing.minTravelCharge,
-        );
-        const label = result.destination?.trim() || `${result.travel.durationMins} min drive`;
-        const destination = result.destination ?? label;
-        setTravelEntries((prev) => {
-          // Google's live predictions drift between calls (minutes and even
-          // the chosen route change), so a reparse of the same destination
-          // keeps the existing auto entry rather than silently moving the
-          // travel price. "Look up" is the deliberate refresh.
-          const existingAuto = prev.find((e) => e.isAuto);
-          const sameDestination =
-            existingAuto?.destination?.trim().toLowerCase() === destination.trim().toLowerCase();
-          const autoEntry =
-            existingAuto && sameDestination
-              ? existingAuto
-              : {
-                  label,
-                  cost,
-                  isAuto: true,
-                  destination,
-                  durationMinsOneWay: result.travel?.durationMins,
-                  durationMinsBack: result.travel?.durationMinsBack,
-                  distanceKmOneWay: result.travel?.distanceKmOneWay,
-                };
-          return [
-            autoEntry,
-            ...parsedCostEntries,
-            ...prev.filter((e) => !e.isAuto && !e.isParsedCost),
-          ];
-        });
+    // Hydrate the time slots. Prefer the per-range list when the parser found
+    // segments; otherwise synthesise one slot from startTime/endTime, or as a
+    // last resort anchor the in-session duration to "now". The billable
+    // window is always slot time + follow-up.
+    let parsedWindowMin = outMins;
+    // A merged job's slots come from several corrected calendar windows -
+    // exact, and not reconstructable from free text - so the parse fills
+    // everything except the times. A single event keeps the old behaviour:
+    // the description wins, and "Reset to event times" undoes a bad guess.
+    const mergedSlots = eventPrefill && eventPrefill.slots.length > 1 ? eventPrefill.slots : null;
+    if (mergedSlots) {
+      parsedWindowMin += mergedSlots.reduce((s, r) => s + timeDiffMins(r.startTime, r.endTime), 0);
+    } else if (result.ranges && result.ranges.length > 0) {
+      setTimeRanges(result.ranges.map((r) => ({ startTime: r.startTime, endTime: r.endTime })));
+      parsedWindowMin += result.ranges.reduce(
+        (s, r) => s + timeDiffMins(r.startTime, r.endTime),
+        0,
+      );
+    } else if (result.startTime && result.endTime) {
+      setTimeRanges([{ startTime: result.startTime, endTime: result.endTime }]);
+      parsedWindowMin += timeDiffMins(result.startTime, result.endTime);
+    } else if (result.startTime) {
+      // Start stated but no end: close the slot at the event's end when billing
+      // a booked job, else at "now". Anchoring to now would end a past job at
+      // today's wall clock instead of inside its actual window.
+      const end = eventPrefill?.slots[0]?.endTime ?? nowTime();
+      setTimeRanges([{ startTime: result.startTime, endTime: end }]);
+      parsedWindowMin += timeDiffMins(result.startTime, end);
+    } else if (result.durationMins !== null) {
+      // Duration only ("was there about 2 hours"): anchor the slot to the
+      // event's start when billing a booked job, else to now-minus-duration.
+      const inSessionMins = Math.max(0, result.durationMins - outMins);
+      const anchor = eventPrefill?.slots[0] ?? null;
+      let startTime: string;
+      let endTime: string;
+      if (anchor) {
+        startTime = anchor.startTime;
+        endTime = addMinsToTime(anchor.startTime, inSessionMins);
       } else {
-        // No drive time from the parse (remote work or geocode-to-origin): drop
-        // any stale auto entry, keep operator-typed manual entries, and still
-        // carry any parsed disbursements (a remote job has no parking, but a
-        // walking-distance one can).
-        setTravelEntries((prev) => [
+        endTime = nowTime();
+        startTime = addMinsToTime(endTime, -inSessionMins);
+      }
+      setTimeRanges([{ startTime, endTime }]);
+      parsedWindowMin = outMins + inSessionMins;
+    }
+
+    // Hydrate task and part lines
+    const parsedTasks: TaskLine[] = result.tasks.map((t) => {
+      const device = t.device ?? null;
+      const action = t.action ?? null;
+      const details = t.details?.trim() ? t.details.trim() : null;
+      // Server already composes the description, but compose locally as a
+      // fallback so descriptions stay correct even if an older route shape
+      // sneaks through.
+      const description = composeDescription(device, action, details) || t.description || "";
+      // If baseRateId is set, this is an hourly task (new rate model) - force
+      // rateConfigId to null so the promo math classifies it correctly even
+      // if the AI emitted a stray ID.
+      const isHourly = t.baseRateId != null;
+      // The route snaps hourly tasks onto the billing grid and returns whole
+      // minutes; carry those as the billed unit with qty unrounded, so the
+      // line quantities still sum to the session. Flat rows keep a 2 dp count.
+      const minutes = isHourly ? (t.minutes ?? Math.round(t.qty * 60)) : undefined;
+      const qty = minutes != null ? minutes / 60 : Math.round(t.qty * 100) / 100;
+      return {
+        rateConfigId: isHourly ? null : (t.rateConfigId ?? null),
+        baseRateId: t.baseRateId ?? null,
+        modifierIds: t.modifierIds ?? [],
+        description,
+        qty,
+        ...(minutes != null && { minutes }),
+        unitPrice: t.unitPrice,
+        lineTotal: Math.round(qty * t.unitPrice * 100) / 100,
+        device,
+        action,
+        details,
+        isShort: t.isShort ?? false,
+        isExplicit: t.isExplicit ?? false,
+        // Per-line halving: an AI-flagged unresolved task bills half its
+        // labour via calcJobTotal; completed tasks in the same job are
+        // unaffected. The chip on the task row is the operator override.
+        unsuccessful: t.unsuccessful ?? false,
+      };
+    });
+    const parsedParts = result.parts.map((p) => ({ description: p.description, cost: p.cost }));
+
+    // Reparse semantics: the new parse result is the new truth for the auto
+    // travel entry AND the parsed out-of-pocket costs (parking, tolls).
+    // Operator-typed manual entries survive a reparse so they don't have to
+    // be re-typed after every AI tweak.
+    setJobAddress(result.destination ?? "");
+
+    // Parsed disbursements pass through at the stated cost; isParsedCost
+    // lets a reparse replace them while a manual address re-lookup (which
+    // only replaces the isAuto drive entry) leaves them alone.
+    const parsedCostEntries: TravelEntry[] = (result.travelCosts ?? []).map((c) => ({
+      label: c.label,
+      cost: Math.round(c.cost * 100) / 100,
+      isParsedCost: true,
+    }));
+
+    if (result.travel && includeTravelDefault) {
+      const cost = calcTravelCharge(
+        result.travel.durationMins,
+        result.travel.durationMinsBack,
+        pricing.travelRatePerHour,
+        pricing.minTravelCharge,
+      );
+      const label = result.destination?.trim() || `${result.travel.durationMins} min drive`;
+      const destination = result.destination ?? label;
+      setTravelEntries((prev) => {
+        // Google's live predictions drift between calls (minutes and even
+        // the chosen route change), so a reparse of the same destination
+        // keeps the existing auto entry rather than silently moving the
+        // travel price. "Look up" is the deliberate refresh.
+        const existingAuto = prev.find((e) => e.isAuto);
+        const sameDestination =
+          existingAuto?.destination?.trim().toLowerCase() === destination.trim().toLowerCase();
+        const autoEntry =
+          existingAuto && sameDestination
+            ? existingAuto
+            : {
+                label,
+                cost,
+                isAuto: true,
+                destination,
+                durationMinsOneWay: result.travel?.durationMins,
+                durationMinsBack: result.travel?.durationMinsBack,
+                distanceKmOneWay: result.travel?.distanceKmOneWay,
+              };
+        return [
+          autoEntry,
           ...parsedCostEntries,
           ...prev.filter((e) => !e.isAuto && !e.isParsedCost),
-        ]);
+        ];
+      });
+    } else {
+      // No drive time from the parse (remote work or geocode-to-origin): drop
+      // any stale auto entry, keep operator-typed manual entries, and still
+      // carry any parsed disbursements (a remote job has no parking, but a
+      // walking-distance one can).
+      //
+      // Booked jobs are the exception. Their auto entry is seeded from the
+      // frozen TravelBlock - a drive that was actually measured for that
+      // window - and a description that simply never mentions the trip is not
+      // evidence it did not happen. Silently dropping it bills no travel on a
+      // job that had some. noTravelCharge stays authoritative: that is the
+      // parser saying the trip was on foot or on the house, which is a real
+      // instruction rather than an omission.
+      const keepSeededTravel = eventPrefill !== null && !result.noTravelCharge;
+      setTravelEntries((prev) => [
+        ...(keepSeededTravel ? prev.filter((e) => e.isAuto) : []),
+        ...parsedCostEntries,
+        ...prev.filter((e) => !e.isAuto && !e.isParsedCost),
+      ]);
+    }
+    // Rebalance parsed tasks proportionally to fit the listed window (over-
+    // long tasks absorb more of the correction; tasks scaling below the
+    // minimum drop), then floor the whole job to the minimum billable time
+    // so a sub-minimum job bills - and displays - at the floor.
+    const collapsed = collapseToWindow(parsedTasks, parsedWindowMin, pricing.taskTiming);
+    setTasks(enforceMinBillable(collapsed.tasks, pricing.minBillableMins));
+    if (collapsed.rescaled || collapsed.dropped > 0) {
+      const parts: string[] = ["Rebalanced tasks"];
+      if (collapsed.dropped > 0) {
+        parts.push(`(dropped ${collapsed.dropped} tiny task${collapsed.dropped === 1 ? "" : "s"})`);
       }
-      // Rebalance parsed tasks proportionally to fit the listed window (over-
-      // long tasks absorb more of the correction; tasks scaling below the
-      // minimum drop), then floor the whole job to the minimum billable time
-      // so a sub-minimum job bills - and displays - at the floor.
-      const collapsed = collapseToWindow(parsedTasks, parsedWindowMin, pricing.taskTiming);
-      setTasks(enforceMinBillable(collapsed.tasks, pricing.minBillableMins));
-      if (collapsed.rescaled || collapsed.dropped > 0) {
-        const parts: string[] = ["Rebalanced tasks"];
-        if (collapsed.dropped > 0) {
-          parts.push(
-            `(dropped ${collapsed.dropped} tiny task${collapsed.dropped === 1 ? "" : "s"})`,
-          );
-        }
-        toast(`${parts.join(" ")} to fit the ${parsedWindowMin}-min window.`, { tone: "info" });
-      }
-      setParts(parsedParts);
-      if (result.notes) setNotes(result.notes);
-    },
-    [
-      pricing.travelRatePerHour,
-      pricing.minTravelCharge,
-      pricing.minBillableMins,
-      pricing.taskTiming,
-      eventPrefill,
-      toast,
-    ],
-  );
+      toast(`${parts.join(" ")} to fit the ${parsedWindowMin}-min window.`, { tone: "info" });
+    }
+    setParts(parsedParts);
+    if (result.notes) setNotes(result.notes);
+  }
 
   /**
    * Submits the free-text AI input to the parse-job API and applies the result to the calculator
@@ -969,12 +967,24 @@ export function CalculatorView({
       // it bills the real session length. The parser reads a digit-led
       // "HH:MM-HH:MM" line as the session range; only prepend it when the
       // description doesn't state its own times, so operator-typed times win.
+      // A merged job contributes one line per event: extractRanges sums them
+      // server-side into the pre-computed total, which excludes the gaps - so
+      // tasks are sized to the time worked, not the wall-clock span. Without
+      // these lines the parser sees no session at all and falls back to the
+      // minimum billable time.
       const eventWindow =
-        eventPrefill && eventPrefill.startTime && eventPrefill.endTime
-          ? `${eventPrefill.startTime}-${eventPrefill.endTime}`
-          : null;
-      const statesTime = /\d{1,2}:\d{2}|\d{1,2}\s?(?:am|pm)/i.test(aiInput);
-      const input = eventWindow && !statesTime ? `${eventWindow}\n${aiInput}` : aiInput;
+        eventPrefill?.slots
+          .filter((slot) => slot.startTime && slot.endTime)
+          .map((slot) => `${slot.startTime}-${slot.endTime}`)
+          .join("\n") || null;
+      // The operator's own ranges win, but only actual RANGES count. Testing
+      // for any time at all treated an incidental mention ("drove to PB Tech
+      // @ 10:30 am") as a stated session, dropped the booked window, and left
+      // the parser with nothing to bill - so the job fell back to the minimum
+      // billable time. extractRanges is the same parser the route uses for the
+      // pre-computed total, so both sides agree on what counts as a range.
+      const statesOwnRanges = extractRanges(aiInput).length > 0;
+      const input = eventWindow && !statesOwnRanges ? `${eventWindow}\n${aiInput}` : aiInput;
       const body: Record<string, unknown> = { input, jobDate };
       // Typed descriptions of booked jobs rarely repeat the address, so hand
       // the current job address (event prefill or Travel card) to the route as
@@ -1178,6 +1188,19 @@ export function CalculatorView({
     // Stale save errors would otherwise sit above the buttons on a blank form.
     setIncomeError(null);
     setSaveInvoiceError(null);
+    // In-flight save bookkeeping. saveSendMode/saveQuoteMode are only ever set
+    // when a save starts, so a failed Save & send leaves them true and puts the
+    // next save's "Saving..." label on the wrong button.
+    setSaveSendMode(false);
+    setSaveQuoteMode(false);
+    setPendingInvoiceId(null);
+    // Transient panel/dialog state - a half-typed rate edit survives an
+    // otherwise-blank form without this.
+    setShowRates(false);
+    setEditingRateId(null);
+    setRateForm(BLANK_RATE_FORM);
+    setShowTaxonomyModal(false);
+    setConfirmDeleteRateId(null);
     clearDraft();
     // Billing a booked job: the prefill is a server prop keyed by eventId, so
     // state resets alone can't remove the banner - drop the query param and
@@ -1270,7 +1293,7 @@ export function CalculatorView({
    * booking start so the worst case shows until the real time is entered.
    */
   function enterCancelMode(): void {
-    const bookingTime = eventPrefill?.startTime ?? timeRanges[0]?.startTime ?? "09:00";
+    const bookingTime = eventPrefill?.slots[0]?.startTime ?? timeRanges[0]?.startTime ?? "09:00";
     // Prefer the booking's own answer. Without one (an event created straight on
     // the calendar), infer from whether there is anywhere to drive to.
     const meetingType: CancelMeetingType =
@@ -1435,9 +1458,12 @@ export function CalculatorView({
           unsuccessfulDiscount:
             totals.unsuccessfulDiscount > 0 ? totals.unsuccessfulDiscount : null,
           // Match back to the billed job when this session came from the
-          // schedule's "Bill in calculator" action.
+          // schedule's "Bill in calculator" action. calendarEventId stays the
+          // earliest event so existing readers are unaffected; the full set
+          // lets every merged event find this invoice.
           bookingId: eventPrefill?.bookingId ?? null,
           calendarEventId: eventPrefill?.calendarEventId ?? null,
+          calendarEventIds: eventPrefill?.slots.map((slot) => slot.calendarEventId) ?? [],
           // Quote mode: server allocates a Q- number + 30-day validity.
           isQuote: quote || undefined,
           // issueDate, dueDate, number all defaulted server-side.
@@ -1632,7 +1658,7 @@ export function CalculatorView({
    */
   function handleCancelEdit(): void {
     setEditingRateId(null);
-    setRateForm({ label: "", type: "hourly", amount: "", unit: "hour", isDefault: false });
+    setRateForm(BLANK_RATE_FORM);
   }
 
   /**
@@ -1904,7 +1930,17 @@ export function CalculatorView({
         </div>
       )}
 
-      <div className="mb-4 flex justify-end">
+      {/* Form toolbar. The full clear lives here rather than under the save
+          buttons: it is the "start over" action, reached mid-form far more
+          often than at the end, and destructive styling keeps it from reading
+          as a fifth way to save. */}
+      <div className="mb-4 flex justify-end gap-2">
+        <button
+          onClick={() => setConfirmClearOpen(true)}
+          className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
+        >
+          Clear form
+        </button>
         <button
           onClick={() => setShowRates((p) => !p)}
           className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
@@ -1950,123 +1986,14 @@ export function CalculatorView({
             travel breakdown) from blowing the grid track past the viewport;
             mirrors the guard on the right column. */}
         <div className="min-w-0 space-y-5">
-          {/* Bill a calendar event: jump straight to a job's corrected times,
-              client, address, and frozen travel prediction. */}
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            {eventPrefill ? (
-              (() => {
-                // Live banner: reflect the CURRENT job date + slot (which the
-                // operator may have edited below), and flag when they drift from
-                // the event's original window so a stray edit is obvious.
-                const slotStart = timeRanges[0]?.startTime ?? "";
-                const slotEnd = timeRanges[timeRanges.length - 1]?.endTime ?? "";
-                const drifted =
-                  jobDate !== eventPrefill.jobDate ||
-                  slotStart !== eventPrefill.startTime ||
-                  slotEnd !== eventPrefill.endTime;
-                return (
-                  <div className="space-y-2 text-sm">
-                    <p className="text-slate-600">
-                      <span className="font-semibold text-russian-violet">Billing booked job:</span>{" "}
-                      {eventPrefill.clientName || "(no name)"} - {jobDate}, {slotStart || "--:--"}-
-                      {slotEnd || "--:--"}
-                      {eventPrefill.bookingId && (
-                        <>
-                          {" · "}
-                          <a
-                            href={`/admin/bookings/${eventPrefill.bookingId}`}
-                            className="font-medium text-russian-violet underline hover:opacity-80"
-                          >
-                            View booking ↗
-                          </a>
-                        </>
-                      )}
-                    </p>
-                    {drifted && (
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-xs text-amber-700">
-                          Differs from the event window ({eventPrefill.jobDate},{" "}
-                          {eventPrefill.startTime}-{eventPrefill.endTime}).
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setJobDate(eventPrefill.jobDate);
-                            setTimeRanges([
-                              {
-                                startTime: eventPrefill.startTime,
-                                endTime: eventPrefill.endTime,
-                              },
-                            ]);
-                          }}
-                          className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-russian-violet hover:bg-slate-50"
-                        >
-                          Reset to event times
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()
-            ) : (
-              <>
-                <div className="flex items-center justify-between gap-2">
-                  <h2 className="text-sm font-semibold text-russian-violet">
-                    Bill a calendar event
-                  </h2>
-                  <button
-                    type="button"
-                    onClick={() => void handleOpenEventPicker()}
-                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
-                  >
-                    {eventPickerOpen ? "Hide" : "Pick a recent event"}
-                  </button>
-                </div>
-                {eventPickerOpen && (
-                  <div className="mt-3 max-h-64 space-y-1 overflow-y-auto">
-                    {loadingEvents && <p className="text-xs text-slate-400">Loading events…</p>}
-                    {!loadingEvents && recentEvents !== null && recentEvents.length === 0 && (
-                      <p className="text-xs text-slate-400">
-                        No booking-calendar events in the last two weeks.
-                      </p>
-                    )}
-                    {(recentEvents ?? []).map((ev) => (
-                      <button
-                        key={ev.id}
-                        type="button"
-                        onClick={() => {
-                          // Stash a part-typed description so the remount the
-                          // navigation triggers doesn't wipe it.
-                          try {
-                            if (aiInput.trim())
-                              sessionStorage.setItem(AI_INPUT_HANDOFF_KEY, aiInput);
-                          } catch {
-                            // Storage unavailable; the description won't carry over.
-                          }
-                          router.push(
-                            `/admin/business/calculator?eventId=${encodeURIComponent(ev.id)}`,
-                          );
-                        }}
-                        className="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-100 px-3 py-2 text-left text-sm hover:border-russian-violet/30 hover:bg-russian-violet/5"
-                      >
-                        <span className="truncate font-medium text-slate-700">{ev.summary}</span>
-                        <span className="shrink-0 text-xs text-slate-500">
-                          {new Intl.DateTimeFormat("en-NZ", {
-                            timeZone: "Pacific/Auckland",
-                            weekday: "short",
-                            day: "numeric",
-                            month: "short",
-                            hour: "numeric",
-                            minute: "2-digit",
-                          }).format(new Date(ev.start))}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
+          <EventPickerSection
+            prefill={eventPrefill}
+            jobDate={jobDate}
+            timeRanges={timeRanges}
+            mergeSuggestGapMins={pricing.mergeSuggestGapMins}
+            onResetToEventTimes={resetToEventTimes}
+            onBillEvents={handleBillEvents}
+          />
 
           {/* Early cancel: bills the call-out fee instead of job work, so every
               job-shaped section below is swapped out while it is on. The button
@@ -2321,7 +2248,7 @@ export function CalculatorView({
             onSelectContact={(c) => {
               const company = c.company?.trim() || null;
               setClientName(c.name);
-              setClientEmail(c.email);
+              setClientEmail(normaliseEmail(c.email));
               setPickedContactName(c.name);
               setPickedContactCompany(company);
               setPickedContactGoogleId(c.id || null);
@@ -2386,12 +2313,6 @@ export function CalculatorView({
               className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-50"
             >
               {savingIncome ? "Saving..." : "Save as income entry"}
-            </button>
-            <button
-              onClick={() => setConfirmClearOpen(true)}
-              className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-500 hover:bg-slate-50"
-            >
-              Clear everything
             </button>
           </div>
 

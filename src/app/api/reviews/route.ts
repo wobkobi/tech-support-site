@@ -7,6 +7,7 @@ import { sendOwnerReviewNotification } from "@/features/reviews/lib/email";
 import { revalidateReviewPaths } from "@/features/reviews/lib/revalidate";
 import { reviewTextError } from "@/features/reviews/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";
+import { normaliseEmailOrNull } from "@/shared/lib/normalise-email";
 import { normaliseContactPhone } from "@/shared/lib/normalise-phone";
 import { prisma as prismaClient } from "@/shared/lib/prisma";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
@@ -188,7 +189,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
         // Fill blanks on the Contact from any details the customer typed,
         // never overwriting an existing value.
-        const submittedEmail = body.contactEmail?.trim().toLowerCase() || null;
+        const submittedEmail = normaliseEmailOrNull(body.contactEmail);
         const submittedPhone = normaliseContactPhone(body.contactPhone);
         const contactUpdate: { email?: string; phone?: string; reviewLinkSubmittedAt: Date } = {
           reviewLinkSubmittedAt: new Date(),

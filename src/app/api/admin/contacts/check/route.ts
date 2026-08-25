@@ -6,6 +6,7 @@
 
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
+import { normaliseEmail } from "@/shared/lib/normalise-email";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return errorResponse("Unauthorized", 401);
   }
 
-  const email = request.nextUrl.searchParams.get("email")?.trim().toLowerCase() ?? "";
+  const email = normaliseEmail(request.nextUrl.searchParams.get("email"));
   if (!email || !email.includes("@")) {
     return NextResponse.json({ ok: true, exists: false });
   }

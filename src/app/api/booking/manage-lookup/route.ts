@@ -8,6 +8,7 @@
 
 import { sendBookingManageLinksEmail } from "@/features/reviews/lib/email";
 import { errorResponse } from "@/shared/lib/api-response";
+import { normaliseEmail } from "@/shared/lib/normalise-email";
 import { prisma } from "@/shared/lib/prisma";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 import { NextRequest, NextResponse } from "next/server";
@@ -30,7 +31,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (limited) return limited;
 
   const body = (await request.json().catch(() => ({}))) as { email?: unknown };
-  const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+  const email = typeof body.email === "string" ? normaliseEmail(body.email) : "";
   // A malformed address is the one case worth reporting - it's the user's own
   // typo, and saying so leaks nothing about who has booked.
   if (!email || !email.includes("@") || email.length > 200) {

@@ -181,6 +181,11 @@ function validatePricing(p: PricingSettings): FieldError[] {
       field: "workmanshipWindowDays",
       message: "Must be 0 or more days (0 = no stated guarantee).",
     });
+  if (!inRange(p.mergeSuggestGapMins, 0, 720))
+    errors.push({
+      field: "mergeSuggestGapMins",
+      message: "Must be 0-720 minutes (0 = never suggest a merge).",
+    });
   if (!nonNeg(p.cancellation?.freeNoticeHours))
     errors.push({ field: "cancellation.freeNoticeHours", message: "Must be 0 or more hours." });
   if (!nonNeg(p.cancellation?.travelChargeHours))

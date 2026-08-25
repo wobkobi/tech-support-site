@@ -1,14 +1,17 @@
 "use client";
 // src/shared/components/EmailInput.tsx
 /**
- * @description Shared email input with consistent blur-validation and inline
- * error display, keeping validation and typo-suggestion behaviour identical
- * across every email field even when wording differs.
+ * @description Shared email input with consistent validation and inline error
+ * display, keeping validation and typo-suggestion behaviour identical across
+ * every email field even when wording differs. Input is lowercased as it is
+ * typed - addresses are case-insensitive everywhere the site sends or matches
+ * them, and {@link normaliseEmail} is what the server stores.
  */
 
 import { validateEmail } from "@/features/booking/lib/booking";
 import { cn } from "@/shared/lib/cn";
 import { suggestEmailCorrection } from "@/shared/lib/email-typo-suggestion";
+import { normaliseEmail } from "@/shared/lib/normalise-email";
 import type React from "react";
 import { useState } from "react";
 
@@ -92,37 +95,51 @@ export function EmailInput({
   // Stored separately from the validation error: a typo suggestion is non-
   // blocking and disappears the moment the user edits the field again.
   const [suggestion, setSuggestion] = useState<string | null>(null);
+  // Set on first blur. Until then, typing stays silent - flagging "j" as an
+  // invalid address the instant someone starts typing is just noise. After it,
+  // the error tracks every keystroke so a correction clears it immediately.
+  const [touched, setTouched] = useState(false);
   const activeError = error !== undefined ? error : internalError;
   const describedBy = activeError ? (errorId ?? `${id}-error`) : undefined;
 
   /**
-   * Runs validateEmail on blur and stashes the result in internal state, then
-   * forwards the event to the caller's onBlur if provided. Also computes a
-   * "did you mean…?" suggestion when the address is otherwise well-formed.
+   * Maps a validateEmail verdict to the message for this field, or null when
+   * the address is fine. Blank is never an error here - a missing required
+   * field is the submit path's call, not this input's.
+   * @param candidate - Address to check.
+   * @returns Error message, or null.
+   */
+  function errorFor(candidate: string): string | null {
+    const result = validateEmail(candidate);
+    if (result === "invalid") return errorMessages?.invalid ?? DEFAULT_INVALID;
+    if (result === "too-long") return errorMessages?.tooLong ?? DEFAULT_TOO_LONG;
+    return null;
+  }
+
+  /**
+   * Validates on blur, marks the field touched so later keystrokes validate
+   * live, then forwards the event to the caller's onBlur if provided. Also
+   * computes a "did you mean…?" suggestion when the address is well-formed.
    * @param e - Blur event.
    */
   function handleBlur(e: React.FocusEvent<HTMLInputElement>): void {
-    const result = validateEmail(value);
-    if (result === "invalid") {
-      setInternalError(errorMessages?.invalid ?? DEFAULT_INVALID);
-    } else if (result === "too-long") {
-      setInternalError(errorMessages?.tooLong ?? DEFAULT_TOO_LONG);
-    } else {
-      setInternalError(null);
-    }
-    setSuggestion(result === "ok" ? suggestEmailCorrection(value) : null);
+    setTouched(true);
+    setInternalError(errorFor(value));
+    setSuggestion(validateEmail(value) === "ok" ? suggestEmailCorrection(value) : null);
     onBlur?.(e);
   }
 
   /**
-   * Clears the internal error + any typo suggestion when the user edits the
-   * field, then forwards the new value to the caller.
+   * Lowercases the keystroke, re-checks it once the field has been blurred at
+   * least once, and forwards the normalised value to the caller. Trailing
+   * whitespace from a paste goes too - no valid address contains a space.
    * @param next - New input value.
    */
   function handleChange(next: string): void {
-    if (internalError) setInternalError(null);
+    const normalised = normaliseEmail(next);
+    setInternalError(touched ? errorFor(normalised) : null);
     if (suggestion) setSuggestion(null);
-    onChange(next);
+    onChange(normalised);
   }
 
   /**
@@ -131,7 +148,7 @@ export function EmailInput({
    */
   function acceptSuggestion(): void {
     if (!suggestion) return;
-    onChange(suggestion);
+    onChange(normaliseEmail(suggestion));
     setSuggestion(null);
     setInternalError(null);
   }

@@ -5,6 +5,7 @@
  * + cost; cost pastes carrying "$"/commas route through {@link parseMoney}.
  * Collapsed with an empty list is the default - parts are opt-in per job.
  */
+import { SectionClearButton } from "@/features/business/components/calculator/SectionClearButton";
 import type { PartLine } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
 import { parseMoney } from "@/shared/lib/parse-money";
@@ -30,13 +31,20 @@ interface Props {
 export function PartsSection({ parts, onPartsChange, show, onToggle }: Props): React.ReactElement {
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-      <button
-        onClick={onToggle}
-        className="flex w-full items-center justify-between text-left text-sm font-semibold text-russian-violet"
-      >
-        Parts / materials
-        <span className="text-xs text-slate-400">{show ? "▲" : "▼"}</span>
-      </button>
+      {/* Clear sits beside the collapse toggle rather than inside it - a button
+          cannot nest inside another button. */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={onToggle}
+          className="flex flex-1 items-center justify-between text-left text-sm font-semibold text-russian-violet"
+        >
+          Parts / materials
+          <span className="text-xs text-slate-400">{show ? "▲" : "▼"}</span>
+        </button>
+        {parts.length > 0 && (
+          <SectionClearButton onClear={() => onPartsChange(() => [])} label="parts" />
+        )}
+      </div>
       {show && (
         <div className="mt-3 space-y-2">
           {parts.map((part, idx) => (

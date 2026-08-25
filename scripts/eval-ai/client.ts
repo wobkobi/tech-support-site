@@ -28,6 +28,10 @@ export interface ParseJobResult {
   tasks?: ParseTask[];
   warnings?: string[];
   ranges?: { startTime: string; endTime: string }[];
+  /** The one trip the job bills, or null when it bills none. */
+  destination?: string | null;
+  /** True only when the operator STATED a trip that is not chargeable. */
+  noTravelCharge?: boolean;
   clarify?: unknown[];
 }
 

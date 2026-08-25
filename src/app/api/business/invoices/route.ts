@@ -22,6 +22,7 @@ import { parseAmount, parseObjectId } from "@/features/business/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { getIdentity } from "@/shared/lib/business-identity.server";
+import { normaliseEmail } from "@/shared/lib/normalise-email";
 import { prisma } from "@/shared/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
@@ -72,6 +73,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Optional match back to the billed job (calculator event-prefill flow).
     bookingId,
     calendarEventId,
+    calendarEventIds,
     // Quote mode: Q- number from the quote counter, QUOTE PDF, no payment
     // until converted to a real invoice.
     isQuote,
@@ -90,6 +92,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     unsuccessfulDiscount?: number | null;
     bookingId?: string | null;
     calendarEventId?: string | null;
+    calendarEventIds?: string[];
     isQuote?: boolean;
     quoteValidUntil?: string | null;
   };
@@ -143,6 +146,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // taxable amount before GST (per IRD treatment of price reductions); they
   // sum into one discount argument for calcInvoiceTotals but persist as
   // separate audit fields. Totals are independent of the invoice number.
+  // De-duplicated so a repeated id cannot make a single-event job look merged.
+  const mergedEventIds = Array.from(
+    new Set(
+      (Array.isArray(calendarEventIds) ? calendarEventIds : []).filter(
+        (id): id is string => typeof id === "string" && id.length > 0,
+      ),
+    ),
+  );
   const { GST_REGISTERED } = await getPolicy();
   const { subtotal, gstAmount, total } = calcInvoiceTotals(
     lineItems,
@@ -168,7 +179,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           isQuote: isQuote === true ? true : null,
           quoteValidUntil: quoteValidValue,
           clientName,
-          clientEmail,
+          clientEmail: normaliseEmail(clientEmail),
           issueDate: issueDateValue,
           dueDate: dueDateValue,
           lineItems,
@@ -188,6 +199,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           bookingId: parseObjectId(bookingId),
           calendarEventId:
             typeof calendarEventId === "string" && calendarEventId ? calendarEventId : null,
+          // Merged jobs bill several events; calendarEventId above is the
+          // earliest of them. Left empty unless there is genuinely more than
+          // one, so a single-event invoice holds one link rather than two
+          // copies of it, and readers can treat "empty" as "see
+          // calendarEventId". Non-string entries are dropped rather than
+          // 500ing the create.
+          calendarEventIds: mergedEventIds.length > 1 ? mergedEventIds : [],
         },
       });
       break;

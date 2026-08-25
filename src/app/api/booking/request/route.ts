@@ -35,6 +35,7 @@ import {
 import { errorResponse } from "@/shared/lib/api-response";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { normaliseAddress } from "@/shared/lib/normalise-address";
+import { normaliseEmail } from "@/shared/lib/normalise-email";
 import { normaliseName } from "@/shared/lib/normalise-name";
 import { validatePhone } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
@@ -141,6 +142,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // resolved by the customer's pick on the client. Falls back to the typed
     // value so a genuine new address still books.
     const cleanName = normaliseName(name) || name.trim();
+    const normalisedEmail = normaliseEmail(email);
     const canonicalAddress =
       meetingType === "in-person" && address?.trim()
         ? ((await normaliseAddress(address.trim())) ?? address.trim())
@@ -290,7 +292,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         startAt,
         endAt,
         timeZone: config.timeZone,
-        attendeeEmail: email.trim().toLowerCase(),
+        attendeeEmail: normalisedEmail,
         attendeeName: cleanName,
         location: meetingType === "in-person" && canonicalAddress ? canonicalAddress : undefined,
       });
@@ -359,7 +361,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       const booking = await prisma.booking.create({
         data: {
           name: cleanName,
-          email: email.trim().toLowerCase(),
+          email: normalisedEmail,
           phone: phoneE164,
           notes: bookingNotes,
           startAt,
@@ -408,7 +410,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
       // Upsert contact record - best effort, never fail the booking on write error
       try {
-        const { contact } = await findOrCreateContactByEmail(email.trim().toLowerCase(), {
+        const { contact } = await findOrCreateContactByEmail(normalisedEmail, {
           name: cleanName,
           phone: phoneE164,
           address: canonicalAddress,
@@ -465,7 +467,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
         console.warn("[booking/request] Concurrent booking conflict", {
           activeSlotKey: startAt.toISOString(),
-          email: email.trim().toLowerCase(),
+          email: normalisedEmail,
           timestamp: new Date().toISOString(),
         });
         // The booking lost the slot race, so the calendar event created above

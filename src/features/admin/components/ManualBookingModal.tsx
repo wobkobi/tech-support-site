@@ -18,6 +18,7 @@ import { EmailInput } from "@/shared/components/EmailInput";
 import { Field } from "@/shared/components/Field";
 import { PhoneInput } from "@/shared/components/PhoneInput";
 import { cn } from "@/shared/lib/cn";
+import { normaliseEmail } from "@/shared/lib/normalise-email";
 import { formatNZPhone, validatePhone } from "@/shared/lib/normalise-phone";
 import { fromNzInputValue, toNzInputValue } from "@/shared/lib/timezone-utils";
 import { useRouter } from "next/navigation";
@@ -173,7 +174,7 @@ export function ManualBookingModal({
         },
         body: JSON.stringify({
           name: name.trim(),
-          email: email.trim().toLowerCase(),
+          email: normaliseEmail(email),
           phone: phoneE164 || null,
           address: combineUnitAndAddress(unit, address) || null,
           notes: notes.trim(),

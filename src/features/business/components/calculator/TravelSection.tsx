@@ -7,6 +7,7 @@
  * {@link breakdownTravelCharge} (there/back > raw > rounded > final).
  */
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
+import { SectionClearButton } from "@/features/business/components/calculator/SectionClearButton";
 import { formatNZD, travelEntriesTotal } from "@/features/business/lib/business";
 import { breakdownTravelCharge } from "@/features/business/lib/pricing-policy";
 import type { TravelEntry } from "@/features/business/types/business";
@@ -83,7 +84,18 @@ export function TravelSection({
 
   return (
     <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h2 className="text-sm font-semibold text-russian-violet">Travel</h2>
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-russian-violet">Travel</h2>
+        {(travelEntries.length > 0 || jobAddress.trim().length > 0) && (
+          <SectionClearButton
+            onClear={() => {
+              onJobAddressChange("");
+              onTravelEntriesChange([]);
+            }}
+            label="travel"
+          />
+        )}
+      </div>
       <div className="flex gap-2">
         <div className="flex-1">
           <AddressAutocomplete

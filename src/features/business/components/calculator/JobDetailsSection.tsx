@@ -6,6 +6,7 @@
  * A follow-up minutes field adds work done outside the slots (a call after the
  * visit, a remote fix later) on top of the slot sum.
  */
+import { SectionClearButton } from "@/features/business/components/calculator/SectionClearButton";
 import { minsToHoursLabel, timeDiffMins } from "@/features/business/lib/business";
 import type { ParsedRange } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
@@ -98,10 +99,23 @@ export function JobDetailsSection({
   }
 
   const multi = timeRanges.length > 1;
+  // Anything worth wiping: extra slots, a typed time, or follow-up minutes.
+  const hasEntry = multi || followUpMins > 0 || timeRanges.some((r) => r.startTime || r.endTime);
 
   return (
     <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h2 className="text-sm font-semibold text-russian-violet">Time</h2>
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-russian-violet">Time</h2>
+        {hasEntry && (
+          <SectionClearButton
+            onClear={() => {
+              onTimeRangesChange([{ startTime: "", endTime: "" }]);
+              onFollowUpMinsChange(0);
+            }}
+            label="time"
+          />
+        )}
+      </div>
 
       <div className="space-y-2">
         {timeRanges.map((range, index) => {

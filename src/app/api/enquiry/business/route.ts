@@ -13,6 +13,7 @@ import {
   type BusinessEnquiryData,
 } from "@/features/reviews/lib/email";
 import { errorResponse } from "@/shared/lib/api-response";
+import { normaliseEmail } from "@/shared/lib/normalise-email";
 import { validatePhone } from "@/shared/lib/normalise-phone";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 import { NextRequest, NextResponse } from "next/server";
@@ -76,7 +77,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const kind = body.kind === "personal" ? "personal" : "business";
     const company = body.company?.trim() ?? "";
     const name = body.name?.trim() ?? "";
-    const email = body.email?.trim() ?? "";
+    const email = normaliseEmail(body.email);
     const needs = body.needs?.trim() ?? "";
 
     if (kind === "business" && !company) {

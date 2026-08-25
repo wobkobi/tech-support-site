@@ -496,6 +496,11 @@ model Invoice {
   // on-site time after each job). Set by the calculator's event prefill flow.
   bookingId        String?       @db.ObjectId
   calendarEventId  String?
+  // Every event a merged job billed, earliest first. calendarEventId stays the
+  // first of these so existing readers keep working; this is what lets the
+  // other events find their way back to the invoice. Empty on single-event and
+  // pre-merge invoices - readers fall back to calendarEventId.
+  calendarEventIds String[]
   driveFileId      String?
   driveWebUrl      String?
   // Stamped when status transitions to VOIDED. Audit trail + powers "Voided

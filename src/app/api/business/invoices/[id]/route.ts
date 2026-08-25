@@ -13,6 +13,7 @@ import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { parseDate, parseObjectId } from "@/features/business/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
+import { normaliseEmail } from "@/shared/lib/normalise-email";
 import { prisma } from "@/shared/lib/prisma";
 import { InvoiceStatus } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
@@ -217,7 +218,7 @@ export async function PATCH(
       where: { id },
       data: {
         ...(clientName !== undefined && { clientName }),
-        ...(clientEmail !== undefined && { clientEmail }),
+        ...(clientEmail !== undefined && { clientEmail: normaliseEmail(clientEmail) }),
         ...(issueDateValue && { issueDate: issueDateValue }),
         ...(dueDateValue && { dueDate: dueDateValue }),
         ...(lineItems !== undefined && {
