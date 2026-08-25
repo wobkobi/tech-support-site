@@ -152,6 +152,18 @@ const DRAFT_KEY = "calculator-draft-v2";
 const AI_INPUT_HANDOFF_KEY = "calculator-ai-input-handoff";
 
 /**
+ * Blank state for the rate panel's add/edit form. Shared by the mount default,
+ * the cancel-edit path, and the full clear so they cannot drift apart.
+ */
+const BLANK_RATE_FORM = {
+  label: "",
+  type: "hourly" as "flat" | "hourly" | "modifier" | "percent",
+  amount: "",
+  unit: "hour",
+  isDefault: false,
+};
+
+/**
  * Subset of CalculatorView state persisted across refreshes. Excludes
  * server-fetched data, UI flags, and the AI-parse session; the "Describe the
  * job" text itself IS persisted (`aiInput`).
@@ -518,13 +530,7 @@ export function CalculatorView({
 
   // Rate management
   const [showRates, setShowRates] = useState(false);
-  const [rateForm, setRateForm] = useState({
-    label: "",
-    type: "hourly" as "flat" | "hourly" | "modifier" | "percent",
-    amount: "",
-    unit: "hour",
-    isDefault: false,
-  });
+  const [rateForm, setRateForm] = useState(BLANK_RATE_FORM);
   const [editingRateId, setEditingRateId] = useState<string | null>(null);
   const [resettingRates, setResettingRates] = useState(false);
 
@@ -1182,6 +1188,19 @@ export function CalculatorView({
     // Stale save errors would otherwise sit above the buttons on a blank form.
     setIncomeError(null);
     setSaveInvoiceError(null);
+    // In-flight save bookkeeping. saveSendMode/saveQuoteMode are only ever set
+    // when a save starts, so a failed Save & send leaves them true and puts the
+    // next save's "Saving..." label on the wrong button.
+    setSaveSendMode(false);
+    setSaveQuoteMode(false);
+    setPendingInvoiceId(null);
+    // Transient panel/dialog state - a half-typed rate edit survives an
+    // otherwise-blank form without this.
+    setShowRates(false);
+    setEditingRateId(null);
+    setRateForm(BLANK_RATE_FORM);
+    setShowTaxonomyModal(false);
+    setConfirmDeleteRateId(null);
     clearDraft();
     // Billing a booked job: the prefill is a server prop keyed by eventId, so
     // state resets alone can't remove the banner - drop the query param and
@@ -1636,7 +1655,7 @@ export function CalculatorView({
    */
   function handleCancelEdit(): void {
     setEditingRateId(null);
-    setRateForm({ label: "", type: "hourly", amount: "", unit: "hour", isDefault: false });
+    setRateForm(BLANK_RATE_FORM);
   }
 
   /**
@@ -1908,7 +1927,17 @@ export function CalculatorView({
         </div>
       )}
 
-      <div className="mb-4 flex justify-end">
+      {/* Form toolbar. The full clear lives here rather than under the save
+          buttons: it is the "start over" action, reached mid-form far more
+          often than at the end, and destructive styling keeps it from reading
+          as a fifth way to save. */}
+      <div className="mb-4 flex justify-end gap-2">
+        <button
+          onClick={() => setConfirmClearOpen(true)}
+          className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
+        >
+          Clear form
+        </button>
         <button
           onClick={() => setShowRates((p) => !p)}
           className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
@@ -2390,12 +2419,6 @@ export function CalculatorView({
               className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-50"
             >
               {savingIncome ? "Saving..." : "Save as income entry"}
-            </button>
-            <button
-              onClick={() => setConfirmClearOpen(true)}
-              className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-500 hover:bg-slate-50"
-            >
-              Clear everything
             </button>
           </div>
 

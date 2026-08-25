@@ -6,6 +6,7 @@
  * looked up from a saved {@link TaskTemplate}. Modifier chips nudge the
  * effective hourly rate; {@link TaskTotalsRow} renders the shared qty/price/total strip.
  */
+import { SectionClearButton } from "@/features/business/components/calculator/SectionClearButton";
 import { Combobox } from "@/features/business/components/Combobox";
 import { composeDescription, formatNZD } from "@/features/business/lib/business";
 import type { RateConfig, TaskLine, TaskTemplate } from "@/features/business/types/business";
@@ -84,13 +85,18 @@ export function TasksSection({
     <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-russian-violet">Tasks</h2>
-        <button
-          type="button"
-          onClick={onManageTags}
-          className="text-xs font-medium text-slate-500 underline hover:text-slate-700"
-        >
-          Manage tags
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={onManageTags}
+            className="text-xs font-medium text-slate-500 underline hover:text-slate-700"
+          >
+            Manage tags
+          </button>
+          {tasks.length > 0 && (
+            <SectionClearButton onClear={() => onTasksChange(() => [])} label="tasks" />
+          )}
+        </div>
       </div>
       {tasks.map((task, idx) => {
         // Flat-rate rows (e.g. Travel) keep their old single-line look;
