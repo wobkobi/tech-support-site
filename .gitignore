@@ -78,3 +78,10 @@ google-tokens.txt
 
 # local reference material
 To the Point - Template.xlsx
+
+# agent instruction files, rewritten by every `next dev` (see
+# node_modules/next/dist/server/lib/generate-agent-files.js). Generated, not
+# authored, so they are not versioned - agent behaviour here is driven by the
+# operator's own global config instead.
+/AGENTS.md
+/CLAUDE.md
