@@ -221,7 +221,18 @@ async function InvoiceRail({
             )}
           </InfoRow>
           <InfoRow label="Calendar">
-            {invoice.calendarEventId ? "Linked" : <span className="text-admin-faint">None</span>}
+            {invoice.calendarEventId ? (
+              // A merged job billed several events at once; calendarEventIds is
+              // empty on every single-event invoice, so the count only shows
+              // where it means something.
+              invoice.calendarEventIds.length > 1 ? (
+                `Linked (${invoice.calendarEventIds.length} events billed together)`
+              ) : (
+                "Linked"
+              )
+            ) : (
+              <span className="text-admin-faint">None</span>
+            )}
           </InfoRow>
           <InfoRow label="Drive PDF">
             {invoice.driveWebUrl ? (

@@ -1458,9 +1458,12 @@ export function CalculatorView({
           unsuccessfulDiscount:
             totals.unsuccessfulDiscount > 0 ? totals.unsuccessfulDiscount : null,
           // Match back to the billed job when this session came from the
-          // schedule's "Bill in calculator" action.
+          // schedule's "Bill in calculator" action. calendarEventId stays the
+          // earliest event so existing readers are unaffected; the full set
+          // lets every merged event find this invoice.
           bookingId: eventPrefill?.bookingId ?? null,
           calendarEventId: eventPrefill?.calendarEventId ?? null,
+          calendarEventIds: eventPrefill?.slots.map((slot) => slot.calendarEventId) ?? [],
           // Quote mode: server allocates a Q- number + 30-day validity.
           isQuote: quote || undefined,
           // issueDate, dueDate, number all defaulted server-side.
