@@ -93,7 +93,7 @@
     "prettier-plugin-packagejson": "^3.0.2",
     "prettier-plugin-tailwindcss": "^0.8.1",
     "prisma": "6.19.3",
-    "puppeteer": "^25.8.0",
+    "puppeteer": "^25.9.0",
     "qr-code-styling": "^1.9.2",
     "server-only": "^0.0.1",
     "sharp": "^0.35.3",
