@@ -87,6 +87,7 @@ export const getPolicy = cache(async (): Promise<Policy> => {
     UNSUCCESSFUL_WORK_FACTOR: pricing.unsuccessfulWorkFactor,
     NO_FIX_FREE_MINS: pricing.noFixFreeMins,
     WORKMANSHIP_WINDOW_DAYS: pricing.workmanshipWindowDays,
+    MERGE_SUGGEST_GAP_MINS: pricing.mergeSuggestGapMins,
     CANCELLATION: pricing.cancellation,
   };
 });

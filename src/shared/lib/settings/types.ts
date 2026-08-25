@@ -126,6 +126,12 @@ export interface PricingSettings {
   noFixFreeMins: number;
   /** Days after a visit during which fallout from that visit's changes is fixed free. 0 = no stated guarantee. */
   workmanshipWindowDays: number;
+  /**
+   * Largest gap (minutes) between two same-day calendar events for the
+   * calculator to offer billing them as one job. Nothing is merged
+   * automatically - it only decides what the event picker suggests.
+   */
+  mergeSuggestGapMins: number;
   cancellation: CancellationSettings;
   reschedule: RescheduleSettings;
 }

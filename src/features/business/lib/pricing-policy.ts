@@ -45,6 +45,9 @@ const NO_FIX_FREE_MINS = 30;
 /** Fallback workmanship-guarantee window (days): fallout from a prior visit's changes is fixed free inside it. */
 const WORKMANSHIP_WINDOW_DAYS = 30;
 
+/** Fallback gap (minutes) under which the calculator offers to bill two same-day events as one job. */
+export const MERGE_SUGGEST_GAP_MINS = 90;
+
 /** Fallback Standard base rate ($/hr) when no default hourly RateConfig row exists; mirrors the seed default. */
 export const FALLBACK_BASE_RATE = 65;
 
@@ -548,5 +551,6 @@ export interface Policy {
   UNSUCCESSFUL_WORK_FACTOR: number;
   NO_FIX_FREE_MINS: number;
   WORKMANSHIP_WINDOW_DAYS: number;
+  MERGE_SUGGEST_GAP_MINS: number;
   CANCELLATION: CancellationPolicy;
 }

@@ -181,6 +181,17 @@ export function PricingTab({ initial, defaults }: Props): React.ReactElement {
           customised={draft.workmanshipWindowDays !== defaults.workmanshipWindowDays}
           onChange={(v) => setTop({ workmanshipWindowDays: v ?? 0 })}
         />
+        <NumberField
+          id="mergeSuggestGapMins"
+          meta={m.mergeSuggestGapMins}
+          value={draft.mergeSuggestGapMins}
+          min={0}
+          max={720}
+          minutesHint
+          error={fieldErrors.mergeSuggestGapMins}
+          customised={draft.mergeSuggestGapMins !== defaults.mergeSuggestGapMins}
+          onChange={(v) => setTop({ mergeSuggestGapMins: v ?? 0 })}
+        />
       </div>
 
       <h3 className="mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase">

@@ -435,6 +435,13 @@ export const PRICING_FIELD_META: Record<string, FieldMeta> = {
     unit: "days",
     off: "Set 0 to drop the guarantee from the pricing and FAQ pages.",
   },
+  mergeSuggestGapMins: {
+    title: "Merge suggestion window",
+    description:
+      "When you bill a calendar event, the calculator offers to bill other events from the same day alongside it if the gap between them is no larger than this. The gap itself is never billed, and nothing merges without you ticking it.",
+    unit: "minutes",
+    off: "Set 0 to stop suggesting merges.",
+  },
   "cancellation.freeNoticeHours": {
     title: "Free-cancellation window (in-person)",
     description:

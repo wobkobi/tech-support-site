@@ -72,6 +72,7 @@ export const DEFAULT_SETTINGS: Settings = {
     unsuccessfulWorkFactor: 0.5,
     noFixFreeMins: 30,
     workmanshipWindowDays: 30,
+    mergeSuggestGapMins: 90,
     cancellation: {
       freeNoticeHours: 12,
       travelChargeHours: 1,

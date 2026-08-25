@@ -5,6 +5,8 @@
  * shapes consumed by the calculator, invoice, and importer code.
  */
 
+import type { CancelMeetingType } from "@/features/business/lib/pricing-policy";
+
 export interface RateConfig {
   id: string;
   label: string;
@@ -238,6 +240,62 @@ export interface ParseJobResponse {
 export interface ParsedRange {
   startTime: string;
   endTime: string;
+}
+
+/** One merged calendar event's contribution to a prefilled job. */
+export interface EventPrefillSlot {
+  /** Google Calendar event id this slot came from. */
+  calendarEventId: string;
+  /** Matching Booking row id, or null for a bare calendar entry. */
+  bookingId: string | null;
+  /** NZ-local HH:MM event start (actual on-site start). */
+  startTime: string;
+  /** NZ-local HH:MM event end (actual on-site end). */
+  endTime: string;
+  /** Event title, for the merged-job banner. */
+  summary: string;
+}
+
+/**
+ * Job prefill built server-side from one or more booking-calendar events
+ * (whose times the operator corrects to actual on-site time) plus their
+ * Booking rows. Wins over any saved draft - billing a specific event is a
+ * fresh task.
+ */
+export interface EventPrefill {
+  /**
+   * Earliest merged event's id; stored on the saved invoice. Invoice.
+   * calendarEventId is singular, so a merged job links back through its first
+   * event only - the rest are recoverable from {@link EventPrefill.slots}.
+   */
+  calendarEventId: string;
+  /** Matching Booking row id, or null for manual calendar events. */
+  bookingId: string | null;
+  /** NZ-local YYYY-MM-DD of the earliest event's start. */
+  jobDate: string;
+  /**
+   * One entry per merged event, in start order; a single-event prefill has
+   * exactly one. Each becomes its own time slot, so the gaps between merged
+   * events never reach the billable total.
+   */
+  slots: EventPrefillSlot[];
+  clientName: string;
+  clientEmail: string;
+  jobAddress: string;
+  /**
+   * How the booking was to be met. Cancel mode bills no round trip on a remote
+   * session. Null when no Booking row backs the event, in which case the
+   * calculator infers it from whether there is an address or a drive.
+   */
+  meetingType: CancelMeetingType | null;
+  /**
+   * Drive prediction made for the events' actual windows, from the frozen
+   * TravelBlock (raw minutes, no scheduling buffer) or the booking snapshot.
+   * One round trip for the whole job: out to the first event, home from the
+   * last. Null when neither exists - the operator looks up manually.
+   */
+  travelMinsThere: number | null;
+  travelMinsBack: number | null;
 }
 
 interface ParsedTaskLine {
