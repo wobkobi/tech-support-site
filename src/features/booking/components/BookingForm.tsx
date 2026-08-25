@@ -24,6 +24,7 @@ import { EmailInput } from "@/shared/components/EmailInput";
 import { PhoneInput } from "@/shared/components/PhoneInput";
 import { cn } from "@/shared/lib/cn";
 import { suggestEmailCorrection } from "@/shared/lib/email-typo-suggestion";
+import { normaliseEmail } from "@/shared/lib/normalise-email";
 import { isPlausibleName, normaliseName } from "@/shared/lib/normalise-name";
 import { validatePhone } from "@/shared/lib/normalise-phone";
 import type { EstimatorRange } from "@/shared/lib/settings/types";
@@ -802,7 +803,7 @@ export default function BookingForm({
             startMinute: selectedMinute,
             duration,
             name: name.trim(),
-            email: email.trim(),
+            email: normaliseEmail(email),
             phone: phone.trim() || undefined,
             meetingType,
             address: meetingType === "in-person" ? combineUnitAndAddress(unit, address) : undefined,

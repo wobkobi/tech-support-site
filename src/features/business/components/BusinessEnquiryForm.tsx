@@ -13,6 +13,7 @@ import { Button } from "@/shared/components/Button";
 import { EmailInput } from "@/shared/components/EmailInput";
 import { PhoneInput } from "@/shared/components/PhoneInput";
 import { cn } from "@/shared/lib/cn";
+import { normaliseEmail } from "@/shared/lib/normalise-email";
 import type React from "react";
 import { useState } from "react";
 import { FaCircleCheck } from "react-icons/fa6";
@@ -78,7 +79,7 @@ export function BusinessEnquiryForm(): React.ReactElement {
           kind: enquiryFor,
           company: isBusiness ? company.trim() : undefined,
           name: name.trim(),
-          email: email.trim(),
+          email: normaliseEmail(email),
           phone: phone.trim() || undefined,
           needs: needs.trim(),
           interest: interest || undefined,

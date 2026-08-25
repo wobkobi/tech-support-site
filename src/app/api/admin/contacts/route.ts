@@ -8,6 +8,7 @@ import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { resolveAddress } from "@/shared/lib/normalise-address";
+import { normaliseEmail } from "@/shared/lib/normalise-email";
 import { toE164NZ } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
@@ -64,7 +65,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return errorResponse("Name and email are required", 400);
   }
 
-  const email = body.email.trim().toLowerCase();
+  const email = normaliseEmail(body.email);
   if (!email.includes("@")) {
     return errorResponse("Invalid email", 400);
   }

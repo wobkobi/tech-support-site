@@ -3,6 +3,7 @@
  * @description Looks up a contact by email so the booking form can pre-fill name/phone/address.
  */
 
+import { normaliseEmail } from "@/shared/lib/normalise-email";
 import { prisma } from "@/shared/lib/prisma";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 import { NextRequest, NextResponse } from "next/server";
@@ -20,7 +21,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const limited = rateLimitOrReject(request, "contact-lookup", 3, 60_000);
   if (limited) return limited;
 
-  const email = request.nextUrl.searchParams.get("email")?.trim().toLowerCase();
+  const email = normaliseEmail(request.nextUrl.searchParams.get("email"));
   if (!email || !email.includes("@")) {
     return NextResponse.json({ ok: false }, { status: 400 });
   }

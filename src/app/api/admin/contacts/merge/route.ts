@@ -10,6 +10,7 @@
 import { deleteContactFromGoogle } from "@/features/contacts/lib/google-contacts";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
+import { normaliseEmailOrNull } from "@/shared/lib/normalise-email";
 import { normaliseContactPhone } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
@@ -96,7 +97,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // Fold every email both contacts know into altEmails (minus the surviving
   // primary address). This is what stops the pair re-splitting: a future booking
   // or review under the secondary's email now resolves back to this one contact.
-  const survivingPrimaryEmail = (data.email ?? primary.email)?.toLowerCase() ?? null;
+  const survivingPrimaryEmail = normaliseEmailOrNull(data.email ?? primary.email);
   const alts = new Set<string>();
   for (const e of [secondary.email, ...secondary.altEmails, ...primary.altEmails]) {
     if (!e) continue;

@@ -57,6 +57,7 @@ import type {
   TravelEntry,
 } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
+import { normaliseEmail } from "@/shared/lib/normalise-email";
 import type { IdentitySettings } from "@/shared/lib/settings/types";
 import { getPacificAucklandOffset, nzDateParts } from "@/shared/lib/timezone-utils";
 import { useRouter } from "next/navigation";
@@ -439,7 +440,10 @@ export function CalculatorView({
   const [stashedTravel, setStashedTravel] = useState<TravelEntry[]>([]);
   // Client details
   const [clientName, setClientName] = useState(() => eventPrefill?.clientName ?? "");
-  const [clientEmail, setClientEmail] = useState(() => eventPrefill?.clientEmail ?? "");
+  // Normalised on seed as well as on typing: a Booking row written before
+  // emails were normalised can still carry capitals, and the invoice preview
+  // must show exactly what gets saved.
+  const [clientEmail, setClientEmail] = useState(() => normaliseEmail(eventPrefill?.clientEmail));
   // Address-to state mirrors the InvoiceBuilder's segmented control so the
   // operator picks Name/Company/Custom once and the choice rides through to
   // the invoice without re-picking.
@@ -608,7 +612,7 @@ export function CalculatorView({
       setParts(draft.parts ?? []);
       setNotes(draft.notes ?? "");
       setClientName(draft.clientName ?? "");
-      setClientEmail(draft.clientEmail ?? "");
+      setClientEmail(normaliseEmail(draft.clientEmail));
       setPickedContactName(draft.pickedContactName ?? null);
       setPickedContactCompany(draft.pickedContactCompany ?? null);
       setPickedContactGoogleId(draft.pickedContactGoogleId ?? null);
@@ -2321,7 +2325,7 @@ export function CalculatorView({
             onSelectContact={(c) => {
               const company = c.company?.trim() || null;
               setClientName(c.name);
-              setClientEmail(c.email);
+              setClientEmail(normaliseEmail(c.email));
               setPickedContactName(c.name);
               setPickedContactCompany(company);
               setPickedContactGoogleId(c.id || null);

@@ -22,6 +22,7 @@ import { parseAmount, parseObjectId } from "@/features/business/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { getIdentity } from "@/shared/lib/business-identity.server";
+import { normaliseEmail } from "@/shared/lib/normalise-email";
 import { prisma } from "@/shared/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
@@ -168,7 +169,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           isQuote: isQuote === true ? true : null,
           quoteValidUntil: quoteValidValue,
           clientName,
-          clientEmail,
+          clientEmail: normaliseEmail(clientEmail),
           issueDate: issueDateValue,
           dueDate: dueDateValue,
           lineItems,

@@ -24,6 +24,7 @@ import { sendCustomerBookingConfirmation } from "@/features/reviews/lib/email";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { getIdentity } from "@/shared/lib/business-identity.server";
+import { normaliseEmail } from "@/shared/lib/normalise-email";
 import { validatePhone } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
@@ -65,7 +66,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return errorResponse("Invalid request body.", 400);
   }
   const name = body.name?.trim() ?? "";
-  const email = body.email?.trim().toLowerCase() ?? "";
+  const email = normaliseEmail(body.email);
   const phoneRaw = body.phone?.trim() || null;
   const address = body.address?.trim() || null;
   const notes = body.notes?.trim() ?? "";

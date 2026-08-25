@@ -9,6 +9,7 @@
  * create pattern below is the canonical replacement.
  */
 
+import { normaliseEmail } from "@/shared/lib/normalise-email";
 import { normaliseContactPhone } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
 import type { Contact } from "@prisma/client";
@@ -48,7 +49,7 @@ export async function findOrCreateContactByEmail(
   email: string,
   seed: ContactSeed,
 ): Promise<FindOrCreateResult> {
-  const normalisedEmail = email.trim().toLowerCase();
+  const normalisedEmail = normaliseEmail(email);
   const existing = await prisma.contact.findFirst({
     where: {
       OR: [

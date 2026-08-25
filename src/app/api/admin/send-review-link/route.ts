@@ -14,6 +14,7 @@ import { sendPastClientReviewRequest } from "@/features/reviews/lib/email";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { getIdentity } from "@/shared/lib/business-identity.server";
+import { normaliseEmail } from "@/shared/lib/normalise-email";
 import { isValidPhone, toE164NZ } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
 import { getSiteUrl } from "@/shared/lib/site-url";
@@ -62,7 +63,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const siteUrl = getSiteUrl();
 
     // Land the Contact first to identify the recipient.
-    const normalisedEmail = mode === "email" ? email!.trim().toLowerCase() : null;
+    const normalisedEmail = mode === "email" ? normaliseEmail(email) : null;
     let normalisedPhone: string | null = null;
     if (mode === "sms") {
       if (!phone) {
