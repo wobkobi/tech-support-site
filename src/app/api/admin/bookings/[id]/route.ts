@@ -400,9 +400,17 @@ export async function PATCH(
     updated.cancelledBy === "customer" &&
     booking.status !== "cancelled"
   ) {
-    void createDraftCancellationInvoice(updated, {
-      reason: updated.noShow ? "no-show" : "late-cancellation",
-    }).catch((err) => console.error("[admin/bookings] Failed to draft cancellation invoice:", err));
+    // Awaited, not detached: Vercel freezes the instance once the response is
+    // sent. The awaits further down this handler used to give a `void` call an
+    // incidental window, but they are skipped on the no-show path, so the fee
+    // invoice was never drafted there.
+    try {
+      await createDraftCancellationInvoice(updated, {
+        reason: updated.noShow ? "no-show" : "late-cancellation",
+      });
+    } catch (err) {
+      console.error("[admin/bookings] Failed to draft cancellation invoice:", err);
+    }
   }
 
   // When transitioning to "completed", send the review request email if one

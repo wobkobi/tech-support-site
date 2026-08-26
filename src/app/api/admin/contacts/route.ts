@@ -95,10 +95,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: true, created: false, contact });
   }
 
-  // Best-effort: push to Google Contacts so it appears on the operator's phone.
-  void syncContactToGoogle(contact.id).catch((err) => {
+  // Push to Google Contacts so it appears on the operator's phone. Awaited, not
+  // detached: Vercel freezes the instance once the response is sent, so a `void`
+  // call would often never reach Google and the contact would stay site-only
+  // until the next sync cron. Still best-effort - a Google hiccup must not fail
+  // the create that already committed.
+  try {
+    await syncContactToGoogle(contact.id);
+  } catch (err) {
     console.error("[admin/contacts] syncContactToGoogle failed:", err);
-  });
+  }
 
   return NextResponse.json({ ok: true, created: true, contact }, { status: 201 });
 }

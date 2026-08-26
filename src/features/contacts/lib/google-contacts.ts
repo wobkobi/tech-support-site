@@ -393,6 +393,15 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
       console.warn(`[google-contacts] syncContactToGoogle: contact ${contactId} not found`);
       return;
     }
+    if (contact.deletedAt) {
+      // A soft-deleted contact was already removed from Google when it was
+      // deleted. Pushing it again re-creates it there - the stored
+      // googleContactId now 404s, so the push falls through to createContact -
+      // and the next import pulls that back as a fresh live contact, silently
+      // undoing the deletion. Guarded here rather than per-caller so the
+      // conflict-resolve path gets it too.
+      return;
+    }
     if (!contact.email) {
       // Phone-only contacts have no email - they are imported FROM Google, not pushed to it.
       return;

@@ -76,10 +76,12 @@ export async function PATCH(
     // marquee / reviews page immediately rather than after the 24h cache TTL.
     revalidateReviewPaths();
 
-    // Fire-and-forget: notify owner of edit
+    // Notify the owner that the review changed - an edit resets it to pending,
+    // so it drops off the public page until re-approved. Awaited, not detached:
+    // Vercel freezes the instance once the response is sent, so neither the
+    // module load nor the send would reliably finish, and a rejection from a
+    // detached promise escapes this try/catch entirely.
     try {
-      // Only send if not anonymous or text changed
-      // (optional: always send for audit)
       const {
         id: reviewId,
         text: reviewText,
@@ -88,16 +90,15 @@ export async function PATCH(
         isAnonymous: anon,
         verified,
       } = updated;
-      void import("@/features/reviews/lib/email").then((m) =>
-        m.sendOwnerReviewNotification({
-          id: reviewId,
-          text: reviewText,
-          firstName: fn,
-          lastName: ln,
-          isAnonymous: anon,
-          verified: !!verified,
-        }),
-      );
+      const { sendOwnerReviewNotification } = await import("@/features/reviews/lib/email");
+      await sendOwnerReviewNotification({
+        id: reviewId,
+        text: reviewText,
+        firstName: fn,
+        lastName: ln,
+        isAnonymous: anon,
+        verified: !!verified,
+      });
     } catch (e) {
       console.warn("[PATCH] Failed to send owner notification after edit", e);
     }

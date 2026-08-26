@@ -390,7 +390,13 @@ export async function backfillContactsFromBookings(): Promise<number> {
       });
       if (!exists) {
         await prisma.contact
-          .create({ data: d })
+          // Explicit null, not omitted: Mongo stores no key for an omitted
+          // optional field, and `where: { deletedAt: null }` - the filter every
+          // reader uses - does not match a document where the key is absent.
+          // Omit it and the backfilled contact is invisible to the admin list,
+          // the sync dirty-set, and the review matcher that runs straight after
+          // this pass. find-or-create.ts passes it for the same reason.
+          .create({ data: { ...d, deletedAt: null } })
           .then(() => (created += 1))
           .catch(() => null);
       }
