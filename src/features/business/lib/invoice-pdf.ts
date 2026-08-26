@@ -5,6 +5,7 @@
  * InvoicePreviewPanel; keep the two layouts in sync.
  */
 import { formatNZD, lineItemQtyLabel } from "@/features/business/lib/business";
+import { nzFinancialYearCode } from "@/features/business/lib/financial-year";
 import { isInvoiceOverdue } from "@/features/business/lib/invoice-status";
 import type { Invoice } from "@/features/business/types/business";
 import { getIdentity } from "@/shared/lib/business-identity.server";
@@ -772,7 +773,5 @@ export async function generateInvoicePdf(invoice: Invoice): Promise<Buffer> {
 export function extractYearCode(invoiceNumber: string): string {
   const m = invoiceNumber.match(/^[A-Z]+-(\d{4,6})-/);
   if (m) return m[1];
-  const now = new Date();
-  const fy = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
-  return String(fy) + String(fy + 1).slice(2);
+  return nzFinancialYearCode();
 }

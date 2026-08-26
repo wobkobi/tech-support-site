@@ -8,6 +8,7 @@
  */
 
 import { nextInvoiceNumber } from "@/features/business/lib/business";
+import { nzFinancialYearCode } from "@/features/business/lib/financial-year";
 import {
   getInvoiceCounter,
   getQuoteCounter,
@@ -61,9 +62,7 @@ export async function getNextInvoiceNumber(): Promise<NextInvoiceNumber> {
       where: { NOT: { number: { startsWith: "Q-" } } },
       orderBy: { number: "desc" },
     });
-    const now = new Date();
-    const fy = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
-    const yearCode = String(fy) + String(fy + 1).slice(2);
+    const yearCode = nzFinancialYearCode();
     return {
       number: nextInvoiceNumber(last?.number ?? null, yearCode),
       sheetNextCount: null,
@@ -98,9 +97,7 @@ export async function getNextQuoteNumber(): Promise<NextInvoiceNumber> {
         : `Q-${data.yearCode}-${String(nextNumber).padStart(4, "0")}`;
     return { number, sheetNextCount: nextNumber, sheetSyncWarning: false };
   } catch {
-    const now = new Date();
-    const fy = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
-    const yearCode = String(fy) + String(fy + 1).slice(2);
+    const yearCode = nzFinancialYearCode();
     return {
       number: `Q-${yearCode}-${String(dbNext).padStart(4, "0")}`,
       sheetNextCount: null,
