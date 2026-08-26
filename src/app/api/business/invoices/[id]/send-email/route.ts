@@ -13,7 +13,7 @@ import {
   resolveReviewInclusion,
   toInvoiceEmailPayload,
 } from "@/features/business/lib/invoice-email-request";
-import { generateInvoicePdf, serializeInvoice } from "@/features/business/lib/invoice-pdf";
+import { generateInvoicePdf, serialiseInvoice } from "@/features/business/lib/invoice-pdf";
 import { sendInvoiceEmail } from "@/features/reviews/lib/email";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
@@ -82,7 +82,7 @@ export async function POST(
   // Generate the invoice PDF
   let pdfBytes: Buffer;
   try {
-    pdfBytes = await generateInvoicePdf(serializeInvoice(invoice));
+    pdfBytes = await generateInvoicePdf(serialiseInvoice(invoice));
   } catch (err) {
     console.error(`[invoice-email] PDF generation failed for ${invoice.number}:`, err);
     return errorResponse("PDF generation failed", 500);

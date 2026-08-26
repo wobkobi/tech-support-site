@@ -8,7 +8,7 @@
 
 import { refreshCalendarCache } from "@/features/calendar/lib/calendar-cache";
 import { errorResponse } from "@/shared/lib/api-response";
-import { isCronAuthorized } from "@/shared/lib/auth";
+import { isCronAuthorised } from "@/shared/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 
 // Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
@@ -21,7 +21,7 @@ export const maxDuration = 60;
  * @returns JSON response with cache refresh results.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  if (!isCronAuthorized(request)) {
+  if (!isCronAuthorised(request)) {
     return errorResponse("Unauthorized", 401);
   }
 

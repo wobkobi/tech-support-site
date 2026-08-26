@@ -12,7 +12,7 @@ import {
   getNextInvoiceNumber,
   writeBackInvoiceCounter,
 } from "@/features/business/lib/invoice-numbering";
-import { generateInvoicePdf, serializeInvoice } from "@/features/business/lib/invoice-pdf";
+import { generateInvoicePdf, serialiseInvoice } from "@/features/business/lib/invoice-pdf";
 import {
   assessCancellation,
   calcTravelCharge,
@@ -206,7 +206,7 @@ async function sendCancellationInvoice(
       : `This invoice covers the late-cancellation fee for the appointment you cancelled inside the notice window. Please see the attached PDF for the details.`;
 
   try {
-    const pdfBytes = await generateInvoicePdf(serializeInvoice(invoice));
+    const pdfBytes = await generateInvoicePdf(serialiseInvoice(invoice));
 
     const ok = await sendInvoiceEmail({
       invoice: {

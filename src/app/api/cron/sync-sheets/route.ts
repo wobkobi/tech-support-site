@@ -9,7 +9,7 @@
 
 import { runSheetsImport } from "@/features/business/lib/sheets-import";
 import { errorResponse } from "@/shared/lib/api-response";
-import { isCronAuthorized } from "@/shared/lib/auth";
+import { isCronAuthorised } from "@/shared/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 
 // Reconciliation walks every per-FY workbook and can retry transient Google
@@ -24,7 +24,7 @@ export const maxDuration = 300;
  * @returns JSON with counts of records imported, updated, skipped, and healed.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  if (!isCronAuthorized(request)) {
+  if (!isCronAuthorised(request)) {
     return errorResponse("Unauthorized", 401);
   }
   try {

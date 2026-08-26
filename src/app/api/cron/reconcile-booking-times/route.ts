@@ -15,7 +15,7 @@
 
 import { reconcileBookingTimes } from "@/features/calendar/lib/reconcile-booking-times";
 import { errorResponse } from "@/shared/lib/api-response";
-import { isCronAuthorized } from "@/shared/lib/auth";
+import { isCronAuthorised } from "@/shared/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 
 // Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
@@ -33,7 +33,7 @@ const CRON_SINCE_DAYS = 7;
  * @returns JSON `{ ok, checked, corrected, rearmed, missing, restored, unreadable }`.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  if (!isCronAuthorized(request)) {
+  if (!isCronAuthorised(request)) {
     return errorResponse("Unauthorized", 401);
   }
 

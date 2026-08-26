@@ -9,7 +9,7 @@
 
 import { recordSubscriptionPayment } from "@/features/business/lib/subscription-recording";
 import { errorResponse } from "@/shared/lib/api-response";
-import { isCronAuthorized } from "@/shared/lib/auth";
+import { isCronAuthorised } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { nzTodayKey } from "@/shared/lib/timezone-utils";
 import { NextRequest, NextResponse } from "next/server";
@@ -25,7 +25,7 @@ export const maxDuration = 60;
  * @returns JSON with count of recorded subscriptions and any errors.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  if (!isCronAuthorized(request)) {
+  if (!isCronAuthorised(request)) {
     return errorResponse("Unauthorized", 401);
   }
 

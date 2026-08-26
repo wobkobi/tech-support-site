@@ -10,7 +10,7 @@
 
 import { syncInvoicePdfToDrive } from "@/features/business/lib/invoice-drive-sync";
 import { parseInvoiceEmailOverrides } from "@/features/business/lib/invoice-email-request";
-import { generateInvoicePdf, serializeInvoice } from "@/features/business/lib/invoice-pdf";
+import { generateInvoicePdf, serialiseInvoice } from "@/features/business/lib/invoice-pdf";
 import { sendVoidNotification } from "@/features/reviews/lib/email";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
@@ -72,7 +72,7 @@ export async function POST(
   // notified:false to the caller so the operator can be advised to email manually.
   let pdfBytes: Buffer | null = null;
   try {
-    pdfBytes = await generateInvoicePdf(serializeInvoice(updated));
+    pdfBytes = await generateInvoicePdf(serialiseInvoice(updated));
   } catch (err) {
     console.error(`[invoice-void] PDF generation failed for ${updated.number}:`, err);
   }

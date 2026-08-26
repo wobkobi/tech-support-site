@@ -16,7 +16,7 @@ import {
   writeBackInvoiceCounter,
   writeBackQuoteCounter,
 } from "@/features/business/lib/invoice-numbering";
-import { generateInvoicePdf, serializeInvoice } from "@/features/business/lib/invoice-pdf";
+import { generateInvoicePdf, serialiseInvoice } from "@/features/business/lib/invoice-pdf";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { parseAmount, parseObjectId } from "@/features/business/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";
@@ -240,7 +240,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // response is sent, so a detached promise may never run. Failures are
   // swallowed so a Drive hiccup never blocks invoice creation.
   try {
-    const pdfBuffer = await generateInvoicePdf(serializeInvoice(invoice));
+    const pdfBuffer = await generateInvoicePdf(serialiseInvoice(invoice));
     await syncInvoicePdfToDrive(invoice, pdfBuffer, "[invoices]");
   } catch (err) {
     console.error("[invoices] Drive PDF upload failed:", err);

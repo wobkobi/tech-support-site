@@ -57,7 +57,7 @@ export interface Invoice {
   total: number;
   /** Snapshot of the promo (if any) that was active when this invoice was created. */
   promoTitle?: string | null;
-  /** Dollar discount applied to the labor subtotal at creation time. */
+  /** Dollar discount applied to the labour subtotal at creation time. */
   promoDiscount?: number | null;
   /** Operator ticked the unsuccessful-work checkbox: half off labour (parts + travel unaffected). */
   unsuccessful?: boolean;

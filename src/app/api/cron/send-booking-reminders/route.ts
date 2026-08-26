@@ -22,7 +22,7 @@ import {
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { sendBookingReminderEmail } from "@/features/reviews/lib/email";
 import { errorResponse } from "@/shared/lib/api-response";
-import { isCronAuthorized } from "@/shared/lib/auth";
+import { isCronAuthorised } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import { NextRequest, NextResponse } from "next/server";
@@ -36,7 +36,7 @@ export const maxDuration = 60;
  * @returns JSON `{ ok, emailsSent, failed, errors }`.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  if (!isCronAuthorized(request)) {
+  if (!isCronAuthorised(request)) {
     return errorResponse("Unauthorized", 401);
   }
 

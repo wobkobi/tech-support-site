@@ -539,11 +539,11 @@ function printTable(results: PageResult[]): void {
 
   for (const r of results) {
     const icon = r.status === "pass" ? "✓" : r.status === "fail" ? "✗" : "!";
-    const color = r.status === "pass" ? "\x1b[32m" : r.status === "fail" ? "\x1b[31m" : "\x1b[33m";
+    const colour = r.status === "pass" ? "\x1b[32m" : r.status === "fail" ? "\x1b[31m" : "\x1b[33m";
     const reset = "\x1b[0m";
 
     console.log(
-      `  ${color}${icon}${reset}       ` +
+      `  ${colour}${icon}${reset}       ` +
         r.name.padEnd(col1) +
         fmtMs(r.ttfbMs).padStart(9) +
         fmtMs(r.fcpMs).padStart(9) +
