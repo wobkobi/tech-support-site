@@ -134,8 +134,11 @@ export function PhoneInput({
         disabled={disabled}
         className={cn(DEFAULT_INPUT_CLASSES, activeError && "border-coquelicot-500/60", className)}
       />
+      {/* text-sm, matching the sibling field errors on the booking form: this
+          renders on customer-facing forms, and at text-xs it was the smallest
+          error message on the site - on the field most likely to be mistyped. */}
       {!hideError && activeError && (
-        <p id={describedBy} className="mt-1 text-xs text-coquelicot-400">
+        <p id={describedBy} className="mt-1 text-sm text-coquelicot-400">
           {activeError}
         </p>
       )}
