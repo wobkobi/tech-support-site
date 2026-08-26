@@ -72,8 +72,15 @@ export async function runContactsSync({
   const conflictedIds = new Set(pendingConflicts.map((c) => c.contactId));
 
   const dirty = contacts.filter((c) => {
-    if (conflictedIds.has(c.id)) return false;
+    // A full sync is an explicit "re-evaluate everything" from the operator, so
+    // it overrides the conflict skip below. Without this the two deadlock: a
+    // contact with a pending conflict is never pushed, so syncContactToGoogle
+    // never re-runs the field comparison, so the conflict can never clear - even
+    // when the comparison would now resolve it on its own. Safe to bypass,
+    // because that comparison still adjudicates per field and re-records a
+    // genuine conflict rather than overwriting Google.
     if (full) return true;
+    if (conflictedIds.has(c.id)) return false;
     if (!c.googleContactId) return true;
     if (!c.lastSyncedAt) return true;
     return c.updatedAt.getTime() > c.lastSyncedAt.getTime();
