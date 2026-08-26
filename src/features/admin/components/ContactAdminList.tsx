@@ -7,6 +7,7 @@
  * (already linked to Google Contacts, shown in a collapsible drawer).
  */
 
+import { useToast } from "@/features/admin/components/ui/Toast";
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import { validateEmail } from "@/features/booking/lib/booking";
 import { formatReviewerName } from "@/features/reviews/lib/formatting";
@@ -484,6 +485,7 @@ export function ContactAdminList({
   });
   const [saving, setSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  const { toast } = useToast();
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [confirmSyncId, setConfirmSyncId] = useState<string | null>(null);
   const [expandedReviewsId, setExpandedReviewsId] = useState<string | null>(null);
@@ -731,12 +733,17 @@ export function ContactAdminList({
     setDeletingId(id);
     try {
       const res = await fetch(`/api/admin/contacts/${id}`, { method: "DELETE" });
-      const data = (await res.json()) as { ok: boolean };
+      const data = (await res.json()) as { ok: boolean; error?: string };
       if (data.ok) {
         setContacts((prev) => prev.filter((c) => c.id !== id));
+      } else {
+        // Say so. Acting only on ok left a failed delete completely silent: the
+        // row stayed put with no explanation, which reads as a dead button.
+        toast(data.error ?? "Couldn't delete that contact - try again.", { tone: "error" });
       }
     } catch (err) {
       console.error("[ContactAdminList] Delete error:", err);
+      toast("Network error - the contact wasn't deleted.", { tone: "error" });
     } finally {
       setDeletingId(null);
       setDeleteConfirmId(null);
@@ -760,12 +767,18 @@ export function ContactAdminList({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ primaryId, secondaryId }),
       });
-      const data = (await res.json()) as { ok: boolean };
+      const data = (await res.json()) as { ok: boolean; error?: string };
       if (data.ok) {
         setContacts((prev) => prev.filter((c) => c.id !== secondaryId));
+      } else {
+        // A merge folds one contact into another and deletes it, so a silent
+        // failure is the worst kind: the operator cannot tell whether the two
+        // were combined or nothing happened at all.
+        toast(data.error ?? "Couldn't merge those contacts - try again.", { tone: "error" });
       }
     } catch (err) {
       console.error("[ContactAdminList] Merge error:", err);
+      toast("Network error - the contacts weren't merged.", { tone: "error" });
     } finally {
       setMergeSourceId(null);
     }
