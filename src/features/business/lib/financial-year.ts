@@ -156,3 +156,19 @@ export function aggregateByFinancialYear(
 export function fyKeyOf(label: string): string {
   return label.match(/(\d{4}-\d{2})/)?.[1] ?? label;
 }
+
+/**
+ * The NZ financial-year code an invoice or quote number carries, e.g. "202627"
+ * for the year beginning 1 April 2026.
+ *
+ * Reads the NZ calendar month rather than the runtime's. The server clock is
+ * UTC on Vercel, which is 12-13 hours behind NZ, so for the first half of each
+ * NZ 1 April a local-time read still says March - and a number minted then
+ * would be filed under the financial year that had just ended.
+ * @param now - Reference instant (defaults to the current time).
+ * @returns Six-digit financial-year code.
+ */
+export function nzFinancialYearCode(now: Date = new Date()): string {
+  const startYear = fyStartYear(now);
+  return String(startYear) + String(startYear + 1).slice(2);
+}
