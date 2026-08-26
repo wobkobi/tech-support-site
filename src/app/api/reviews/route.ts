@@ -3,6 +3,7 @@
  * @description API routes for reviews with verification support.
  */
 
+import { parseObjectId, parseString } from "@/features/business/lib/validation";
 import { sendOwnerReviewNotification } from "@/features/reviews/lib/email";
 import { revalidateReviewPaths } from "@/features/reviews/lib/revalidate";
 import { reviewTextError } from "@/features/reviews/lib/validation";
@@ -102,10 +103,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     let customerRef = null;
     let autoContactId: string | null = null;
 
+    // Validate the verification inputs before any of them reaches a `where`.
+    // These are the secrets that prove who the reviewer is, and Prisma reads a
+    // filter object in place of a scalar - so an unchecked value lets a caller
+    // match a booking or contact they hold no token for and post as verified.
+    const claimedToken = parseString(body.reviewToken);
+    const claimedBookingId = parseObjectId(body.bookingId);
+    const claimedContactId = parseObjectId(body.contactId);
+
     // Verify against a real booking
-    if (body.bookingId && body.reviewToken) {
+    if (claimedBookingId && claimedToken) {
       const booking = await prisma.booking.findFirst({
-        where: { id: body.bookingId, reviewToken: body.reviewToken },
+        where: { id: claimedBookingId, reviewToken: claimedToken },
       });
 
       if (booking) {
@@ -151,9 +160,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       } else {
         // Token supplied but the booking is gone - keep the token so the review
         // is still identifiable, and log rather than silently dropping it.
-        customerRef = body.reviewToken;
+        customerRef = claimedToken;
         console.warn(
-          `[reviews] booking-token submission matched no booking (bookingId=${body.bookingId}); review kept with customerRef.`,
+          `[reviews] booking-token submission matched no booking (bookingId=${claimedBookingId}); review kept with customerRef.`,
         );
       }
     }
@@ -161,11 +170,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Verify against a contact-level manual review link. The token may be the
     // contact's primary reviewToken or one inherited from a merged-away
     // contact (altReviewTokens) - both prove the same person.
-    if (!verified && body.contactId && body.reviewToken) {
+    if (!verified && claimedContactId && claimedToken) {
       const contact = await prisma.contact.findFirst({
         where: {
-          id: body.contactId,
-          OR: [{ reviewToken: body.reviewToken }, { altReviewTokens: { has: body.reviewToken } }],
+          id: claimedContactId,
+          OR: [{ reviewToken: claimedToken }, { altReviewTokens: { has: claimedToken } }],
         },
         select: { id: true, email: true, phone: true, deletedAt: true },
       });
@@ -184,7 +193,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           );
         }
         verified = true;
-        customerRef = body.reviewToken;
+        customerRef = claimedToken;
         autoContactId = contact.id;
 
         // Fill blanks on the Contact from any details the customer typed,
@@ -201,9 +210,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         // The token is valid but the contact was soft-deleted/merged away. Keep
         // the token (so the review re-links if the contact returns) but don't
         // mark it verified or link it to a dead row.
-        customerRef = body.reviewToken;
+        customerRef = claimedToken;
         console.warn(
-          `[reviews] contact-token submission matched a soft-deleted contact (contactId=${body.contactId}); review kept with customerRef for later re-link.`,
+          `[reviews] contact-token submission matched a soft-deleted contact (contactId=${claimedContactId}); review kept with customerRef for later re-link.`,
         );
       }
     }

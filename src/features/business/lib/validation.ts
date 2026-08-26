@@ -31,6 +31,30 @@ export function parseRate(value: unknown): number | null {
   return n;
 }
 
+/** Length ceiling for a body string; comfortably above any token or email this API accepts. */
+const MAX_STRING_LEN = 200;
+
+/**
+ * Parses a plain string from a request body, rejecting anything that isn't one.
+ *
+ * This is a security guard rather than a convenience. Prisma accepts a filter
+ * object anywhere a scalar is allowed, so an unchecked body value lands in a
+ * `where` as an operator instead of a literal: a caller sending
+ * `{"cancelToken":{"not":""}}` turns `where: { cancelToken }` into "any row whose
+ * token isn't empty" and matches somebody else's record. A plain `if (!token)`
+ * check does not catch it, because an object is truthy. Every request-body value
+ * that reaches a `where` must pass through here first.
+ * @param value - Raw value from a request body.
+ * @param maxLen - Longest accepted length (defaults to {@link MAX_STRING_LEN}).
+ * @returns The trimmed string, or null when it isn't a non-empty string within `maxLen`.
+ */
+export function parseString(value: unknown, maxLen: number = MAX_STRING_LEN): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (trimmed === "" || trimmed.length > maxLen) return null;
+  return trimmed;
+}
+
 /** MongoDB ObjectId hex shape, the only string Prisma accepts for a `@db.ObjectId` field. */
 const OBJECT_ID_RE = /^[a-f0-9]{24}$/i;
 
