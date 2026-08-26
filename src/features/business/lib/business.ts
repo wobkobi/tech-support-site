@@ -106,8 +106,17 @@ export function calcInvoiceTotals(
   promoDiscount = 0,
   gstRegistered: boolean = GST_REGISTERED,
 ): { subtotal: number; gstAmount: number; total: number } {
+  // Round EACH line before summing, matching the per-line lineTotal that
+  // jobToLineItems stores and the PDF's Total column prints. Summing unrounded
+  // and rounding once let that column disagree with the Subtotal beneath it:
+  // two 35-minute lines at $65/hr each print $37.92, but the unrounded sum
+  // rounded to $75.83 instead of $75.84 - a visible error on the customer's
+  // invoice.
   const subtotal =
-    Math.round(lineItems.reduce((sum, item) => sum + item.qty * item.unitPrice, 0) * 100) / 100;
+    Math.round(
+      lineItems.reduce((sum, item) => sum + Math.round(item.qty * item.unitPrice * 100) / 100, 0) *
+        100,
+    ) / 100;
   const taxableAmount = Math.max(0, Math.round((subtotal - promoDiscount) * 100) / 100);
   const gstAmount = gstRegistered ? calcGstFromInclusive(taxableAmount, GST_RATE) : 0;
   return {

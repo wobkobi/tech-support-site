@@ -5,6 +5,8 @@
  * in Apr 2025 - Mar 2026 belong to "FY 2025-26".
  */
 
+import { nzDayStartUtc } from "@/shared/lib/timezone-utils";
+
 /** Index of April in JS Date (0 = January). */
 const APRIL = 3;
 
@@ -16,12 +18,15 @@ const DEFAULT_START_DATE = new Date("2025-10-01T00:00:00Z");
 
 /**
  * Computes the start year of the NZ financial year that contains `date`.
+ * Reads UTC parts: every date reaching here has been through
+ * {@link nzDayStartUtc}, so its UTC calendar day IS its NZ calendar day.
  * @param date - Any date.
  * @returns Start year (e.g. 2025 for any date in Apr 2025 - Mar 2026).
  */
 function fyStartYear(date: Date): number {
-  const m = date.getMonth();
-  const y = date.getFullYear();
+  const d = nzDayStartUtc(date);
+  const m = d.getUTCMonth();
+  const y = d.getUTCFullYear();
   return m >= APRIL ? y : y - 1;
 }
 
@@ -55,10 +60,13 @@ export function getFinancialYear(
   startDate: Date = DEFAULT_START_DATE,
 ): FinancialYear {
   const startYear = fyStartYear(date);
-  const start = new Date(startYear, APRIL, 1);
-  const end = new Date(startYear + 1, APRIL, 1);
-  const businessStartedDuringThisFy = startDate >= start && startDate < end;
-  const current = now >= start && now < end;
+  // UTC boundaries, matching how entry dates are stored - see nzDayStartUtc.
+  const start = new Date(Date.UTC(startYear, APRIL, 1));
+  const end = new Date(Date.UTC(startYear + 1, APRIL, 1));
+  const startedOn = nzDayStartUtc(startDate);
+  const today = nzDayStartUtc(now);
+  const businessStartedDuringThisFy = startedOn >= start && startedOn < end;
+  const current = today >= start && today < end;
   const yy = String((startYear + 1) % 100).padStart(2, "0");
   const label = `FY ${startYear}-${yy}${businessStartedDuringThisFy ? " (partial)" : ""}`;
   return { label, start, end, partial: businessStartedDuringThisFy, current };
@@ -79,7 +87,7 @@ export function listFinancialYears(
   const currentStartYear = fyStartYear(now);
   const fys: FinancialYear[] = [];
   for (let y = currentStartYear; y >= firstStartYear; y--) {
-    fys.push(getFinancialYear(new Date(y, APRIL, 1), now, startDate));
+    fys.push(getFinancialYear(new Date(Date.UTC(y, APRIL, 1)), now, startDate));
   }
   return fys;
 }

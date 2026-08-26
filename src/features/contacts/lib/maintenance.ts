@@ -163,6 +163,15 @@ async function foldContactInto(keeper: MergeableContact, dup: MergeableContact):
         where: { contactId: dup.id },
         data: { contactId: keeper.id },
       }),
+      // ContactConflict.contactId is a bare ObjectId with no relation, so
+      // nothing cascades on the delete below. Left behind, an unresolved
+      // conflict points at a row that no longer exists: it renders as
+      // "Unknown", every resolve attempt 500s on P2025, and the unresolved
+      // count never returns to zero.
+      prisma.contactConflict.updateMany({
+        where: { contactId: dup.id },
+        data: { contactId: keeper.id },
+      }),
       ...(Object.keys(fill).length > 0
         ? [prisma.contact.update({ where: { id: keeper.id }, data: fill })]
         : []),
@@ -349,7 +358,11 @@ export async function backfillContactsFromBookings(): Promise<number> {
   for (const c of live) {
     if (c.email) continue;
     const norm = normaliseContactPhone(c.phone);
-    if (norm) phoneOnlyByNorm.set(norm, c);
+    // Mobile-only, the same gate mergePhoneOnlyContacts applies: a shared
+    // landline may belong to two different people in one household. Without it,
+    // a son booking on the family landline had his email written onto his
+    // mother's contact and no contact of his own was ever created.
+    if (norm && isNZMobileKey(norm)) phoneOnlyByNorm.set(norm, c);
   }
 
   // Newest booking wins per email (Map overwrite as the ascending scan proceeds).

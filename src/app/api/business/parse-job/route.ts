@@ -115,8 +115,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return errorResponse("Unauthorized", 401);
   }
 
-  // Parse and validate body
-  const body = await request.json();
+  // Parse and validate body. `.catch(() => null)` like the sibling routes: the
+  // try below starts well after this line, so a malformed body threw straight
+  // out of the handler as a bare 500 instead of the 400 the validation returns.
+  const body = await request.json().catch(() => null);
+  if (body === null || typeof body !== "object") {
+    return errorResponse("Invalid request body", 400);
+  }
   const { input, answers, jobDate, fallbackDestination } = body as {
     input: unknown;
     answers?: Record<string, unknown>;

@@ -57,7 +57,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return errorResponse("Invalid date", 400);
   }
 
-  const { entry, sheetRowKey } = await recordIncome({
+  const { entry, sheetRowKey, sheetSyncWarning } = await recordIncome({
     date: entryDate,
     customer,
     description,
@@ -67,5 +67,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     invoiceId,
   });
 
-  return NextResponse.json({ ok: true, entry: { ...entry, sheetRowKey } }, { status: 201 });
+  // sheetSyncWarning has to reach the client: recordIncome swallows a Cashbook
+  // append failure so the entry still saves, and dropping the flag here reported
+  // a clean 201 for a payment that never made it to the sheet. The sibling
+  // expenses route returns it, and the UI already renders the warning toast.
+  return NextResponse.json(
+    { ok: true, entry: { ...entry, sheetRowKey }, sheetSyncWarning },
+    { status: 201 },
+  );
 }

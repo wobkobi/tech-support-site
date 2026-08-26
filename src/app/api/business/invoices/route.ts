@@ -114,6 +114,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const dueDateValue = dueDate
     ? new Date(dueDate)
     : new Date(Date.now() + identity.paymentTermsDays * 24 * 60 * 60 * 1000);
+  // Guarded like quoteValidUntil below. An unparseable date (e.g. "14/09/2026")
+  // reached prisma.create as an Invalid Date and threw outside any try/catch,
+  // 500ing with no message - and by then getNextInvoiceNumber had already burnt
+  // an invoice number off the Sheets counter.
+  if (Number.isNaN(issueDateValue.getTime()) || Number.isNaN(dueDateValue.getTime())) {
+    return errorResponse("Enter a valid issue date and due date", 400);
+  }
   // Quote validity: explicit date wins; default 30 days out. dueDate still
   // gets a value (schema requires one) but quotes never render or enforce it.
   const quoteValidValue = isQuote

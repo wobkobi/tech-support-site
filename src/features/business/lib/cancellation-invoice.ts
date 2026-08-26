@@ -27,7 +27,7 @@ import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-crea
 import { sendInvoiceEmail } from "@/features/reviews/lib/email";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { prisma } from "@/shared/lib/prisma";
-import type { Booking, Invoice } from "@prisma/client";
+import { Prisma, type Booking, type Invoice } from "@prisma/client";
 
 export interface DraftCancellationInvoiceOptions {
   /**
@@ -130,9 +130,10 @@ export async function createDraftCancellationInvoice(
   }
 
   // Shared numbering avoids unique-constraint collisions with the admin flow.
-  const { number, sheetNextCount } = await getNextInvoiceNumber();
+  let { number, sheetNextCount } = await getNextInvoiceNumber();
   const { subtotal, gstAmount, total } = calcInvoiceTotals(lineItems, 0, GST_REGISTERED);
   const now = new Date();
+  const paymentTermsDays = (await getIdentity()).paymentTermsDays;
 
   let contactId: string | null = null;
   try {
@@ -148,28 +149,51 @@ export async function createDraftCancellationInvoice(
 
   const customerNotes = cancellationNotes(reason, booking.startAt);
 
-  const invoice = await prisma.invoice.create({
-    data: {
-      number,
-      clientName: booking.name,
-      clientEmail: booking.email,
-      issueDate: now,
-      dueDate: new Date(
-        now.getTime() + (await getIdentity()).paymentTermsDays * 24 * 60 * 60 * 1000,
-      ),
-      lineItems,
-      gst: gstAmount > 0,
-      subtotal,
-      gstAmount,
-      total,
-      status: "DRAFT",
-      notes: customerNotes,
-      contactId,
-      // Link the auto-draft to the booking it bills so the booking detail page
-      // (Phase 9) can surface it. Legacy cancellation invoices stay unlinked.
-      bookingId: booking.id,
-    },
-  });
+  // Retry on a number collision, matching the admin create and convert paths.
+  // getNextInvoiceNumber is a non-atomic read-modify-write, so an operator
+  // saving an invoice at the same moment a customer self-cancels can mint the
+  // same number. Without the retry this path threw P2002 into a bare .catch and
+  // the cancellation fee was silently never invoiced.
+  let invoice: Invoice | null = null;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      invoice = await prisma.invoice.create({
+        data: {
+          number,
+          clientName: booking.name,
+          clientEmail: booking.email,
+          issueDate: now,
+          dueDate: new Date(now.getTime() + paymentTermsDays * 24 * 60 * 60 * 1000),
+          lineItems,
+          gst: gstAmount > 0,
+          subtotal,
+          gstAmount,
+          total,
+          status: "DRAFT",
+          notes: customerNotes,
+          contactId,
+          // Link the auto-draft to the booking it bills so the booking detail page
+          // (Phase 9) can surface it. Legacy cancellation invoices stay unlinked.
+          bookingId: booking.id,
+        },
+      });
+      break;
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === "P2002" &&
+        attempt < 4
+      ) {
+        console.warn(`[cancellation-invoice] Invoice number ${number} collided; re-allocating.`);
+        ({ number, sheetNextCount } = await getNextInvoiceNumber());
+        continue;
+      }
+      throw err;
+    }
+  }
+  if (!invoice) {
+    throw new Error("Could not allocate a unique invoice number for the cancellation fee");
+  }
   console.log(
     `[cancellation-invoice] Drafted ${reason} invoice ${number} for booking ${booking.id}`,
   );

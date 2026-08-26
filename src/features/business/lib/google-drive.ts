@@ -160,16 +160,29 @@ export async function searchAllInvoicePdfs(): Promise<
   { name: string; fileId: string; webUrl: string }[]
 > {
   const drive = getDriveClient();
-  const res = await drive.files.list({
-    q: "name contains 'TTP-' and mimeType='application/pdf' and trashed=false",
-    fields: "files(id,name,webViewLink)",
-    pageSize: 500,
-  });
-  return (res.data.files ?? []).map((f) => ({
-    name: f.name!,
-    fileId: f.id!,
-    webUrl: f.webViewLink!,
-  }));
+  const results: { name: string; fileId: string; webUrl: string }[] = [];
+  // Paged like listSpreadsheetsInFolder below. Drive treats pageSize as a
+  // maximum and routinely returns a short page plus a continuation token for a
+  // broad drive-wide query, so reading one page silently truncated the set:
+  // invoices whose PDF sat on a later page looked like they had no Drive file
+  // at all and never got their driveFileId/driveWebUrl back-filled. Requesting
+  // nextPageToken in `fields` is required - omit it and the token is not even
+  // returned.
+  let pageToken: string | undefined;
+  do {
+    const res = await drive.files.list({
+      q: "name contains 'TTP-' and mimeType='application/pdf' and trashed=false",
+      fields: "nextPageToken, files(id,name,webViewLink)",
+      pageSize: 500,
+      ...(pageToken ? { pageToken } : {}),
+    });
+    for (const f of res.data.files ?? []) {
+      if (!f.id || !f.name) continue;
+      results.push({ name: f.name, fileId: f.id, webUrl: f.webViewLink! });
+    }
+    pageToken = res.data.nextPageToken ?? undefined;
+  } while (pageToken);
+  return results;
 }
 
 /**

@@ -94,6 +94,19 @@ export async function PATCH(
         await prisma.calendarEventCache.deleteMany({
           where: { eventId: block.sourceEventId, calendarEmail: block.calendarEmail },
         });
+        // The travel windows either side are separate synthetic cache rows
+        // (travel-before:/travel-after:, written under the booking calendar), and
+        // the cron skips an ignored event entirely - so leaving them behind kept
+        // those slots unbookable for up to their 30-min TTL plus the stale-serve
+        // window, long after the operator said the day was clear.
+        const syntheticIds = [block.beforeEventId, block.afterEventId].filter(
+          (eventId): eventId is string => eventId !== null,
+        );
+        if (syntheticIds.length > 0) {
+          await prisma.calendarEventCache.deleteMany({
+            where: { eventId: { in: syntheticIds } },
+          });
+        }
       } catch (err) {
         console.error("[travel/[id]] Failed to purge cache entry on ignore:", err);
       }
