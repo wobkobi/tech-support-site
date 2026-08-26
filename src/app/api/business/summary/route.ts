@@ -12,6 +12,7 @@ import { isAdminRequest } from "@/shared/lib/auth";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
+import { nzDateParts } from "@/shared/lib/timezone-utils";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
@@ -26,8 +27,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  // NZ calendar month expressed as UTC midnights, because that is how ledger
+  // entries are stored ("2026-04-01" parses as 2026-04-01T00:00:00Z). Building
+  // these from local-time parts read as UTC on Vercel, so for the first ~13
+  // hours of each NZ 1st an entry dated that day fell outside both bounds and
+  // vanished from the month totals.
+  const [nzYear, nzMonth] = nzDateParts(now);
+  const monthStart = new Date(Date.UTC(nzYear, nzMonth - 1, 1));
+  const monthEnd = new Date(Date.UTC(nzYear, nzMonth, 1));
 
   const [incomeEntries, expenseEntries] = await Promise.all([
     prisma.incomeEntry.findMany({ select: { amount: true, date: true } }),
@@ -37,6 +44,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const totalIncome = incomeEntries.reduce((s, e) => s + e.amount, 0);
   const totalExpensesExcl = expenseEntries.reduce((s, e) => s + e.amountExcl, 0);
   const totalGstClaimable = expenseEntries.reduce((s, e) => s + e.gstAmount, 0);
+  const profit = Math.round((totalIncome - totalExpensesExcl) * 100) / 100;
 
   const currentMonthIncome = incomeEntries
     .filter((e) => e.date >= monthStart && e.date < monthEnd)
@@ -62,8 +70,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       totalIncome,
       totalExpensesExcl,
       totalGstClaimable,
-      taxReserve: Math.round(totalIncome * incomeTax * 100) / 100,
-      profit: Math.round((totalIncome - totalExpensesExcl) * 100) / 100,
+      // Provision on PROFIT, not gross income. financial-year.ts computes the
+      // per-FY reserve that way to match the NZ sole-trader Tax Planner sheet,
+      // and both figures are returned in this same response - computing the
+      // headline on gross had them contradicting each other, overstating what
+      // needed setting aside by the tax rate on every dollar of expenses.
+      taxReserve: Math.round(Math.max(0, profit * incomeTax) * 100) / 100,
+      profit,
       currentMonthIncome,
       currentMonthExpenses,
       incomeCount: incomeEntries.length,

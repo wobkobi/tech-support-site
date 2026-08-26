@@ -172,3 +172,87 @@ export async function normaliseAddress(raw: string | null | undefined): Promise<
   const resolution = await resolveAddress(raw);
   return resolution.status === "resolved" ? resolution.address : null;
 }
+
+/** NZ street-type abbreviations Google Contacts commonly holds in typed addresses. */
+const STREET_ABBREVIATIONS: Record<string, string> = {
+  st: "street",
+  str: "street",
+  rd: "road",
+  ave: "avenue",
+  av: "avenue",
+  cres: "crescent",
+  cr: "crescent",
+  dr: "drive",
+  pl: "place",
+  tce: "terrace",
+  ln: "lane",
+  hwy: "highway",
+  pde: "parade",
+  cl: "close",
+  ct: "court",
+  gr: "grove",
+  gdns: "gardens",
+  blvd: "boulevard",
+  mt: "mount",
+  pt: "point",
+};
+
+/** Words that carry no addressing information when comparing two forms of one address. */
+const ADDRESS_NOISE = new Set([
+  "new",
+  "zealand",
+  "nz",
+  "apartment",
+  "apt",
+  "unit",
+  "flat",
+  "level",
+]);
+
+/**
+ * Reduces an address to the set of words that actually identify it, so two
+ * spellings of one place compare equal.
+ *
+ * A unit number is kept welded to its street number: `x/y` means unit x AT
+ * number y, so the two halves must never become interchangeable tokens - split
+ * them and "12/160 Kepa Rd" would read as the same place as plain "160 Kepa
+ * Rd". Google Contacts often puts the unit on its own first line instead, so
+ * that shape is rejoined into `x/y` before anything else happens.
+ * @param value - Address in any format.
+ * @returns Identifying words, or null when there is no address.
+ */
+function addressTokens(value: string | null): Set<string> | null {
+  if (!value) return null;
+  const rejoined = value.toLowerCase().replace(/^\s*(\d+[a-z]?)\s*[\n\r]+\s*(?=\d)/, "$1/");
+  const flattened = rejoined
+    .replace(/[\n\r,.]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const words = flattened
+    .split(" ")
+    .map((word) => STREET_ABBREVIATIONS[word] ?? word)
+    .filter((word) => word && !ADDRESS_NOISE.has(word));
+  return words.length > 0 ? new Set(words) : null;
+}
+
+/**
+ * Whether `canonical` is the same address as `other`, only more completely
+ * stated. True when every identifying word in `other` appears in `canonical`.
+ *
+ * The site stores the Geocoding API's canonical form, which spells out the
+ * street type and adds the suburb and postcode; Google Contacts keeps whatever
+ * was typed. Comparing those as raw strings made every canonicalised address
+ * look like a two-sided disagreement. Subsumption is deliberately one-way: an
+ * address carrying detail the canonical form lacks (a unit number, a different
+ * street) is NOT a match and stays a real conflict.
+ * @param canonical - The richer, canonicalised address (the site's).
+ * @param other - The other form to test against it (Google's).
+ * @returns True when `other` says nothing `canonical` doesn't already say.
+ */
+export function addressCovers(canonical: string | null, other: string | null): boolean {
+  const a = addressTokens(canonical);
+  const b = addressTokens(other);
+  if (!a || !b) return false;
+  for (const word of b) if (!a.has(word)) return false;
+  return true;
+}

@@ -8,7 +8,7 @@
 
 import { runContactsSync } from "@/features/contacts/lib/contacts-sync";
 import { errorResponse } from "@/shared/lib/api-response";
-import { isCronAuthorized } from "@/shared/lib/auth";
+import { isCronAuthorised } from "@/shared/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 
 // A catch-up sync that pushes many contacts (sequential People API calls at
@@ -23,7 +23,7 @@ export const maxDuration = 300;
  * @returns JSON with pushed/imported/conflicts/skipped counts.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  if (!isCronAuthorized(request)) {
+  if (!isCronAuthorised(request)) {
     return errorResponse("Unauthorized", 401);
   }
   try {

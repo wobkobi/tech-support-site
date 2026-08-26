@@ -5,6 +5,7 @@
 // changes back in. Reuses the per-contact merge/conflict engine in
 // google-contacts.ts unchanged - this module only decides what to sync and when.
 
+import { UNRESOLVED_CONFLICT_FILTER } from "@/features/contacts/lib/contact-conflicts";
 import { prisma } from "@/shared/lib/prisma";
 import { importFromGoogleContacts, syncContactToGoogle } from "./google-contacts";
 import {
@@ -65,7 +66,7 @@ export async function runContactsSync({
   });
 
   const pendingConflicts = await prisma.contactConflict.findMany({
-    where: { resolvedAt: null },
+    where: { ...UNRESOLVED_CONFLICT_FILTER },
     select: { contactId: true },
   });
   const conflictedIds = new Set(pendingConflicts.map((c) => c.contactId));
@@ -93,6 +94,8 @@ export async function runContactsSync({
   // 3. Pull Google's changes back in.
   const imported = await importFromGoogleContacts();
 
-  const conflicts = await prisma.contactConflict.count({ where: { resolvedAt: null } });
+  const conflicts = await prisma.contactConflict.count({
+    where: { ...UNRESOLVED_CONFLICT_FILTER },
+  });
   return { pushed, imported, conflicts, skipped: conflictedIds.size };
 }

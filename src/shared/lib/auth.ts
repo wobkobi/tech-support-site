@@ -151,8 +151,8 @@ function isValidCronBearer(authHeader: string | null): boolean {
  * Validates cron authorization. Bearer-token-only; cron-job.org is the sole
  * scheduler.
  * @param request - The incoming request to verify.
- * @returns True if authorized, false otherwise.
+ * @returns True if authorised, false otherwise.
  */
-export function isCronAuthorized(request: NextRequest): boolean {
+export function isCronAuthorised(request: NextRequest): boolean {
   return isValidCronBearer(request.headers.get("authorization"));
 }

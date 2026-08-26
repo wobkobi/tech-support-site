@@ -468,7 +468,9 @@ export default async function InvoiceViewPage({
             </div>
             {invoice.promoDiscount && invoice.promoDiscount > 0 && (
               <div className="flex justify-between gap-3 text-amber-700">
-                <span>Promo (labor only){invoice.promoTitle ? `: ${invoice.promoTitle}` : ""}</span>
+                <span>
+                  Promo (labour only){invoice.promoTitle ? `: ${invoice.promoTitle}` : ""}
+                </span>
                 <span className="whitespace-nowrap">-{formatNZD(invoice.promoDiscount)}</span>
               </div>
             )}

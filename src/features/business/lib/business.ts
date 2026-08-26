@@ -106,8 +106,17 @@ export function calcInvoiceTotals(
   promoDiscount = 0,
   gstRegistered: boolean = GST_REGISTERED,
 ): { subtotal: number; gstAmount: number; total: number } {
+  // Round EACH line before summing, matching the per-line lineTotal that
+  // jobToLineItems stores and the PDF's Total column prints. Summing unrounded
+  // and rounding once let that column disagree with the Subtotal beneath it:
+  // two 35-minute lines at $65/hr each print $37.92, but the unrounded sum
+  // rounded to $75.83 instead of $75.84 - a visible error on the customer's
+  // invoice.
   const subtotal =
-    Math.round(lineItems.reduce((sum, item) => sum + item.qty * item.unitPrice, 0) * 100) / 100;
+    Math.round(
+      lineItems.reduce((sum, item) => sum + Math.round(item.qty * item.unitPrice * 100) / 100, 0) *
+        100,
+    ) / 100;
   const taxableAmount = Math.max(0, Math.round((subtotal - promoDiscount) * 100) / 100);
   const gstAmount = gstRegistered ? calcGstFromInclusive(taxableAmount, GST_RATE) : 0;
   return {
@@ -777,7 +786,11 @@ export function calcJobTotal(
   // labour-derived figure below (tasks total, holiday uplift, promo and
   // unsuccessful discounts) agrees with the floored invoice lines.
   const job = { ...jobIn, tasks: enforceMinBillable(jobIn.tasks, pricing.minBillableMins) };
-  const tasksTotal = job.tasks.reduce((s, t) => s + t.qty * t.unitPrice, 0);
+  // Round each task line before summing, exactly as jobToLineItems does when it
+  // builds the invoice rows. This preview and the saved invoice must land on the
+  // same cent: summing unrounded here made the calculator quote $75.83 for a job
+  // whose invoice then read $75.84.
+  const tasksTotal = job.tasks.reduce((s, t) => s + Math.round(t.qty * t.unitPrice * 100) / 100, 0);
   const partsTotal = job.parts.reduce((s, p) => s + p.cost, 0);
   const rawTravelTotal = travelEntriesTotal(job.travelEntries);
   // Auto entries trigger the floor; manual-only entries (parking, etc.) don't.
@@ -789,9 +802,12 @@ export function calcJobTotal(
   // Public-holiday surcharge uplifts labour only (hourly task lines), never
   // travel or parts. 0 when the job date isn't a holiday.
   const holidayUplift = pricing.holidayUplift ?? 0;
+  // Per-line rounding again: jobToLineItems accumulates its labour running
+  // total from the ROUNDED lineTotals, so the surcharge must be derived from
+  // the same base or the surcharge line itself drifts a cent.
   const hourlyTasksTotal = job.tasks
     .filter(isHourlyTask)
-    .reduce((s, t) => s + t.qty * t.unitPrice, 0);
+    .reduce((s, t) => s + Math.round(t.qty * t.unitPrice * 100) / 100, 0);
   const holidaySurcharge =
     holidayUplift > 0 ? Math.round(hourlyTasksTotal * holidayUplift * 100) / 100 : 0;
   const subtotal =

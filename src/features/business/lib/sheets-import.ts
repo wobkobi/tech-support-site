@@ -602,9 +602,16 @@ async function healUnsyncedEntries(warnings: string[], errors: string[]): Promis
   let healed = 0;
   const cutoff = new Date(Date.now() - SELF_HEAL_MAX_AGE_MS);
 
+  // `sheetRowKey: null` alone finds nothing: recordIncome/recordExpense omit the
+  // field on create, so Mongo stores no key at all, and Prisma compiles a bare
+  // null to "exists AND is null". The OR catches the unset shape as well - which
+  // is every entry this self-heal exists to rescue.
+  const unsyncedFilter = {
+    OR: [{ sheetRowKey: null }, { sheetRowKey: { isSet: false } }],
+  };
   const [incomeOrphans, expenseOrphans] = await Promise.all([
-    prisma.incomeEntry.findMany({ where: { sheetRowKey: null } }),
-    prisma.expenseEntry.findMany({ where: { sheetRowKey: null } }),
+    prisma.incomeEntry.findMany({ where: unsyncedFilter }),
+    prisma.expenseEntry.findMany({ where: unsyncedFilter }),
   ]);
 
   for (const entry of incomeOrphans) {
@@ -618,10 +625,14 @@ async function healUnsyncedEntries(warnings: string[], errors: string[]): Promis
         warnings.push(`Income ${entry.id}: no sheet resolves for ${entry.date.toISOString()}`);
         continue;
       }
+      // Deterministic Sync ID = the entry id, matching recordIncome. Without it
+      // the append mints a random id, skips the append-if-absent dedup, and a
+      // heal that follows a successful append writes the row a second time.
       const sheetRowKey = await appendRowWithSyncId(
         spreadsheetId,
         "Cashbook",
         buildCashbookCells(entry),
+        entry.id,
       );
       await prisma.incomeEntry.update({ where: { id: entry.id }, data: { sheetRowKey } });
       healed++;
@@ -641,10 +652,13 @@ async function healUnsyncedEntries(warnings: string[], errors: string[]): Promis
         warnings.push(`Expense ${entry.id}: no sheet resolves for ${entry.date.toISOString()}`);
         continue;
       }
+      // Deterministic Sync ID = the entry id, matching recordExpense (see the
+      // Cashbook branch above for why omitting it double-writes the row).
       const sheetRowKey = await appendRowWithSyncId(
         spreadsheetId,
         "Expenses",
         buildExpenseCells(entry),
+        entry.id,
       );
       await prisma.expenseEntry.update({ where: { id: entry.id }, data: { sheetRowKey } });
       healed++;

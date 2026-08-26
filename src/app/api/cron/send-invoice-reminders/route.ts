@@ -8,7 +8,7 @@ import { findRecordedPayment } from "@/features/business/lib/invoice-payment-mat
 import { sendOverdueReminder } from "@/features/business/lib/invoice-reminders";
 import { NOT_A_QUOTE_FILTER } from "@/features/business/lib/invoice-status";
 import { errorResponse } from "@/shared/lib/api-response";
-import { isCronAuthorized } from "@/shared/lib/auth";
+import { isCronAuthorised } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import { NextRequest, NextResponse } from "next/server";
@@ -22,7 +22,7 @@ export const maxDuration = 60;
  * @returns JSON `{ ok, sent, skipped, paid, failed, errors }`.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  if (!isCronAuthorized(request)) {
+  if (!isCronAuthorised(request)) {
     return errorResponse("Unauthorized", 401);
   }
 

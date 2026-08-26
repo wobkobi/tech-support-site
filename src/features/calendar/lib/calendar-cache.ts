@@ -4,7 +4,7 @@
  */
 
 import {
-  fetchAllCalendarEvents,
+  fetchAllCalendarEventsDetailed,
   getBookingCalendarId,
   type CalendarEvent,
 } from "@/features/calendar/lib/google-calendar";
@@ -221,11 +221,23 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
   const roundTravel = (raw: number): number =>
     roundTravelMinutes(raw, scheduling.travelRoundBufferMin);
 
-  // Fetch fresh calendar events
+  // Fetch fresh calendar events. The failed-calendar set matters as much as the
+  // events: a calendar that errored contributes nothing, which is
+  // indistinguishable from "its events were all cancelled" unless the stale
+  // sweep below is told to leave it alone.
   let rawEvents: CalendarEvent[] = [];
+  let failedCalendarIds: string[] = [];
   try {
-    rawEvents = await fetchAllCalendarEvents(travelWindowStart, maxDate);
+    ({ events: rawEvents, failedCalendarIds } = await fetchAllCalendarEventsDetailed(
+      travelWindowStart,
+      maxDate,
+    ));
     console.log(`[refreshCalendarCache] Fetched ${rawEvents.length} calendar events`);
+    if (failedCalendarIds.length > 0) {
+      console.warn(
+        `[refreshCalendarCache] ${failedCalendarIds.length} calendar(s) failed to fetch (${failedCalendarIds.join(", ")}); their travel blocks are preserved this run`,
+      );
+    }
   } catch (error) {
     console.error("[refreshCalendarCache] Failed to fetch calendar events:", error);
     // Don't throw - the stale cache covers the gap when the API fails
@@ -475,6 +487,9 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
     let needsRebuild = true;
     let reuseRawToMinutes: number | null = null;
     let reuseRawBackMinutes: number | null = null;
+    // Row to drop once a replacement is actually ready to write - see the
+    // deferred delete below.
+    let staleBlockId: string | null = null;
 
     if (existing) {
       const eventTimesMatch =
@@ -545,11 +560,13 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
             console.error("[refreshCalendarCache] Failed to delete stale cache entries:", err);
           }
         }
-        try {
-          await prisma.travelBlock.delete({ where: { id: existing.id } });
-        } catch (err) {
-          console.error("[refreshCalendarCache] Failed to delete stale TravelBlock:", err);
-        }
+        // Deferred, not deleted here: the rebuild below bails out when both
+        // Distance Matrix legs come back null, and dropping the row now would
+        // take the operator's customOrigin / customTravelBackDestination /
+        // transportMode with it. The next run would then find no row to inherit
+        // from and rebuild from home on "driving", losing the overrides for
+        // good. Delete it only once a replacement is ready to write.
+        staleBlockId = existing.id;
       }
     }
 
@@ -740,7 +757,9 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
       }
     }
 
-    // Skip entirely if both directions failed (try again next cron run)
+    // Skip entirely if both directions failed (try again next cron run). Any
+    // superseded block is still in the table - the delete is deferred until a
+    // replacement exists - so the operator's overrides survive to that retry.
     if (rawTravelToMinutes === null && rawTravelBackMinutes === null) {
       if (isDev) console.log(`[travel] Both directions null for "${event.summary}" - skipping`);
       continue;
@@ -817,6 +836,12 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
     // travel-back minutes even when suppressed, so an un-suppression can reuse them.
     const persistedMode = existing?.transportMode ?? seriesMode ?? null;
     try {
+      // Now that a replacement is ready, retire the row the rebuild superseded.
+      // `existing` is still the in-memory copy, so the overrides read below
+      // survive this delete.
+      if (staleBlockId) {
+        await prisma.travelBlock.delete({ where: { id: staleBlockId } });
+      }
       await prisma.travelBlock.create({
         data: {
           sourceEventId: event.id,
@@ -849,9 +874,17 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
   }
 
   // Delete stale blocks whose source event no longer exists
+  const failedCalendars = new Set(failedCalendarIds);
   for (const block of existingBlocks) {
     const key = `${block.sourceEventId}|${block.calendarEmail}`;
     if (currentEventKeys.has(key)) continue;
+
+    // A calendar that failed to fetch contributes no keys, so every one of its
+    // blocks looks stale. Deleting them would destroy the operator's `ignored`,
+    // `customOrigin` and `transportMode` overrides on a transient 429, and the
+    // next successful run would rebuild the blocks with defaults - silently
+    // re-blocking days that had been marked clear. Skip until it answers again.
+    if (failedCalendars.has(block.calendarEmail)) continue;
 
     // Freeze finished events' blocks: the fetch window starts at `now`, so a
     // naturally-finished event vanishes from currentEventKeys the moment it

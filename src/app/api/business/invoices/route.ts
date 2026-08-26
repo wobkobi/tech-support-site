@@ -16,7 +16,7 @@ import {
   writeBackInvoiceCounter,
   writeBackQuoteCounter,
 } from "@/features/business/lib/invoice-numbering";
-import { generateInvoicePdf, serializeInvoice } from "@/features/business/lib/invoice-pdf";
+import { generateInvoicePdf, serialiseInvoice } from "@/features/business/lib/invoice-pdf";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { parseAmount, parseObjectId } from "@/features/business/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";
@@ -114,6 +114,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const dueDateValue = dueDate
     ? new Date(dueDate)
     : new Date(Date.now() + identity.paymentTermsDays * 24 * 60 * 60 * 1000);
+  // Guarded like quoteValidUntil below. An unparseable date (e.g. "14/09/2026")
+  // reached prisma.create as an Invalid Date and threw outside any try/catch,
+  // 500ing with no message - and by then getNextInvoiceNumber had already burnt
+  // an invoice number off the Sheets counter.
+  if (Number.isNaN(issueDateValue.getTime()) || Number.isNaN(dueDateValue.getTime())) {
+    return errorResponse("Enter a valid issue date and due date", 400);
+  }
   // Quote validity: explicit date wins; default 30 days out. dueDate still
   // gets a value (schema requires one) but quotes never render or enforce it.
   const quoteValidValue = isQuote
@@ -240,7 +247,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // response is sent, so a detached promise may never run. Failures are
   // swallowed so a Drive hiccup never blocks invoice creation.
   try {
-    const pdfBuffer = await generateInvoicePdf(serializeInvoice(invoice));
+    const pdfBuffer = await generateInvoicePdf(serialiseInvoice(invoice));
     await syncInvoicePdfToDrive(invoice, pdfBuffer, "[invoices]");
   } catch (err) {
     console.error("[invoices] Drive PDF upload failed:", err);

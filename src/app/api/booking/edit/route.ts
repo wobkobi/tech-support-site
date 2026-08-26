@@ -233,16 +233,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       cancelUrl: `${siteUrl}/booking/cancel?token=${encodeURIComponent(booking.cancelToken)}`,
     });
 
-    // Replace the calendar event: delete the old one, then create at the new time.
-    if (booking.calendarEventId) {
-      try {
-        await deleteBookingEvent({ eventId: booking.calendarEventId });
-      } catch (err) {
-        console.error("[booking/edit] Failed to delete old calendar event:", err);
-      }
-    }
-
-    // Create new calendar event
+    // Replace the calendar event: CREATE the replacement first, then retire the
+    // old one. Deleting first meant a Google 5xx on the create left the customer
+    // with no calendar event at all while the booking still read `confirmed`
+    // against a dead calendarEventId, and a retry could not recover it. Creating
+    // first means the worst case is a duplicate event, which is recoverable.
+    // The slot validation above already excludes this booking's own event, so
+    // the overlap between create and delete cannot fail the conflict check.
     let calendarEventId: string | null = null;
     try {
       const summary = `Tech Support: ${cleanName} - ${cleanDurationLabel}`;
@@ -260,10 +257,23 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       console.log(`[booking/edit] Created new calendar event: ${calendarEventId}`);
     } catch (calendarError) {
       console.error("[booking/edit] Failed to create new calendar event:", calendarError);
+      // The original event is untouched, so the appointment still stands at its
+      // old time and the customer can simply try again.
       return NextResponse.json(
         { ok: false, error: "Failed to update calendar event. Please try again." },
         { status: 500 },
       );
+    }
+
+    // Replacement is live - retire the old event. Best-effort: a failure here
+    // leaves a stale duplicate for the operator to clear, which is far better
+    // than the appointment disappearing.
+    if (booking.calendarEventId) {
+      try {
+        await deleteBookingEvent({ eventId: booking.calendarEventId });
+      } catch (err) {
+        console.error("[booking/edit] Failed to delete old calendar event:", err);
+      }
     }
 
     // Capture the original start time before mutating so the rescheduled

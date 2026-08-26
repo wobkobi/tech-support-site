@@ -3,6 +3,7 @@
  * @description Admin endpoint listing pending Google Contacts sync conflicts.
  */
 
+import { UNRESOLVED_CONFLICT_FILTER } from "@/features/contacts/lib/contact-conflicts";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   try {
     const conflicts = await prisma.contactConflict.findMany({
-      where: { resolvedAt: null },
+      where: { ...UNRESOLVED_CONFLICT_FILTER },
       orderBy: { createdAt: "desc" },
       take: 200,
     });

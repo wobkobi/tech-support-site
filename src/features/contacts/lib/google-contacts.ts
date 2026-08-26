@@ -8,7 +8,7 @@
  */
 
 import { getOAuth2Client } from "@/features/calendar/lib/google-calendar";
-import { resolveAddress } from "@/shared/lib/normalise-address";
+import { addressCovers, resolveAddress } from "@/shared/lib/normalise-address";
 import { isNZMobileKey, normaliseContactPhone, toE164NZ } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
 import { google } from "googleapis";
@@ -393,6 +393,15 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
       console.warn(`[google-contacts] syncContactToGoogle: contact ${contactId} not found`);
       return;
     }
+    if (contact.deletedAt) {
+      // A soft-deleted contact was already removed from Google when it was
+      // deleted. Pushing it again re-creates it there - the stored
+      // googleContactId now 404s, so the push falls through to createContact -
+      // and the next import pulls that back as a fresh live contact, silently
+      // undoing the deletion. Guarded here rather than per-caller so the
+      // conflict-resolve path gets it too.
+      return;
+    }
     if (!contact.email) {
       // Phone-only contacts have no email - they are imported FROM Google, not pushed to it.
       return;
@@ -510,12 +519,19 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
       siteChanged,
       googleChanged,
     );
-    const addressAction = compareSingleField(
-      contact.address,
-      googleAddress,
-      siteChanged,
-      googleChanged,
-    );
+    // Addresses compare by meaning, not by text. The site stores the Geocoding
+    // API's canonical form ("13 Humariri Street, Point Chevalier, Auckland
+    // 1022, New Zealand") while Google keeps what was typed ("13 Humariri St
+    // Point Chevalier Auckland 1022"). Those are one address, but as raw
+    // strings they differ, so every canonicalised address was landing as a
+    // conflict for the operator to adjudicate. When the site's form merely
+    // states the same place more fully, push it so Google ends up standardised
+    // too and the difference stops recurring. Anything Google says that the
+    // canonical form doesn't cover - a unit number, a different street - falls
+    // through and is still a real conflict.
+    const addressAction = addressCovers(contact.address, googleAddress)
+      ? "push"
+      : compareSingleField(contact.address, googleAddress, siteChanged, googleChanged);
 
     // Build the Google update body from the actions
     const updateBody: Record<string, unknown> = {};

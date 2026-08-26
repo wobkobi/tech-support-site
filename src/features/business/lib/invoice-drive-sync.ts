@@ -11,7 +11,7 @@ import { uploadInvoicePdf } from "@/features/business/lib/google-drive";
 import {
   extractYearCode,
   generateInvoicePdf,
-  serializeInvoice,
+  serialiseInvoice,
 } from "@/features/business/lib/invoice-pdf";
 import { prisma } from "@/shared/lib/prisma";
 
@@ -71,7 +71,7 @@ export async function syncInvoicePdfToDriveById(
   try {
     const inv = await prisma.invoice.findUnique({ where: { id: invoiceId } });
     if (!inv) return;
-    const pdfBytes = await generateInvoicePdf(serializeInvoice(inv));
+    const pdfBytes = await generateInvoicePdf(serialiseInvoice(inv));
     await syncInvoicePdfToDrive(inv, pdfBytes, logPrefix);
   } catch (err) {
     console.error(`${logPrefix} Drive sync (by id) failed:`, err);

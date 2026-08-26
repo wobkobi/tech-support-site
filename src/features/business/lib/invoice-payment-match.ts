@@ -7,6 +7,7 @@
 // payment record.
 
 import { prisma } from "@/shared/lib/prisma";
+import { nzDayStartUtc } from "@/shared/lib/timezone-utils";
 
 /** Cents of slack on the amount compare: the sheet round-trips it through a float. */
 const AMOUNT_TOLERANCE = 0.01;
@@ -78,7 +79,12 @@ export async function findRecordedPayment(
       // bare `invoiceId: null` to "exists AND is null" on Mongo - which skips
       // exactly the rows this is looking for. The OR catches both shapes.
       OR: [{ invoiceId: null }, { invoiceId: { isSet: false } }],
-      date: { gte: invoice.issueDate },
+      // Floored to the issue date's NZ DAY, not the issue instant. Ledger rows
+      // are stored at UTC midnight of an NZ day, while issueDate carries a real
+      // time of day - so an invoice raised at 3pm and paid that same evening
+      // produced `00:00Z >= 03:00Z` = false, matched nothing, and the reminder
+      // cron chased a customer who had already paid.
+      date: { gte: nzDayStartUtc(invoice.issueDate) },
       amount: { gte: invoice.total - AMOUNT_TOLERANCE, lte: invoice.total + AMOUNT_TOLERANCE },
     },
     orderBy: { date: "asc" },

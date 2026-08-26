@@ -242,8 +242,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // inline version this replaced omitted "/" and left the marquee stale.
     revalidateReviewPaths();
 
-    // Notify the owner - fire-and-forget, never blocks the response
-    void sendOwnerReviewNotification(review);
+    // Awaited, not detached: Vercel freezes the instance once the response is
+    // sent, so a `void` call here would usually never reach Resend and the
+    // review would sit unapproved with no notification and no log line.
+    // sendOwnerReviewNotification swallows its own errors.
+    await sendOwnerReviewNotification(review);
 
     // `status` goes back so the thank-you screen can say whether the review is
     // already live or waiting on approval, instead of guessing.

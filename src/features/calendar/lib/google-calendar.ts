@@ -432,16 +432,29 @@ export async function listBlockedDayRanges(
     }));
 }
 
+/** Events plus the calendars that failed, for callers that must tell "no events" from "no answer". */
+export interface CalendarFetchResult {
+  events: CalendarEvent[];
+  /**
+   * Calendars whose fetch threw. Their events are absent from `events`, so a
+   * caller must NOT read that absence as "these events no longer exist".
+   */
+  failedCalendarIds: string[];
+}
+
 /**
- * Fetches all calendar events from specified calendars (no list permission needed)
+ * Fetches all calendar events from specified calendars (no list permission
+ * needed), reporting which calendars failed. Prefer this over
+ * {@link fetchAllCalendarEvents} when absence of an event drives a delete:
+ * a partial failure otherwise looks identical to a cancelled event.
  * @param startDate - Start of range
  * @param endDate - End of range
- * @returns Array of calendar events from all specified calendars
+ * @returns Events from every calendar that answered, plus the ids of those that didn't.
  */
-export async function fetchAllCalendarEvents(
+export async function fetchAllCalendarEventsDetailed(
   startDate: Date,
   endDate: Date,
-): Promise<CalendarEvent[]> {
+): Promise<CalendarFetchResult> {
   const calendar = getCalendarClient();
 
   const calendarIds = fetchAccessibleCalendarIds();
@@ -536,13 +549,15 @@ export async function fetchAllCalendarEvents(
   );
 
   const allEvents: CalendarEvent[] = [];
-  let errorCount = 0;
-  for (const result of perCalendarResults) {
-    if (result === null) errorCount++;
+  const failedCalendarIds: string[] = [];
+  // perCalendarResults is index-aligned with calendarIds (both come off the
+  // same map), so a null marks exactly which calendar went missing.
+  perCalendarResults.forEach((result, i) => {
+    if (result === null) failedCalendarIds.push(calendarIds[i]);
     else allEvents.push(...result);
-  }
+  });
 
-  if (errorCount === calendarIds.length) {
+  if (failedCalendarIds.length === calendarIds.length) {
     throw new Error(
       `Failed to fetch events from all ${calendarIds.length} calendars - check API credentials`,
     );
@@ -551,7 +566,22 @@ export async function fetchAllCalendarEvents(
   console.log(
     `[calendar] Total: ${allEvents.length} events across ${calendarIds.length} calendars`,
   );
-  return allEvents;
+  return { events: allEvents, failedCalendarIds };
+}
+
+/**
+ * Events from every accessible calendar, discarding which ones failed. Callers
+ * that delete records based on an event's absence must use
+ * {@link fetchAllCalendarEventsDetailed} instead.
+ * @param startDate - Start of range
+ * @param endDate - End of range
+ * @returns Array of calendar events from all specified calendars.
+ */
+export async function fetchAllCalendarEvents(
+  startDate: Date,
+  endDate: Date,
+): Promise<CalendarEvent[]> {
+  return (await fetchAllCalendarEventsDetailed(startDate, endDate)).events;
 }
 
 /**

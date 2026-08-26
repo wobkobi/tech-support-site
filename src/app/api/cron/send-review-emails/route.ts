@@ -10,7 +10,7 @@
 import { CALENDAR_EVENT_PRESENT_FILTER } from "@/features/booking/lib/booking";
 import { sendCustomerReviewRequest } from "@/features/reviews/lib/email";
 import { errorResponse } from "@/shared/lib/api-response";
-import { isCronAuthorized } from "@/shared/lib/auth";
+import { isCronAuthorised } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import { NextRequest, NextResponse } from "next/server";
@@ -26,7 +26,7 @@ export const maxDuration = 60;
  * @returns JSON response with results
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  if (!isCronAuthorized(request)) {
+  if (!isCronAuthorised(request)) {
     return errorResponse("Unauthorized", 401);
   }
 
@@ -179,6 +179,21 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         }
       } catch (error) {
         console.error(`[review-email] Failed for booking ${booking.id}:`, error);
+        // Stamp the same failure marker the `ok === false` branch uses.
+        // reviewSentAt was already claimed above, so without this the booking is
+        // excluded from the main query AND from the retry pass below - the
+        // customer would never be asked, and nothing would ever notice.
+        // sendCustomerReviewRequest only wraps its Resend call in a try, so a
+        // throw from getIdentity() or buildEmailSignature() lands here rather
+        // than returning false.
+        try {
+          await prisma.booking.update({
+            where: { id: booking.id },
+            data: { reviewSendFailedAt: now },
+          });
+        } catch (stampError) {
+          console.error(`[review-email] Could not flag ${booking.id} for retry:`, stampError);
+        }
         results.failed++;
         results.errors.push(`Booking ${booking.id}: ${String(error)}`);
       }

@@ -21,10 +21,10 @@ const DARK = rgb(30 / 255, 41 / 255, 59 / 255); // slate-800 #1e293b
 const MID = rgb(100 / 255, 116 / 255, 139 / 255); // slate-500 #64748b
 const LIGHT = rgb(203 / 255, 213 / 255, 225 / 255); // slate-300 #cbd5e1
 const AMBER = rgb(180 / 255, 83 / 255, 9 / 255); // amber-700 #b45309 (matches web promo)
-const PAID_COLOR = rgb(0.1, 0.55, 0.25);
-const OVERDUE_COLOR = rgb(0.78, 0.16, 0.16);
+const PAID_COLOUR = rgb(0.1, 0.55, 0.25);
+const OVERDUE_COLOUR = rgb(0.78, 0.16, 0.16);
 // Purple distinguishes VOID from PAID (green) and OVERDUE (red).
-const VOID_COLOR = rgb(90 / 255, 42 / 255, 130 / 255);
+const VOID_COLOUR = rgb(90 / 255, 42 / 255, 130 / 255);
 
 const MARGIN = 42;
 const PAGE_W = 595.28;
@@ -114,7 +114,7 @@ function parseWordmarkPaths(): LogoPath[] {
  * @param inv - Prisma Invoice row.
  * @returns The Invoice DTO with ISO-string dates.
  */
-export function serializeInvoice(inv: PrismaInvoice): Invoice {
+export function serialiseInvoice(inv: PrismaInvoice): Invoice {
   return {
     id: inv.id,
     number: inv.number,
@@ -167,13 +167,13 @@ function drawStatusWatermark(ctx: PdfCtx, invoice: Invoice): void {
           ? "OVERDUE"
           : null;
   if (!text) return;
-  const color = invoice.isQuote
+  const colour = invoice.isQuote
     ? BRAND
     : invoice.status === "PAID"
-      ? PAID_COLOR
+      ? PAID_COLOUR
       : invoice.status === "VOIDED"
-        ? VOID_COLOR
-        : OVERDUE_COLOR;
+        ? VOID_COLOUR
+        : OVERDUE_COLOUR;
   const size = 140;
   const width = ctx.bold.widthOfTextAtSize(text, size);
   // Offset the baseline-left anchor so the rotated text centres on the page.
@@ -187,7 +187,7 @@ function drawStatusWatermark(ctx: PdfCtx, invoice: Invoice): void {
     y: PAGE_H / 2 - ry,
     size,
     font: ctx.bold,
-    color,
+    color: colour,
     opacity: 0.12,
     rotate: degrees(-25),
   });
@@ -233,33 +233,45 @@ function drawHeader(ctx: PdfCtx, invoice: Invoice, logoPaths: LogoPath[]): numbe
     font: ctx.font,
     color: DARK,
   });
-  rightY -= 16;
-  // Quotes hide the DRAFT/SENT lifecycle (meaningless to the customer) and
-  // show the validity date instead; a voided quote still shows VOID.
+  // Neither quotes nor invoices print the DRAFT/SENT lifecycle: it is internal
+  // bookkeeping, and the customer holding the document already knows it was
+  // sent. A DRAFT stamp on an invoice they have been asked to pay reads as a
+  // mistake. Quotes show their validity date instead; invoices print only the
+  // states that change what the reader should do - PAID, OVERDUE, VOID - and
+  // nothing at all while merely drafted or sent.
   const statusText = invoice.isQuote
     ? invoice.status === "VOIDED"
       ? "VOID"
       : invoice.quoteValidUntil
         ? `Valid until ${formatDateShort(invoice.quoteValidUntil)}`
         : "QUOTE"
-    : invoice.status;
-  const statusColor =
-    invoice.status === "PAID"
-      ? PAID_COLOR
+    : invoice.status === "PAID"
+      ? "PAID"
       : invoice.status === "VOIDED"
-        ? VOID_COLOR
+        ? "VOID"
+        : isInvoiceOverdue(invoice)
+          ? "OVERDUE"
+          : null;
+  const statusColour =
+    invoice.status === "PAID"
+      ? PAID_COLOUR
+      : invoice.status === "VOIDED"
+        ? VOID_COLOUR
         : invoice.isQuote
           ? BRAND
-          : invoice.status === "SENT"
-            ? rgb(0.1, 0.35, 0.75)
-            : MID;
-  ctx.page.drawText(statusText, {
-    x: rightX - ctx.bold.widthOfTextAtSize(statusText, 11),
-    y: rightY,
-    size: 11,
-    font: ctx.bold,
-    color: statusColor,
-  });
+          : OVERDUE_COLOUR;
+  // Only consume the line when there is something to say, so the GST number
+  // moves up rather than leaving a blank gap under the invoice number.
+  if (statusText) {
+    rightY -= 16;
+    ctx.page.drawText(statusText, {
+      x: rightX - ctx.bold.widthOfTextAtSize(statusText, 11),
+      y: rightY,
+      size: 11,
+      font: ctx.bold,
+      color: statusColour,
+    });
+  }
   if (ctx.identity.gstNumber) {
     rightY -= 15;
     const gstLine = `GST# ${ctx.identity.gstNumber}`;
@@ -494,8 +506,8 @@ function drawTotalsBlock(ctx: PdfCtx, invoice: Invoice, y: number): number {
     const isBold = opts.isBold ?? false;
     const isPromo = opts.isPromo ?? false;
     const f = isBold ? ctx.bold : ctx.font;
-    const labelColor = isBold ? BRAND : isPromo ? AMBER : MID;
-    const valueColor = isBold ? BRAND : isPromo ? AMBER : DARK;
+    const labelColour = isBold ? BRAND : isPromo ? AMBER : MID;
+    const valueColour = isBold ? BRAND : isPromo ? AMBER : DARK;
     const labelSize = isBold ? 14 : 12;
     const valueSize = isBold ? 16 : 12;
     const valueWidth = f.widthOfTextAtSize(value, valueSize);
@@ -506,8 +518,8 @@ function drawTotalsBlock(ctx: PdfCtx, invoice: Invoice, y: number): number {
       lbl = lbl.slice(0, -1);
     }
     if (lbl !== label) lbl = lbl.slice(0, -1) + "…";
-    ctx.page.drawText(lbl, { x: totalsLabelX, y, size: labelSize, font: f, color: labelColor });
-    ctx.page.drawText(value, { x: valueX, y, size: valueSize, font: f, color: valueColor });
+    ctx.page.drawText(lbl, { x: totalsLabelX, y, size: labelSize, font: f, color: labelColour });
+    ctx.page.drawText(value, { x: valueX, y, size: valueSize, font: f, color: valueColour });
     y -= isBold ? 26 : 19;
   };
 
@@ -515,8 +527,8 @@ function drawTotalsBlock(ctx: PdfCtx, invoice: Invoice, y: number): number {
   if (invoice.promoDiscount && invoice.promoDiscount > 0) {
     // Suffix clarifies the discount only applies to labour lines.
     const label = invoice.promoTitle
-      ? `Promo (labor only): ${invoice.promoTitle}`
-      : "Promo discount (labor only)";
+      ? `Promo (labour only): ${invoice.promoTitle}`
+      : "Promo discount (labour only)";
     drawRow(label, `-${formatNZD(invoice.promoDiscount)}`, { isPromo: true });
   }
   if (invoice.unsuccessfulDiscount && invoice.unsuccessfulDiscount > 0) {

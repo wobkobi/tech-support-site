@@ -56,6 +56,23 @@ export function nzDateParts(date: Date): [number, number, number] {
 }
 
 /**
+ * Collapses an instant to the UTC midnight of its NZ calendar day.
+ *
+ * This is the scale ledger entries are stored on: a "2026-04-01" date string
+ * parses as 2026-04-01T00:00:00Z, so a stored date is UTC midnight of an NZ
+ * day rather than a real NZ instant. Bucketing or comparing an instant against
+ * those rows has to put both on this scale first. Distinct from
+ * {@link nzMidnightUtc}, which returns the true instant of NZ midnight
+ * (11:00/12:00Z the day before) and is for scheduling, not ledger dates.
+ * @param instant - The instant to collapse.
+ * @returns UTC midnight of that instant's NZ calendar day.
+ */
+export function nzDayStartUtc(instant: Date): Date {
+  const [y, m, d] = nzDateParts(instant);
+  return new Date(Date.UTC(y, m - 1, d));
+}
+
+/**
  * Formats an instant as the NZ-local "YYYY-MM-DDTHH:mm" string an
  * `<input type="datetime-local">` expects. The browser would render its own
  * local time, which is only NZ time by luck, and the server runs in UTC.

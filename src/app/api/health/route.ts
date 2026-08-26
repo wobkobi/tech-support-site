@@ -8,7 +8,7 @@
  * missing. Consumed by the post-deploy smoke workflow.
  */
 
-import { isAdminRequest, isCronAuthorized } from "@/shared/lib/auth";
+import { isAdminRequest, isCronAuthorised } from "@/shared/lib/auth";
 import { getEnvReport } from "@/shared/lib/env";
 import { NextRequest, NextResponse } from "next/server";
 import pkg from "../../../../package.json";
@@ -51,7 +51,7 @@ async function checkDatabase(): Promise<DbCheck> {
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const version = pkg.version;
 
-  const authed = (await isAdminRequest(request)) || isCronAuthorized(request);
+  const authed = (await isAdminRequest(request)) || isCronAuthorised(request);
   if (!authed) {
     return NextResponse.json({ ok: true, version });
   }

@@ -49,7 +49,7 @@ export async function POST(request: NextRequest): Promise<Response> {
   if (!body.number || !body.clientName) {
     return errorResponse("number and clientName are required", 400);
   }
-  // serializeInvoice calls toISOString on both dates, which throws a RangeError
+  // serialiseInvoice calls toISOString on both dates, which throws a RangeError
   // on an Invalid Date - the shape a cleared date input on the edit form sends.
   const issueDate = parseDate(body.issueDate);
   const dueDate = parseDate(body.dueDate);

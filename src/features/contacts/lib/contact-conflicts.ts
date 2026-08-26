@@ -13,6 +13,23 @@ import type { ContactField } from "@prisma/client";
 export type { ContactField };
 
 /**
+ * Prisma where-fragment for conflicts still awaiting a decision. MUST be this
+ * OR shape: {@link recordContactConflict} omits `resolvedAt` on create, so Mongo
+ * stores no key at all, and Prisma compiles a bare `resolvedAt: null` to
+ * "exists AND is null" - which matches none of them. Every reader used the bare
+ * form, so recorded conflicts were invisible: the admin list and badge read
+ * zero, the dedup check below never matched (so each sync filed another
+ * duplicate), and clearContactConflict never auto-cleared anything.
+ *
+ * Spread into a `where` that has no OR of its own (wrap in AND otherwise).
+ * Mirrors NOT_A_QUOTE_FILTER in invoice-status.ts.
+ */
+export const UNRESOLVED_CONFLICT_FILTER = {
+  // Plain mutable shape (no `as const`): Prisma's where input needs a mutable OR.
+  OR: [{ resolvedAt: null }, { resolvedAt: { isSet: false } }],
+};
+
+/**
  * Records (or refreshes) a pending conflict for a contact's field. If an
  * unresolved row already exists for the same contactId + field, its values
  * are updated in place so the admin always sees the latest both-sides state.
@@ -33,7 +50,7 @@ export async function recordContactConflict(args: {
 
   try {
     const existing = await prisma.contactConflict.findFirst({
-      where: { contactId, field, resolvedAt: null },
+      where: { contactId, field, ...UNRESOLVED_CONFLICT_FILTER },
       select: { id: true },
     });
     if (existing) {
@@ -43,7 +60,7 @@ export async function recordContactConflict(args: {
       });
     } else {
       await prisma.contactConflict.create({
-        data: { contactId, field, siteValue, googleValue },
+        data: { contactId, field, siteValue, googleValue, resolvedAt: null },
       });
     }
   } catch (err) {
@@ -63,7 +80,7 @@ export async function recordContactConflict(args: {
 export async function clearContactConflict(contactId: string, field: ContactField): Promise<void> {
   try {
     await prisma.contactConflict.updateMany({
-      where: { contactId, field, resolvedAt: null },
+      where: { contactId, field, ...UNRESOLVED_CONFLICT_FILTER },
       data: { resolvedAt: new Date(), resolution: "auto" },
     });
   } catch (err) {

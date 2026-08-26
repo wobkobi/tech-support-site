@@ -6,7 +6,7 @@
 
 import { HOME_REGION, NZ_REGION } from "@/features/business/lib/pricing-policy";
 import { errorResponse } from "@/shared/lib/api-response";
-import { isCronAuthorized } from "@/shared/lib/auth";
+import { isCronAuthorised } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { google } from "googleapis";
 import { NextRequest, NextResponse } from "next/server";
@@ -39,7 +39,7 @@ function regionFor(description: string | null | undefined): string | null {
  * @returns JSON `{ ok, upserted, years }` or an error.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  if (!isCronAuthorized(request)) {
+  if (!isCronAuthorised(request)) {
     return errorResponse("Unauthorized", 401);
   }
 

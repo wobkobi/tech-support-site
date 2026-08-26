@@ -132,17 +132,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       },
     });
 
-    // Fire-and-forget so a draft (or send) failure never blocks the cancel response.
+    // Awaited, not detached: Vercel freezes the instance once the response is
+    // sent, so a `void` call here would usually never run and the fee would go
+    // unbilled with nothing logged. The failure is still swallowed - the
+    // cancellation itself has already committed and must be reported as done.
     if (lateCancellation) {
-      void createDraftCancellationInvoice(updated, {
-        cancelledAt: now,
-        reason: "late-cancellation",
-        // Auto-send only on this customer self-cancel path; no-show / operator
-        // cancels stay drafts for review (see admin/bookings/[id]/route.ts).
-        autoSend: CANCELLATION.autoSendCancellationInvoice,
-      }).catch((err) =>
-        console.error("[booking/cancel] Failed to draft cancellation invoice:", err),
-      );
+      try {
+        await createDraftCancellationInvoice(updated, {
+          cancelledAt: now,
+          reason: "late-cancellation",
+          // Auto-send only on this customer self-cancel path; no-show / operator
+          // cancels stay drafts for review (see admin/bookings/[id]/route.ts).
+          autoSend: CANCELLATION.autoSendCancellationInvoice,
+        });
+      } catch (err) {
+        console.error("[booking/cancel] Failed to draft cancellation invoice:", err);
+      }
     }
 
     return NextResponse.json({

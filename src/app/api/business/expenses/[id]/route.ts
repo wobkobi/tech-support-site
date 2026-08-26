@@ -166,6 +166,12 @@ export async function DELETE(
       const spreadsheetId = await resolveSheetIdForDate(existing.date);
       if (spreadsheetId) {
         await deleteRowBySyncId(spreadsheetId, "Expenses", existing.sheetRowKey);
+      } else {
+        // No sheet resolved (missing or renamed FY folder). The row survives and
+        // the next import re-creates the entry from it, silently undoing this
+        // delete - so this is a warning, not a clean success.
+        console.error(`[expenses] No sheet resolved for entry ${id}; sheet row left in place`);
+        sheetSyncWarning = true;
       }
     } catch (err) {
       console.error(`[expenses] Failed to delete sheet row for entry ${id}:`, err);

@@ -2,7 +2,7 @@
 // send-and-stamp shared by the daily cron and the manual action, plus the
 // apology for a reminder that chased an already-paid invoice.
 
-import { generateInvoicePdf, serializeInvoice } from "@/features/business/lib/invoice-pdf";
+import { generateInvoicePdf, serialiseInvoice } from "@/features/business/lib/invoice-pdf";
 import { sendInvoiceReminderEmail, sendPaymentApologyEmail } from "@/features/reviews/lib/email";
 import { prisma } from "@/shared/lib/prisma";
 import type { Invoice as PrismaInvoice } from "@prisma/client";
@@ -28,7 +28,7 @@ export async function sendOverdueReminder(invoice: PrismaInvoice): Promise<Remin
 
   let pdfBytes: Buffer;
   try {
-    pdfBytes = await generateInvoicePdf(serializeInvoice(invoice));
+    pdfBytes = await generateInvoicePdf(serialiseInvoice(invoice));
   } catch (err) {
     console.error(`[invoice-reminders] PDF generation failed for ${invoice.number}:`, err);
     return { ok: false, error: "PDF generation failed" };
