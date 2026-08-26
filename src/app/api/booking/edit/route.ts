@@ -16,6 +16,7 @@ import {
 } from "@/features/booking/lib/booking";
 import { loadBlockingBookings } from "@/features/booking/lib/existing-bookings.server";
 import { lookupDriveRoundTrip } from "@/features/business/lib/travel-distance";
+import { parseString } from "@/features/business/lib/validation";
 import {
   createBookingEvent,
   deleteBookingEvent,
@@ -69,7 +70,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const body = (await request.json()) as EditBookingPayload;
     const {
-      cancelToken,
       dateKey,
       timeOfDay,
       startMinute = 0,
@@ -80,6 +80,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       meetingType,
       notes,
     } = body;
+    // parseString, not a bare destructure: the payload type is a compile-time
+    // claim only, and a filter object here would load somebody else's booking
+    // and rewrite it.
+    const cancelToken = parseString(body.cancelToken);
 
     if (!cancelToken) {
       return errorResponse("Missing cancel token.", 400);

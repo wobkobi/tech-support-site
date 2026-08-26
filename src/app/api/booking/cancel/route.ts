@@ -9,6 +9,7 @@
 import { createDraftCancellationInvoice } from "@/features/business/lib/cancellation-invoice";
 import { assessCancellation } from "@/features/business/lib/pricing-policy";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
+import { parseString } from "@/features/business/lib/validation";
 import { deleteBookingEvent } from "@/features/calendar/lib/google-calendar";
 import { errorResponse } from "@/shared/lib/api-response";
 import { prisma } from "@/shared/lib/prisma";
@@ -74,7 +75,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     // Parse and validate body
     const body = (await request.json()) as CancelPayload;
-    const { cancelToken } = body;
+    // parseString, not a bare destructure: the payload type is a compile-time
+    // claim only, and a filter object here would match somebody else's booking.
+    const cancelToken = parseString(body.cancelToken);
 
     if (!cancelToken) {
       return errorResponse("Missing cancel token.", 400);
