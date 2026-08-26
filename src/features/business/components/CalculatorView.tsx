@@ -35,6 +35,7 @@ import {
   todayISO,
   type JobPricing,
 } from "@/features/business/lib/business";
+import { INCOME_METHODS } from "@/features/business/lib/constants";
 import {
   assessCancellation,
   calcTravelCharge,
@@ -1544,7 +1545,9 @@ export function CalculatorView({
           customer: clientName || "Walk-in",
           description: buildIncomeDescription(job),
           amount: totals.total,
-          method: "Business Account",
+          // Not a literal: this is income, and "Business Account" is an expense
+          // method that INCOME_METHODS does not contain.
+          method: INCOME_METHODS[0],
         }),
       });
       const d = (await res.json()) as {

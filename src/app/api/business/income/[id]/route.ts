@@ -6,6 +6,7 @@
  * so DB changes are never blocked - the sync cron reconciles any drift.
  */
 
+import { INCOME_METHODS } from "@/features/business/lib/constants";
 import {
   appendRowWithSyncId,
   buildCashbookCells,
@@ -43,6 +44,11 @@ export async function PUT(
 
   if (!date || !customer || !description || amount === undefined || !method) {
     return errorResponse("Missing required fields", 400);
+  }
+  // Same gate as the create path: an edit must not be able to set a method the
+  // Cashbook's validation list will reject.
+  if (!(INCOME_METHODS as readonly string[]).includes(method)) {
+    return errorResponse("Invalid payment method", 400);
   }
   const safeAmount = parseAmount(amount);
   if (safeAmount === null) {
