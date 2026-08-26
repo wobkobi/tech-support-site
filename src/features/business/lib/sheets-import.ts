@@ -18,14 +18,12 @@ import {
 } from "@/features/business/lib/sheets-sync";
 import { parseObjectId } from "@/features/business/lib/validation";
 import { prisma } from "@/shared/lib/prisma";
+import { acquireRunLock, releaseRunLock } from "@/shared/lib/run-lock";
 import type { ExpenseEntry, IncomeEntry } from "@prisma/client";
 import { randomUUID } from "crypto";
 
 /** Setting key for the run lock shared by the cron and the manual import. */
 const LOCK_KEY = "sync-sheets-lock";
-
-/** A lock older than this is considered stale (crashed run) and is stolen. */
-const LOCK_TTL_MS = 10 * 60_000;
 
 /** Column Z (0-indexed 25) carries the Sync ID; must match sheets-sync.ts. */
 const SYNC_ID_COLUMN_INDEX = 25;
@@ -551,44 +549,6 @@ async function importFromSheet(
 }
 
 /**
- * Attempts to take the run lock; a lock older than {@link LOCK_TTL_MS} is
- * treated as left behind by a crashed run and stolen.
- * @returns True when the lock was acquired.
- */
-async function acquireSyncLock(): Promise<boolean> {
-  const nowIso = new Date().toISOString();
-  const staleThreshold = new Date(Date.now() - LOCK_TTL_MS).toISOString();
-  // Compare-and-set: atomically steal a stale lock. The value is an ISO
-  // timestamp, which sorts chronologically, so `value < staleThreshold` means
-  // older than the TTL. updateMany is a single atomic op per document, so two
-  // concurrent runs can't both match - after the first stamps `nowIso`, the
-  // row no longer satisfies the second's stale filter.
-  const stolen = await prisma.setting.updateMany({
-    where: { key: LOCK_KEY, value: { lt: staleThreshold } },
-    data: { value: nowIso },
-  });
-  if (stolen.count === 1) return true;
-  // Nothing stale to steal: either a fresh lock holds it, or no lock exists.
-  // Try to create the row - the unique `key` index makes concurrent creates
-  // race-safe (only one wins; the loser throws and returns false).
-  try {
-    await prisma.setting.create({ data: { key: LOCK_KEY, value: nowIso } });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/** Releases the run lock. Never throws - a leftover lock expires via TTL. */
-async function releaseSyncLock(): Promise<void> {
-  try {
-    await prisma.setting.deleteMany({ where: { key: LOCK_KEY } });
-  } catch (err) {
-    console.warn("[sheets-import] Failed to release sync lock:", err);
-  }
-}
-
-/**
  * Appends site entries that never made it to a sheet (append failed at create
  * time). Only entries younger than {@link SELF_HEAL_MAX_AGE_MS} are appended -
  * older unlinked rows predate the Sync ID rollout or reflect sheet-side
@@ -690,7 +650,7 @@ export async function runSheetsImport(dryRun: boolean): Promise<ImportResult> {
     expensesSkipped: 0,
   };
 
-  if (!dryRun && !(await acquireSyncLock())) {
+  if (!dryRun && !(await acquireRunLock(LOCK_KEY))) {
     return { ok: false, locked: true, ...zero, errors: ["Another sync run holds the lock"] };
   }
 
@@ -798,6 +758,6 @@ export async function runSheetsImport(dryRun: boolean): Promise<ImportResult> {
     }
     return result;
   } finally {
-    if (!dryRun) await releaseSyncLock();
+    if (!dryRun) await releaseRunLock(LOCK_KEY);
   }
 }

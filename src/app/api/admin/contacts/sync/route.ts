@@ -5,9 +5,10 @@
  * contact (full mode) rather than just the changed ones.
  */
 
-import { runContactsSync } from "@/features/contacts/lib/contacts-sync";
+import { CONTACTS_SYNC_LOCK_KEY, runContactsSync } from "@/features/contacts/lib/contacts-sync";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
+import { isRunLocked } from "@/shared/lib/run-lock";
 import { NextRequest, NextResponse } from "next/server";
 
 // Full mode pushes EVERY email-bearing contact (sequential People API calls
@@ -28,7 +29,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    const { pushed, imported } = await runContactsSync({ full: true });
+    const { pushed, imported, alreadyRunning } = await runContactsSync({ full: true });
+    if (alreadyRunning) {
+      // 409, not 200: a full run takes minutes, and the operator navigating away
+      // and back resets the button's local state. Without this they can fire a
+      // second sync into the middle of the first, racing the merge passes that
+      // hard-delete duplicate contacts.
+      return errorResponse("A contact sync is already running. Give it a minute.", 409);
+    }
     return NextResponse.json({ ok: true, importedCount: imported, syncedCount: pushed });
   } catch (error) {
     console.error("[api/admin/contacts/sync] Error:", error);
@@ -37,4 +45,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // the credentials or the integration internals.
     return errorResponse("Contact sync failed.", 500);
   }
+}
+
+/**
+ * GET /api/admin/contacts/sync
+ * Whether a sync is currently running, so the admin button can show real state
+ * instead of a flag that resets whenever the operator navigates away and back.
+ * @param request - Incoming request.
+ * @returns JSON `{ ok, running }`.
+ */
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  if (!(await isAdminRequest(request))) {
+    return errorResponse("Unauthorized", 401);
+  }
+  return NextResponse.json({ ok: true, running: await isRunLocked(CONTACTS_SYNC_LOCK_KEY) });
 }
