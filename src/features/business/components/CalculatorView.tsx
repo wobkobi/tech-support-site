@@ -1455,6 +1455,11 @@ export function CalculatorView({
           notes: notes || null,
           promoTitle: promoActive ? activePromo.title : null,
           promoDiscount: promoActive ? totals.promoDiscount : null,
+          // Send the flag alongside its discount. The server stores
+          // `unsuccessful === true`, so omitting it recorded every
+          // calculator-raised invoice as successful even when the half-price
+          // reduction had been applied - the audit trail the column exists for.
+          unsuccessful: totals.unsuccessfulDiscount > 0,
           unsuccessfulDiscount:
             totals.unsuccessfulDiscount > 0 ? totals.unsuccessfulDiscount : null,
           // Match back to the billed job when this session came from the
@@ -1537,9 +1542,22 @@ export function CalculatorView({
           method: "Business Account",
         }),
       });
-      const d = await res.json();
+      const d = (await res.json()) as {
+        ok?: boolean;
+        error?: string;
+        sheetSyncWarning?: boolean;
+      };
       if (d.ok) {
-        toast("Income entry saved.", { tone: "success" });
+        // Surface a failed Cashbook append, as IncomeView and ExpensesView do.
+        // recordIncome swallows the sheet error so the entry still saves, so a
+        // plain success toast here hid money that never reached the sheet.
+        if (d.sheetSyncWarning) {
+          toast("Income saved, but the Cashbook sheet update didn't go through.", {
+            tone: "warning",
+          });
+        } else {
+          toast("Income entry saved.", { tone: "success" });
+        }
         resetFormState();
       } else {
         setIncomeError(d.error || "Could not save income entry.");
