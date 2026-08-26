@@ -78,9 +78,14 @@ export function computeTaxPlan(
   rates: TaxRates = DEFAULT_TAX_RATES,
 ): TaxPlan {
   const profit = income - expensesExcl;
-  const incomeTax = round2(profit * rates.incomeTax);
-  const acc = round2(profit * rates.acc);
-  const kiwiSaver = round2(profit * rates.kiwiSaver);
+  // Clamped at zero, as financial-year.ts and the dashboard summary both do: a
+  // loss-making scope produced negative set-asides, and "set aside -$240 for
+  // income tax" is not a thing. The profit figure itself stays signed so the
+  // loss is still reported honestly.
+  const taxable = Math.max(0, profit);
+  const incomeTax = round2(taxable * rates.incomeTax);
+  const acc = round2(taxable * rates.acc);
+  const kiwiSaver = round2(taxable * rates.kiwiSaver);
   const total = round2(incomeTax + acc + kiwiSaver);
 
   const outputFromIncome = round2(income * rates.gstOutOfInclusive);
