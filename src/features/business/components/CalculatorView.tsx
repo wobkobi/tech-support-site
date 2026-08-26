@@ -757,6 +757,11 @@ export function CalculatorView({
       clientName,
       clientEmail,
       notes,
+      // Both feed jobToLineItems above. Omitted, a settings change that
+      // re-rendered this component without remounting left the preview on stale
+      // line items while `totals` below recomputed - the two then disagree.
+      pricing.minTravelCharge,
+      pricing.minBillableMins,
     ],
   );
 
