@@ -163,11 +163,9 @@ async function foldContactInto(keeper: MergeableContact, dup: MergeableContact):
         where: { contactId: dup.id },
         data: { contactId: keeper.id },
       }),
-      // ContactConflict.contactId is a bare ObjectId with no relation, so
-      // nothing cascades on the delete below. Left behind, an unresolved
-      // conflict points at a row that no longer exists: it renders as
-      // "Unknown", every resolve attempt 500s on P2025, and the unresolved
-      // count never returns to zero.
+      // ContactConflict.contactId has no relation, so nothing cascades on the
+      // delete below. Left behind, the conflict points at a missing row: renders
+      // as "Unknown", 500s on every resolve, and the count never returns to zero.
       prisma.contactConflict.updateMany({
         where: { contactId: dup.id },
         data: { contactId: keeper.id },
@@ -403,12 +401,9 @@ export async function backfillContactsFromBookings(): Promise<number> {
       });
       if (!exists) {
         await prisma.contact
-          // Explicit null, not omitted: Mongo stores no key for an omitted
-          // optional field, and `where: { deletedAt: null }` - the filter every
-          // reader uses - does not match a document where the key is absent.
-          // Omit it and the backfilled contact is invisible to the admin list,
-          // the sync dirty-set, and the review matcher that runs straight after
-          // this pass. find-or-create.ts passes it for the same reason.
+          // Explicit null, not omitted: Mongo stores no key for an omitted optional
+          // field, so `where: { deletedAt: null }` would not match this contact and it
+          // would be invisible to every reader. find-or-create.ts does the same.
           .create({ data: { ...d, deletedAt: null } })
           .then(() => (created += 1))
           .catch(() => null);

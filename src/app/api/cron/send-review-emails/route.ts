@@ -179,13 +179,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         }
       } catch (error) {
         console.error(`[review-email] Failed for booking ${booking.id}:`, error);
-        // Stamp the same failure marker the `ok === false` branch uses.
-        // reviewSentAt was already claimed above, so without this the booking is
-        // excluded from the main query AND from the retry pass below - the
-        // customer would never be asked, and nothing would ever notice.
-        // sendCustomerReviewRequest only wraps its Resend call in a try, so a
-        // throw from getIdentity() or buildEmailSignature() lands here rather
-        // than returning false.
+        // Stamp the same failure marker the `ok === false` branch uses. reviewSentAt
+        // is already claimed above, so without this the booking is excluded from both
+        // the main query and the retry pass - never asked, never noticed.
+        // sendCustomerReviewRequest wraps only its Resend call, so a throw lands here.
         try {
           await prisma.booking.update({
             where: { id: booking.id },

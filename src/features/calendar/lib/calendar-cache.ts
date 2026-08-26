@@ -560,12 +560,10 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
             console.error("[refreshCalendarCache] Failed to delete stale cache entries:", err);
           }
         }
-        // Deferred, not deleted here: the rebuild below bails out when both
-        // Distance Matrix legs come back null, and dropping the row now would
-        // take the operator's customOrigin / customTravelBackDestination /
-        // transportMode with it. The next run would then find no row to inherit
-        // from and rebuild from home on "driving", losing the overrides for
-        // good. Delete it only once a replacement is ready to write.
+        // Deferred, not deleted here: the rebuild below bails when both Distance
+        // Matrix legs come back null, and dropping the row now would take the
+        // operator's customOrigin / transportMode overrides with it for good.
+        // Delete only once a replacement is ready to write.
         staleBlockId = existing.id;
       }
     }
@@ -880,10 +878,9 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
     if (currentEventKeys.has(key)) continue;
 
     // A calendar that failed to fetch contributes no keys, so every one of its
-    // blocks looks stale. Deleting them would destroy the operator's `ignored`,
-    // `customOrigin` and `transportMode` overrides on a transient 429, and the
-    // next successful run would rebuild the blocks with defaults - silently
-    // re-blocking days that had been marked clear. Skip until it answers again.
+    // blocks looks stale. Deleting them would destroy the operator's `ignored` /
+    // `customOrigin` / `transportMode` overrides on a transient 429. Skip until
+    // it answers again.
     if (failedCalendars.has(block.calendarEmail)) continue;
 
     // Freeze finished events' blocks: the fetch window starts at `now`, so a

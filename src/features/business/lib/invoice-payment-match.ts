@@ -79,11 +79,9 @@ export async function findRecordedPayment(
       // bare `invoiceId: null` to "exists AND is null" on Mongo - which skips
       // exactly the rows this is looking for. The OR catches both shapes.
       OR: [{ invoiceId: null }, { invoiceId: { isSet: false } }],
-      // Floored to the issue date's NZ DAY, not the issue instant. Ledger rows
-      // are stored at UTC midnight of an NZ day, while issueDate carries a real
-      // time of day - so an invoice raised at 3pm and paid that same evening
-      // produced `00:00Z >= 03:00Z` = false, matched nothing, and the reminder
-      // cron chased a customer who had already paid.
+      // Floored to the issue date's NZ day, not the instant: ledger rows sit at
+      // UTC midnight while issueDate carries a time, so an invoice raised at 3pm
+      // and paid that evening matched nothing and got chased as overdue.
       date: { gte: nzDayStartUtc(invoice.issueDate) },
       amount: { gte: invoice.total - AMOUNT_TOLERANCE, lte: invoice.total + AMOUNT_TOLERANCE },
     },

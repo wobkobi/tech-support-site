@@ -19,11 +19,9 @@ const COQ = "243, 66, 19";
  */
 export function ReviewScrollHandler(): null {
   useEffect(() => {
-    // The retry chain below can still be pending up to two seconds after the
-    // component goes away (it only keeps retrying while the target is absent,
-    // e.g. a link to a review that no longer exists). A late retry re-reads the
-    // CURRENT hash, so on a page navigated to in the meantime it would scroll
-    // that page back to the top under the reader.
+    // The retry chain can still be pending up to two seconds after unmount (it
+    // only retries while the target is absent). A late retry re-reads the current
+    // hash and would scroll whatever page the reader moved to back to the top.
     let cancelled = false;
 
     /**

@@ -394,12 +394,10 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
       return;
     }
     if (contact.deletedAt) {
-      // A soft-deleted contact was already removed from Google when it was
-      // deleted. Pushing it again re-creates it there - the stored
-      // googleContactId now 404s, so the push falls through to createContact -
-      // and the next import pulls that back as a fresh live contact, silently
-      // undoing the deletion. Guarded here rather than per-caller so the
-      // conflict-resolve path gets it too.
+      // A soft-deleted contact was already removed from Google. Pushing it again
+      // re-creates it there (the stored googleContactId 404s, so the push falls
+      // through to createContact) and the next import pulls it back as live.
+      // Guarded here, not per-caller, so the conflict-resolve path is covered too.
       return;
     }
     if (!contact.email) {
@@ -519,16 +517,10 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
       siteChanged,
       googleChanged,
     );
-    // Addresses compare by meaning, not by text. The site stores the Geocoding
-    // API's canonical form ("13 Humariri Street, Point Chevalier, Auckland
-    // 1022, New Zealand") while Google keeps what was typed ("13 Humariri St
-    // Point Chevalier Auckland 1022"). Those are one address, but as raw
-    // strings they differ, so every canonicalised address was landing as a
-    // conflict for the operator to adjudicate. When the site's form merely
-    // states the same place more fully, push it so Google ends up standardised
-    // too and the difference stops recurring. Anything Google says that the
-    // canonical form doesn't cover - a unit number, a different street - falls
-    // through and is still a real conflict.
+    // Addresses compare by meaning, not text: the site stores the Geocoding
+    // canonical form while Google keeps what was typed, so every canonicalised
+    // address used to land as a conflict. Push when the site's form only states
+    // the same place more fully - see addressCovers for what counts as cover.
     const addressAction = addressCovers(contact.address, googleAddress)
       ? "push"
       : compareSingleField(contact.address, googleAddress, siteChanged, googleChanged);

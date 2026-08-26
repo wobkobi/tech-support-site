@@ -161,13 +161,10 @@ export async function searchAllInvoicePdfs(): Promise<
 > {
   const drive = getDriveClient();
   const results: { name: string; fileId: string; webUrl: string }[] = [];
-  // Paged like listSpreadsheetsInFolder below. Drive treats pageSize as a
-  // maximum and routinely returns a short page plus a continuation token for a
-  // broad drive-wide query, so reading one page silently truncated the set:
-  // invoices whose PDF sat on a later page looked like they had no Drive file
-  // at all and never got their driveFileId/driveWebUrl back-filled. Requesting
-  // nextPageToken in `fields` is required - omit it and the token is not even
-  // returned.
+  // Paged like listSpreadsheetsInFolder below: Drive treats pageSize as a
+  // maximum and returns a continuation token for broad queries, so one page
+  // silently truncated the set. Requesting nextPageToken in `fields` is
+  // required - omit it and the token is not returned at all.
   let pageToken: string | undefined;
   do {
     const res = await drive.files.list({

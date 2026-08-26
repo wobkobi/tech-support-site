@@ -150,10 +150,8 @@ export async function createDraftCancellationInvoice(
   const customerNotes = cancellationNotes(reason, booking.startAt);
 
   // Retry on a number collision, matching the admin create and convert paths.
-  // getNextInvoiceNumber is a non-atomic read-modify-write, so an operator
-  // saving an invoice at the same moment a customer self-cancels can mint the
-  // same number. Without the retry this path threw P2002 into a bare .catch and
-  // the cancellation fee was silently never invoiced.
+  // getNextInvoiceNumber is a non-atomic read-modify-write, so a concurrent
+  // save can mint the same number - and a bare P2002 lost the fee invoice.
   let invoice: Invoice | null = null;
   for (let attempt = 0; attempt < 5; attempt++) {
     try {

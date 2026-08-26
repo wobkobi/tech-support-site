@@ -52,11 +52,9 @@ export interface ContactsSyncResult {
 export async function runContactsSync({
   full = false,
 }: { full?: boolean } = {}): Promise<ContactsSyncResult> {
-  // Refuse to overlap. This run merges and hard-deletes duplicate contacts and
-  // then pushes to Google, so two at once can race each other into P2025s or
-  // double-push the same person. The cron and a manual click can land on
-  // different serverless instances, so the lock lives in the database rather
-  // than in memory.
+  // Refuse to overlap: this run merges and hard-deletes duplicates before
+  // pushing, so two at once race each other. The cron and a manual click can
+  // land on different instances, so the lock lives in the database.
   if (!(await acquireRunLock(CONTACTS_SYNC_LOCK_KEY))) {
     return { pushed: 0, imported: 0, conflicts: 0, skipped: 0, alreadyRunning: true };
   }
@@ -88,13 +86,10 @@ export async function runContactsSync({
     const conflictedIds = new Set(pendingConflicts.map((c) => c.contactId));
 
     const dirty = contacts.filter((c) => {
-      // A full sync is an explicit "re-evaluate everything" from the operator, so
-      // it overrides the conflict skip below. Without this the two deadlock: a
-      // contact with a pending conflict is never pushed, so syncContactToGoogle
-      // never re-runs the field comparison, so the conflict can never clear - even
-      // when the comparison would now resolve it on its own. Safe to bypass,
-      // because that comparison still adjudicates per field and re-records a
-      // genuine conflict rather than overwriting Google.
+      // A full sync means "re-evaluate everything", so it overrides the conflict
+      // skip below - otherwise the two deadlock: a conflicted contact is never
+      // pushed, so the comparison that would clear the conflict never runs. Safe,
+      // because that comparison still re-records a genuine conflict.
       if (full) return true;
       if (conflictedIds.has(c.id)) return false;
       if (!c.googleContactId) return true;
