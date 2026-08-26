@@ -14,6 +14,7 @@ import {
   type ConflictRow,
 } from "@/features/admin/components/ContactConflictsView";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
+import { UNRESOLVED_CONFLICT_FILTER } from "@/features/contacts/lib/contact-conflicts";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import type { Metadata } from "next";
@@ -36,7 +37,7 @@ export default async function AdminContactConflictsPage(): Promise<React.ReactEl
 
   const [conflicts, flagged] = await Promise.all([
     prisma.contactConflict.findMany({
-      where: { resolvedAt: null },
+      where: { ...UNRESOLVED_CONFLICT_FILTER },
       orderBy: { createdAt: "desc" },
       take: 200,
     }),

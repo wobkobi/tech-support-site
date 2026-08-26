@@ -9,6 +9,7 @@
 import { ContactsAdminView } from "@/features/admin/components/ContactsAdminView";
 import { PageHeader } from "@/features/admin/components/ui/PageHeader";
 import { StatCard } from "@/features/admin/components/ui/StatCard";
+import { UNRESOLVED_CONFLICT_FILTER } from "@/features/contacts/lib/contact-conflicts";
 import { enrichContactsFromBookings } from "@/features/contacts/lib/maintenance";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
@@ -37,7 +38,7 @@ export default async function AdminContactsPage(): Promise<React.ReactElement> {
   const [initialConflicts, pendingConflictsCount, allContacts, reviews] = await Promise.all([
     enrichContactsFromBookings(),
     prisma.contactConflict.count({
-      where: { resolvedAt: null },
+      where: { ...UNRESOLVED_CONFLICT_FILTER },
     }),
     prisma.contact.findMany({
       where: { deletedAt: null },

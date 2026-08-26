@@ -15,8 +15,12 @@ import { randomUUID } from "crypto";
  */
 async function ensureContactReviewToken(contactId: string): Promise<string | null> {
   try {
-    const contact = await prisma.contact.findUnique({
-      where: { id: contactId },
+    // Soft-deleted contacts are excluded here, not just on the email-match path
+    // below. An invoice keeps its contactId after the contact is deleted, so
+    // without this a re-send minted a fresh reviewToken onto the deleted row and
+    // emailed a review request to someone who had been removed.
+    const contact = await prisma.contact.findFirst({
+      where: { id: contactId, deletedAt: null },
       select: { reviewToken: true },
     });
     if (!contact) return null;
