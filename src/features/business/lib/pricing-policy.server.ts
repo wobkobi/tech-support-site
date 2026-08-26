@@ -11,11 +11,11 @@ import {
   GST_RATE,
   HOME_REGION,
   NZ_REGION,
-  nzDateKey,
   type Policy,
 } from "@/features/business/lib/pricing-policy";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
+import { nzDateKey } from "@/shared/lib/timezone-utils";
 import Holidays from "date-holidays";
 import { unstable_cache } from "next/cache";
 import { cache } from "react";

@@ -13,6 +13,7 @@ import { cancellationCopy } from "@/features/business/lib/pricing-policy";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { Button } from "@/shared/components/Button";
 import { CARD } from "@/shared/components/PageLayout";
+import { renderEmphasised } from "@/shared/components/renderEmphasised";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { cn } from "@/shared/lib/cn";
 import { formatDateTimeLong } from "@/shared/lib/date-format";
@@ -36,20 +37,6 @@ export const metadata: Metadata = {
   title: "Booking request received",
   robots: { index: false, follow: false },
 };
-
-/**
- * Renders the `**…**` emphasis convention from pricing-policy.ts copy
- * generators as `<strong>` spans, so customer-facing copy bolds the same
- * figures + policy boundaries the pricing page does.
- * @param text - Copy string containing zero or more `**…**` segments.
- * @returns Array of React nodes ready to drop into a parent block element.
- */
-function renderEmphasised(text: string): React.ReactNode[] {
-  return text.split(/(\*\*[^*]+\*\*)/g).map((part, i) => {
-    const m = part.match(/^\*\*([^*]+)\*\*$/);
-    return m ? <strong key={i}>{m[1]}</strong> : <span key={i}>{part}</span>;
-  });
-}
 
 /**
  * Human-readable appointment length, derived from the booked window rather than
