@@ -218,6 +218,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         // so the schedule agenda's "Open in Maps" link and the cancellation-invoice
         // draft can read booking.address for manually-created bookings too.
         address,
+        // Same structured columns the public flow writes. Without them a manual
+        // booking renders no meeting-type or duration chip, which left the operator
+        // reading those values out of the raw notes text instead.
+        meetingType: address ? "in_person" : "remote",
+        duration: durationMinutes === 60 ? "short" : "long",
         notes: bookingNotes,
         startAt,
         endAt,

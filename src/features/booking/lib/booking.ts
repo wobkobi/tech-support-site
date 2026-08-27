@@ -7,6 +7,40 @@ import type { AvailabilitySettings, MorningGuard } from "@/shared/lib/settings/t
 import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 
 /**
+ * Splits a notes blob into the free text someone actually typed and the trailing
+ * metadata block, so the parser and the admin edit form can never disagree on
+ * where one ends and the other begins.
+ * @param raw - Raw notes string from the DB.
+ * @returns The free text and the metadata block, both trimmed.
+ */
+function splitNotesBlob(raw: string | null): { userNotes: string; meta: string } {
+  const trimmed = (raw ?? "").trim();
+  if (!trimmed) return { userNotes: "", meta: "" };
+  // A metadata-only blob (operator-entered, customer typed nothing) opens straight onto
+  // "[...]", so there is no "\n\n[" separator. Without the startsWith check the whole
+  // internal block falls through as `userNotes` and is shown back to the customer.
+  const idx = trimmed.startsWith("[") ? 0 : trimmed.indexOf("\n\n[");
+  if (idx === -1) return { userNotes: trimmed, meta: "" };
+  return { userNotes: trimmed.slice(0, idx).trim(), meta: trimmed.slice(idx).trim() };
+}
+
+/**
+ * Rewrites only the free-text part of a notes blob, leaving the metadata block
+ * byte-identical. The admin edit form shows just the human note, so a save must
+ * not disturb the "[...]" / "Address:" lines {@link parseBookingNotes} and the
+ * contact backfill still read out of the text.
+ * @param raw - Existing notes blob.
+ * @param userNotes - Replacement free text.
+ * @returns The rebuilt blob.
+ */
+export function replaceUserNotes(raw: string | null, userNotes: string): string {
+  const { meta } = splitNotesBlob(raw);
+  const text = userNotes.trim();
+  if (!meta) return text;
+  return text ? `${text}\n\n${meta}` : meta;
+}
+
+/**
  * Parses the structured booking notes blob back into its parts.
  * Format: `{userNotes}\n\n[{timeLabel} - {durationLabel}]\nMeeting type: ...\n[Address: ...]\n[Phone: ...]`
  * The structured columns (`address`, `meetingType`) are preferred now; this
@@ -21,15 +55,7 @@ export function parseBookingNotes(raw: string | null): {
   address: string;
   phone: string;
 } {
-  if (!raw) return { userNotes: "", meetingType: "", address: "", phone: "" };
-
-  // A metadata-only blob (operator-entered, customer typed nothing) opens straight onto
-  // "[...]", so there is no "\n\n[" separator. Without the startsWith check the whole
-  // internal block falls through as `userNotes` and is shown back to the customer.
-  const trimmed = raw.trim();
-  const metaSeparatorIdx = trimmed.startsWith("[") ? 0 : trimmed.indexOf("\n\n[");
-  const userNotes = metaSeparatorIdx === -1 ? trimmed : trimmed.slice(0, metaSeparatorIdx).trim();
-  const meta = metaSeparatorIdx === -1 ? "" : trimmed.slice(metaSeparatorIdx);
+  const { userNotes, meta } = splitNotesBlob(raw);
 
   const meetingTypeLine = meta.match(/Meeting type:\s*(.+)/i)?.[1]?.trim() ?? "";
   const meetingType: "in-person" | "remote" | "" = meetingTypeLine

@@ -4,14 +4,16 @@
  * @description Editable customer/booking info card on the booking detail page:
  * name, email, phone, address, and notes. View mode shows the values; Edit mode
  * swaps in inputs (address uses the Places autocomplete) and saves via the sparse
- * admin bookings PATCH, then refreshes the page. Address is read from and written
- * back into the notes "Address:" line - the same convention the PATCH route and
- * contact backfill use - so an edit stays consistent across notes and contact.
+ * admin bookings PATCH, then refreshes the page. Only the free text is shown and
+ * edited - the notes blob's metadata block is machine-written mirror, surfaced on
+ * this page as chips - but the address is still written back into its "Address:"
+ * line, the convention the PATCH route and contact backfill both read.
  */
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import { useBookingActions } from "@/features/booking/hooks/use-booking-actions";
+import { parseBookingNotes, replaceUserNotes } from "@/features/booking/lib/booking";
 import { cn } from "@/shared/lib/cn";
 import { useRouter } from "next/navigation";
 import type React from "react";
@@ -27,7 +29,9 @@ interface BookingInfoCardProps {
   email: string;
   /** Customer phone (nullable). */
   phone: string | null;
-  /** Free-text booking notes (nullable); holds the "Address:" line. */
+  /** Address column; legacy rows carry it only in the notes "Address:" line. */
+  address: string | null;
+  /** Raw booking notes blob (nullable): free text plus the metadata mirror. */
   notes: string | null;
 }
 
@@ -36,15 +40,6 @@ const INPUT_CLS = cn(
   "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-russian-violet",
 );
 const LABEL_CLS = "text-xs font-semibold text-admin-muted uppercase";
-
-/**
- * Pulls the address out of the notes "Address:" line.
- * @param notes - The booking notes.
- * @returns The address, or "" when there is no Address line.
- */
-function addressFromNotes(notes: string | null): string {
-  return (notes ?? "").match(/Address:\s*(.+)/i)?.[1]?.trim() ?? "";
-}
 
 /**
  * A read-only label/value row.
@@ -75,6 +70,7 @@ function Row({
  * @param props.name - Customer name.
  * @param props.email - Customer email.
  * @param props.phone - Customer phone (nullable).
+ * @param props.address - Address column (nullable).
  * @param props.notes - Booking notes (nullable).
  * @returns The info card element.
  */
@@ -83,6 +79,7 @@ export function BookingInfoCard({
   name,
   email,
   phone,
+  address,
   notes,
 }: BookingInfoCardProps): React.ReactElement {
   const router = useRouter();
@@ -90,34 +87,45 @@ export function BookingInfoCard({
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const initialAddress = addressFromNotes(notes);
+  // Prefer the column; legacy rows predate it and carry the address only in the
+  // notes text, which parseBookingNotes reads back off the "Address:" line.
+  const parsed = parseBookingNotes(notes);
+  const initialAddress = address?.trim() || parsed.address;
   const [form, setForm] = useState({
     name,
     email,
     phone: phone ?? "",
     address: initialAddress,
-    notes: notes ?? "",
+    notes: parsed.userNotes,
   });
 
   /**
    * Resets the form to the current props and leaves edit mode.
    */
   function cancel(): void {
-    setForm({ name, email, phone: phone ?? "", address: initialAddress, notes: notes ?? "" });
+    setForm({
+      name,
+      email,
+      phone: phone ?? "",
+      address: initialAddress,
+      notes: parsed.userNotes,
+    });
     setEditing(false);
   }
 
   /**
-   * Saves the edits. Merges the address back into the notes "Address:" line and
-   * sends `address` so the linked contact syncs too; refreshes on success.
+   * Saves the edits. Puts the edited free text back in front of the untouched
+   * metadata block, merges the address into its "Address:" line, and sends
+   * `address` so the linked contact syncs too; refreshes on success.
    */
   async function save(): Promise<void> {
     setSaving(true);
+    const rebuilt = replaceUserNotes(notes, form.notes);
     // Keep the notes "Address:" line in step with the edited address (same as the
     // route's contact sync); when there's no Address line the replace is a no-op.
     const mergedNotes = form.address
-      ? form.notes.replace(/^(Address:\s*).*$/im, `$1${form.address.trim()}`)
-      : form.notes;
+      ? rebuilt.replace(/^(Address:\s*).*$/im, `$1${form.address.trim()}`)
+      : rebuilt;
     const result = await patchBooking(
       id,
       {
@@ -162,8 +170,8 @@ export function BookingInfoCard({
         </Row>
         {initialAddress && <Row label="Address">{initialAddress}</Row>}
         <Row label="Notes">
-          {notes ? (
-            <span className="whitespace-pre-wrap">{notes}</span>
+          {parsed.userNotes ? (
+            <span className="whitespace-pre-wrap">{parsed.userNotes}</span>
           ) : (
             <span className="text-admin-faint">None</span>
           )}

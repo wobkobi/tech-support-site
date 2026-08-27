@@ -20,6 +20,7 @@ import {
   optimisticBusyEvent,
   type WeekEvent,
 } from "@/features/admin/lib/schedule-types";
+import { parseBookingNotes } from "@/features/booking/lib/booking";
 import { cn } from "@/shared/lib/cn";
 import { isPastEditWindow, nzDayEndMs } from "@/shared/lib/edit-window";
 import { addDaysToDateKey, getPacificAucklandOffset, nzDateKey } from "@/shared/lib/timezone-utils";
@@ -39,6 +40,25 @@ function formatGap(minutes: number): string {
   if (h > 0 && m > 0) return `${h}h ${m}m free`;
   if (h > 0) return `${h}h free`;
   return `${m}m free`;
+}
+
+/**
+ * Notes row on a booking card, showing only what the person actually typed. The
+ * rest of the blob is the machine-written metadata mirror, and its Address line
+ * already renders as its own row above this one.
+ * @param props - Component props.
+ * @param props.notes - Raw booking notes blob.
+ * @returns The notes row, or null when nothing was typed.
+ */
+function BookingNotesRow({ notes }: { notes: string | null }): React.ReactElement | null {
+  const { userNotes } = parseBookingNotes(notes);
+  if (!userNotes) return null;
+  return (
+    <div className="text-xs whitespace-pre-wrap text-admin-text-secondary">
+      <span className="text-admin-faint">Notes: </span>
+      {userNotes}
+    </div>
+  );
 }
 
 /** Minimum gap between consecutive bookings to render a "free" label. */
@@ -728,12 +748,7 @@ export function DayAgendaView({
                           {ev.booking.address}
                         </div>
                       )}
-                      {ev.booking.notes && (
-                        <div className="text-xs whitespace-pre-wrap text-admin-text-secondary">
-                          <span className="text-admin-faint">Notes: </span>
-                          {ev.booking.notes}
-                        </div>
-                      )}
+                      <BookingNotesRow notes={ev.booking.notes} />
                       <div className="mt-1 flex items-center justify-between gap-2 text-[11px] text-admin-faint">
                         <span className="font-mono">#{ev.booking.id}</span>
                         <span className="italic">Hold to edit</span>
