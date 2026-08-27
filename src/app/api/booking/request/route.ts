@@ -136,11 +136,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return errorResponse(payloadCheck.error, 400);
     }
 
-    // Tidy the name (casing/spacing) and Google-canonicalise a typed address.
-    // normaliseAddress only formats an UNAMBIGUOUS match (null on 0 or >1
-    // candidates), so we never guess between streets - any real ambiguity was
-    // resolved by the customer's pick on the client. Falls back to the typed
-    // value so a genuine new address still books.
+    // normaliseAddress only formats an UNAMBIGUOUS match (null on 0 or >1 candidates), so
+    // it never guesses between streets - real ambiguity was resolved by the customer's
+    // pick on the client. Falls back to the typed value so a new address still books.
     const cleanName = normaliseName(name) || name.trim();
     const normalisedEmail = normaliseEmail(email);
     const canonicalAddress =
@@ -217,12 +215,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const cancelToken = randomUUID();
     const reviewToken = randomUUID();
 
-    // Snapshot the public quote the customer saw (carried from /pricing or the
-    // inline booking estimate). Fetched before the notes/calendar are built so
-    // the quoted range appears in both. Best effort; the id is validated loosely
-    // and the range, travel slice, typed description and AI reading are all
-    // copied so they survive the estimate-log retention purge. The stored
-    // priceLow/priceHigh are the all-in total (labour + travel).
+    // Snapshot the quote the customer saw, before the notes/calendar are built so it
+    // lands in both. Best effort, and every field is copied rather than referenced so it
+    // survives the estimate-log retention purge. priceLow/priceHigh are the all-in total.
     let priceEstimateIdAtBooking: string | null = null;
     let quotedLowAtBooking: number | null = null;
     let quotedHighAtBooking: number | null = null;
@@ -265,9 +260,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       bookingNotes += `Quoted: ${formatQuotedRange(quotedLowAtBooking, quotedHighAtBooking, quotedTravelAtBooking)}\n`;
     }
 
-    // The notes blob above is the internal record (time label, meeting type,
-    // address, quoted range) that parseBookingNotes reads back. The customer is
-    // an attendee on the calendar event, so the invite gets the customer-facing
+    // The notes blob above is the internal record parseBookingNotes reads back. The
+    // customer is an attendee on the event, so the invite gets the customer-facing
     // description instead - it must never carry the quoted price or the metadata.
     const identity = await getIdentity();
     const siteUrl = getSiteUrl();
@@ -310,9 +304,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // Snapshot rates + active promo + one-way travel time so the quoted
-    // price survives later admin rate edits / promo expiry. Consumed by the
-    // late-cancellation invoice helper + future "open invoice from booking".
+    // Snapshot rates + active promo + one-way travel so the quoted price survives later
+    // rate edits and promo expiry. Read by the late-cancellation invoice helper.
     // Best-effort: failures degrade to null rather than blocking the booking.
     const [rates, activePromo] = await Promise.all([
       prisma.rateConfig.findMany().catch((err) => {
@@ -330,10 +323,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // can't reprice an already-quoted booking.
     const travelRatePerHourAtBooking = (await getSettings()).pricing.travelRatePerHour;
 
-    // Drive-time snapshot for in-person bookings: outbound quoted at the
-    // booking's start, return at its end - genuine traffic predictions for
-    // the actual drives. Lets the late-cancel handler bill travel without a
-    // re-lookup. Non-blocking on failure.
+    // Drive-time snapshot for in-person bookings: outbound quoted at the start, return at
+    // the end, so both are real traffic predictions for the actual drives. Lets the
+    // late-cancel handler bill travel without a re-lookup. Non-blocking on failure.
     let travelMinsAtBooking: number | null = null;
     let travelMinsBackAtBooking: number | null = null;
     if (meetingType === "in-person" && canonicalAddress) {
@@ -421,9 +413,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         console.error("[booking/request] Failed to upsert contact:", contactError);
       }
 
-      // Send confirmation emails before returning so Vercel doesn't kill the
-      // function before the Resend requests complete. Both functions catch all
-      // errors internally and never throw. The owner alert always fires; the
+      // Send before returning, or Vercel kills the function mid-request; both helpers
+      // swallow their own errors and never throw. The owner alert always fires, the
       // customer confirmation honours the notifyConfirmation setting.
       const { comms } = await getSettings();
       await Promise.all([

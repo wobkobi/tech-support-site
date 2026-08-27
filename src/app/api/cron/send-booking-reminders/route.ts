@@ -103,11 +103,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           meetingType: b.meetingType,
           rescheduleCount: b.rescheduleCount,
         });
-        // Only stamp sent-at after Resend accepts the send. Stamping before
-        // would silently drop the reminder forever on a transient hiccup,
-        // since the next cron run would skip a non-null timestamp. A duplicate
-        // send (if the cron times out between the send and the update) is
-        // recoverable; a missed appointment reminder isn't.
+        // Stamp sent-at only after Resend accepts: stamping first would drop the reminder
+        // forever on a transient hiccup, since the next run skips a non-null timestamp.
+        // A duplicate send is recoverable; a missed appointment reminder isn't.
         if (ok) {
           await prisma.booking.update({
             where: { id: b.id },

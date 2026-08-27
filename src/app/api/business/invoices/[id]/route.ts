@@ -287,10 +287,9 @@ export async function DELETE(
   }
 
   const { id } = await params;
-  // Only DRAFT invoices are deletable. SENT/PAID/VOIDED are part of the audit
-  // trail (and for VOIDED in particular, the IRD record-retention rule) so
-  // they can never be removed - the UI hides the delete button for those
-  // statuses, but the rule is enforced server-side too in case of crafted requests.
+  // Only DRAFT invoices are deletable: SENT/PAID/VOIDED are audit trail, and VOIDED falls
+  // under the IRD record-retention rule. The UI hides the button, but the rule is enforced
+  // here too against crafted requests.
   const existing = await prisma.invoice.findUnique({
     where: { id },
     select: { status: true },

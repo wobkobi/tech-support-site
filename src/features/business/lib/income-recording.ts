@@ -65,10 +65,9 @@ export async function recordIncome(data: RecordIncomeInput): Promise<RecordIncom
     },
   });
 
-  // Synchronous append so the row is written before the response (Vercel can
-  // terminate the function before a fire-and-forget promise resolves). Failures
-  // are swallowed - the DB entry stands and the cron self-heal re-appends later
-  // - but surfaced to the caller via sheetSyncWarning.
+  // Synchronous append so the row lands before the response - Vercel can terminate the
+  // function before a fire-and-forget promise resolves. Failures are swallowed (the DB
+  // entry stands, the cron self-heal re-appends) but surfaced via sheetSyncWarning.
   let sheetRowKey: string | null = null;
   let sheetSyncWarning = false;
   try {

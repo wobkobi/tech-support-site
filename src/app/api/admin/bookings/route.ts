@@ -163,10 +163,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const cancelToken = randomUUID();
   const reviewToken = randomUUID();
 
-  // Internal notes blob: the operator's record, parsed back by
-  // parseBookingNotes. Never sent to the customer - the calendar invite gets the
-  // customer-facing description built below, since the client is an attendee and
-  // would otherwise read the admin marker and the raw metadata.
+  // Internal notes blob, parsed back by parseBookingNotes. The customer is an attendee on
+  // the invite, so the event gets the customer-facing description built below instead -
+  // this one would show them the admin marker and the raw metadata.
   let bookingNotes = notes ? `${notes}\n\n` : "";
   bookingNotes += `[Manual entry by admin - ${durationMinutes} min]\n`;
   bookingNotes += `Meeting type: ${address ? "In-person" : "Remote"}\n`;

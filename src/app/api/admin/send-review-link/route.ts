@@ -106,11 +106,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const reviewUrl = `${siteUrl}/review?token=${reviewToken}`;
 
     if (mode === "sms") {
-      // SMS is not wired to a provider yet. Persist only the token (never the
-      // send-state) so the operator can copy the link and send it themselves.
-      // Stamping reviewLinkSentAt here would mark the customer as "review
-      // requested" and suppress them from future auto-sends while nothing was
-      // actually sent.
+      // No SMS provider yet: persist the token only, never the send-state. Stamping
+      // reviewLinkSentAt would suppress the customer from future auto-sends when
+      // nothing was actually sent.
       // TODO: wire a real SMS provider, then stamp send-state like the email path.
       if (!contact.reviewToken) {
         await prisma.contact.update({ where: { id: contact.id }, data: { reviewToken } });
@@ -123,10 +121,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ ok: true, reviewUrl, smsText, copyOnly: true });
     }
 
-    // Email path: send first, then stamp the send-state only on a successful
-    // send. Stamping before the send would mark the customer as "review
-    // requested" even on a Resend failure, so every retry short-circuits at the
-    // dedup guard above without ever re-sending.
+    // Stamp the send-state only after a successful send: stamping first would mark the
+    // customer "review requested" even on a Resend failure, so every retry would
+    // short-circuit at the dedup guard above without re-sending.
     const sent = await sendPastClientReviewRequest({
       id: contact.id,
       name: name.trim(),

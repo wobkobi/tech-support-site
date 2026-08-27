@@ -1,17 +1,15 @@
 // scripts/calibrate-benchmarks.ts
 // Read-only report of what jobs ACTUALLY took, from real invoices, so the public
-// estimator's benchmark numbers can be judged against reality.
-// No AI, no API calls, no writes. Run: npm run calibrate
+// estimator's benchmarks can be judged against reality. No AI, no API calls, no writes.
+// Run: npm run calibrate
 //
 // It reports; it does NOT conclude. Two limits are deliberate and load-bearing:
-//   1. Task tags are coarse - "Laptop setup" covers a 15-min account fix AND a
-//      90-min new-laptop build - so a tag's median is NOT a benchmark's truth.
-//      The benchmarks are printed alongside for pairing BY EYE; auto-pairing
-//      them produced confident nonsense and was removed.
-//   2. LineItem stores qty with no unit, so a part (qty=1 = one cable) looks
-//      identical to an hour of labour. A line counts as labour only when its
-//      unitPrice matches a live hourly rate; everything else is excluded and
-//      listed, so exclusions stay visible instead of silently skewing the maths.
+//   1. Task tags are coarse - "Laptop setup" covers a 15-min account fix AND a 90-min
+//      new-laptop build - so a tag's median is NOT a benchmark's truth. Benchmarks print
+//      alongside for pairing BY EYE; auto-pairing them produced confident nonsense.
+//   2. LineItem stores qty with no unit, so a part (qty=1) looks identical to an hour of
+//      labour. A line counts as labour only when its unitPrice matches a live hourly rate;
+//      everything else is excluded and listed, so exclusions stay visible.
 
 import { prisma } from "@/shared/lib/prisma";
 import { loadLiveContext, type LiveContext } from "./eval-ai/context";

@@ -166,12 +166,10 @@ export function SettingsView({
     setFocusTarget({ id: fieldKey, nonce: Date.now() });
   };
 
-  // After a search jump, scroll the target field into view + focus it once the
-  // (possibly just-switched) tab has rendered. Search indexes the meta key, but
-  // a tab renders a nested key's field under its last segment alone (the group
-  // prefix is implied by the tab it lives in), so "cancellation.callOutFee"
-  // has to also look for "callOutFee" or every nested field would only ever
-  // switch tabs without scrolling.
+  // After a search jump, scroll + focus the target once the (possibly just-switched) tab
+  // has rendered. Search indexes the full meta key but a tab renders nested fields under
+  // the last segment alone, so "cancellation.callOutFee" must also try "callOutFee" or
+  // nested fields would switch tabs without ever scrolling.
   useEffect(() => {
     if (!focusTarget) return;
     const t = setTimeout(() => {

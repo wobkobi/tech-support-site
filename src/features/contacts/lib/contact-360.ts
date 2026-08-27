@@ -1,9 +1,8 @@
 // src/features/contacts/lib/contact-360.ts
-// One loader for everything a contact touches, so the customer-360 page and
-// any future caller share ONE set of matching rules. Rules mirror the
-// contact-sync matchers in maintenance.ts exactly: email primary (lowercased,
-// incl. alts), phone fallback (normaliseContactPhone, mobile keys only - a
-// shared landline may be a household). Income is reached through the invoices.
+// One loader for everything a contact touches, so every caller shares ONE set of matching
+// rules. Mirrors the sync matchers in maintenance.ts exactly: email primary (lowercased,
+// alts included), phone fallback (normaliseContactPhone, mobile keys only - a shared
+// landline may be a household). Income is reached through the invoices.
 
 import { isNZMobileKey, normaliseContactPhone } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
@@ -60,11 +59,10 @@ export interface Contact360 {
   };
 }
 
-// Bounded scan for the phone-only fallback: the stored booking phone is
-// un-normalised, so it cannot be queried by its match key and must be filtered in
-// JS. Only reached for a contact with no email on file, and capped so a growing
-// bookings table cannot turn one page view into a full scan. Revisit with a
-// denormalised link if volume climbs past this.
+// Bounded scan for the phone-only fallback: the stored booking phone is un-normalised, so
+// it can't be queried by match key and has to be filtered in JS. Only reached when a
+// contact has no email, and capped so a growing bookings table can't turn one page view
+// into a full scan - denormalise the link if volume climbs past this.
 const PHONE_FALLBACK_SCAN_CAP = 1000;
 
 /**

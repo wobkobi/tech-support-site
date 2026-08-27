@@ -205,11 +205,10 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
   const maxDate = new Date(
     now.getTime() + settings.availability.maxAdvanceDays * 24 * 60 * 60 * 1000,
   );
-  // Also process jobs finished within the last few days so their travel bars stay
-  // on the schedule for the record (they'd otherwise be cleaned once the job passed).
-  // Past legs are priced at a near-future proxy inside calculateTravelMinutes.
-  // Doubles as the TravelBlock retention cutoff: once an event drops out of this
-  // window nothing refreshes its block, so the sweep at the end removes it.
+  // Also process jobs finished in the last few days so their travel bars stay on the
+  // schedule for the record; past legs price at a near-future proxy inside
+  // calculateTravelMinutes. Doubles as the TravelBlock retention cutoff - once an event
+  // drops out of this window nothing refreshes its block, so the sweep removes it.
   const TRAVEL_RETENTION_DAYS = 7;
   const travelWindowStart = new Date(now.getTime() - TRAVEL_RETENTION_DAYS * 24 * 60 * 60 * 1000);
   const scheduling = settings.scheduling;
@@ -221,10 +220,9 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
   const roundTravel = (raw: number): number =>
     roundTravelMinutes(raw, scheduling.travelRoundBufferMin);
 
-  // Fetch fresh calendar events. The failed-calendar set matters as much as the
-  // events: a calendar that errored contributes nothing, which is
-  // indistinguishable from "its events were all cancelled" unless the stale
-  // sweep below is told to leave it alone.
+  // The failed-calendar set matters as much as the events: a calendar that errored
+  // contributes nothing, which is indistinguishable from "all its events were cancelled"
+  // unless the stale sweep below is told to leave it alone.
   let rawEvents: CalendarEvent[] = [];
   let failedCalendarIds: string[] = [];
   try {
@@ -251,10 +249,9 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
     },
   });
 
-  // Load admin-marked "ignored" TravelBlocks to know which Car events to
-  // skip when populating the calendar cache + travel blocks. An ignored event
-  // means "I have access to the car that day" - the booking page should not
-  // treat it as a no-car window and no travel-to-home block should fire.
+  // Admin-marked "ignored" TravelBlocks say which Car events to skip when populating the
+  // cache and travel blocks. An ignored event means "I have the car that day", so the
+  // booking page must not treat it as a no-car window and no travel-home block fires.
   const ignoredRows = await prisma.travelBlock.findMany({
     where: { ignored: true },
     select: { sourceEventId: true, calendarEmail: true },
@@ -330,11 +327,9 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
   const carCalId = process.env.CAR_CALENDAR_ID ?? process.env.WORK_CALENDAR_ID ?? "";
   const isDev = process.env.NODE_ENV === "development";
 
-  // Car-calendar entries are the dumb case: always home > event location >
-  // home, no smart-origin lookup, no chaining. Car events are also kept out
-  // of OTHER events' smart-origin and chaining candidates so they don't
-  // pollute those decisions, but still appear in calendarEventCache so
-  // booking is blocked during the event itself.
+  // Car-calendar entries are the dumb case: always home > event > home, no smart origin,
+  // no chaining. They are also kept out of OTHER events' origin and chaining candidates,
+  // but still land in calendarEventCache so booking is blocked during the event itself.
   const travelRelevantEvents = carCalId
     ? rawEvents.filter((e) => e.calendarEmail !== carCalId)
     : rawEvents;
@@ -353,11 +348,9 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
     }
   }
 
-  // Eligible-for-TravelBlock: every event within the travel window (recent past +
-  // future) from any calendar that has a resolvable destination. Recent past jobs
-  // are kept so their travel bars stay for the record; their legs are priced at a
-  // proxy time. Falls back to event.summary when no dedicated location field is set
-  // (e.g. business name as the title).
+  // Eligible-for-TravelBlock: every event in the travel window (recent past + future),
+  // from any calendar, with a resolvable destination. Falls back to event.summary when no
+  // location field is set - a business name as the title still resolves.
   const eligibleEvents = rawEvents.filter(
     (e) => (e.location ?? e.summary) && new Date(e.start) > travelWindowStart,
   );
@@ -426,10 +419,9 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
     const key = `${event.id}|${event.calendarEmail}`;
     const existing = blockByKey.get(key);
 
-    // Admin-flagged "I have the car that day" override: leave the TravelBlock
-    // as-is (the admin's flag is the source of truth) and skip every Distance
-    // Matrix / cache write below. The cache entry for the event itself was
-    // already purged above, so the booking page is unblocked.
+    // Admin-flagged "I have the car that day": the flag is the source of truth, so leave
+    // the TravelBlock as-is and skip every Distance Matrix / cache write below. The
+    // event's own cache entry was purged above, so the booking page is unblocked.
     if (ignoredKeys.has(key)) {
       if (isDev) console.log(`[travel] Skipping ignored event "${event.summary}"`);
       continue;
@@ -452,10 +444,9 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
       ? new Date(eventEnd.getTime() + scheduling.travelBackDepartureBufferMin * 60 * 1000)
       : eventEnd;
 
-    // Detect the best origin: preceding event location within 4 hours, or home.
-    // For Car events the origin is forced to home - no smart-origin lookup.
-    // Car events are also filtered out of travelRelevantEvents so they don't
-    // pollute other events' smart-origin or chain candidate searches.
+    // Best origin: the preceding event's location within 4 hours, else home. Car events
+    // force home (no lookup) and are filtered out of travelRelevantEvents, so they never
+    // pollute another event's origin or chain-candidate search.
     const detectedOrigin = isCarEvent
       ? homeAddress
       : findSmartOrigin(
@@ -471,11 +462,9 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
     const effectiveBackDestination = existing?.customTravelBackDestination ?? homeAddress;
     const hasCustomBackDestination = existing?.customTravelBackDestination != null;
 
-    // Candidate next-event for chaining. Identity + start are stored on the
-    // block so a subsequent run can detect if the candidate moved or vanished.
-    // Skipped when admin set a custom back destination - the explicit choice
-    // wins - or when the current event is a Work event (Work blocks don't have
-    // a return trip to chain anywhere from).
+    // Candidate next-event for chaining; its identity + start are stored on the block so a
+    // later run can tell if it moved or vanished. Skipped when a custom back destination
+    // was set (the explicit choice wins) or on a Work event, which has no return trip.
     const chained =
       hasCustomBackDestination || isCarEvent
         ? null
@@ -560,20 +549,17 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
             console.error("[refreshCalendarCache] Failed to delete stale cache entries:", err);
           }
         }
-        // Deferred, not deleted here: the rebuild below bails when both Distance
-        // Matrix legs come back null, and dropping the row now would take the
-        // operator's customOrigin / transportMode overrides with it for good.
-        // Delete only once a replacement is ready to write.
+        // Deferred, not deleted: the rebuild below bails when both Distance Matrix legs
+        // come back null, and dropping the row now would take the operator's customOrigin
+        // / transportMode overrides with it. Delete only once a replacement is ready.
         staleBlockId = existing.id;
       }
     }
 
     if (!needsRebuild && existing != null) {
-      // Upsert cache entries so they are recreated if they expired (30-min TTL)
-      // OR if an earlier run failed to write them and left beforeEventId/
-      // afterEventId null on the TravelBlock row. The gate is on roundedMinutes
-      // (whether a travel time actually exists) rather than on the stored cache
-      // id, so a one-time upsert failure self-heals on the next refresh.
+      // Upsert so entries come back after the 30-min TTL, or after an earlier run failed
+      // and left beforeEventId/afterEventId null. Gated on roundedMinutes (does a travel
+      // time exist) rather than the stored cache id, so a failed upsert self-heals.
       let backfilledBeforeId: string | null = null;
       let backfilledAfterId: string | null = null;
 
@@ -728,10 +714,9 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
       }
     }
 
-    // Suppress travel-back when dwell at home would be under the minimum.
-    // The next event's travel-to leg (via findSmartOrigin) reserves the gap
-    // instead. Car events don't participate in chaining (chained is forced to
-    // null upstream), so they always fall through to a real travel-back home.
+    // Suppress travel-back when dwell at home would be under the minimum; the next event's
+    // travel-to leg (via findSmartOrigin) reserves the gap instead. Car events never chain
+    // (chained is forced null upstream), so they always get a real travel-back home.
     let travelBackSuppressed = false;
     if (
       chained &&
@@ -877,19 +862,15 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
     const key = `${block.sourceEventId}|${block.calendarEmail}`;
     if (currentEventKeys.has(key)) continue;
 
-    // A calendar that failed to fetch contributes no keys, so every one of its
-    // blocks looks stale. Deleting them would destroy the operator's `ignored` /
-    // `customOrigin` / `transportMode` overrides on a transient 429. Skip until
-    // it answers again.
+    // A calendar that failed to fetch contributes no keys, so all its blocks look stale.
+    // Deleting them would destroy the operator's `ignored` / `customOrigin` /
+    // `transportMode` overrides on a transient 429 - skip until it answers again.
     if (failedCalendars.has(block.calendarEmail)) continue;
 
-    // Freeze finished events' blocks: the fetch window starts at `now`, so a
-    // naturally-finished event vanishes from currentEventKeys the moment it
-    // ends. Its block is the historical record of the reserved travel - the
-    // schedule's past days still render it, and the operator's end-of-event
-    // time corrections must not churn it. Only blocks whose event vanished
-    // while still upcoming (cancelled or deleted) are cleaned up here; the
-    // frozen ones age out in the retention sweep below.
+    // Freeze finished events' blocks: the fetch window starts at `now`, so an event
+    // vanishes from currentEventKeys the moment it ends, and its block is the historical
+    // record the schedule's past days render. Only blocks whose event vanished while
+    // still upcoming (cancelled or deleted) are cleaned up; frozen ones age out below.
     if (block.eventEndAt < now) continue;
 
     const staleIds = [block.beforeEventId, block.afterEventId].filter(
@@ -913,11 +894,10 @@ export async function refreshCalendarCache(): Promise<RefreshResult> {
     }
   }
 
-  // Retention sweep: a finished job's block is frozen while the cron still fetches
-  // its event, but once the event falls out of the travel window nothing refreshes
-  // it again, so keeping it only grows the table and clutters the admin list. Its
-  // synthetic cache entries are normally long expired; delete them by id anyway so
-  // a block that outlived its 30-min TTL can't strand orphans.
+  // Retention sweep: once an event falls out of the travel window nothing refreshes its
+  // frozen block again, so keeping it only grows the table and clutters the admin list.
+  // The synthetic cache entries are normally long expired, but delete them by id anyway
+  // so a block that outlived its TTL can't strand orphans.
   const agedOutBlocks = await prisma.travelBlock.findMany({
     where: { eventEndAt: { lt: travelWindowStart } },
     select: { id: true, beforeEventId: true, afterEventId: true },

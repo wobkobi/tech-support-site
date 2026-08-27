@@ -95,10 +95,9 @@ export async function PUT(
     const newSheetId = await resolveSheetIdForDate(updated.date);
     const oldSheetId = await resolveSheetIdForDate(existing.date);
     if (sheetRowKey && oldSheetId && newSheetId && newSheetId !== oldSheetId) {
-      // Cross-FY move: create the new row first and persist its key, then
-      // remove the old row best-effort. A failed append leaves the old row
-      // intact (outer catch); a failed delete leaves a logged stray, not a
-      // lost entry.
+      // Cross-FY move: create the new row and persist its key first, then remove the old
+      // one best-effort. A failed append leaves the old row intact (outer catch); a failed
+      // delete leaves a logged stray rather than a lost entry.
       const oldKey = sheetRowKey;
       sheetRowKey = await appendRowWithSyncId(newSheetId, "Expenses", buildExpenseCells(updated));
       await prisma.expenseEntry.update({ where: { id }, data: { sheetRowKey } });

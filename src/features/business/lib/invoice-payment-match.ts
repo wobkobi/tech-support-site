@@ -1,10 +1,8 @@
 // src/features/business/lib/invoice-payment-match.ts
-// Finds the income entry that looks like an invoice's payment, for an invoice
-// the site still has as SENT. Money entered straight into the Cashbook sheet
-// never touches the invoice - only POST /pay links the two - so the row stays
-// SENT and the reminder cron chases someone who has already paid. The cron uses
-// this to hold off, and the invoice page uses it to prompt for the missing
-// payment record.
+// Finds the income entry that looks like a still-SENT invoice's payment. Money typed
+// straight into the Cashbook sheet never touches the invoice (only POST /pay links the
+// two), so the row stays SENT and the reminder cron would chase someone who has paid.
+// The cron uses this to hold off; the invoice page uses it to prompt for the record.
 
 import { prisma } from "@/shared/lib/prisma";
 import { nzDayStartUtc } from "@/shared/lib/timezone-utils";

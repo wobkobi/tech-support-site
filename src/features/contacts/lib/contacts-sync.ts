@@ -1,9 +1,8 @@
 // src/features/contacts/lib/contacts-sync.ts
-// Orchestrates a two-way Google Contacts sync. Runs the local dedup/merge
-// maintenance FIRST so duplicates are never propagated up to Google, then pushes
-// only the contacts that actually changed (the dirty set), then pulls Google's
-// changes back in. Reuses the per-contact merge/conflict engine in
-// google-contacts.ts unchanged - this module only decides what to sync and when.
+// Orchestrates a two-way Google Contacts sync: local dedup/merge FIRST so duplicates
+// never reach Google, then push only the contacts that changed (the dirty set), then pull
+// Google's changes back. Decides what to sync and when; the per-contact merge/conflict
+// engine lives in google-contacts.ts.
 
 import { UNRESOLVED_CONFLICT_FILTER } from "@/features/contacts/lib/contact-conflicts";
 import { prisma } from "@/shared/lib/prisma";
@@ -60,12 +59,10 @@ export async function runContactsSync({
   }
 
   try {
-    // 1. Clean up locally so duplicates never propagate to Google. Normalise the
-    // deletedAt field first - a contact missing it is invisible to every
-    // `deletedAt: null` reader (MongoDB isSet gotcha), including the merge passes
-    // below. The merges then run strongest key first: a shared Google resource
-    // name is proof of a duplicate, a shared email is near-proof, and a shared
-    // mobile is the weakest of the three.
+    // 1. Clean up locally so duplicates never reach Google. Normalise deletedAt first - a
+    // contact missing the key is invisible to every `deletedAt: null` reader, the merge
+    // passes included. Merges then run strongest key first: a shared Google resource name
+    // proves a duplicate, a shared email nearly does, a shared mobile is weakest.
     await normaliseSoftDeleteField();
     await mergeDuplicateGoogleContacts();
     await mergeDuplicateEmailContacts();
@@ -86,10 +83,9 @@ export async function runContactsSync({
     const conflictedIds = new Set(pendingConflicts.map((c) => c.contactId));
 
     const dirty = contacts.filter((c) => {
-      // A full sync means "re-evaluate everything", so it overrides the conflict
-      // skip below - otherwise the two deadlock: a conflicted contact is never
-      // pushed, so the comparison that would clear the conflict never runs. Safe,
-      // because that comparison still re-records a genuine conflict.
+      // A full sync overrides the conflict skip below, or the two deadlock: a conflicted
+      // contact is never pushed, so the comparison that would clear the conflict never
+      // runs. Safe, because that comparison still re-records a genuine conflict.
       if (full) return true;
       if (conflictedIds.has(c.id)) return false;
       if (!c.googleContactId) return true;

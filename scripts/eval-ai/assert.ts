@@ -1,9 +1,8 @@
 // scripts/eval-ai/assert.ts
-// Pure, network-free expectation maths and tolerance helpers for the eval
-// harness. Expected values come from the SAME canonical billing clamp the
-// routes call (clampBillableMins), so the auditor tracks the routes without
-// mirroring their code. Independent correctness is anchored by the hardcoded
-// canonical constants in the self-test (see index.ts).
+// Pure, network-free expectation maths and tolerance helpers for the eval harness.
+// Expected values come from the SAME canonical billing clamp the routes call
+// (clampBillableMins), so the auditor tracks the routes without mirroring their code.
+// Independent correctness is anchored by the hardcoded constants in the self-test.
 
 import { clampBillableMins } from "@/features/business/lib/pricing-policy";
 

@@ -49,10 +49,9 @@ export async function POST(
   // Parse optional overrides
   const { greetingName, customBody, sendNotification } = await parseInvoiceEmailOverrides(request);
 
-  // Idempotent for already-voided invoices: skip the status flip + voidedAt
-  // stamp and just (re)send the notification + (re)sync Drive. Useful when
-  // the first send hit a Resend error or the operator wants to send a follow-
-  // up reminder. The original voidedAt timestamp is preserved.
+  // Idempotent for already-voided invoices: skip the status flip and voidedAt stamp,
+  // preserving the original timestamp, and just re-send the notification and re-sync
+  // Drive - for a first send that hit a Resend error, or a deliberate follow-up.
   const alreadyVoided = invoice.status === "VOIDED";
   const voidedAt = alreadyVoided ? invoice.voidedAt : new Date();
   const updated = alreadyVoided

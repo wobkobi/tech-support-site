@@ -40,19 +40,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const now = new Date();
     const delayAgo = new Date(now.getTime() - comms.reviewEmailDelayMins * 60 * 1000);
 
-    // Find confirmed/completed bookings that ended at least the configured
-    // delay ago and have not had a review email yet.
+    // Bookings whose calendar event was deleted are excluded: the job was called off in
+    // Calendar and nobody cancelled the row, so asking how it went would be asking about
+    // a visit that never happened.
     //
-    // A booking whose calendar event has been deleted is excluded: the job was
-    // called off in Calendar and nobody cancelled the row, so asking how it went
-    // would be asking about a visit that never happened.
-    //
-    // MongoDB gotcha: documents written before reviewSentAt existed in the
-    // schema have no `reviewSentAt` field at all (not even null). Prisma's
-    // `reviewSentAt: null` filter only matches explicit nulls and skips
-    // those documents. Using `isSet: false` on its own would skip the
-    // opposite case (field present and null). The OR covers both - and two of
-    // them have to live under AND, since a second top-level OR would win.
+    // Mongo gotcha: `reviewSentAt: null` matches explicit nulls only and skips docs
+    // written before the field existed; `isSet: false` alone skips the opposite case.
+    // Both arms are needed, and both ORs sit under AND since a second top-level one wins.
     const bookingsToEmail = await prisma.booking.findMany({
       where: {
         endAt: {
@@ -77,10 +71,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       bookingsToEmail.map((b) => ({ id: b.id, email: b.email })),
     );
 
-    // Deduplicate by email: skip bookings whose email already received a review request
-    // (either from another booking or a manual Contact send via admin).
-    // Only query emails that are actually in this batch to avoid full-table scans.
-    // Soft-deleted contacts don't count as "already emailed".
+    // Deduplicate by email: skip bookings whose address already got a request, from
+    // another booking or a manual admin send. Only emails in this batch are queried, to
+    // avoid a full-table scan, and soft-deleted contacts don't count as already emailed.
     const batchEmails = bookingsToEmail.map((b) => b.email);
     const [alreadyEmailedBookings, alreadyEmailedContacts, alreadyLinkedInvoices] =
       await Promise.all([
@@ -179,10 +172,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         }
       } catch (error) {
         console.error(`[review-email] Failed for booking ${booking.id}:`, error);
-        // Stamp the same failure marker the `ok === false` branch uses. reviewSentAt
-        // is already claimed above, so without this the booking is excluded from both
-        // the main query and the retry pass - never asked, never noticed.
-        // sendCustomerReviewRequest wraps only its Resend call, so a throw lands here.
+        // Same failure marker the `ok === false` branch uses: reviewSentAt is already
+        // claimed above, so without it the booking falls out of both the main query and
+        // the retry pass. sendCustomerReviewRequest only wraps its Resend call.
         try {
           await prisma.booking.update({
             where: { id: booking.id },

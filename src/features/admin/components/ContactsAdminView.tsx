@@ -36,10 +36,9 @@ export function ContactsAdminView({
   const [checkingAddresses, setCheckingAddresses] = useState(false);
   const [addressResult, setAddressResult] = useState<string | null>(null);
 
-  // `syncing` is component state, so navigating away and back resets it while a
-  // run is still going - which is how the operator ends up firing a second sync
-  // into the middle of the first. Ask the server what is actually happening on
-  // mount, then poll until it finishes so the button tracks reality.
+  // `syncing` is component state, so navigating away and back resets it mid-run - that is
+  // how a second sync gets fired into the middle of the first. Ask the server on mount,
+  // then poll until it finishes so the button tracks reality.
   useEffect(() => {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;

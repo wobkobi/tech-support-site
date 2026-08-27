@@ -192,10 +192,9 @@ export function InvoicesListView(): React.ReactElement {
     setStatusFilter((s) => (s === key ? "all" : key));
   }
 
-  // Summary across ALL invoices (not the filtered view). Legacy PAID rows with no
-  // paidAt are excluded from "paid this month" - their pay date is unknown.
-  // Quotes are not money owed - they get their own counter and stay out of
-  // every dollar stat.
+  // Summary across ALL invoices, not the filtered view. Legacy PAID rows with no paidAt
+  // are excluded from "paid this month" (unknown pay date), and quotes are not money owed,
+  // so they get their own counter and stay out of every dollar stat.
   const summary = useMemo(() => {
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     let outstanding = 0;

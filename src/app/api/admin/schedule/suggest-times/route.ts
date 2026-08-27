@@ -262,11 +262,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   const calendarEvents = rawEvents.map((e) => ({ id: e.id, start: e.start, end: e.end }));
 
-  // Inject travel as synthetic occupied blocks. isSlotFree recognises the
-  // `travel-before:`/`travel-after:` id prefixes and applies NO extra buffer
-  // (the rounded minutes already include it). Same guards as the schedule
-  // grid: a leg only exists when its rounded minutes are set, and the return
-  // leg is skipped when suppressed (operator stayed out).
+  // Inject travel as synthetic occupied blocks. isSlotFree spots the `travel-before:` /
+  // `travel-after:` prefixes and adds NO buffer - the rounded minutes already include it.
+  // Same guards as the schedule grid: minutes must be set, suppressed return legs skipped.
   for (const b of travelBlocks) {
     if (b.beforeEventId && b.roundedMinutes != null && b.roundedMinutes > 0) {
       calendarEvents.push({
@@ -291,11 +289,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   const { days } = buildAvailableDays(existingForSlots, calendarEvents, now, config);
 
-  // Flatten to the next `limit` slots for the chosen duration, honouring the
-  // optional date range. Days come back in chronological order, windows by start
-  // hour, sub-slots by minute - so first-come iteration yields the soonest times.
-  // Build the candidate pool first. With an address we gather a wider pool (up to
-  // GATE_CAP) so travel-gating still leaves enough survivors for `limit`.
+  // Flatten to the next `limit` slots. Days arrive chronologically, windows by start hour,
+  // sub-slots by minute, so first-come iteration yields the soonest times. With an address
+  // the candidate pool widens to GATE_CAP so travel-gating still leaves enough survivors.
   const rawSlots: SuggestedSlot[] = [];
   const cap = address ? Math.max(limit, GATE_CAP) : limit;
   for (const day of days) {

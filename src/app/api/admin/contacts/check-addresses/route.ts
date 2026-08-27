@@ -65,10 +65,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       contact.addressCandidates.every((value, i) => value === candidates[i]);
     if (sameFlags) continue;
 
-    // Raising a flag bumps updatedAt, which would mark the row locally changed
-    // and re-push an address that never actually changed. Re-stamp lastSyncedAt
-    // to match - but only for rows that were already clean, since re-stamping a
-    // dirty row would swallow a genuine pending push.
+    // Raising a flag bumps updatedAt, which would mark the row dirty and re-push an
+    // address that never changed, so re-stamp lastSyncedAt to match. Only for rows that
+    // were already clean - re-stamping a dirty one would swallow a genuine pending push.
     const wasClean = contact.lastSyncedAt !== null && contact.updatedAt <= contact.lastSyncedAt;
     const stampedAt = new Date();
 

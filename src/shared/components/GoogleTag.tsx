@@ -33,11 +33,10 @@ export function GoogleTag(): React.ReactElement | null {
   // Admin pages are operator-only; keep them out of analytics entirely.
   const isAdmin = pathname === "/admin" || pathname.startsWith("/admin/");
 
-  // Unmounting does not unload gtag.js, and GA4 enhanced measurement reports a
-  // page_view on every history change - so client-side navigation into /admin
-  // would still send the admin path (which carries invoice and contact IDs).
-  // The `ga-disable-<ID>` flag is checked per hit, so toggling it suppresses
-  // those hits even though the tag is already live.
+  // Unmounting doesn't unload gtag.js, and GA4 enhanced measurement fires a page_view on
+  // every history change, so navigating into /admin would still send a path carrying
+  // invoice and contact IDs. `ga-disable-<ID>` is checked per hit, so toggling it
+  // suppresses those hits even with the tag already live.
   useEffect(() => {
     if (!GA4_ID) return;
     (window as unknown as Record<string, boolean>)[`ga-disable-${GA4_ID}`] = isAdmin;

@@ -11,9 +11,8 @@ import { isAdminRequest } from "@/shared/lib/auth";
 import { isRunLocked } from "@/shared/lib/run-lock";
 import { NextRequest, NextResponse } from "next/server";
 
-// Full mode pushes EVERY email-bearing contact (sequential People API calls
-// at ~1s each), so the run scales with the contact count; give it the full
-// serverless ceiling.
+// Full mode pushes EVERY email-bearing contact at ~1s per sequential People API
+// call, so the run scales with the contact count - give it the full ceiling.
 export const maxDuration = 300;
 
 /**
@@ -31,18 +30,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const { pushed, imported, alreadyRunning } = await runContactsSync({ full: true });
     if (alreadyRunning) {
-      // 409, not 200: a full run takes minutes, and the operator navigating away
-      // and back resets the button's local state. Without this they can fire a
-      // second sync into the middle of the first, racing the merge passes that
-      // hard-delete duplicate contacts.
+      // 409, not 200: the button's local state resets on navigate-away, so without this
+      // a second sync could race the merge passes that hard-delete duplicate contacts.
       return errorResponse("A contact sync is already running. Give it a minute.", 409);
     }
     return NextResponse.json({ ok: true, importedCount: imported, syncedCount: pushed });
   } catch (error) {
     console.error("[api/admin/contacts/sync] Error:", error);
-    // Generic message to the client; the OAuth / Google API detail goes only
-    // to the server log so a transient Google failure can't leak the shape of
-    // the credentials or the integration internals.
+    // Generic message to the client; the OAuth / Google detail stays in the server log
+    // so a transient failure can't leak the integration internals.
     return errorResponse("Contact sync failed.", 500);
   }
 }

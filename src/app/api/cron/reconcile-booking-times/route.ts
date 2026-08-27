@@ -21,10 +21,9 @@ import { NextRequest, NextResponse } from "next/server";
 // Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
 export const maxDuration = 60;
 
-// Short lookback: the query has no upper bound, so every future booking is
-// covered regardless, and a week back reaches everything the review cron can
-// still act on. The 60-day default belongs to the manual sweep, which is not
-// paying an event lookup twice an hour.
+// Short lookback: the query has no upper bound, so every future booking is covered
+// anyway, and a week back reaches everything the review cron can still act on. The 60-day
+// default belongs to the manual sweep, which isn't paying an event lookup twice an hour.
 const CRON_SINCE_DAYS = 7;
 
 /**

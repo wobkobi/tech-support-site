@@ -49,10 +49,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return errorResponse("Cannot merge a contact into itself.", 400);
   }
 
-  // Both sides must be live. Merging into a soft-deleted primary (dedupe self-heal
-  // or another tab deleted it between load and click) would move the secondary's
-  // reviews onto a hidden contact where matchReviewsToContacts can never resurface
-  // them.
+  // Both sides must be live: merging into a soft-deleted primary (a dedupe self-heal, or
+  // another tab, between load and click) would move the secondary's reviews onto a hidden
+  // contact that matchReviewsToContacts can never resurface.
   const [primary, secondary] = await Promise.all([
     prisma.contact.findFirst({ where: { id: primaryId, deletedAt: null } }),
     prisma.contact.findFirst({ where: { id: secondaryId, deletedAt: null } }),

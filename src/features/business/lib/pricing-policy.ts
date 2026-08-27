@@ -306,10 +306,9 @@ export function clampBillableMins(
 }
 
 // > Copy generators
-// Generators take their variable inputs explicitly so the rendered text
-// always matches the live values. Key figures are wrapped in `**…**` so the
-// pricing page can emit `<strong>` while emails / FAQs pass the markers
-// through as plain-text emphasis.
+// Inputs are passed explicitly so the rendered text always matches the live values. Key
+// figures are wrapped in `**…**` so the pricing page can emit `<strong>` while emails and
+// FAQs pass the markers through as plain-text emphasis.
 
 /**
  * Renders an hour count for customer-facing copy. The windows are settings, so

@@ -47,10 +47,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const now = Date.now();
   const todayStart = Math.floor(now / day) * day;
   const from = new Date(todayStart - 14 * day);
-  // Two UTC days of headroom, because NZ is UTC+12/13: at 1am NZ the current
-  // NZ day runs past UTC midnight, and a one-day bound would hide that
-  // afternoon's jobs. The NZ-day filter below is what actually excludes
-  // tomorrow; this only has to be wide enough not to lose today.
+  // Two UTC days of headroom because NZ is UTC+12/13: at 1am NZ the current NZ day runs
+  // past UTC midnight, and a one-day bound would hide that afternoon's jobs. The NZ-day
+  // filter below is what excludes tomorrow; this only has to avoid losing today.
   const to = new Date(todayStart + 2 * day);
   const todayKey = NZ_DAY.format(new Date(now));
 

@@ -1,12 +1,9 @@
 // src/features/contacts/lib/maintenance.ts
-// Single source of truth for contact maintenance: backfilling contacts from
-// bookings, merging duplicates (by Google link, then email, then mobile),
-// linking reviews to contacts, and surfacing field conflicts for the admin to
-// resolve. Every merge pass folds through one helper so they cannot drift apart
-// in what they preserve off the deleted row. The sync-contacts cron,
-// the standalone admin routes, and the contacts admin page (enrich only) call
-// these - keeping the logic here is what stops the paths from drifting apart.
-// Every reader excludes soft-deleted contacts (deletedAt != null).
+// Single source of truth for contact maintenance: backfilling contacts from bookings,
+// merging duplicates (by Google link, then email, then mobile), linking reviews, and
+// surfacing field conflicts for the admin. The cron, the admin routes and the contacts
+// page all call these, and every merge folds through one helper, so no path can drift in
+// what it preserves off the deleted row. Every reader excludes soft-deleted contacts.
 
 import { isNZMobileKey, normaliseContactPhone } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
@@ -356,10 +353,9 @@ export async function backfillContactsFromBookings(): Promise<number> {
   for (const c of live) {
     if (c.email) continue;
     const norm = normaliseContactPhone(c.phone);
-    // Mobile-only, the same gate mergePhoneOnlyContacts applies: a shared
-    // landline may belong to two different people in one household. Without it,
-    // a son booking on the family landline had his email written onto his
-    // mother's contact and no contact of his own was ever created.
+    // Mobile-only, the same gate mergePhoneOnlyContacts applies: a shared landline may
+    // belong to two people in one household. Without it a son booking on the family
+    // landline gets his email written onto his mother's contact and never gets his own.
     if (norm && isNZMobileKey(norm)) phoneOnlyByNorm.set(norm, c);
   }
 

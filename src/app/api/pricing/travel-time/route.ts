@@ -81,10 +81,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return errorResponse("destination is required", 400);
   }
 
-  // With no slot chosen (the /pricing wizard), quoting live traffic means an
-  // estimate opened at 11pm prices an empty motorway for a job that will
-  // actually happen mid-afternoon. Fall back to a representative bookable time
-  // instead of "now".
+  // With no slot chosen (the /pricing wizard), live traffic would price an empty motorway
+  // for an estimate opened at 11pm on a job that happens mid-afternoon. Fall back to a
+  // representative bookable time instead of "now".
   const { scheduling } = await getSettings();
   const departureTime =
     parseIsoField(body?.departureTimeIso) ??

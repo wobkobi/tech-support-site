@@ -102,13 +102,10 @@ export default async function ReviewPage({
       prefillEmail = contact.email;
       prefillPhone = contact.phone;
       tokenValid = true;
-      // Mirror the POST dedup guard (one review per contactId). A review left
-      // via a BOOKING link sets Review.contactId but leaves
-      // Contact.reviewLinkSubmittedAt null, so keying off that flag alone would
-      // render a create form that the POST then rejects with a 409. Contact
-      // reviews are keyed by contactId, not by which of the person's tokens the
-      // review arrived through, so an existing review is found (and edited) via
-      // any of their links.
+      // Mirror POST's one-review-per-contactId guard: a review left via a BOOKING link
+      // sets Review.contactId but not Contact.reviewLinkSubmittedAt, so keying off that
+      // flag alone would render a create form POST then 409s. Keyed by contactId, not by
+      // token, so the existing review is found (and editable) through any of their links.
       const contactReview =
         maybeExistingReview ??
         (await prisma.review.findFirst({

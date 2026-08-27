@@ -110,10 +110,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return errorResponse(payloadCheck.error, 400);
     }
 
-    // Tidy the name, validate the phone, and Google-canonicalise a typed address
-    // (unambiguous matches only - see normaliseAddress) so the edited booking,
-    // calendar event, and contact all carry a verified address. Falls back to
-    // the typed value when Google has no single confident match.
+    // Canonicalise a typed address (unambiguous matches only - see normaliseAddress) so
+    // the booking, calendar event and contact all carry the same verified one. Falls back
+    // to the typed value when Google has no single confident match.
     const cleanName = normaliseName(name) || name.trim();
     const phoneValidation = validatePhone(phone ?? "");
     if (phoneValidation.result === "invalid") {
@@ -233,13 +232,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       cancelUrl: `${siteUrl}/booking/cancel?token=${encodeURIComponent(booking.cancelToken)}`,
     });
 
-    // Replace the calendar event: CREATE the replacement first, then retire the
-    // old one. Deleting first meant a Google 5xx on the create left the customer
-    // with no calendar event at all while the booking still read `confirmed`
-    // against a dead calendarEventId, and a retry could not recover it. Creating
-    // first means the worst case is a duplicate event, which is recoverable.
-    // The slot validation above already excludes this booking's own event, so
-    // the overlap between create and delete cannot fail the conflict check.
+    // Create the replacement BEFORE retiring the old event: a Google 5xx on the create
+    // then leaves a recoverable duplicate rather than a confirmed booking pointing at a
+    // dead calendarEventId. Slot validation above excludes this booking's own event, so
+    // the momentary overlap can't fail the conflict check.
     let calendarEventId: string | null = null;
     try {
       const summary = `Tech Support: ${cleanName} - ${cleanDurationLabel}`;
@@ -280,9 +276,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // email notifications can show "was: <old time>".
     const previousStartAt = booking.startAt;
 
-    // Re-snapshot both drive legs for the (possibly new) address and times -
-    // outbound at the new start, return at the new end - so a late cancel
-    // bills the correct travel. Remote leaves both null so switching
+    // Re-snapshot both drive legs for the (possibly new) address and times so a late
+    // cancel bills the correct travel. Remote leaves both null, so switching
     // in-person > remote drops the old round-trip charge. Non-blocking on error.
     let travelMinsAtBooking: number | null = null;
     let travelMinsBackAtBooking: number | null = null;
@@ -311,13 +306,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           activeSlotKey: startAt.toISOString(),
           bufferAfterMin: config.bookingBufferAfterMin,
           rescheduleCount: { increment: 1 },
-          // Clear the reminder stamp so the 24h nudge fires again at the new
-          // time. The stamp is otherwise never cleared, so a booking moved after
-          // its reminder went out is never reminded again - the reschedule
-          // confirmation tells the customer the new time, but the day-before
-          // nudge is what stops no-shows. Gated on the start actually moving, so
-          // an edit that only touches notes or the address doesn't re-send a
-          // reminder the customer already has.
+          // Clear the reminder stamp so the 24h nudge fires again at the new time -
+          // nothing else ever clears it, so a moved booking would lose the nudge that
+          // stops no-shows. Gated on the start moving, so a notes-only edit doesn't
+          // re-send a reminder the customer already has.
           ...(startAt.getTime() !== booking.startAt.getTime() ? { emailReminderSentAt: null } : {}),
           phone: phoneE164,
           // Keep the structured snapshots in step with the edit so the
@@ -350,10 +342,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       throw error;
     }
 
-    // Upsert Contact + sync to Google. Best-effort: a failure here must not
-    // fail the edit (the booking + calendar event are already saved). Contact
-    // name/phone/address stay in step with the booking so edit-form
-    // corrections propagate to Google Contacts.
+    // Upsert Contact + sync to Google so edit-form corrections reach Google Contacts.
+    // Best-effort: the booking and calendar event are already saved, so a failure here
+    // must not fail the edit.
     try {
       // Route through the shared helper so matching is case-insensitive and
       // soft-delete-aware (never resurrecting a deleted contact), then keep the

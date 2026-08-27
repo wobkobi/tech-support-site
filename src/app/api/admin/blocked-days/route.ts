@@ -83,10 +83,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const nextKey = addDaysToDateKey(dateKey, 1);
 
   try {
-    // Merge with any contiguous block so adjacent days collapse into a single
-    // span instead of piling up separate one-day "Busy" events. `before` ends
-    // exactly at D (its last covered day is D-1); `after` starts at D+1. Best
-    // effort: a failed adjacency lookup falls through to a standalone create.
+    // Merge with any contiguous block so adjacent days collapse into one span instead of
+    // piling up one-day "Busy" events. `before` ends exactly at D (last covered day D-1);
+    // `after` starts at D+1. A failed adjacency lookup falls through to a plain create.
     let before: Awaited<ReturnType<typeof listBlockedDayRanges>>[number] | null = null;
     let after: Awaited<ReturnType<typeof listBlockedDayRanges>>[number] | null = null;
     try {

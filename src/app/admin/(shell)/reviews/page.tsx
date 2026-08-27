@@ -129,10 +129,9 @@ export default async function AdminReviewsPage({
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-  // Two reasons to keep someone out of the picker, with two different lifetimes.
-  // A review already left is permanent - there is nothing left to ask for. A
-  // recent send is just a nudge already made, so it lapses after the window and
-  // they become suggestable again rather than being hidden for good.
+  // Two reasons to keep someone out of the picker, with two lifetimes: a review already
+  // left is permanent (nothing left to ask for), while a recent send is just a nudge
+  // already made, so it lapses after the window rather than hiding them for good.
   const reviewedEmails = new Set<string>([
     ...sentContacts.flatMap((c) =>
       c.reviewLinkSubmittedAt && c.email ? [c.email.toLowerCase()] : [],
@@ -253,11 +252,9 @@ export default async function AdminReviewsPage({
     }),
   ].sort((a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime());
 
-  // Summary stats. Computed over the same soft-capped sets loaded above, so at
-  // 1000+ reviews or sends these describe the most recent 1000 rather than all
-  // time - fine at current volume, and the caps move together if that changes.
-  // Legacy rows are sends that predate send-tracking (reviewed by definition),
-  // so counting them would report a conversion rate that flatters itself.
+  // Computed over the same soft-capped sets above, so past 1000 rows these describe the
+  // most recent 1000, not all time. Legacy rows are sends predating send-tracking
+  // (reviewed by definition), so counting them would flatter the conversion rate.
   const trackedSends = linkHistory.filter((e) => e.source !== "Legacy");
   const sentLast30 = trackedSends.filter((e) => new Date(e.sentAt) >= thirtyDaysAgo);
   const reviewedLast30 = sentLast30.filter((e) => e.reviewed).length;

@@ -146,10 +146,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return errorResponse("input must be 1000 characters or fewer", 400);
   }
 
-  // Whitelist the clarification answer keys to the IDs the model is allowed to
-  // ask about (see the CLARIFICATION MODE block in the system prompt). Anything
-  // else is dropped on the floor so a crafted payload can't smuggle synthetic
-  // "[User clarifications: ...]" annotations into the trusted segment.
+  // Whitelist clarification answer keys to the IDs the model may ask about (see
+  // CLARIFICATION MODE in the system prompt). Anything else is dropped, so a crafted
+  // payload can't smuggle synthetic "[User clarifications: ...]" into the trusted segment.
   const ALLOWED_ANSWER_KEYS = new Set(["location", "duration", "tasks"]);
   const safeAnswers: Record<string, string> = {};
   if (answers && typeof answers === "object") {
@@ -251,10 +250,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ ok: true, clarify: parsed.clarify });
     }
 
-    // Descriptions of booked jobs rarely restate the address, so when the AI
-    // found no destination fall back to the calculator's address. From here the
-    // travel branches (and the response's destination echo) treat it exactly
-    // like an operator-typed address; an explicit no-travel parse still wins.
+    // Booked-job descriptions rarely restate the address, so fall back to the calculator's
+    // when the AI found no destination. From here every branch treats it exactly like an
+    // operator-typed address; an explicit no-travel parse still wins.
     if (!parsed.destination && !parsed.noTravelCharge && fallbackDest) {
       parsed.destination = fallbackDest;
     }
@@ -270,11 +268,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         destination: parsed.destination ?? undefined,
       };
     } else if (!parsed.noTravelCharge && parsed.destination) {
-      // Look up both drive legs via Google Distance Matrix, each at its own
-      // departure: outbound at the parsed job start, return at the parsed end
-      // (or start + duration); missing times use the lookup's defaults. Direct
-      // helper call, not a self-fetch - works without NEXT_PUBLIC_BASE_URL and
-      // doesn't burn the public route's rate-limit budget.
+      // Both drive legs at their own departure: outbound at the parsed start, return at
+      // the parsed end (or start + duration). Direct helper call, not a self-fetch - works
+      // without NEXT_PUBLIC_BASE_URL and doesn't burn the public route's rate limit.
       const parsedRanges = parsed.ranges ?? [];
       const departAt = nzTimeToDate(parsed.startTime ?? parsedRanges[0]?.startTime, jobDateAnchor);
       let returnAt = nzTimeToDate(
@@ -350,10 +346,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         if (device && !knownDevices.has(device.toLowerCase())) newTags.add(device);
         if (action && !knownActions.has(action.toLowerCase())) newTags.add(action);
         const snap = findTemplateByTags(device, action, templates);
-        // Billing signals must not print on the invoice line. The prompt
-        // forbids them in details, but the model still echoes speed hints
-        // ("quick") from inputs like "(quick)" - strip them deterministically
-        // and tidy the leftover separators; an emptied details drops to null.
+        // Billing signals must not print on the invoice line. The prompt forbids them, but
+        // the model still echoes speed hints ("quick") back out of inputs like "(quick)" -
+        // strip them deterministically and tidy the separators; an emptied details is null.
         const rawDetails = t.details?.trim() ? t.details.trim() : null;
         const details = rawDetails
           ? rawDetails
@@ -376,11 +371,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             return rate;
           })
           .filter((r): r is RateConfig => r !== null && r.hourlyDelta !== null);
-        // Delivery channels (At home / Remote / Phone) are mutually exclusive -
-        // the prompt says so, but enforce it so a model that stacks them cannot
-        // compound the discounts. Keep the channel with the highest effective
-        // rate; ties keep the first emitted. Matches the DEFAULT label names -
-        // renamed channels bypass this guard.
+        // Delivery channels (At home / Remote / Phone) are mutually exclusive; the prompt
+        // says so, but enforce it so a model stacking them can't compound the discounts.
+        // Highest effective rate wins, ties keep the first. Matches DEFAULT label names,
+        // so a renamed channel bypasses this guard.
         const CHANNEL_LABELS = new Set(["at home", "remote", "phone"]);
         const channels = modifierRates.filter((r) => CHANNEL_LABELS.has(r.label.toLowerCase()));
         const keptChannel = channels.reduce<RateConfig | null>(
@@ -475,10 +469,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         : 0;
     parsed.outOfSessionMins = outOfSessionMins;
 
-    // Wall-clock ceiling: AI sometimes inflates durationMins from its own task
-    // estimates ("9-9:30" but emits 50 min). Cap durationMins to the stated
-    // span plus any out-of-session minutes - gaps only reduce billable time,
-    // never increase it, but work after the session adds on top.
+    // Wall-clock ceiling: the model sometimes inflates durationMins off its own task
+    // estimates ("9-9:30" but emits 50 min). Cap to the stated span plus out-of-session
+    // minutes - gaps only reduce billable time, but work after the session adds on top.
     if (parsed.startTime && parsed.endTime && typeof parsed.durationMins === "number") {
       const [sh, sm] = parsed.startTime.split(":").map(Number);
       const [eh, em] = parsed.endTime.split(":").map(Number);
@@ -507,10 +500,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       const statedTotal = precomputed + outOfSessionMins;
       const cap = Math.min(statedTotal, maxJobMins);
       if (typeof parsed.durationMins === "number" && parsed.durationMins > cap) {
-        // Name the constraint that actually bound. A long-but-real session
-        // ("12pm-12am") is cut by the longest-billable-day ceiling, not by the
-        // model over-reading the ranges - blaming the model there sends the
-        // operator hunting for a parse error that never happened.
+        // Name the constraint that actually bound: a long-but-real session ("12pm-12am")
+        // is cut by the longest-billable-day ceiling, not by a misread range, and blaming
+        // the model sends the operator hunting for a parse error that never happened.
         parsed.warnings = [
           ...(parsed.warnings ?? []),
           cap < statedTotal
@@ -534,13 +526,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       parsed.durationMins = null;
     }
 
-    // Safety net: fit the task quantities to the billable total. Two sets are
-    // pinned and never scaled - `isExplicit` (an operator-stated duration is
-    // exact) and `isShort` (a quick one-shot task cannot absorb a share of a
-    // long session just because time is left over). Only the floating set
-    // moves, and it lands on the billing-increment grid: a bare proportional
-    // multiplier produces quantities like 0.85h (51 min) off a 5-min grid,
-    // which read on the invoice as times nobody worked.
+    // Fit task quantities to the billable total. `isExplicit` (operator-stated, so
+    // exact) and `isShort` (a one-shot task can't absorb a long session's leftovers) are
+    // pinned; only the floating set moves, and it snaps to the billing grid - a bare
+    // proportional multiplier yields quantities like 0.85h that nobody worked.
     if (
       parsed.tasks?.length > 0 &&
       typeof parsed.durationMins === "number" &&
@@ -557,11 +546,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         incMins,
       );
       const targetHours = Math.round((targetMins / 60) * 100) / 100;
-      // Minutes are the billed unit. Snap every task onto the grid up front and
-      // carry qty as those minutes in hours, unrounded - the model emits qty at
-      // 2 dp, which cannot hold a 5-minute step (10 min arrives as 0.17h =
-      // 10.2 min), and that fraction is what stopped a 140-minute job ever
-      // billing 140.
+      // Minutes are the billed unit: snap each task onto the grid up front and carry qty
+      // as minutes-in-hours, unrounded. The model's 2 dp qty can't hold a 5-minute step
+      // (10 min arrives as 0.17h = 10.2 min), and that drift is what stopped a 140-minute
+      // job ever billing 140.
       /**
        * A model-emitted quantity read back as whole minutes on the billing grid,
        * floored at one increment so no task lands at zero.
@@ -596,11 +584,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         const canScaleFloating =
           floatingSumMins > 0 && floatingTargetMins >= floatingIdx.length * incMins;
         if (canScaleFloating) {
-          // Proportional share, floored onto the increment grid with one
-          // increment as the minimum, then the whole-increment remainder goes
-          // to the largest shares first. Mirrors the prompt's subBase +
-          // subLeftover distribution so the model and the server apportion
-          // the same way.
+          // Proportional share floored onto the increment grid (one increment minimum),
+          // then the remainder goes to the largest shares first. Mirrors the prompt's
+          // subBase + subLeftover split so the model and the server apportion identically.
           const multiplier = floatingTargetMins / floatingSumMins;
           const shares = floatingIdx.map(({ t, i }) => {
             const rawMins = (t.minutes ?? 0) * multiplier;
@@ -625,13 +611,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             `Rebalanced floating task quantities to match the ${targetHours}h total (stated and quick-task durations untouched).`,
           ];
         } else {
-          // No floating task can absorb the gap - every task is pinned, or the
-          // pinned set already fills the window. Pinned qtys round UP on the
-          // step grid, so overshoot vs the RAW stated minutes of up to one
-          // step per pinned task is expected. Warn on undershoot vs the
-          // billable target or overshoot beyond that allowance: a residual
-          // nothing can plausibly absorb usually means the window itself is
-          // wrong (a break, or overlapping ranges), not under-estimated tasks.
+          // Nothing floating left to absorb the gap. Pinned qtys round UP on the step
+          // grid, so overshoot of up to one step per pinned task is expected; warn only
+          // outside that. A residual nothing can absorb usually means the window itself
+          // is wrong (a break, overlapping ranges), not that the tasks were too small.
           const pinnedCount = parsed.tasks.filter(isPinned).length;
           const overshoot = Math.round((sumQty - parsed.durationMins / 60) * 100) / 100;
           // A job under the minimum billable time always has tasks summing below

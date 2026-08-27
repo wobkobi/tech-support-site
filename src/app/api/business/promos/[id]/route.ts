@@ -44,14 +44,10 @@ export async function PATCH(
     return errorResponse("Promo not found", 404);
   }
 
-  // Merge the patched fields over the current row and re-validate before writing,
-  // mirroring POST's validatePromo. A sparse PATCH could otherwise leave the promo
-  // in a state POST would reject - both discount fields set, percentDiscount out of
-  // range, or endAt before startAt - which then flows straight into public pricing
-  // ("500% off", $0/hr).
-  // Parse rather than trusting `!== undefined`: a cleared date input sends "",
-  // which becomes an Invalid Date that compares false against everything, so it
-  // would slide past the start-before-end check into Prisma and 500 the update.
+  // Re-validate the MERGED row, not just the patch: a sparse PATCH could otherwise land
+  // a promo POST would reject (both discount fields set, endAt before startAt) straight
+  // into public pricing. Dates are parsed rather than tested for undefined - a cleared
+  // input sends "", and the resulting Invalid Date compares false against everything.
   const startAt = body.startAt !== undefined ? parseDate(body.startAt) : existing.startAt;
   const endAt = body.endAt !== undefined ? parseDate(body.endAt) : existing.endAt;
   if (!startAt || !endAt) {

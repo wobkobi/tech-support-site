@@ -215,10 +215,9 @@ export function EventPickerSection({
   const rowClasses =
     "flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left text-sm";
 
-  // One list, two behaviours. On a blank calculator a row is a button that
-  // loads that job. Once a job is loaded every row becomes a tickbox instead,
-  // with the billed events ticked and listed alongside the rest - so an
-  // accidental merge is undone by unticking it, not by starting over.
+  // One list, two behaviours: on a blank calculator a row is a button that loads the job;
+  // once one is loaded every row becomes a tickbox, billed events ticked, so an accidental
+  // merge is undone by unticking rather than starting over.
   const pickerList = (
     <div className="mt-3 max-h-64 space-y-1 overflow-y-auto">
       {events === null && <p className="text-xs text-slate-400">Loading events…</p>}

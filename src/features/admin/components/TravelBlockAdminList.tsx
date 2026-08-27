@@ -264,10 +264,9 @@ export function TravelBlockAdminList({
           const isSaving = saving === b.id;
           const isEditingOrigin = editingOriginId === b.id;
           const effectiveOrigin = b.customOrigin ?? b.detectedOrigin ?? null;
-          // Past jobs have no live cache and the cron won't revisit them, so the
-          // cache-expiry and "recalculate" hints below are noise - hide them. A
-          // finished job is past by a wide margin, so this stays stable across
-          // SSR + hydration (unlike the sub-minute expiry text it gates).
+          // Past jobs have no live cache and the cron won't revisit them, so the expiry
+          // and "recalculate" hints below are noise. A finished job is past by a wide
+          // margin, so this stays stable across SSR + hydration.
           const isPast = new Date(b.eventEndAt) < new Date();
 
           return (

@@ -36,10 +36,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const ids = expired.map((b) => b.id);
 
     if (ids.length > 0) {
-      // Guard each release on status + expiry so a hold confirmed between the
-      // findMany and this write (slow calendar-create straddling expiry) is not
-      // clobbered back to cancelled. updateMany accepts the non-unique guard;
-      // the per-id activeSlotKey stays unique to satisfy the slot constraint.
+      // Guard each release on status + expiry so a hold confirmed between the findMany and
+      // this write (a slow calendar-create straddling expiry) isn't clobbered back to
+      // cancelled. updateMany takes the non-unique guard; activeSlotKey stays per-id.
       await Promise.all(
         ids.map((id) =>
           prisma.booking.updateMany({

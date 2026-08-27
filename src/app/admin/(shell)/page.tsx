@@ -165,10 +165,9 @@ export default async function AdminPage(): Promise<React.ReactElement> {
       where: { reviewLinkSentAt: { not: null }, deletedAt: null },
       select: { email: true, phone: true },
     }),
-    // Suggestion candidates: only contacts never stamped as sent. Contacts
-    // with reviewLinkSentAt set were always filtered out below, so excluding
-    // them DB-side keeps the scan proportional to actual candidates instead
-    // of the whole table. isSet covers pre-field rows (MongoDB gotcha).
+    // Suggestion candidates: only contacts never stamped as sent. Excluding the rest
+    // DB-side (they were filtered below anyway) keeps the scan proportional to real
+    // candidates. isSet covers pre-field rows.
     prisma.contact.findMany({
       where: {
         deletedAt: null,
@@ -235,10 +234,9 @@ export default async function AdminPage(): Promise<React.ReactElement> {
   ]);
 
   // --- Retainers due this month ---
-  // A retainer client counts as invoiced once an invoice linked by contactId,
-  // issued this month, carries a line item mentioning "retainer". lineItems is
-  // an embedded composite type, so the text match runs in JS - the Mongo
-  // connector can't regex-filter composite string content.
+  // Invoiced = an invoice linked by contactId, issued this month, with a line item
+  // mentioning "retainer". The text match runs in JS: lineItems is an embedded composite
+  // type and the Mongo connector can't regex-filter composite string content.
   let retainersDue: typeof retainerContacts = [];
   if (retainerContacts.length > 0) {
     const monthInvoices = await prisma.invoice.findMany({

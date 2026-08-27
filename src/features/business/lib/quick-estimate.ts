@@ -158,19 +158,17 @@ export async function fetchQuickEstimate(input: QuickEstimateInput): Promise<Qui
     lowEndFloorFactor,
   );
   const travel = calcTravelCharge(travelMins, travelMinsBack, travelRatePerHour, minTravelCharge);
-  // Labour band is the range shown to the customer; travel is a (mostly fixed)
-  // add-on surfaced on its own line rather than folded into the range. The
-  // logged price below stays the all-in total so the booking snapshot is
-  // unchanged.
+  // The labour band is the range shown to the customer; travel is a mostly fixed add-on on
+  // its own line rather than folded in. The logged price below stays the all-in total, so
+  // the booking snapshot is unchanged.
   const low = band.low;
   const high = band.high;
   const totalLow = band.low + travel;
   const totalHigh = band.high + travel;
 
-  // Labour-time band from the same confidence factors that widen the price,
-  // rounded to 5-min steps so the card can show a range ("15 - 30 min") that
-  // lines up with the price range. Travel is not counted here - it's a price
-  // add-on, not time the customer is billed for on-site work.
+  // Labour-time band from the same confidence factors that widen the price, rounded to
+  // 5-min steps so the card's range ("15 - 30 min") lines up with the price range. Travel
+  // is excluded - it's a price add-on, not on-site time.
   const timeBand = estimatorRange[confidence] ?? estimatorRange.medium;
   const minsLow = Math.max(5, Math.round((effectiveMins * timeBand.lowFactor) / 5) * 5);
   const minsHigh = Math.max(minsLow + 5, Math.round((effectiveMins * timeBand.highFactor) / 5) * 5);

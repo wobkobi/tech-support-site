@@ -68,10 +68,9 @@ export async function findOrCreateContactByEmail(
       address: seed.address ?? null,
       addressUnverified: seed.addressUnverified ?? false,
       addressCandidates: seed.addressCandidates ?? [],
-      // Explicit null, not omitted: MongoDB stores no key for an omitted
-      // optional field, and `where: { deletedAt: null }` - the filter every
-      // reader uses - does not match a document where the key is absent. Omit
-      // it and the new contact is invisible to the list, sync, and matchers.
+      // Explicit null, not omitted: Mongo stores no key for an omitted optional field, and
+      // `where: { deletedAt: null }` - the filter every reader uses - won't match an absent
+      // key. Omit it and the new contact is invisible to the list, sync and matchers.
       deletedAt: null,
       googleContactId: seed.googleContactId ?? null,
     },

@@ -1,14 +1,12 @@
 // scripts/eval-ai/cases.ts
-// Static golden cases for the eval harness. Single-task estimate cases are
-// generated from the live benchmarks at runtime (see index.ts); this file holds
-// the authored parse cases, a wide estimate set, and the cross-route set.
+// Static golden cases for the eval harness. Single-task estimate cases are generated from
+// the live benchmarks at runtime (see index.ts); this file holds the authored parse cases,
+// a wide estimate set, and the cross-route set.
 //
-// Parse cases carry only the input - the expected duration is derived from the
-// CANONICAL calcSessionMins(input) at evaluation time, so the auditor and the
-// route read time ranges from one implementation. "exact" cases hard-gate on
-// that canonical total (including deliberately adversarial ones like a bare
-// "9-5" or an injection attempt); "info" cases only assert the run does not
-// crash (no-precompute prose, out-of-session work).
+// Parse cases carry only the input - the expected duration comes from the CANONICAL
+// calcSessionMins(input) at evaluation time, so auditor and route read ranges from one
+// implementation. "exact" cases hard-gate on that total (adversarial ones included, like
+// a bare "9-5" or an injection attempt); "info" cases only assert the run doesn't crash.
 
 /** An authored parse-job case. Expected duration = calcSessionMins(input). */
 export interface ParseCase {
@@ -348,10 +346,9 @@ export const CROSS_ROUTE_CASES: CrossRouteCase[] = [
   },
 ];
 
-// Travel decisions. A job bills ONE round trip or none, and destination +
-// noTravelCharge must always agree. Every case here is one the parser got
-// wrong at some point: silence read as free, a walk hiding a later drive, a
-// warranty errand billed to the client.
+// Travel decisions: a job bills ONE round trip or none, and destination + noTravelCharge
+// must always agree. Every case here is one the parser once got wrong - silence read as
+// free, a walk hiding a later drive, a warranty errand billed to the client.
 export const TRAVEL_CASES: TravelCase[] = [
   {
     id: "travel-unspecified",

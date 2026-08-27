@@ -23,11 +23,9 @@ export function parseBookingNotes(raw: string | null): {
 } {
   if (!raw) return { userNotes: "", meetingType: "", address: "", phone: "" };
 
-  // A metadata-only blob - an operator-entered booking where the customer typed
-  // nothing - opens straight onto the "[...]" block, so there is no "\n\n["
-  // separator to find. Without the startsWith check the whole internal block
-  // (admin marker, meeting type, street address) falls through as `userNotes`
-  // and gets shown back to the customer under "What you told me".
+  // A metadata-only blob (operator-entered, customer typed nothing) opens straight onto
+  // "[...]", so there is no "\n\n[" separator. Without the startsWith check the whole
+  // internal block falls through as `userNotes` and is shown back to the customer.
   const trimmed = raw.trim();
   const metaSeparatorIdx = trimmed.startsWith("[") ? 0 : trimmed.indexOf("\n\n[");
   const userNotes = metaSeparatorIdx === -1 ? trimmed : trimmed.slice(0, metaSeparatorIdx).trim();
@@ -714,11 +712,9 @@ export function validateBookingRequest(
     return { valid: false, error: "This time slot is no longer available" };
   }
 
-  // Enforce the operator's daily caps server-side too - the day grid applies
-  // them when rendering, but a stale page (loaded before the day filled) or a
-  // direct API caller could otherwise book past the limit. Mirrors the
-  // cap logic in buildAvailableDays; for edits the current booking is already
-  // excluded from existingBookings, so it doesn't count against itself.
+  // Enforce the daily caps server-side too: the day grid applies them when rendering, but
+  // a stale page or a direct API caller could book past the limit. Mirrors the cap logic
+  // in buildAvailableDays; on an edit the booking is already out of existingBookings.
   const dayBookings = existingBookings.filter(
     (b) => b.startAt.toLocaleDateString("en-CA", { timeZone: config.timeZone }) === dateKey,
   );

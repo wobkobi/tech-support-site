@@ -234,12 +234,10 @@ function drawHeader(ctx: PdfCtx, invoice: Invoice, logoPaths: LogoPath[]): numbe
     font: ctx.font,
     color: DARK,
   });
-  // Neither quotes nor invoices print the DRAFT/SENT lifecycle: it is internal
-  // bookkeeping, and the customer holding the document already knows it was
-  // sent. A DRAFT stamp on an invoice they have been asked to pay reads as a
-  // mistake. Quotes show their validity date instead; invoices print only the
-  // states that change what the reader should do - PAID, OVERDUE, VOID - and
-  // nothing at all while merely drafted or sent.
+  // The DRAFT/SENT lifecycle is internal bookkeeping and never printed - a DRAFT stamp on
+  // an invoice someone has been asked to pay reads as a mistake. Invoices show only the
+  // states that change what the reader should do (PAID, OVERDUE, VOID); quotes show their
+  // validity date instead.
   const statusText = invoice.isQuote
     ? invoice.status === "VOIDED"
       ? "VOID"

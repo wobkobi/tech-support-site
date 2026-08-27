@@ -64,10 +64,8 @@ export default async function AdminSchedulePage({
   // fallback. Falls through to today's week when neither is provided.
   const resolvedWeekStartParam = day && /^\d{4}-\d{2}-\d{2}$/.test(day) ? mondayOf(day) : weekStart;
   const weekStartDate = resolveWeekStart(resolvedWeekStartParam, now);
-  // Prefetch BUFFER_WEEKS weeks either side of the requested week so the
-  // mobile agenda can step day-by-day and the desktop grid can chevron
-  // week-by-week without a server round-trip until the user walks past the
-  // buffer.
+  // Prefetch BUFFER_WEEKS either side so the mobile agenda can step day-by-day and the
+  // desktop grid week-by-week without a round-trip until the user walks past the buffer.
   const bufferStartDate = addDays(weekStartDate, -BUFFER_DAYS_BEFORE);
   const bufferEndDate = addDays(weekStartDate, BUFFER_DAYS_AFTER);
   // Hoisted so the event fetch and the auto-refresh poll share byte-identical
@@ -80,10 +78,9 @@ export default async function AdminSchedulePage({
   const carCalId = process.env.CAR_CALENDAR_ID ?? process.env.WORK_CALENDAR_ID ?? "";
   const personalCalId = process.env.PERSONAL_CALENDAR_ID ?? "";
 
-  // Live calendar fetch covers all configured calendars for the 3-week
-  // buffer so day-stepping across the visible-week boundary stays client-
-  // side. Travel blocks queried separately because synthetic cache entries
-  // don't carry their parent context.
+  // All configured calendars across the 3-week buffer, so day-stepping over the
+  // visible-week boundary stays client-side. Travel blocks are queried separately -
+  // synthetic cache entries don't carry their parent context.
   const [rawEvents, travelBlocks] = await Promise.all([
     getCachedScheduleEvents(bufferStartIso, bufferEndIso).catch(() => []),
     prisma.travelBlock.findMany({
@@ -121,10 +118,9 @@ export default async function AdminSchedulePage({
     return "personal";
   }
 
-  // Enrich booking-kind events with their Booking row so the day agenda can
-  // expand to show customer details + drive quick-action mutations from the
-  // card. Only joined for calendar events that came from the booking
-  // calendar; travel/personal/car events have no matching row.
+  // Join booking-kind events to their Booking row so the day agenda can expand customer
+  // details and drive quick actions from the card. Only booking-calendar events have a
+  // matching row; travel/personal/car ones don't.
   const bookingCalEventIds = rawEvents
     .filter((e) => e.calendarEmail === bookingCalId)
     .map((e) => e.id);
@@ -182,13 +178,10 @@ export default async function AdminSchedulePage({
     });
   }
 
-  // Anchor each travel leg to its event's CURRENT times (matched by sourceEventId),
-  // not the times cached on the block. The operator edits event ends to the actual
-  // finish, so a block can carry a stale end until the travel cron recomputes -
-  // anchoring live keeps the leg flush against the event instead of stranded inside
-  // another one (a travel bar must never land in the middle of an event). Blocks
-  // whose event is gone are dropped as orphans. Rounded minutes may lag by one cron
-  // cycle, so a leg's length can be slightly off until then, but its POSITION is right.
+  // Anchor each leg to its event's CURRENT times (via sourceEventId), not the block's
+  // cached ones: the operator edits event ends to the actual finish, so a stale cached
+  // end would strand the travel bar inside another event. Length can lag a cron cycle
+  // behind the real minutes; position never does.
   const rawEventById = new Map(rawEvents.map((e) => [e.id, e]));
 
   for (const b of travelBlocks) {
@@ -221,10 +214,9 @@ export default async function AdminSchedulePage({
     }
   }
 
-  // Holiday lookups span the full buffered window so the agenda can show
-  // holiday badges across the prefetched range without another fetch. One
-  // batched read covers the whole window (the per-day variant costs a DB
-  // round-trip per buffered day).
+  // Span the full buffered window so holiday badges render across the prefetched range
+  // without another fetch. One batched read - the per-day variant costs a DB round-trip
+  // per buffered day.
   const bufferedDayKeys: string[] = [];
   for (let i = -BUFFER_DAYS_BEFORE; i < BUFFER_DAYS_AFTER; i++) {
     bufferedDayKeys.push(nzDateKey(addDays(weekStartDate, i)));

@@ -244,11 +244,10 @@ export async function reconcileBookingTimes(options: {
       const startAt = new Date(lookup.event.start);
       const endAt = new Date(lookup.event.end);
 
-      // Both send stamps are one-way, so a booking whose times have changed
-      // carries stamps describing a date it no longer has and is skipped by both
-      // crons forever. Checked against the times themselves, not against whether
-      // this pass moved anything: a row corrected by an earlier run has matching
-      // times and stale stamps, and a drift-gated check would never reach it.
+      // Both send stamps are one-way, so a booking whose times moved carries stamps for a
+      // date it no longer has and is skipped by both crons forever. Checked against the
+      // times, not against whether this pass moved anything - a row an earlier run already
+      // corrected has matching times and stale stamps, which a drift gate would miss.
       const stamps = staleSendStamps(booking, startAt, endAt, now);
       const clearStamps = {
         ...(stamps.includes("reminder") ? { emailReminderSentAt: null } : {}),

@@ -167,10 +167,9 @@ export function TravelSection({
                       step="0.01"
                       value={entry.cost || ""}
                       onPaste={(e) => {
-                        // Only intercept when the clipboard carries a "$",
-                        // commas, or other junk; plain numeric pastes fall
-                        // through to the native number input so decimal entry
-                        // stays unaffected.
+                        // Only intercept clipboard text carrying "$", commas
+                        // or other junk; a plain numeric paste falls through to
+                        // the native number input so decimal entry is unaffected.
                         const text = e.clipboardData.getData("text");
                         if (!/[^\d.]/.test(text)) return;
                         const value = parseMoney(text);

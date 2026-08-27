@@ -82,16 +82,10 @@ export async function POST(
   // settled - and acknowledged - months ago.
   const sendApology = typeof body.sendApology === "boolean" ? body.sendApology : !alreadyPaid;
 
-  // Atomic claim: stamp the payment only where paidAt is still empty. Covers a
-  // fresh payment (status flips to PAID) and a backfill onto a legacy PAID row
-  // (paidAt still empty). A concurrent double-click or a re-pay finds paidAt
-  // already set > count 0 > returns current state without a second income row.
-  //
-  // "Empty" must match BOTH an explicit null AND a missing field: on the
-  // schemaless Mongo store, invoices created before paidAt existed (and any the
-  // driver never wrote a null for) simply have no paidAt key. Prisma compiles a
-  // bare `paidAt: null` to "exists AND is null" ($ne $$REMOVE), which silently
-  // skips those rows - so OR in an isSet:false arm to catch the absent-key case.
+  // Atomic claim: stamp only where paidAt is still empty, so a double-click or a re-pay
+  // hits count 0 and never writes a second income row. "Empty" must match an explicit
+  // null AND a missing key - Prisma compiles a bare `paidAt: null` to "exists AND is
+  // null" ($ne $$REMOVE), which silently skips rows written before paidAt existed.
   const claim = await prisma.invoice.updateMany({
     where: { id, OR: [{ paidAt: null }, { paidAt: { isSet: false } }] },
     data: { status: "PAID", paidAt, paymentMethod: method, paymentReference: reference },
@@ -175,10 +169,9 @@ export async function POST(
   // Re-sync the PAID-watermarked PDF to Drive (awaited; best-effort).
   await syncInvoicePdfToDriveById(id, "[invoice-pay]");
 
-  // Apologise when a reminder chased money that had already arrived. Re-checked
-  // here rather than trusted from the body, and best-effort like the Drive sync:
-  // a failed send leaves apologySentAt null (retryable) and never unwinds the
-  // recorded payment.
+  // Apologise when a reminder chased money that had already arrived. Re-checked here
+  // rather than trusted from the body, and best-effort: a failed send leaves apologySentAt
+  // null (retryable) and never unwinds the recorded payment.
   let apologySent = false;
   if (
     sendApology &&

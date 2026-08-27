@@ -249,19 +249,14 @@ export interface AdditionalAsset {
   plateRadius?: number;
 }
 
-// public/assets/email-signature-400x135.png is deliberately absent from this
-// list and must not be deleted. Emails already delivered hotlink it and fetch it
-// when the recipient opens them, so the file has to keep resolving even though
-// nothing generates it any more. build:icons only writes, never prunes, so an
-// orphan here is stable.
+// public/assets/email-signature-400x135.png is deliberately absent from this list and must
+// not be deleted: already-delivered emails hotlink it and fetch it on open, so it has to
+// keep resolving. build:icons only writes, never prunes, so the orphan is stable.
 export const ADDITIONAL_ASSETS: AdditionalAsset[] = [
-  // Email signature logo, used both inside the app's emails and pasted into a
-  // mail client's own signature setting. Carries its own white plate: the app's
-  // cards are white so it is invisible there, but a client in dark mode would
-  // otherwise leave the deep-navy mark unreadable. 280px because a mail client
-  // renders a pasted signature at natural width, and anything wider than an
-  // iPhone compose viewport gets a horizontal scrollbar; that is also exactly 2x
-  // the 140px the templates display it at.
+  // Email signature logo, for the app's emails and for pasting into a mail client's own
+  // signature. Carries a white plate so the deep-navy mark stays readable in a dark-mode
+  // client. 280px because a pasted signature renders at natural width and anything wider
+  // than an iPhone compose viewport gets a scrollbar - also exactly 2x the 140px display.
   {
     name: "email-signature-280x95",
     width: 280,
@@ -307,18 +302,16 @@ export interface BackdropVariant {
 }
 
 export const BACKDROP_VARIANTS: BackdropVariant[] = [
-  // Primary backdrop served to AVIF-capable browsers via <picture>. The image
-  // is a full-viewport, heavily-blurred (radius 35) decorative backdrop scaled
-  // 110%, so 1440px upscales invisibly on wide screens while ~quartering the
-  // byte cost of a 2560px source. q90 + effort=9 stays visually lossless.
+  // Primary backdrop for AVIF-capable browsers via <picture>. Heavily blurred (radius 35)
+  // and scaled 110%, so 1440px upscales invisibly on wide screens at roughly a quarter the
+  // bytes of a 2560px source. q90 + effort=9 stays visually lossless.
   { name: "backdrop-blur", width: 1440, quality: 90, format: "avif" },
   // WebP fallback for iOS 15 / older Safari (iPhone 7 etc.) - no AVIF support
   // there. Higher quality since the audience that hits this is small.
   { name: "backdrop-blur", width: 1440, quality: 90, format: "webp" },
-  // JPEG fallback for the static old-browser page (public/legacy.html). High
-  // Sierra Safari and other ancient browsers decode neither AVIF nor WebP, so
-  // the fallback page needs a universally-decodable backdrop. Smaller width +
-  // lower quality since it is heavily blurred and serves low-spec devices.
+  // JPEG fallback for the static old-browser page (public/legacy.html): High Sierra
+  // Safari and friends decode neither AVIF nor WebP. Smaller and lower quality, since it
+  // is heavily blurred and serves low-spec devices.
   { name: "backdrop-blur", width: 1280, quality: 80, format: "jpeg" },
 ];
 

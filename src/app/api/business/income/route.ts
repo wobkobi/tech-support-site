@@ -75,10 +75,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     invoiceId,
   });
 
-  // sheetSyncWarning has to reach the client: recordIncome swallows a Cashbook
-  // append failure so the entry still saves, and dropping the flag here reported
-  // a clean 201 for a payment that never made it to the sheet. The sibling
-  // expenses route returns it, and the UI already renders the warning toast.
+  // sheetSyncWarning has to reach the client: recordIncome swallows a Cashbook append
+  // failure so the entry still saves, and dropping the flag here reports a clean 201 for a
+  // payment that never reached the sheet. The expenses route returns it too.
   return NextResponse.json(
     { ok: true, entry: { ...entry, sheetRowKey }, sheetSyncWarning },
     { status: 201 },

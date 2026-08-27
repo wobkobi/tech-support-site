@@ -1,18 +1,14 @@
 // scripts/reconcile-booking-times.ts
-// Reports (and optionally applies) the difference between each booking's stored
-// times and its live Google Calendar event. Reads the booking calendar and the
-// live database, so it costs Calendar quota and needs .env.local.
+// Reports (and optionally applies) the difference between each booking's stored times and
+// its live Google Calendar event. Reads the booking calendar and the live database, so it
+// costs Calendar quota and needs .env.local.
 // Run with: npm run reconcile:times:dry      (writes nothing)
 //           npm run reconcile:times:apply    (writes)
 //
-// Two scripts rather than one plus a flag, because getting the flag through is
-// the failure everyone hits: PowerShell 5.1 strips a bare `--` before npm sees
-// it, npm then reads what follows as its own config, and the flag never reaches
-// this script. `npm run reconcile:times:dry -- --apply` therefore runs a DRY RUN
-// that reads exactly like a successful apply. Quote the separator for the flags
-// that have no script of their own:
-//           npm run reconcile:times:dry '--' --days 120
-// From bash (including the git hooks) the bare `--` is fine.
+// Two scripts rather than one plus a flag: PowerShell 5.1 strips a bare `--` before npm
+// sees it, so `npm run reconcile:times:dry -- --apply` silently runs a DRY RUN that reads
+// exactly like a successful apply. Quote the separator for flags with no script of their
+// own - `npm run reconcile:times:dry '--' --days 120`. From bash the bare `--` is fine.
 
 import { reconcileBookingTimes } from "@/features/calendar/lib/reconcile-booking-times";
 import { formatDateTimeShort } from "@/shared/lib/date-format";

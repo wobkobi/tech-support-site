@@ -1,8 +1,6 @@
 // scripts/eval-ai/index.ts
-// On-demand eval harness for the two AI routes. Black-box tests estimate-duration
-// and parse-job against a running dev server. Run with `npm run eval:ai` (needs
-// `npm run dev` in another terminal). `--self-test` runs the network-free
-// pure-logic checks only.
+// On-demand eval harness for the two AI routes: black-box tests estimate-duration and
+// parse-job against a running dev server (`npm run dev` in another terminal).
 //
 // Usage:
 //   npm run eval:ai -- --self-test        # pure checks, no server, no API calls
@@ -399,14 +397,11 @@ function evaluate(ctx: LiveContext, raw: RawRun[]): CheckResult[] {
               : `durationMins=${first} (canonical ${canonical})`,
         });
       } else {
-        // Two things the raw canonical does not account for. The route caps
-        // durationMins at the longest-billable-day ceiling, so a 12h or 19h
-        // stated session legitimately comes back capped (the cross-route check
-        // below already reads ctx.maxJobMins for the same reason). And the
-        // collector stores an absent durationMins as -1 to keep `durations` a
-        // number[], so a canonical of null - "these ranges state no duration" -
-        // must be compared against that sentinel, not against null itself.
-        // No minimum or increment is applied: durationMins is worked minutes,
+        // Two things the raw canonical misses. The route caps durationMins at the
+        // longest-billable-day ceiling, so a 12h or 19h stated session legitimately comes
+        // back capped. And the collector stores an absent durationMins as -1 to keep
+        // `durations` a number[], so a canonical null compares against that sentinel, not
+        // against null. No minimum or increment applies - durationMins is worked minutes,
         // and the billing floor lands on task qty instead.
         const expected = canonical === null ? -1 : Math.min(canonical, ctx.maxJobMins);
         /**
@@ -573,12 +568,10 @@ function printReport(checks: CheckResult[]): void {
     const artifact = path.join(dir, `run-${started.replace(/[:.]/g, "-")}.json`);
     fs.writeFileSync(artifact, JSON.stringify({ started, runs, checks, raw }, null, 2));
 
-    // The deterministic asserts gate the exit code: context (stated-time
-    // exactness, min-billable floor, increment) and travel (which single trip
-    // the job bills). Both are branch decisions with one right answer, not
-    // model taste. Reproducibility is a soft, reported signal - a hosted LLM is
-    // never bit-for-bit reproducible, so a run-to-run spread is surfaced as a
-    // warning, not a build failure.
+    // The deterministic asserts gate the exit code: context (stated-time exactness,
+    // min-billable floor, increment) and travel (which single trip the job bills) are
+    // branch decisions with one right answer, not model taste. Reproducibility is soft -
+    // a hosted LLM is never bit-for-bit reproducible, so a spread warns, never fails.
     const hardFailed = checks.filter(
       (c) => c.status === "fail" && (c.family === "context" || c.family === "travel"),
     );
@@ -605,10 +598,9 @@ function printReport(checks: CheckResult[]): void {
     );
     process.exit(hardFailed.length === 0 ? 0 : 1);
   } catch (err) {
-    // Print the diagnostic message the client built (route, status, hint) as a
-    // single clean line - no stack trace - then exit non-zero. Catching here
-    // also avoids the abrupt unhandled-rejection teardown that trips a libuv
-    // assertion on Windows.
+    // Print the client's diagnostic (route, status, hint) as one clean line, no stack
+    // trace, then exit non-zero. Catching here also avoids the unhandled-rejection
+    // teardown that trips a libuv assertion on Windows.
     const message = err instanceof Error ? err.message : String(err);
     console.error(`\n\x1b[31m✗ eval run failed\x1b[0m\n  ${message}\n`);
     process.exit(1);

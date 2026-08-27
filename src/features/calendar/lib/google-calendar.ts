@@ -468,11 +468,9 @@ export async function fetchAllCalendarEventsDetailed(
   const perCalendarResults = await Promise.all(
     calendarIds.map(async (calendarId): Promise<CalendarEvent[] | null> => {
       try {
-        // Page through the calendar: events.list caps a page at 2500 (default 250)
-        // and returns nextPageToken when truncated. Without the loop a busy
-        // calendar (recurring series expanded by singleEvents over the booking
-        // horizon) would silently drop events past the first page, leaving those
-        // times treated as free.
+        // Page through the calendar: events.list caps a page at 2500 (default 250) and
+        // returns nextPageToken when truncated. Without the loop a busy calendar would
+        // silently drop events past page one, leaving those times treated as free.
         const events: calendar_v3.Schema$Event[] = [];
         let pageToken: string | undefined;
         do {
