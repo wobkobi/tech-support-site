@@ -387,11 +387,10 @@ async function checkPage(
 
   try {
     if (remote) {
-      // Remote deployment: scope auth + Vercel protection-bypass headers to the
-      // deployment origin via request interception, so the admin secret is
-      // never sent to third-party hosts (maps, fonts, the Meta pixel). The
-      // bypass header rides EVERY origin request (public pages sit behind the
-      // SSO wall too); the admin secret only rides admin specs.
+      // Remote deployment: scope auth and bypass headers to the deployment origin, so the
+      // admin secret never reaches third-party hosts (maps, fonts, the Meta pixel). The
+      // bypass header rides EVERY origin request - public pages sit behind the SSO wall
+      // too - while the admin secret rides admin specs only.
       await page.setRequestInterception(true);
       page.on("request", (req) => {
         const headers = { ...req.headers() };
@@ -432,10 +431,9 @@ async function checkPage(
       errors.push(`[pageerror] ${text}`);
     });
 
-    // Capture console.error output. React 19 hydration mismatches,
-    // error-boundary logging, and app-level console.error land on this channel
-    // (not pageerror), so a page can look fine to the checks above yet still be
-    // broken. Filter the same known-missing URLs and per-page ignores.
+    // React 19 hydration mismatches, error-boundary logging and app-level console.error
+    // land on this channel, not pageerror, so a page can pass the checks above and still
+    // be broken. The same known-missing URLs and per-page ignores are filtered.
     page.on("console", (msg) => {
       if (msg.type() !== "error") return;
       const text = msg.text();
@@ -443,14 +441,11 @@ async function checkPage(
       if (IGNORE_404_URLS.some((s) => text.includes(s) || locUrl.includes(s))) return;
       if (IGNORE_CONSOLE_GLOBAL.some((s) => text.includes(s) || locUrl.includes(s))) return;
       if (spec.ignoreErrors?.some((s) => text.includes(s) || locUrl.includes(s)) ?? false) return;
-      // Deployment Protection bounces browser-initiated sub-resource fetches that
-      // carry neither the primed cookie nor the interception header. <link
-      // rel="manifest"> is the case that bites: the browser fetches it with
-      // credentials omitted (no crossorigin attribute), and being browser- rather
-      // than renderer-initiated it is not reliably interceptable, so the wall
-      // redirects it until Chrome gives up. Only reachable against a protected
-      // remote, so a genuine redirect loop still fails locally and on any public
-      // deployment.
+      // Deployment Protection bounces browser-initiated sub-resource fetches carrying
+      // neither the primed cookie nor the interception header. <link rel="manifest"> is
+      // the case that bites: the browser fetches it with credentials omitted and, being
+      // browser- rather than renderer-initiated, it is not reliably interceptable, so the
+      // wall redirects until Chrome gives up. Only reachable against a protected remote.
       if (
         remote?.bypassSecret &&
         text.includes("ERR_TOO_MANY_REDIRECTS") &&
@@ -614,10 +609,9 @@ function printTable(results: PageResult[]): void {
     // automatically - no manual list to maintain.
     const { publicPages, adminPages } = discoverPages();
 
-    // Admin pages are only included when ADMIN_SECRET is set; the secret rides
-    // along as the X-Admin-Secret header (attached inside checkPage). Without
-    // the secret the proxy redirects every admin page to /admin/login, which
-    // would just measure the login page repeatedly - skip them instead.
+    // Admin pages need ADMIN_SECRET, which rides along as the X-Admin-Secret header
+    // (attached inside checkPage). Without it the proxy redirects every admin page to
+    // /admin/login, which would just measure the login page repeatedly.
     const adminToken = process.env.ADMIN_SECRET;
     const adminPagesAuthed: PageSpec[] = adminToken
       ? adminPages.map((spec) => ({ ...spec, isAdmin: true }))

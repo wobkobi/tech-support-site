@@ -4,6 +4,7 @@
  * Column layout matches the format produced by Google Contacts own export tool.
  */
 
+import { splitName } from "@/features/contacts/lib/split-name";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
@@ -27,19 +28,6 @@ function csvCell(value: string | null | undefined): string {
     str = `'${str}`;
   }
   return `"${str.replace(/"/g, '""')}"`;
-}
-
-/**
- * Splits a full display name into first and last name parts.
- * Everything before the last word is the first name; the last word is the last name.
- * @param fullName - Full display name.
- * @returns Object with first and last name strings.
- */
-function splitName(fullName: string): { first: string; last: string } {
-  const parts = (fullName ?? "").trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return { first: "", last: "" };
-  if (parts.length === 1) return { first: parts[0], last: "" };
-  return { first: parts.slice(0, -1).join(" "), last: parts[parts.length - 1] };
 }
 
 /**
@@ -124,7 +112,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   // Build one row per contact
   const rows = contacts.map((c, idx) => {
-    const { first, last } = splitName(c.name);
+    const { givenName: first, familyName: last } = splitName(c.name);
     const emails = emailLists[idx];
     const phones = phoneLists[idx];
 

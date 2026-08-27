@@ -1,21 +1,17 @@
 // scripts/check-email-render.ts
-// Renders outbound emails through their real send functions and asserts the HTML
-// and the derived text/plain part both come out intact. Global fetch is stubbed
-// at the Resend transport, so nothing is delivered and no API quota is spent.
-// Fixtures carry hostile input (tags, entities, a URL) so the escaping and the
-// anchor rewrite are exercised rather than assumed.
+// Renders outbound emails through their real send functions and asserts the HTML and the
+// derived text/plain part both survive. fetch is stubbed at the Resend transport, so
+// nothing is delivered and no quota is spent, and the fixtures carry hostile input (tags,
+// entities, a URL) so escaping and the anchor rewrite are exercised, not assumed.
 //
-// Scope: only the sends that do NOT read settings run here. getSettings wraps its
-// query in unstable_cache, which needs a Next request context, so the eleven
-// settings-dependent sends throw "incrementalCache missing" outside the server.
-// Those are covered interactively by the preview routes instead:
-// /api/admin/preview-review-email and /api/business/invoices/[id]/preview-email.
+// Only sends that do NOT read settings run here: getSettings wraps its query in
+// unstable_cache, which needs a Next request context, so the eleven settings-dependent
+// sends throw "incrementalCache missing" outside the server. The preview routes cover
+// those (/api/admin/preview-review-email, /api/business/invoices/[id]/preview-email).
 //
-// The --conditions flag is required, not optional: email.ts pulls in
-// pricing-policy.server.ts, which imports `server-only`. That package's exports
-// map resolves to a module that throws on the default condition and to an empty
-// one under `react-server`, which is the condition Next builds with. Without the
-// flag every run dies on "cannot be imported from a Client Component module".
+// --conditions is required, not optional: email.ts reaches pricing-policy.server.ts,
+// which imports `server-only` - a package that throws on the default condition and is
+// empty under `react-server`, the condition Next builds with.
 // Run with:
 //   npx dotenv -e .env.local -- tsx --conditions=react-server scripts/check-email-render.ts
 

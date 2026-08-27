@@ -1,10 +1,8 @@
 // src/features/business/lib/sheets-import.ts
-// Sheet > site reconciliation for the Cashbook (income) and Expenses tabs. The
-// sheet is the source of truth: rows match DB entries by the hidden column-Z
-// Sync ID, differing fields update the DB, unmatched rows are (re)created, and
-// manually-typed rows get a Sync ID backfilled. runSheetsImport also self-heals
-// site entries whose sheet append failed, and takes a Setting-backed lock so
-// overlapping runs cannot double-write.
+// Sheet > site reconciliation for the Cashbook (income) and Expenses tabs. The sheet is
+// the source of truth: rows join to DB entries on the hidden column-Z Sync ID, differing
+// fields update the DB, unmatched rows are (re)created, manually-typed rows get a Sync ID
+// backfilled. Also self-heals entries whose sheet append failed, under a Setting lock.
 import { calcGstFromInclusive } from "@/features/business/lib/business";
 import { listSpreadsheetsInFolder } from "@/features/business/lib/google-drive";
 import { withRetry } from "@/features/business/lib/google-retry";
@@ -18,14 +16,12 @@ import {
 } from "@/features/business/lib/sheets-sync";
 import { parseObjectId } from "@/features/business/lib/validation";
 import { prisma } from "@/shared/lib/prisma";
+import { acquireRunLock, releaseRunLock } from "@/shared/lib/run-lock";
 import type { ExpenseEntry, IncomeEntry } from "@prisma/client";
 import { randomUUID } from "crypto";
 
 /** Setting key for the run lock shared by the cron and the manual import. */
 const LOCK_KEY = "sync-sheets-lock";
-
-/** A lock older than this is considered stale (crashed run) and is stolen. */
-const LOCK_TTL_MS = 10 * 60_000;
 
 /** Column Z (0-indexed 25) carries the Sync ID; must match sheets-sync.ts. */
 const SYNC_ID_COLUMN_INDEX = 25;
@@ -286,11 +282,10 @@ async function importFromSheet(
 
     try {
       if (syncId) {
-        // A duplicate Sync ID within this run is a copy-pasted sheet row. If the
-        // second row's data matches the first, it's a machine copy (a retried
-        // append, or an unedited paste) and skipping avoids double-counting. If
-        // it differs materially, it's a real second transaction that copied the
-        // hidden id - mint a fresh id and import it.
+        // A duplicate Sync ID within one run is a copy-pasted sheet row. Identical data
+        // means a machine copy (retried append, unedited paste) - skip it rather than
+        // double-count. Different data is a real second transaction that carried the
+        // hidden id along, so mint a fresh one and import it.
         if (state.seenSyncIds.has(syncId)) {
           const first = state.incomeByKey.get(syncId);
           if (!first || !incomeDiffers(first, data)) {
@@ -324,12 +319,10 @@ async function importFromSheet(
             incomeSkipped++;
           }
         } else {
-          // No snapshot match. The snapshot is taken at run start, so an entry
-          // created mid-run (e.g. an invoice /pay whose sheet row carries the
-          // entry id as its Sync ID) is invisible here. Look it up live by id
-          // before creating a DUPLICATE - a deterministic Sync ID equals the
-          // entry's Mongo id, so a hit means "already recorded - just link it".
-          // Gate on the ObjectId shape; a legacy UUID would throw on findUnique.
+          // The snapshot is taken at run start, so an entry created mid-run (an invoice
+          // /pay, say) is invisible here. A deterministic Sync ID equals the entry's Mongo
+          // id, so look it up live before creating a DUPLICATE. Gated on the ObjectId
+          // shape - a legacy UUID would throw on findUnique.
           const idLink = parseObjectId(syncId)
             ? await prisma.incomeEntry.findUnique({ where: { id: syncId } })
             : null;
@@ -551,44 +544,6 @@ async function importFromSheet(
 }
 
 /**
- * Attempts to take the run lock; a lock older than {@link LOCK_TTL_MS} is
- * treated as left behind by a crashed run and stolen.
- * @returns True when the lock was acquired.
- */
-async function acquireSyncLock(): Promise<boolean> {
-  const nowIso = new Date().toISOString();
-  const staleThreshold = new Date(Date.now() - LOCK_TTL_MS).toISOString();
-  // Compare-and-set: atomically steal a stale lock. The value is an ISO
-  // timestamp, which sorts chronologically, so `value < staleThreshold` means
-  // older than the TTL. updateMany is a single atomic op per document, so two
-  // concurrent runs can't both match - after the first stamps `nowIso`, the
-  // row no longer satisfies the second's stale filter.
-  const stolen = await prisma.setting.updateMany({
-    where: { key: LOCK_KEY, value: { lt: staleThreshold } },
-    data: { value: nowIso },
-  });
-  if (stolen.count === 1) return true;
-  // Nothing stale to steal: either a fresh lock holds it, or no lock exists.
-  // Try to create the row - the unique `key` index makes concurrent creates
-  // race-safe (only one wins; the loser throws and returns false).
-  try {
-    await prisma.setting.create({ data: { key: LOCK_KEY, value: nowIso } });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/** Releases the run lock. Never throws - a leftover lock expires via TTL. */
-async function releaseSyncLock(): Promise<void> {
-  try {
-    await prisma.setting.deleteMany({ where: { key: LOCK_KEY } });
-  } catch (err) {
-    console.warn("[sheets-import] Failed to release sync lock:", err);
-  }
-}
-
-/**
  * Appends site entries that never made it to a sheet (append failed at create
  * time). Only entries younger than {@link SELF_HEAL_MAX_AGE_MS} are appended -
  * older unlinked rows predate the Sync ID rollout or reflect sheet-side
@@ -602,10 +557,9 @@ async function healUnsyncedEntries(warnings: string[], errors: string[]): Promis
   let healed = 0;
   const cutoff = new Date(Date.now() - SELF_HEAL_MAX_AGE_MS);
 
-  // `sheetRowKey: null` alone finds nothing: recordIncome/recordExpense omit the
-  // field on create, so Mongo stores no key at all, and Prisma compiles a bare
-  // null to "exists AND is null". The OR catches the unset shape as well - which
-  // is every entry this self-heal exists to rescue.
+  // `sheetRowKey: null` alone finds nothing: recordIncome/recordExpense omit the field on
+  // create, so Mongo stores no key and Prisma compiles a bare null to "exists AND is
+  // null". The OR catches the unset shape - which is every entry this self-heal rescues.
   const unsyncedFilter = {
     OR: [{ sheetRowKey: null }, { sheetRowKey: { isSet: false } }],
   };
@@ -690,7 +644,7 @@ export async function runSheetsImport(dryRun: boolean): Promise<ImportResult> {
     expensesSkipped: 0,
   };
 
-  if (!dryRun && !(await acquireSyncLock())) {
+  if (!dryRun && !(await acquireRunLock(LOCK_KEY))) {
     return { ok: false, locked: true, ...zero, errors: ["Another sync run holds the lock"] };
   }
 
@@ -768,12 +722,10 @@ export async function runSheetsImport(dryRun: boolean): Promise<ImportResult> {
     if (!dryRun) {
       result.healed = await healUnsyncedEntries(warnings, result.errors);
 
-      // Log-only existence check: a linked DB entry whose Sync ID appeared in
-      // no scanned sheet means its row was deleted sheet-side. Under
-      // sheet-wins that entry should go too, but auto-deleting on a partial
-      // scan would be destructive - so surface it and leave the decision to
-      // the operator. Skipped when any sheet failed to load (folder mode) or
-      // when only one workbook was scanned (single mode misses other FYs).
+      // Log-only: a linked entry whose Sync ID appeared in no scanned sheet had its row
+      // deleted sheet-side. Sheet-wins says delete it too, but auto-deleting off a partial
+      // scan is destructive, so leave the call to the operator. Skipped when a sheet
+      // failed to load, or when only one workbook was scanned (other FYs missed).
       if (folderId && allSheetsClean) {
         for (const [key, entry] of state.incomeByKey) {
           if (!state.seenSyncIds.has(key)) {
@@ -798,6 +750,6 @@ export async function runSheetsImport(dryRun: boolean): Promise<ImportResult> {
     }
     return result;
   } finally {
-    if (!dryRun) await releaseSyncLock();
+    if (!dryRun) await releaseRunLock(LOCK_KEY);
   }
 }

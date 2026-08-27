@@ -35,6 +35,7 @@ import {
   todayISO,
   type JobPricing,
 } from "@/features/business/lib/business";
+import { INCOME_METHODS } from "@/features/business/lib/constants";
 import {
   assessCancellation,
   calcTravelCharge,
@@ -356,11 +357,10 @@ export function CalculatorView({
 }: CalculatorViewProps): React.ReactElement {
   const router = useRouter();
 
-  // Draft restore runs in the mount effect below - reading localStorage during
-  // render made server HTML and client hydration disagree whenever a draft
-  // existed. State initialises to server-consistent defaults.
-  // True when a meaningful draft was restored; readable inside async .then()
-  // callbacks without being a React dependency.
+  // Draft restore runs in the mount effect below: reading localStorage during render made
+  // server HTML and hydration disagree. State starts at server-consistent defaults.
+  // The ref reads true once a meaningful draft was restored, and is usable inside async
+  // .then() callbacks without becoming a React dependency.
   const draftLoadedRef = useRef(false);
   // Captured once to keep timeAgo() pure for the toast label.
   const [mountedAt] = useState(() => Date.now());
@@ -383,11 +383,9 @@ export function CalculatorView({
   // Out-of-session work (a call after the visit, a remote fix later) billed on
   // top of the slot sum. The AI parse seeds it from outOfSessionMins.
   const [followUpMins, setFollowUpMins] = useState(0);
-  // Every travel charge (auto-lookup + any manual entries) lumped together.
-  // jobToLineItems sums them into one "Round-trip travel" invoice line. An event
-  // prefill seeds the entry from the drive prediction made for the event's
-  // ACTUAL window (frozen TravelBlock / booking snapshot) - a fresh lookup on
-  // a past job could only quote tomorrow's traffic, not that day's.
+  // Every travel charge (auto-lookup + manual) together; jobToLineItems sums them into
+  // one "Round-trip travel" line. An event prefill seeds from the frozen TravelBlock /
+  // booking snapshot - a fresh lookup on a past job could only quote tomorrow's traffic.
   const [travelEntries, setTravelEntries] = useState<TravelEntry[]>(() => {
     if (!eventPrefill?.travelMinsThere || eventPrefill.travelMinsThere <= 0) return [];
     const there = eventPrefill.travelMinsThere;
@@ -572,17 +570,13 @@ export function CalculatorView({
     setTravelEntries((prev) => prev.filter((e) => !e.isAuto));
   }
 
-  // Mount seeding + contacts fetch. Rates/templates/promo arrive as server
-  // props; the "now" times must still seed in an effect (nowTime() at render
-  // would mismatch between server render and hydration). Contacts stay a
-  // client fetch - the People API pages through every connection and is far
-  // too slow to block the server render on.
+  // Mount seeding + contacts fetch. The "now" times must seed in an effect - nowTime() at
+  // render would mismatch between server render and hydration. Contacts stay a client
+  // fetch: the People API pages through every connection, far too slow to block on.
   useEffect(() => {
-    // Restore the saved draft after mount (localStorage is client-only; see
-    // the note above the state block). An event prefill is a deliberate
-    // fresh billing task and outranks any draft; non-meaningful drafts (just
-    // auto-seeded times from a previous session) seed fresh "now" times
-    // instead of restoring stale timestamps.
+    // Restore the saved draft after mount (localStorage is client-only). An event prefill
+    // is a deliberate fresh billing task and outranks any draft; a non-meaningful draft
+    // (just auto-seeded times) reseeds "now" rather than restoring stale timestamps.
     const draft = eventPrefill ? null : loadDraft();
     if (draft && isMeaningfulDraft(draft)) {
       draftLoadedRef.current = true;
@@ -610,14 +604,10 @@ export function CalculatorView({
       const now = nowTime();
       setTimeRanges([{ startTime: now, endTime: addHour(now) }]);
     }
-    // Carry the typed description into event billing. The prefill deliberately
-    // outranks the draft for dates/client/travel, but the description is the
-    // operator's own words about the job being billed, so it survives: prefer
-    // the picker's sessionStorage stash (fresher than the 500ms-debounced
-    // draft), else the draft's text - which covers the schedule's "Bill in
-    // calculator" path, where no stash exists. Read it before the draft
-    // writer's first 500ms tick overwrites the stored draft with this mount's
-    // empty box.
+    // The prefill outranks the draft for dates/client/travel, but the description is the
+    // operator's own words, so it survives: prefer the picker's sessionStorage stash
+    // (fresher than the 500ms-debounced draft), else the draft text, which covers the
+    // schedule's "Bill in calculator" path. Read before the draft writer's first tick.
     try {
       const handoff = sessionStorage.getItem(AI_INPUT_HANDOFF_KEY);
       if (handoff) sessionStorage.removeItem(AI_INPUT_HANDOFF_KEY);
@@ -722,10 +712,9 @@ export function CalculatorView({
     clientName,
     clientEmail,
   };
-  // Cancel-mode verdict for the form's explanation. Pure: new Date(string) is
-  // deterministic, unlike the argless new Date() / Date.now() the React Compiler
-  // purity rule rejects in render. The windows are measured from the booking's
-  // start back to the moment the client called it off.
+  // Cancel-mode verdict for the form's explanation, measured from the booking's start back
+  // to when the client called it off. Pure: new Date(string) is deterministic, unlike the
+  // argless new Date() / Date.now() the React Compiler purity rule rejects in render.
   const cancelBookingStart = new Date(`${jobDate}T${cancelBookingTime || "00:00"}`);
   const cancelledAtStamp = new Date(`${cancelledAtDate || jobDate}T${cancelledAtTime || "00:00"}`);
   const cancelNoticeHours =
@@ -757,6 +746,11 @@ export function CalculatorView({
       clientName,
       clientEmail,
       notes,
+      // Both feed jobToLineItems above. Omitted, a settings change that
+      // re-rendered this component without remounting left the preview on stale
+      // line items while `totals` below recomputed - the two then disagree.
+      pricing.minTravelCharge,
+      pricing.minBillableMins,
     ],
   );
 
@@ -776,15 +770,13 @@ export function CalculatorView({
     const outMins = Math.max(0, Math.round(result.outOfSessionMins ?? 0));
     setFollowUpMins(outMins);
 
-    // Hydrate the time slots. Prefer the per-range list when the parser found
-    // segments; otherwise synthesise one slot from startTime/endTime, or as a
-    // last resort anchor the in-session duration to "now". The billable
-    // window is always slot time + follow-up.
+    // Prefer the per-range list when the parser found segments; otherwise synthesise one
+    // slot from startTime/endTime, or as a last resort anchor the in-session duration to
+    // "now". The billable window is always slot time + follow-up.
     let parsedWindowMin = outMins;
-    // A merged job's slots come from several corrected calendar windows -
-    // exact, and not reconstructable from free text - so the parse fills
-    // everything except the times. A single event keeps the old behaviour:
-    // the description wins, and "Reset to event times" undoes a bad guess.
+    // A merged job's slots come from several corrected calendar windows - exact, and not
+    // reconstructable from free text - so the parse fills everything but the times. On a
+    // single event the description wins, and "Reset to event times" undoes a bad guess.
     const mergedSlots = eventPrefill && eventPrefill.slots.length > 1 ? eventPrefill.slots : null;
     if (mergedSlots) {
       parsedWindowMin += mergedSlots.reduce((s, r) => s + timeDiffMins(r.startTime, r.endTime), 0);
@@ -862,10 +854,9 @@ export function CalculatorView({
     });
     const parsedParts = result.parts.map((p) => ({ description: p.description, cost: p.cost }));
 
-    // Reparse semantics: the new parse result is the new truth for the auto
-    // travel entry AND the parsed out-of-pocket costs (parking, tolls).
-    // Operator-typed manual entries survive a reparse so they don't have to
-    // be re-typed after every AI tweak.
+    // A reparse is the new truth for the auto travel entry and the parsed out-of-pocket
+    // costs (parking, tolls). Operator-typed manual entries survive it, so they don't have
+    // to be re-typed after every AI tweak.
     setJobAddress(result.destination ?? "");
 
     // Parsed disbursements pass through at the stated cost; isParsedCost
@@ -887,10 +878,9 @@ export function CalculatorView({
       const label = result.destination?.trim() || `${result.travel.durationMins} min drive`;
       const destination = result.destination ?? label;
       setTravelEntries((prev) => {
-        // Google's live predictions drift between calls (minutes and even
-        // the chosen route change), so a reparse of the same destination
-        // keeps the existing auto entry rather than silently moving the
-        // travel price. "Look up" is the deliberate refresh.
+        // Google's live predictions drift between calls (minutes, and even the
+        // route), so a reparse of the same destination keeps the existing auto
+        // entry rather than silently moving the price. "Look up" is the refresh.
         const existingAuto = prev.find((e) => e.isAuto);
         const sameDestination =
           existingAuto?.destination?.trim().toLowerCase() === destination.trim().toLowerCase();
@@ -913,18 +903,14 @@ export function CalculatorView({
         ];
       });
     } else {
-      // No drive time from the parse (remote work or geocode-to-origin): drop
-      // any stale auto entry, keep operator-typed manual entries, and still
-      // carry any parsed disbursements (a remote job has no parking, but a
-      // walking-distance one can).
+      // No drive time from the parse (remote, or geocoded to origin): drop the stale auto
+      // entry, keep manual ones, and still carry parsed disbursements - a walking-distance
+      // job can still have parking.
       //
-      // Booked jobs are the exception. Their auto entry is seeded from the
-      // frozen TravelBlock - a drive that was actually measured for that
-      // window - and a description that simply never mentions the trip is not
-      // evidence it did not happen. Silently dropping it bills no travel on a
-      // job that had some. noTravelCharge stays authoritative: that is the
-      // parser saying the trip was on foot or on the house, which is a real
-      // instruction rather than an omission.
+      // Booked jobs are the exception: their auto entry comes from the frozen TravelBlock,
+      // a drive that was actually measured, and a description that just never mentions the
+      // trip is not evidence it did not happen. noTravelCharge still wins - that is the
+      // parser being told the trip was on foot or on the house, not an omission.
       const keepSeededTravel = eventPrefill !== null && !result.noTravelCharge;
       setTravelEntries((prev) => [
         ...(keepSeededTravel ? prev.filter((e) => e.isAuto) : []),
@@ -932,10 +918,9 @@ export function CalculatorView({
         ...prev.filter((e) => !e.isAuto && !e.isParsedCost),
       ]);
     }
-    // Rebalance parsed tasks proportionally to fit the listed window (over-
-    // long tasks absorb more of the correction; tasks scaling below the
-    // minimum drop), then floor the whole job to the minimum billable time
-    // so a sub-minimum job bills - and displays - at the floor.
+    // Rebalance parsed tasks proportionally to fit the listed window - over-long tasks
+    // absorb more of the correction, and tasks scaling below the minimum drop - then floor
+    // the whole job so a sub-minimum one bills, and displays, at the minimum.
     const collapsed = collapseToWindow(parsedTasks, parsedWindowMin, pricing.taskTiming);
     setTasks(enforceMinBillable(collapsed.tasks, pricing.minBillableMins));
     if (collapsed.rescaled || collapsed.dropped > 0) {
@@ -961,35 +946,27 @@ export function CalculatorView({
     setParseResult(null);
     setClarifyQuestions([]);
     try {
-      // jobDate lets the server quote travel at the job's weekday traffic
-      // pattern rather than today's.
-      // When billing a booked job, hand the AI the booking's actual window so
-      // it bills the real session length. The parser reads a digit-led
-      // "HH:MM-HH:MM" line as the session range; only prepend it when the
-      // description doesn't state its own times, so operator-typed times win.
-      // A merged job contributes one line per event: extractRanges sums them
-      // server-side into the pre-computed total, which excludes the gaps - so
-      // tasks are sized to the time worked, not the wall-clock span. Without
-      // these lines the parser sees no session at all and falls back to the
-      // minimum billable time.
+      // jobDate quotes travel at the job's weekday traffic pattern, not today's. For a
+      // booked job, prepend the booking's window as a digit-led "HH:MM-HH:MM" line so the
+      // parser bills the real session length instead of falling back to the minimum -
+      // only when the description states no times of its own, so operator times win. A
+      // merged job gets one line per event; extractRanges sums them server-side excluding
+      // the gaps, so tasks are sized to time worked rather than wall-clock span.
       const eventWindow =
         eventPrefill?.slots
           .filter((slot) => slot.startTime && slot.endTime)
           .map((slot) => `${slot.startTime}-${slot.endTime}`)
           .join("\n") || null;
-      // The operator's own ranges win, but only actual RANGES count. Testing
-      // for any time at all treated an incidental mention ("drove to PB Tech
-      // @ 10:30 am") as a stated session, dropped the booked window, and left
-      // the parser with nothing to bill - so the job fell back to the minimum
-      // billable time. extractRanges is the same parser the route uses for the
-      // pre-computed total, so both sides agree on what counts as a range.
+      // The operator's own ranges win, but only actual RANGES count. Testing for any time
+      // at all let an incidental mention ("drove to PB Tech @ 10:30 am") pass as a stated
+      // session, dropping the booked window and leaving nothing to bill. extractRanges is
+      // the same parser the route uses for the pre-computed total, so both sides agree.
       const statesOwnRanges = extractRanges(aiInput).length > 0;
       const input = eventWindow && !statesOwnRanges ? `${eventWindow}\n${aiInput}` : aiInput;
       const body: Record<string, unknown> = { input, jobDate };
-      // Typed descriptions of booked jobs rarely repeat the address, so hand
-      // the current job address (event prefill or Travel card) to the route as
-      // a travel fallback. The AI's own extracted destination still wins, and
-      // a remote booking bills no drive so nothing is sent.
+      // Typed descriptions rarely repeat the address, so hand the current job address
+      // (event prefill or Travel card) to the route as a travel fallback. The AI's own
+      // extracted destination still wins, and a remote booking sends nothing.
       const fallbackDestination = jobAddress.trim();
       if (fallbackDestination && eventPrefill?.meetingType !== "remote") {
         body.fallbackDestination = fallbackDestination;
@@ -1028,10 +1005,9 @@ export function CalculatorView({
     setTasks((prev) => {
       const t = [...prev];
       const item = { ...t[idx], [field]: val };
-      // Minutes are the billed unit on hourly rows, so a hand-edited qty has to
-      // rewrite them or the stale value would keep winning downstream. The task
-      // row edits hrs + mins, so the incoming qty is already a whole number of
-      // minutes; snap it and carry qty unrounded so the column stays exact.
+      // Minutes are the billed unit on hourly rows, so a hand-edited qty must rewrite them
+      // or the stale value keeps winning downstream. The row edits hrs + mins, so the
+      // incoming qty is already whole minutes: snap it, and carry qty unrounded.
       if (field === "qty") {
         const mins = Math.round(Number(val) * 60);
         if (item.baseRateId != null) {
@@ -1325,10 +1301,9 @@ export function CalculatorView({
     setNotes("");
   }
 
-  // The button that opens cancel mode sits at the bottom of the column while the
-  // form renders at the top, so without this you would click it and watch
-  // nothing happen. Runs after the form exists; exiting is left alone, since the
-  // button you came back to is already under the cursor.
+  // The button that opens cancel mode sits at the bottom of the column while the form
+  // renders at the top, so without this the click looks like it did nothing. Runs after
+  // the form exists; exiting is left alone, as that button is already under the cursor.
   useEffect(() => {
     if (!cancelMode) return;
     const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -1455,17 +1430,15 @@ export function CalculatorView({
           notes: notes || null,
           promoTitle: promoActive ? activePromo.title : null,
           promoDiscount: promoActive ? totals.promoDiscount : null,
-          // Send the flag alongside its discount. The server stores
-          // `unsuccessful === true`, so omitting it recorded every
-          // calculator-raised invoice as successful even when the half-price
-          // reduction had been applied - the audit trail the column exists for.
+          // Send the flag alongside its discount: the server stores
+          // `unsuccessful === true`, so omitting it records every calculator-raised
+          // invoice as successful even when the half-price reduction was applied.
           unsuccessful: totals.unsuccessfulDiscount > 0,
           unsuccessfulDiscount:
             totals.unsuccessfulDiscount > 0 ? totals.unsuccessfulDiscount : null,
-          // Match back to the billed job when this session came from the
-          // schedule's "Bill in calculator" action. calendarEventId stays the
-          // earliest event so existing readers are unaffected; the full set
-          // lets every merged event find this invoice.
+          // Match back to the billed job when the session came from the schedule's
+          // "Bill in calculator" action. calendarEventId stays the earliest event for
+          // existing readers; the full set lets every merged event find this invoice.
           bookingId: eventPrefill?.bookingId ?? null,
           calendarEventId: eventPrefill?.calendarEventId ?? null,
           calendarEventIds: eventPrefill?.slots.map((slot) => slot.calendarEventId) ?? [],
@@ -1539,7 +1512,9 @@ export function CalculatorView({
           customer: clientName || "Walk-in",
           description: buildIncomeDescription(job),
           amount: totals.total,
-          method: "Business Account",
+          // Not a literal: this is income, and "Business Account" is an expense
+          // method that INCOME_METHODS does not contain.
+          method: INCOME_METHODS[0],
         }),
       });
       const d = (await res.json()) as {
@@ -2392,10 +2367,9 @@ function TaskTimeWarning({
   const taskMin = hourlyTaskMinutes(tasks);
   if (taskMin === 0) return null;
 
-  // Sub-minimum job: the whole-job labour sits under the billable floor. Offer
-  // to bill it at the minimum (Fix floors the tasks). Checked before the window
-  // comparison because a short job usually has taskMin == windowMin, which the
-  // drift tolerance below would otherwise swallow.
+  // Sub-minimum job: whole-job labour sits under the billable floor, so offer to bill at
+  // the minimum (Fix floors the tasks). Checked before the window comparison - a short job
+  // usually has taskMin == windowMin, which the drift tolerance below would swallow.
   if (taskMin < minBillableMins) {
     return (
       <div
@@ -2422,11 +2396,9 @@ function TaskTimeWarning({
   // Suppress that expected overshoot - Fix never rescales pinned tasks.
   const overshoot = taskMin - windowMin;
   if (overshoot > 0 && overshoot <= explicitRoundingAllowanceMins(tasks, snapMins)) return null;
-  // Tolerance: qty rounds to 2 dp (= 0.6-min granularity), so a 3-task split
-  // can drift up to ~1.5 min from windowMin while still being "correct" after
-  // collapseToWindow has snapped each row to the increment. Without this
-  // the banner shows "Tasks total 215 min - listed window is 215 min" because
-  // the underlying float is 214.8 vs 215.
+  // Tolerance: qty rounds to 2 dp (0.6-min granularity), so a 3-task split can sit ~1.5
+  // min off windowMin and still be correct after collapseToWindow. Without it the banner
+  // reads "Tasks total 215 min - listed window is 215 min" off a 214.8 vs 215 float.
   if (Math.abs(taskMin - windowMin) < 2) return null;
   const over = taskMin > windowMin;
   // Billing to the minimum floor legitimately exceeds a shorter worked window,

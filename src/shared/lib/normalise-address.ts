@@ -43,10 +43,9 @@ async function geocode(raw: string | null | undefined): Promise<GeocodeOutcome> 
   const trimmed = raw?.trim();
   if (!trimmed) return { ok: false };
 
-  // Server-only key, deliberately with no fallback to GOOGLE_MAPS_API_KEY: that
-  // one is published to the browser by the `env` block in next.config.ts for
-  // Places autocomplete, so falling back would put a publicly readable key on
-  // server-side quota. Better to do nothing than to spend a leaked key.
+  // Server-only key, deliberately with no fallback to GOOGLE_MAPS_API_KEY: that one is
+  // published to the browser for Places autocomplete, so falling back would put a
+  // publicly readable key on server-side quota. Better to do nothing than spend it.
   const apiKey = process.env.GOOGLE_MAPS_SERVER_KEY;
   if (!apiKey) {
     console.warn("[normalise-address] No GOOGLE_MAPS_SERVER_KEY set - skipping geocode.");

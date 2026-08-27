@@ -191,10 +191,9 @@ export async function importFromGoogleContacts(): Promise<number> {
         // keys drift apart.
         const googleMatch = byGoogleId.get(resourceName);
         const emailMatch = email ? byEmail.get(email) : undefined;
-        // A landline stands in as the identity only when Google offers nothing
-        // better: the number is often shared, so matching an email-bearing
-        // Google person onto a household landline would hijack the row of
-        // whoever else lives there. A mobile is personal, so it always counts.
+        // A landline stands in as the identity only when Google offers nothing better:
+        // it is often shared, so matching an email-bearing person onto a household
+        // landline would hijack whoever else lives there. A mobile always counts.
         const phoneMatch =
           normPhone && (!emailEntry || isNZMobileKey(normPhone))
             ? byPhoneKey.get(normPhone)
@@ -206,22 +205,18 @@ export async function importFromGoogleContacts(): Promise<number> {
         const renameTrusted = Boolean(googleMatch ?? emailMatch) || isNZMobileKey(normPhone);
         try {
           if (existing) {
-            // Nothing to pull when the stored link and etag both match - the
-            // etag only moves when Google's copy changes. Skipping the rewrite
-            // keeps updatedAt untouched so unchanged rows never enter the push
-            // dirty set.
+            // Nothing to pull when the stored link and etag both match - the etag only
+            // moves when Google's copy changes. Skipping the rewrite leaves updatedAt
+            // alone, so unchanged rows never enter the push dirty set.
             if (existing.googleContactId === resourceName && existing.lastGoogleEtag === etag) {
               continue;
             }
-            // First-sync pull: on import, Google's values flow into the site DB
-            // (Google wins for any field it has populated). The blank-safety
-            // rule means empty Google values never overwrite existing site data.
-            // Stamping lastSyncedAt + lastGoogleEtag here is critical: without
-            // it the next syncContactToGoogle would see the etag as "changed"
-            // and conflict every field. lastSyncedAt and updatedAt must be the
-            // SAME instant: left to auto-stamp, @updatedAt lands a few ms after
-            // this new Date(), so the strict updatedAt > lastSyncedAt dirty
-            // check would re-push the row every run and the cron never finishes.
+            // First-sync pull: Google wins for any field it has populated, but blank
+            // values never overwrite site data. Stamping lastSyncedAt + lastGoogleEtag is
+            // critical - without it the next push reads the etag as changed and conflicts
+            // every field. Pass ONE Date for both stamps: an auto @updatedAt lands a few
+            // ms later, and the strict updatedAt > lastSyncedAt check would then re-push
+            // every row until the cron times out.
             const stampedAt = new Date();
             const updates: Record<string, unknown> = {
               googleContactId: resourceName,
@@ -394,12 +389,9 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
       return;
     }
     if (contact.deletedAt) {
-      // A soft-deleted contact was already removed from Google when it was
-      // deleted. Pushing it again re-creates it there - the stored
-      // googleContactId now 404s, so the push falls through to createContact -
-      // and the next import pulls that back as a fresh live contact, silently
-      // undoing the deletion. Guarded here rather than per-caller so the
-      // conflict-resolve path gets it too.
+      // A soft-deleted contact is already gone from Google. Pushing it re-creates it (the
+      // stored googleContactId 404s, so the push falls through to createContact) and the
+      // next import pulls it back live. Guarded here so every caller path is covered.
       return;
     }
     if (!contact.email) {
@@ -519,16 +511,9 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
       siteChanged,
       googleChanged,
     );
-    // Addresses compare by meaning, not by text. The site stores the Geocoding
-    // API's canonical form ("13 Humariri Street, Point Chevalier, Auckland
-    // 1022, New Zealand") while Google keeps what was typed ("13 Humariri St
-    // Point Chevalier Auckland 1022"). Those are one address, but as raw
-    // strings they differ, so every canonicalised address was landing as a
-    // conflict for the operator to adjudicate. When the site's form merely
-    // states the same place more fully, push it so Google ends up standardised
-    // too and the difference stops recurring. Anything Google says that the
-    // canonical form doesn't cover - a unit number, a different street - falls
-    // through and is still a real conflict.
+    // Addresses compare by meaning, not text: the site stores the Geocoding canonical form
+    // while Google keeps what was typed, so a plain comparison flags every one as a
+    // conflict. Push when the site's form only states the same place more fully.
     const addressAction = addressCovers(contact.address, googleAddress)
       ? "push"
       : compareSingleField(contact.address, googleAddress, siteChanged, googleChanged);
@@ -578,12 +563,10 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
       googleContactId: resourceName,
       lastGoogleEtag: googlePerson.etag ?? currentEtag,
     };
-    // Only mark the local edit as synced when the push actually succeeded;
-    // otherwise leave lastSyncedAt so the dirty-set retries the push next run.
-    // lastSyncedAt and updatedAt must be the SAME instant: left to auto-stamp,
-    // @updatedAt lands a few ms after this new Date(), so the strict
-    // updatedAt > lastSyncedAt dirty check would mark the row dirty again and
-    // every run re-pushes the whole contact list until the cron times out.
+    // Only stamp lastSyncedAt when the push actually succeeded, so a failure stays in the
+    // dirty set and retries next run. Pass ONE Date for both stamps: an auto @updatedAt
+    // lands a few ms later, and the strict updatedAt > lastSyncedAt check would then
+    // re-dirty the row and re-push the whole list every run until the cron times out.
     if (pushOk) {
       const stampedAt = new Date();
       siteUpdate.lastSyncedAt = stampedAt;
@@ -598,11 +581,9 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
       // flagging it for review when it doesn't resolve to one confident match.
       Object.assign(siteUpdate, await addressFields(googleAddress));
     }
-    // Keep the site's phone as the first phone in the merged list so the rest
-    // of the app (which reads Contact.phone as the primary) sees the primary
-    // number, and store the union tail as altPhones so every number the person
-    // uses is matchable locally. mergedPhones already unions site primary +
-    // alts + Google's list, so a plain set here loses nothing.
+    // Keep the site's phone first so the app (which reads Contact.phone as primary) still
+    // sees the primary, and store the tail as altPhones so every number is matchable.
+    // mergedPhones already unions site primary + alts + Google's list, so nothing is lost.
     if (mergedPhones[0] && mergedPhones[0] !== contact.phone) {
       siteUpdate.phone = mergedPhones[0];
     }

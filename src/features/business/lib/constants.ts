@@ -36,4 +36,6 @@ export const EXPENSE_CATEGORIES = [
 
 export const PAYMENT_METHODS = ["Business Account", "Personal then Reimburse", "Cash"] as const;
 
-export const INCOME_METHODS = ["Cash", "Bank", "Mixed"] as const;
+// Bank first: it is both the most common and the default the income form,
+// the payment dialog and the calculator all take from INCOME_METHODS[0].
+export const INCOME_METHODS = ["Bank", "Cash", "Mixed"] as const;

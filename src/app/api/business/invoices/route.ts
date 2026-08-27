@@ -114,10 +114,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const dueDateValue = dueDate
     ? new Date(dueDate)
     : new Date(Date.now() + identity.paymentTermsDays * 24 * 60 * 60 * 1000);
-  // Guarded like quoteValidUntil below. An unparseable date (e.g. "14/09/2026")
-  // reached prisma.create as an Invalid Date and threw outside any try/catch,
-  // 500ing with no message - and by then getNextInvoiceNumber had already burnt
-  // an invoice number off the Sheets counter.
+  // Guarded like quoteValidUntil below: an unparseable date ("14/09/2026") reaches
+  // prisma.create as an Invalid Date and throws outside any try/catch, 500ing with no
+  // message - after getNextInvoiceNumber has already burnt a number off the counter.
   if (Number.isNaN(issueDateValue.getTime()) || Number.isNaN(dueDateValue.getTime())) {
     return errorResponse("Enter a valid issue date and due date", 400);
   }
@@ -148,11 +147,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     unsuccessfulDiscountValue = parsed;
   }
 
-  // GST mode is driven by the live pricing settings (gstRegistered); the
-  // request body does not carry gst. Promo + unsuccessful both reduce the
-  // taxable amount before GST (per IRD treatment of price reductions); they
-  // sum into one discount argument for calcInvoiceTotals but persist as
-  // separate audit fields. Totals are independent of the invoice number.
   // De-duplicated so a repeated id cannot make a single-event job look merged.
   const mergedEventIds = Array.from(
     new Set(
@@ -161,6 +155,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       ),
     ),
   );
+  // GST mode comes from the live pricing settings, never the request body. Promo and
+  // unsuccessful discounts both reduce the taxable amount before GST (IRD treatment of
+  // price reductions), so they sum into one argument but persist as separate fields.
   const { GST_REGISTERED } = await getPolicy();
   const { subtotal, gstAmount, total } = calcInvoiceTotals(
     lineItems,
@@ -168,10 +165,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     GST_REGISTERED,
   );
 
-  // Allocate a number and create the invoice, retrying on a unique-number
-  // collision. Concurrent creates or a stale sheet counter can mint the same
-  // number; the unique index rejects the loser, and getNextInvoiceNumber
-  // re-allocates above the new DB max on the next pass rather than 500ing.
+  // Retry on a unique-number collision: concurrent creates or a stale sheet counter can
+  // mint the same number, and the index rejects the loser. getNextInvoiceNumber then
+  // re-allocates above the new DB max rather than 500ing.
   let invoice: Awaited<ReturnType<typeof prisma.invoice.create>> | null = null;
   let sheetNextCount: number | null = null;
   let sheetSyncWarning = false;
@@ -199,19 +195,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           unsuccessful: unsuccessful === true,
           unsuccessfulDiscount: unsuccessfulDiscountValue > 0 ? unsuccessfulDiscountValue : null,
           notes: notes ?? null,
-          // ObjectId shape enforced on both ids (Prisma throws on a malformed
-          // id, which would 500 the create; it also throws at read time
-          // otherwise); calendarEventId is a free-form Google id.
+          // Prisma throws on a malformed ObjectId, so check the shape here rather than
+          // 500 the create; calendarEventId is a free-form Google id, not an ObjectId.
           contactId: parseObjectId(contactId),
           bookingId: parseObjectId(bookingId),
           calendarEventId:
             typeof calendarEventId === "string" && calendarEventId ? calendarEventId : null,
-          // Merged jobs bill several events; calendarEventId above is the
-          // earliest of them. Left empty unless there is genuinely more than
-          // one, so a single-event invoice holds one link rather than two
-          // copies of it, and readers can treat "empty" as "see
-          // calendarEventId". Non-string entries are dropped rather than
-          // 500ing the create.
+          // Merged jobs bill several events; calendarEventId above is the earliest.
+          // Left empty below 2 so readers can treat "empty" as "see calendarEventId"
+          // rather than as a second copy of it.
           calendarEventIds: mergedEventIds.length > 1 ? mergedEventIds : [],
         },
       });
@@ -242,10 +234,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     await writeBackInvoiceCounter(sheetNextCount);
   }
 
-  // Generate the PDF and sync it to Drive. Awaited (not fire-and-forget) so it
-  // completes before the response - Vercel freezes the instance once the
-  // response is sent, so a detached promise may never run. Failures are
-  // swallowed so a Drive hiccup never blocks invoice creation.
+  // Awaited, not fire-and-forget: Vercel freezes the instance once the response is sent,
+  // so a detached promise may never run. Failures are swallowed so a Drive hiccup never
+  // blocks invoice creation.
   try {
     const pdfBuffer = await generateInvoicePdf(serialiseInvoice(invoice));
     await syncInvoicePdfToDrive(invoice, pdfBuffer, "[invoices]");

@@ -1,12 +1,12 @@
 // src/features/contacts/lib/contacts-sync.ts
-// Orchestrates a two-way Google Contacts sync. Runs the local dedup/merge
-// maintenance FIRST so duplicates are never propagated up to Google, then pushes
-// only the contacts that actually changed (the dirty set), then pulls Google's
-// changes back in. Reuses the per-contact merge/conflict engine in
-// google-contacts.ts unchanged - this module only decides what to sync and when.
+// Orchestrates a two-way Google Contacts sync: local dedup/merge FIRST so duplicates
+// never reach Google, then push only the contacts that changed (the dirty set), then pull
+// Google's changes back. Decides what to sync and when; the per-contact merge/conflict
+// engine lives in google-contacts.ts.
 
 import { UNRESOLVED_CONFLICT_FILTER } from "@/features/contacts/lib/contact-conflicts";
 import { prisma } from "@/shared/lib/prisma";
+import { acquireRunLock, releaseRunLock } from "@/shared/lib/run-lock";
 import { importFromGoogleContacts, syncContactToGoogle } from "./google-contacts";
 import {
   backfillContactsFromBookings,
@@ -18,7 +18,12 @@ import {
 } from "./maintenance";
 
 /** Outcome counts from a {@link runContactsSync} pass. */
+/** Setting key for the run lock shared by the cron and the manual sync. */
+export const CONTACTS_SYNC_LOCK_KEY = "sync-contacts-lock";
+
 export interface ContactsSyncResult {
+  /** True when another run held the lock and this call did nothing. */
+  alreadyRunning?: boolean;
   /** Contacts pushed to Google this run. */
   pushed: number;
   /** Contacts pulled/linked from Google this run. */
@@ -46,63 +51,68 @@ export interface ContactsSyncResult {
 export async function runContactsSync({
   full = false,
 }: { full?: boolean } = {}): Promise<ContactsSyncResult> {
-  // 1. Clean up locally so duplicates never propagate to Google. Normalise the
-  // deletedAt field first - a contact missing it is invisible to every
-  // `deletedAt: null` reader (MongoDB isSet gotcha), including the merge passes
-  // below. The merges then run strongest key first: a shared Google resource
-  // name is proof of a duplicate, a shared email is near-proof, and a shared
-  // mobile is the weakest of the three.
-  await normaliseSoftDeleteField();
-  await mergeDuplicateGoogleContacts();
-  await mergeDuplicateEmailContacts();
-  await mergePhoneOnlyContacts();
-  await backfillContactsFromBookings();
-  await matchReviewsToContacts();
-
-  // 2. Build the push set from live, email-bearing contacts.
-  const contacts = await prisma.contact.findMany({
-    where: { deletedAt: null, email: { not: null } },
-    select: { id: true, updatedAt: true, lastSyncedAt: true, googleContactId: true },
-  });
-
-  const pendingConflicts = await prisma.contactConflict.findMany({
-    where: { ...UNRESOLVED_CONFLICT_FILTER },
-    select: { contactId: true },
-  });
-  const conflictedIds = new Set(pendingConflicts.map((c) => c.contactId));
-
-  const dirty = contacts.filter((c) => {
-    // A full sync is an explicit "re-evaluate everything" from the operator, so
-    // it overrides the conflict skip below. Without this the two deadlock: a
-    // contact with a pending conflict is never pushed, so syncContactToGoogle
-    // never re-runs the field comparison, so the conflict can never clear - even
-    // when the comparison would now resolve it on its own. Safe to bypass,
-    // because that comparison still adjudicates per field and re-records a
-    // genuine conflict rather than overwriting Google.
-    if (full) return true;
-    if (conflictedIds.has(c.id)) return false;
-    if (!c.googleContactId) return true;
-    if (!c.lastSyncedAt) return true;
-    return c.updatedAt.getTime() > c.lastSyncedAt.getTime();
-  });
-
-  let pushed = 0;
-  for (const c of dirty) {
-    try {
-      await syncContactToGoogle(c.id);
-      pushed++;
-    } catch (err) {
-      // syncContactToGoogle already swallows its own errors; this guards against
-      // anything unexpected so one bad contact can't abort the whole run.
-      console.error(`[contacts-sync] push failed for ${c.id}:`, err);
-    }
+  // Refuse to overlap: this run merges and hard-deletes duplicates before
+  // pushing, so two at once race each other. The cron and a manual click can
+  // land on different instances, so the lock lives in the database.
+  if (!(await acquireRunLock(CONTACTS_SYNC_LOCK_KEY))) {
+    return { pushed: 0, imported: 0, conflicts: 0, skipped: 0, alreadyRunning: true };
   }
 
-  // 3. Pull Google's changes back in.
-  const imported = await importFromGoogleContacts();
+  try {
+    // 1. Clean up locally so duplicates never reach Google. Normalise deletedAt first - a
+    // contact missing the key is invisible to every `deletedAt: null` reader, the merge
+    // passes included. Merges then run strongest key first: a shared Google resource name
+    // proves a duplicate, a shared email nearly does, a shared mobile is weakest.
+    await normaliseSoftDeleteField();
+    await mergeDuplicateGoogleContacts();
+    await mergeDuplicateEmailContacts();
+    await mergePhoneOnlyContacts();
+    await backfillContactsFromBookings();
+    await matchReviewsToContacts();
 
-  const conflicts = await prisma.contactConflict.count({
-    where: { ...UNRESOLVED_CONFLICT_FILTER },
-  });
-  return { pushed, imported, conflicts, skipped: conflictedIds.size };
+    // 2. Build the push set from live, email-bearing contacts.
+    const contacts = await prisma.contact.findMany({
+      where: { deletedAt: null, email: { not: null } },
+      select: { id: true, updatedAt: true, lastSyncedAt: true, googleContactId: true },
+    });
+
+    const pendingConflicts = await prisma.contactConflict.findMany({
+      where: { ...UNRESOLVED_CONFLICT_FILTER },
+      select: { contactId: true },
+    });
+    const conflictedIds = new Set(pendingConflicts.map((c) => c.contactId));
+
+    const dirty = contacts.filter((c) => {
+      // A full sync overrides the conflict skip below, or the two deadlock: a conflicted
+      // contact is never pushed, so the comparison that would clear the conflict never
+      // runs. Safe, because that comparison still re-records a genuine conflict.
+      if (full) return true;
+      if (conflictedIds.has(c.id)) return false;
+      if (!c.googleContactId) return true;
+      if (!c.lastSyncedAt) return true;
+      return c.updatedAt.getTime() > c.lastSyncedAt.getTime();
+    });
+
+    let pushed = 0;
+    for (const c of dirty) {
+      try {
+        await syncContactToGoogle(c.id);
+        pushed++;
+      } catch (err) {
+        // syncContactToGoogle already swallows its own errors; this guards against
+        // anything unexpected so one bad contact can't abort the whole run.
+        console.error(`[contacts-sync] push failed for ${c.id}:`, err);
+      }
+    }
+
+    // 3. Pull Google's changes back in.
+    const imported = await importFromGoogleContacts();
+
+    const conflicts = await prisma.contactConflict.count({
+      where: { ...UNRESOLVED_CONFLICT_FILTER },
+    });
+    return { pushed, imported, conflicts, skipped: conflictedIds.size };
+  } finally {
+    await releaseRunLock(CONTACTS_SYNC_LOCK_KEY);
+  }
 }

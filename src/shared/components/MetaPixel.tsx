@@ -37,10 +37,9 @@ export function MetaPixel(): React.ReactElement | null {
   // Report each App Router navigation as a fresh PageView - fbevents.js only
   // auto-fires on the hard page load, not on client-side route changes.
   useEffect(() => {
-    // Prime on the very first run regardless of whether fbq has loaded yet: the
-    // base snippet already fires PageView on the hard load, so this run is never
-    // a real navigation. Priming before the fbq guard stops a not-yet-ready
-    // pixel from swallowing the first client-side navigation's PageView.
+    // Prime on the first run whether or not fbq has loaded: the base snippet already fired
+    // PageView on the hard load, so this run is never a real navigation. Priming before
+    // the fbq guard stops a not-yet-ready pixel eating the first navigation's PageView.
     if (!primed.current) {
       primed.current = true;
       return;

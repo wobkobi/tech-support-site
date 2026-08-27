@@ -83,10 +83,9 @@ export async function DELETE(
     );
   }
 
-  // Refuse to touch a real booking's calendar event via the blocked-day route:
-  // that would strip the appointment off the calendar while the Booking row stays
-  // confirmed with a now-dangling calendarEventId. Blocked-day events are never
-  // referenced by a Booking.
+  // Refuse to touch a real booking's calendar event from the blocked-day route: it would
+  // strip the appointment off the calendar while the Booking row stays confirmed with a
+  // dangling calendarEventId. No Booking ever references a blocked-day event.
   const bookingUsingEvent = await prisma.booking.findFirst({
     where: { calendarEventId: eventId },
     select: { id: true },

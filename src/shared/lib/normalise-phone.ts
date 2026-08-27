@@ -30,10 +30,9 @@ export function formatNZPhone(raw: string): string {
   const digits = raw.replace(/\D/g, "");
   if (!digits) return hasPlus ? "+" : "";
 
-  // Every branch's final group is open-ended (slice with no end) so a longer
-  // number keeps all its digits - this is a display formatter that feeds the
-  // stored value on blur, so dropping a digit would corrupt the phone number
-  // (e.g. an 11-digit 021 mobile with an 8-digit subscriber part).
+  // Every branch's final group is open-ended (slice with no end) so a longer number keeps
+  // all its digits. This formatter feeds the stored value on blur, so a dropped digit
+  // corrupts the number - an 11-digit 021 mobile has an 8-digit subscriber part.
   if (hasPlus) {
     // +64 XX XXX XXXX... (rough grouping for international)
     const a = digits.slice(0, 2);

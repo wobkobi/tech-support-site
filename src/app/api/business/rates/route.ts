@@ -17,11 +17,9 @@ import type { Settings } from "@/shared/lib/settings/types";
 import { revalidateTag } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 
-// Seed shape: one base hourly rate (Standard), modifier rates that shift the
-// effective $/hr (At home -$10, Remote -$10), and a percentage modifier for
-// Public Holiday (+25%). There is no separate Complex tier - everything bills
-// at the Standard rate plus the other modifiers. The travel $/hr is a pricing
-// setting (Settings > Pricing), not a rate row.
+// Seed shape: one base hourly rate (Standard), $/hr modifiers (At home -$10, Remote -$10)
+// and a percentage one (Public Holiday +25%). No separate Complex tier - everything bills
+// at Standard plus modifiers. The travel $/hr is a pricing setting, not a rate row.
 const DEFAULTS = [
   {
     label: "Standard",
@@ -112,11 +110,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     await prisma.rateConfig.deleteMany({ where: { label: { in: ["Student", "Complex"] } } });
   }
 
-  // Travel-row retirement: the travel $/hr is a pricing setting now. Carry a
-  // surviving row's rate into the settings blob first when the blob doesn't
-  // state one yet - a customised rate must never silently reset to the
-  // default - then delete the row(s) so the rate panel can no longer edit the
-  // rate. Legacy per-km rows carry no hourly rate; they just delete.
+  // Travel-row retirement: the travel $/hr lives in pricing settings now. Carry a
+  // surviving row's rate into the blob first if it states none - a customised rate must
+  // never silently reset - then delete the rows. Legacy per-km rows just delete.
   const travelRows = rates.filter((r) => r.unit === "travel-hour" || r.unit === "km");
   let travelRetired = false;
   if (travelRows.length > 0) {
@@ -144,10 +140,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
   }
 
-  // updatedAt backfill: rows created before the field existed have no value in
-  // Mongo; an unset nullable field reads back as null, so the null check covers
-  // both unset and explicit-null rows. Stamp them once with "now" so the
-  // pricing-page footer has something to show; future edits stamp via @updatedAt.
+  // updatedAt backfill: rows predating the field have no value in Mongo, and an unset
+  // nullable field reads back as null, so the null check covers both. Stamp once with
+  // "now" so the pricing-page footer has something to show; later edits use @updatedAt.
   const needsUpdatedAtBackfill = rates.some((r) => r.updatedAt === null);
   if (needsUpdatedAtBackfill) {
     await prisma.rateConfig.updateMany({

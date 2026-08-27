@@ -58,10 +58,9 @@ export async function getInvoiceCounter(): Promise<InvoiceCounterData> {
   const yearRaw = ((ranges[1]?.values?.[0]?.[0] as string | undefined) ?? "").trim();
   const lastRaw = ranges[2]?.values?.[0]?.[0];
   const yearCode = yearRaw.replace("-", "");
-  // Guard against manually-mistyped SETTINGS cells (a blank B11, a "#REF!"
-  // error, or a stray non-numeric B19). Throwing here hands off to the Prisma
-  // fallback in getNextInvoiceNumber rather than minting a poisoned number like
-  // "TTP--0001" or "TTP-...-0NaN" that would then be written back to the sheet.
+  // Guard against mistyped SETTINGS cells (a blank B11, a "#REF!", a non-numeric B19).
+  // Throwing hands off to the Prisma fallback in getNextInvoiceNumber rather than minting
+  // a poisoned "TTP--0001" or "TTP-...-0NaN" that then gets written back to the sheet.
   if (!/^\d{4,6}$/.test(yearCode)) {
     throw new Error(`Invoice counter: SETTINGS!B11 financial year is malformed ("${yearRaw}")`);
   }

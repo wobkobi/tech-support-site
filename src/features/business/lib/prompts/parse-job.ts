@@ -350,10 +350,9 @@ export function buildParseJobContext(
           actionTags,
         )}\n\n`
       : "";
-  // The pair list is capped: callers order templates by usageCount desc, so
-  // the top slice keeps the pairings that actually recur while bounding the
-  // prompt as the template table grows. The tag vocabulary above still derives
-  // from ALL templates, so the full taxonomy stays visible to TAG SELECTION.
+  // The pair list is capped: callers order templates by usageCount desc, so the top slice
+  // keeps the pairings that recur while bounding the prompt as the table grows. The tag
+  // vocabulary above still derives from ALL templates, so TAG SELECTION sees everything.
   const TEMPLATE_PAIR_CAP = 50;
   const templateBlock =
     templates.length > 0
@@ -369,10 +368,9 @@ export function buildParseJobContext(
   const identityBlock = identity
     ? `Business: ${identity.company}, sole trader ${identity.name}, based in ${identity.location}.\n\n`
     : "";
-  // Only modifiers the server can actually apply (a signed hourlyDelta) are
-  // offered to the model. Percentage-only modifiers like Public Holiday are
-  // applied downstream by booking date, never picked by the parser, so they
-  // stay off this list to avoid the model emitting a label the route drops.
+  // Only modifiers the server can actually apply (a signed hourlyDelta) are offered.
+  // Percentage-only ones like Public Holiday are applied downstream by booking date, so
+  // listing them would only invite the model to emit a label the route drops.
   const modifierLabels = rates
     .filter((r) => r.unit === "modifier" && r.hourlyDelta !== null)
     .map((r) => r.label);

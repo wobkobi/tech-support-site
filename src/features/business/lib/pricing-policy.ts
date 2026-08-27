@@ -60,25 +60,6 @@ export const NZ_REGION = "NZ";
 export const HOME_REGION = "Auckland";
 
 /**
- * Formats a Date as a Pacific/Auckland-local YYYY-MM-DD so booking timestamps
- * match the `PublicHoliday.date` strings (always NZ-local).
- * @param d - Date instance to format.
- * @returns ISO-style date string in NZ-local time.
- */
-export function nzDateKey(d: Date): string {
-  const parts = new Intl.DateTimeFormat("en-NZ", {
-    timeZone: "Pacific/Auckland",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(d);
-  const year = parts.find((p) => p.type === "year")?.value ?? "";
-  const month = parts.find((p) => p.type === "month")?.value ?? "";
-  const day = parts.find((p) => p.type === "day")?.value ?? "";
-  return `${year}-${month}-${day}`;
-}
-
-/**
  * Cancellation rules. In-person and remote are priced separately: an on-site
  * visit costs a slot plus a drive across Auckland, a remote session only costs
  * the slot, so remote gets a shorter free window and a smaller flat fee with no
@@ -325,10 +306,9 @@ export function clampBillableMins(
 }
 
 // > Copy generators
-// Generators take their variable inputs explicitly so the rendered text
-// always matches the live values. Key figures are wrapped in `**…**` so the
-// pricing page can emit `<strong>` while emails / FAQs pass the markers
-// through as plain-text emphasis.
+// Inputs are passed explicitly so the rendered text always matches the live values. Key
+// figures are wrapped in `**…**` so the pricing page can emit `<strong>` while emails and
+// FAQs pass the markers through as plain-text emphasis.
 
 /**
  * Renders an hour count for customer-facing copy. The windows are settings, so

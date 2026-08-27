@@ -65,10 +65,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         }
       }
 
-      // The money may already be in, entered straight into the Cashbook sheet
-      // rather than against the invoice. Chasing someone who has paid is worse
-      // than a nudge arriving late, so hold off and let the operator confirm -
-      // the invoice page shows the same match with a prompt to record it.
+      // The money may already be in, entered straight into the Cashbook rather than
+      // against the invoice. Chasing someone who has paid is worse than a late nudge, so
+      // hold off - the invoice page shows the same match with a prompt to record it.
       const payment = await findRecordedPayment(inv);
       if (payment) {
         results.paid++;

@@ -108,10 +108,9 @@ export function EventActionSheet({
   const isCompleted = status === "completed";
   const isConfirmed = status === "confirmed";
   const isTestBooking = booking.name.toLowerCase().includes("test");
-  // State changes (complete / cancel / no-show) lock 18h after the booking ends,
-  // mirroring the server guard - disable them here so the operator sees it up
-  // front instead of firing a request that bounces back as a rejection toast.
-  // Billing, review resend, reschedule (future-only), and delete stay available.
+  // State changes (complete / cancel / no-show) lock 18h after the booking ends, mirroring
+  // the server guard, so the operator sees it up front rather than via a rejection toast.
+  // Billing, review resend, reschedule (future-only) and delete stay available.
   const isEditLocked = isPastEditWindow(new Date(event.endAt).getTime(), renderedAt, lockHours);
 
   /**

@@ -132,10 +132,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       },
     });
 
-    // Awaited, not detached: Vercel freezes the instance once the response is
-    // sent, so a `void` call here would usually never run and the fee would go
-    // unbilled with nothing logged. The failure is still swallowed - the
-    // cancellation itself has already committed and must be reported as done.
+    // Awaited, not detached: Vercel freezes the instance once the response is sent, so a
+    // `void` call would usually never run and the fee would go unbilled and unlogged. The
+    // failure is still swallowed - the cancellation has committed and must report as done.
     if (lateCancellation) {
       try {
         await createDraftCancellationInvoice(updated, {

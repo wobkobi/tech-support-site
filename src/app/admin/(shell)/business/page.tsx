@@ -231,10 +231,9 @@ export default async function BusinessPage({
   const scopedExpensesTotal = expenses.reduce((s, r) => s + r.amountExcl, 0);
   const scopedGstTotal = expenses.reduce((s, r) => s + r.gstAmount, 0);
 
-  // Pull the per-FY rates from the workbook's SETTINGS tab. The sheet stays
-  // authoritative; the live tax settings are the fallback for any cell it
-  // doesn't fill (and the source when there's no workbook at all). Cached per
-  // scope since the Drive/Sheets reads cost 3-5s on a miss.
+  // Per-FY rates from the workbook's SETTINGS tab. The sheet stays authoritative; live tax
+  // settings fill any cell it leaves blank, or all of them when there's no workbook.
+  // Cached per scope - the Drive/Sheets reads cost 3-5s on a miss.
   const taxSettings = settings.tax;
   const gstRegistered = settings.pricing.gstRegistered;
   let rates: TaxRates = {

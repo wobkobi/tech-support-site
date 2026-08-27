@@ -6,6 +6,7 @@
  * Sheet failures are logged and swallowed so DB recording is never blocked.
  */
 
+import { INCOME_METHODS } from "@/features/business/lib/constants";
 import { recordIncome } from "@/features/business/lib/income-recording";
 import { parseAmount, parseDate } from "@/features/business/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";
@@ -47,6 +48,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return errorResponse("Missing required fields", 400);
   }
 
+  // Gate on INCOME_METHODS like the /pay route does. Only truthiness was
+  // checked here, so an expense method or free text reached the Cashbook, whose
+  // method column is a fixed Data Validation list.
+  if (!(INCOME_METHODS as readonly string[]).includes(method)) {
+    return errorResponse("Invalid payment method", 400);
+  }
+
   const safeAmount = parseAmount(amount);
   if (safeAmount === null) {
     return errorResponse("Invalid amount", 400);
@@ -67,10 +75,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     invoiceId,
   });
 
-  // sheetSyncWarning has to reach the client: recordIncome swallows a Cashbook
-  // append failure so the entry still saves, and dropping the flag here reported
-  // a clean 201 for a payment that never made it to the sheet. The sibling
-  // expenses route returns it, and the UI already renders the warning toast.
+  // sheetSyncWarning has to reach the client: recordIncome swallows a Cashbook append
+  // failure so the entry still saves, and dropping the flag here reports a clean 201 for a
+  // payment that never reached the sheet. The expenses route returns it too.
   return NextResponse.json(
     { ok: true, entry: { ...entry, sheetRowKey }, sheetSyncWarning },
     { status: 201 },

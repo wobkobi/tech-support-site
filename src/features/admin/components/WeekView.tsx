@@ -155,9 +155,8 @@ export function WeekView({
     }
     for (const ev of events) {
       if (ev.isAllDay) {
-        // Multi-day all-day events (Busy blocks spanning several days) need to
-        // appear in every day bucket they overlap. Google's all-day end is
-        // exclusive (next NZ midnight), so the YYYY-MM-DD comparison is
+        // Multi-day all-day events must land in every day bucket they overlap. Google's
+        // all-day end is exclusive (next NZ midnight), so the YYYY-MM-DD comparison is
         // start-inclusive, end-exclusive.
         const startKey = nzDateKey(new Date(ev.startAt));
         const endKey = nzDateKey(new Date(ev.endAt));
@@ -191,10 +190,9 @@ export function WeekView({
     [],
   );
 
-  // Merge consecutive-day all-day events into spanning bars. Each bar covers
-  // the columns from its first visible day to its last visible day (inclusive).
-  // Column numbering: 1 = time gutter, 2..8 = days, so day index i sits at
-  // grid column i + 2.
+  // Merge consecutive-day all-day events into spanning bars, each covering its first to
+  // last visible day inclusive. Column numbering: 1 = time gutter, 2..8 = days, so day
+  // index i sits at grid column i + 2.
   const allDayBars = useMemo(() => {
     interface RawBar {
       key: string;
@@ -205,10 +203,9 @@ export function WeekView({
     }
     const raw: RawBar[] = [];
 
-    // Blocks (booking-kind all-day, incl. optimistic placeholders): merge ANY
-    // contiguous run of blocked days into ONE "Busy" span so the bar stays
-    // stable while the server reconciles rapid blocks into a merged event -
-    // no flicker as the calendar catches up.
+    // Merge ANY contiguous run of blocked days (booking-kind all-day, optimistic
+    // placeholders included) into ONE "Busy" span, so the bar doesn't flicker while the
+    // server reconciles rapid blocks into a merged event.
     const blocked = days.map((d) => d.allDayEvents.some((e) => e.kind === "booking"));
     for (let i = 0; i < days.length;) {
       if (!blocked[i]) {
@@ -537,10 +534,9 @@ function DayColumn({
         const durationMin =
           (new Date(ev.endAt).getTime() - new Date(ev.startAt).getTime()) / 60_000;
         const height = Math.max(18, durationMin * PX_PER_MINUTE);
-        // Bookings open on single click (double-click silently fails if the
-        // clicks drift a pixel). With a DB row > in-app detail page; no row
-        // (added straight in Google Calendar) > open there. stopPropagation
-        // always runs so a card click never falls through to the add-booking modal.
+        // Single click, since a double-click silently fails if the clicks drift a pixel.
+        // With a DB row > in-app detail page; without one (added straight in Google
+        // Calendar) > open there. stopPropagation always runs so the add modal never fires.
         const bookingId = ev.kind === "booking" ? ev.booking?.id : undefined;
         const calendarLink =
           ev.kind === "booking" && !bookingId ? (ev.htmlLink ?? undefined) : undefined;

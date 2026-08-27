@@ -1,12 +1,9 @@
 // src/features/business/lib/time-parse.ts
-// Canonical time-range parser shared by the admin parse-job route and the eval
-// auditor, so both compute stated-session minutes from ONE implementation.
-// Lines are normalised first (noon/midnight, dotted meridiems, dot minutes),
-// then paired times are resolved: an assumed meridiem retries a non-positive
-// span as an am/pm pair (+12h) before rolling overnight, while explicitly
-// stated meridiems roll straight overnight. Overlapping and duplicate ranges
-// merge so the same minute never bills twice. Pure and dependency-free so the
-// tsx eval harness can import it.
+// Canonical time-range parser shared by the parse-job route and the eval auditor, so both
+// compute stated-session minutes from ONE implementation. Lines are normalised first
+// (noon/midnight, dotted meridiems, dot minutes), then a non-positive span retries as an
+// am/pm pair (+12h) if the meridiem was assumed, or rolls overnight if it was stated.
+// Overlapping ranges merge so a minute never bills twice. Pure, so tsx can import it.
 
 /** am/pm marker, or null when a time fragment carries none. */
 type Meridiem = "am" | "pm" | null;
@@ -18,10 +15,9 @@ export interface ParsedTimeRange {
   durationMins: number;
 }
 
-// One range: two time fragments - colon form ("11:30"), compact form ("0900",
-// "130"), or bare hours, each with an optional meridiem - split by a dash,
-// "to", or plain whitespace. Bare-space pairs involving a compact fragment
-// are rejected in extractRanges so phone numbers cannot pair up as times.
+// One range: two time fragments - colon ("11:30"), compact ("0900", "130") or bare hours,
+// each with an optional meridiem - split by a dash, "to", or whitespace. Bare-space pairs
+// with a compact fragment are rejected in extractRanges so phone numbers can't pair up.
 const TIME_RANGE_RE =
   /(\d{1,2}:\d{2}|\d{3,4}|\d{1,2})\s*(am|pm)?(\s*[-–—]\s*|\s+to\s+|\s+)(\d{1,2}:\d{2}|\d{3,4}|\d{1,2})\s*(am|pm)?/gi;
 
@@ -114,10 +110,9 @@ export function extractRanges(input: string): ParsedTimeRange[] {
       const [, startRaw, startMerRaw, sep, endRaw, endMerRaw] = match;
       // Bare-space compact pairs are phone numbers or IDs, never a range.
       if (!/[-–—]|to/.test(sep) && (isCompact(startRaw) || isCompact(endRaw))) continue;
-      // A dashed date reads as a range if taken at face value: "2026-08-25"
-      // pairs 2026 with 08 as 20:26-08:00, an overnight shift of nearly 15
-      // hours. A third dash-joined number on either side means this is a date,
-      // not a time - no real range carries one.
+      // A dashed date reads as a range at face value: "2026-08-25" pairs 2026 with 08 as
+      // 20:26-08:00, a near-15-hour overnight. A third dash-joined number on either side
+      // means it is a date, not a time - no real range carries one.
       const matchEnd = (match.index ?? 0) + match[0].length;
       if (/^\s*[-–—]\s*\d/.test(line.slice(matchEnd))) continue;
       if (/\d\s*[-–—]\s*$/.test(line.slice(0, match.index ?? 0))) continue;

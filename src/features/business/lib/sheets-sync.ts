@@ -235,12 +235,10 @@ export async function appendRowWithSyncId(
   while (padded.length < SYNC_ID_COLUMN_INDEX) padded.push("");
   padded.push(id);
 
-  // Write into the first empty row rather than values.append: the tabs are
-  // 1000-row templates with formula columns pre-filled down the grid, so
-  // values.append (which lands after the last populated cell in ANY searched
-  // column) strands new rows near row 1000. Null cells in `padded` are skipped
-  // by update, so sheet-managed formulas survive. A rare concurrent collision
-  // orphans one sheetRowKey, which the cron self-heal re-appends later.
+  // Write into the first empty row, not values.append: the tabs are 1000-row templates
+  // with formula columns pre-filled, and append lands after the last populated cell in
+  // ANY column, stranding new rows near row 1000. Nulls in `padded` are skipped by update
+  // so sheet formulas survive; a rare collision orphans a sheetRowKey the cron re-appends.
   const targetRow = await firstEmptyRow(spreadsheetId, tabName);
   const sheets = getSheetsClient();
   await withRetry(
@@ -428,10 +426,9 @@ export async function updateRowBySyncId(
 ): Promise<{ updated: boolean; syncId: string }> {
   const rowIndex = await findRowIndexBySyncId(spreadsheetId, tabName, syncId);
   if (rowIndex === null) {
-    // Row vanished (sheet-side delete): re-append under the SAME Sync ID rather
-    // than minting a fresh random one, so the caller's persisted sheetRowKey
-    // stays valid and the import's id-fallback can re-link an orphan left by a
-    // failed re-persist.
+    // Row vanished (sheet-side delete): re-append under the SAME Sync ID, not a fresh
+    // random one, so the caller's persisted sheetRowKey stays valid and the import's
+    // id-fallback can re-link an orphan left by a failed re-persist.
     const newSyncId = await appendRowWithSyncId(spreadsheetId, tabName, cells, syncId);
     return { updated: false, syncId: newSyncId };
   }

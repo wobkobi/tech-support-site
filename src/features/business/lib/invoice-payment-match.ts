@@ -1,10 +1,8 @@
 // src/features/business/lib/invoice-payment-match.ts
-// Finds the income entry that looks like an invoice's payment, for an invoice
-// the site still has as SENT. Money entered straight into the Cashbook sheet
-// never touches the invoice - only POST /pay links the two - so the row stays
-// SENT and the reminder cron chases someone who has already paid. The cron uses
-// this to hold off, and the invoice page uses it to prompt for the missing
-// payment record.
+// Finds the income entry that looks like a still-SENT invoice's payment. Money typed
+// straight into the Cashbook sheet never touches the invoice (only POST /pay links the
+// two), so the row stays SENT and the reminder cron would chase someone who has paid.
+// The cron uses this to hold off; the invoice page uses it to prompt for the record.
 
 import { prisma } from "@/shared/lib/prisma";
 import { nzDayStartUtc } from "@/shared/lib/timezone-utils";
@@ -79,11 +77,9 @@ export async function findRecordedPayment(
       // bare `invoiceId: null` to "exists AND is null" on Mongo - which skips
       // exactly the rows this is looking for. The OR catches both shapes.
       OR: [{ invoiceId: null }, { invoiceId: { isSet: false } }],
-      // Floored to the issue date's NZ DAY, not the issue instant. Ledger rows
-      // are stored at UTC midnight of an NZ day, while issueDate carries a real
-      // time of day - so an invoice raised at 3pm and paid that same evening
-      // produced `00:00Z >= 03:00Z` = false, matched nothing, and the reminder
-      // cron chased a customer who had already paid.
+      // Floored to the issue date's NZ day, not the instant: ledger rows sit at
+      // UTC midnight while issueDate carries a time, so an invoice raised at 3pm
+      // and paid that evening matched nothing and got chased as overdue.
       date: { gte: nzDayStartUtc(invoice.issueDate) },
       amount: { gte: invoice.total - AMOUNT_TOLERANCE, lte: invoice.total + AMOUNT_TOLERANCE },
     },

@@ -78,9 +78,8 @@ export function computeTaxPlan(
   rates: TaxRates = DEFAULT_TAX_RATES,
 ): TaxPlan {
   const profit = income - expensesExcl;
-  // Clamped at zero, as financial-year.ts and the dashboard summary both do: a
-  // loss-making scope produced negative set-asides, and "set aside -$240 for
-  // income tax" is not a thing. The profit figure itself stays signed so the
+  // Clamped at zero, as financial-year.ts and the dashboard summary both do: "set aside
+  // -$240 for income tax" is not a thing. The profit figure itself stays signed, so the
   // loss is still reported honestly.
   const taxable = Math.max(0, profit);
   const incomeTax = round2(taxable * rates.incomeTax);

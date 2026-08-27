@@ -38,10 +38,9 @@ export interface NextInvoiceNumber {
 export async function getNextInvoiceNumber(): Promise<NextInvoiceNumber> {
   try {
     const data = await getInvoiceCounter();
-    // Quote rows share the table + unique index but number from their own
-    // counter - exclude them so a Q- number can never seed the invoice
-    // sequence (isQuote catches converted rows whose flag was later cleared;
-    // the prefix filter catches any legacy row).
+    // Quote rows share the table and unique index but number from their own counter, so
+    // exclude them or a Q- number could seed the invoice sequence. isQuote catches
+    // converted rows; the prefix filter catches legacy ones.
     const last = await prisma.invoice.findFirst({
       where: { NOT: { number: { startsWith: "Q-" } } },
       orderBy: { number: "desc" },

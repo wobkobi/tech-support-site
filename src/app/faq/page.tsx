@@ -17,6 +17,7 @@ import {
 import { getPolicy, getPublicPricing } from "@/features/business/lib/pricing-policy.server";
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
 import { CARD, FrostedSection, PageShell, SOFT_CARD } from "@/shared/components/PageLayout";
+import { renderEmphasised } from "@/shared/components/renderEmphasised";
 import { cn } from "@/shared/lib/cn";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import type { Metadata } from "next";
@@ -56,18 +57,6 @@ const linkStyle =
  */
 function stripEmphasis(text: string): string {
   return text.replace(/\*\*([^*]+)\*\*/g, "$1");
-}
-
-/**
- * Renders `**…**` as `<strong>` spans for the JSX accordion bodies.
- * @param text - Copy string containing zero or more `**…**` segments.
- * @returns Array of React nodes ready to drop into a parent block element.
- */
-function renderEmphasised(text: string): React.ReactNode[] {
-  return text.split(/(\*\*[^*]+\*\*)/g).map((part, i) => {
-    const m = part.match(/^\*\*([^*]+)\*\*$/);
-    return m ? <strong key={i}>{m[1]}</strong> : <span key={i}>{part}</span>;
-  });
 }
 
 /**

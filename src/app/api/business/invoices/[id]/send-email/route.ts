@@ -100,13 +100,10 @@ export async function POST(
     return errorResponse("Email send failed", 502);
   }
 
-  // Stamp reviewLinkSentAt iff the review line was actually included. This is
-  // what powers the 30-day cooldown for invoice-to-invoice sends in
-  // getInvoiceReviewEligibility. Resending the same invoice with the toggle
-  // still on re-stamps it; sending with the toggle off leaves it alone (the
-  // last actual send timestamp stands).
-  // Only promote a DRAFT to SENT on first send. Re-sending a SENT or PAID
-  // invoice (a receipt copy) must not regress its status back to SENT.
+  // Stamp reviewLinkSentAt only when the review line actually went out - it drives the
+  // 30-day cooldown in getInvoiceReviewEligibility, so a send with the toggle off must
+  // leave the last real timestamp standing. Status only ever moves DRAFT > SENT; a
+  // re-sent SENT or PAID invoice (a receipt copy) must not regress.
   const updated = await prisma.invoice.update({
     where: { id },
     data: {

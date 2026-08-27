@@ -20,6 +20,7 @@ import {
   optimisticBusyEvent,
   type WeekEvent,
 } from "@/features/admin/lib/schedule-types";
+import { parseBookingNotes } from "@/features/booking/lib/booking";
 import { cn } from "@/shared/lib/cn";
 import { isPastEditWindow, nzDayEndMs } from "@/shared/lib/edit-window";
 import { addDaysToDateKey, getPacificAucklandOffset, nzDateKey } from "@/shared/lib/timezone-utils";
@@ -39,6 +40,25 @@ function formatGap(minutes: number): string {
   if (h > 0 && m > 0) return `${h}h ${m}m free`;
   if (h > 0) return `${h}h free`;
   return `${m}m free`;
+}
+
+/**
+ * Notes row on a booking card, showing only what the person actually typed. The
+ * rest of the blob is the machine-written metadata mirror, and its Address line
+ * already renders as its own row above this one.
+ * @param props - Component props.
+ * @param props.notes - Raw booking notes blob.
+ * @returns The notes row, or null when nothing was typed.
+ */
+function BookingNotesRow({ notes }: { notes: string | null }): React.ReactElement | null {
+  const { userNotes } = parseBookingNotes(notes);
+  if (!userNotes) return null;
+  return (
+    <div className="text-xs whitespace-pre-wrap text-admin-text-secondary">
+      <span className="text-admin-faint">Notes: </span>
+      {userNotes}
+    </div>
+  );
 }
 
 /** Minimum gap between consecutive bookings to render a "free" label. */
@@ -144,10 +164,9 @@ export function DayAgendaView({
     };
   }, [yy, mm, dd, offset, selectedDayKey]);
 
-  // Filter the week's events down to the selected day. All-day events are
-  // start-inclusive / end-exclusive so multi-day Busy blocks show on each
-  // overlapping day key. Timed events are sorted by start instant + then
-  // interleaved with "free" gap markers between consecutive bookings.
+  // Filter the week down to the selected day. All-day events are start-inclusive /
+  // end-exclusive so multi-day Busy blocks show on every overlapping day key; timed events
+  // sort by start instant, then interleave with "free" gap markers.
   const { agendaItems, timedEvents, allDayEvents } = useMemo(() => {
     const timed: WeekEvent[] = [];
     const allDay: WeekEvent[] = [];
@@ -165,10 +184,8 @@ export function DayAgendaView({
     // `+12:00`-offset strings with travel blocks' UTC `Z` ISO output.
     timed.sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
 
-    // Interleave free-time gap markers between consecutive bookings. Only
-    // booking>booking gaps get a label - the operator's free-slot view
-    // shouldn't be confused by travel or personal events that already imply
-    // unavailability.
+    // Only booking>booking gaps get a free-time label - travel and personal events
+    // already imply unavailability, and labelling around them muddies the free-slot view.
     type AgendaItem =
       | { type: "event"; ev: WeekEvent }
       | { type: "gap"; minutes: number }
@@ -185,10 +202,9 @@ export function DayAgendaView({
       if (gapMin >= MIN_GAP_MINUTES) items.push({ type: "gap", minutes: gapMin });
     }
 
-    // Mark where the day has got to, before the first event still to come. An
-    // event already under way starts before now, so the marker lands after its
-    // card rather than splitting it. Skipped on an empty day, where a lone line
-    // with nothing either side says less than the "no events" message does.
+    // Mark where the day has got to, before the first event still to come - an event
+    // already under way started before now, so the marker lands after its card rather than
+    // splitting it. Skipped on an empty day, where the "no events" message says more.
     if (timed.length > 0 && selectedDayKey === nzDateKey(new Date(nowMs))) {
       const next = items.findIndex(
         (it) => it.type === "event" && new Date(it.ev.startAt).getTime() > nowMs,
@@ -202,10 +218,9 @@ export function DayAgendaView({
   }, [events, selectedDayKey, nowMs]);
 
   const holidayName = holidaysByDateKey[selectedDayKey] ?? null;
-  // Optimistic override for a just-clicked day: true = blocked, false = free,
-  // undefined = use the real calendar. `busyEvent` (real event, for the unblock
-  // id) excludes the placeholder; the displayed list shows/hides the block to
-  // match the click instantly.
+  // Optimistic override for a just-clicked day: true = blocked, false = free, undefined =
+  // use the real calendar. `busyEvent` excludes the placeholder (it carries the unblock
+  // id); the displayed list shows or hides the block to match the click instantly.
   const override = optimisticBlock.get(selectedDayKey);
   const realBusy = allDayEvents.find((e) => e.kind === "booking");
   const effectiveBlocked = override ?? realBusy != null;
@@ -733,12 +748,7 @@ export function DayAgendaView({
                           {ev.booking.address}
                         </div>
                       )}
-                      {ev.booking.notes && (
-                        <div className="text-xs whitespace-pre-wrap text-admin-text-secondary">
-                          <span className="text-admin-faint">Notes: </span>
-                          {ev.booking.notes}
-                        </div>
-                      )}
+                      <BookingNotesRow notes={ev.booking.notes} />
                       <div className="mt-1 flex items-center justify-between gap-2 text-[11px] text-admin-faint">
                         <span className="font-mono">#{ev.booking.id}</span>
                         <span className="italic">Hold to edit</span>

@@ -10,12 +10,10 @@ import { cn } from "@/shared/lib/cn";
 import type React from "react";
 import { FaBan, FaCircleCheck } from "react-icons/fa6";
 
-// Serialize block/unblock writes across ALL day buttons. The block/unblock routes
-// read the current blocks then patch/delete to auto-merge or trim - two requests
-// running at once race that read-modify-write and can drop a block (e.g. blocking
-// Wed-Sun rapidly left Wed + Thu unblocked). A shared promise chain makes each
-// request wait for the previous to commit, so every merge sees the latest state.
-// The optimistic UI still updates instantly per click; only the network write queues.
+// Serialise block/unblock writes across ALL day buttons: the routes read the current
+// blocks then patch/delete to merge or trim, so two in flight race that read-modify-write
+// and drop blocks (rapid Wed-Sun left Wed + Thu unblocked). Only the network write
+// queues - the optimistic UI still updates instantly per click.
 let blockWriteQueue: Promise<unknown> = Promise.resolve();
 
 /**
@@ -112,10 +110,9 @@ export function BlockDayButton({
       onOptimisticChange?.(dateKey, false);
       return;
     }
-    // No confirm dialog: blocking/unblocking is instant + reversible (click again),
-    // so the operator can toggle several days in quick succession. Flip the UI now
-    // (before the slow Google round-trip); reconcile via onChanged on success, or
-    // revert to the old state if the request fails.
+    // No confirm dialog: blocking is instant and reversible, so the operator can toggle
+    // several days quickly. Flip the UI before the slow Google round-trip, then reconcile
+    // via onChanged on success or revert on failure.
     onOptimisticChange?.(dateKey, !isBlocked);
     onPending(dateKey, true);
     try {

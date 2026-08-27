@@ -118,11 +118,9 @@ export function useSettingsForm<G extends SettingsGroup>(
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(baseline);
 
-  // Dotted paths of the fields edited since the last save, keyed the same way
-  // field ids are, so a field row can recognise itself without every call site
-  // threading a prop. Arrays and other non-plain values report as one path
-  // (`morningGuards`, `servedSuburbs`) rather than per index, matching the
-  // single anchor those composite editors render.
+  // Dotted paths of fields edited since the last save, keyed like field ids so a row can
+  // recognise itself without a threaded prop. Arrays report as one path (`morningGuards`)
+  // rather than per index, matching the single anchor those composite editors render.
   const changedPaths = useMemo(() => new Set(diffPaths(draft, baseline)), [draft, baseline]);
 
   // Warn before a full-page unload (reload / close / external nav) with unsaved

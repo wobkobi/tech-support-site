@@ -1,9 +1,8 @@
 // src/shared/lib/normalise-email.ts
-// Single source of truth for the email form that gets stored, matched, and
-// sent to. Every provider the site deals with treats addresses
-// case-insensitively, so storing "Jane.Smith@Example.com" alongside
-// "jane.smith@example.com" only ever produces duplicate contacts and missed
-// review-cooldown matches. Everything is normalised on the way in instead.
+// Single source of truth for the email form that gets stored, matched and sent to. Every
+// provider the site deals with treats addresses case-insensitively, so storing
+// "Jane.Smith@Example.com" beside "jane.smith@example.com" only ever produces duplicate
+// contacts and missed review-cooldown matches.
 
 /**
  * Normalises an email address for storage and comparison: trims surrounding

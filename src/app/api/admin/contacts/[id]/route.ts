@@ -213,10 +213,9 @@ export async function DELETE(
     return NextResponse.json({ ok: true, alreadyDeleted: true });
   }
 
-  // Unlink the contact's reviews as we soft-delete, atomically. Otherwise they
-  // keep a contactId pointing at a now-hidden contact, and matchReviewsToContacts
-  // (which only re-homes contactId==null) would never surface them again. Nulled,
-  // they show as unlinked and can re-match to a live contact.
+  // Unlink the contact's reviews in the same write as the soft-delete: left pointing at a
+  // hidden contact they never resurface, since matchReviewsToContacts only re-homes
+  // contactId==null. Nulled, they show as unlinked and can re-match to a live contact.
   await prisma.$transaction([
     prisma.review.updateMany({ where: { contactId: id }, data: { contactId: null } }),
     prisma.contact.update({ where: { id }, data: { deletedAt: new Date() } }),

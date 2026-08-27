@@ -167,10 +167,9 @@ export function PricingWizard({
       ),
     ]);
 
-    // Both legs quoted at "now"-ish traffic (no job time exists at this
-    // point; the server defaults the return to +60 min, matching the
-    // fallback duration below). Force 0 for remote even if an address was
-    // typed before backing up.
+    // Both legs at "now"-ish traffic - no job time exists yet, and the server
+    // defaults the return to +60 min, matching the fallback duration below.
+    // Forced to 0 for remote even if an address was typed before backing up.
     const travelMins =
       meeting === "remote"
         ? 0
@@ -262,10 +261,10 @@ export function PricingWizard({
         ? rawOriginal
         : null;
 
-    // Per-task breakdown: allocate the visit range proportionally to each
-    // task's share of total mins. Per-line rangeFor would re-apply the $20 min
-    // spread and inflate beyond the visit total; proportional split keeps the
-    // sum honest with drift snapping to the largest line.
+    // Allocate the visit range proportionally to each task's share of total mins. A
+    // per-line rangeFor would re-apply the $20 minimum spread and inflate past the visit
+    // total; the proportional split keeps the sum honest, with drift snapping to the
+    // largest line.
     const taskLines = (() => {
       const visitJob = rangeFor(effectiveMins, promoRate);
       if (tasks.length <= 1) {

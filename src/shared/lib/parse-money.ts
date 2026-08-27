@@ -20,10 +20,9 @@
  */
 export function parseMoney(raw: string): number | null {
   const trimmed = raw.trim();
-  // Reject any negative marker before stripping symbols - a leading "-", a "-"
-  // tucked after the currency symbol ("$-20"), or accounting parentheses
-  // ("(20.00)") - so a refund line pasted from a statement is refused rather
-  // than landing as a positive cost.
+  // Reject negative markers before stripping symbols - a leading "-", one tucked after the
+  // currency symbol ("$-20"), or accounting parentheses ("(20.00)") - so a refund pasted
+  // from a statement is refused rather than landing as a positive cost.
   if (trimmed === "" || /[-()]/.test(trimmed)) return null;
   const cleaned = trimmed.replace(/[^\d.]/g, "");
   if (cleaned === "" || cleaned === ".") return null;

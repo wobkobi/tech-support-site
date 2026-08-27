@@ -33,12 +33,10 @@ function escapeHtml(value: string): string {
     .replace(/'/g, "&#39;");
 }
 
-// Bare http(s) URL inside ALREADY-ESCAPED text. `&amp;` stays part of the match
-// because it is a real query separator the operator typed; any other entity
-// ends it, since &quot; / &#39; / &lt; / &gt; came from quotes or brackets
-// AROUND the link rather than from the link itself. Only http(s) matches, so
-// javascript: and data: URLs can never become anchors. Case-insensitive because
-// a phone keyboard will autocapitalise "Https://" at the start of a line.
+// Bare http(s) URL inside ALREADY-ESCAPED text. `&amp;` stays in the match (a real query
+// separator the operator typed); any other entity ends it, since &quot; / &#39; / &lt; /
+// &gt; came from punctuation AROUND the link. http(s) only, so javascript: and data: can
+// never become anchors. Case-insensitive: a phone keyboard autocapitalises "Https://".
 const ESCAPED_URL_RE = /https?:\/\/(?:&amp;|[^\s&])+/gi;
 
 /** Sentence punctuation that belongs to the prose, not to a trailing URL. */

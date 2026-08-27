@@ -104,10 +104,9 @@ export async function calculateTravelMinutes(
     url.searchParams.set("destinations", destination);
     url.searchParams.set("mode", mode);
     url.searchParams.set(timeParam, Math.floor(epochSeconds).toString());
-    // best_guess traffic for driving: Google's most-likely duration for the
-    // departure time. The settings travelRoundBufferMin already pads blocks for
-    // bad runs, so pessimistic on top double-counted the safety margin.
-    // traffic_model is only valid for driving departure lookups.
+    // best_guess traffic: Google's most-likely duration for the departure time. The
+    // travelRoundBufferMin setting already pads blocks for bad runs, so pessimistic on top
+    // double-counts the safety margin. traffic_model only applies to driving departures.
     if (mode === "driving" && timeParam === "departure_time") {
       url.searchParams.set("traffic_model", "best_guess");
     }
@@ -163,10 +162,9 @@ export async function calculateTravelMinutes(
   }
 
   // Driving "arrive by": Google ignores arrival_time for driving, so iterate the
-  // departure. Price the drive departing AT the target arrival (rough), then
-  // re-price departing that many minutes earlier so the sampled traffic is for
-  // when you'd actually set off. Clamp to just ahead of now - Distance Matrix
-  // rejects a past departure_time (imminent jobs).
+  // departure. Price it leaving AT the target arrival for a rough duration, then re-price
+  // leaving that many minutes earlier so the traffic sampled is for the real departure.
+  // Clamped to just ahead of now, since Distance Matrix rejects a past departure_time.
   if (mode === "driving" && wantArrival) {
     const targetSec = anchor.getTime() / 1000;
     const rough = await query("departure_time", targetSec);

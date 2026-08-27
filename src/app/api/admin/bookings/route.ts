@@ -163,10 +163,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const cancelToken = randomUUID();
   const reviewToken = randomUUID();
 
-  // Internal notes blob: the operator's record, parsed back by
-  // parseBookingNotes. Never sent to the customer - the calendar invite gets the
-  // customer-facing description built below, since the client is an attendee and
-  // would otherwise read the admin marker and the raw metadata.
+  // Internal notes blob, parsed back by parseBookingNotes. The customer is an attendee on
+  // the invite, so the event gets the customer-facing description built below instead -
+  // this one would show them the admin marker and the raw metadata.
   let bookingNotes = notes ? `${notes}\n\n` : "";
   bookingNotes += `[Manual entry by admin - ${durationMinutes} min]\n`;
   bookingNotes += `Meeting type: ${address ? "In-person" : "Remote"}\n`;
@@ -219,6 +218,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         // so the schedule agenda's "Open in Maps" link and the cancellation-invoice
         // draft can read booking.address for manually-created bookings too.
         address,
+        // Same structured columns the public flow writes. Without them a manual
+        // booking renders no meeting-type or duration chip, which left the operator
+        // reading those values out of the raw notes text instead.
+        meetingType: address ? "in_person" : "remote",
+        duration: durationMinutes === 60 ? "short" : "long",
         notes: bookingNotes,
         startAt,
         endAt,

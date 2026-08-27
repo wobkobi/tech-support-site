@@ -148,11 +148,9 @@ export async function PATCH(
 
   const now = new Date();
 
-  // Lock past events: refuse state changes (complete / cancel / no-show) and
-  // time edits on a booking that ended more than the configured window ago -
-  // both feed billing, so stale history shouldn't be rewritten by accident.
-  // Metadata-only edits (name/email/phone/notes/address corrections) are still
-  // allowed.
+  // Lock past events: state changes and time edits both feed billing, so a booking that
+  // ended more than the configured window ago can't be rewritten by accident.
+  // Metadata-only edits (name/email/phone/notes/address) are still allowed.
   const isStateChange = body.status !== undefined || body.markNoShow === true;
   const isTimeChange = body.startAt !== undefined || body.endAt !== undefined;
   const { scheduling } = await getSettings();
@@ -211,11 +209,9 @@ export async function PATCH(
       );
     }
 
-    // Staying silent needs BOTH times in the past - that is the only shape that
-    // is purely "record what actually happened". A booking still ahead is an
-    // ordinary reschedule, and one whose stored time has passed but is being
-    // moved into the future is a reschedule too (a stale row being corrected to
-    // a date the customer may not know about yet), so both notify.
+    // Staying silent needs BOTH times in the past - only then is the edit purely
+    // "record what actually happened". Anything moving into the future is a reschedule
+    // the customer may not know about yet, so it notifies.
     const alreadyRun =
       booking.startAt.getTime() <= now.getTime() && startAt.getTime() <= now.getTime();
     const notify = !alreadyRun && booking.status !== "cancelled";
@@ -234,10 +230,9 @@ export async function PATCH(
     if (!booking.activeSlotKey?.startsWith("released:")) {
       data.activeSlotKey = startAt.toISOString();
     }
-    // A moved start needs its 24h nudge again; the stamp is otherwise never
-    // cleared, so a booking reminded at the old time is never reminded at the
-    // new one. Gated on the start actually changing, so correcting only the
-    // finish time doesn't re-send a reminder the customer already has.
+    // A moved start needs its 24h nudge again, and nothing else clears the stamp. Gated on
+    // the start actually changing, so correcting only the finish time doesn't re-send a
+    // reminder the customer already has.
     if (startAt.getTime() !== booking.startAt.getTime()) {
       data.emailReminderSentAt = null;
     }
@@ -246,10 +241,9 @@ export async function PATCH(
       // The replacement invite only supersedes the old one when its SEQUENCE
       // rises, and the ICS sequence is built from rescheduleCount.
       data.rescheduleCount = { increment: 1 };
-      // Re-snapshot both drive legs at the new times so a later cancellation
-      // bills the right travel. Deliberately not done on the past branch:
-      // travel is frozen once a job has run, and a fresh lookup against a
-      // historic departure time would only blank it.
+      // Re-snapshot both drive legs at the new times so a later cancellation bills the
+      // right travel. Not done on the past branch - travel freezes once a job has run, and
+      // a lookup against a historic departure time would only blank it.
       if (booking.meetingType === "in_person" && booking.address) {
         try {
           const drive = await lookupDriveRoundTrip(booking.address, startAt, endAt);
@@ -322,10 +316,9 @@ export async function PATCH(
     data.status = "confirmed";
   }
 
-  // Apply the update. activeSlotKey is unique, so a time edit onto a start
-  // another live booking already holds surfaces here as P2002 - and unlike an
-  // overlap it can't be forced through, since the constraint is the thing
-  // keeping two bookings off the same slot.
+  // activeSlotKey is unique, so a time edit onto a start another live booking holds
+  // surfaces as P2002. Unlike an overlap it can't be forced through - that constraint is
+  // what keeps two bookings off the same slot.
   const updated = await prisma.booking.update({ where: { id }, data }).catch((error: unknown) => {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       return null;
@@ -400,10 +393,9 @@ export async function PATCH(
     updated.cancelledBy === "customer" &&
     booking.status !== "cancelled"
   ) {
-    // Awaited, not detached: Vercel freezes the instance once the response is
-    // sent. The awaits further down this handler used to give a `void` call an
-    // incidental window, but they are skipped on the no-show path, so the fee
-    // invoice was never drafted there.
+    // Awaited, not detached: Vercel freezes the instance once the response is sent, and
+    // the no-show path skips the awaits further down that would otherwise give a `void`
+    // call an incidental window - the fee invoice would never be drafted.
     try {
       await createDraftCancellationInvoice(updated, {
         reason: updated.noShow ? "no-show" : "late-cancellation",
@@ -413,12 +405,9 @@ export async function PATCH(
     }
   }
 
-  // When transitioning to "completed", send the review request email if one
-  // has not already gone out. updateMany with the null-or-missing guard is
-  // atomic, so it cannot race with the /api/cron/send-review-emails cron - if
-  // the cron already claimed the send, the updateMany returns count=0 and the
-  // send is skipped. Same `isSet: false` clause as the cron to handle MongoDB
-  // documents where `reviewSentAt` was never written (pre-schema docs).
+  // Atomic claim: updateMany returns count=0 if the send-review-emails cron got there
+  // first, so the two can never double-send. `isSet: false` also covers Mongo docs
+  // written before reviewSentAt existed, which have no such key at all.
   let reviewSent = false;
   if (
     body.status === "completed" &&
@@ -523,10 +512,9 @@ export async function DELETE(
     }
   }
 
-  // Drop the dangling reference first: Review.bookingId is a bare ObjectId, not
-  // a relation, so deleting the booking would otherwise leave reviews pointing at
-  // a row that no longer exists. The review itself is kept (it stays linked to
-  // its contact via contactId/customerRef).
+  // Drop the dangling reference first: Review.bookingId is a bare ObjectId, not a
+  // relation, so deleting the booking would leave reviews pointing at nothing. The review
+  // is kept - it stays linked to its contact via contactId/customerRef.
   await prisma.review.updateMany({ where: { bookingId: id }, data: { bookingId: null } });
   await prisma.booking.delete({ where: { id } });
 

@@ -115,10 +115,9 @@ export async function uploadInvoicePdf(
       await ensureAnyoneWithLinkReader(res.data.id!);
       return { fileId: res.data.id!, webUrl: res.data.webViewLink! };
     } catch (err) {
-      // Only fall through to a fresh create when the target is genuinely gone
-      // (404/410). A transient 5xx/429/timeout may have applied (or would
-      // succeed on retry), so rethrow it rather than orphaning the existing PDF
-      // behind a duplicate that the emailed link no longer points at.
+      // Only fall through to a fresh create when the target is genuinely gone (404/410).
+      // A transient 5xx/429/timeout may have applied, or would on retry, so rethrow rather
+      // than orphaning the existing PDF behind a duplicate the emailed link misses.
       const e = err as { code?: unknown; response?: { status?: unknown } };
       const status =
         typeof e.response?.status === "number"
@@ -161,13 +160,9 @@ export async function searchAllInvoicePdfs(): Promise<
 > {
   const drive = getDriveClient();
   const results: { name: string; fileId: string; webUrl: string }[] = [];
-  // Paged like listSpreadsheetsInFolder below. Drive treats pageSize as a
-  // maximum and routinely returns a short page plus a continuation token for a
-  // broad drive-wide query, so reading one page silently truncated the set:
-  // invoices whose PDF sat on a later page looked like they had no Drive file
-  // at all and never got their driveFileId/driveWebUrl back-filled. Requesting
-  // nextPageToken in `fields` is required - omit it and the token is not even
-  // returned.
+  // Paged like listSpreadsheetsInFolder below: Drive treats pageSize as a maximum and
+  // returns a continuation token on broad queries, so a single page silently truncates.
+  // nextPageToken must be requested in `fields` - omit it and the token never comes back.
   let pageToken: string | undefined;
   do {
     const res = await drive.files.list({

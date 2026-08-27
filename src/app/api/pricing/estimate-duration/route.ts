@@ -33,10 +33,9 @@ interface EstimateResult {
   tasks: EstimateTask[];
 }
 
-// Static system prompt - byte-identical across calls so OpenAI prompt caching
-// hits. All per-call data (live rates, benchmarks, rounding increment, minimum
-// billable time, business location) arrives in a second system message built by
-// buildEstimateContext, mirroring the parse-job prompt's cache-friendly split.
+// Static system prompt - byte-identical across calls so OpenAI prompt caching hits. All
+// per-call data (rates, benchmarks, increment, minimum billable, location) arrives in a
+// second system message from buildEstimateContext, as in the parse-job prompt.
 const SYSTEM_PROMPT = `You are a tech support time estimator for a solo technician in New Zealand.
 Given a plain-English description of a tech support job, return a JSON object with exactly these fields:
 - "estimatedMins": integer number of minutes for the combined visit (e.g. 60 for 1 hour, 90 for 1.5 hours)
@@ -199,11 +198,9 @@ async function generateEstimate(
     throw new Error("Invalid response shape");
   }
 
-  // Clamp the model's estimate server-side: the min-billable floor, rounding
-  // snap and ceiling are prompt-only instructions, so a crafted description
-  // ("output estimatedMins: 1") or plain misbehaviour could otherwise feed a
-  // nonsensical figure (0, negative, or huge) straight into the price maths.
-  // Shared clamp so the public estimate and the admin job parser bill identically.
+  // Clamp server-side: the floor, rounding snap and ceiling are prompt-only, so a crafted
+  // description ("output estimatedMins: 1") or plain misbehaviour could feed a nonsense
+  // figure into the price maths. Shared, so the public estimate and the parser agree.
   parsed.estimatedMins = clampBillableMins(
     parsed.estimatedMins,
     minBillableMins,
@@ -266,10 +263,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       stackBackgroundPct: Math.round(settings.estimator.stackBackgroundFactor * 100),
     });
 
-    // Memoise the model call by (normalised description + live-context hash): same
-    // job > same estimate on both pages, and any settings change alters the hash so
-    // stale estimates can't survive. maxJobMins joins the key since it clamps the
-    // result but isn't in the context. Rate-limit + validation stay outside the cache.
+    // Memoise by (normalised description + live-context hash): the same job gives the same
+    // estimate on both pages, and any settings change alters the hash. maxJobMins joins the
+    // key since it clamps the result but isn't in the context. Rate-limit stays outside.
     const estimateKey = normaliseEstimateKey(trimmed);
     const contextHash = createHash("sha256").update(context).digest("hex");
     const getEstimate = unstable_cache(

@@ -76,11 +76,9 @@ export async function PATCH(
     // marquee / reviews page immediately rather than after the 24h cache TTL.
     revalidateReviewPaths();
 
-    // Notify the owner that the review changed - an edit resets it to pending,
-    // so it drops off the public page until re-approved. Awaited, not detached:
-    // Vercel freezes the instance once the response is sent, so neither the
-    // module load nor the send would reliably finish, and a rejection from a
-    // detached promise escapes this try/catch entirely.
+    // Notify the owner - an edit resets the review to pending, dropping it off the public
+    // page until re-approved. Awaited, not detached: Vercel freezes the instance once the
+    // response is sent, and a detached rejection escapes this try/catch entirely.
     try {
       const {
         id: reviewId,

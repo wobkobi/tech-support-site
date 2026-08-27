@@ -1,12 +1,9 @@
 // src/features/contacts/lib/maintenance.ts
-// Single source of truth for contact maintenance: backfilling contacts from
-// bookings, merging duplicates (by Google link, then email, then mobile),
-// linking reviews to contacts, and surfacing field conflicts for the admin to
-// resolve. Every merge pass folds through one helper so they cannot drift apart
-// in what they preserve off the deleted row. The sync-contacts cron,
-// the standalone admin routes, and the contacts admin page (enrich only) call
-// these - keeping the logic here is what stops the paths from drifting apart.
-// Every reader excludes soft-deleted contacts (deletedAt != null).
+// Single source of truth for contact maintenance: backfilling contacts from bookings,
+// merging duplicates (by Google link, then email, then mobile), linking reviews, and
+// surfacing field conflicts for the admin. The cron, the admin routes and the contacts
+// page all call these, and every merge folds through one helper, so no path can drift in
+// what it preserves off the deleted row. Every reader excludes soft-deleted contacts.
 
 import { isNZMobileKey, normaliseContactPhone } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
@@ -163,11 +160,9 @@ async function foldContactInto(keeper: MergeableContact, dup: MergeableContact):
         where: { contactId: dup.id },
         data: { contactId: keeper.id },
       }),
-      // ContactConflict.contactId is a bare ObjectId with no relation, so
-      // nothing cascades on the delete below. Left behind, an unresolved
-      // conflict points at a row that no longer exists: it renders as
-      // "Unknown", every resolve attempt 500s on P2025, and the unresolved
-      // count never returns to zero.
+      // ContactConflict.contactId has no relation, so nothing cascades on the
+      // delete below. Left behind, the conflict points at a missing row: renders
+      // as "Unknown", 500s on every resolve, and the count never returns to zero.
       prisma.contactConflict.updateMany({
         where: { contactId: dup.id },
         data: { contactId: keeper.id },
@@ -358,10 +353,9 @@ export async function backfillContactsFromBookings(): Promise<number> {
   for (const c of live) {
     if (c.email) continue;
     const norm = normaliseContactPhone(c.phone);
-    // Mobile-only, the same gate mergePhoneOnlyContacts applies: a shared
-    // landline may belong to two different people in one household. Without it,
-    // a son booking on the family landline had his email written onto his
-    // mother's contact and no contact of his own was ever created.
+    // Mobile-only, the same gate mergePhoneOnlyContacts applies: a shared landline may
+    // belong to two people in one household. Without it a son booking on the family
+    // landline gets his email written onto his mother's contact and never gets his own.
     if (norm && isNZMobileKey(norm)) phoneOnlyByNorm.set(norm, c);
   }
 
@@ -403,12 +397,9 @@ export async function backfillContactsFromBookings(): Promise<number> {
       });
       if (!exists) {
         await prisma.contact
-          // Explicit null, not omitted: Mongo stores no key for an omitted
-          // optional field, and `where: { deletedAt: null }` - the filter every
-          // reader uses - does not match a document where the key is absent.
-          // Omit it and the backfilled contact is invisible to the admin list,
-          // the sync dirty-set, and the review matcher that runs straight after
-          // this pass. find-or-create.ts passes it for the same reason.
+          // Explicit null, not omitted: Mongo stores no key for an omitted optional
+          // field, so `where: { deletedAt: null }` would not match this contact and it
+          // would be invisible to every reader. find-or-create.ts does the same.
           .create({ data: { ...d, deletedAt: null } })
           .then(() => (created += 1))
           .catch(() => null);

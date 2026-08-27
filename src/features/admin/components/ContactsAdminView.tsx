@@ -9,7 +9,7 @@ import type { ConflictEntry } from "@/features/contacts/lib/maintenance";
 import { cn } from "@/shared/lib/cn";
 import { useRouter } from "next/navigation";
 import type React from "react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ContactAdminList, type ContactRow } from "./ContactAdminList";
 
 interface ContactsAdminViewProps {
@@ -35,6 +35,45 @@ export function ContactsAdminView({
   const [syncConfirmPending, setSyncConfirmPending] = useState(false);
   const [checkingAddresses, setCheckingAddresses] = useState(false);
   const [addressResult, setAddressResult] = useState<string | null>(null);
+
+  // `syncing` is component state, so navigating away and back resets it mid-run - that is
+  // how a second sync gets fired into the middle of the first. Ask the server on mount,
+  // then poll until it finishes so the button tracks reality.
+  useEffect(() => {
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    // Only refresh on a running > finished transition. Refreshing whenever the
+    // server simply reports "not running" would fire on every page load.
+    let sawRunning = false;
+
+    /**
+     * Reads live sync state and re-arms while a run is in flight.
+     */
+    async function poll(): Promise<void> {
+      try {
+        const res = await fetch("/api/admin/contacts/sync");
+        if (!res.ok) return;
+        const { running } = (await res.json()) as { running?: boolean };
+        if (cancelled) return;
+        setSyncing(running === true);
+        if (running) {
+          sawRunning = true;
+          timer = setTimeout(() => void poll(), 5000);
+        } else if (sawRunning) {
+          // It finished while this page was open, so the rows on screen predate it.
+          router.refresh();
+        }
+      } catch {
+        // Offline or a transient failure - leave the button as it is.
+      }
+    }
+
+    void poll();
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [router]);
 
   const syncedCount = contacts.filter((c) => !!c.googleContactId).length;
   const unsyncedCount = contacts.filter((c) => !c.googleContactId).length;

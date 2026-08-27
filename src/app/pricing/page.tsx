@@ -26,6 +26,7 @@ import {
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
 import { CARD, FrostedSection, PageShell, SOFT_CARD } from "@/shared/components/PageLayout";
 import { PixelEvent } from "@/shared/components/PixelEvent";
+import { renderEmphasised } from "@/shared/components/renderEmphasised";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
 import { getSettings } from "@/shared/lib/settings/get-settings";
@@ -64,18 +65,6 @@ export async function generateMetadata(): Promise<Metadata> {
 
 const linkStyle =
   "text-coquelicot-500 hover:text-coquelicot-400 underline-offset-4 hover:underline";
-
-/**
- * Renders `**…**` segments from pricing-policy copy as `<strong>` spans.
- * @param text - Copy string containing zero or more `**…**` segments.
- * @returns Array of React nodes ready to drop into a `<div>`.
- */
-function renderEmphasised(text: string): React.ReactNode[] {
-  return text.split(/(\*\*[^*]+\*\*)/g).map((part, i) => {
-    const m = part.match(/^\*\*([^*]+)\*\*$/);
-    return m ? <strong key={i}>{m[1]}</strong> : <span key={i}>{part}</span>;
-  });
-}
 
 const ACCORDION_DETAILS =
   "group rounded-xl border border-seasalt-200/60 bg-white/40 p-0 open:bg-white open:shadow-sm";

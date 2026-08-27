@@ -11,11 +11,11 @@ import {
   GST_RATE,
   HOME_REGION,
   NZ_REGION,
-  nzDateKey,
   type Policy,
 } from "@/features/business/lib/pricing-policy";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
+import { nzDateKey } from "@/shared/lib/timezone-utils";
 import Holidays from "date-holidays";
 import { unstable_cache } from "next/cache";
 import { cache } from "react";
@@ -169,10 +169,9 @@ export const getPublicPricing = cache(async (): Promise<PublicPricing> => {
         description: MODIFIER_DESCRIPTIONS[row.label] ?? "",
       });
     } else if (row.label === "Public Holiday") {
-      // Single source: the uplift shown here comes from the pricing settings
-      // (what getPolicy charges), NOT the RateConfig percentDelta - so the
-      // displayed % can never drift from the charged %. The row only needs to
-      // exist to surface the modifier on the accordion.
+      // The uplift shown comes from the pricing settings (what getPolicy charges), NOT the
+      // RateConfig percentDelta, so the displayed % can't drift from the charged one. The
+      // row only has to exist to surface the modifier on the accordion.
       const uplift = pricing.publicHolidayUplift;
       const pct = Math.round(uplift * 100);
       modifiers.push({
@@ -202,10 +201,9 @@ export const getPublicPricing = cache(async (): Promise<PublicPricing> => {
   };
 });
 
-// Cached Holidays instances. The nationwide instance covers all public
-// holidays; the Auckland instance is queried separately for the regional
-// anniversary day. date-holidays computes algorithmically, so the same
-// instance is reused for every year.
+// Cached Holidays instances: nationwide for public holidays, Auckland queried separately
+// for the regional anniversary day. date-holidays computes algorithmically, so one
+// instance serves every year.
 const hdNz = new Holidays("NZ");
 const hdAuckland = new Holidays("NZ", "AUK");
 

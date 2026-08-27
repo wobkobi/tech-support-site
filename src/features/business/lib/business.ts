@@ -106,12 +106,9 @@ export function calcInvoiceTotals(
   promoDiscount = 0,
   gstRegistered: boolean = GST_REGISTERED,
 ): { subtotal: number; gstAmount: number; total: number } {
-  // Round EACH line before summing, matching the per-line lineTotal that
-  // jobToLineItems stores and the PDF's Total column prints. Summing unrounded
-  // and rounding once let that column disagree with the Subtotal beneath it:
-  // two 35-minute lines at $65/hr each print $37.92, but the unrounded sum
-  // rounded to $75.83 instead of $75.84 - a visible error on the customer's
-  // invoice.
+  // Round EACH line before summing, matching the lineTotal jobToLineItems stores and the
+  // PDF prints. Summing unrounded lets the Total column disagree with the Subtotal under
+  // it: two 35-min lines at $65/hr print $37.92 each but sum to $75.83, not $75.84.
   const subtotal =
     Math.round(
       lineItems.reduce((sum, item) => sum + Math.round(item.qty * item.unitPrice * 100) / 100, 0) *
@@ -305,11 +302,9 @@ export function collapseToWindow(
   const flat = tasks.filter((t) => t.baseRateId == null);
   if (hourlyIn.length === 0) return { tasks, dropped: 0, rescaled: false };
 
-  // The classification below splits tasks into short / explicit / floating
-  // groups, so the surviving lines have to be put back into the order the
-  // operator listed them - otherwise a quick task leads the invoice and the
-  // session's main work sinks to the bottom. Every derived clone carries its
-  // source position via {@link derive}.
+  // The classification below splits tasks into short / explicit / floating groups, so the
+  // survivors have to be restored to the operator's order - otherwise a quick task leads
+  // the invoice and the main work sinks. Clones carry their position via {@link derive}.
   const orderOf = new Map<TaskLine, number>();
   tasks.forEach((t, i) => orderOf.set(t, i));
   /**
@@ -338,10 +333,9 @@ export function collapseToWindow(
     return { tasks, dropped: 0, rescaled: false };
   }
 
-  // Pin short tasks at the operator's quick-task time; drop any that don't fit.
-  // isExplicit wins over isShort: a stated duration is the operator's own
-  // measurement, so it keeps its qty rather than being rewritten to the
-  // quick-task time (the parser emits the flags exclusive, this is the guard).
+  // Pin short tasks at the operator's quick-task time and drop any that don't fit.
+  // isExplicit beats isShort - a stated duration is the operator's own measurement, so it
+  // keeps its qty. The parser emits the flags exclusive; this is the guard.
   const short: TaskLine[] = hourlyIn
     .filter((t) => t.isShort && !t.isExplicit)
     .map((t) => derive(t, timing.shortTaskMins));
@@ -786,10 +780,9 @@ export function calcJobTotal(
   // labour-derived figure below (tasks total, holiday uplift, promo and
   // unsuccessful discounts) agrees with the floored invoice lines.
   const job = { ...jobIn, tasks: enforceMinBillable(jobIn.tasks, pricing.minBillableMins) };
-  // Round each task line before summing, exactly as jobToLineItems does when it
-  // builds the invoice rows. This preview and the saved invoice must land on the
-  // same cent: summing unrounded here made the calculator quote $75.83 for a job
-  // whose invoice then read $75.84.
+  // Round each task line before summing, exactly as jobToLineItems does: this preview and
+  // the saved invoice must land on the same cent, and summing unrounded quoted $75.83 for
+  // a job whose invoice then read $75.84.
   const tasksTotal = job.tasks.reduce((s, t) => s + Math.round(t.qty * t.unitPrice * 100) / 100, 0);
   const partsTotal = job.parts.reduce((s, p) => s + p.cost, 0);
   const rawTravelTotal = travelEntriesTotal(job.travelEntries);
@@ -827,10 +820,9 @@ export function calcJobTotal(
       .reduce((s, t) => s + t.qty * t.unitPrice, 0);
     unsuccessfulDiscount = Math.round(flaggedTasksTotal * unsuccessfulCut * 100) / 100;
   }
-  // GST applied to the discounted amount per NZ IRD price-reduction treatment.
-  // Clamp at 0 (matching calcInvoiceTotals) so stacked promo + unsuccessful
-  // discounts can never drive the total negative and disagree with the persisted
-  // invoice, which the server floors to 0.
+  // GST applies to the discounted amount, per IRD price-reduction treatment. Clamped at 0
+  // like calcInvoiceTotals, so stacked promo + unsuccessful discounts can't drive the
+  // total negative and disagree with the persisted invoice.
   const taxableAmount = Math.max(
     0,
     Math.round((subtotal - promoDiscount - unsuccessfulDiscount) * 100) / 100,

@@ -27,12 +27,10 @@ const exo = Exo({
 
 const siteUrl = getSiteUrl();
 
-// Runs synchronously during HTML parse, before paint. Old browsers (macOS High
-// Sierra Safari, Windows 7 Chrome/Firefox, old Android/iOS) cannot render the
-// Tailwind v4 / Next 16 app, so redirect them to the plain static fallback.
-// Probe color-mix() as a proxy: it lands in exactly the browsers Tailwind v4
-// needs (Safari 16.4+, Chrome 111+, Firefox 113+). Deliberately ES5-safe.
-// "?full=1" or a stored flag lets a visitor override and try the full site.
+// Runs during HTML parse, before paint, so browsers too old for the Tailwind v4 / Next 16
+// app get the static fallback instead. color-mix() is the probe because its support line
+// is exactly Tailwind v4's (Safari 16.4+, Chrome 111+, Firefox 113+). Deliberately
+// ES5-safe; "?full=1" or a stored flag lets a visitor override.
 const legacyRedirectScript = `(function(){try{var allow=false;try{if(window.localStorage&&localStorage.getItem("ttp-allow-modern")==="1")allow=true;}catch(e){}if(window.location&&window.location.search.indexOf("full=1")!==-1){allow=true;try{localStorage.setItem("ttp-allow-modern","1");}catch(e){}}if(allow)return;var ok=window.CSS&&typeof CSS.supports==="function"&&CSS.supports("color","color-mix(in srgb, #000, #fff)");if(!ok){window.location.replace("/legacy.html");}}catch(e){}})();`;
 
 export const metadata: Metadata = {

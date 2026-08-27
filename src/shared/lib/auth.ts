@@ -106,12 +106,10 @@ export async function requireAdminAuth(redirectPath = "/admin"): Promise<void> {
   const ok = await verifySessionCookieValue(value);
   if (ok) return;
 
-  // Same X-Admin-Secret path isAdminRequest accepts, so a script can fetch an
-  // admin page instead of getting a login redirect whose HTML still carries the
-  // intended page's metadata - a blank-looking render that reads as a bug.
-  // Browsers can't set the header on a navigation, so the cookie remains the
-  // only browser-facing path. Failures are rate-limited per IP exactly as on
-  // the API side, because this puts secret guessing in front of pages too.
+  // Same X-Admin-Secret path isAdminRequest accepts, so a script fetching an admin page
+  // gets the page rather than a login redirect that still carries its metadata. Browsers
+  // can't set the header on a navigation, so the cookie stays the only browser path.
+  // Rate-limited per IP as on the API side - this puts secret guessing in front of pages.
   const headerStore = await headers();
   const ip =
     headerStore.get("x-forwarded-for")?.split(",")[0]?.trim() ||

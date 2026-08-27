@@ -149,10 +149,9 @@ export async function lookupDriveRoundTrip(
 
   const fullDestination = `${trimmed}, New Zealand`;
 
-  // Distance Matrix only accepts a future departure_time, and without one
-  // Google omits duration_in_traffic entirely - the quote would silently
-  // degrade to free-flow times. Clamp both legs to the future and keep the
-  // return leg at or after the outbound one.
+  // Distance Matrix only accepts a future departure_time, and without one Google omits
+  // duration_in_traffic entirely, silently degrading the quote to free-flow times. Clamp
+  // both legs forward, keeping the return at or after the outbound.
   const departMs = Math.max(departAt?.getTime() ?? 0, Date.now() + 60_000);
   const returnMs = returnAt
     ? Math.max(returnAt.getTime(), departMs)

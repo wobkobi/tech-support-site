@@ -193,10 +193,9 @@ export default function BookingForm({
     },
   ];
 
-  // Form state. `selectedDateKey` is stored instead of the full BookableDay
-  // object so that when `availableDays` changes (e.g. after router.refresh on
-  // a 409), the latest slot data is always read from props during render -
-  // no useEffect-driven reconciliation needed.
+  // `selectedDateKey` rather than the full BookableDay: when `availableDays` changes (a
+  // router.refresh after a 409), the latest slot data is read from props during render,
+  // with no useEffect reconciliation.
   const [duration, setDuration] = useState<JobDuration>(initialValues?.duration ?? "short");
   const [selectedDateKey, setSelectedDateKey] = useState<string | null>(() => {
     if (initialValues?.dateKey && availableDays.some((d) => d.dateKey === initialValues.dateKey)) {
@@ -389,10 +388,9 @@ export default function BookingForm({
     });
   }, [hasSubmitError]);
 
-  // Submit guards. `submittingRef` blocks Enter-key spam regardless of React's
-  // setState timing. `idempotencyKey` is generated once per mount via the lazy
-  // useState initialiser (which is allowed to call impure functions); the
-  // server logs it so a retried submit can be correlated with the original.
+  // `submittingRef` blocks Enter-key spam regardless of React's setState timing.
+  // `idempotencyKey` is minted once per mount in the lazy useState initialiser (allowed to
+  // be impure); the server logs it so a retried submit correlates with the original.
   const submittingRef = useRef(false);
   const [idempotencyKey] = useState<string>(() =>
     typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -468,12 +466,9 @@ export default function BookingForm({
     }
   }
 
-  // Synchronise the selected time during render if it's no longer available
-  // for the current day + duration (e.g. after a router.refresh changed slot
-  // availability). The `selectedTime !== null` guard prevents an infinite
-  // setState loop - once the selection is nulled, the next render sees null
-  // and stops. This is the React-recommended "adjust state when a prop
-  // changes" pattern, used instead of a useEffect.
+  // React's "adjust state when a prop changes" pattern, not a useEffect: drop the
+  // selected time during render once it stops being available for the current day +
+  // duration. The `!== null` guard breaks the setState loop - the next render sees null.
   if (selectedTime !== null && selectedDay) {
     const window = selectedDay.timeWindows.find((w) => w.value === selectedTime);
     const sub = window?.subSlots.find((s) => s.minute === selectedMinute);
@@ -484,15 +479,10 @@ export default function BookingForm({
     }
   }
 
-  // Restore a localStorage draft on mount (new-booking mode only). Selection
-  // (dateKey/timeOfDay/startMinute) is only restored when it still matches a
-  // currently-available slot - otherwise those fields are silently dropped so
-  // the user picks a fresh time without seeing a misleading pre-pick.
-  //
-  // The setState-in-effect lint is intentionally suppressed: localStorage is
-  // unavailable during SSR, so the read cannot move to a useState lazy
-  // initialiser (it would either crash server-side or cause a hydration
-  // mismatch).
+  // Restore a localStorage draft on mount (new-booking mode only). The selection is
+  // restored only if it still matches an available slot, so the user never sees a
+  // misleading pre-pick. The setState-in-effect lint is suppressed on purpose:
+  // localStorage is unavailable during SSR, so this cannot be a lazy useState initialiser.
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (isEditMode) return;
@@ -740,10 +730,9 @@ export default function BookingForm({
     submittingRef.current = true;
     setSubmitting(true);
 
-    // Google-verify a typed-but-not-picked address before booking. When it
-    // resolves to more than one place we ask the customer which they meant - we
-    // never assume. Skipped in maps-fallback mode (no geocoder to check against)
-    // and once they've picked a candidate or chosen to use their text as-is.
+    // Google-verify a typed-but-not-picked address before booking; more than one match
+    // asks the customer which they meant rather than assuming. Skipped in maps-fallback
+    // mode, and once they have picked a candidate or chosen their text as-is.
     if (meetingType === "in-person" && !addressVerified && !addressOverrideAcked && !mapsFallback) {
       try {
         const verifyRes = await fetch("/api/booking/verify-address", {
@@ -1339,10 +1328,8 @@ export default function BookingForm({
                         setAddress(v);
                         setAddressCandidates(null);
                         // Any keystroke invalidates the prior pick. onChange
-                        // fires before onPlaceSelected on a real pick, so
-                        // batched updates leave verified=true on suggestions.
-                        // Skipped in fallback mode - there's no autocomplete to
-                        // verify against.
+                        // fires before onPlaceSelected, so batching leaves
+                        // verified=true on a real pick. Skipped in fallback mode.
                         if (!mapsFallback) {
                           setAddressVerified(false);
                           setAddressOverrideAcked(false);
@@ -1533,10 +1520,9 @@ export default function BookingForm({
               }
             }}
             onPaste={(e) => {
-              // Detect when the paste would push the value past maxLength so the user
-              // gets a hint that their text was trimmed (browsers silently
-              // truncate on maxLength). textarea selection range narrows the
-              // check to whatever the paste is actually replacing.
+              // Browsers truncate silently at maxLength, so detect an over-long
+              // paste and hint that the text was trimmed. The selection range
+              // narrows the check to whatever the paste actually replaces.
               const pasted = e.clipboardData.getData("text") ?? "";
               const target = e.currentTarget;
               const selectionLen = (target.selectionEnd ?? 0) - (target.selectionStart ?? 0);

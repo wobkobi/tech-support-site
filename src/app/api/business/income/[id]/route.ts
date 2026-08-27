@@ -6,6 +6,7 @@
  * so DB changes are never blocked - the sync cron reconciles any drift.
  */
 
+import { INCOME_METHODS } from "@/features/business/lib/constants";
 import {
   appendRowWithSyncId,
   buildCashbookCells,
@@ -44,6 +45,11 @@ export async function PUT(
   if (!date || !customer || !description || amount === undefined || !method) {
     return errorResponse("Missing required fields", 400);
   }
+  // Same gate as the create path: an edit must not be able to set a method the
+  // Cashbook's validation list will reject.
+  if (!(INCOME_METHODS as readonly string[]).includes(method)) {
+    return errorResponse("Invalid payment method", 400);
+  }
   const safeAmount = parseAmount(amount);
   if (safeAmount === null) {
     return errorResponse("Invalid amount", 400);
@@ -80,10 +86,9 @@ export async function PUT(
     const newSheetId = await resolveSheetIdForDate(updated.date);
     const oldSheetId = await resolveSheetIdForDate(existing.date);
     if (sheetRowKey && oldSheetId && newSheetId && newSheetId !== oldSheetId) {
-      // Cross-FY move: create the new row first and persist its key, then
-      // remove the old row best-effort. A failed append leaves the old row
-      // intact (outer catch); a failed delete leaves a logged stray, not a
-      // lost entry.
+      // Cross-FY move: create the new row and persist its key first, then remove the old
+      // one best-effort. A failed append leaves the old row intact (outer catch); a failed
+      // delete leaves a logged stray rather than a lost entry.
       const oldKey = sheetRowKey;
       sheetRowKey = await appendRowWithSyncId(newSheetId, "Cashbook", buildCashbookCells(updated));
       await prisma.incomeEntry.update({ where: { id }, data: { sheetRowKey } });

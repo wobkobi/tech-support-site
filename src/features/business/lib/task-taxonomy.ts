@@ -1,10 +1,8 @@
 // src/features/business/lib/task-taxonomy.ts
-// Renames a task-template tag (device or action) across every row that uses
-// it - the safe way to fix a drifted or misspelt tag. Clearing a tag instead
-// is permanent: parse-job may only reuse tags in the live vocabulary, which is
-// built from these very fields. A rename can collide with an existing
-// (device, action) pair - findTemplateByTags would silently shadow one row -
-// so a collision MERGES: usage counts add up and the duplicate row is removed.
+// Renames a task-template tag (device or action) across every row that uses it - the safe
+// way to fix a drifted or misspelt tag, since clearing one is permanent (parse-job may
+// only reuse tags from the live vocabulary these fields build). A rename that collides
+// with an existing (device, action) pair MERGES rather than silently shadowing a row.
 
 import { composeDescription } from "@/features/business/lib/business";
 import { prisma } from "@/shared/lib/prisma";
