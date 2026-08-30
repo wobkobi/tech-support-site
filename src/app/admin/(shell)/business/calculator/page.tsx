@@ -23,6 +23,7 @@ import { fetchBookingEvent } from "@/features/calendar/lib/google-calendar";
 import { requireAdminAuth } from "@/shared/lib/auth";
 import { getIdentity } from "@/shared/lib/business-identity.server";
 import { prisma } from "@/shared/lib/prisma";
+import { NZ_TZ } from "@/shared/lib/timezone-utils";
 import type { Metadata } from "next";
 import type React from "react";
 import { Suspense } from "react";
@@ -53,9 +54,7 @@ const BOOKING_SELECT = {
  * @returns Formatted NZ-local string.
  */
 function formatNz(iso: string, options: Intl.DateTimeFormatOptions): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Pacific/Auckland", ...options }).format(
-    new Date(iso),
-  );
+  return new Intl.DateTimeFormat("en-CA", { timeZone: NZ_TZ, ...options }).format(new Date(iso));
 }
 
 /** One resolved calendar event plus the records that back it. */

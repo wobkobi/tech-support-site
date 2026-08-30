@@ -4,6 +4,7 @@
  */
 
 import { prisma } from "@/shared/lib/prisma";
+import { NZ_TZ } from "@/shared/lib/timezone-utils";
 import { unstable_cache } from "next/cache";
 
 /** Cache tag invalidated by the promo CRUD routes. */
@@ -109,7 +110,7 @@ function formatPromoEnd(endIso: string, now: Date = new Date()): string {
   // a promo ending between NZ midnight and noon isn't labelled the prior day.
   if (diffDays <= 7 && diffDays > 0) {
     const weekday = new Intl.DateTimeFormat("en-NZ", {
-      timeZone: "Pacific/Auckland",
+      timeZone: NZ_TZ,
       weekday: "long",
     }).format(end);
     return `this ${weekday}`;
@@ -118,7 +119,7 @@ function formatPromoEnd(endIso: string, now: Date = new Date()): string {
   // Otherwise short date; year only if not current year.
   const sameYear = end.getFullYear() === now.getFullYear();
   return new Intl.DateTimeFormat("en-NZ", {
-    timeZone: "Pacific/Auckland",
+    timeZone: NZ_TZ,
     weekday: "short",
     day: "numeric",
     month: "short",

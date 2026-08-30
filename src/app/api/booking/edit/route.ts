@@ -39,7 +39,7 @@ import { prisma } from "@/shared/lib/prisma";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import { getSiteUrl } from "@/shared/lib/site-url";
-import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
+import { nzWallClockUtc } from "@/shared/lib/timezone-utils";
 import { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -200,8 +200,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Calculate start/end times
     const [year, month, day] = dateKey.split("-").map(Number);
-    const utcOffset = getPacificAucklandOffset(year, month, day);
-    const startAt = new Date(Date.UTC(year, month - 1, day, startHour - utcOffset, startMinute, 0));
+    const startAt = nzWallClockUtc(year, month, day, startHour, startMinute);
     const endAt = new Date(startAt.getTime() + durationMinutes * 60 * 1000);
 
     // Build updated notes

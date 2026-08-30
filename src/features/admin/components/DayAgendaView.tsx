@@ -14,7 +14,6 @@ import {
   KIND_BAR_BG,
   KIND_STYLES,
   LegendDot,
-  NZ_TZ,
   formatTimeRange,
   mondayOf,
   optimisticBusyEvent,
@@ -23,7 +22,12 @@ import {
 import { parseBookingNotes } from "@/features/booking/lib/booking";
 import { cn } from "@/shared/lib/cn";
 import { isPastEditWindow, nzDayEndMs } from "@/shared/lib/edit-window";
-import { addDaysToDateKey, getPacificAucklandOffset, nzDateKey } from "@/shared/lib/timezone-utils";
+import {
+  NZ_TZ,
+  addDaysToDateKey,
+  getPacificAucklandOffset,
+  nzDateKey,
+} from "@/shared/lib/timezone-utils";
 import { useRouter } from "next/navigation";
 import type React from "react";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";

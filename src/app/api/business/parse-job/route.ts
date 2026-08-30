@@ -23,7 +23,7 @@ import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
-import { getPacificAucklandOffset, nzDateParts } from "@/shared/lib/timezone-utils";
+import { NZ_TZ, getPacificAucklandOffset, nzDateParts } from "@/shared/lib/timezone-utils";
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 
@@ -185,7 +185,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }));
 
     const currentTime = new Intl.DateTimeFormat("en-NZ", {
-      timeZone: "Pacific/Auckland",
+      timeZone: NZ_TZ,
       hour: "2-digit",
       minute: "2-digit",
       hour12: false,

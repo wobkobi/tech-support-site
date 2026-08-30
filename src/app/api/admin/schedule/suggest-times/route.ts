@@ -14,7 +14,7 @@ import { calculateTravelMinutes } from "@/features/calendar/lib/travel-time";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { prisma } from "@/shared/lib/prisma";
-import { addDaysToDateKey, getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
+import { addDaysToDateKey, nzWallClockUtc } from "@/shared/lib/timezone-utils";
 import { NextRequest, NextResponse } from "next/server";
 
 // A slow Google/DB round-trip must not 504 on the default timeout.
@@ -300,7 +300,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (!day.hasAnySlots) continue;
 
     const [y, m, d] = day.dateKey.split("-").map(Number);
-    const utcOffset = getPacificAucklandOffset(y, m, d);
 
     // One candidate per hour: the EARLIEST free start in the hour, so a clean :00
     // is preferred and :15/:30 only surface when :00 is taken - never a run of
@@ -316,7 +315,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Cap per day + spread the picks across the day, so the list offers varied
     // times over several days rather than one day's morning.
     for (const c of spreadEvenly(candidates, PER_DAY_LIMIT)) {
-      const startUtc = new Date(Date.UTC(y, m - 1, d, c.startHour - utcOffset, c.minute, 0));
+      const startUtc = nzWallClockUtc(y, m, d, c.startHour, c.minute);
       rawSlots.push({
         dateKey: day.dateKey,
         startIso: startUtc.toISOString(),

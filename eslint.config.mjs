@@ -81,6 +81,18 @@ export default defineConfig([
       // Next/React noise
       "react/no-unescaped-entities": "off",
 
+      // The NZ timezone name belongs in timezone-utils, which exports NZ_TZ and
+      // the helpers built on it. Hardcoding the literal is how eleven files ended
+      // up doing their own date maths, and how a DST bug gets in.
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "Literal[value='Pacific/Auckland']",
+          message:
+            "Import NZ_TZ from @/shared/lib/timezone-utils instead of hardcoding the timezone.",
+        },
+      ],
+
       // JSDoc enforcement
       "jsdoc/require-jsdoc": [
         "error",
@@ -126,6 +138,12 @@ export default defineConfig([
 
   // Re-enable prettier/prettier rule so ESLint reports formatting violations
   prettierPlugin,
+
+  // timezone-utils owns the timezone literal; everywhere else imports NZ_TZ.
+  {
+    files: ["src/shared/lib/timezone-utils.ts"],
+    rules: { "no-restricted-syntax": "off" },
+  },
 
   // Ignores (this replaces your manual ignores + Next defaults)
   globalIgnores([
