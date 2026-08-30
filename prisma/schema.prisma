@@ -664,6 +664,12 @@ model Promo {
   flatHourlyRate  Float?
   percentDiscount Float?
   isActive        Boolean  @default(true)
+
+  // Higher wins when two promos' windows overlap. Replaces the implicit
+  // "newest createdAt wins", which could not be overridden. Existing promos
+  // sit at 0, so the createdAt tie-break still decides them exactly as before.
+  priority Int @default(0)
+
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -774,4 +780,28 @@ model PushDevice {
 
   // Consecutive non-fatal send failures. Fatal ones delete the row instead.
   failureCount Int @default(0)
+}
+
+// One recorded use of a promo. Booking.promoIdAtBooking already snapshots the
+// promo per booking, but only for bookings - a redemption row also covers
+// calculator jobs and invoices, and is what the caps in a later phase count.
+model PromoRedemption {
+  id      String @id @default(auto()) @map("_id") @db.ObjectId
+  promoId String @db.ObjectId
+
+  // Whichever surface the redemption came from.
+  bookingId String? @db.ObjectId
+  invoiceId String? @db.ObjectId
+  contactId String? @db.ObjectId
+
+  // Dollar value of the discount at redemption time, stored rather than
+  // recomputed because the promo's terms can change afterwards. Null on rows
+  // created by the backfill: the realised discount was never recorded, and a
+  // number reconstructed from a quoted range would be a guess.
+  discountValue Float?
+
+  redeemedAt DateTime @default(now())
+
+  @@index([promoId, redeemedAt])
+  @@index([promoId, contactId])
 }
