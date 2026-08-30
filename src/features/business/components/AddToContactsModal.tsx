@@ -10,6 +10,7 @@
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { Modal } from "@/features/admin/components/ui/Modal";
+import { useToast } from "@/features/admin/components/ui/Toast";
 import type React from "react";
 import { useState } from "react";
 
@@ -54,6 +55,7 @@ export function AddToContactsModal({
 }: AddToContactsModalProps): React.ReactElement {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   /**
    * Persists the contact then closes. Passes the new Contact's DB id back via
@@ -78,6 +80,7 @@ export function AddToContactsModal({
         ok?: boolean;
         contact?: { id?: string };
       };
+      toast("Contact saved.", { tone: "success" });
       onClose(data.contact?.id ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save contact");

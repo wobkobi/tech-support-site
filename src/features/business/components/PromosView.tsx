@@ -282,6 +282,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
         if (editingId) return prev.map((p) => (p.id === editingId ? next : p));
         return [next, ...prev];
       });
+      toast(editingId ? "Promo updated." : "Promo created.", { tone: "success" });
       resetForm();
     } finally {
       setBusy(false);
@@ -304,6 +305,8 @@ export function PromosView({ initial }: Props): React.ReactElement {
     }
     const d = (await res.json()) as { ok: boolean; promo: PromoRow };
     setPromos((prev) => prev.map((x) => (x.id === p.id ? d.promo : x)));
+    // `p` is the pre-toggle row, so the new state is the opposite of p.isActive.
+    toast(p.isActive ? "Promo disabled." : "Promo enabled.", { tone: "success" });
   }
 
   /** Deletes the promo held in the confirm dialog. Past invoices keep their snapshot. */

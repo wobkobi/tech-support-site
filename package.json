@@ -1,9 +1,11 @@
 {
   "name": "tech-support-site",
-  "version": "4.19.8",
+  "version": "4.21.0",
   "private": true,
   "type": "module",
   "scripts": {
+    "backfill:booking-columns:apply": "dotenv -e .env.local -- tsx scripts/backfill-booking-columns.ts --apply",
+    "backfill:booking-columns:dry": "dotenv -e .env.local -- tsx scripts/backfill-booking-columns.ts",
     "build": "next build --turbopack",
     "build:ads": "tsx scripts/build-ads.ts",
     "build:all": "npm run build:icons && npm run build",
@@ -12,6 +14,7 @@
     "calibrate": "dotenv -e .env.local -- tsx scripts/calibrate-benchmarks.ts",
     "check:addresses": "tsx scripts/check-address-resolution.ts",
     "check:emails": "dotenv -e .env.local -- tsx --conditions=react-server scripts/check-email-render.ts",
+    "check:push": "tsx scripts/check-push-delivery.ts",
     "db:push": "prisma db push",
     "dev": "next dev --turbopack",
     "eval:ai": "dotenv -e .env.local -- tsx scripts/eval-ai/index.ts",
@@ -27,7 +30,7 @@
     "typecheck": "tsc --noEmit"
   },
   "simple-git-hooks": {
-    "pre-commit": "if ! find node_modules/.npm-update-stamp -mmin -1440 2>/dev/null | grep -q .; then npm update --package-lock-only --allow-remote=all --no-audit --no-fund && touch node_modules/.npm-update-stamp; fi && npm install --package-lock-only --allow-remote=all --no-audit --no-fund && git add package-lock.json package.json && npx lint-staged && npm run typecheck && npm run check:addresses",
+    "pre-commit": "if ! find node_modules/.npm-update-stamp -mmin -1440 2>/dev/null | grep -q .; then npm update --package-lock-only --allow-remote=all --no-audit --no-fund && touch node_modules/.npm-update-stamp; fi && npm install --package-lock-only --allow-remote=all --no-audit --no-fund && git add package-lock.json package.json && npx lint-staged && npm run typecheck && npm run check:addresses && npm run check:push",
     "pre-push": "npm run lint && npm run build && npm run smoke -- --skip-build"
   },
   "lint-staged": {
@@ -57,13 +60,14 @@
     "date-holidays": "^3.36.0",
     "googleapis": "^176.0.0",
     "next": "^16.3.3",
-    "openai": "^7.7.0",
+    "openai": "^7.8.0",
     "pdf-lib": "^1.17.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-icons": "^5.7.0",
-    "resend": "^6.24.0",
-    "tailwind-merge": "^3.6.0"
+    "resend": "^6.25.0",
+    "tailwind-merge": "^3.6.0",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
@@ -74,18 +78,19 @@
     "@types/node": "^26.4.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.5",
+    "@types/web-push": "^3.6.4",
     "canvas": "^3.2.3",
     "dotenv": "^17.4.2",
     "dotenv-cli": "^11.0.0",
     "eslint": "9.39.5",
     "eslint-config-next": "^16.3.3",
     "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-jsdoc": "^64.2.1",
+    "eslint-plugin-jsdoc": "^64.3.1",
     "eslint-plugin-prettier": "^5.5.6",
     "eslint-plugin-tailwind-canonical-classes": "^1.4.1",
     "globals": "^17.11.0",
     "jsdom": "^30.0.1",
-    "lint-staged": "^17.3.0",
+    "lint-staged": "^17.4.1",
     "png-to-ico": "^3.0.2",
     "postcss": "^8.5.26",
     "prettier": "^3.9.6",
@@ -97,9 +102,9 @@
     "qr-code-styling": "^1.9.2",
     "server-only": "^0.0.1",
     "sharp": "^0.35.4",
-    "simple-git-hooks": "^2.13.1",
+    "simple-git-hooks": "^2.14.0",
     "tailwindcss": "^4.3.3",
-    "tsx": "^4.23.12",
+    "tsx": "^4.23.13",
     "typescript": "6.0.3",
     "typescript-eslint": "^8.68.0"
   },

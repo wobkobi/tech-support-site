@@ -5,6 +5,7 @@
  * conflicts for one-click resolution and drives the Google Contacts sync
  * (import + push) with a confirmation step and result message.
  */
+import { useToast } from "@/features/admin/components/ui/Toast";
 import type { ConflictEntry } from "@/features/contacts/lib/maintenance";
 import { cn } from "@/shared/lib/cn";
 import { useRouter } from "next/navigation";
@@ -29,6 +30,7 @@ export function ContactsAdminView({
   contacts,
 }: ContactsAdminViewProps): React.ReactElement {
   const router = useRouter();
+  const { toast } = useToast();
   const [conflicts, setConflicts] = useState<ConflictEntry[]>(initialConflicts);
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
@@ -96,16 +98,21 @@ export function ContactsAdminView({
         setSyncResult(
           `Done - ${data.importedCount ?? 0} imported from Google, ${data.syncedCount ?? 0} pushed to Google.`,
         );
+        toast(`Contacts synced - ${data.importedCount ?? 0} in, ${data.syncedCount ?? 0} out.`, {
+          tone: "success",
+        });
         router.refresh();
       } else {
         setSyncResult(`Error: ${data.error ?? "unknown"}`);
+        toast(data.error ?? "Contact sync failed.", { tone: "error" });
       }
     } catch {
       setSyncResult("Network error - try again.");
+      toast("Network error - the contact sync didn't finish.", { tone: "error" });
     } finally {
       setSyncing(false);
     }
-  }, [router]);
+  }, [router, toast]);
 
   const runAddressCheck = useCallback(async () => {
     setCheckingAddresses(true);
@@ -120,16 +127,21 @@ export function ContactsAdminView({
       };
       if (data.ok) {
         setAddressResult(`Checked ${data.checked ?? 0} - ${data.flagged ?? 0} need a look.`);
+        toast(`Address check done - ${data.flagged ?? 0} of ${data.checked ?? 0} need a look.`, {
+          tone: "success",
+        });
         router.refresh();
       } else {
         setAddressResult(`Error: ${data.error ?? "unknown"}`);
+        toast(data.error ?? "Address check failed.", { tone: "error" });
       }
     } catch {
       setAddressResult("Network error - try again.");
+      toast("Network error - the address check didn't finish.", { tone: "error" });
     } finally {
       setCheckingAddresses(false);
     }
-  }, [router]);
+  }, [router, toast]);
 
   const resolveConflict = useCallback(
     async (conflict: ConflictEntry, chosenName: string | null, chosenPhone: string | null) => {
@@ -141,18 +153,22 @@ export function ContactsAdminView({
       if (chosenName !== null) body.name = chosenName;
       if (chosenPhone !== null) body.phone = chosenPhone;
       try {
-        await fetch("/api/admin/contacts/resolve-conflict", {
+        const res = await fetch("/api/admin/contacts/resolve-conflict", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         });
+        if (!res.ok) throw new Error(`resolve failed (${res.status})`);
+        // Drop the row only once the write has landed. Clearing it regardless
+        // hid failures: the conflict left the screen but was never resolved.
+        setConflicts((prev) => prev.filter((c) => c.sourceId !== conflict.sourceId));
+        toast("Conflict resolved.", { tone: "success" });
         router.refresh();
       } catch {
-        // best-effort
+        toast("Couldn't resolve that conflict - try again.", { tone: "error" });
       }
-      setConflicts((prev) => prev.filter((c) => c.sourceId !== conflict.sourceId));
     },
-    [router],
+    [router, toast],
   );
 
   const skipConflict = useCallback((sourceId: string) => {

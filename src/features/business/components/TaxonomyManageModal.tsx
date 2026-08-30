@@ -14,6 +14,7 @@
  */
 
 import { Modal } from "@/features/admin/components/ui/Modal";
+import { useToast } from "@/features/admin/components/ui/Toast";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
 import { useEffect, useState } from "react";
@@ -56,6 +57,7 @@ interface Props {
  */
 export function TaxonomyManageModal({ onClose, onChanged }: Props): React.ReactElement {
   const headers: Record<string, string> = {};
+  const { toast } = useToast();
 
   const [devices, setDevices] = useState<string[]>([]);
   const [actions, setActions] = useState<string[]>([]);
@@ -139,6 +141,9 @@ export function TaxonomyManageModal({ onClose, onChanged }: Props): React.ReactE
       if (!res.ok || !data.ok) throw new Error(data.error ?? "Delete failed");
       await reload();
       onChanged?.();
+      toast(`Cleared "${name}" from ${data.cleared ?? 0} task${data.cleared === 1 ? "" : "s"}.`, {
+        tone: "success",
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Delete failed");
     } finally {
@@ -172,6 +177,7 @@ export function TaxonomyManageModal({ onClose, onChanged }: Props): React.ReactE
       setRenaming(null);
       await reload();
       onChanged?.();
+      toast(`Renamed "${name}" to "${target}".`, { tone: "success" });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Rename failed");
     } finally {

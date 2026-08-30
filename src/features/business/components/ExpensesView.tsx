@@ -161,8 +161,12 @@ export function ExpensesView({ onMigrated }: ExpensesViewProps): React.ReactElem
         setEntries((prev) =>
           editingId ? prev.map((en) => (en.id === editingId ? d.entry : en)) : [d.entry, ...prev],
         );
+        // A sheet-sync failure is the more useful message, so it replaces the
+        // plain confirmation rather than stacking a second toast on top of it.
         if (d.sheetSyncWarning) {
           toast("Saved, but the Expenses sheet update didn't go through.", { tone: "warning" });
+        } else {
+          toast(editingId ? "Expense updated." : "Expense saved.", { tone: "success" });
         }
         setForm(emptyForm);
         setEditingId(null);
@@ -218,6 +222,8 @@ export function ExpensesView({ onMigrated }: ExpensesViewProps): React.ReactElem
         if (editingId === id) cancelEdit();
         if (d.sheetSyncWarning) {
           toast("Deleted, but the Expenses sheet row couldn't be removed.", { tone: "warning" });
+        } else {
+          toast("Expense deleted.", { tone: "success" });
         }
       } else {
         toast(d.error ?? "Couldn't delete entry.", { tone: "error" });

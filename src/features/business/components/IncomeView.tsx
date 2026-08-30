@@ -102,8 +102,12 @@ export function IncomeView(): React.ReactElement {
         setEntries((prev) =>
           editingId ? prev.map((en) => (en.id === editingId ? d.entry : en)) : [d.entry, ...prev],
         );
+        // A sheet-sync failure is the more useful message, so it replaces the
+        // plain confirmation rather than stacking a second toast on top of it.
         if (d.sheetSyncWarning) {
           toast("Saved, but the Cashbook sheet update didn't go through.", { tone: "warning" });
+        } else {
+          toast(editingId ? "Income entry updated." : "Income entry saved.", { tone: "success" });
         }
         setForm(emptyForm);
         setEditingId(null);
@@ -156,6 +160,8 @@ export function IncomeView(): React.ReactElement {
         if (editingId === id) cancelEdit();
         if (d.sheetSyncWarning) {
           toast("Deleted, but the Cashbook sheet row couldn't be removed.", { tone: "warning" });
+        } else {
+          toast("Income entry deleted.", { tone: "success" });
         }
       } else {
         toast(d.error ?? "Couldn't delete entry.", { tone: "error" });

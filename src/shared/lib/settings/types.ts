@@ -251,6 +251,12 @@ export interface CommsSettings {
   notifyConfirmation: boolean;
   notifyReminder: boolean;
   notifyReviewRequest: boolean;
+  /** Push to the operator's devices when a booking is made or rescheduled. */
+  pushOnBooking: boolean;
+  /** Push to the operator's devices when a customer cancels. */
+  pushOnCancellation: boolean;
+  /** Push to the operator's devices when a review is submitted. */
+  pushOnReview: boolean;
   /** Send the booking reminder this many hours before the appointment. */
   reminderLeadHours: number;
   /** Delay after a job ends before the review-request email fires (minutes). */

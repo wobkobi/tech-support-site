@@ -4,6 +4,7 @@
  * @description Client button that POSTs to the travel recalculation API, then
  * shows the cached-event count or an error and refreshes the route.
  */
+import { useToast } from "@/features/admin/components/ui/Toast";
 import { cn } from "@/shared/lib/cn";
 import { useRouter } from "next/navigation";
 import type React from "react";
@@ -15,6 +16,7 @@ import { useCallback, useState } from "react";
  */
 export function RecalculateButton(): React.ReactElement {
   const router = useRouter();
+  const { toast } = useToast();
   const [recalculating, setRecalculating] = useState(false);
   const [result, setResult] = useState<string | null>(null);
 
@@ -28,16 +30,21 @@ export function RecalculateButton(): React.ReactElement {
       const data = (await res.json()) as { ok: boolean; cachedCount?: number; error?: string };
       if (data.ok) {
         setResult(`Done - ${data.cachedCount ?? 0} events cached.`);
+        toast(`Travel times recalculated - ${data.cachedCount ?? 0} events cached.`, {
+          tone: "success",
+        });
         router.refresh();
       } else {
         setResult(`Error: ${data.error ?? "unknown"}`);
+        toast(data.error ?? "Couldn't recalculate travel times.", { tone: "error" });
       }
     } catch {
       setResult("Network error - try again.");
+      toast("Network error - the recalculation didn't finish.", { tone: "error" });
     } finally {
       setRecalculating(false);
     }
-  }, [router]);
+  }, [router, toast]);
 
   return (
     <div className="flex flex-wrap items-center gap-3">

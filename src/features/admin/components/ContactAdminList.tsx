@@ -707,6 +707,7 @@ export function ContactAdminList({
         );
         setEditingId(null);
         setEditError(null);
+        toast("Contact updated.", { tone: "success" });
       } else {
         setEditError(data.error ?? "Save failed. Please try again.");
       }
@@ -736,6 +737,7 @@ export function ContactAdminList({
       const data = (await res.json()) as { ok: boolean; error?: string };
       if (data.ok) {
         setContacts((prev) => prev.filter((c) => c.id !== id));
+        toast("Contact deleted.", { tone: "success" });
       } else {
         // Say so. Acting only on ok left a failed delete completely silent: the
         // row stayed put with no explanation, which reads as a dead button.
@@ -770,6 +772,7 @@ export function ContactAdminList({
       const data = (await res.json()) as { ok: boolean; error?: string };
       if (data.ok) {
         setContacts((prev) => prev.filter((c) => c.id !== secondaryId));
+        toast("Contacts merged.", { tone: "success" });
       } else {
         // A merge folds one contact into another and deletes it, so a silent
         // failure is the worst kind: the operator cannot tell whether the two
