@@ -13,7 +13,15 @@
 
 import { AdminSidebar } from "@/features/admin/components/AdminSidebar";
 import { AdminToastProvider } from "@/features/admin/components/ui/Toast";
+import { PushRegistrar } from "@/features/notifications/components/PushRegistrar";
+import type { Metadata } from "next";
 import type React from "react";
+
+// Installing from the admin should produce a home-screen icon that opens the
+// admin, not the public homepage the root manifest's start_url points at.
+export const metadata: Metadata = {
+  manifest: "/admin.webmanifest",
+};
 
 /**
  * Renders the admin chrome (sidebar + content column) and the toast provider
@@ -29,6 +37,7 @@ export default function AdminShellLayout({
 }): React.ReactElement {
   return (
     <AdminToastProvider>
+      <PushRegistrar />
       <div className="flex min-h-screen overflow-x-clip">
         <AdminSidebar />
         {/* Sidebar is fixed-position; reserve its width on lg+ only (mobile uses

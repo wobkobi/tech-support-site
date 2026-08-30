@@ -134,6 +134,10 @@ export default defineConfig([
     "build/**",
     "next-env.d.ts",
     "node_modules/**",
+    // Static assets, not source. sw.js is a service worker: its globals
+    // (self, clients) are not in scope for the typed TS config, and the lint
+    // script already only covers {src,scripts}.
+    "public/**",
     "dist/**",
     "coverage/**",
     ".turbo/**",
