@@ -11,9 +11,13 @@ import { assessCancellation } from "@/features/business/lib/pricing-policy";
 import { getPolicy } from "@/features/business/lib/pricing-policy.server";
 import { parseString } from "@/features/business/lib/validation";
 import { deleteBookingEvent } from "@/features/calendar/lib/google-calendar";
+import { sendOwnerPush } from "@/features/notifications/lib/push";
+import { sendOwnerBookingCancellation } from "@/features/reviews/lib/email";
 import { errorResponse } from "@/shared/lib/api-response";
+import { formatDateTimeShort } from "@/shared/lib/date-format";
 import { prisma } from "@/shared/lib/prisma";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
+import { getSettings } from "@/shared/lib/settings/get-settings";
 import { NextRequest, NextResponse } from "next/server";
 
 // Raise the serverless ceiling so a slow upstream call (LLM / Google API / PDF) cannot 504 on the default timeout.
@@ -147,6 +151,33 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       } catch (err) {
         console.error("[booking/cancel] Failed to draft cancellation invoice:", err);
       }
+    }
+
+    // This route notified nobody at all, so a cancellation stayed invisible
+    // until someone happened to look at the calendar. Awaited for the same
+    // reason as the invoice above; both helpers swallow their own errors.
+    await sendOwnerBookingCancellation(
+      {
+        id: updated.id,
+        name: updated.name,
+        email: updated.email,
+        notes: updated.notes ?? "",
+        startAt: updated.startAt,
+        endAt: updated.endAt,
+        cancelToken: updated.cancelToken,
+      },
+      { lateCancellation },
+    );
+
+    const { comms } = await getSettings();
+    if (comms.pushOnCancellation) {
+      await sendOwnerPush({
+        title: "Booking cancelled",
+        // Name and time only - this renders on a lock screen.
+        body: `${updated.name} - was ${formatDateTimeShort(updated.startAt)}`,
+        url: `/admin/bookings/${updated.id}`,
+        tag: `booking-${updated.id}`,
+      });
     }
 
     return NextResponse.json({

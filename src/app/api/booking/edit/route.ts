@@ -24,12 +24,14 @@ import {
 } from "@/features/calendar/lib/google-calendar";
 import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-create";
 import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
+import { sendOwnerPush } from "@/features/notifications/lib/push";
 import {
   sendCustomerBookingConfirmation,
   sendOwnerBookingNotification,
 } from "@/features/reviews/lib/email";
 import { errorResponse } from "@/shared/lib/api-response";
 import { getIdentity } from "@/shared/lib/business-identity.server";
+import { formatDateTimeShort } from "@/shared/lib/date-format";
 import { normaliseAddress } from "@/shared/lib/normalise-address";
 import { normaliseName } from "@/shared/lib/normalise-name";
 import { validatePhone } from "@/shared/lib/normalise-phone";
@@ -367,8 +369,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       console.error("[booking/edit] Failed to upsert/sync contact:", contactError);
     }
 
-    // Notify customer + owner of the reschedule. Both helpers catch their own
-    // errors and never throw - the edit's success doesn't depend on Resend.
+    // Notify customer + owner of the reschedule. Every helper catches its own
+    // errors and never throws - the edit's success doesn't depend on Resend or
+    // on the push service.
+    const { comms } = await getSettings();
     await Promise.all([
       sendCustomerBookingConfirmation(
         {
@@ -403,6 +407,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         },
         { kind: "rescheduled", previousStartAt },
       ),
+      ...(comms.pushOnBooking
+        ? [
+            sendOwnerPush({
+              title: "Booking rescheduled",
+              // Name and time only - this renders on a lock screen.
+              body: `${cleanName} - now ${formatDateTimeShort(startAt)}`,
+              url: `/admin/bookings/${booking.id}`,
+              tag: `booking-${booking.id}`,
+            }),
+          ]
+        : []),
     ]);
 
     return NextResponse.json({ ok: true });

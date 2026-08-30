@@ -538,6 +538,64 @@ export async function sendOwnerBookingNotification(
 }
 
 /**
+ * Tells the owner a customer has cancelled. The cancel route previously
+ * notified nobody, so a cancellation was silent until someone looked at the
+ * calendar. Failures are caught and logged - never throws.
+ * @param booking - The cancelled booking's details.
+ * @param options - Optional flags.
+ * @param options.lateCancellation - True when the cancel landed inside the fee window.
+ * @returns Promise that resolves when the email is sent (or silently fails).
+ */
+export async function sendOwnerBookingCancellation(
+  booking: BookingNotificationData,
+  options?: { lateCancellation?: boolean },
+): Promise<void> {
+  const adminEmail = process.env.ADMIN_EMAIL;
+  const from = process.env.EMAIL_FROM;
+
+  if (!adminEmail || !from || !process.env.RESEND_API_KEY) {
+    console.warn(
+      `[email] Not configured (${missingEmailEnv("ADMIN_EMAIL", "EMAIL_FROM", "RESEND_API_KEY")}) - skipping owner cancellation notification.`,
+    );
+    return;
+  }
+
+  const start = formatDateTimeLong(booking.startAt);
+  const safeName = escapeHtml(booking.name);
+  const safeEmail = escapeHtml(booking.email);
+  const safeMailto = encodeURIComponent(booking.email);
+  const lateLine = options?.lateCancellation
+    ? `<p style="margin:0 0 16px;color:#c1440e;font-size:13px">Inside the fee window - a draft cancellation invoice was created.</p>`
+    : "";
+
+  const html = renderNotificationEmail(`
+    <h2 style="margin:0 0 4px;color:#0c0a3e;font-size:20px">Booking cancelled</h2>
+    <p style="margin:0 0 4px;color:#555;font-size:14px">Was: <s>${escapeHtml(start)}</s></p>
+    ${lateLine}
+
+    <div style="background:#f6f7f8;border-radius:8px;padding:16px;margin-bottom:20px">
+      <p style="margin:0 0 4px;font-size:14px;color:#888">Customer</p>
+      <p style="margin:0 0 12px;font-size:15px;color:#0c0a3e;font-weight:600">${safeName}</p>
+      <p style="margin:0;font-size:14px;color:#444"><a href="mailto:${safeMailto}" style="color:#43bccd">${safeEmail}</a></p>
+    </div>
+`);
+
+  try {
+    await getResend().emails.send({
+      from,
+      // Reply goes to the customer who cancelled, not back to the owner inbox.
+      replyTo: booking.email,
+      to: adminEmail,
+      subject: `Booking cancelled - ${booking.name} (${start})`,
+      html,
+      text: htmlToText(html),
+    });
+  } catch (error) {
+    console.error("[email] Failed to send owner cancellation notification:", error);
+  }
+}
+
+/**
  * Sends the customer a booking confirmation or reschedule notification.
  * Failures are caught and logged - never throws.
  * @param booking - The booking details.

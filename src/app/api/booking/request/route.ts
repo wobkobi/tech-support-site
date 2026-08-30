@@ -28,12 +28,14 @@ import {
 } from "@/features/calendar/lib/google-calendar";
 import { findOrCreateContactByEmail } from "@/features/contacts/lib/find-or-create";
 import { syncContactToGoogle } from "@/features/contacts/lib/google-contacts";
+import { sendOwnerPush } from "@/features/notifications/lib/push";
 import {
   sendCustomerBookingConfirmation,
   sendOwnerBookingNotification,
 } from "@/features/reviews/lib/email";
 import { errorResponse } from "@/shared/lib/api-response";
 import { getIdentity } from "@/shared/lib/business-identity.server";
+import { formatDateTimeShort } from "@/shared/lib/date-format";
 import { normaliseAddress } from "@/shared/lib/normalise-address";
 import { normaliseEmail } from "@/shared/lib/normalise-email";
 import { normaliseName } from "@/shared/lib/normalise-name";
@@ -429,6 +431,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           address: combineUnitAndAddress(booking.unit ?? "", booking.address ?? ""),
           meetingType: booking.meetingType,
         }),
+        ...(comms.pushOnBooking
+          ? [
+              sendOwnerPush({
+                title: "New booking",
+                // Name and time only - this renders on a lock screen.
+                body: `${booking.name} - ${formatDateTimeShort(booking.startAt)}`,
+                url: `/admin/bookings/${booking.id}`,
+                tag: `booking-${booking.id}`,
+              }),
+            ]
+          : []),
         ...(comms.notifyConfirmation
           ? [
               sendCustomerBookingConfirmation({

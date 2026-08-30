@@ -4,6 +4,7 @@
  */
 
 import { parseObjectId, parseString } from "@/features/business/lib/validation";
+import { sendOwnerPush } from "@/features/notifications/lib/push";
 import { sendOwnerReviewNotification } from "@/features/reviews/lib/email";
 import { revalidateReviewPaths } from "@/features/reviews/lib/revalidate";
 import { reviewTextError } from "@/features/reviews/lib/validation";
@@ -219,7 +220,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Token-verified reviews auto-approve only when the operator opts in;
     // otherwise everything starts pending for manual approval.
-    const { reviews: reviewSettings } = await getSettings();
+    const { reviews: reviewSettings, comms } = await getSettings();
     const status = verified && reviewSettings.autoApproveVerified ? "approved" : "pending";
 
     // Create the review
@@ -247,6 +248,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // review would sit unapproved with no notification and no log line.
     // sendOwnerReviewNotification swallows its own errors.
     await sendOwnerReviewNotification(review);
+
+    if (comms.pushOnReview) {
+      await sendOwnerPush({
+        title: "New review",
+        // Reviews carry no rating field, so report approval state - never stars.
+        body: `${review.firstName ?? "Someone"} - ${
+          status === "approved" ? "published" : "waiting on approval"
+        }`,
+        url: "/admin/reviews",
+        tag: `review-${review.id}`,
+      });
+    }
 
     // `status` goes back so the thank-you screen can say whether the review is
     // already live or waiting on approval, instead of guessing.
