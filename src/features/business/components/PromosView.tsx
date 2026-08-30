@@ -14,7 +14,7 @@ import { pickWinningPromo } from "@/features/business/lib/promos";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
 import type React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 /** Shared classes for the promo form inputs. */
 const inputClass =
@@ -202,6 +202,36 @@ function findOverlaps(promos: PromoRow[]): { ids: Set<string>; winners: Map<stri
   return { ids, winners };
 }
 
+/** Redemption totals for one promo, as returned by the stats endpoint. */
+interface PromoStats {
+  redemptions: number;
+  totalDiscount: number;
+  unvaluedRedemptions: number;
+  lastRedeemedAt: string | null;
+}
+
+/**
+ * One-line usage summary for a promo.
+ *
+ * Reports rows with no recorded value separately rather than counting them as
+ * zero: a promo redeemed before value tracking would otherwise read as "$0
+ * discounted", which looks like a promo nobody benefited from.
+ * @param stats - Totals for this promo, or undefined when it has none.
+ * @returns A sentence describing usage.
+ */
+function usageNote(stats: PromoStats | undefined): string {
+  if (!stats || stats.redemptions === 0) return "Not used yet.";
+  const times = `Used ${stats.redemptions} time${stats.redemptions === 1 ? "" : "s"}`;
+  if (stats.unvaluedRedemptions === stats.redemptions) {
+    return `${times} - discount value not recorded.`;
+  }
+  const money = formatNZD(stats.totalDiscount);
+  if (stats.unvaluedRedemptions > 0) {
+    return `${times} - ${money} discounted (${stats.unvaluedRedemptions} before value tracking).`;
+  }
+  return `${times} - ${money} discounted.`;
+}
+
 /**
  * Phrase for a promo caught in an overlap: which promo actually wins, or that
  * this one does. Empty when the promo overlaps nothing.
@@ -240,6 +270,17 @@ export function PromosView({ initial }: Props): React.ReactElement {
   const [deleting, setDeleting] = useState(false);
 
   const { ids: overlaps, winners: overlapWinners } = findOverlaps(promos);
+  const [stats, setStats] = useState<Record<string, PromoStats>>({});
+
+  useEffect(() => {
+    fetch("/api/business/promos/stats")
+      .then((r) => r.json())
+      .then((d: { ok: boolean; stats?: Record<string, PromoStats> }) => {
+        if (d.ok && d.stats) setStats(d.stats);
+        else toast("Couldn't load promo usage.", { tone: "error" });
+      })
+      .catch(() => toast("Couldn't load promo usage.", { tone: "error" }));
+  }, [toast]);
 
   /** Resets the form back to its blank state and exits edit mode. */
   function resetForm(): void {
@@ -536,6 +577,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
                         {p.description && (
                           <p className="text-xs text-admin-faint">{p.description}</p>
                         )}
+                        <p className="text-xs text-admin-muted">{usageNote(stats[p.id])}</p>
                         {overlapping && (
                           <p className="text-xs font-medium text-amber-700">
                             {overlapNote(p, overlapWinners, promos)}
@@ -604,6 +646,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
                       {p.description && (
                         <p className="mt-0.5 text-sm text-admin-muted">{p.description}</p>
                       )}
+                      <p className="mt-0.5 text-sm text-admin-muted">{usageNote(stats[p.id])}</p>
                       {overlapping && (
                         <p className="mt-0.5 text-sm font-medium text-amber-700">
                           {overlapNote(p, overlapWinners, promos)}
