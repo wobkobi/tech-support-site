@@ -17,6 +17,7 @@ import {
   FaArrowTrendUp,
   FaArrowUpRightFromSquare,
   FaBars,
+  FaBell,
   FaBriefcase,
   FaCalculator,
   FaCalendarDays,
@@ -46,6 +47,7 @@ type AdminPage =
   | "business-invoices"
   | "business-calculator"
   | "promos"
+  | "notifications"
   | "settings";
 
 interface NavItem {
@@ -140,6 +142,13 @@ const PROMOS_NAV_ITEM: NavItem = {
   path: "/admin/promos",
 };
 
+const NOTIFICATIONS_NAV_ITEM: NavItem = {
+  page: "notifications",
+  label: "Notifications",
+  icon: <FaBell className="shrink-0" />,
+  path: "/admin/notifications",
+};
+
 const SETTINGS_NAV_ITEM: NavItem = {
   page: "settings",
   label: "Settings",
@@ -179,7 +188,13 @@ export function AdminSidebar(): React.ReactElement {
   const router = useRouter();
   const active = activeNavPath(
     pathname,
-    [...NAV_ITEMS, ...BUSINESS_NAV_ITEMS, PROMOS_NAV_ITEM, SETTINGS_NAV_ITEM].map((i) => i.path),
+    [
+      ...NAV_ITEMS,
+      ...BUSINESS_NAV_ITEMS,
+      PROMOS_NAV_ITEM,
+      NOTIFICATIONS_NAV_ITEM,
+      SETTINGS_NAV_ITEM,
+    ].map((i) => i.path),
   );
   // Pairing the drawer state with the pathname auto-closes it on navigation
   // without a setState-in-effect (which the React lint rule rejects).
@@ -303,22 +318,24 @@ export function AdminSidebar(): React.ReactElement {
 
           <div className="my-2 border-t border-white/10" />
 
-          {[PROMOS_NAV_ITEM, SETTINGS_NAV_ITEM].map(({ page, label, icon, path }) => (
-            <Link
-              key={page}
-              href={path}
-              onClick={() => setOpen(false)}
-              className={cn(
-                "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors select-none",
-                active === path
-                  ? "bg-white/15 text-white"
-                  : "text-white/60 hover:bg-white/10 hover:text-white/90",
-              )}
-            >
-              {icon}
-              {label}
-            </Link>
-          ))}
+          {[PROMOS_NAV_ITEM, NOTIFICATIONS_NAV_ITEM, SETTINGS_NAV_ITEM].map(
+            ({ page, label, icon, path }) => (
+              <Link
+                key={page}
+                href={path}
+                onClick={() => setOpen(false)}
+                className={cn(
+                  "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors select-none",
+                  active === path
+                    ? "bg-white/15 text-white"
+                    : "text-white/60 hover:bg-white/10 hover:text-white/90",
+                )}
+              >
+                {icon}
+                {label}
+              </Link>
+            ),
+          )}
         </nav>
 
         {/* Footer - link back to the public site + sign-out trigger. */}
