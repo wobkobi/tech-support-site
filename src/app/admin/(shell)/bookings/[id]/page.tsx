@@ -15,6 +15,7 @@ import { BookingActions } from "@/features/booking/components/admin/BookingActio
 import { BookingInfoCard } from "@/features/booking/components/admin/BookingInfoCard";
 import { BookingTimeline } from "@/features/booking/components/admin/BookingTimeline";
 import { BookingTimesCard } from "@/features/booking/components/admin/BookingTimesCard";
+import { meetingTypeFromNotes } from "@/features/booking/lib/booking";
 import { formatMins, formatNZD } from "@/features/business/lib/business";
 import { formatQuotedRange } from "@/features/business/lib/estimate-range";
 import { requireAdminAuth } from "@/shared/lib/auth";
@@ -139,6 +140,11 @@ export default async function BookingDetailPage({
 
   const isTest = booking.name.toLowerCase().includes("test");
   const tone = STATUS_TONE[booking.status] ?? "neutral";
+  // Bookings predating the column - every manual one created before the admin
+  // route started writing it - state the meeting type only in the notes text.
+  // Without the fallback the chip is the one place it was visible, so it would
+  // simply vanish for those rows.
+  const meetingType = booking.meetingType ?? meetingTypeFromNotes(booking.notes);
 
   // Which price-snapshot fields exist decides whether to show the card.
   const hasPriceSnapshot =
@@ -170,7 +176,7 @@ export default async function BookingDetailPage({
           <span className="flex flex-wrap items-center gap-3">
             <span>{booking.name}</span>
             <StatusPill tone={tone}>{booking.status}</StatusPill>
-            {booking.meetingType && <Chip>{MEETING_LABEL[booking.meetingType]}</Chip>}
+            {meetingType && <Chip>{MEETING_LABEL[meetingType]}</Chip>}
             {booking.duration && <Chip>{DURATION_LABEL[booking.duration]}</Chip>}
           </span>
         }

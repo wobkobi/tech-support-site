@@ -41,6 +41,22 @@ export function replaceUserNotes(raw: string | null, userNotes: string): string 
 }
 
 /**
+ * Maps the meeting type stated in a notes blob onto the MeetingType column's
+ * spelling. Bookings written before the column existed - and every manual one
+ * created before the admin route started populating it - carry the value only
+ * in the notes text, so the detail page's chip and the backfill both resolve it
+ * through here rather than each spelling the mapping out.
+ * @param raw - Raw notes string from the DB.
+ * @returns The column value, or null when the notes state neither.
+ */
+export function meetingTypeFromNotes(raw: string | null): "in_person" | "remote" | null {
+  const { meetingType } = parseBookingNotes(raw);
+  if (meetingType === "in-person") return "in_person";
+  if (meetingType === "remote") return "remote";
+  return null;
+}
+
+/**
  * Parses the structured booking notes blob back into its parts.
  * Format: `{userNotes}\n\n[{timeLabel} - {durationLabel}]\nMeeting type: ...\n[Address: ...]\n[Phone: ...]`
  * The structured columns (`address`, `meetingType`) are preferred now; this
