@@ -8,6 +8,7 @@
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { Modal } from "@/features/admin/components/ui/Modal";
+import { useToast } from "@/features/admin/components/ui/Toast";
 import AddressAutocomplete from "@/features/booking/components/AddressAutocomplete";
 import {
   combineUnitAndAddress,
@@ -54,6 +55,7 @@ export function ManualBookingModal({
   initialDurationMinutes = 60,
 }: ManualBookingModalProps): React.ReactElement {
   const router = useRouter();
+  const { toast } = useToast();
   const nameRef = useRef<HTMLInputElement>(null);
   const nameWrapRef = useRef<HTMLDivElement>(null);
   // Lets the footer's Create button submit the form that lives in the modal body.
@@ -189,6 +191,9 @@ export function ManualBookingModal({
         setSubmitting(false);
         return;
       }
+      toast(sendConfirmation ? "Booking created - confirmation sent." : "Booking created.", {
+        tone: "success",
+      });
       router.refresh();
       onClose();
     } catch (err) {

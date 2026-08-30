@@ -5,6 +5,7 @@
  * with per-event transport mode selector and custom origin override.
  */
 
+import { useToast } from "@/features/admin/components/ui/Toast";
 import { cn } from "@/shared/lib/cn";
 import { formatDateTimeShort } from "@/shared/lib/date-format";
 import type React from "react";
@@ -127,7 +128,7 @@ export function TravelBlockAdminList({
   const [saving, setSaving] = useState<string | null>(null);
   const [editingOriginId, setEditingOriginId] = useState<string | null>(null);
   const [originInput, setOriginInput] = useState<string>("");
-  const [actionError, setActionError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   /**
    * Updates the transport mode for a block and clears stale travel minutes locally.
@@ -136,7 +137,6 @@ export function TravelBlockAdminList({
    */
   async function setMode(id: string, mode: TransportMode): Promise<void> {
     setSaving(id);
-    setActionError(null);
     try {
       const res = await fetch(`/api/admin/travel/${id}`, {
         method: "PATCH",
@@ -144,7 +144,7 @@ export function TravelBlockAdminList({
         body: JSON.stringify({ transportMode: mode }),
       });
       if (!res.ok) {
-        setActionError("Couldn't update the transport mode - try again.");
+        toast("Couldn't update the transport mode - try again.", { tone: "error" });
         return;
       }
       // The route reprices immediately and returns the fresh minutes; apply them
@@ -164,8 +164,9 @@ export function TravelBlockAdminList({
             : b,
         ),
       );
+      toast("Transport mode updated.", { tone: "success" });
     } catch {
-      setActionError("Network error - the change wasn't saved.");
+      toast("Network error - the change wasn't saved.", { tone: "error" });
     } finally {
       setSaving(null);
     }
@@ -179,7 +180,6 @@ export function TravelBlockAdminList({
    */
   async function setIgnored(id: string, next: boolean): Promise<void> {
     setSaving(id);
-    setActionError(null);
     try {
       const res = await fetch(`/api/admin/travel/${id}`, {
         method: "PATCH",
@@ -187,12 +187,13 @@ export function TravelBlockAdminList({
         body: JSON.stringify({ ignored: next }),
       });
       if (!res.ok) {
-        setActionError("Couldn't update the ignore flag - try again.");
+        toast("Couldn't update the ignore flag - try again.", { tone: "error" });
         return;
       }
       setBlocks((prev) => prev.map((b) => (b.id === id ? { ...b, ignored: next } : b)));
+      toast(next ? "Event ignored for travel." : "Event back in travel.", { tone: "success" });
     } catch {
-      setActionError("Network error - the change wasn't saved.");
+      toast("Network error - the change wasn't saved.", { tone: "error" });
     } finally {
       setSaving(null);
     }
@@ -205,7 +206,6 @@ export function TravelBlockAdminList({
    */
   async function saveOrigin(id: string, customOrigin: string | null): Promise<void> {
     setSaving(id);
-    setActionError(null);
     try {
       const res = await fetch(`/api/admin/travel/${id}`, {
         method: "PATCH",
@@ -213,7 +213,7 @@ export function TravelBlockAdminList({
         body: JSON.stringify({ customOrigin }),
       });
       if (!res.ok) {
-        setActionError("Couldn't save the origin - try again.");
+        toast("Couldn't save the origin - try again.", { tone: "error" });
         return;
       }
       // Apply the freshly repriced minutes the route returns for the new origin.
@@ -233,8 +233,9 @@ export function TravelBlockAdminList({
         ),
       );
       setEditingOriginId(null);
+      toast(customOrigin ? "Origin updated." : "Origin cleared.", { tone: "success" });
     } catch {
-      setActionError("Network error - the change wasn't saved.");
+      toast("Network error - the change wasn't saved.", { tone: "error" });
     } finally {
       setSaving(null);
     }
@@ -250,14 +251,6 @@ export function TravelBlockAdminList({
 
   return (
     <>
-      {actionError && (
-        <p
-          role="alert"
-          className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800"
-        >
-          {actionError}
-        </p>
-      )}
       <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
         {blocks.map((b) => {
           const currentMode = (b.transportMode ?? "driving") as TransportMode;

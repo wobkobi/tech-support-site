@@ -8,6 +8,7 @@
 
 import { AdminButton } from "@/features/admin/components/ui/AdminButton";
 import { Card } from "@/features/admin/components/ui/Card";
+import { useToast } from "@/features/admin/components/ui/Toast";
 import type React from "react";
 import { useState } from "react";
 
@@ -41,6 +42,7 @@ export function SheetImportButton(): React.ReactElement {
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState<ImportResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   /** Fetches a dry-run preview from the import API without writing to the database. */
   async function handlePreview(): Promise<void> {
@@ -55,6 +57,7 @@ export function SheetImportButton(): React.ReactElement {
       setPreview(data);
     } catch {
       setError("Could not read sheet. Check GOOGLE_SHEET_ID and OAuth.");
+      toast("Could not read the sheet.", { tone: "error" });
     } finally {
       setLoading(false);
     }
@@ -72,8 +75,12 @@ export function SheetImportButton(): React.ReactElement {
       const data = (await res.json()) as ImportResult;
       setDone(data);
       setPreview(null);
+      toast(`Imported ${data.incomeImported} income and ${data.expensesImported} expense rows.`, {
+        tone: "success",
+      });
     } catch {
       setError("Import failed.");
+      toast("Sheet import failed.", { tone: "error" });
     } finally {
       setLoading(false);
     }

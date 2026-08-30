@@ -6,6 +6,7 @@
  * header, and a full-width labelled button used by the mobile day-agenda view.
  */
 
+import { useToast } from "@/features/admin/components/ui/Toast";
 import { cn } from "@/shared/lib/cn";
 import type React from "react";
 import { FaBan, FaCircleCheck } from "react-icons/fa6";
@@ -89,6 +90,8 @@ export function BlockDayButton({
   onOptimisticChange,
   variant = "icon",
 }: BlockDayButtonProps): React.ReactElement | null {
+  // Above the early return below - hooks must run on every render.
+  const { toast } = useToast();
   const isBlocked = blocked ?? busyEventId != null;
   // Hide the toggle entirely for a day that can't be blocked: more than 18h in
   // the past (locked), or a free day that already has a booking (a full-day Busy
@@ -134,14 +137,14 @@ export function BlockDayButton({
       const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
       if (!res.ok || data.ok !== true) {
         onOptimisticChange?.(dateKey, isBlocked); // revert
-        window.alert(data.error ?? "Failed to update blocked day.");
+        toast(data.error ?? "Couldn't update that blocked day.", { tone: "error" });
       } else {
         onChanged();
       }
     } catch (err) {
       console.error("[BlockDayButton] request failed", err);
       onOptimisticChange?.(dateKey, isBlocked); // revert
-      window.alert("Network error - try again.");
+      toast("Network error - the day wasn't changed.", { tone: "error" });
     } finally {
       onPending(dateKey, false);
     }

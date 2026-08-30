@@ -5,6 +5,7 @@
  * send a review link to a past client, or mark a completed event and send its review.
  */
 
+import { useToast } from "@/features/admin/components/ui/Toast";
 import {
   SendReviewLinkForm,
   type ContactSuggestion,
@@ -53,6 +54,7 @@ export function DashboardQuickActions({
   contactSuggestions,
 }: DashboardQuickActionsProps): React.ReactElement {
   const router = useRouter();
+  const { toast } = useToast();
   const [bookings, setBookings] = useState<PastBookingRow[]>(initial);
   const [completing, setCompleting] = useState<string | null>(null);
   const [done, setDone] = useState<Set<string>>(new Set());
@@ -73,12 +75,18 @@ export function DashboardQuickActions({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "completed" }),
       });
+      const patchData = (await patchRes.json().catch(() => ({}))) as {
+        error?: string;
+        reviewSent?: boolean;
+      };
       if (!patchRes.ok) {
-        const d = (await patchRes.json()) as { error?: string };
-        throw new Error(d.error ?? "Failed to mark completed.");
+        throw new Error(patchData.error ?? "Failed to mark completed.");
       }
 
       setDone((prev) => new Set(prev).add(id));
+      toast(patchData.reviewSent ? "Marked completed - review email sent." : "Marked completed.", {
+        tone: "success",
+      });
       // Re-render the server components so the dashboard stat cards (Confirmed
       // bookings, Pending reviews) reflect the completion.
       router.refresh();
