@@ -747,3 +747,31 @@ model Subscription {
 
   @@index([isActive, nextDue])
 }
+
+// One registered browser-on-device that receives operator push notifications.
+// Rows are created by /api/admin/push/subscribe and removed automatically when
+// the push service reports the endpoint is gone (404/410).
+model PushDevice {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  // Push service URL. Unique: re-subscribing the same browser must update the
+  // existing row rather than accumulate a duplicate every time.
+  endpoint String @unique
+
+  // Encryption material from the browser's PushSubscription.
+  p256dh String
+  auth   String
+
+  // Operator-facing device name, plus the UA it was registered from.
+  label     String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
+
+  // Stamped on every successful send. The device list surfaces it, so a
+  // subscription iOS dropped silently shows up as a stale timestamp.
+  lastSeenAt DateTime?
+
+  // Consecutive non-fatal send failures. Fatal ones delete the row instead.
+  failureCount Int @default(0)
+}

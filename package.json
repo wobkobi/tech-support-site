@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "backfill:booking-columns:apply": "dotenv -e .env.local -- tsx scripts/backfill-booking-columns.ts --apply",
+    "backfill:booking-columns:dry": "dotenv -e .env.local -- tsx scripts/backfill-booking-columns.ts",
     "build": "next build --turbopack",
     "build:ads": "tsx scripts/build-ads.ts",
     "build:all": "npm run build:icons && npm run build",
@@ -63,7 +65,8 @@
     "react-dom": "^19.2.8",
     "react-icons": "^5.7.0",
     "resend": "^6.25.0",
-    "tailwind-merge": "^3.6.0"
+    "tailwind-merge": "^3.6.0",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
@@ -74,6 +77,7 @@
     "@types/node": "^26.4.0",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.5",
+    "@types/web-push": "^3.6.4",
     "canvas": "^3.2.3",
     "dotenv": "^17.4.2",
     "dotenv-cli": "^11.0.0",
