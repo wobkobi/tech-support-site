@@ -154,30 +154,36 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     // This route notified nobody at all, so a cancellation stayed invisible
-    // until someone happened to look at the calendar. Awaited for the same
-    // reason as the invoice above; both helpers swallow their own errors.
-    await sendOwnerBookingCancellation(
-      {
-        id: updated.id,
-        name: updated.name,
-        email: updated.email,
-        notes: updated.notes ?? "",
-        startAt: updated.startAt,
-        endAt: updated.endAt,
-        cancelToken: updated.cancelToken,
-      },
-      { lateCancellation },
-    );
+    // until someone happened to look at the calendar. Wrapped like the invoice
+    // above: the helpers swallow their own errors, but the settings read does
+    // not, and the cancellation has committed - a throw here would report a
+    // successful cancel as failed and invite the customer to try again.
+    try {
+      await sendOwnerBookingCancellation(
+        {
+          id: updated.id,
+          name: updated.name,
+          email: updated.email,
+          notes: updated.notes ?? "",
+          startAt: updated.startAt,
+          endAt: updated.endAt,
+          cancelToken: updated.cancelToken,
+        },
+        { lateCancellation },
+      );
 
-    const { comms } = await getSettings();
-    if (comms.pushOnCancellation) {
-      await sendOwnerPush({
-        title: "Booking cancelled",
-        // Name and time only - this renders on a lock screen.
-        body: `${updated.name} - was ${formatDateTimeShort(updated.startAt)}`,
-        url: `/admin/bookings/${updated.id}`,
-        tag: `booking-${updated.id}`,
-      });
+      const { comms } = await getSettings();
+      if (comms.pushOnCancellation) {
+        await sendOwnerPush({
+          title: "Booking cancelled",
+          // Name and time only - this renders on a lock screen.
+          body: `${updated.name} - was ${formatDateTimeShort(updated.startAt)}`,
+          url: `/admin/bookings/${updated.id}`,
+          tag: `booking-${updated.id}`,
+        });
+      }
+    } catch (err) {
+      console.error("[booking/cancel] Failed to notify the owner:", err);
     }
 
     return NextResponse.json({

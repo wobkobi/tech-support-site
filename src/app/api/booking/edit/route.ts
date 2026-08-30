@@ -371,8 +371,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Notify customer + owner of the reschedule. Every helper catches its own
     // errors and never throws - the edit's success doesn't depend on Resend or
-    // on the push service.
-    const { comms } = await getSettings();
+    // on the push service. The settings read is the one thing here that can
+    // throw, and the reschedule has already committed, so a failure drops the
+    // optional push rather than reporting a successful edit as failed.
+    const comms = await getSettings()
+      .then((s) => s.comms)
+      .catch(() => null);
     await Promise.all([
       sendCustomerBookingConfirmation(
         {
@@ -407,7 +411,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         },
         { kind: "rescheduled", previousStartAt },
       ),
-      ...(comms.pushOnBooking
+      ...(comms?.pushOnBooking
         ? [
             sendOwnerPush({
               title: "Booking rescheduled",
