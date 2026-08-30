@@ -37,7 +37,12 @@ export async function PATCH(
     flatHourlyRate: number | null;
     percentDiscount: number | null;
     isActive: boolean;
+    priority: number;
   }>;
+
+  if (body.priority !== undefined && !Number.isInteger(body.priority)) {
+    return errorResponse("priority must be a whole number", 400);
+  }
 
   const existing = await prisma.promo.findUnique({ where: { id } });
   if (!existing) {
@@ -80,6 +85,7 @@ export async function PATCH(
       ...(body.flatHourlyRate !== undefined && { flatHourlyRate: body.flatHourlyRate }),
       ...(body.percentDiscount !== undefined && { percentDiscount: body.percentDiscount }),
       ...(body.isActive !== undefined && { isActive: body.isActive }),
+      ...(body.priority !== undefined && { priority: body.priority }),
     },
   });
   // Next 16's revalidateTag requires a second CacheLifeConfig arg.

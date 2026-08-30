@@ -22,6 +22,7 @@ interface PromoBody {
   flatHourlyRate?: number | null;
   percentDiscount?: number | null;
   isActive?: boolean;
+  priority?: number;
 }
 
 /**
@@ -48,6 +49,11 @@ function validatePromo(body: PromoBody): string | null {
   }
   if (hasPct && (body.percentDiscount! <= 0 || body.percentDiscount! >= 1)) {
     return "percentDiscount must be between 0 and 1 (e.g. 0.20 for 20%)";
+  }
+  // Reject rather than coerce: a fractional priority would order unpredictably
+  // against the integer column and read as accepted.
+  if (body.priority !== undefined && !Number.isInteger(body.priority)) {
+    return "priority must be a whole number";
   }
   return null;
 }
@@ -87,6 +93,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       flatHourlyRate: body.flatHourlyRate ?? null,
       percentDiscount: body.percentDiscount ?? null,
       isActive: body.isActive ?? true,
+      priority: body.priority ?? 0,
     },
   });
 
