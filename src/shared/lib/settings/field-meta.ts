@@ -138,6 +138,18 @@ export const COMMS_FIELD_META: Record<string, FieldMeta> = {
     title: "Review-request email",
     description: "Email the customer a review request a little after the job finishes.",
   },
+  pushOnBooking: {
+    title: "Push on new booking",
+    description: "Notify your own devices when a booking is made or rescheduled.",
+  },
+  pushOnCancellation: {
+    title: "Push on cancellation",
+    description: "Notify your own devices when a customer cancels a booking.",
+  },
+  pushOnReview: {
+    title: "Push on new review",
+    description: "Notify your own devices when a customer submits a review.",
+  },
   reminderLeadHours: {
     title: "Reminder lead time",
     description: "Send the reminder once the appointment is within this many hours.",

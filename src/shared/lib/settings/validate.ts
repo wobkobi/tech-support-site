@@ -310,7 +310,14 @@ function validateEstimator(e: EstimatorSettings): FieldError[] {
  */
 function validateComms(c: CommsSettings): FieldError[] {
   const errors: FieldError[] = [];
-  for (const key of ["notifyConfirmation", "notifyReminder", "notifyReviewRequest"] as const) {
+  for (const key of [
+    "notifyConfirmation",
+    "notifyReminder",
+    "notifyReviewRequest",
+    "pushOnBooking",
+    "pushOnCancellation",
+    "pushOnReview",
+  ] as const) {
     if (typeof c[key] !== "boolean") errors.push({ field: key, message: "Must be on or off." });
   }
   if (!inRange(c.reminderLeadHours, 1, 168))

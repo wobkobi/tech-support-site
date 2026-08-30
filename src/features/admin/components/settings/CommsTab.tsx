@@ -89,6 +89,37 @@ export function CommsTab({ initial, defaults }: Props): React.ReactElement {
         />
       </div>
 
+      {/* Operator-facing, unlike the emails above. Uses plain `set`: the
+          last-one-off guard exists to stop the customer going dark, and turning
+          every push off is a legitimate choice. Devices are enrolled separately
+          on /admin/notifications - these only gate what gets sent. */}
+      <h3 className="mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase">
+        Which push notifications you get
+      </h3>
+      <div className="mt-2 divide-y divide-admin-border">
+        <ToggleField
+          id="pushOnBooking"
+          meta={m.pushOnBooking}
+          value={draft.pushOnBooking}
+          customised={draft.pushOnBooking !== defaults.pushOnBooking}
+          onChange={(v) => set({ pushOnBooking: v })}
+        />
+        <ToggleField
+          id="pushOnCancellation"
+          meta={m.pushOnCancellation}
+          value={draft.pushOnCancellation}
+          customised={draft.pushOnCancellation !== defaults.pushOnCancellation}
+          onChange={(v) => set({ pushOnCancellation: v })}
+        />
+        <ToggleField
+          id="pushOnReview"
+          meta={m.pushOnReview}
+          value={draft.pushOnReview}
+          customised={draft.pushOnReview !== defaults.pushOnReview}
+          onChange={(v) => set({ pushOnReview: v })}
+        />
+      </div>
+
       <h3 className="mt-6 text-xs font-bold tracking-wide text-russian-violet uppercase">
         Timings
       </h3>
