@@ -18,6 +18,7 @@ import {
 import { loadBlockingBookings } from "@/features/booking/lib/existing-bookings.server";
 import { formatQuotedRange } from "@/features/business/lib/estimate-range";
 import { lookupPublicHoliday } from "@/features/business/lib/pricing-policy.server";
+import { recordPromoRedemption } from "@/features/business/lib/promo-redemption";
 import { getActivePromo } from "@/features/business/lib/promos";
 import { lookupDriveRoundTrip } from "@/features/business/lib/travel-distance";
 import { parseObjectId } from "@/features/business/lib/validation";
@@ -411,6 +412,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         await syncContactToGoogle(contact.id);
       } catch (contactError) {
         console.error("[booking/request] Failed to upsert contact:", contactError);
+      }
+
+      // Awaited, not detached: Vercel freezes the instance once the response is
+      // sent. The helper swallows its own errors - a booking must not fail
+      // because analytics bookkeeping did.
+      if (booking.promoIdAtBooking) {
+        await recordPromoRedemption({
+          promoId: booking.promoIdAtBooking,
+          bookingId: booking.id,
+          // The realised discount is not known until the job is invoiced.
+          discountValue: null,
+        });
       }
 
       // Send before returning, or Vercel kills the function mid-request; both helpers
