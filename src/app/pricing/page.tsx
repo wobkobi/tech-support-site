@@ -125,9 +125,15 @@ export default async function PricingPage(): Promise<React.ReactElement> {
             {promo ? (
               <>
                 <div className="rounded-lg border border-mustard-400 bg-mustard-50 p-5">
-                  <p className="mb-1 text-lg text-rich-black/60 line-through sm:text-xl">
-                    ${baseRate}/hr
-                  </p>
+                  {/* Only a rate promo changes this number. A fixed amount or a
+                      travel discount leaves it alone, and crossing out a price
+                      to show the same price back reads as broken - the offer
+                      itself is stated in the banner below. */}
+                  {applyPromoToHourlyRate(baseRate, promo) < baseRate && (
+                    <p className="mb-1 text-lg text-rich-black/60 line-through sm:text-xl">
+                      ${baseRate}/hr
+                    </p>
+                  )}
                   <p className="mb-2 text-3xl font-bold text-russian-violet sm:text-4xl">
                     ${applyPromoToHourlyRate(baseRate, promo).toFixed(0)}/hr
                   </p>
