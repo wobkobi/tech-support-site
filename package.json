@@ -6,6 +6,8 @@
   "scripts": {
     "backfill:booking-columns:apply": "dotenv -e .env.local -- tsx scripts/backfill-booking-columns.ts --apply",
     "backfill:booking-columns:dry": "dotenv -e .env.local -- tsx scripts/backfill-booking-columns.ts",
+    "backfill:invoice-contacts:apply": "dotenv -e .env.local -- tsx scripts/backfill-invoice-contacts.ts --apply",
+    "backfill:invoice-contacts:dry": "dotenv -e .env.local -- tsx scripts/backfill-invoice-contacts.ts",
     "backfill:promo-redemptions:apply": "dotenv -e .env.local -- tsx scripts/backfill-promo-redemptions.ts --apply",
     "backfill:promo-redemptions:dry": "dotenv -e .env.local -- tsx scripts/backfill-promo-redemptions.ts",
     "build": "next build --turbopack",
