@@ -19,8 +19,11 @@ import { NextRequest, NextResponse } from "next/server";
  * Answers only valid/invalid plus the offer's wording. It never names the
  * promo's other terms, so the endpoint cannot be walked to enumerate what
  * codes exist.
+ * Returns the resolved promo on a hit so the caller can price with it right
+ * away rather than asking for it again. Nothing is disclosed without a correct
+ * code, so this adds no enumeration surface.
  * @param request - Incoming request with `{ code }`.
- * @returns JSON with validity and a customer-facing description.
+ * @returns JSON with validity, a customer-facing description, and the promo.
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   // Public and unauthenticated, so guessing codes is the obvious abuse. A
@@ -32,7 +35,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const body = (await request.json().catch(() => null)) as { code?: string } | null;
   const normalised = normalisePromoCode(body?.code);
   if (!normalised) {
-    return NextResponse.json({ ok: true, valid: false, description: null });
+    return NextResponse.json({ ok: true, valid: false, description: null, promo: null });
   }
 
   // Resolved through the same function that prices the booking, so a code
@@ -45,5 +48,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     ok: true,
     valid,
     description: valid && promo ? describePromoDiscount(promo) : null,
+    promo: valid ? promo : null,
   });
 }
