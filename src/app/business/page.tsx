@@ -8,12 +8,10 @@
 import { BusinessEnquiryForm } from "@/features/business/components/BusinessEnquiryForm";
 import { formatMoneyCompact } from "@/features/business/lib/business";
 import { getPublicPricing } from "@/features/business/lib/pricing-policy.server";
-import { getActivePromo, promoTravelFactor } from "@/features/business/lib/promos";
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
 import { Button } from "@/shared/components/Button";
 import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
 import { PixelEvent } from "@/shared/components/PixelEvent";
-import { PromoPrice } from "@/shared/components/PromoPrice";
 import { cn } from "@/shared/lib/cn";
 import { getSiteUrl } from "@/shared/lib/site-url";
 import type { Metadata } from "next";
@@ -170,11 +168,11 @@ const siteUrl = getSiteUrl();
  * @returns Business page element.
  */
 export default async function BusinessPage(): Promise<React.ReactElement> {
-  const [pricing, promo] = await Promise.all([getPublicPricing(), getActivePromo()]);
-  // A travel promo runs site-wide, so this line has to move with it or the
-  // business page quotes a rate the booking flow will not charge.
-  const displayTravelRate =
-    Math.round(pricing.travelRatePerHour * promoTravelFactor(promo) * 100) / 100;
+  const pricing = await getPublicPricing();
+  // Deliberately undiscounted. Promos are a home offer, and the calculator
+  // charges a business visit's travel in full, so discounting it here would
+  // quote a rate the invoice does not honour.
+  const displayTravelRate = pricing.travelRatePerHour;
   const businessJsonLd = {
     "@context": "https://schema.org",
     "@type": "Service",
@@ -319,11 +317,8 @@ export default async function BusinessPage(): Promise<React.ReactElement> {
               <li className="flex gap-2">
                 <span className="mt-1 text-moonstone-400">•</span>
                 <span>
-                  Travel billed at{" "}
-                  <PromoPrice discounted={promoTravelFactor(promo) < 1}>
-                    {formatMoneyCompact(displayTravelRate)}/hr
-                  </PromoPrice>{" "}
-                  for one round trip per visit
+                  Travel billed at {formatMoneyCompact(displayTravelRate)}/hr for one round trip per
+                  visit
                 </span>
               </li>
               <li className="flex gap-2">

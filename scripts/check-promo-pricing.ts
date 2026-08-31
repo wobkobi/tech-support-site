@@ -10,7 +10,7 @@
 // if that ever stops being true.
 // Run with: npm run check:promo-pricing
 
-import { formatMoneyCompact } from "@/features/business/lib/business";
+import { computeJobPromoDiscount, formatMoneyCompact } from "@/features/business/lib/business";
 import { validateDiscount } from "@/features/business/lib/promo-validation";
 import {
   applyPromoToHourlyRate,
@@ -359,6 +359,77 @@ function main(): void {
   );
 
   expectEqual("no promo leaves modifiers alone", promoModifierRate(65, 40, "delta", null), 40);
+
+  // ---- The calculator: promos are a home offer ----
+  //
+  // This decides what a real invoice charges. Business labour is excluded, and
+  // so is a business visit's travel - a travel promo used to discount it
+  // because the travel branch returned before the business filter ran.
+
+  const BIZ = "biz-modifier-id";
+
+  /**
+   * Builds a one-task job for the promo-discount cases.
+   * @param unitPrice - The task's hourly rate.
+   * @param business - Whether it carries the Business modifier.
+   * @param travel - Travel charge on the job.
+   * @returns A job shaped like the calculator's.
+   */
+  function job(
+    unitPrice: number,
+    business: boolean,
+    travel = 0,
+  ): Parameters<typeof computeJobPromoDiscount>[0] {
+    return {
+      durationMins: 60,
+      tasks: [
+        {
+          rateConfigId: null,
+          baseRateId: "base",
+          modifierIds: business ? [BIZ] : [],
+          description: "Task",
+          qty: 1,
+          unitPrice,
+          lineTotal: unitPrice,
+        },
+      ],
+      parts: [],
+      travelEntries: [],
+      notes: "",
+      _travel: travel,
+    } as unknown as Parameters<typeof computeJobPromoDiscount>[0];
+  }
+
+  expectEqual(
+    "home labour is discounted",
+    computeJobPromoDiscount(job(65, false), promo("percent", 0.15), 0, BIZ),
+    9.75,
+  );
+
+  expectEqual(
+    "business labour is not",
+    computeJobPromoDiscount(job(95, true), promo("percent", 0.15), 0, BIZ),
+    0,
+  );
+
+  expectEqual(
+    "a fixed amount skips business labour too",
+    computeJobPromoDiscount(job(95, true), promo("fixed_amount", 10), 0, BIZ),
+    0,
+  );
+
+  expectEqual(
+    "travel is discounted on a home visit",
+    computeJobPromoDiscount(job(65, false), promo("free_travel", 0), 40, BIZ),
+    40,
+  );
+
+  // The bug this pins: the travel branch used to return before the filter.
+  expectEqual(
+    "travel is NOT discounted on a business visit",
+    computeJobPromoDiscount(job(95, true), promo("free_travel", 0), 40, BIZ),
+    0,
+  );
 
   console.log(failures === 0 ? "\nAll fixtures passed." : `\n${failures} fixture(s) failed.`);
   process.exit(failures === 0 ? 0 : 1);

@@ -723,13 +723,16 @@ export interface JobPricing {
 
 /**
  * Promo discount on a job's labour only (hourly task lines).
+ *
+ * Exported for check:promo-pricing - this decides real money on an invoice and
+ * the business exclusion below has no other coverage.
  * @param job - Job calculation.
  * @param promo - Active promo or null.
  * @param travelTotal - The job's travel charge, which a free-travel promo discounts.
  * @param businessModifierId - Modifier marking business labour, which promos skip.
  * @returns Discount in dollars.
  */
-function computeJobPromoDiscount(
+export function computeJobPromoDiscount(
   job: JobCalculation,
   promo: JobPromo | null,
   travelTotal: number,
@@ -737,9 +740,21 @@ function computeJobPromoDiscount(
 ): number {
   if (!promo) return 0;
 
+  /**
+   * Whether a task carries the Business modifier.
+   * @param t - The task line to classify.
+   * @returns True when the line is business labour.
+   */
+  const isBusinessTask = (t: (typeof job.tasks)[number]): boolean =>
+    !!businessModifierId && (t.modifierIds ?? []).includes(businessModifierId);
+
   // Travel is its own flat line rather than an hourly task, so a travel promo
   // is the one type that does not touch the labour subtotal at all.
   if (promo.discountType === "free_travel" && promo.travelPercent != null) {
+    // A visit that did any business work is a business visit, so its drive is
+    // not discounted either. Erring toward charging in full: promos are a home
+    // offer, and the alternative silently under-bills a business customer.
+    if (job.tasks.some(isBusinessTask)) return 0;
     const charged = Math.min(1, Math.max(0, promo.travelPercent));
     return Math.round(travelTotal * (1 - charged) * 100) / 100;
   }
@@ -751,7 +766,7 @@ function computeJobPromoDiscount(
     .filter((t) => t.baseRateId != null || t.rateConfigId == null)
     // Business labour is out of scope for a promo. Checked per task rather than
     // per job so a mixed job discounts only its home-rate lines.
-    .filter((t) => !businessModifierId || !(t.modifierIds ?? []).includes(businessModifierId));
+    .filter((t) => !isBusinessTask(t));
   const labourSubtotal = hourlyTasks.reduce((s, t) => s + t.qty * t.unitPrice, 0);
   if (labourSubtotal <= 0) return 0;
 
