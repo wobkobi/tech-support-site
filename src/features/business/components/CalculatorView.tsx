@@ -1092,6 +1092,26 @@ export function CalculatorView({
   }
 
   /**
+   * Attaches a saved invoice to a Contact. Best-effort: the invoice still
+   * stands without the FK, but losing it costs the review link and the
+   * contact's invoice history.
+   * @param invoiceId - The saved invoice.
+   * @param contactDbId - Contact to attach it to.
+   * @returns Promise that resolves once the write has been attempted.
+   */
+  async function linkInvoiceToContact(invoiceId: string, contactDbId: string): Promise<void> {
+    try {
+      await fetch(`/api/business/invoices/${invoiceId}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ contactId: contactDbId }),
+      });
+    } catch {
+      // Best-effort backfill; the invoice still saves without the FK.
+    }
+  }
+
+  /**
    * Closes the add-to-contacts modal after a direct save. If the modal
    * created a Contact, PATCH the just-saved invoice with that contact's id
    * before navigating to the detail page. Best-effort backfill - the invoice
@@ -1104,15 +1124,7 @@ export function CalculatorView({
     if (!invoiceId) return;
     setPendingInvoiceId(null);
     if (contactDbId) {
-      try {
-        await fetch(`/api/business/invoices/${invoiceId}`, {
-          method: "PATCH",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ contactId: contactDbId }),
-        });
-      } catch {
-        // Best-effort backfill; the invoice still saves without the FK.
-      }
+      await linkInvoiceToContact(invoiceId, contactDbId);
     }
     clearDraft();
     router.push(`/admin/business/invoices/${invoiceId}`);
@@ -1467,16 +1479,30 @@ export function CalculatorView({
       // Add-to-contacts gate: defer nav until the modal closes so
       // handleAddContactClose can backfill contactId via PATCH. "Save & send"
       // skips this - the detail send flow runs its own add-to-contacts hook-in.
-      if (!send && clientEmail.trim()) {
+      // Only the "new contact" path ever set contactId, via the prompt below,
+      // so an invoice for a customer already on file was never linked to them.
+      // That link is what the review-link check and the contact's invoice
+      // history read, so resolve it here whether or not the prompt fires.
+      if (clientEmail.trim()) {
         try {
           const checkRes = await fetch(
             `/api/admin/contacts/check?email=${encodeURIComponent(clientEmail.trim())}`,
           );
-          const checkData = (await checkRes.json()) as { exists?: boolean };
-          if (checkRes.ok && checkData.exists === false) {
-            setPendingInvoiceId(invoiceId);
-            setSavingInvoice(false);
-            return;
+          const checkData = (await checkRes.json()) as {
+            exists?: boolean;
+            contactId?: string | null;
+          };
+          if (checkRes.ok) {
+            if (checkData.contactId) {
+              await linkInvoiceToContact(invoiceId, checkData.contactId);
+            } else if (checkData.exists === false && !send) {
+              // Unknown email: defer nav so handleAddContactClose can create
+              // the contact and link it. "Save & send" skips the prompt - the
+              // detail send flow runs its own add-to-contacts hook-in.
+              setPendingInvoiceId(invoiceId);
+              setSavingInvoice(false);
+              return;
+            }
           }
         } catch {
           // Fall through to navigate.
