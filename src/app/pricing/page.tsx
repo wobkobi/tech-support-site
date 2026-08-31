@@ -163,10 +163,11 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                     ⚡ Limited offer: {promo.title}
                     {promo.description ? ` - ${promo.description}` : ""}
                   </p>
-                  {/* Only when neither crossed-out pair above states the
-                      saving, so the page never names a promo without saying
-                      what it gives. */}
-                  {!ratePair && !travelPair && (
+                  {/* A rate promo's crossed-out pair IS the offer, so repeating
+                      it reads as clutter. For the other types the pair is an
+                      illustration - $55/hr under a $10-off promo is a one-hour
+                      figure - so the real terms have to be stated beside it. */}
+                  {promo.discountType !== "flat_hourly" && promo.discountType !== "percent" && (
                     <p className="mt-1 text-base font-semibold sm:text-lg">
                       {describePromoDiscount(promo)}
                     </p>
