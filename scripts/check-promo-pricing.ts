@@ -10,6 +10,7 @@
 // if that ever stops being true.
 // Run with: npm run check:promo-pricing
 
+import { validateDiscount } from "@/features/business/lib/promo-validation";
 import {
   applyPromoToHourlyRate,
   applyPromoToQuote,
@@ -159,6 +160,60 @@ function main(): void {
     "fixed amount does not eat into travel",
     applyPromoToQuote(parts(10, 10, 30), promo("fixed_amount", 100)),
     parts(0, 0, 30),
+  );
+
+  // ---- Validation: each type is judged on its own value column ----
+  //
+  // The create and edit routes each had their own copy of this and drifted:
+  // the edit route kept demanding one of the two original columns, so editing
+  // a fixed-amount promo was rejected outright. These cases pin the shape.
+
+  expectEqual(
+    "fixed amount is valid with both original columns null",
+    validateDiscount({
+      discountType: "fixed_amount",
+      flatHourlyRate: null,
+      percentDiscount: null,
+      fixedAmount: 20,
+    }),
+    null,
+  );
+
+  expectEqual(
+    "free travel is valid at 0 (travel is free)",
+    validateDiscount({ discountType: "free_travel", travelPercent: 0 }),
+    null,
+  );
+
+  expectEqual(
+    "free travel at 1 is rejected - it would discount nothing",
+    validateDiscount({ discountType: "free_travel", travelPercent: 1 }),
+    "travelPercent must be between 0 and 1 (0 = free travel)",
+  );
+
+  expectEqual(
+    "fixed amount without a value is rejected",
+    validateDiscount({ discountType: "fixed_amount", fixedAmount: null }),
+    "fixedAmount must be a positive number",
+  );
+
+  expectEqual(
+    "flat hourly still validates as before",
+    validateDiscount({ discountType: "flat_hourly", flatHourlyRate: 60 }),
+    null,
+  );
+
+  expectEqual(
+    "percent still validates as before",
+    validateDiscount({ discountType: "percent", percentDiscount: 0.2 }),
+    null,
+  );
+
+  // A promo written before discountType existed still has to pass.
+  expectEqual(
+    "legacy row with only flatHourlyRate is valid",
+    validateDiscount({ flatHourlyRate: 50 }),
+    null,
   );
 
   console.log(failures === 0 ? "\nAll fixtures passed." : `\n${failures} fixture(s) failed.`);

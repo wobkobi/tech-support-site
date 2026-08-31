@@ -6,6 +6,7 @@
  * return 404 when the promo does not exist.
  */
 
+import { validateDiscount } from "@/features/business/lib/promo-validation";
 import { ACTIVE_PROMO_TAG } from "@/features/business/lib/promos";
 import { parseDate } from "@/features/business/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";
@@ -61,21 +62,25 @@ export async function PATCH(
   if (!startAt || !endAt) {
     return errorResponse("startAt and endAt must be valid dates", 400);
   }
-  const flatHourlyRate =
-    body.flatHourlyRate !== undefined ? body.flatHourlyRate : existing.flatHourlyRate;
-  const percentDiscount =
-    body.percentDiscount !== undefined ? body.percentDiscount : existing.percentDiscount;
-
   if (startAt >= endAt) {
     return errorResponse("startAt must be before endAt", 400);
   }
-  const hasFlat = typeof flatHourlyRate === "number" && flatHourlyRate > 0;
-  const hasPct = typeof percentDiscount === "number" && percentDiscount > 0;
-  if (hasFlat === hasPct) {
-    return errorResponse("exactly one of flatHourlyRate or percentDiscount must be set", 400);
-  }
-  if (hasPct && (percentDiscount <= 0 || percentDiscount >= 1)) {
-    return errorResponse("percentDiscount must be between 0 and 1 (e.g. 0.20 for 20%)", 400);
+
+  // A sparse edit only carries the fields that changed, so validate the merged
+  // result rather than the patch: switching a promo's type sends the new value
+  // column and nulls the old one, and judging either in isolation rejects it.
+  const merged = {
+    discountType: body.discountType ?? existing.discountType,
+    flatHourlyRate:
+      body.flatHourlyRate !== undefined ? body.flatHourlyRate : existing.flatHourlyRate,
+    percentDiscount:
+      body.percentDiscount !== undefined ? body.percentDiscount : existing.percentDiscount,
+    fixedAmount: body.fixedAmount !== undefined ? body.fixedAmount : existing.fixedAmount,
+    travelPercent: body.travelPercent !== undefined ? body.travelPercent : existing.travelPercent,
+  };
+  const discountError = validateDiscount(merged);
+  if (discountError) {
+    return errorResponse(discountError, 400);
   }
 
   const promo = await prisma.promo.update({
