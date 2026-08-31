@@ -16,6 +16,7 @@ import {
   applyPromoToHourlyRate,
   applyPromoToQuote,
   describePromoDiscount,
+  promoModifierRate,
   promoRateBeforeAfter,
   promoTravelBeforeAfter,
   type ActivePromo,
@@ -318,6 +319,46 @@ function main(): void {
   expectEqual("half a dollar keeps both digits", formatMoneyCompact(8.5), "$8.50");
   expectEqual("and never rounds away", formatMoneyCompact(7.5), "$7.50");
   expectEqual("a discounted whole rate stays whole", formatMoneyCompact(34), "$34");
+
+  // ---- Modifier rates during a promo ----
+  //
+  // Mirrors the engine. A delta modifier changes the task's own rate, so the
+  // promo discounts the modified figure. An uplift is a surcharge on full
+  // labour and the promo discount comes off full labour too, so they add
+  // rather than multiply - 65 + 25% - 15% is 71.50, not 81.25 x 0.85.
+
+  expectEqual(
+    "percent promo discounts a delta modifier",
+    promoModifierRate(65, 40, "delta", promo("percent", 0.15)),
+    34,
+  );
+
+  expectEqual(
+    "percent promo against a holiday uplift is additive",
+    promoModifierRate(65, 81.25, "uplift", promo("percent", 0.15)),
+    71.5,
+  );
+
+  expectEqual(
+    "fixed amount comes off a delta modifier",
+    promoModifierRate(65, 40, "delta", promo("fixed_amount", 10)),
+    30,
+  );
+
+  expectEqual(
+    "fixed amount against an uplift takes the same dollars",
+    promoModifierRate(65, 81.25, "uplift", promo("fixed_amount", 10)),
+    71.25,
+  );
+
+  // A travel promo touches no labour rate at all.
+  expectEqual(
+    "travel promo leaves modifiers alone",
+    promoModifierRate(65, 40, "delta", promo("free_travel", 0)),
+    40,
+  );
+
+  expectEqual("no promo leaves modifiers alone", promoModifierRate(65, 40, "delta", null), 40);
 
   console.log(failures === 0 ? "\nAll fixtures passed." : `\n${failures} fixture(s) failed.`);
   process.exit(failures === 0 ? 0 : 1);

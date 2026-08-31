@@ -95,6 +95,13 @@ export const getPolicy = cache(async (): Promise<Policy> => {
 /** One labour modifier as rendered on the pricing page accordion. */
 interface PublicModifier {
   label: string;
+  /**
+   * How the modifier reaches the rate. A "delta" changes the task's own $/hr,
+   * so a promo discounts the modified figure; an "uplift" is a surcharge on
+   * full labour, which a promo does not touch. They combine differently and
+   * the pricing page has to tell them apart.
+   */
+  kind: "delta" | "uplift";
   /** Effective $/hr after applying the modifier to the base hourly rate. */
   effectiveRate: number;
   /** Customer-facing delta description (e.g. "+$20", "-$10", "+25%"). */
@@ -164,6 +171,7 @@ export const getPublicPricing = cache(async (): Promise<PublicPricing> => {
     ) {
       modifiers.push({
         label: row.label,
+        kind: "delta",
         effectiveRate: Math.round((baseRate + row.hourlyDelta) * 100) / 100,
         deltaDescription: row.hourlyDelta > 0 ? `+$${row.hourlyDelta}` : `-$${-row.hourlyDelta}`,
         description: MODIFIER_DESCRIPTIONS[row.label] ?? "",
@@ -176,6 +184,7 @@ export const getPublicPricing = cache(async (): Promise<PublicPricing> => {
       const pct = Math.round(uplift * 100);
       modifiers.push({
         label: row.label,
+        kind: "uplift",
         effectiveRate: Math.round(baseRate * (1 + uplift) * 100) / 100,
         deltaDescription: `+${pct}%`,
         description: MODIFIER_DESCRIPTIONS[row.label] ?? "",

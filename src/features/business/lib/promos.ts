@@ -252,6 +252,36 @@ export function promoTravelFactor(promo: ActivePromo | null): number {
   return Math.min(1, Math.max(0, promo.travelPercent));
 }
 
+/**
+ * The rate a modified job actually bills at while a promo runs.
+ *
+ * The two modifier kinds combine with a promo differently, and mirroring the
+ * engine matters or the page quotes a rate the invoice will not charge:
+ *
+ * - A "delta" modifier changes the task's own $/hr, so the promo discounts the
+ *   already-modified figure: a phone job at $40 under 15% off bills at $34.
+ * - An "uplift" is a surcharge calculated on FULL labour, and the promo
+ *   discount is taken from full labour too, so the two are additive rather
+ *   than multiplied. A public holiday at +25% under 15% off bills at
+ *   base + 25% of base - 15% of base, not the uplifted rate times 0.85.
+ * @param baseRate - The undiscounted hourly rate.
+ * @param modifierRate - The modifier's rate before any promo.
+ * @param kind - Whether the modifier changes the rate or adds a surcharge.
+ * @param promo - Active promo, or null.
+ * @returns The rate actually charged.
+ */
+export function promoModifierRate(
+  baseRate: number,
+  modifierRate: number,
+  kind: "delta" | "uplift",
+  promo: ActivePromo | null,
+): number {
+  if (!promo) return modifierRate;
+  if (kind === "delta") return promoDisplayRate(modifierRate, promo);
+  const discountPerHour = baseRate - promoDisplayRate(baseRate, promo);
+  return Math.round((modifierRate - discountPerHour) * 100) / 100;
+}
+
 /** A crossed-out "before" figure and the one a promo leaves in its place. */
 export interface PromoBeforeAfter {
   before: number;

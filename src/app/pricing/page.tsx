@@ -23,6 +23,7 @@ import {
   describePromoDiscount,
   getActivePromo,
   promoDisplayRate,
+  promoModifierRate,
   promoRateBeforeAfter,
   promoTravelBeforeAfter,
   promoTravelFactor,
@@ -176,15 +177,13 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                     ⚡ Limited offer: {promo.title}
                     {promo.description ? ` - ${promo.description}` : ""}
                   </p>
-                  {/* A rate promo's crossed-out pair IS the offer, so repeating
-                      it reads as clutter. For the other types the pair is an
-                      illustration - $55/hr under a $10-off promo is a one-hour
-                      figure - so the real terms have to be stated beside it. */}
-                  {promo.discountType !== "flat_hourly" && promo.discountType !== "percent" && (
-                    <p className="mt-1 text-base font-semibold sm:text-lg">
-                      {describePromoDiscount(promo)}
-                    </p>
-                  )}
+                  {/* Always: the crossed-out pair shows the result, not the
+                      terms. "$65 to $55.25" does not tell anyone it is 15% off,
+                      and for a fixed amount the pair is only a one-hour
+                      illustration. */}
+                  <p className="mt-1 text-base font-semibold sm:text-lg">
+                    {describePromoDiscount(promo)}
+                  </p>
                   <p className="mt-1 text-base text-russian-violet-900 sm:text-lg">
                     Until {formatDateShort(promo.endAt)}.
                   </p>
@@ -375,7 +374,19 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                       <li key={mod.label} className="flex flex-col">
                         <span>
                           <strong>{mod.label}</strong> ({mod.deltaDescription} ={" "}
-                          <strong>${mod.effectiveRate}/hr</strong>) - {mod.description}
+                          <PromoPrice
+                            discounted={
+                              promoModifierRate(baseRate, mod.effectiveRate, mod.kind, promo) !==
+                              mod.effectiveRate
+                            }
+                            className="font-bold"
+                          >
+                            {formatMoneyCompact(
+                              promoModifierRate(baseRate, mod.effectiveRate, mod.kind, promo),
+                            )}
+                            /hr
+                          </PromoPrice>
+                          ) - {mod.description}
                         </span>
                       </li>
                     ))}
