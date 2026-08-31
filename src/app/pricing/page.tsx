@@ -7,6 +7,7 @@
 
 import { GetEstimateButton } from "@/features/business/components/GetEstimateButton";
 import { PricingWizard } from "@/features/business/components/PricingWizard";
+import { formatMoneyCompact } from "@/features/business/lib/business";
 import {
   cancellationCopy,
   gstCopy,
@@ -30,6 +31,7 @@ import {
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
 import { CARD, FrostedSection, PageShell, SOFT_CARD } from "@/shared/components/PageLayout";
 import { PixelEvent } from "@/shared/components/PixelEvent";
+import { PromoPrice } from "@/shared/components/PromoPrice";
 import { renderEmphasised } from "@/shared/components/renderEmphasised";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
@@ -104,6 +106,8 @@ export default async function PricingPage(): Promise<React.ReactElement> {
   const travelFactor = promoTravelFactor(promo);
   const displayTravelRate = Math.round(pricing.travelRatePerHour * travelFactor * 100) / 100;
   const displayMinTravel = Math.round(policy.MIN_TRAVEL_CHARGE * travelFactor * 100) / 100;
+  const rateDiscounted = displayRate !== baseRate;
+  const travelDiscounted = travelFactor < 1;
   return (
     <PageShell>
       <PixelEvent event="ViewContent" />
@@ -255,16 +259,27 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                 <ul className="space-y-2.5 text-base text-rich-black sm:text-lg">
                   <li className="flex gap-3">
                     <span className="mt-1 text-lg text-moonstone-400">•</span>
-                    <span>Hourly rate (${displayRate}/hr)</span>
+                    <span>
+                      Hourly rate (
+                      <PromoPrice discounted={rateDiscounted}>
+                        {formatMoneyCompact(displayRate)}/hr
+                      </PromoPrice>
+                      )
+                    </span>
                   </li>
                   <li className="flex gap-3">
                     <span className="mt-1 text-lg text-moonstone-400">•</span>
                     <span>
                       <strong>One round trip</strong> billed at{" "}
-                      <strong>${displayTravelRate}/hr</strong> (lower than the hourly rate),{" "}
+                      <PromoPrice discounted={travelDiscounted} className="font-bold">
+                        {formatMoneyCompact(displayTravelRate)}/hr
+                      </PromoPrice>{" "}
+                      (lower than the hourly rate),{" "}
                       {/* Read from settings, not hardcoded: the minimum is
                           configurable and this line used to state $10 flat. */}
-                      <strong>${displayMinTravel} minimum</strong>
+                      <PromoPrice discounted={travelDiscounted} className="font-bold">
+                        {formatMoneyCompact(displayMinTravel)} minimum
+                      </PromoPrice>
                     </span>
                   </li>
                   <li className="flex gap-3">

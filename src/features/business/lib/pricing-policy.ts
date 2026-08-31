@@ -12,7 +12,11 @@
  * text always matches the live policy. Keep this module client-safe (no Prisma).
  */
 
-import { MIN_TRAVEL_CHARGE, billableMins } from "@/features/business/lib/business";
+import {
+  MIN_TRAVEL_CHARGE,
+  billableMins,
+  formatMoneyCompact,
+} from "@/features/business/lib/business";
 import { formatDateShort } from "@/shared/lib/date-format";
 
 /** GST is back-calculated from the inclusive total via calcGstFromInclusive when enabled. */
@@ -461,9 +465,11 @@ export function travelCopy(
   minTravelCharge: number = MIN_TRAVEL_CHARGE,
 ): string {
   return (
-    `Travel is **one round trip** billed at **$${travelRatePerHour}/hr** - a separate, ` +
+    // Formatted, not interpolated raw: a promo can halve these into cents, and
+    // bare arithmetic prints "$7.5", which is not a price.
+    `Travel is **one round trip** billed at **${formatMoneyCompact(travelRatePerHour)}/hr** - a separate, ` +
     `lower rate than labour. ` +
-    `**Minimum $${minTravelCharge}** when there is any travel at all. ` +
+    `**Minimum ${formatMoneyCompact(minTravelCharge)}** when there is any travel at all. ` +
     `If a job runs long and needs a second visit, **that second trip is on me**.`
   );
 }

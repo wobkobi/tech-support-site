@@ -6,12 +6,14 @@
  */
 
 import { BusinessEnquiryForm } from "@/features/business/components/BusinessEnquiryForm";
+import { formatMoneyCompact } from "@/features/business/lib/business";
 import { getPublicPricing } from "@/features/business/lib/pricing-policy.server";
 import { getActivePromo, promoTravelFactor } from "@/features/business/lib/promos";
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
 import { Button } from "@/shared/components/Button";
 import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
 import { PixelEvent } from "@/shared/components/PixelEvent";
+import { PromoPrice } from "@/shared/components/PromoPrice";
 import { cn } from "@/shared/lib/cn";
 import { getSiteUrl } from "@/shared/lib/site-url";
 import type { Metadata } from "next";
@@ -316,7 +318,13 @@ export default async function BusinessPage(): Promise<React.ReactElement> {
             <ul className="space-y-2 text-base text-rich-black/90 sm:text-lg">
               <li className="flex gap-2">
                 <span className="mt-1 text-moonstone-400">•</span>
-                <span>Travel billed at ${displayTravelRate}/hr for one round trip per visit</span>
+                <span>
+                  Travel billed at{" "}
+                  <PromoPrice discounted={promoTravelFactor(promo) < 1}>
+                    {formatMoneyCompact(displayTravelRate)}/hr
+                  </PromoPrice>{" "}
+                  for one round trip per visit
+                </span>
               </li>
               <li className="flex gap-2">
                 <span className="mt-1 text-moonstone-400">•</span>

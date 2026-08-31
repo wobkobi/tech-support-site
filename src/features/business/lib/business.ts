@@ -42,6 +42,18 @@ export function formatNZD(amount: number): string {
 }
 
 /**
+ * Money for customer-facing prose: whole dollars stay whole ("$65"), cents
+ * appear only when they exist ("$7.50"). {@link formatNZD} always prints cents,
+ * which reads wrong in a rate like "$65.00/hr", while bare arithmetic prints
+ * "$7.5", which is not a price.
+ * @param amount - Dollar amount.
+ * @returns The formatted amount.
+ */
+export function formatMoneyCompact(amount: number): string {
+  return Number.isInteger(amount) ? `$${amount}` : formatNZD(amount);
+}
+
+/**
  * Formats a minute count as a compact "Xh Ym" string for admin display.
  * @param mins - Minutes (non-negative integer).
  * @returns "45 min" / "1h" / "1h 30m".
