@@ -1,7 +1,8 @@
 // src/app/api/admin/contacts/check/route.ts
 /**
- * @description Lightweight existence check by email, used by the post-save
- * "Add to contacts?" popup to decide whether to prompt the operator.
+ * @description Lightweight contact lookup by email. The post-save "Add to
+ * contacts?" popup uses `exists` to decide whether to prompt; the calculator
+ * uses `contactId` to link an invoice to a customer who is already on file.
  */
 
 import { errorResponse } from "@/shared/lib/api-response";
@@ -12,10 +13,10 @@ import { NextRequest, NextResponse } from "next/server";
 
 /**
  * GET /api/admin/contacts/check?email=...
- * Returns { exists } for the given email (case-insensitive). Empty / invalid
- * email returns exists=false so callers can fail-quiet.
+ * Returns { exists, contactId } for the given email (case-insensitive). Empty
+ * or invalid email returns exists=false so callers can fail-quiet.
  * @param request - Incoming request.
- * @returns JSON { ok, exists }.
+ * @returns JSON { ok, exists, contactId }.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!(await isAdminRequest(request))) {
@@ -24,7 +25,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   const email = normaliseEmail(request.nextUrl.searchParams.get("email"));
   if (!email || !email.includes("@")) {
-    return NextResponse.json({ ok: true, exists: false });
+    return NextResponse.json({ ok: true, exists: false, contactId: null });
   }
 
   const hit = await prisma.contact.findFirst({
@@ -34,5 +35,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     },
     select: { id: true },
   });
-  return NextResponse.json({ ok: true, exists: Boolean(hit) });
+  // The id was always selected but never returned, so a customer already on
+  // file could not be linked to their invoice.
+  return NextResponse.json({ ok: true, exists: Boolean(hit), contactId: hit?.id ?? null });
 }
