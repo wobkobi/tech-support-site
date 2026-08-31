@@ -1,13 +1,13 @@
 // src/app/api/business/job-context/route.ts
 /**
- * @description GET /api/business/job-context?date=YYYY-MM-DD - admin-only.
- * Given the date a job was actually done, returns whether it was an NZ public
- * holiday (with the live labour uplift) and which promo was live that day, so
- * the calculator prices a past job by what applied then, not today.
+ * @description GET /api/business/job-context?date=YYYY-MM-DD[&code=CODE] -
+ * admin-only. Given the date a job was actually done, returns whether it was an
+ * NZ public holiday (with the live labour uplift) and which promo applied that
+ * day, so the calculator prices a past job by what applied then, not today.
  */
 
 import { lookupPublicHoliday } from "@/features/business/lib/pricing-policy.server";
-import { resolvePromoForDate, type ActivePromo } from "@/features/business/lib/promos";
+import { resolvePromo, type ActivePromo } from "@/features/business/lib/promos";
 import { errorResponse } from "@/shared/lib/api-response";
 import { isAdminRequest } from "@/shared/lib/auth";
 import { getSettings } from "@/shared/lib/settings/get-settings";
@@ -18,13 +18,18 @@ interface JobContextResponse {
   holidayName: string | null;
   /** Labour uplift fraction to apply (the live setting on a holiday, else 0). */
   holidayUplift: number;
-  /** Promo that was live on that date, or null. */
+  /**
+   * Promo that applied on that date, or null. A code that resolves is returned
+   * in place of the automatic promo; one that does not falls back to it, so the
+   * caller compares `promo.code` to know whether the code took.
+   */
   promo: ActivePromo | null;
 }
 
 /**
  * Resolves the holiday + promo context for a job date.
- * @param request - Incoming request with a `date` query param (YYYY-MM-DD).
+ * @param request - Incoming request with a `date` query param (YYYY-MM-DD) and
+ * an optional `code` for a job taken over the phone with a promo code.
  * @returns JSON { holidayName, holidayUplift, promo }.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
@@ -41,10 +46,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   // regardless of server timezone or DST (+12/+13).
   const date = new Date(`${dateStr}T12:00:00+12:00`);
 
+  // Resolved at the job date rather than now: a code valid today may not have
+  // been running on the day the work happened, and the invoice must reflect the
+  // day.
+  const code = request.nextUrl.searchParams.get("code");
+
   const [settings, holiday, promo] = await Promise.all([
     getSettings(),
     lookupPublicHoliday(date).catch(() => null),
-    resolvePromoForDate(date).catch(() => null),
+    resolvePromo({ at: date, code }).catch(() => null),
   ]);
 
   const body: JobContextResponse = {

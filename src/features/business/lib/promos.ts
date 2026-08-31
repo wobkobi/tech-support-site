@@ -173,33 +173,6 @@ export const getActivePromo = unstable_cache(
   { tags: [ACTIVE_PROMO_TAG], revalidate: 60 },
 );
 
-/**
- * Resolves the automatic promo that was in force on a given date (highest
- * priority wins on overlap, then newest). Used by the admin calculator to price
- * a past job with the promo that was live when the work actually happened, not
- * today's.
- *
- * Automatic only: a code promo applies to a job only if someone entered the
- * code, which is a fact about the job rather than about the date. Pass the code
- * to {@link resolvePromo} for that.
- * @param date - The job date to resolve against.
- * @returns Resolved promo or null.
- */
-export async function resolvePromoForDate(date: Date): Promise<ActivePromo | null> {
-  const row = await prisma.promo
-    .findFirst({
-      where: {
-        isActive: true,
-        kind: "automatic",
-        startAt: { lte: date },
-        endAt: { gt: date },
-      },
-      orderBy: PROMO_ORDER,
-    })
-    .catch(() => null);
-  return row ? toActivePromo(row) : null;
-}
-
 /** What a promo resolution depends on beyond the moment. */
 export interface PromoContext {
   /** The job date to price against. Defaults to now. */
