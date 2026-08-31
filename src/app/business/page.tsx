@@ -7,6 +7,7 @@
 
 import { BusinessEnquiryForm } from "@/features/business/components/BusinessEnquiryForm";
 import { getPublicPricing } from "@/features/business/lib/pricing-policy.server";
+import { getActivePromo, promoTravelFactor } from "@/features/business/lib/promos";
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
 import { Button } from "@/shared/components/Button";
 import { CARD, FrostedSection, PageShell } from "@/shared/components/PageLayout";
@@ -167,7 +168,11 @@ const siteUrl = getSiteUrl();
  * @returns Business page element.
  */
 export default async function BusinessPage(): Promise<React.ReactElement> {
-  const pricing = await getPublicPricing();
+  const [pricing, promo] = await Promise.all([getPublicPricing(), getActivePromo()]);
+  // A travel promo runs site-wide, so this line has to move with it or the
+  // business page quotes a rate the booking flow will not charge.
+  const displayTravelRate =
+    Math.round(pricing.travelRatePerHour * promoTravelFactor(promo) * 100) / 100;
   const businessJsonLd = {
     "@context": "https://schema.org",
     "@type": "Service",
@@ -311,9 +316,7 @@ export default async function BusinessPage(): Promise<React.ReactElement> {
             <ul className="space-y-2 text-base text-rich-black/90 sm:text-lg">
               <li className="flex gap-2">
                 <span className="mt-1 text-moonstone-400">•</span>
-                <span>
-                  Travel billed at ${pricing.travelRatePerHour}/hr for one round trip per visit
-                </span>
+                <span>Travel billed at ${displayTravelRate}/hr for one round trip per visit</span>
               </li>
               <li className="flex gap-2">
                 <span className="mt-1 text-moonstone-400">•</span>

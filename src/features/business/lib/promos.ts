@@ -227,6 +227,31 @@ function formatPromoEnd(endIso: string, now: Date = new Date()): string {
   }).format(end);
 }
 
+/**
+ * The labour rate to quote while a promo runs. For a fixed amount this is the
+ * one-hour illustration described on {@link promoRateBeforeAfter}; for a travel
+ * promo the labour rate is untouched.
+ * @param baseRate - The undiscounted hourly rate.
+ * @param promo - Active promo, or null.
+ * @returns The rate to display.
+ */
+export function promoDisplayRate(baseRate: number, promo: ActivePromo | null): number {
+  if (!promo) return baseRate;
+  return promoRateBeforeAfter(baseRate, promo)?.after ?? baseRate;
+}
+
+/**
+ * The fraction of travel still charged while a promo runs: 1 when no travel
+ * promo applies, 0 when travel is free. Multiply any travel figure - the hourly
+ * drive rate, the minimum charge - by this to quote it correctly.
+ * @param promo - Active promo, or null.
+ * @returns The fraction charged, 0 to 1.
+ */
+export function promoTravelFactor(promo: ActivePromo | null): number {
+  if (!promo || promo.discountType !== "free_travel" || promo.travelPercent === null) return 1;
+  return Math.min(1, Math.max(0, promo.travelPercent));
+}
+
 /** A crossed-out "before" figure and the one a promo leaves in its place. */
 export interface PromoBeforeAfter {
   before: number;

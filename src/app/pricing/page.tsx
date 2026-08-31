@@ -21,8 +21,10 @@ import { getPolicy, getPublicPricing } from "@/features/business/lib/pricing-pol
 import {
   describePromoDiscount,
   getActivePromo,
+  promoDisplayRate,
   promoRateBeforeAfter,
   promoTravelBeforeAfter,
+  promoTravelFactor,
   summariseForBanner,
 } from "@/features/business/lib/promos";
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
@@ -95,6 +97,13 @@ export default async function PricingPage(): Promise<React.ReactElement> {
   // that figure, so nothing is struck out to show the same number back.
   const ratePair = promo ? promoRateBeforeAfter(baseRate, promo) : null;
   const travelPair = promo ? promoTravelBeforeAfter(policy.MIN_TRAVEL_CHARGE, promo) : null;
+  // Every other price on the page quotes these rather than the raw settings, so
+  // a live promo is not announced in the hero and then contradicted further
+  // down by the standard rates.
+  const displayRate = promoDisplayRate(baseRate, promo);
+  const travelFactor = promoTravelFactor(promo);
+  const displayTravelRate = Math.round(pricing.travelRatePerHour * travelFactor * 100) / 100;
+  const displayMinTravel = Math.round(policy.MIN_TRAVEL_CHARGE * travelFactor * 100) / 100;
   return (
     <PageShell>
       <PixelEvent event="ViewContent" />
@@ -246,14 +255,16 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                 <ul className="space-y-2.5 text-base text-rich-black sm:text-lg">
                   <li className="flex gap-3">
                     <span className="mt-1 text-lg text-moonstone-400">•</span>
-                    <span>Hourly rate (${baseRate}/hr)</span>
+                    <span>Hourly rate (${displayRate}/hr)</span>
                   </li>
                   <li className="flex gap-3">
                     <span className="mt-1 text-lg text-moonstone-400">•</span>
                     <span>
                       <strong>One round trip</strong> billed at{" "}
-                      <strong>${pricing.travelRatePerHour}/hr</strong> (lower than the hourly rate),{" "}
-                      <strong>$10 minimum</strong>
+                      <strong>${displayTravelRate}/hr</strong> (lower than the hourly rate),{" "}
+                      {/* Read from settings, not hardcoded: the minimum is
+                          configurable and this line used to state $10 flat. */}
+                      <strong>${displayMinTravel} minimum</strong>
                     </span>
                   </li>
                   <li className="flex gap-3">
@@ -366,9 +377,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                   />
                 </summary>
                 <div className={ACCORDION_BODY}>
-                  {renderEmphasised(
-                    travelCopy(pricing.travelRatePerHour, policy.MIN_TRAVEL_CHARGE),
-                  )}
+                  {renderEmphasised(travelCopy(displayTravelRate, displayMinTravel))}
                 </div>
               </details>
 
