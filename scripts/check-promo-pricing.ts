@@ -56,6 +56,8 @@ function promo(type: ActivePromo["discountType"], value: number): ActivePromo {
     description: null,
     startAt: "2026-01-01T00:00:00.000Z",
     endAt: "2026-12-31T00:00:00.000Z",
+    kind: "automatic",
+    code: null,
     discountType: type,
     flatHourlyRate: type === "flat_hourly" ? value : null,
     percentDiscount: type === "percent" ? value : null,
