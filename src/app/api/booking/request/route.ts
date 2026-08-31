@@ -18,6 +18,7 @@ import {
 import { loadBlockingBookings } from "@/features/booking/lib/existing-bookings.server";
 import { formatQuotedRange } from "@/features/business/lib/estimate-range";
 import { lookupPublicHoliday } from "@/features/business/lib/pricing-policy.server";
+import { recordPromoRedemption } from "@/features/business/lib/promo-redemption";
 import { getActivePromo } from "@/features/business/lib/promos";
 import { lookupDriveRoundTrip } from "@/features/business/lib/travel-distance";
 import { parseObjectId } from "@/features/business/lib/validation";
@@ -44,7 +45,7 @@ import { prisma } from "@/shared/lib/prisma";
 import { rateLimitOrReject } from "@/shared/lib/rate-limit";
 import { getSettings } from "@/shared/lib/settings/get-settings";
 import { getSiteUrl } from "@/shared/lib/site-url";
-import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
+import { nzWallClockUtc } from "@/shared/lib/timezone-utils";
 import { Prisma, type AiEstimateCategory, type EstimateTask } from "@prisma/client";
 import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
@@ -209,9 +210,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Calculate start/end times
     const [year, month, day] = dateKey.split("-").map(Number);
 
-    // Get dynamic UTC offset for this date (handles NZDT/NZST)
-    const utcOffset = getPacificAucklandOffset(year, month, day);
-    const startAt = new Date(Date.UTC(year, month - 1, day, startHour - utcOffset, startMinute, 0));
+    const startAt = nzWallClockUtc(year, month, day, startHour, startMinute);
     const endAt = new Date(startAt.getTime() + durationMinutes * 60 * 1000);
 
     const cancelToken = randomUUID();
@@ -413,6 +412,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         await syncContactToGoogle(contact.id);
       } catch (contactError) {
         console.error("[booking/request] Failed to upsert contact:", contactError);
+      }
+
+      // Awaited, not detached: Vercel freezes the instance once the response is
+      // sent. The helper swallows its own errors - a booking must not fail
+      // because analytics bookkeeping did.
+      if (booking.promoIdAtBooking) {
+        await recordPromoRedemption({
+          promoId: booking.promoIdAtBooking,
+          bookingId: booking.id,
+          // The realised discount is not known until the job is invoiced.
+          discountValue: null,
+        });
       }
 
       // Send before returning, or Vercel kills the function mid-request; both helpers

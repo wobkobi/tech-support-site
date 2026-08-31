@@ -3,7 +3,8 @@
  * @description Timezone utility functions for Pacific/Auckland timezone calculations.
  */
 
-const NZ_TZ = "Pacific/Auckland";
+/** The one NZ timezone name. Exported so nothing has to hardcode the literal. */
+export const NZ_TZ = "Pacific/Auckland";
 
 // Built once and reused: constructing an Intl.DateTimeFormat is the expensive
 // part, .format() is cheap, and the schedule views call this per event.
@@ -112,8 +113,34 @@ export function fromNzInputValue(local: string): Date {
  * @returns UTC Date at NZ midnight of that date.
  */
 export function nzMidnightUtc(year: number, month: number, day: number): Date {
+  return nzWallClockUtc(year, month, day, 0, 0);
+}
+
+/**
+ * An NZ wall-clock time on a calendar date, as the equivalent UTC instant:
+ * "2pm on 3 March in Auckland" as a real moment. Every booking path needs this,
+ * and assembling it inline is where the sign of the offset and the 0-indexed
+ * month get fumbled.
+ *
+ * The offset is read at NZ midnight of that date, so on the two DST transition
+ * days a 2-3am wall-clock time is ambiguous. Appointments do not run then, and
+ * this matches what every caller already did.
+ * @param year - Full year.
+ * @param month - Month 1-12 (overflow wraps).
+ * @param day - Day of month (overflow wraps).
+ * @param hour - NZ wall-clock hour, 0-23.
+ * @param minute - NZ wall-clock minute (defaults to 0).
+ * @returns UTC Date for that NZ wall-clock moment.
+ */
+export function nzWallClockUtc(
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute = 0,
+): Date {
   const offset = getPacificAucklandOffset(year, month, day);
-  return new Date(Date.UTC(year, month - 1, day, -offset, 0, 0));
+  return new Date(Date.UTC(year, month - 1, day, hour - offset, minute, 0));
 }
 
 /**

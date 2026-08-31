@@ -10,10 +10,11 @@ import { ConfirmDialog } from "@/features/admin/components/ui/ConfirmDialog";
 import { StatusPill, type StatusTone } from "@/features/admin/components/ui/StatusPill";
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { formatNZD } from "@/features/business/lib/business";
+import { pickWinningPromo } from "@/features/business/lib/promos";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
 import type React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 /** Shared classes for the promo form inputs. */
 const inputClass =
@@ -31,6 +32,8 @@ interface FormState {
   type: PromoType;
   amount: string;
   isActive: boolean;
+  /** Higher wins when windows overlap. Held as a string for the input. */
+  priority: string;
 }
 
 /**
@@ -99,6 +102,7 @@ function emptyForm(): FormState {
     type: "flat",
     amount: "",
     isActive: true,
+    priority: "0",
   };
 }
 
@@ -165,18 +169,83 @@ function rangesOverlap(a: PromoRow, b: PromoRow): boolean {
  * @param promos - All promos.
  * @returns Set of overlapping IDs.
  */
-function findOverlaps(promos: PromoRow[]): Set<string> {
+function findOverlaps(promos: PromoRow[]): { ids: Set<string>; winners: Map<string, string> } {
   const ids = new Set<string>();
+  const winners = new Map<string, string>();
   const active = promos.filter((p) => p.isActive);
   for (let i = 0; i < active.length; i++) {
     for (let j = i + 1; j < active.length; j++) {
-      if (rangesOverlap(active[i], active[j])) {
-        ids.add(active[i].id);
-        ids.add(active[j].id);
+      if (!rangesOverlap(active[i], active[j])) continue;
+      ids.add(active[i].id);
+      ids.add(active[j].id);
+      // Resolved through the shared selector, and on createdAt rather than
+      // startAt, so the warning can never name a different winner than the
+      // query that actually picks the promo.
+      const winner = pickWinningPromo([
+        {
+          id: active[i].id,
+          priority: active[i].priority,
+          createdAt: new Date(active[i].createdAt),
+        },
+        {
+          id: active[j].id,
+          priority: active[j].priority,
+          createdAt: new Date(active[j].createdAt),
+        },
+      ]);
+      if (winner) {
+        winners.set(active[i].id, winner.id);
+        winners.set(active[j].id, winner.id);
       }
     }
   }
-  return ids;
+  return { ids, winners };
+}
+
+/** Redemption totals for one promo, as returned by the stats endpoint. */
+interface PromoStats {
+  redemptions: number;
+  totalDiscount: number;
+  unvaluedRedemptions: number;
+  lastRedeemedAt: string | null;
+}
+
+/**
+ * One-line usage summary for a promo.
+ *
+ * Reports rows with no recorded value separately rather than counting them as
+ * zero: a promo redeemed before value tracking would otherwise read as "$0
+ * discounted", which looks like a promo nobody benefited from.
+ * @param stats - Totals for this promo, or undefined when it has none.
+ * @returns A sentence describing usage.
+ */
+function usageNote(stats: PromoStats | undefined): string {
+  if (!stats || stats.redemptions === 0) return "Not used yet.";
+  const times = `Used ${stats.redemptions} time${stats.redemptions === 1 ? "" : "s"}`;
+  if (stats.unvaluedRedemptions === stats.redemptions) {
+    return `${times} - discount value not recorded.`;
+  }
+  const money = formatNZD(stats.totalDiscount);
+  if (stats.unvaluedRedemptions > 0) {
+    return `${times} - ${money} discounted (${stats.unvaluedRedemptions} before value tracking).`;
+  }
+  return `${times} - ${money} discounted.`;
+}
+
+/**
+ * Phrase for a promo caught in an overlap: which promo actually wins, or that
+ * this one does. Empty when the promo overlaps nothing.
+ * @param promo - The promo being rendered.
+ * @param winners - Winning promo id per overlapping promo id.
+ * @param all - Every promo, for resolving the winner's title.
+ * @returns A sentence, or an empty string when there is no clash.
+ */
+function overlapNote(promo: PromoRow, winners: Map<string, string>, all: PromoRow[]): string {
+  const winnerId = winners.get(promo.id);
+  if (!winnerId) return "";
+  if (winnerId === promo.id) return "Overlaps another promo - this one wins.";
+  const winner = all.find((p) => p.id === winnerId);
+  return `Overlaps another promo - ${winner ? winner.title : "the other"} wins.`;
 }
 
 interface Props {
@@ -200,7 +269,18 @@ export function PromosView({ initial }: Props): React.ReactElement {
   const [confirmDelete, setConfirmDelete] = useState<PromoRow | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const overlaps = findOverlaps(promos);
+  const { ids: overlaps, winners: overlapWinners } = findOverlaps(promos);
+  const [stats, setStats] = useState<Record<string, PromoStats>>({});
+
+  useEffect(() => {
+    fetch("/api/business/promos/stats")
+      .then((r) => r.json())
+      .then((d: { ok: boolean; stats?: Record<string, PromoStats> }) => {
+        if (d.ok && d.stats) setStats(d.stats);
+        else toast("Couldn't load promo usage.", { tone: "error" });
+      })
+      .catch(() => toast("Couldn't load promo usage.", { tone: "error" }));
+  }, [toast]);
 
   /** Resets the form back to its blank state and exits edit mode. */
   function resetForm(): void {
@@ -231,6 +311,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
             : "",
       ),
       isActive: p.isActive,
+      priority: String(p.priority),
     });
   }
 
@@ -260,6 +341,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
       flatHourlyRate: form.type === "flat" ? amount : null,
       percentDiscount: form.type === "percent" ? amount / 100 : null,
       isActive: form.isActive,
+      priority: parseInt(form.priority, 10) || 0,
     };
 
     setBusy(true);
@@ -412,6 +494,20 @@ export function PromosView({ initial }: Props): React.ReactElement {
           </label>
         </div>
 
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-admin-muted">Priority</span>
+          <input
+            type="number"
+            step={1}
+            value={form.priority}
+            onChange={(e) => setForm((p) => ({ ...p, priority: e.target.value }))}
+            className={cn(inputClass, "w-32")}
+          />
+          <span className="text-xs text-admin-faint">
+            Higher wins when two promos overlap. Ties go to the newer one.
+          </span>
+        </label>
+
         <label className="flex items-center gap-2 text-sm text-admin-muted">
           <input
             type="checkbox"
@@ -444,8 +540,9 @@ export function PromosView({ initial }: Props): React.ReactElement {
       {overlaps.size > 0 && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
           <strong>Heads up:</strong> {overlaps.size} active promos have overlapping date ranges.
-          Customers will see whichever was created most recently. Consider disabling or shortening
-          one to avoid surprise behaviour.
+          Only one applies at a time - the highest priority wins, then the newer one. Customers will
+          see whichever was created most recently. Consider disabling or shortening one to avoid
+          surprise behaviour.
         </div>
       )}
 
@@ -479,6 +576,12 @@ export function PromosView({ initial }: Props): React.ReactElement {
                         <p className="font-medium text-admin-text">{p.title}</p>
                         {p.description && (
                           <p className="text-xs text-admin-faint">{p.description}</p>
+                        )}
+                        <p className="text-xs text-admin-muted">{usageNote(stats[p.id])}</p>
+                        {overlapping && (
+                          <p className="text-xs font-medium text-amber-700">
+                            {overlapNote(p, overlapWinners, promos)}
+                          </p>
                         )}
                       </td>
                       <td className="px-4 py-3 text-xs text-admin-muted">
@@ -542,6 +645,12 @@ export function PromosView({ initial }: Props): React.ReactElement {
                       <p className="text-base font-semibold text-admin-text">{p.title}</p>
                       {p.description && (
                         <p className="mt-0.5 text-sm text-admin-muted">{p.description}</p>
+                      )}
+                      <p className="mt-0.5 text-sm text-admin-muted">{usageNote(stats[p.id])}</p>
+                      {overlapping && (
+                        <p className="mt-0.5 text-sm font-medium text-amber-700">
+                          {overlapNote(p, overlapWinners, promos)}
+                        </p>
                       )}
                     </div>
                     <StatusPill tone={statusTone(status)} className="shrink-0">

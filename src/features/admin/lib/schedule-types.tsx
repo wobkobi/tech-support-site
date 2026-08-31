@@ -5,9 +5,8 @@
  */
 
 import { cn } from "@/shared/lib/cn";
+import { NZ_TZ } from "@/shared/lib/timezone-utils";
 import type React from "react";
-
-export const NZ_TZ = "Pacific/Auckland";
 
 export type WeekViewKind = "booking" | "car" | "personal" | "travel";
 

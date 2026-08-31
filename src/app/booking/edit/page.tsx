@@ -24,7 +24,7 @@ import { getIdentity } from "@/shared/lib/business-identity.server";
 import { cn } from "@/shared/lib/cn";
 import { prisma } from "@/shared/lib/prisma";
 import { getSettings } from "@/shared/lib/settings/get-settings";
-import { nzDateKey } from "@/shared/lib/timezone-utils";
+import { NZ_TZ, nzDateKey } from "@/shared/lib/timezone-utils";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type React from "react";
@@ -44,7 +44,7 @@ export const metadata: Metadata = {
  */
 function getNZHour(date: Date): number {
   const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Pacific/Auckland",
+    timeZone: NZ_TZ,
     hour: "numeric",
     hour12: false,
   }).formatToParts(date);
@@ -179,13 +179,13 @@ export default async function EditBookingPage({
     availableDays.unshift({
       dateKey,
       dayLabel: new Intl.DateTimeFormat("en-NZ", {
-        timeZone: "Pacific/Auckland",
+        timeZone: NZ_TZ,
         weekday: "short",
         day: "numeric",
         month: "short",
       }).format(booking.startAt),
       fullLabel: new Intl.DateTimeFormat("en-NZ", {
-        timeZone: "Pacific/Auckland",
+        timeZone: NZ_TZ,
         weekday: "long",
         month: "short",
         day: "numeric",

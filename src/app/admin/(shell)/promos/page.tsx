@@ -28,6 +28,10 @@ export interface PromoRow {
   flatHourlyRate: number | null;
   percentDiscount: number | null;
   isActive: boolean;
+  /** Higher wins when windows overlap. */
+  priority: number;
+  /** The overlap warning's tie-break must match the query's, so it needs this. */
+  createdAt: string;
 }
 
 /**
@@ -47,6 +51,8 @@ export default async function AdminPromosPage(): Promise<React.ReactElement> {
     flatHourlyRate: p.flatHourlyRate,
     percentDiscount: p.percentDiscount,
     isActive: p.isActive,
+    priority: p.priority,
+    createdAt: p.createdAt.toISOString(),
   }));
 
   return (

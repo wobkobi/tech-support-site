@@ -3,7 +3,7 @@
  * @description Canonical NZ date/time formatters (Pacific/Auckland for clocked outputs).
  */
 
-const NZ_TZ = "Pacific/Auckland";
+import { NZ_TZ } from "@/shared/lib/timezone-utils";
 
 /**
  * Coerces a Date or ISO string into a Date instance.

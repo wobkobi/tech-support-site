@@ -4,10 +4,38 @@
  */
 
 import { prisma } from "@/shared/lib/prisma";
+import { NZ_TZ } from "@/shared/lib/timezone-utils";
 import { unstable_cache } from "next/cache";
 
 /** Cache tag invalidated by the promo CRUD routes. */
 export const ACTIVE_PROMO_TAG = "active-promo";
+
+/** The fields promo selection needs. Real Promo rows satisfy this structurally. */
+export interface PromoCandidate {
+  id: string;
+  priority: number;
+  createdAt: Date;
+}
+
+/**
+ * Picks the winning promo from overlapping candidates: highest priority, then
+ * newest. The createdAt tie-break is what every promo used before priority
+ * existed, so leaving them all at 0 preserves today's behaviour exactly.
+ *
+ * The queries below reach the same answer through their own orderBy, since
+ * findFirst does the work in the database. This is the rule written down once,
+ * unit-testable without a connection, and is what the admin overlap warning
+ * uses to name a winner - so the warning cannot disagree with the query.
+ * @param candidates - Promos whose windows all contain the moment in question.
+ * @returns The winner, or null when there are no candidates.
+ */
+export function pickWinningPromo<T extends PromoCandidate>(candidates: T[]): T | null {
+  if (candidates.length === 0) return null;
+  return candidates.reduce((best, row) => {
+    if (row.priority !== best.priority) return row.priority > best.priority ? row : best;
+    return row.createdAt > best.createdAt ? row : best;
+  });
+}
 
 /** Plain-data promo shape exposed across the app. */
 export interface ActivePromo {
@@ -21,7 +49,8 @@ export interface ActivePromo {
 }
 
 /**
- * Returns the currently-active promo or null. Newest wins on overlap.
+ * Returns the currently-active promo or null. Highest priority wins on overlap,
+ * then newest.
  * @returns Active promo or null.
  */
 export const getActivePromo = unstable_cache(
@@ -33,7 +62,7 @@ export const getActivePromo = unstable_cache(
         startAt: { lte: now },
         endAt: { gt: now },
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: [{ priority: "desc" }, { createdAt: "desc" }],
     });
     if (!row) return null;
     return {
@@ -51,9 +80,9 @@ export const getActivePromo = unstable_cache(
 );
 
 /**
- * Resolves the promo that was in force on a given date (newest wins on
- * overlap). Used by the admin calculator to price a past job with the promo
- * that was live when the work actually happened, not today's.
+ * Resolves the promo that was in force on a given date (highest priority wins
+ * on overlap, then newest). Used by the admin calculator to price a past job
+ * with the promo that was live when the work actually happened, not today's.
  * @param date - The job date to resolve against.
  * @returns Resolved promo or null.
  */
@@ -61,7 +90,7 @@ export async function resolvePromoForDate(date: Date): Promise<ActivePromo | nul
   const row = await prisma.promo
     .findFirst({
       where: { isActive: true, startAt: { lte: date }, endAt: { gt: date } },
-      orderBy: { createdAt: "desc" },
+      orderBy: [{ priority: "desc" }, { createdAt: "desc" }],
     })
     .catch(() => null);
   if (!row) return null;
@@ -109,7 +138,7 @@ function formatPromoEnd(endIso: string, now: Date = new Date()): string {
   // a promo ending between NZ midnight and noon isn't labelled the prior day.
   if (diffDays <= 7 && diffDays > 0) {
     const weekday = new Intl.DateTimeFormat("en-NZ", {
-      timeZone: "Pacific/Auckland",
+      timeZone: NZ_TZ,
       weekday: "long",
     }).format(end);
     return `this ${weekday}`;
@@ -118,7 +147,7 @@ function formatPromoEnd(endIso: string, now: Date = new Date()): string {
   // Otherwise short date; year only if not current year.
   const sameYear = end.getFullYear() === now.getFullYear();
   return new Intl.DateTimeFormat("en-NZ", {
-    timeZone: "Pacific/Auckland",
+    timeZone: NZ_TZ,
     weekday: "short",
     day: "numeric",
     month: "short",

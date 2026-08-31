@@ -8,6 +8,7 @@
 import { useToast } from "@/features/admin/components/ui/Toast";
 import { cn } from "@/shared/lib/cn";
 import { formatDateTimeShort } from "@/shared/lib/date-format";
+import { NZ_TZ } from "@/shared/lib/timezone-utils";
 import type React from "react";
 import { useEffect, useState } from "react";
 
@@ -95,7 +96,7 @@ function formatEventTime(start: string, end: string): string {
   // Start uses the canonical "Mon 11 May, 2:30 pm" formatter; the end is
   // time-only (no canonical formatter for that) so it stays inline.
   const endTime = new Intl.DateTimeFormat("en-NZ", {
-    timeZone: "Pacific/Auckland",
+    timeZone: NZ_TZ,
     hour: "numeric",
     minute: "2-digit",
     hour12: true,

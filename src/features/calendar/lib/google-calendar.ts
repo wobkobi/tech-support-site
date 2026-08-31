@@ -7,7 +7,7 @@ import { google, type calendar_v3 } from "googleapis";
 import { unstable_cache } from "next/cache";
 
 import { requireEnv } from "@/shared/lib/env";
-import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
+import { nzMidnightUtc } from "@/shared/lib/timezone-utils";
 
 /**
  * Cache tag invalidated by routes that mutate bookings or blocked days so the
@@ -518,10 +518,10 @@ export async function fetchAllCalendarEventsDetailed(
             const endDateStr = event.end.date;
             const [sYear, sMonth, sDay] = startDateStr.split("-").map(Number);
             const [eYear, eMonth, eDay] = endDateStr.split("-").map(Number);
-            const utcOffset = getPacificAucklandOffset(sYear, sMonth, sDay);
-            // NZ midnight = UTC hour 0 minus utcOffset (JS Date handles negative hour wrap)
-            const startAt = new Date(Date.UTC(sYear, sMonth - 1, sDay, -utcOffset, 0, 0));
-            const endAt = new Date(Date.UTC(eYear, eMonth - 1, eDay, -utcOffset, 0, 0));
+            // Each boundary resolves its own offset: an all-day block spanning a
+            // DST change has a different offset at its end than at its start.
+            const startAt = nzMidnightUtc(sYear, sMonth, sDay);
+            const endAt = nzMidnightUtc(eYear, eMonth, eDay);
             processedEvents.push({
               id: event.id!,
               start: startAt.toISOString(),

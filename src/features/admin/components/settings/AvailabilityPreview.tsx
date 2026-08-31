@@ -11,11 +11,12 @@
 import { buildAvailableDays, hourLabel } from "@/features/booking/lib/booking";
 import { cn } from "@/shared/lib/cn";
 import type { AvailabilitySettings } from "@/shared/lib/settings/types";
+import { NZ_TZ } from "@/shared/lib/timezone-utils";
 import type React from "react";
 import { useMemo } from "react";
 
 /** App timezone; the booking engine is NZ-only. */
-const TIME_ZONE = "Pacific/Auckland";
+const TIME_ZONE = NZ_TZ;
 
 /** Weekday order shown in the grid (Mon-Sun) with their getUTCDay() index. */
 const DAY_ORDER: { index: number; name: string }[] = [

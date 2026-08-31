@@ -14,7 +14,7 @@ import {
 } from "@/features/business/lib/event-merge";
 import type { EventPrefill, ParsedRange } from "@/features/business/types/business";
 import { cn } from "@/shared/lib/cn";
-import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
+import { NZ_TZ, getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -38,7 +38,7 @@ interface Props {
 
 /** NZ-local "Mon 3 Feb, 2:15 pm" for the picker rows. */
 const EVENT_STAMP = new Intl.DateTimeFormat("en-NZ", {
-  timeZone: "Pacific/Auckland",
+  timeZone: NZ_TZ,
   weekday: "short",
   day: "numeric",
   month: "short",

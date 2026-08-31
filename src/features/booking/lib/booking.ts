@@ -4,7 +4,7 @@
  */
 
 import type { AvailabilitySettings, MorningGuard } from "@/shared/lib/settings/types";
-import { getPacificAucklandOffset } from "@/shared/lib/timezone-utils";
+import { NZ_TZ, getPacificAucklandOffset, nzWallClockUtc } from "@/shared/lib/timezone-utils";
 
 /**
  * Splits a notes blob into the free text someone actually typed and the trailing
@@ -38,6 +38,22 @@ export function replaceUserNotes(raw: string | null, userNotes: string): string 
   const text = userNotes.trim();
   if (!meta) return text;
   return text ? `${text}\n\n${meta}` : meta;
+}
+
+/**
+ * Maps the meeting type stated in a notes blob onto the MeetingType column's
+ * spelling. Bookings written before the column existed - and every manual one
+ * created before the admin route started populating it - carry the value only
+ * in the notes text, so the detail page's chip and the backfill both resolve it
+ * through here rather than each spelling the mapping out.
+ * @param raw - Raw notes string from the DB.
+ * @returns The column value, or null when the notes state neither.
+ */
+export function meetingTypeFromNotes(raw: string | null): "in_person" | "remote" | null {
+  const { meetingType } = parseBookingNotes(raw);
+  if (meetingType === "in-person") return "in_person";
+  if (meetingType === "remote") return "remote";
+  return null;
 }
 
 /**
@@ -172,7 +188,7 @@ export const CALENDAR_EVENT_PRESENT_FILTER = {
 };
 
 export const BOOKING_CONFIG = {
-  timeZone: "Pacific/Auckland",
+  timeZone: NZ_TZ,
   maxAdvanceDays: 14,
   bufferMin: 15, // buffer applied around Google Calendar events
   bookingBufferAfterMin: 30, // buffer blocked after each booking ends (in case it runs long)
@@ -695,10 +711,7 @@ export function validateBookingRequest(
     return { valid: false, error: "That time isn't within the day's hours" };
   }
 
-  // Get dynamic UTC offset for this date (handles NZDT/NZST)
-  const utcOffset = getPacificAucklandOffset(year, month, day);
-
-  const slotStart = new Date(Date.UTC(year, month - 1, day, startHour - utcOffset, startMinute, 0));
+  const slotStart = nzWallClockUtc(year, month, day, startHour, startMinute);
   const slotEnd = new Date(slotStart.getTime() + durationMinutes * 60 * 1000);
 
   if (slotStart < now) {

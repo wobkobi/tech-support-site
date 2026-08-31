@@ -5,6 +5,7 @@
 // lands as its own time slot, and the slot sum ignores what sits between them).
 
 import { MERGE_SUGGEST_GAP_MINS } from "@/features/business/lib/pricing-policy";
+import { NZ_TZ } from "@/shared/lib/timezone-utils";
 
 /** Minimal calendar event shape the merge scan needs. */
 export interface MergeCandidateEvent {
@@ -38,7 +39,7 @@ export interface MergeSuggestion {
 
 /** NZ-local YYYY-MM-DD for an ISO timestamp. */
 const NZ_DAY = new Intl.DateTimeFormat("en-CA", {
-  timeZone: "Pacific/Auckland",
+  timeZone: NZ_TZ,
   year: "numeric",
   month: "2-digit",
   day: "2-digit",

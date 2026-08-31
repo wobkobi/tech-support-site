@@ -12,7 +12,6 @@ import { useOptimisticDayBlocks } from "@/features/admin/hooks/use-optimistic-da
 import {
   KIND_STYLES,
   LegendDot,
-  NZ_TZ,
   OPTIMISTIC_BUSY_PREFIX,
   formatHour,
   formatTimeRange,
@@ -23,7 +22,7 @@ import {
 } from "@/features/admin/lib/schedule-types";
 import { cn } from "@/shared/lib/cn";
 import { isPastEditWindow, nzDayEndMs } from "@/shared/lib/edit-window";
-import { getPacificAucklandOffset, nzDateKey } from "@/shared/lib/timezone-utils";
+import { NZ_TZ, getPacificAucklandOffset, nzDateKey } from "@/shared/lib/timezone-utils";
 import { useRouter } from "next/navigation";
 import type React from "react";
 import { useEffect, useMemo, useState, useTransition } from "react";
