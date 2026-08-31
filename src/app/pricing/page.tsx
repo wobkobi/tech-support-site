@@ -98,7 +98,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
   // Crossed-out pairs for the promo block. Null when the promo does not touch
   // that figure, so nothing is struck out to show the same number back.
   const ratePair = promo ? promoRateBeforeAfter(baseRate, promo) : null;
-  const travelPair = promo ? promoTravelBeforeAfter(policy.MIN_TRAVEL_CHARGE, promo) : null;
+  const travelPair = promo ? promoTravelBeforeAfter(pricing.travelRatePerHour, promo) : null;
   // Every other price on the page quotes these rather than the raw settings, so
   // a live promo is not announced in the hero and then contradicted further
   // down by the standard rates.
@@ -150,19 +150,19 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                       crosses out the travel charge below instead. */}
                   {ratePair && (
                     <p className="mb-1 text-lg text-rich-black/60 line-through sm:text-xl">
-                      ${ratePair.before}/hr
+                      {formatMoneyCompact(ratePair.before)}/hr
                     </p>
                   )}
                   <p className="mb-2 text-3xl font-bold text-russian-violet sm:text-4xl">
-                    ${(ratePair?.after ?? baseRate).toFixed(0)}/hr
+                    {formatMoneyCompact(ratePair?.after ?? baseRate)}/hr
                   </p>
                   {travelPair && (
                     <p className="mb-2 text-lg font-semibold text-russian-violet sm:text-xl">
                       Travel{" "}
                       <span className="text-rich-black/60 line-through">
-                        ${travelPair.before.toFixed(0)}
+                        {formatMoneyCompact(travelPair.before)}/hr
                       </span>{" "}
-                      ${travelPair.after.toFixed(0)}
+                      {formatMoneyCompact(travelPair.after)}/hr
                     </p>
                   )}
                   <p className="text-base text-rich-black/80 sm:text-lg">

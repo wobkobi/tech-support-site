@@ -10,6 +10,7 @@
 // if that ever stops being true.
 // Run with: npm run check:promo-pricing
 
+import { formatMoneyCompact } from "@/features/business/lib/business";
 import { validateDiscount } from "@/features/business/lib/promo-validation";
 import {
   applyPromoToHourlyRate,
@@ -306,6 +307,17 @@ function main(): void {
     promoTravelBeforeAfter(25, promo("fixed_amount", 10)),
     null,
   );
+
+  // ---- Money formatting ----
+  //
+  // A promo can halve a whole-dollar setting into cents. Bare arithmetic then
+  // prints "$7.5", and toFixed(0) rounded $8.50 up to "$9" beside a "$8.50"
+  // stated lower down the same page. Both shipped once.
+
+  expectEqual("whole dollars stay whole", formatMoneyCompact(65), "$65");
+  expectEqual("half a dollar keeps both digits", formatMoneyCompact(8.5), "$8.50");
+  expectEqual("and never rounds away", formatMoneyCompact(7.5), "$7.50");
+  expectEqual("a discounted whole rate stays whole", formatMoneyCompact(34), "$34");
 
   console.log(failures === 0 ? "\nAll fixtures passed." : `\n${failures} fixture(s) failed.`);
   process.exit(failures === 0 ? 0 : 1);
