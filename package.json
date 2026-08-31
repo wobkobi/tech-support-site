@@ -1,6 +1,6 @@
 {
   "name": "tech-support-site",
-  "version": "4.22.0",
+  "version": "4.22.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -18,6 +18,7 @@
     "calibrate": "dotenv -e .env.local -- tsx scripts/calibrate-benchmarks.ts",
     "check:addresses": "tsx scripts/check-address-resolution.ts",
     "check:emails": "dotenv -e .env.local -- tsx --conditions=react-server scripts/check-email-render.ts",
+    "check:emails-merge": "tsx scripts/check-contact-emails.ts",
     "check:promos": "tsx scripts/check-promo-selection.ts",
     "check:push": "tsx scripts/check-push-delivery.ts",
     "db:push": "prisma db push",
@@ -35,7 +36,7 @@
     "typecheck": "tsc --noEmit"
   },
   "simple-git-hooks": {
-    "pre-commit": "if ! find node_modules/.npm-update-stamp -mmin -1440 2>/dev/null | grep -q .; then npm update --package-lock-only --allow-remote=all --no-audit --no-fund && touch node_modules/.npm-update-stamp; fi && npm install --package-lock-only --allow-remote=all --no-audit --no-fund && git add package-lock.json package.json && npx lint-staged && npm run typecheck && npm run check:addresses && npm run check:push && npm run check:promos",
+    "pre-commit": "if ! find node_modules/.npm-update-stamp -mmin -1440 2>/dev/null | grep -q .; then npm update --package-lock-only --allow-remote=all --no-audit --no-fund && touch node_modules/.npm-update-stamp; fi && npm install --package-lock-only --allow-remote=all --no-audit --no-fund && git add package-lock.json package.json && npx lint-staged && npm run typecheck && npm run check:addresses && npm run check:push && npm run check:promos && npm run check:emails-merge",
     "pre-push": "npm run lint && npm run build && npm run smoke -- --skip-build"
   },
   "lint-staged": {

@@ -8,6 +8,7 @@
  */
 
 import { getOAuth2Client } from "@/features/calendar/lib/google-calendar";
+import { mergeEmails } from "@/features/contacts/lib/merge-emails";
 import { addressCovers, resolveAddress } from "@/shared/lib/normalise-address";
 import { isNZMobileKey, normaliseContactPhone, toE164NZ } from "@/shared/lib/normalise-phone";
 import { prisma } from "@/shared/lib/prisma";
@@ -90,6 +91,8 @@ export async function importFromGoogleContacts(): Promise<number> {
       id: string;
       name: string;
       email: string | null;
+      /** Every other address this contact answers to, all lowercased. */
+      altEmails: string[];
       phone: string | null;
       address: string | null;
       googleContactId: string | null;
@@ -126,6 +129,7 @@ export async function importFromGoogleContacts(): Promise<number> {
         id: c.id,
         name: c.name,
         email: c.email,
+        altEmails: c.altEmails,
         phone: c.phone,
         address: c.address,
         googleContactId: c.googleContactId,
@@ -173,7 +177,13 @@ export async function importFromGoogleContacts(): Promise<number> {
         const resourceName = person.resourceName;
         if (!resourceName) continue;
 
-        const emailEntry = person.emailAddresses?.[0]?.value?.trim().toLowerCase() ?? null;
+        // Every address Google holds, not just the first. An address after the
+        // first is still a way this person can be recognised on a booking,
+        // review or invoice, and reading only [0] silently threw the rest away.
+        const emailList = (person.emailAddresses ?? [])
+          .map((e) => e.value?.trim().toLowerCase())
+          .filter((v): v is string => !!v);
+        const emailEntry = emailList[0] ?? null;
         const rawPhone = person.phoneNumbers?.[0]?.value?.trim() ?? null;
         const phone = rawPhone ? toE164NZ(rawPhone) || rawPhone : null;
         const normPhone = normaliseContactPhone(rawPhone);
@@ -236,6 +246,14 @@ export async function importFromGoogleContacts(): Promise<number> {
             // Writing the E.164 form back also repairs a number stored in
             // domestic form, which is what made the row unmatchable on import.
             if (phone && phone !== existing.phone) updates.phone = phone;
+            // Add, never replace: contact merges also write altEmails, and
+            // setting the list here would discard what a merge folded in.
+            const knownEmails = new Set([
+              ...(existing.email ? [existing.email.toLowerCase()] : []),
+              ...existing.altEmails.map((e) => e.toLowerCase()),
+            ]);
+            const newAlts = emailList.filter((e) => !knownEmails.has(e));
+            if (newAlts.length > 0) updates.altEmails = { push: newAlts };
             // Canonicalise hand-typed Google addresses, but only when the value
             // actually changed - keeps Geocoding calls near zero on repeat
             // imports. Flags ride along in the same stamped update.
@@ -268,6 +286,9 @@ export async function importFromGoogleContacts(): Promise<number> {
               data: {
                 name: displayName,
                 email,
+                // Whatever Google holds beyond the primary, so any of them
+                // resolves back to this contact.
+                altEmails: emailList.filter((e) => e !== email),
                 phone,
                 ...addressData,
                 // Explicit null: an omitted optional field has no key in
@@ -285,6 +306,9 @@ export async function importFromGoogleContacts(): Promise<number> {
               id: created.id,
               name: created.name,
               email,
+              // Mirror what the create just wrote, so a second Google person
+              // resolving to this contact compares against the full set.
+              altEmails: emailList.filter((e) => e !== email),
               phone,
               address: created.address,
               googleContactId: resourceName,
@@ -489,7 +513,12 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
     const googleChanged = !contact.lastGoogleEtag || currentEtag !== contact.lastGoogleEtag;
 
     const googleName = googlePerson.names?.[0]?.displayName?.trim() || null;
-    const googleEmail = googlePerson.emailAddresses?.[0]?.value?.trim() || null;
+    const googleEmailList = (googlePerson.emailAddresses ?? [])
+      .map((e) => e.value?.trim())
+      .filter((v): v is string => !!v);
+    // The primary for conflict purposes is still Google's first address; the
+    // rest are carried alongside rather than discarded.
+    const googleEmail = googleEmailList[0] || null;
     const googleAddress = googlePerson.addresses?.[0]?.formattedValue?.trim() || null;
     const googlePhoneList = (googlePerson.phoneNumbers ?? [])
       .map((p) => p.value?.trim())
@@ -511,6 +540,21 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
       siteChanged,
       googleChanged,
     );
+    // Emails union like phones, but the primary is decided by emailAction above
+    // rather than by list order: Contact.email is the display and send address,
+    // not merely one of a set. Without this the push replaced Google's list
+    // with a single address and deleted every other one the customer uses.
+    const primaryEmail =
+      emailAction === "pull" && googleEmail ? googleEmail : (contact.email ?? googleEmail);
+    const mergedEmails = mergeEmails(
+      [contact.email, ...contact.altEmails],
+      googleEmailList,
+      primaryEmail,
+    );
+    const emailsChanged =
+      mergedEmails.length !== googleEmailList.length ||
+      mergedEmails.some((e, i) => e !== googleEmailList[i]?.toLowerCase());
+
     // Addresses compare by meaning, not text: the site stores the Geocoding canonical form
     // while Google keeps what was typed, so a plain comparison flags every one as a
     // conflict. Push when the site's form only states the same place more fully.
@@ -530,8 +574,8 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
       updateBody.names = [{ displayName: contact.name, givenName, familyName }];
       updateFields.push("names");
     }
-    if (emailAction === "push" && contact.email) {
-      updateBody.emailAddresses = [{ value: contact.email }];
+    if ((emailAction === "push" || emailsChanged) && mergedEmails.length > 0) {
+      updateBody.emailAddresses = mergedEmails.map((value) => ({ value }));
       updateFields.push("emailAddresses");
     }
     if (addressAction === "push" && contact.address) {
@@ -576,6 +620,17 @@ export async function syncContactToGoogle(contactId: string): Promise<void> {
     // Stored lowercased - the import matches on the lowercased form, so a
     // mixed-case row here comes back as a duplicate on the next pull.
     if (emailAction === "pull" && googleEmail) siteUpdate.email = googleEmail.toLowerCase();
+    // Same shape as altPhones below: the primary stays on Contact.email for the
+    // app to display and send to, and every other address lands in altEmails so
+    // a booking, review or invoice raised under it still resolves to this
+    // person. mergedEmails already unions both sides, so nothing is lost.
+    const emailTail = mergedEmails.filter((e) => e !== primaryEmail?.trim().toLowerCase());
+    if (
+      emailTail.length !== contact.altEmails.length ||
+      contact.altEmails.some((e) => !emailTail.includes(e.toLowerCase()))
+    ) {
+      siteUpdate.altEmails = { set: emailTail };
+    }
     if (addressAction === "pull" && googleAddress) {
       // Canonicalise the hand-typed Google address before it lands on the site,
       // flagging it for review when it doesn't resolve to one confident match.
