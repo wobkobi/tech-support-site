@@ -37,6 +37,9 @@ export function pickWinningPromo<T extends PromoCandidate>(candidates: T[]): T |
   });
 }
 
+/** Which stage of the quote a promo acts on. */
+export type PromoDiscountType = "flat_hourly" | "percent" | "fixed_amount" | "free_travel";
+
 /** Plain-data promo shape exposed across the app. */
 export interface ActivePromo {
   id: string;
@@ -44,8 +47,67 @@ export interface ActivePromo {
   description: string | null;
   startAt: string;
   endAt: string;
+  /** Null on rows written before the column existed; treated as a rate promo. */
+  discountType: PromoDiscountType | null;
   flatHourlyRate: number | null;
   percentDiscount: number | null;
+  fixedAmount: number | null;
+  travelPercent: number | null;
+}
+
+/** The parts of a priced job a promo can act on after the band is built. */
+export interface QuoteParts {
+  /** Low end of the labour band, in dollars. */
+  labourLow: number;
+  /** High end of the labour band, in dollars. */
+  labourHigh: number;
+  /** Round-trip travel charge, in dollars. */
+  travel: number;
+}
+
+/**
+ * Rounds a dollar figure to cents, keeping the arithmetic out of float drift.
+ * @param value - Raw dollar amount.
+ * @returns The amount rounded to two decimal places.
+ */
+function toCents(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+/**
+ * Applies the promo types that act on the whole quote, after the labour band
+ * and travel have been priced.
+ *
+ * The rate-based types are deliberately absent here: the pipeline discounts the
+ * hourly rate BEFORE priceRangeFor builds the band, so moving them to this
+ * stage would round differently and shift existing prices. They stay in
+ * {@link applyPromoToHourlyRate} and this function leaves them alone.
+ * @param parts - The priced labour band and travel charge.
+ * @param promo - Resolved promo, or null.
+ * @returns The parts after any quote-level discount.
+ */
+export function applyPromoToQuote(parts: QuoteParts, promo: ActivePromo | null): QuoteParts {
+  if (!promo) return parts;
+
+  if (promo.discountType === "free_travel" && promo.travelPercent !== null) {
+    const factor = Math.min(1, Math.max(0, promo.travelPercent));
+    return { ...parts, travel: toCents(parts.travel * factor) };
+  }
+
+  if (promo.discountType === "fixed_amount" && promo.fixedAmount !== null) {
+    // Off labour only, floored at zero. Travel is the operator's actual driving
+    // time rather than a margin, so a discount larger than the labour is capped
+    // instead of eating into it - and the floor stops a small job quoting a
+    // negative figure.
+    const off = Math.max(0, promo.fixedAmount);
+    return {
+      ...parts,
+      labourLow: toCents(Math.max(0, parts.labourLow - off)),
+      labourHigh: toCents(Math.max(0, parts.labourHigh - off)),
+    };
+  }
+
+  return parts;
 }
 
 /**
@@ -71,8 +133,11 @@ export const getActivePromo = unstable_cache(
       description: row.description,
       startAt: row.startAt.toISOString(),
       endAt: row.endAt.toISOString(),
+      discountType: row.discountType,
       flatHourlyRate: row.flatHourlyRate,
       percentDiscount: row.percentDiscount,
+      fixedAmount: row.fixedAmount,
+      travelPercent: row.travelPercent,
     };
   },
   ["active-promo"],
@@ -100,8 +165,11 @@ export async function resolvePromoForDate(date: Date): Promise<ActivePromo | nul
     description: row.description,
     startAt: row.startAt.toISOString(),
     endAt: row.endAt.toISOString(),
+    discountType: row.discountType,
     flatHourlyRate: row.flatHourlyRate,
     percentDiscount: row.percentDiscount,
+    fixedAmount: row.fixedAmount,
+    travelPercent: row.travelPercent,
   };
 }
 
@@ -113,6 +181,10 @@ export async function resolvePromoForDate(date: Date): Promise<ActivePromo | nul
  */
 export function applyPromoToHourlyRate(rate: number, promo: ActivePromo | null): number {
   if (!promo) return rate;
+  // fixed_amount and free_travel act on the priced quote, not the rate.
+  if (promo.discountType === "fixed_amount" || promo.discountType === "free_travel") {
+    return rate;
+  }
   if (promo.flatHourlyRate !== null) {
     // Never raise the price - a promo above the base rate is a misconfig.
     return Math.min(rate, promo.flatHourlyRate);

@@ -8,7 +8,11 @@
 
 import { priceRangeFor, remoteRateDelta } from "@/features/business/lib/estimate-range";
 import { calcTravelCharge, FALLBACK_BASE_RATE } from "@/features/business/lib/pricing-policy";
-import { applyPromoToHourlyRate, type ActivePromo } from "@/features/business/lib/promos";
+import {
+  applyPromoToHourlyRate,
+  applyPromoToQuote,
+  type ActivePromo,
+} from "@/features/business/lib/promos";
 import type { PublicRate } from "@/features/business/types/pricing";
 import type { EstimateConfidence, EstimatorRange } from "@/shared/lib/settings/types";
 
@@ -157,14 +161,26 @@ export async function fetchQuickEstimate(input: QuickEstimateInput): Promise<Qui
     estimatorRange,
     lowEndFloorFactor,
   );
-  const travel = calcTravelCharge(travelMins, travelMinsBack, travelRatePerHour, minTravelCharge);
+  const rawTravel = calcTravelCharge(
+    travelMins,
+    travelMinsBack,
+    travelRatePerHour,
+    minTravelCharge,
+  );
+  // Quote-level promo types act here, after the band and travel are priced.
+  // The rate-based types already applied above and are a no-op at this stage.
+  const discounted = applyPromoToQuote(
+    { labourLow: band.low, labourHigh: band.high, travel: rawTravel },
+    promo,
+  );
+  const travel = discounted.travel;
   // The labour band is the range shown to the customer; travel is a mostly fixed add-on on
   // its own line rather than folded in. The logged price below stays the all-in total, so
   // the booking snapshot is unchanged.
-  const low = band.low;
-  const high = band.high;
-  const totalLow = band.low + travel;
-  const totalHigh = band.high + travel;
+  const low = discounted.labourLow;
+  const high = discounted.labourHigh;
+  const totalLow = discounted.labourLow + travel;
+  const totalHigh = discounted.labourHigh + travel;
 
   // Labour-time band from the same confidence factors that widen the price, rounded to
   // 5-min steps so the card's range ("15 - 30 min") lines up with the price range. Travel

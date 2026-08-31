@@ -12,6 +12,7 @@ import { priceRangeFor, remoteRateDelta } from "@/features/business/lib/estimate
 import { calcTravelCharge, FALLBACK_BASE_RATE } from "@/features/business/lib/pricing-policy";
 import {
   applyPromoToHourlyRate,
+  applyPromoToQuote,
   summariseForBanner,
   type ActivePromo,
 } from "@/features/business/lib/promos";
@@ -253,11 +254,34 @@ export function PricingWizard({
       return { low, high, travel };
     };
 
-    const promoRange = buildVisitRange(promoRate);
-    // Only show the crossed-out original when it actually differs after rounding.
-    const rawOriginal = promoApplied ? buildVisitRange(fullRate) : null;
+    // Quote-level promo types (fixed amount, free travel) act here, after the
+    // band and travel are priced. The rate-based types already applied to
+    // promoRate above and are a no-op at this stage.
+    const pricedRange = buildVisitRange(promoRate);
+    const discounted = applyPromoToQuote(
+      { labourLow: pricedRange.low, labourHigh: pricedRange.high, travel: pricedRange.travel },
+      activePromo,
+    );
+    const promoRange = {
+      low: discounted.labourLow,
+      high: discounted.labourHigh,
+      travel: discounted.travel,
+    };
+    // The crossed-out "before" figure is deliberately undiscounted at both
+    // stages. A quote-level promo moves travel without touching the band, so
+    // the comparison has to include travel or a free-travel offer would show
+    // no saving at all.
+    const anyDiscount =
+      promoApplied ||
+      promoRange.low !== pricedRange.low ||
+      promoRange.high !== pricedRange.high ||
+      promoRange.travel !== pricedRange.travel;
+    const rawOriginal = anyDiscount ? buildVisitRange(fullRate) : null;
     const original =
-      rawOriginal && (rawOriginal.low !== promoRange.low || rawOriginal.high !== promoRange.high)
+      rawOriginal &&
+      (rawOriginal.low !== promoRange.low ||
+        rawOriginal.high !== promoRange.high ||
+        rawOriginal.travel !== promoRange.travel)
         ? rawOriginal
         : null;
 
