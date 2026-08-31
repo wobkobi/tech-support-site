@@ -10,8 +10,6 @@
     "backfill:invoice-contacts:dry": "dotenv -e .env.local -- tsx scripts/backfill-invoice-contacts.ts",
     "backfill:promo-redemptions:apply": "dotenv -e .env.local -- tsx scripts/backfill-promo-redemptions.ts --apply",
     "backfill:promo-redemptions:dry": "dotenv -e .env.local -- tsx scripts/backfill-promo-redemptions.ts",
-    "backfill:promo-types:apply": "dotenv -e .env.local -- tsx scripts/backfill-promo-discount-type.ts --apply",
-    "backfill:promo-types:dry": "dotenv -e .env.local -- tsx scripts/backfill-promo-discount-type.ts",
     "build": "next build --turbopack",
     "build:ads": "tsx scripts/build-ads.ts",
     "build:all": "npm run build:icons && npm run build",
