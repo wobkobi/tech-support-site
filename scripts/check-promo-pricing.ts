@@ -227,13 +227,13 @@ function main(): void {
   expectEqual(
     "fixed amount reads as money off",
     describePromoDiscount(promo("fixed_amount", 10)),
-    "$10 off all jobs",
+    "$10 off home jobs",
   );
 
   expectEqual(
     "free travel reads as free, not 100% off",
     describePromoDiscount(promo("free_travel", 0)),
-    "Free travel on all jobs",
+    "Free travel on home jobs",
   );
 
   expectEqual(
@@ -245,13 +245,13 @@ function main(): void {
   expectEqual(
     "flat hourly wording is unchanged",
     describePromoDiscount(promo("flat_hourly", 60)),
-    "$60/hr on all jobs",
+    "$60/hr on home jobs",
   );
 
   expectEqual(
     "percent wording is unchanged",
     describePromoDiscount(promo("percent", 0.2)),
-    "20% off all jobs",
+    "20% off home jobs",
   );
 
   // ---- The pricing page's crossed-out pairs ----

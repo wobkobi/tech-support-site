@@ -303,8 +303,14 @@ export function promoTravelBeforeAfter(
 }
 
 /**
- * What a promo gives, with no date attached - "$10 off all jobs", "Free
- * travel on all jobs". Split out of {@link summariseForBanner} because the
+ * What a promo gives, with no date attached - "$10 off home jobs", "Free
+ * travel on home jobs".
+ *
+ * "Home jobs", not "all jobs": promos are a home-rate offer and business work
+ * is excluded, so the banner would otherwise promise a discount on the business
+ * page that the invoice does not honour.
+ *
+ * Split out of {@link summariseForBanner} because the
  * pricing page states the end date separately and would otherwise say it
  * twice, and because a non-rate promo leaves the headline $/hr unchanged and
  * needs this line to say what the offer actually is.
@@ -315,17 +321,17 @@ export function describePromoDiscount(promo: ActivePromo): string {
   if (promo.discountType === "free_travel" && promo.travelPercent !== null) {
     // 0 means nothing is charged for the drive; anything else is a part-charge.
     return promo.travelPercent === 0
-      ? "Free travel on all jobs"
+      ? "Free travel on home jobs"
       : `${Math.round((1 - promo.travelPercent) * 100)}% off travel`;
   }
   if (promo.discountType === "fixed_amount" && promo.fixedAmount !== null) {
-    return `$${promo.fixedAmount} off all jobs`;
+    return `$${promo.fixedAmount} off home jobs`;
   }
   if (promo.flatHourlyRate !== null) {
-    return `$${promo.flatHourlyRate}/hr on all jobs`;
+    return `$${promo.flatHourlyRate}/hr on home jobs`;
   }
   if (promo.percentDiscount !== null) {
-    return `${Math.round(promo.percentDiscount * 100)}% off all jobs`;
+    return `${Math.round(promo.percentDiscount * 100)}% off home jobs`;
   }
   return "Limited offer";
 }

@@ -707,6 +707,12 @@ export interface JobPricing {
   /** Fraction charged for an unsuccessful visit (e.g. 0.5 = half); defaults to 0.5. */
   unsuccessfulFactor?: number;
   /**
+   * RateConfig id of the "Business" modifier. Labour carrying it is excluded
+   * from promo discounts: promos are a home-rate offer, and without this a
+   * business job priced during one is silently under-charged.
+   */
+  businessModifierId?: string | null;
+  /**
    * Live task-timing settings for {@link collapseToWindow} and
    * {@link explicitRoundingAllowanceMins}. Not a {@link calcJobTotal} input -
    * it rides along so the calculator's apportionment reads the same settings
@@ -720,12 +726,14 @@ export interface JobPricing {
  * @param job - Job calculation.
  * @param promo - Active promo or null.
  * @param travelTotal - The job's travel charge, which a free-travel promo discounts.
+ * @param businessModifierId - Modifier marking business labour, which promos skip.
  * @returns Discount in dollars.
  */
 function computeJobPromoDiscount(
   job: JobCalculation,
   promo: JobPromo | null,
   travelTotal: number,
+  businessModifierId?: string | null,
 ): number {
   if (!promo) return 0;
 
@@ -739,7 +747,11 @@ function computeJobPromoDiscount(
   // A task is hourly if either: it has a baseRateId set (new rate model),
   // OR no flat rateConfigId. The double check survives stale AI output that
   // forgets to clear rateConfigId.
-  const hourlyTasks = job.tasks.filter((t) => t.baseRateId != null || t.rateConfigId == null);
+  const hourlyTasks = job.tasks
+    .filter((t) => t.baseRateId != null || t.rateConfigId == null)
+    // Business labour is out of scope for a promo. Checked per task rather than
+    // per job so a mixed job discounts only its home-rate lines.
+    .filter((t) => !businessModifierId || !(t.modifierIds ?? []).includes(businessModifierId));
   const labourSubtotal = hourlyTasks.reduce((s, t) => s + t.qty * t.unitPrice, 0);
   if (labourSubtotal <= 0) return 0;
 
@@ -839,7 +851,12 @@ export function calcJobTotal(
     holidayUplift > 0 ? Math.round(hourlyTasksTotal * holidayUplift * 100) / 100 : 0;
   const subtotal =
     Math.round((tasksTotal + partsTotal + travelTotal + holidaySurcharge) * 100) / 100;
-  const promoDiscount = computeJobPromoDiscount(job, promo, travelTotal);
+  const promoDiscount = computeJobPromoDiscount(
+    job,
+    promo,
+    travelTotal,
+    pricing.businessModifierId,
+  );
   // Fraction removed from an unsuccessful line: 1 - the charged share.
   const unsuccessfulCut = 1 - (pricing.unsuccessfulFactor ?? 0.5);
   let unsuccessfulDiscount = 0;

@@ -727,8 +727,14 @@ export function CalculatorView({
     policy: cancellation,
   });
 
-  // Apply the date's public-holiday uplift to labour (0 when not a holiday).
-  const jobPricing = { ...pricing, holidayUplift: holiday.uplift };
+  // Apply the date's public-holiday uplift to labour (0 when not a holiday),
+  // and tell the totals which modifier marks business labour so a promo skips
+  // it - promos are a home-rate offer.
+  // Same predicate getPublicPricing uses to derive the business rate, so the
+  // page and the invoice cannot disagree about which modifier means business.
+  const businessModifierId =
+    rates.find((r) => r.label === "Business" && r.unit === "modifier")?.id ?? null;
+  const jobPricing = { ...pricing, holidayUplift: holiday.uplift, businessModifierId };
   const totals = calcJobTotal(job, !skipPromo ? activePromo : null, jobPricing);
   // Memoise the flattened line items so the preview panel's React.memo can
   // skip re-render when unrelated parent state changes (e.g. typing in the
