@@ -38,6 +38,9 @@ export async function PATCH(
     percentDiscount: number | null;
     isActive: boolean;
     priority: number;
+    discountType: "flat_hourly" | "percent" | "fixed_amount" | "free_travel";
+    fixedAmount: number | null;
+    travelPercent: number | null;
   }>;
 
   if (body.priority !== undefined && !Number.isInteger(body.priority)) {
@@ -86,6 +89,9 @@ export async function PATCH(
       ...(body.percentDiscount !== undefined && { percentDiscount: body.percentDiscount }),
       ...(body.isActive !== undefined && { isActive: body.isActive }),
       ...(body.priority !== undefined && { priority: body.priority }),
+      ...(body.discountType !== undefined && { discountType: body.discountType }),
+      ...(body.fixedAmount !== undefined && { fixedAmount: body.fixedAmount }),
+      ...(body.travelPercent !== undefined && { travelPercent: body.travelPercent }),
     },
   });
   // Next 16's revalidateTag requires a second CacheLifeConfig arg.

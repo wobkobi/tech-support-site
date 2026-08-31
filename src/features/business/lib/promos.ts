@@ -234,6 +234,15 @@ function formatPromoEnd(endIso: string, now: Date = new Date()): string {
  */
 export function summariseForBanner(promo: ActivePromo): string {
   const until = formatPromoEnd(promo.endAt);
+  if (promo.discountType === "free_travel" && promo.travelPercent !== null) {
+    // 0 means nothing is charged for the drive; anything else is a part-charge.
+    return promo.travelPercent === 0
+      ? `Free travel on all jobs until ${until}`
+      : `${Math.round((1 - promo.travelPercent) * 100)}% off travel until ${until}`;
+  }
+  if (promo.discountType === "fixed_amount" && promo.fixedAmount !== null) {
+    return `$${promo.fixedAmount} off all jobs until ${until}`;
+  }
   if (promo.flatHourlyRate !== null) {
     return `$${promo.flatHourlyRate}/hr on all jobs until ${until}`;
   }

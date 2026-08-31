@@ -20,7 +20,58 @@ import { useEffect, useState } from "react";
 const inputClass =
   "rounded-lg border border-admin-border bg-admin-surface px-3 py-2 text-sm text-admin-text focus:ring-2 focus:ring-russian-violet/30 focus:outline-none";
 
-type PromoType = "flat" | "percent";
+type PromoType = "flat" | "percent" | "fixed" | "travel";
+
+/** Form type > the column the API stores it under. */
+const DISCOUNT_TYPE: Record<PromoType, "flat_hourly" | "percent" | "fixed_amount" | "free_travel"> =
+  {
+    flat: "flat_hourly",
+    percent: "percent",
+    fixed: "fixed_amount",
+    travel: "free_travel",
+  };
+
+/** What the amount field means for each type, shown beside the input. */
+const AMOUNT_LABEL: Record<PromoType, string> = {
+  flat: "Hourly rate ($/hr)",
+  percent: "Discount (%)",
+  fixed: "Amount off ($)",
+  travel: "Travel discount (%)",
+};
+
+/**
+ * The form type a stored promo corresponds to. Falls back to the value columns
+ * for rows written before discountType existed.
+ * @param p - Stored promo row.
+ * @returns The matching form type.
+ */
+function promoTypeOf(p: PromoRow): PromoType {
+  if (p.discountType === "fixed_amount") return "fixed";
+  if (p.discountType === "free_travel") return "travel";
+  if (p.discountType === "flat_hourly") return "flat";
+  if (p.discountType === "percent") return "percent";
+  return p.flatHourlyRate !== null ? "flat" : "percent";
+}
+
+/**
+ * The number to show in the amount field for a stored promo, in the units the
+ * operator types rather than the units the column stores.
+ * @param p - Stored promo row.
+ * @returns The amount, or an empty string when the promo has no value set.
+ */
+function amountFor(p: PromoRow): number | string {
+  switch (promoTypeOf(p)) {
+    case "flat":
+      return p.flatHourlyRate ?? "";
+    case "percent":
+      return p.percentDiscount !== null ? Math.round(p.percentDiscount * 100) : "";
+    case "fixed":
+      return p.fixedAmount ?? "";
+    case "travel":
+      // Stored as the fraction still charged; shown as the discount.
+      return p.travelPercent !== null ? Math.round((1 - p.travelPercent) * 100) : "";
+  }
+}
 
 interface FormState {
   title: string;
@@ -248,6 +299,28 @@ function overlapNote(promo: PromoRow, winners: Map<string, string>, all: PromoRo
   return `Overlaps another promo - ${winner ? winner.title : "the other"} wins.`;
 }
 
+/**
+ * Short operator-facing description of what a promo does, used by both the
+ * table and the mobile card so the two cannot drift.
+ * @param p - Stored promo row.
+ * @returns A phrase like "$60.00/hr" or "Free travel".
+ */
+function describeDiscount(p: PromoRow): string {
+  switch (promoTypeOf(p)) {
+    case "flat":
+      return p.flatHourlyRate !== null ? `${formatNZD(p.flatHourlyRate)}/hr` : "-";
+    case "percent":
+      return p.percentDiscount !== null ? `${Math.round(p.percentDiscount * 100)}% off` : "-";
+    case "fixed":
+      return p.fixedAmount !== null ? `${formatNZD(p.fixedAmount)} off` : "-";
+    case "travel":
+      if (p.travelPercent === null) return "-";
+      return p.travelPercent === 0
+        ? "Free travel"
+        : `${Math.round((1 - p.travelPercent) * 100)}% off travel`;
+  }
+}
+
 interface Props {
   /** Initial server-fetched promo list. */
   initial: PromoRow[];
@@ -302,14 +375,8 @@ export function PromosView({ initial }: Props): React.ReactElement {
       startDate: toDateInput(p.startAt),
       // Stored as start-of-next-day; render the inclusive end date.
       endDate: endIsoToInclusiveDate(p.endAt),
-      type: p.flatHourlyRate !== null ? "flat" : "percent",
-      amount: String(
-        p.flatHourlyRate !== null
-          ? p.flatHourlyRate
-          : p.percentDiscount !== null
-            ? Math.round(p.percentDiscount * 100)
-            : "",
-      ),
+      type: promoTypeOf(p),
+      amount: String(amountFor(p)),
       isActive: p.isActive,
       priority: String(p.priority),
     });
@@ -337,9 +404,15 @@ export function PromosView({ initial }: Props): React.ReactElement {
       // Widen day-level inputs: end is start-of-next-day so it's inclusive.
       startAt: startOfDayISO(form.startDate),
       endAt: endOfDayISO(form.endDate),
-      // XOR: send only the field that matches the selected type.
+      // Send only the column that matches the selected type; the route
+      // validates per type and rejects anything half-filled.
+      discountType: DISCOUNT_TYPE[form.type],
       flatHourlyRate: form.type === "flat" ? amount : null,
       percentDiscount: form.type === "percent" ? amount / 100 : null,
+      fixedAmount: form.type === "fixed" ? amount : null,
+      // The operator enters "% off travel"; the column stores the fraction
+      // still charged, so 100% off is 0.
+      travelPercent: form.type === "travel" ? 1 - amount / 100 : null,
       isActive: form.isActive,
       priority: parseInt(form.priority, 10) || 0,
     };
@@ -473,22 +546,24 @@ export function PromosView({ initial }: Props): React.ReactElement {
               className={inputClass}
             >
               <option value="flat">Flat $/hr</option>
-              <option value="percent">% discount</option>
+              <option value="percent">% off the job</option>
+              <option value="fixed">$ off the job</option>
+              <option value="travel">% off travel</option>
             </select>
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-admin-muted">
-              {form.type === "flat" ? "Amount ($/hr)" : "Discount (%)"}
-            </span>
+            <span className="text-xs font-medium text-admin-muted">{AMOUNT_LABEL[form.type]}</span>
             <input
               type="number"
               required
               min="0"
-              step={form.type === "flat" ? "0.01" : "1"}
-              max={form.type === "percent" ? 99 : undefined}
+              step={form.type === "flat" || form.type === "fixed" ? "0.01" : "1"}
+              // A travel discount may be the full 100%; a job discount of 100%
+              // would be a free job, which is a mistake rather than an offer.
+              max={form.type === "percent" ? 99 : form.type === "travel" ? 100 : undefined}
               value={form.amount}
               onChange={(e) => setForm((p) => ({ ...p, amount: e.target.value }))}
-              placeholder={form.type === "flat" ? "50" : "20"}
+              placeholder={form.type === "flat" ? "50" : form.type === "fixed" ? "20" : "20"}
               className={inputClass}
             />
           </label>
@@ -588,13 +663,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
                         {formatDateShort(p.startAt)} -{" "}
                         {formatDateShort(endIsoToInclusiveDate(p.endAt))}
                       </td>
-                      <td className="px-4 py-3 text-xs text-admin-text">
-                        {p.flatHourlyRate !== null
-                          ? `${formatNZD(p.flatHourlyRate)}/hr`
-                          : p.percentDiscount !== null
-                            ? `${Math.round(p.percentDiscount * 100)}% off`
-                            : "-"}
-                      </td>
+                      <td className="px-4 py-3 text-xs text-admin-text">{describeDiscount(p)}</td>
                       <td className="px-4 py-3">
                         <StatusPill tone={statusTone(status)}>{statusLabel(status)}</StatusPill>
                       </td>
@@ -665,13 +734,7 @@ export function PromosView({ initial }: Props): React.ReactElement {
                       {formatDateShort(endIsoToInclusiveDate(p.endAt))}
                     </dd>
                     <dt className="text-admin-faint">Type</dt>
-                    <dd className="text-admin-text">
-                      {p.flatHourlyRate !== null
-                        ? `${formatNZD(p.flatHourlyRate)}/hr`
-                        : p.percentDiscount !== null
-                          ? `${Math.round(p.percentDiscount * 100)}% off`
-                          : "-"}
-                    </dd>
+                    <dd className="text-admin-text">{describeDiscount(p)}</dd>
                   </dl>
 
                   <div className="mt-4 flex flex-wrap gap-2">

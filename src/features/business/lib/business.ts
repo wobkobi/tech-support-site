@@ -676,8 +676,12 @@ export function jobToLineItems(
 
 /** Active-promo shape consumed by {@link calcJobTotal}. Kept loose so business.ts doesn't depend on the wider promos module. */
 export interface JobPromo {
+  /** Which value below applies. Null on rows predating the column - treated as a rate promo. */
+  discountType?: "flat_hourly" | "percent" | "fixed_amount" | "free_travel" | null;
   flatHourlyRate: number | null;
   percentDiscount: number | null;
+  fixedAmount?: number | null;
+  travelPercent?: number | null;
 }
 
 /** Live pricing values threaded into {@link calcJobTotal}; defaults are the code consts. */
@@ -703,10 +707,22 @@ export interface JobPricing {
  * Promo discount on a job's labour only (hourly task lines).
  * @param job - Job calculation.
  * @param promo - Active promo or null.
+ * @param travelTotal - The job's travel charge, which a free-travel promo discounts.
  * @returns Discount in dollars.
  */
-function computeJobPromoDiscount(job: JobCalculation, promo: JobPromo | null): number {
+function computeJobPromoDiscount(
+  job: JobCalculation,
+  promo: JobPromo | null,
+  travelTotal: number,
+): number {
   if (!promo) return 0;
+
+  // Travel is its own flat line rather than an hourly task, so a travel promo
+  // is the one type that does not touch the labour subtotal at all.
+  if (promo.discountType === "free_travel" && promo.travelPercent != null) {
+    const charged = Math.min(1, Math.max(0, promo.travelPercent));
+    return Math.round(travelTotal * (1 - charged) * 100) / 100;
+  }
 
   // A task is hourly if either: it has a baseRateId set (new rate model),
   // OR no flat rateConfigId. The double check survives stale AI output that
@@ -724,6 +740,12 @@ function computeJobPromoDiscount(job: JobCalculation, promo: JobPromo | null): n
   if (promo.percentDiscount !== null) {
     const pct = Math.max(0, Math.min(1, promo.percentDiscount));
     return Math.round(labourSubtotal * pct * 100) / 100;
+  }
+  if (promo.discountType === "fixed_amount" && promo.fixedAmount != null) {
+    // Capped at the labour subtotal, matching applyPromoToQuote: travel is the
+    // operator's driving time rather than margin, so a discount larger than the
+    // labour is capped instead of eating into it.
+    return Math.round(Math.min(Math.max(0, promo.fixedAmount), labourSubtotal) * 100) / 100;
   }
   return 0;
 }
@@ -805,7 +827,7 @@ export function calcJobTotal(
     holidayUplift > 0 ? Math.round(hourlyTasksTotal * holidayUplift * 100) / 100 : 0;
   const subtotal =
     Math.round((tasksTotal + partsTotal + travelTotal + holidaySurcharge) * 100) / 100;
-  const promoDiscount = computeJobPromoDiscount(job, promo);
+  const promoDiscount = computeJobPromoDiscount(job, promo, travelTotal);
   // Fraction removed from an unsuccessful line: 1 - the charged share.
   const unsuccessfulCut = 1 - (pricing.unsuccessfulFactor ?? 0.5);
   let unsuccessfulDiscount = 0;

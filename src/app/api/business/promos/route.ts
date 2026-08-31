@@ -23,6 +23,9 @@ interface PromoBody {
   percentDiscount?: number | null;
   isActive?: boolean;
   priority?: number;
+  discountType?: "flat_hourly" | "percent" | "fixed_amount" | "free_travel";
+  fixedAmount?: number | null;
+  travelPercent?: number | null;
 }
 
 /**
@@ -42,13 +45,43 @@ function validatePromo(body: PromoBody): string | null {
   if (startAt >= endAt) {
     return "startAt must be before endAt";
   }
-  const hasFlat = typeof body.flatHourlyRate === "number" && body.flatHourlyRate > 0;
-  const hasPct = typeof body.percentDiscount === "number" && body.percentDiscount > 0;
-  if (hasFlat === hasPct) {
-    return "exactly one of flatHourlyRate or percentDiscount must be set";
-  }
-  if (hasPct && (body.percentDiscount! <= 0 || body.percentDiscount! >= 1)) {
-    return "percentDiscount must be between 0 and 1 (e.g. 0.20 for 20%)";
+  // Each type carries its own value column, and exactly one must be set.
+  // Validating per type rather than as a blanket XOR keeps a misconfigured
+  // promo out of the database instead of surfacing later as a wrong price.
+  const type = body.discountType ?? (body.flatHourlyRate != null ? "flat_hourly" : "percent");
+  switch (type) {
+    case "flat_hourly":
+      if (typeof body.flatHourlyRate !== "number" || body.flatHourlyRate <= 0) {
+        return "flatHourlyRate must be a positive number";
+      }
+      break;
+    case "percent":
+      if (
+        typeof body.percentDiscount !== "number" ||
+        body.percentDiscount <= 0 ||
+        body.percentDiscount >= 1
+      ) {
+        return "percentDiscount must be between 0 and 1 (e.g. 0.20 for 20%)";
+      }
+      break;
+    case "fixed_amount":
+      if (typeof body.fixedAmount !== "number" || body.fixedAmount <= 0) {
+        return "fixedAmount must be a positive number";
+      }
+      break;
+    case "free_travel":
+      // The fraction still charged: 0 is free travel, 0.5 is half price. 1
+      // would be a promo that does nothing.
+      if (
+        typeof body.travelPercent !== "number" ||
+        body.travelPercent < 0 ||
+        body.travelPercent >= 1
+      ) {
+        return "travelPercent must be between 0 and 1 (0 = free travel)";
+      }
+      break;
+    default:
+      return "discountType must be flat_hourly, percent, fixed_amount or free_travel";
   }
   // Reject rather than coerce: a fractional priority would order unpredictably
   // against the integer column and read as accepted.
@@ -90,8 +123,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       description: body.description ?? null,
       startAt: parseDate(body.startAt)!,
       endAt: parseDate(body.endAt)!,
+      discountType: body.discountType ?? (body.flatHourlyRate != null ? "flat_hourly" : "percent"),
       flatHourlyRate: body.flatHourlyRate ?? null,
       percentDiscount: body.percentDiscount ?? null,
+      fixedAmount: body.fixedAmount ?? null,
+      travelPercent: body.travelPercent ?? null,
       isActive: body.isActive ?? true,
       priority: body.priority ?? 0,
     },
