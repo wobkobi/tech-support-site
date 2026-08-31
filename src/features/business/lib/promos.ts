@@ -228,27 +228,38 @@ function formatPromoEnd(endIso: string, now: Date = new Date()): string {
 }
 
 /**
+ * What a promo gives, with no date attached - "$10 off all jobs", "Free
+ * travel on all jobs". Split out of {@link summariseForBanner} because the
+ * pricing page states the end date separately and would otherwise say it
+ * twice, and because a non-rate promo leaves the headline $/hr unchanged and
+ * needs this line to say what the offer actually is.
+ * @param promo - Active promo.
+ * @returns The offer phrase.
+ */
+export function describePromoDiscount(promo: ActivePromo): string {
+  if (promo.discountType === "free_travel" && promo.travelPercent !== null) {
+    // 0 means nothing is charged for the drive; anything else is a part-charge.
+    return promo.travelPercent === 0
+      ? "Free travel on all jobs"
+      : `${Math.round((1 - promo.travelPercent) * 100)}% off travel`;
+  }
+  if (promo.discountType === "fixed_amount" && promo.fixedAmount !== null) {
+    return `$${promo.fixedAmount} off all jobs`;
+  }
+  if (promo.flatHourlyRate !== null) {
+    return `$${promo.flatHourlyRate}/hr on all jobs`;
+  }
+  if (promo.percentDiscount !== null) {
+    return `${Math.round(promo.percentDiscount * 100)}% off all jobs`;
+  }
+  return "Limited offer";
+}
+
+/**
  * Customer-facing one-line summary for banner + pricing hero.
  * @param promo - Active promo.
  * @returns Banner string.
  */
 export function summariseForBanner(promo: ActivePromo): string {
-  const until = formatPromoEnd(promo.endAt);
-  if (promo.discountType === "free_travel" && promo.travelPercent !== null) {
-    // 0 means nothing is charged for the drive; anything else is a part-charge.
-    return promo.travelPercent === 0
-      ? `Free travel on all jobs until ${until}`
-      : `${Math.round((1 - promo.travelPercent) * 100)}% off travel until ${until}`;
-  }
-  if (promo.discountType === "fixed_amount" && promo.fixedAmount !== null) {
-    return `$${promo.fixedAmount} off all jobs until ${until}`;
-  }
-  if (promo.flatHourlyRate !== null) {
-    return `$${promo.flatHourlyRate}/hr on all jobs until ${until}`;
-  }
-  if (promo.percentDiscount !== null) {
-    const pctLabel = `${Math.round(promo.percentDiscount * 100)}% off`;
-    return `${pctLabel} all jobs until ${until}`;
-  }
-  return `Limited offer until ${until}`;
+  return `${describePromoDiscount(promo)} until ${formatPromoEnd(promo.endAt)}`;
 }

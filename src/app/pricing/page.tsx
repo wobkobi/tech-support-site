@@ -20,6 +20,7 @@ import {
 import { getPolicy, getPublicPricing } from "@/features/business/lib/pricing-policy.server";
 import {
   applyPromoToHourlyRate,
+  describePromoDiscount,
   getActivePromo,
   summariseForBanner,
 } from "@/features/business/lib/promos";
@@ -148,6 +149,15 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                     ⚡ Limited offer: {promo.title}
                     {promo.description ? ` - ${promo.description}` : ""}
                   </p>
+                  {/* State the offer itself when the rate above doesn't. A
+                      fixed-amount or travel promo leaves the $/hr unchanged, so
+                      without this the page names a promo and never says what it
+                      gives. A rate promo needs no line: the number says it. */}
+                  {applyPromoToHourlyRate(baseRate, promo) === baseRate && (
+                    <p className="mt-1 text-base font-semibold sm:text-lg">
+                      {describePromoDiscount(promo)}
+                    </p>
+                  )}
                   <p className="mt-1 text-base text-russian-violet-900 sm:text-lg">
                     Until {formatDateShort(promo.endAt)}.
                   </p>

@@ -14,6 +14,7 @@ import { validateDiscount } from "@/features/business/lib/promo-validation";
 import {
   applyPromoToHourlyRate,
   applyPromoToQuote,
+  describePromoDiscount,
   type ActivePromo,
   type QuoteParts,
 } from "@/features/business/lib/promos";
@@ -214,6 +215,41 @@ function main(): void {
     "legacy row with only flatHourlyRate is valid",
     validateDiscount({ flatHourlyRate: 50 }),
     null,
+  );
+
+  // ---- Customer-facing copy ----
+  //
+  // A non-rate promo leaves the headline $/hr alone, so this phrase is the only
+  // place the pricing page says what the offer actually gives.
+
+  expectEqual(
+    "fixed amount reads as money off",
+    describePromoDiscount(promo("fixed_amount", 10)),
+    "$10 off all jobs",
+  );
+
+  expectEqual(
+    "free travel reads as free, not 100% off",
+    describePromoDiscount(promo("free_travel", 0)),
+    "Free travel on all jobs",
+  );
+
+  expectEqual(
+    "part-charged travel reads as a percentage off",
+    describePromoDiscount(promo("free_travel", 0.5)),
+    "50% off travel",
+  );
+
+  expectEqual(
+    "flat hourly wording is unchanged",
+    describePromoDiscount(promo("flat_hourly", 60)),
+    "$60/hr on all jobs",
+  );
+
+  expectEqual(
+    "percent wording is unchanged",
+    describePromoDiscount(promo("percent", 0.2)),
+    "20% off all jobs",
   );
 
   console.log(failures === 0 ? "\nAll fixtures passed." : `\n${failures} fixture(s) failed.`);
