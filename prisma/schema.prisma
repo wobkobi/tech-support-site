@@ -655,6 +655,14 @@ model TaskTemplate {
 //   - percentDiscount: 0..1, multiplied against the labor subtotal.
 // The active promo is applied to labor only (tasks + top-level Time charge);
 // parts and Travel are never discounted.
+// How a customer comes by a promo. Automatic promos apply to everyone inside
+// the window; a code promo applies only when the customer enters it, and must
+// never be advertised on the banner.
+enum PromoKind {
+  automatic
+  code
+}
+
 // What a promo does to a quote. Each type acts on a different stage of the
 // pricing pipeline, which is why one hourly-rate modifier could not express
 // them all: flat_hourly and percent change the labour rate, free_travel
@@ -672,6 +680,14 @@ model Promo {
   description     String?
   startAt         DateTime
   endAt           DateTime
+
+  kind            PromoKind @default(automatic)
+  // Uppercased on write so lookups are exact. Deliberately NOT @unique:
+  // MongoDB's unique index treats a second null as a duplicate, and every
+  // automatic promo has a null code, so the second one would P2002 - the same
+  // trap documented on Booking.activeSlotKey and Contact.reviewToken.
+  // Uniqueness is enforced in promo-validation instead.
+  code            String?
 
   // Which value column below carries this promo's terms. Optional only so
   // existing rows load before the backfill stamps them; treat it as required.
@@ -698,6 +714,8 @@ model Promo {
 
   // getActivePromo() filters by these three; covers most lookups.
   @@index([isActive, startAt, endAt])
+  // Code lookup on the customer-entered path.
+  @@index([kind, code])
 }
 
 // Per-task split returned by the public price estimator AI (one entry per
