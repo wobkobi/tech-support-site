@@ -43,7 +43,14 @@ function setNavOffset(px: number): void {
 export function PromoBannerClient({ promo }: Props): React.ReactElement {
   const pathname = usePathname();
   // Admin pages have their own chrome - no public promo banner over the top.
-  const hidden = pathname === "/admin" || pathname.startsWith("/admin/");
+  // Business too, not just admin: promos are a home-rate offer, and the phrase
+  // is unscoped ("15% off"), so on the business page it would promise a
+  // discount the invoice does not honour.
+  const hidden =
+    pathname === "/admin" ||
+    pathname.startsWith("/admin/") ||
+    pathname === "/business" ||
+    pathname.startsWith("/business/");
 
   // Both states start false on the server AND first client render so
   // hydration matches; the effect below syncs from localStorage on mount.

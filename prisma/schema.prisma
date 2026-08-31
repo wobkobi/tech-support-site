@@ -655,14 +655,37 @@ model TaskTemplate {
 //   - percentDiscount: 0..1, multiplied against the labor subtotal.
 // The active promo is applied to labor only (tasks + top-level Time charge);
 // parts and Travel are never discounted.
+// What a promo does to a quote. Each type acts on a different stage of the
+// pricing pipeline, which is why one hourly-rate modifier could not express
+// them all: flat_hourly and percent change the labour rate, free_travel
+// changes the travel line, and fixed_amount comes off the total after both.
+enum PromoDiscountType {
+  flat_hourly
+  percent
+  fixed_amount
+  free_travel
+}
+
 model Promo {
   id              String   @id @default(auto()) @map("_id") @db.ObjectId
   title           String
   description     String?
   startAt         DateTime
   endAt           DateTime
+
+  // Which value column below carries this promo's terms. Optional only so
+  // existing rows load before the backfill stamps them; treat it as required.
+  discountType    PromoDiscountType?
+
+  // Exactly one is set, matching discountType. Separate nullable columns
+  // rather than one polymorphic value, so a misconfigured promo is visible in
+  // the data rather than surfacing as a wrong price.
   flatHourlyRate  Float?
   percentDiscount Float?
+  fixedAmount     Float?
+  // Fraction of the normal travel charge to bill, 0 for free travel.
+  travelPercent   Float?
+
   isActive        Boolean  @default(true)
 
   // Higher wins when two promos' windows overlap. Replaces the implicit

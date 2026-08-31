@@ -6,6 +6,7 @@
  */
 
 import { BusinessEnquiryForm } from "@/features/business/components/BusinessEnquiryForm";
+import { formatMoneyCompact } from "@/features/business/lib/business";
 import { getPublicPricing } from "@/features/business/lib/pricing-policy.server";
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
 import { Button } from "@/shared/components/Button";
@@ -168,6 +169,10 @@ const siteUrl = getSiteUrl();
  */
 export default async function BusinessPage(): Promise<React.ReactElement> {
   const pricing = await getPublicPricing();
+  // Deliberately undiscounted. Promos are a home offer, and the calculator
+  // charges a business visit's travel in full, so discounting it here would
+  // quote a rate the invoice does not honour.
+  const displayTravelRate = pricing.travelRatePerHour;
   const businessJsonLd = {
     "@context": "https://schema.org",
     "@type": "Service",
@@ -312,7 +317,8 @@ export default async function BusinessPage(): Promise<React.ReactElement> {
               <li className="flex gap-2">
                 <span className="mt-1 text-moonstone-400">•</span>
                 <span>
-                  Travel billed at ${pricing.travelRatePerHour}/hr for one round trip per visit
+                  Travel billed at {formatMoneyCompact(displayTravelRate)}/hr for one round trip per
+                  visit
                 </span>
               </li>
               <li className="flex gap-2">

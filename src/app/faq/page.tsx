@@ -7,6 +7,7 @@
  * never drifts from the /pricing accordion + booking emails.
  */
 
+import { formatMoneyCompact } from "@/features/business/lib/business";
 import {
   cancellationCopy,
   gstCopy,
@@ -15,8 +16,14 @@ import {
   workmanshipCopy,
 } from "@/features/business/lib/pricing-policy";
 import { getPolicy, getPublicPricing } from "@/features/business/lib/pricing-policy.server";
+import {
+  getActivePromo,
+  promoDisplayRate,
+  promoTravelFactor,
+} from "@/features/business/lib/promos";
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
 import { CARD, FrostedSection, PageShell, SOFT_CARD } from "@/shared/components/PageLayout";
+import { PromoPrice } from "@/shared/components/PromoPrice";
 import { renderEmphasised } from "@/shared/components/renderEmphasised";
 import { cn } from "@/shared/lib/cn";
 import { getSettings } from "@/shared/lib/settings/get-settings";
@@ -64,11 +71,19 @@ function stripEmphasis(text: string): string {
  * @returns FAQ page element.
  */
 export default async function FaqPage(): Promise<React.ReactElement> {
-  const [pricing, policy, settings] = await Promise.all([
+  const [pricing, policy, settings, promo] = await Promise.all([
     getPublicPricing(),
     getPolicy(),
     getSettings(),
+    getActivePromo(),
   ]);
+  // Quote the promo prices, or the FAQ contradicts the banner running above it.
+  const displayRate = promoDisplayRate(pricing.baseRate, promo);
+  const travelFactor = promoTravelFactor(promo);
+  const displayTravelRate = Math.round(pricing.travelRatePerHour * travelFactor * 100) / 100;
+  const displayMinTravel = Math.round(policy.MIN_TRAVEL_CHARGE * travelFactor * 100) / 100;
+  const rateDiscounted = displayRate !== pricing.baseRate;
+  const travelDiscounted = travelFactor < 1;
   const paymentTermsDays = settings.identity.paymentTermsDays;
   const cancellationText = cancellationCopy(policy.CANCELLATION);
   const unsuccessfulText = unsuccessfulWorkCopy(
@@ -155,18 +170,28 @@ export default async function FaqPage(): Promise<React.ReactElement> {
     },
     {
       question: "How much does it cost?",
-      plainAnswer: `Work is $${pricing.baseRate}/hr whatever the job - troubleshooting, setup, data recovery, hardware repairs, the lot. On-site visits also include round-trip drive time at $${pricing.travelRatePerHour}/hr ($10 minimum). I'll always confirm the expected cost before any work starts so there are no surprises on the bill.`,
+      plainAnswer: `Work is ${formatMoneyCompact(displayRate)}/hr whatever the job - troubleshooting, setup, data recovery, hardware repairs, the lot. On-site visits also include round-trip drive time at ${formatMoneyCompact(displayTravelRate)}/hr (${formatMoneyCompact(displayMinTravel)} minimum). I'll always confirm the expected cost before any work starts so there are no surprises on the bill.`,
       answer: (
         <>
           <p>
-            Work is <strong>${pricing.baseRate}/hr</strong> whatever the job - troubleshooting,
-            setup, data recovery, hardware repairs, the lot. I confirm the expected cost before any
-            work starts, so there are no surprises on the invoice.
+            Work is{" "}
+            <PromoPrice discounted={rateDiscounted} className="font-bold">
+              {formatMoneyCompact(displayRate)}/hr
+            </PromoPrice>{" "}
+            whatever the job - troubleshooting, setup, data recovery, hardware repairs, the lot. I
+            confirm the expected cost before any work starts, so there are no surprises on the
+            invoice.
           </p>
           <p className="mt-2 text-rich-black/80">
             On-site visits also include one round trip billed at{" "}
-            <strong>${pricing.travelRatePerHour}/hr</strong> (the dedicated Travel rate, lower than
-            labour), with a $10 minimum when there's any travel at all.
+            <PromoPrice discounted={travelDiscounted} className="font-bold">
+              {formatMoneyCompact(displayTravelRate)}/hr
+            </PromoPrice>{" "}
+            (the dedicated Travel rate, lower than labour), with a{" "}
+            <PromoPrice discounted={travelDiscounted}>
+              {formatMoneyCompact(displayMinTravel)}
+            </PromoPrice>{" "}
+            minimum when there's any travel at all.
           </p>
           <p className="mt-2 text-rich-black/80">
             The full breakdown lives on the{" "}

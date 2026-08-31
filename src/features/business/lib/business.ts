@@ -42,6 +42,18 @@ export function formatNZD(amount: number): string {
 }
 
 /**
+ * Money for customer-facing prose: whole dollars stay whole ("$65"), cents
+ * appear only when they exist ("$7.50"). {@link formatNZD} always prints cents,
+ * which reads wrong in a rate like "$65.00/hr", while bare arithmetic prints
+ * "$7.5", which is not a price.
+ * @param amount - Dollar amount.
+ * @returns The formatted amount.
+ */
+export function formatMoneyCompact(amount: number): string {
+  return Number.isInteger(amount) ? `$${amount}` : formatNZD(amount);
+}
+
+/**
  * Formats a minute count as a compact "Xh Ym" string for admin display.
  * @param mins - Minutes (non-negative integer).
  * @returns "45 min" / "1h" / "1h 30m".
@@ -676,8 +688,12 @@ export function jobToLineItems(
 
 /** Active-promo shape consumed by {@link calcJobTotal}. Kept loose so business.ts doesn't depend on the wider promos module. */
 export interface JobPromo {
+  /** Which value below applies. Null on rows predating the column - treated as a rate promo. */
+  discountType?: "flat_hourly" | "percent" | "fixed_amount" | "free_travel" | null;
   flatHourlyRate: number | null;
   percentDiscount: number | null;
+  fixedAmount?: number | null;
+  travelPercent?: number | null;
 }
 
 /** Live pricing values threaded into {@link calcJobTotal}; defaults are the code consts. */
@@ -691,6 +707,12 @@ export interface JobPricing {
   /** Fraction charged for an unsuccessful visit (e.g. 0.5 = half); defaults to 0.5. */
   unsuccessfulFactor?: number;
   /**
+   * RateConfig id of the "Business" modifier. Labour carrying it is excluded
+   * from promo discounts: promos are a home-rate offer, and without this a
+   * business job priced during one is silently under-charged.
+   */
+  businessModifierId?: string | null;
+  /**
    * Live task-timing settings for {@link collapseToWindow} and
    * {@link explicitRoundingAllowanceMins}. Not a {@link calcJobTotal} input -
    * it rides along so the calculator's apportionment reads the same settings
@@ -701,17 +723,50 @@ export interface JobPricing {
 
 /**
  * Promo discount on a job's labour only (hourly task lines).
+ *
+ * Exported for check:promo-pricing - this decides real money on an invoice and
+ * the business exclusion below has no other coverage.
  * @param job - Job calculation.
  * @param promo - Active promo or null.
+ * @param travelTotal - The job's travel charge, which a free-travel promo discounts.
+ * @param businessModifierId - Modifier marking business labour, which promos skip.
  * @returns Discount in dollars.
  */
-function computeJobPromoDiscount(job: JobCalculation, promo: JobPromo | null): number {
+export function computeJobPromoDiscount(
+  job: JobCalculation,
+  promo: JobPromo | null,
+  travelTotal: number,
+  businessModifierId?: string | null,
+): number {
   if (!promo) return 0;
+
+  /**
+   * Whether a task carries the Business modifier.
+   * @param t - The task line to classify.
+   * @returns True when the line is business labour.
+   */
+  const isBusinessTask = (t: (typeof job.tasks)[number]): boolean =>
+    !!businessModifierId && (t.modifierIds ?? []).includes(businessModifierId);
+
+  // Travel is its own flat line rather than an hourly task, so a travel promo
+  // is the one type that does not touch the labour subtotal at all.
+  if (promo.discountType === "free_travel" && promo.travelPercent != null) {
+    // A visit that did any business work is a business visit, so its drive is
+    // not discounted either. Erring toward charging in full: promos are a home
+    // offer, and the alternative silently under-bills a business customer.
+    if (job.tasks.some(isBusinessTask)) return 0;
+    const charged = Math.min(1, Math.max(0, promo.travelPercent));
+    return Math.round(travelTotal * (1 - charged) * 100) / 100;
+  }
 
   // A task is hourly if either: it has a baseRateId set (new rate model),
   // OR no flat rateConfigId. The double check survives stale AI output that
   // forgets to clear rateConfigId.
-  const hourlyTasks = job.tasks.filter((t) => t.baseRateId != null || t.rateConfigId == null);
+  const hourlyTasks = job.tasks
+    .filter((t) => t.baseRateId != null || t.rateConfigId == null)
+    // Business labour is out of scope for a promo. Checked per task rather than
+    // per job so a mixed job discounts only its home-rate lines.
+    .filter((t) => !isBusinessTask(t));
   const labourSubtotal = hourlyTasks.reduce((s, t) => s + t.qty * t.unitPrice, 0);
   if (labourSubtotal <= 0) return 0;
 
@@ -724,6 +779,12 @@ function computeJobPromoDiscount(job: JobCalculation, promo: JobPromo | null): n
   if (promo.percentDiscount !== null) {
     const pct = Math.max(0, Math.min(1, promo.percentDiscount));
     return Math.round(labourSubtotal * pct * 100) / 100;
+  }
+  if (promo.discountType === "fixed_amount" && promo.fixedAmount != null) {
+    // Capped at the labour subtotal, matching applyPromoToQuote: travel is the
+    // operator's driving time rather than margin, so a discount larger than the
+    // labour is capped instead of eating into it.
+    return Math.round(Math.min(Math.max(0, promo.fixedAmount), labourSubtotal) * 100) / 100;
   }
   return 0;
 }
@@ -805,7 +866,12 @@ export function calcJobTotal(
     holidayUplift > 0 ? Math.round(hourlyTasksTotal * holidayUplift * 100) / 100 : 0;
   const subtotal =
     Math.round((tasksTotal + partsTotal + travelTotal + holidaySurcharge) * 100) / 100;
-  const promoDiscount = computeJobPromoDiscount(job, promo);
+  const promoDiscount = computeJobPromoDiscount(
+    job,
+    promo,
+    travelTotal,
+    pricing.businessModifierId,
+  );
   // Fraction removed from an unsuccessful line: 1 - the charged share.
   const unsuccessfulCut = 1 - (pricing.unsuccessfulFactor ?? 0.5);
   let unsuccessfulDiscount = 0;

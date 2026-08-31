@@ -25,8 +25,12 @@ export interface PromoRow {
   description: string | null;
   startAt: string;
   endAt: string;
+  discountType: "flat_hourly" | "percent" | "fixed_amount" | "free_travel" | null;
   flatHourlyRate: number | null;
   percentDiscount: number | null;
+  fixedAmount: number | null;
+  /** Fraction of travel still charged; 0 is free travel. */
+  travelPercent: number | null;
   isActive: boolean;
   /** Higher wins when windows overlap. */
   priority: number;
@@ -48,8 +52,11 @@ export default async function AdminPromosPage(): Promise<React.ReactElement> {
     description: p.description,
     startAt: p.startAt.toISOString(),
     endAt: p.endAt.toISOString(),
+    discountType: p.discountType,
     flatHourlyRate: p.flatHourlyRate,
     percentDiscount: p.percentDiscount,
+    fixedAmount: p.fixedAmount,
+    travelPercent: p.travelPercent,
     isActive: p.isActive,
     priority: p.priority,
     createdAt: p.createdAt.toISOString(),

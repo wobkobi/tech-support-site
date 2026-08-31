@@ -7,6 +7,7 @@
 
 import { GetEstimateButton } from "@/features/business/components/GetEstimateButton";
 import { PricingWizard } from "@/features/business/components/PricingWizard";
+import { formatMoneyCompact } from "@/features/business/lib/business";
 import {
   cancellationCopy,
   gstCopy,
@@ -19,13 +20,19 @@ import {
 } from "@/features/business/lib/pricing-policy";
 import { getPolicy, getPublicPricing } from "@/features/business/lib/pricing-policy.server";
 import {
-  applyPromoToHourlyRate,
+  describePromoDiscount,
   getActivePromo,
+  promoDisplayRate,
+  promoModifierRate,
+  promoRateBeforeAfter,
+  promoTravelBeforeAfter,
+  promoTravelFactor,
   summariseForBanner,
 } from "@/features/business/lib/promos";
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
 import { CARD, FrostedSection, PageShell, SOFT_CARD } from "@/shared/components/PageLayout";
 import { PixelEvent } from "@/shared/components/PixelEvent";
+import { PromoPrice } from "@/shared/components/PromoPrice";
 import { renderEmphasised } from "@/shared/components/renderEmphasised";
 import { cn } from "@/shared/lib/cn";
 import { formatDateShort } from "@/shared/lib/date-format";
@@ -89,6 +96,19 @@ export default async function PricingPage(): Promise<React.ReactElement> {
     getSettings(),
   ]);
   const baseRate = pricing.baseRate;
+  // Crossed-out pairs for the promo block. Null when the promo does not touch
+  // that figure, so nothing is struck out to show the same number back.
+  const ratePair = promo ? promoRateBeforeAfter(baseRate, promo) : null;
+  const travelPair = promo ? promoTravelBeforeAfter(pricing.travelRatePerHour, promo) : null;
+  // Every other price on the page quotes these rather than the raw settings, so
+  // a live promo is not announced in the hero and then contradicted further
+  // down by the standard rates.
+  const displayRate = promoDisplayRate(baseRate, promo);
+  const travelFactor = promoTravelFactor(promo);
+  const displayTravelRate = Math.round(pricing.travelRatePerHour * travelFactor * 100) / 100;
+  const displayMinTravel = Math.round(policy.MIN_TRAVEL_CHARGE * travelFactor * 100) / 100;
+  const rateDiscounted = displayRate !== baseRate;
+  const travelDiscounted = travelFactor < 1;
   return (
     <PageShell>
       <PixelEvent event="ViewContent" />
@@ -125,12 +145,27 @@ export default async function PricingPage(): Promise<React.ReactElement> {
             {promo ? (
               <>
                 <div className="rounded-lg border border-mustard-400 bg-mustard-50 p-5">
-                  <p className="mb-1 text-lg text-rich-black/60 line-through sm:text-xl">
-                    ${baseRate}/hr
-                  </p>
+                  {/* Every promo that saves money on labour moves this number,
+                      including a fixed amount - see promoRateBeforeAfter for
+                      what that figure means. A travel promo leaves it alone and
+                      crosses out the travel charge below instead. */}
+                  {ratePair && (
+                    <p className="mb-1 text-lg text-rich-black/60 line-through sm:text-xl">
+                      {formatMoneyCompact(ratePair.before)}/hr
+                    </p>
+                  )}
                   <p className="mb-2 text-3xl font-bold text-russian-violet sm:text-4xl">
-                    ${applyPromoToHourlyRate(baseRate, promo).toFixed(0)}/hr
+                    {formatMoneyCompact(ratePair?.after ?? baseRate)}/hr
                   </p>
+                  {travelPair && (
+                    <p className="mb-2 text-lg font-semibold text-russian-violet sm:text-xl">
+                      Travel{" "}
+                      <span className="text-rich-black/60 line-through">
+                        {formatMoneyCompact(travelPair.before)}/hr
+                      </span>{" "}
+                      {formatMoneyCompact(travelPair.after)}/hr
+                    </p>
+                  )}
                   <p className="text-base text-rich-black/80 sm:text-lg">
                     One rate for every home job - troubleshooting, setup, software, tune-ups, Wi-Fi,
                     backups, data recovery, hardware repairs, and more.
@@ -141,6 +176,13 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                   <p className="text-base font-bold sm:text-lg">
                     ⚡ Limited offer: {promo.title}
                     {promo.description ? ` - ${promo.description}` : ""}
+                  </p>
+                  {/* Always: the crossed-out pair shows the result, not the
+                      terms. "$65 to $55.25" does not tell anyone it is 15% off,
+                      and for a fixed amount the pair is only a one-hour
+                      illustration. */}
+                  <p className="mt-1 text-base font-semibold sm:text-lg">
+                    {describePromoDiscount(promo)}
                   </p>
                   <p className="mt-1 text-base text-russian-violet-900 sm:text-lg">
                     Until {formatDateShort(promo.endAt)}.
@@ -216,14 +258,27 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                 <ul className="space-y-2.5 text-base text-rich-black sm:text-lg">
                   <li className="flex gap-3">
                     <span className="mt-1 text-lg text-moonstone-400">•</span>
-                    <span>Hourly rate (${baseRate}/hr)</span>
+                    <span>
+                      Hourly rate (
+                      <PromoPrice discounted={rateDiscounted}>
+                        {formatMoneyCompact(displayRate)}/hr
+                      </PromoPrice>
+                      )
+                    </span>
                   </li>
                   <li className="flex gap-3">
                     <span className="mt-1 text-lg text-moonstone-400">•</span>
                     <span>
                       <strong>One round trip</strong> billed at{" "}
-                      <strong>${pricing.travelRatePerHour}/hr</strong> (lower than the hourly rate),{" "}
-                      <strong>$10 minimum</strong>
+                      <PromoPrice discounted={travelDiscounted} className="font-bold">
+                        {formatMoneyCompact(displayTravelRate)}/hr
+                      </PromoPrice>{" "}
+                      (lower than the hourly rate),{" "}
+                      {/* Read from settings, not hardcoded: the minimum is
+                          configurable and this line used to state $10 flat. */}
+                      <PromoPrice discounted={travelDiscounted} className="font-bold">
+                        {formatMoneyCompact(displayMinTravel)} minimum
+                      </PromoPrice>
                     </span>
                   </li>
                   <li className="flex gap-3">
@@ -319,7 +374,19 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                       <li key={mod.label} className="flex flex-col">
                         <span>
                           <strong>{mod.label}</strong> ({mod.deltaDescription} ={" "}
-                          <strong>${mod.effectiveRate}/hr</strong>) - {mod.description}
+                          <PromoPrice
+                            discounted={
+                              promoModifierRate(baseRate, mod.effectiveRate, mod.kind, promo) !==
+                              mod.effectiveRate
+                            }
+                            className="font-bold"
+                          >
+                            {formatMoneyCompact(
+                              promoModifierRate(baseRate, mod.effectiveRate, mod.kind, promo),
+                            )}
+                            /hr
+                          </PromoPrice>
+                          ) - {mod.description}
                         </span>
                       </li>
                     ))}
@@ -336,9 +403,7 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                   />
                 </summary>
                 <div className={ACCORDION_BODY}>
-                  {renderEmphasised(
-                    travelCopy(pricing.travelRatePerHour, policy.MIN_TRAVEL_CHARGE),
-                  )}
+                  {renderEmphasised(travelCopy(displayTravelRate, displayMinTravel))}
                 </div>
               </details>
 

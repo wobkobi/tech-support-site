@@ -6,6 +6,7 @@
  * promo, and revalidates the active-promo cache tag.
  */
 
+import { resolveDiscountType, validateDiscount } from "@/features/business/lib/promo-validation";
 import { ACTIVE_PROMO_TAG } from "@/features/business/lib/promos";
 import { parseDate } from "@/features/business/lib/validation";
 import { errorResponse } from "@/shared/lib/api-response";
@@ -23,6 +24,9 @@ interface PromoBody {
   percentDiscount?: number | null;
   isActive?: boolean;
   priority?: number;
+  discountType?: "flat_hourly" | "percent" | "fixed_amount" | "free_travel";
+  fixedAmount?: number | null;
+  travelPercent?: number | null;
 }
 
 /**
@@ -42,14 +46,10 @@ function validatePromo(body: PromoBody): string | null {
   if (startAt >= endAt) {
     return "startAt must be before endAt";
   }
-  const hasFlat = typeof body.flatHourlyRate === "number" && body.flatHourlyRate > 0;
-  const hasPct = typeof body.percentDiscount === "number" && body.percentDiscount > 0;
-  if (hasFlat === hasPct) {
-    return "exactly one of flatHourlyRate or percentDiscount must be set";
-  }
-  if (hasPct && (body.percentDiscount! <= 0 || body.percentDiscount! >= 1)) {
-    return "percentDiscount must be between 0 and 1 (e.g. 0.20 for 20%)";
-  }
+  // Shared with the edit route: two copies of this drifted once already, which
+  // is how editing a fixed-amount promo came to be rejected outright.
+  const discountError = validateDiscount(body);
+  if (discountError) return discountError;
   // Reject rather than coerce: a fractional priority would order unpredictably
   // against the integer column and read as accepted.
   if (body.priority !== undefined && !Number.isInteger(body.priority)) {
@@ -90,8 +90,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       description: body.description ?? null,
       startAt: parseDate(body.startAt)!,
       endAt: parseDate(body.endAt)!,
+      discountType: resolveDiscountType(body),
       flatHourlyRate: body.flatHourlyRate ?? null,
       percentDiscount: body.percentDiscount ?? null,
+      fixedAmount: body.fixedAmount ?? null,
+      travelPercent: body.travelPercent ?? null,
       isActive: body.isActive ?? true,
       priority: body.priority ?? 0,
     },
