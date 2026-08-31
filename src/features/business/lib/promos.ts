@@ -242,6 +242,26 @@ export async function resolvePromo(context: PromoContext): Promise<ActivePromo |
 }
 
 /**
+ * Whether another promo already holds a code.
+ *
+ * Uniqueness is enforced here rather than by a database constraint: MongoDB's
+ * unique index counts a second null as a duplicate, and every automatic promo
+ * has a null code, so creating a second automatic promo would be rejected
+ * outright. Both promo routes call this so the rule cannot drift between them.
+ * @param code - The normalised code being claimed, or null when there is none.
+ * @param excludeId - Promo being edited, so it does not conflict with itself.
+ * @returns True when the code is already taken.
+ */
+export async function isPromoCodeTaken(code: string | null, excludeId?: string): Promise<boolean> {
+  if (!code) return false;
+  const clash = await prisma.promo.findFirst({
+    where: { code, ...(excludeId ? { id: { not: excludeId } } : {}) },
+    select: { id: true },
+  });
+  return clash !== null;
+}
+
+/**
  * Applies a promo to one hourly rate. Flat overrides (capped at original); percent multiplies.
  * @param rate - Pre-promo $/hr.
  * @param promo - Active promo or null.
