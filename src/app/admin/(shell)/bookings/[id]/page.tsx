@@ -155,13 +155,18 @@ export default async function BookingDetailPage({
     booking.promoTitleAtBooking != null ||
     booking.publicHolidayName != null;
 
+  // percentDiscount is stored as a fraction, so it has to be scaled before the
+  // "%" is added - printed raw, a 15% promo reads as "0.15% off".
+  //
+  // Only the two rate columns are snapshotted, so a fixed-amount or travel
+  // promo shows its title alone rather than a wrong figure.
   const promoSummary = booking.promoTitleAtBooking
     ? [
         booking.promoTitleAtBooking,
         booking.promoFlatHourlyRateAtBooking != null
           ? `${formatNZD(booking.promoFlatHourlyRateAtBooking)}/hr flat`
           : booking.promoPercentDiscountAtBooking != null
-            ? `${booking.promoPercentDiscountAtBooking}% off`
+            ? `${Math.round(booking.promoPercentDiscountAtBooking * 100)}% off`
             : null,
       ]
         .filter(Boolean)
