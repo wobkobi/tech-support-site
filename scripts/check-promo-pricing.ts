@@ -15,6 +15,8 @@ import {
   applyPromoToHourlyRate,
   applyPromoToQuote,
   describePromoDiscount,
+  promoRateBeforeAfter,
+  promoTravelBeforeAfter,
   type ActivePromo,
   type QuoteParts,
 } from "@/features/business/lib/promos";
@@ -250,6 +252,59 @@ function main(): void {
     "percent wording is unchanged",
     describePromoDiscount(promo("percent", 0.2)),
     "20% off all jobs",
+  );
+
+  // ---- The pricing page's crossed-out pairs ----
+
+  expectEqual(
+    "flat hourly crosses out the base rate",
+    promoRateBeforeAfter(65, promo("flat_hourly", 50)),
+    { before: 65, after: 50 },
+  );
+
+  expectEqual(
+    "percent crosses out the base rate",
+    promoRateBeforeAfter(65, promo("percent", 0.2)),
+    { before: 65, after: 52 },
+  );
+
+  // At the operator's request: a one-hour illustration, not a charged rate.
+  expectEqual(
+    "fixed amount subtracts from the hourly figure",
+    promoRateBeforeAfter(65, promo("fixed_amount", 10)),
+    { before: 65, after: 55 },
+  );
+
+  expectEqual(
+    "a fixed amount bigger than the rate floors at zero",
+    promoRateBeforeAfter(65, promo("fixed_amount", 100)),
+    { before: 65, after: 0 },
+  );
+
+  // A travel promo must not touch the hourly pair, or the page crosses out a
+  // price and shows the identical one back - the reported bug.
+  expectEqual(
+    "free travel leaves the hourly pair alone",
+    promoRateBeforeAfter(65, promo("free_travel", 0)),
+    null,
+  );
+
+  expectEqual(
+    "free travel crosses out the travel charge",
+    promoTravelBeforeAfter(25, promo("free_travel", 0)),
+    { before: 25, after: 0 },
+  );
+
+  expectEqual(
+    "half-price travel halves the travel charge",
+    promoTravelBeforeAfter(25, promo("free_travel", 0.5)),
+    { before: 25, after: 12.5 },
+  );
+
+  expectEqual(
+    "a labour promo leaves the travel pair alone",
+    promoTravelBeforeAfter(25, promo("fixed_amount", 10)),
+    null,
   );
 
   console.log(failures === 0 ? "\nAll fixtures passed." : `\n${failures} fixture(s) failed.`);

@@ -19,9 +19,10 @@ import {
 } from "@/features/business/lib/pricing-policy";
 import { getPolicy, getPublicPricing } from "@/features/business/lib/pricing-policy.server";
 import {
-  applyPromoToHourlyRate,
   describePromoDiscount,
   getActivePromo,
+  promoRateBeforeAfter,
+  promoTravelBeforeAfter,
   summariseForBanner,
 } from "@/features/business/lib/promos";
 import { BreadcrumbJsonLd } from "@/shared/components/BreadcrumbJsonLd";
@@ -90,6 +91,10 @@ export default async function PricingPage(): Promise<React.ReactElement> {
     getSettings(),
   ]);
   const baseRate = pricing.baseRate;
+  // Crossed-out pairs for the promo block. Null when the promo does not touch
+  // that figure, so nothing is struck out to show the same number back.
+  const ratePair = promo ? promoRateBeforeAfter(baseRate, promo) : null;
+  const travelPair = promo ? promoTravelBeforeAfter(policy.MIN_TRAVEL_CHARGE, promo) : null;
   return (
     <PageShell>
       <PixelEvent event="ViewContent" />
@@ -126,18 +131,27 @@ export default async function PricingPage(): Promise<React.ReactElement> {
             {promo ? (
               <>
                 <div className="rounded-lg border border-mustard-400 bg-mustard-50 p-5">
-                  {/* Only a rate promo changes this number. A fixed amount or a
-                      travel discount leaves it alone, and crossing out a price
-                      to show the same price back reads as broken - the offer
-                      itself is stated in the banner below. */}
-                  {applyPromoToHourlyRate(baseRate, promo) < baseRate && (
+                  {/* Every promo that saves money on labour moves this number,
+                      including a fixed amount - see promoRateBeforeAfter for
+                      what that figure means. A travel promo leaves it alone and
+                      crosses out the travel charge below instead. */}
+                  {ratePair && (
                     <p className="mb-1 text-lg text-rich-black/60 line-through sm:text-xl">
-                      ${baseRate}/hr
+                      ${ratePair.before}/hr
                     </p>
                   )}
                   <p className="mb-2 text-3xl font-bold text-russian-violet sm:text-4xl">
-                    ${applyPromoToHourlyRate(baseRate, promo).toFixed(0)}/hr
+                    ${(ratePair?.after ?? baseRate).toFixed(0)}/hr
                   </p>
+                  {travelPair && (
+                    <p className="mb-2 text-lg font-semibold text-russian-violet sm:text-xl">
+                      Travel{" "}
+                      <span className="text-rich-black/60 line-through">
+                        ${travelPair.before.toFixed(0)}
+                      </span>{" "}
+                      ${travelPair.after.toFixed(0)}
+                    </p>
+                  )}
                   <p className="text-base text-rich-black/80 sm:text-lg">
                     One rate for every home job - troubleshooting, setup, software, tune-ups, Wi-Fi,
                     backups, data recovery, hardware repairs, and more.
@@ -149,11 +163,10 @@ export default async function PricingPage(): Promise<React.ReactElement> {
                     ⚡ Limited offer: {promo.title}
                     {promo.description ? ` - ${promo.description}` : ""}
                   </p>
-                  {/* State the offer itself when the rate above doesn't. A
-                      fixed-amount or travel promo leaves the $/hr unchanged, so
-                      without this the page names a promo and never says what it
-                      gives. A rate promo needs no line: the number says it. */}
-                  {applyPromoToHourlyRate(baseRate, promo) === baseRate && (
+                  {/* Only when neither crossed-out pair above states the
+                      saving, so the page never names a promo without saying
+                      what it gives. */}
+                  {!ratePair && !travelPair && (
                     <p className="mt-1 text-base font-semibold sm:text-lg">
                       {describePromoDiscount(promo)}
                     </p>

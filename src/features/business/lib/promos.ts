@@ -227,6 +227,56 @@ function formatPromoEnd(endIso: string, now: Date = new Date()): string {
   }).format(end);
 }
 
+/** A crossed-out "before" figure and the one a promo leaves in its place. */
+export interface PromoBeforeAfter {
+  before: number;
+  after: number;
+}
+
+/**
+ * The hourly pair the pricing page crosses out, or null when the promo leaves
+ * the hourly figure alone.
+ *
+ * For a fixed amount this is the rate minus the discount, which is a one-hour
+ * illustration rather than a rate anyone is charged: a 30-minute job under a
+ * $10-off promo saves $10, not half the hourly reduction. Shown this way at the
+ * operator's request, so the headline moves for every promo type that saves
+ * money on labour.
+ * @param baseRate - The undiscounted hourly rate.
+ * @param promo - Active promo.
+ * @returns The pair, or null when the hourly figure is unaffected.
+ */
+export function promoRateBeforeAfter(
+  baseRate: number,
+  promo: ActivePromo,
+): PromoBeforeAfter | null {
+  if (promo.discountType === "free_travel") return null;
+  if (promo.discountType === "fixed_amount" && promo.fixedAmount !== null) {
+    const after = Math.max(0, Math.round((baseRate - promo.fixedAmount) * 100) / 100);
+    return after < baseRate ? { before: baseRate, after } : null;
+  }
+  const after = applyPromoToHourlyRate(baseRate, promo);
+  return after < baseRate ? { before: baseRate, after } : null;
+}
+
+/**
+ * The travel pair the pricing page crosses out, or null when the promo leaves
+ * travel alone. Anchored on the minimum travel charge, since the real figure
+ * depends on the drive.
+ * @param minTravelCharge - The minimum charged for a visit's travel.
+ * @param promo - Active promo.
+ * @returns The pair, or null when travel is unaffected.
+ */
+export function promoTravelBeforeAfter(
+  minTravelCharge: number,
+  promo: ActivePromo,
+): PromoBeforeAfter | null {
+  if (promo.discountType !== "free_travel" || promo.travelPercent === null) return null;
+  const factor = Math.min(1, Math.max(0, promo.travelPercent));
+  const after = Math.round(minTravelCharge * factor * 100) / 100;
+  return after < minTravelCharge ? { before: minTravelCharge, after } : null;
+}
+
 /**
  * What a promo gives, with no date attached - "$10 off all jobs", "Free
  * travel on all jobs". Split out of {@link summariseForBanner} because the
