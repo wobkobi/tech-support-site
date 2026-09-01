@@ -23,6 +23,7 @@ import {
   describePromoDiscount,
   getActivePromo,
   promoDisplayRate,
+  promoForAppointment,
   promoModifierRate,
   promoRateBeforeAfter,
   promoTravelBeforeAfter,
@@ -96,15 +97,23 @@ export default async function PricingPage(): Promise<React.ReactElement> {
     getSettings(),
   ]);
   const baseRate = pricing.baseRate;
+  // Words and numbers part company here. `promo` still announces the offer and
+  // names its restriction; `pricedPromo` is null for a promo whose weekday or
+  // time-of-day restriction this page cannot check, because nobody has picked
+  // an appointment yet. Quoting a Tuesday discount to someone who has not
+  // chosen a day promises a price the invoice will not honour.
+  const pricedPromo = promoForAppointment(promo, null);
   // Crossed-out pairs for the promo block. Null when the promo does not touch
   // that figure, so nothing is struck out to show the same number back.
-  const ratePair = promo ? promoRateBeforeAfter(baseRate, promo) : null;
-  const travelPair = promo ? promoTravelBeforeAfter(pricing.travelRatePerHour, promo) : null;
+  const ratePair = pricedPromo ? promoRateBeforeAfter(baseRate, pricedPromo) : null;
+  const travelPair = pricedPromo
+    ? promoTravelBeforeAfter(pricing.travelRatePerHour, pricedPromo)
+    : null;
   // Every other price on the page quotes these rather than the raw settings, so
   // a live promo is not announced in the hero and then contradicted further
   // down by the standard rates.
-  const displayRate = promoDisplayRate(baseRate, promo);
-  const travelFactor = promoTravelFactor(promo);
+  const displayRate = promoDisplayRate(baseRate, pricedPromo);
+  const travelFactor = promoTravelFactor(pricedPromo);
   const displayTravelRate = Math.round(pricing.travelRatePerHour * travelFactor * 100) / 100;
   const displayMinTravel = Math.round(policy.MIN_TRAVEL_CHARGE * travelFactor * 100) / 100;
   const rateDiscounted = displayRate !== baseRate;

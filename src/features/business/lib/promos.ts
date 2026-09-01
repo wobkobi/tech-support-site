@@ -236,6 +236,30 @@ export function hasRecurringWindow(window: RecurringWindow): boolean {
   );
 }
 
+/**
+ * The promo a quote may be priced with, given what is known about the
+ * appointment.
+ *
+ * Splits the numbers from the words. A restricted promo is still advertised -
+ * {@link summariseForBanner} names the restriction - but it must not discount a
+ * figure when the appointment cannot be checked against it. Quoting a Tuesday
+ * discount to someone who has not picked a day promises a price the invoice
+ * will not honour, which is the same failure as quoting a business customer a
+ * home-rate promo.
+ * @param promo - The resolved promo, or null.
+ * @param at - The appointment instant, or null when none has been chosen.
+ * @returns The promo to price with, or null.
+ */
+export function promoForAppointment(
+  promo: ActivePromo | null,
+  at: Date | null,
+): ActivePromo | null {
+  if (!promo) return null;
+  if (!hasRecurringWindow(promo)) return promo;
+  if (!at) return null;
+  return matchesRecurringWindow(promo, at) ? promo : null;
+}
+
 /** What a promo resolution depends on beyond the moment. */
 export interface PromoContext {
   /** The job date to price against. Defaults to now. */
@@ -681,8 +705,10 @@ function formatMinuteOfDay(minute: number): string {
  * is what stops "20% off" reading as an offer that applies right now. Hiding the
  * promo until the day itself would keep it from exactly the person deciding
  * whether to book one.
+ * Returned bare, without an "only", so a caller can finish the sentence its own
+ * way: the banner appends "only" while the wizard says "available Tuesdays".
  * @param window - The promo's weekday and time-of-day restriction.
- * @returns A phrase like "Tuesdays only", or null when unrestricted.
+ * @returns A phrase like "Tuesdays 9am to 5pm", or null when unrestricted.
  */
 export function describeRecurringWindow(window: RecurringWindow): string | null {
   const days = [...window.activeWeekdays].sort((a, b) => a - b);
@@ -706,9 +732,9 @@ export function describeRecurringWindow(window: RecurringWindow): string | null 
     }
   }
 
-  if (!hasTime) return `${dayPart} only`;
+  if (!hasTime) return dayPart;
   const timePart = `${formatMinuteOfDay(window.activeFromMinute!)} to ${formatMinuteOfDay(window.activeToMinute!)}`;
-  return dayPart ? `${dayPart} ${timePart}` : `${timePart} only`;
+  return dayPart ? `${dayPart} ${timePart}` : timePart;
 }
 
 /**
@@ -719,5 +745,5 @@ export function describeRecurringWindow(window: RecurringWindow): string | null 
 export function summariseForBanner(promo: ActivePromo): string {
   const base = `${describePromoDiscount(promo)} until ${formatPromoEnd(promo.endAt)}`;
   const restriction = describeRecurringWindow(promo);
-  return restriction ? `${base}, ${restriction}` : base;
+  return restriction ? `${base}, ${restriction} only` : base;
 }

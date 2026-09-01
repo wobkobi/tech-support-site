@@ -12,6 +12,7 @@ import {
   applyPromoToHourlyRate,
   applyPromoToQuote,
   normalisePromoCode,
+  promoForAppointment,
   type ActivePromo,
 } from "@/features/business/lib/promos";
 import type { PublicRate } from "@/features/business/types/pricing";
@@ -138,7 +139,15 @@ export async function fetchQuickEstimate(input: QuickEstimateInput): Promise<Qui
   // invalid one falls through rather than blocking the automatic promo. This is
   // the displayed figure only - /api/booking/request re-resolves the code
   // itself and prices from that, so a fabricated code buys nothing.
-  const promo: ActivePromo | null = codePromo ?? autoPromo;
+  const resolved: ActivePromo | null = codePromo ?? autoPromo;
+  // A promo restricted to certain days is priced in only once a slot is picked,
+  // because that is the appointment it has to be checked against. Before then it
+  // is advertised but not applied, so the estimate never promises a discount the
+  // booking will not honour.
+  const promo = promoForAppointment(
+    resolved,
+    input.departureTimeIso ? new Date(input.departureTimeIso) : null,
+  );
   // Both legs quoted at "now"-ish traffic (no job time exists here; the
   // server defaults the return to +60 min, matching the fallback duration).
   const travelMins =

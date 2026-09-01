@@ -14,6 +14,9 @@ import { calcTravelCharge, FALLBACK_BASE_RATE } from "@/features/business/lib/pr
 import {
   applyPromoToHourlyRate,
   applyPromoToQuote,
+  describePromoDiscount,
+  describeRecurringWindow,
+  promoForAppointment,
   summariseForBanner,
   type ActivePromo,
 } from "@/features/business/lib/promos";
@@ -443,7 +446,10 @@ export function PricingWizard({
     };
     // Held so applying a promo code later reprices from the same estimate.
     setQuoteInputs(inputs);
-    const promo = codePromo ?? activePromo;
+    // No appointment exists at this point in the wizard, so a promo restricted
+    // to certain days cannot be checked and is deliberately not priced in. It is
+    // still named below, under the estimate.
+    const promo = promoForAppointment(codePromo ?? activePromo, null);
     const { range, promoRate } = buildPriceRange(inputs, settings, promo);
 
     setResult(range);
@@ -520,7 +526,7 @@ export function PricingWizard({
     if (!quoteInputs) return;
     // A rejected code leaves the automatic promo in place - it never costs the
     // customer a discount they already had.
-    const effective = promo ?? activePromo;
+    const effective = promoForAppointment(promo ?? activePromo, null);
     const built = buildPriceRange(quoteInputs, settings, effective);
     setResult(built.range);
     logEstimate(quoteInputs, built.range, built.promoRate, effective);
@@ -591,6 +597,17 @@ export function PricingWizard({
   if (loading) {
     return <div className="py-8 text-center text-sm text-slate-400">Loading calculator...</div>;
   }
+
+  // An offer the estimate could not price in, because it only runs on certain
+  // days and no appointment has been chosen yet. Named rather than dropped: a
+  // customer who would book a Tuesday should know a Tuesday is worth picking.
+  const restrictedOffer = (() => {
+    const resolved = codePromo ?? activePromo;
+    if (!resolved || promoForAppointment(resolved, null)) return null;
+    const when = describeRecurringWindow(resolved);
+    if (!when) return null;
+    return `${describePromoDiscount(resolved)} is available ${when}. Pick one of those times when you book and it comes off this estimate.`;
+  })();
 
   // An applied code travels to /booking so the customer does not re-enter it;
   // the booking route re-resolves it there rather than trusting the link.
@@ -770,6 +787,12 @@ export function PricingWizard({
               </p>
             )}
           </div>
+
+          {restrictedOffer && (
+            <p className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-base font-medium text-amber-800">
+              {restrictedOffer}
+            </p>
+          )}
 
           <PromoCodeField
             value={promoCode}

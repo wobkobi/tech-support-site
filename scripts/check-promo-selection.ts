@@ -235,25 +235,25 @@ function main(): void {
   // deciding whether to book one.
 
   expectWinner("no restriction has nothing to say", describeRecurringWindow(window([])), null);
-  expectWinner("one day", describeRecurringWindow(window(TUESDAY)), "Tuesdays only");
-  expectWinner("two days", describeRecurringWindow(window([2, 4])), "Tuesdays and Thursdays only");
+  expectWinner("one day", describeRecurringWindow(window(TUESDAY)), "Tuesdays");
+  expectWinner("two days", describeRecurringWindow(window([2, 4])), "Tuesdays and Thursdays");
   expectWinner(
     "three read as a list",
     describeRecurringWindow(window([1, 2, 3])),
-    "Mondays, Tuesdays and Wednesdays only",
+    "Mondays, Tuesdays and Wednesdays",
   );
   expectWinner(
     "the full working week has its own word",
     describeRecurringWindow(window([1, 2, 3, 4, 5])),
-    "weekdays only",
+    "weekdays",
   );
-  expectWinner("and so does the weekend", describeRecurringWindow(window([0, 6])), "weekends only");
+  expectWinner("and so does the weekend", describeRecurringWindow(window([0, 6])), "weekends");
   expectWinner(
     "out-of-order days still read in order",
     describeRecurringWindow(window([4, 2])),
-    "Tuesdays and Thursdays only",
+    "Tuesdays and Thursdays",
   );
-  expectWinner("a time range alone", describeRecurringWindow(OFFICE), "9am to 5pm only");
+  expectWinner("a time range alone", describeRecurringWindow(OFFICE), "9am to 5pm");
   expectWinner(
     "days and a time range together",
     describeRecurringWindow(window(TUESDAY, 9 * 60, 17 * 60)),
@@ -262,7 +262,7 @@ function main(): void {
   expectWinner(
     "a half hour keeps its minutes",
     describeRecurringWindow(window([], 9 * 60 + 30, 12 * 60)),
-    "9:30am to 12pm only",
+    "9:30am to 12pm",
   );
   expectWinner(
     "half a range says nothing, matching how it is enforced",

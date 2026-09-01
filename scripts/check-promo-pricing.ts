@@ -16,9 +16,11 @@ import {
   applyPromoToHourlyRate,
   applyPromoToQuote,
   describePromoDiscount,
+  promoForAppointment,
   promoModifierRate,
   promoRateBeforeAfter,
   promoTravelBeforeAfter,
+  summariseForBanner,
   type ActivePromo,
   type QuoteParts,
 } from "@/features/business/lib/promos";
@@ -199,6 +201,48 @@ function main(): void {
     "free travel at 1 is rejected - it would discount nothing",
     validateDiscount({ discountType: "free_travel", travelPercent: 1 }),
     "travelPercent must be between 0 and 1 (0 = free travel)",
+  );
+
+  // ---- A restricted promo is advertised but not priced in ----
+  //
+  // Words and numbers part company: the banner names the restriction, while any
+  // surface without an appointment to check declines to discount. Quoting a
+  // Tuesday discount to someone who has not picked a day promises a price the
+  // invoice will not honour.
+
+  const tuesdayOnly: ActivePromo = { ...promo("percent", 0.2), activeWeekdays: [2] };
+
+  expectEqual(
+    "an unrestricted promo prices anywhere",
+    promoForAppointment(promo("percent", 0.2), null)?.id ?? null,
+    "p1",
+  );
+  expectEqual(
+    "a restricted one does not, with no appointment",
+    promoForAppointment(tuesdayOnly, null)?.id ?? null,
+    null,
+  );
+  expectEqual(
+    "it does on a matching appointment",
+    promoForAppointment(tuesdayOnly, new Date("2026-06-01T21:00:00Z"))?.id ?? null,
+    "p1",
+  );
+  expectEqual(
+    "and not on a different day",
+    promoForAppointment(tuesdayOnly, new Date("2026-06-02T21:00:00Z"))?.id ?? null,
+    null,
+  );
+  expectEqual("null in, null out", promoForAppointment(null, null), null);
+
+  // The banner is what adds the qualifier, so the phrase itself stays reusable.
+  expectEqual(
+    "the banner names the restriction",
+    summariseForBanner({
+      ...tuesdayOnly,
+      activeFromMinute: 9 * 60,
+      activeToMinute: 17 * 60,
+    }).endsWith(", Tuesdays 9am to 5pm only"),
+    true,
   );
 
   // ---- Validation: kind and code have to agree ----
