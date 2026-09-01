@@ -288,7 +288,7 @@ export const TASK_TIMING_FALLBACK: TaskTimingConfig = {
 };
 
 /**
- * Collapses task lines so their total hourly minutes fit the listed job window.
+ * Fits task lines to the listed job window, in both directions.
  * Pinned tasks (isShort or isExplicit) keep their parser-emitted qty - short
  * tasks at the live `shortTaskMins`, explicit tasks at whatever the operator
  * stated, with a one-snap-step-per-task overshoot allowance (see
@@ -339,10 +339,54 @@ export function collapseToWindow(
   const inInputOrder = (list: TaskLine[]): TaskLine[] =>
     [...list].sort((a, b) => (orderOf.get(a) ?? 0) - (orderOf.get(b) ?? 0));
 
-  // Already fits - nothing to collapse, and minutes are exact so there is no
-  // rounding drift left to park.
-  if (sumTaskMinutes(hourlyIn) <= windowMin) {
+  const hourlyMin = sumTaskMinutes(hourlyIn);
+
+  // Exactly right - nothing to move in either direction.
+  if (hourlyMin === windowMin) {
     return { tasks, dropped: 0, rescaled: false };
+  }
+
+  // Short of the window. The event end is the actual finish, so the difference
+  // is real time on the job that the parsed durations did not account for -
+  // typically because a description rounds to "an hour and a half". Grown to
+  // meet the window, mirroring how an overflow is scaled down to match it
+  // exactly; leaving it would quietly bill less than the job took.
+  if (hourlyMin < windowMin) {
+    const floatingUp = hourlyIn.filter((t) => !t.isShort && !t.isExplicit);
+    let grown: TaskLine[];
+    if (floatingUp.length > 0) {
+      // Floating tasks carry no stated duration, so they absorb the difference
+      // first and pinned ones keep the operator's own measurement.
+      const pinned = hourlyIn.filter((t) => t.isShort || t.isExplicit);
+      const target = windowMin - sumTaskMinutes(pinned);
+      const multiplier = target / sumTaskMinutes(floatingUp);
+      grown = [
+        ...pinned,
+        ...floatingUp.map((t) =>
+          derive(t, snapMinutes(taskMinutes(t) * multiplier, timing.snapMins)),
+        ),
+      ];
+    } else {
+      // Every task is pinned. The largest line takes the remainder, which is the
+      // one case where a stated duration is overridden - preferred to billing
+      // under the window, since the window is what the job actually ran.
+      grown = [...hourlyIn];
+    }
+    // Park what the snap grid left over on the largest adjustable line, so the
+    // billed total lands on the window exactly - the same reconciliation the
+    // collapse path below does.
+    const adjustable =
+      floatingUp.length > 0 ? grown.filter((t) => !t.isShort && !t.isExplicit) : grown;
+    const error = windowMin - sumTaskMinutes(grown);
+    if (error !== 0 && adjustable.length > 0) {
+      let biggest = adjustable[0];
+      for (const t of adjustable) if (taskMinutes(t) > taskMinutes(biggest)) biggest = t;
+      grown[grown.indexOf(biggest)] = derive(
+        biggest,
+        Math.max(timing.minTaskMins, taskMinutes(biggest) + error),
+      );
+    }
+    return { tasks: inInputOrder([...grown, ...flat]), dropped: 0, rescaled: true };
   }
 
   // Pin short tasks at the operator's quick-task time and drop any that don't fit.
