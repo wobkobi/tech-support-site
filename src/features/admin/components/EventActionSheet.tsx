@@ -108,8 +108,10 @@ export function EventActionSheet({
   const isCompleted = status === "completed";
   const isConfirmed = status === "confirmed";
   const isTestBooking = booking.name.toLowerCase().includes("test");
-  // State changes (complete / cancel / no-show) lock 18h after the booking ends, mirroring
-  // the server guard, so the operator sees it up front rather than via a rejection toast.
+  // Cancel / no-show lock 18h after the booking ends, mirroring the server
+  // guard, so the operator sees it up front rather than via a rejection toast.
+  // Completing stays available at any age - it is the expected terminal state
+  // and moves no money, so locking it would only leave the booking unfinishable.
   // Billing, review resend, reschedule (future-only) and delete stay available.
   const isEditLocked = isPastEditWindow(new Date(event.endAt).getTime(), renderedAt, lockHours);
 
@@ -215,7 +217,7 @@ export function EventActionSheet({
 
           {isEditLocked && !isCancelled && (
             <p className="px-1 text-center text-xs text-admin-faint">
-              Status changes lock {lockHours}h after a booking ends.
+              Cancelling locks {lockHours}h after a booking ends. Completing stays open.
             </p>
           )}
 
@@ -223,7 +225,7 @@ export function EventActionSheet({
             <button
               type="button"
               onClick={handleComplete}
-              disabled={busy || isEditLocked}
+              disabled={busy}
               className="inline-flex h-11 items-center justify-center rounded-lg bg-green-500/20 px-4 text-sm font-semibold text-green-700 hover:bg-green-500/30 disabled:opacity-50"
             >
               Mark completed
